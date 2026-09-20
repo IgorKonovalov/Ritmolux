@@ -1,6 +1,10 @@
 # 0205 — The library becomes navigable
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-20. Six phases in six commits (`c3ed56cb`, `eaeca3bc`,
+> `74b1e5c5`, `fe2b682f`, `5220ce99`, `e5f95955`); Mode 4 round 1: **no blockers, no majors, six
+> minors**, four repaired in `68aa54b8`. Verified: the full workspace suite green in the conductor's
+> ledger (2069 passed, 7 skipped), `cargo doc -D warnings`, `fmt`, `clippy --workspace
+> --all-targets`, the studio's typecheck/lint/tests, and the Node gate roster.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Amended:** 2026-09-19 — four navigation affordances added after a second UX pass, all in the
@@ -8,10 +12,10 @@
 > A/B compare as a new Phase 4. The thumbnail browser was considered and deliberately left to its
 > own plan, after this one — see `## Followups`.
 > **Owner skill(s):** dev, studio-builder
-> **Related ADRs:** [0228](../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)
-> (proposed), [0229](../adrs/0229-the-studio-marks-a-preset-over-the-control-protocol.md)
-> (proposed), [0176](../adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md),
-> [0022](../adrs/0022-build-time-preset-embedding.md), [0027](../adrs/0027-scene-rotation-constant-default-calmer-cadence.md)
+> **Related ADRs:** [0228](../../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)
+> (accepted), [0229](../../adrs/0229-the-studio-marks-a-preset-over-the-control-protocol.md)
+> (accepted), [0176](../../adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md),
+> [0022](../../adrs/0022-build-time-preset-embedding.md), [0027](../../adrs/0027-scene-rotation-constant-default-calmer-cadence.md)
 
 ## TL;DR
 
@@ -27,37 +31,37 @@ key and finding it still marked after a restart.
 
 ## Context & problem
 
-**The roster outgrew the way it is presented.** [`docs/running.md`](../running.md) describes the
+**The roster outgrew the way it is presented.** [`docs/running.md`](../../running.md) describes the
 browser accurately — as many columns as the window fits, arrows walking and wrapping, type to
 filter, `Enter` to select — and that design was sized for a library a fraction of the current one.
 At 114 presets across fourteen filename families, finding a specific look means remembering its
 name well enough to type it, and finding *a good one* means pressing `Space` until something lands.
 
 **Auto-rotate draws from everything, including what you never want to see.** `[rotate]`'s policy
-([ADR-0027](../adrs/0027-scene-rotation-constant-default-calmer-cadence.md)) is a dwell window and
+([ADR-0027](../../adrs/0027-scene-rotation-constant-default-calmer-cadence.md)) is a dwell window and
 a track-change nudge; the *set* it draws from is the whole library, with no way to narrow it and no
 memory of what it just showed.
 
 **There is no way to record an opinion.** This is the half that reaches past navigation:
-[backlog 0256](../design-backlog.md) records that nothing in this repository asks whether a shipped
+[backlog 0256](../../design-backlog.md) records that nothing in this repository asks whether a shipped
 preset is any good, that the `distinctness` report covers nine of fourteen families, and that the
 route to a curation mechanism runs through a human verdict *first*. A `hidden` mark made in passing
 is that verdict, captured when it forms.
 
 **What is already decided, and is therefore not this plan's to revisit.** Preset identity is the
-**name** — [spec 0001](../specs/0001-c-abi.md) settled that for persisted choices. The shipped set
-is embedded and read-only ([ADR-0022](../adrs/0022-build-time-preset-embedding.md)), so a mark
+**name** — [spec 0001](../../specs/0001-c-abi.md) settled that for persisted choices. The shipped set
+is embedded and read-only ([ADR-0022](../../adrs/0022-build-time-preset-embedding.md)), so a mark
 cannot live in a `.toml`. And the studio is a separate process that reaches the player only over
 the control protocol
-([ADR-0176](../adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md)).
+([ADR-0176](../../adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md)).
 The two ADRs beside this plan turn those into a shape.
 
 ## Decision
 
 We will add **two name-keyed marks in the standalone's own user-state file**
-([ADR-0228](../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)), spend them
+([ADR-0228](../../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)), spend them
 in the director and the browser, and expose them to the studio through **one new control message**
-([ADR-0229](../adrs/0229-the-studio-marks-a-preset-over-the-control-protocol.md)) with the player
+([ADR-0229](../../adrs/0229-the-studio-marks-a-preset-over-the-control-protocol.md)) with the player
 as the only writer.
 
 Rejected during the interview: marks in the preset file (the shipped set is read-only, and a
@@ -65,11 +69,11 @@ personal opinion is not content that ships); marks in `config.toml` (a second wr
 settings menu's file, for tidiness alone); marks keyed by index (spec 0001 already refused it); a
 1–5 rating (it asks for a judgement that mostly does not exist, and every threshold on it becomes a
 constant to defend); and the studio reading the marks file directly (two writers, and the exact
-shim [ADR-0177](../adrs/0177-a-fourth-skill-lane-builds-the-studio.md) forbids).
+shim [ADR-0177](../../adrs/0177-a-fourth-skill-lane-builds-the-studio.md) forbids).
 
 **`hidden` is not retirement.** A hidden preset still ships, still passes the gates, still appears
 in `shot --presets presets --report`. Deleting the file at cohort cadence is
-[ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s business and stays there.
+[ADR-0089](../../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s business and stays there.
 
 ## Architecture diagram
 
@@ -114,7 +118,7 @@ reason.
 ## Implementation phases
 
 Phases 1–5 are `dev` and run contiguously; phase 6 is `studio-builder` and hands off per
-[ADR-0188](../adrs/0188-the-two-implementer-lanes-hand-off-automatically.md).
+[ADR-0188](../../adrs/0188-the-two-implementer-lanes-hand-off-automatically.md).
 
 ### Phase 1 — The marks store, and one key that proves it
 
@@ -218,7 +222,7 @@ Phases 1–5 are `dev` and run contiguously; phase 6 is `studio-builder` and han
   must learn about a mark it did not set, which is ADR-0229's stated cost and the thing a
   request/reply shape would miss. A mark naming an unknown preset is refused with a reported
   reason rather than silently stored, matching the observability direction
-  [Plan 0198](done/0198-the-control-path-stops-failing-quietly.md) takes for the rest of the control
+  [Plan 0198](0198-the-control-path-stops-failing-quietly.md) takes for the rest of the control
   path. The spec is updated in this phase, not at the close — it is the contract, and
   `studio-builder` reads it next.
 
@@ -282,7 +286,7 @@ pub enum RotateSource {
 ## What this plan does NOT do
 
 - **It does not retire, delete or curate any preset.** `hidden` is a view, not a verdict on what
-  ships; [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md) owns retirement.
+  ships; [ADR-0089](../../adrs/0089-the-library-renews-by-replacement-cohorts.md) owns retirement.
 - **It does not build backlog 0256's curation mechanism.** It builds the instrument that produces
   that entry's step-2 evidence, which the entry explicitly says must come first.
 - **It does not touch `core` or the C ABI**, so the foobar component keeps rotating the whole set.
@@ -291,7 +295,7 @@ pub enum RotateSource {
   taxonomy is a different plan with a different interview.
 - **It does not put pictures in the browser.** The thumbnail browser was weighed in this plan's
   second UX pass and routed to its own plan, because where a thumbnail lives — embedded against
-  [NFR §4](../nfr.md#4-size-and-dependencies)'s soft cap, or generated on first run with a
+  [NFR §4](../../nfr.md#4-size-and-dependencies)'s soft cap, or generated on first run with a
   staleness rule — is a decision with a real rejected alternative and belongs in an ADR of its
   own. See `## Followups`.
 - **It does not change `[rotate]`'s dwell policy.** ADR-0027's cadence stands; only the set it
@@ -403,11 +407,11 @@ pub enum RotateSource {
 - **What shipped:** feature — two preset marks and everything that spends them, in the standalone and
   the studio. `core/`, `core-cabi/`, `rlx-ring/`, `plugin-foobar/` and `presets/` are byte-unchanged,
   so the C ABI does not move and the foobar component keeps rotating the whole set.
-- **Operator docs touched:** [`docs/running.md`](../running.md) (the six new keys, marking, the three
+- **Operator docs touched:** [`docs/running.md`](../../running.md) (the six new keys, marking, the three
   narrowings, the A/B hold, the corner's marks and countdown),
-  [`docs/configuration.md`](../configuration.md) (the `marks.toml` section, `[rotate] source`,
+  [`docs/configuration.md`](../../configuration.md) (the `marks.toml` section, `[rotate] source`,
   `[hud] next_rotation`, and the complete-file block both keys ride in) and
-  [spec 0003](../specs/0003-studio-control-protocol.md) (the `ctl/mark` and `marks` rows, six
+  [spec 0003](../../specs/0003-studio-control-protocol.md) (the `ctl/mark` and `marks` rows, six
   invariants, two scenarios, a provenance entry and the corrected `prev` invariant).
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *43 stated reductions still
   hold across all 20 live entries (4 unprobeable)*, re-run after Phase 6. The advisory lists
@@ -420,18 +424,117 @@ pub enum RotateSource {
   `check-gate-carriers`, `check-backlog-claims` and `toc --check` were run by hand and are green.
 - **Outstanding `human` phases:** none; Phase 6 was a separate `studio-builder` run over this lane.
 
+## Close review
+
+> Mode 4, conductor mode (ADR-0205), round 1, 2026-09-20. Written by a separate session handed the
+> plan and the lane and nothing an implementer wrote. Full text at
+> `tools/conductor/state/reviews/0205-round-1.md`.
+
+**Verdict: no blockers, no majors, six minors.** All six phases are present, each as its own commit,
+each tagged with a single in-vocabulary `**Owner skill:**`. `core/`, `core-cabi/`, `rlx-ring/`,
+`plugin-foobar/` and `presets/` are byte-unchanged over the whole range, so the C ABI did not move
+and no audio-source or platform type went near the core. The one seam widened — spec 0003 — was
+widened under ADR-0229, with the spec updated in the phase that owns it rather than at the close.
+
+### What was run
+
+| Gate | Result |
+|---|---|
+| `with-lock suite -- cargo nextest run --workspace` | `skipped ... tree 11ef8e8 is green in the suite ledger, run by gate 0205-pre-review at 2026-09-20T07:53:18.537Z: 2069 tests run: 2069 passed (13 slow), 7 skipped` (ADR-0207) |
+| `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` | clean |
+| `cargo fmt --all --check` + `cargo clippy --workspace --all-targets -- -D warnings` | clean |
+| `npm --prefix studio run typecheck` / `lint` / `test` | clean; 31 files, 294 tests |
+| `check-doc-links`, `check-index-rows`, `check-comment-hygiene`, `check-system-counts`, `check-reader-prose`, `toc --check`, `check-gate-carriers` | all OK |
+| `check-backlog-claims` | OK — 43 reductions across 20 live entries (4 unprobeable) |
+| `check-translations` | OK — 5 stamped; advisory below |
+
+The suite line is the ledger record written by the process that saw the exit code, and it is lens 1's
+evidence in place of a re-run. The log's `Full suite: owed to the conductor's pre-review gate` is
+correct in this mode, not a missing run.
+
+### Lens 1 — alignment
+
+Read against the diff rather than against the log. Phase 1's round trip is asserted through the file
+rather than through the type, and the absent/empty/malformed property in all three shapes. Phase 2's
+`eligible_names` and `Traversal` read no clock, and the no-repeat-while-unseen and no-preset-across-a-
+cycle-boundary halves are asserted over five seeds; the set-changing-between-draws case the plan
+called most likely to be got subtly wrong has its own test. Retiring `console::next_up` was correct
+rather than scope creep: it *was* the "which preset does a rotation take" rule. Phase 3's four
+narrowings are independent and cumulative, each asserted, and the drawn row is held to `COL_CHARS`.
+Phase 4's nine slots, both number rows, no wrap, and the countdown's two off-switches are asserted.
+Phase 5's decoder refuses an unknown mark word rather than coercing it, the queue deduplicates per
+`(preset, mark)` pair under `MARK_SLOTS`, and the `marks` line carries both sets whole with both keys
+present when empty. Phase 6 asserts all three of ADR-0229's claims, including the unsolicited half.
+No ADR decision was silently reversed: ADR-0228's "the gates never read marks" holds by construction,
+and ADR-0229's single writer is `Show::set_mark`, which the hotkey, the browser and the wire all
+reach.
+
+### Lens 2 — layering, coupling, real-time safety
+
+Core untouched; the browser's family column needed no core edit because `SystemKind::family()` was
+already public. Nothing new runs on the audio callback; the marks file is written from the input path
+at keypress rate, on the same footing as `save_config`, and the per-frame wire path is bounded by
+`MARK_SLOTS` with the copy taken out of the listener before the applier runs. C ABI unmoved. The
+protocol grew by one message and one event, both in spec 0003 with invariants and scenarios. No
+studio-side shim: `Library.tsx` opens no file and renders only what the player reported. `Traversal`
+beside `Director` rather than inside it is the right cut — one is a pure seeded function of the
+library and the marks, the other reads the audio.
+
+### Lens 3 — docs and release bookkeeping
+
+`docs/running.md`, `docs/configuration.md` and spec 0003 were swept in the phases that changed what
+they describe, and the sweep is complete for what this plan touched. `presets/` was not touched, so
+step 3b's curation sweep has no trigger and the work-around grep is empty. **Translation advisory:**
+`docs/running.ru.md` is stamped `b3015078` while its source is at `fe2b682f25` — this plan's own
+Phase 4 moved it, so the Russian lacks the six new keys, the marking section and the countdown;
+`packaging/foobar/READ-ME-FIRST.ru.md` is stale from an earlier plan. Both are readings routed to the
+content lane, not repairs. Version bump owed: **minor**, this being a feature plan.
+
+### Lens 4 — correctness and determinism
+
+The traversal reads no clock and no dependency. `Traversal::pick` guards its modulus and answers
+`None` on an empty pool; `fit` counts characters and is asserted against a multi-byte name; no new
+`unwrap`/`expect` outside tests. `/ctl/mark` is validated once at the decoder and again at the
+applier against the roster, with the non-zero-is-on rule stated and asserted for `1`, `-1` and `42`.
+No new numeric assertion is a frozen measurement. The one place two sources could agree only on the
+development configuration is the family column, where `show.families()` and the renderer's roster can
+disagree after a reload that installed nothing — and `Show::reload` probes exactly that by comparing
+lengths and re-deriving from the embedded set, with `browse_rows` falling back to an empty family
+rather than a guess.
+
+### Lens 5 — design integrity
+
+Dependencies still point inward. The `Scene` trait and the C ABI are untouched; the control protocol
+grew under an ADR with the spec updated in the same phase. No god module — Phase 2 *removed* a
+responsibility from `console.rs` — and the new state is split by the question it answers: `Marks`
+owns the opinion, `Traversal` the order, `OverlayState` the view. No new hot-path directory, so Plan
+0002's guard scan set needs no extension.
+
+### Findings
+
+| # | severity | where | what | disposition |
+|---|---|---|---|---|
+| 1 | minor | `standalone/src/overlay.rs:50` | `NAME_CHARS`' doc claims the longest shipped preset name is 18 and that truncation never fires on the embedded set; `presets/star_mandala_bordered.toml` ships `Star Mandala Bordered` at 21, which now draws as `Star Mandala Bo...`. Phase 3 narrowed the budget from 24, where it fitted. The same claim was repeated in `fit`'s doc and in `a_name_is_only_shortened_past_the_column_budget`'s docstring, and nothing asserts it against the shipped roster. | comment text repaired in `68aa54b8`; whether the budget should be 21 is a code change and stays open |
+| 2 | minor | `standalone/src/show.rs:600` | The mark applier has no test. Phase 5's done-when has two behavioural halves the tree does not assert — that a `/ctl/mark` applies exactly as the hotkey does, and that a mark naming an unknown preset is refused with a reported reason. The decoder, the queue, the event line and the studio's sender are each tested; the loop in `apply_control_rest` that checks the name, calls `set_mark` and emits `UNMARKABLE_PRESET` is covered by nothing. `show.rs` already carries a test module with a `show()` fixture, so the gap is cheap to close. | open — test logic is outside what a close may repair |
+| 3 | minor | `standalone/src/show.rs:286` | A mark arriving over the wire skips the two refreshes the hotkey path performs. `AppState::toggle_mark` follows a mark with `refresh_upcoming` and `browse.on_roster_changed`; `Show::set_mark`, which `/ctl/mark` reaches directly, does neither. So the console's `next up` can go on naming a preset the studio just hid, and a browser left open can keep a highlight pointing at no visible row. Display-only: `Traversal::draw` re-`peek`s against the live set, `Enter` answers `Close` rather than selecting, and both self-correct at the next draw or keypress. | open — code |
+| 4 | minor | `standalone/src/app_state.rs:1267` | `step_previous`'s doc called the roster-predecessor fallback "the whole of a run that has not switched". The trail also empties when it has been walked all the way back, and the fallback fires there too. Spec 0003's `prev` invariant states the case without claiming it is the only one, so only this comment overstated. | comment text repaired in `68aa54b8` |
+| 5 | minor | `standalone/src/show.rs:167` | The comment said the traversal's seed distinguishes two machines with different libraries. It is `renderer.preset_names().count()` read **before** the reload installs the per-user or `RLX_PRESET_DIR` library — the embedded count, one number per build — so every launch of a build replays one order. `Traversal::new`'s doc repeated it. The determinism is defensible; the justification was not what the code does. | comment text repaired in `68aa54b8`; changing the seed is a code decision and stays open |
+| 6 | minor | `docs/plans/0205-…:301` | `## Implementation log` ran 148 lines against `## Implementation phases`'s 122. The report is not allowed to outweigh the contract, and nothing gates it. | condensed in `68aa54b8`, every distinct claim kept |
+
+No finding from an earlier round: this was round 1.
+
 ## Followups (after this lands)
 
 - **The thumbnail browser — its own plan and ADR, sequenced after this one.** It is the thing that
   actually fixes picking a look out of a list of identifiers, and it shares the browser overlay
   with Phase 3, so it cannot run beside this plan. The design question it opens: thumbnails
-  embedded at build time beside the presets ([ADR-0022](../adrs/0022-build-time-preset-embedding.md))
-  and charged against [NFR §4](../nfr.md#4-size-and-dependencies)'s 10,000,000 B soft cap — which
+  embedded at build time beside the presets ([ADR-0022](../../adrs/0022-build-time-preset-embedding.md))
+  and charged against [NFR §4](../../nfr.md#4-size-and-dependencies)'s 10,000,000 B soft cap — which
   that document notes *"has never been measured against what the exe actually contains"* — or
   rendered on first run and cached, which trades binary size for a first-launch cost and a rule
   for when a thumbnail has gone stale. `scripts/docs-shots.mjs` already renders gallery cards, so
   the capture half exists.
-- Read the accumulated `hidden` set as [backlog 0256](../design-backlog.md)'s step-2 evidence, once
+- Read the accumulated `hidden` set as [backlog 0256](../../design-backlog.md)'s step-2 evidence, once
   there has been enough ordinary use for it to mean something.
 - Pruning marks for names no longer in any library, if the file becomes unwieldy.
 - Marks in the foobar component, if ever wanted — a C ABI question and its own ADR.

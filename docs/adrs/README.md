@@ -249,8 +249,8 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0225](0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md) | The backdrop ramp gets an angular coordinate, and the floor stays out of the chain | proposed |
 | [0226](0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md) | The mark roster travels by blending its fields, and an integer index is an identity | proposed |
 | [0227](0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md) | A borrowed look is authored natively, and the reference never enters the repository | proposed |
-| [0228](0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md) | A preset mark is user state, keyed by name, in its own file | proposed |
-| [0229](0229-the-studio-marks-a-preset-over-the-control-protocol.md) | The studio marks a preset over the control protocol, never by opening the file | proposed |
+| [0228](0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md) | A preset mark is user state, keyed by name, in its own file | accepted 2026-09-20, Plan 0205 |
+| [0229](0229-the-studio-marks-a-preset-over-the-control-protocol.md) | The studio marks a preset over the control protocol, never by opening the file | accepted 2026-09-20, Plan 0205 |
 | [0230](0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md) | Thumbnails are rendered by a subprocess of the player itself | proposed |
 | [0231](0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md) | The standalone's size cap is re-derived from what it carries, and the build reports it | proposed, amends NFR §4 |
 | [0232](0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md) | A preset's frame cost is measured and reported, never asserted | proposed |

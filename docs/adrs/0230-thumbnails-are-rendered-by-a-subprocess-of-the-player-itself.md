@@ -13,7 +13,7 @@
 
 The browser presents 114 presets as a list of identifiers. `analytic_echoplate` does not say what
 it looks like, so choosing means opening things at random — the problem
-[Plan 0205](../plans/0205-the-library-becomes-navigable.md)'s filters narrow but cannot solve,
+[Plan 0205](../plans/done/0205-the-library-becomes-navigable.md)'s filters narrow but cannot solve,
 because they narrow a list of names into a shorter list of names.
 
 The fix is a picture per preset. The decision is where that picture comes from, and three

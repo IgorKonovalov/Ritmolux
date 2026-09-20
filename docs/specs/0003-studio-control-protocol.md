@@ -277,7 +277,7 @@ and it is here so a reader who wants the history has it in one place rather than
 
 **Added 2026-09-20**, from one plan:
 
-- **[Plan 0205](../plans/0205-the-library-becomes-navigable.md) Phase 5** added the `ctl/mark`
+- **[Plan 0205](../plans/done/0205-the-library-becomes-navigable.md) Phase 5** added the `ctl/mark`
   message and the `marks` event, on ADR-0229's decision that the player stays the only writer of
   the marks file. This is the first row on either table that is about **library state** rather than
   about the frame being rendered, which ADR-0229 names as a genuine widening of what the protocol
