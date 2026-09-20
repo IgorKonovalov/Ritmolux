@@ -8,7 +8,7 @@
  */
 import { useMemo } from 'react'
 
-import type { CtlAction, TransportVerb } from '@shared/protocol'
+import type { CtlAction, PresetMark, TransportVerb } from '@shared/protocol'
 
 export interface PlayerActions {
   /** Hold `value` on `name` until it is cleared or a reload drops it. */
@@ -17,6 +17,15 @@ export interface PlayerActions {
   clearParams: () => void
   selectPreset: (name: string) => void
   transport: (verb: TransportVerb) => void
+  /**
+   * Put `mark` into the state `on` names on the preset called `name`.
+   *
+   * The studio never writes the marks file — the player is its only writer
+   * (ADR-0229) — so nothing here is optimistic: the row moves when the `marks`
+   * event comes back, exactly as it does for a mark made at the player's own
+   * keyboard.
+   */
+  setMark: (name: string, mark: PresetMark, on: boolean) => void
 }
 
 export function usePlayerActions(): PlayerActions {
@@ -28,6 +37,7 @@ export function usePlayerActions(): PlayerActions {
       clearParams: () => send({ kind: 'params_clear' }),
       selectPreset: (name) => send({ kind: 'preset', name }),
       transport: (verb) => send({ kind: 'transport', verb }),
+      setMark: (name, mark, on) => send({ kind: 'mark', name, mark, on }),
     }
   }, [])
 }

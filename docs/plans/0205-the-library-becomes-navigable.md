@@ -312,7 +312,7 @@ pub enum RotateSource {
 | 3 — The browser narrows | dev | done | 74b1e5c5 |
 | 4 — The keys and the HUD carry it | dev | done | fe2b682f |
 | 5 — The protocol carries a mark | dev | done | 5220ce99 |
-| 6 — The studio marks and filters | studio-builder | not started | |
+| 6 — The studio marks and filters | studio-builder | done | committed with this row |
 
 ### Notes
 
@@ -400,6 +400,22 @@ pub enum RotateSource {
 - The `marks` event is emitted **after** the startup `roster`, since a parent joins the two by name,
   and on every change whoever made it — the hotkey path and the wire path both run through
   `Show::set_mark`, which is the one writer.
+
+- **Phase 6 reached past the library view into the event state and the action layer**:
+  `shared/protocol.ts` (the `marks` event, the `mark` action and its address),
+  `electron/player/osc.ts` (its three arguments), `hooks/usePlayerEvents.ts` (the `marks` field),
+  `hooks/usePlayer.ts` (`setMark`), and `App.tsx`/`views/Editor.tsx`, which carry the marks down to
+  the library tab. Nothing in main changed: `ControlSender` and the `player:ctl` handler are generic
+  over `CtlAction`, so a new member of the union travels with no new plumbing.
+- **A hidden preset keeps its row in the studio's list**, unlike the player's browser, where Phase 3
+  put it behind `F6`. The studio is the editing surface, and the mark is undone from the same row
+  that set it; the row is dimmed rather than removed. Only the favourites narrowing hides anything
+  here.
+- `marks` is `undefined` until a `marks` line arrives, and the list then shows **no mark controls and
+  no filter** rather than an unmarked library. The unsolicited half of ADR-0229 is asserted by
+  replacing the component's `marks` with no click in between, not by driving a live player.
+- The `Editor` test's props gained `marks: undefined` (`renderer/views/Editor.test.tsx`), which is
+  outside the phase's file list; the prop is required and that test predates it.
 
 ### Close triggers
 

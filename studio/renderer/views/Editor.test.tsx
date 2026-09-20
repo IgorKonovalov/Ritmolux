@@ -173,6 +173,9 @@ function editor(overrides: Partial<EditorProps> = {}) {
     roster: ['ink'],
     active: 'ink',
     dir: DIR,
+    // No `marks` line has arrived in this test, which is a state of its own:
+    // the library tab shows none rather than an unmarked library (ADR-0229).
+    marks: undefined,
     onProblem,
     ...overrides,
   }

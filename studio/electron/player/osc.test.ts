@@ -99,6 +99,7 @@ describe('the ctl vocabulary on the wire', () => {
     { kind: 'params_clear' },
     { kind: 'preset', name: 'aurora' },
     { kind: 'transport', verb: 'next' },
+    { kind: 'mark', name: 'aurora', mark: 'favourite', on: true },
     { kind: 'ping', nonce: 7 },
   ]
 
@@ -119,6 +120,26 @@ describe('the ctl vocabulary on the wire', () => {
       { tag: 's', value: 'warp' },
       { tag: 'f', value: 0.25 },
     ])
+  })
+
+  it('sends mark as two strings then the state, in that order', () => {
+    // The player refuses an argument list of another shape rather than coercing
+    // it (spec 0003), so the order and the types are the message.
+    expect(argsOf(encodeCtl({ kind: 'mark', name: 'Gyre', mark: 'hidden', on: true }))).toEqual([
+      { tag: 's', value: 'Gyre' },
+      { tag: 's', value: 'hidden' },
+      { tag: 'i', value: 1 },
+    ])
+  })
+
+  it('clears a mark with a zero state rather than a second address', () => {
+    expect(argsOf(encodeCtl({ kind: 'mark', name: 'Gyre', mark: 'favourite', on: false }))).toEqual(
+      [
+        { tag: 's', value: 'Gyre' },
+        { tag: 's', value: 'favourite' },
+        { tag: 'i', value: 0 },
+      ],
+    )
   })
 
   it('sends params/clear with no arguments at all', () => {
