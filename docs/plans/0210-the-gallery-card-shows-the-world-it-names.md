@@ -252,10 +252,6 @@ position in the phrase's quiet bar, six phrases apart, so the difference is deve
 not lighting. Retiring the four entries into the family row would have emptied
 `CARD_HOP_OVERRIDES`, which the same done-when asks to stay demonstrable.
 
-**The stop condition was measured and not reached.** A hop-2754 card at 640x360 Rich takes **5.1 s**
-for `warp_tracery` and **11.8 s** for `reaction_verdigris` — the 13-passes-a-frame worst case — on
-the Windows development box, hardware adapter, release build (ADR-0071).
-
 **The byte-identity done-when was shown by rendering, not asserted.**
 `node scripts/docs-shots.mjs analytic_echoplate` re-rendered a non-accumulating card with no
 `--signal-secs` on the command line and left `git status` carrying no image change.
@@ -292,13 +288,27 @@ this session established.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no. No preset file, pending or shipped, was read or written by any phase.
 - **Plan header `Closes:`** design-backlog 0254, 0255
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** a feature. `shot` gains `--signal-secs`, `scripts/docs-shots.mjs` resolves a
+  card's hop per family, and 45 committed gallery cards across six families now show a developed
+  world. No existing `shot` behaviour moves: the flag's default is the constant it replaces, and a
+  card whose hop did not move re-renders from the same command line, byte for byte.
+- **Operator docs touched:** `docs/capturing.md` — the flag table gains `--signal-secs`, and
+  *A full-size frame under real audio* gains *A late hop photographs a world that is still
+  assembling*, carrying the phrase arithmetic, the worked command and the per-card cost.
+  `docs/configuration.md` is in Phase 2's `Files touched:` and was deliberately not edited — see
+  the Notes above.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *"43 stated reductions
+  still hold across all 20 live entries (4 unprobeable)"*. 30 advisory rows for probed paths that
+  moved, none of them this plan's.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). The last narrowed run on this
+  tree, at Phase 2, was `cargo nextest run --workspace -P fast` — 1688 passed, 86 skipped, exit 0.
+  Phase 3 changed only committed PNGs.
+- **Outstanding `human` phases:** Phase 4 — a person judging each re-rendered card against a late
+  render of the same preset, `warp_tracery` explicitly. Nothing in Phases 2 or 3 records a verdict;
+  the four pictures read during the re-render were checked for "did this render at all", not for
+  whether the card is now the look.
 
 ## Followups (after this lands)
 
