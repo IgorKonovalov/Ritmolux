@@ -175,11 +175,43 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the renderer takes a name | dev | done | committed with this row |
-| 2 — the accumulating set is named, and the hop follows the family | dev | not started | |
+| 2 — the accumulating set is named, and the hop follows the family | dev | parked — see Notes | |
 | 3 — the affected cards are re-rendered as sets | dev | not started | |
 | 4 — a person says whether the cards are now the look | human | not started | |
 
 ### Notes
+
+**Phase 2 is parked `plan_wrong`: the signal cannot be extended from
+`scripts/docs-shots.mjs`, and the plan forbids the file where it can be.** The synthesized clip is
+`SIGNAL_SECS: f32 = 4.0` in `standalone/src/shot/args.rs`, a constant every `--signal` kind is built
+at; at 48 kHz and a 512-sample hop that is **375 analysis hops**, so hop 374 — the existing swarm
+override — is already the last hop the clip has. `shot` has no flag for the length: the roster is
+`--preset/--presets/--preset-file/--set/--frames/--size/--out/--all/--report/--json/--tier/--signal/--audio/--strip/--horizon/--interval/--render/--fps/--ffmpeg/--crf/--at/--frame-at`,
+and `--frame-at 375` does not clamp — `check_hops` in `standalone/src/shot/film.rs` fails the run
+with *"the clip is only 375 analysis hops long"*, which is pinned by
+`check_hops_rejects_past_the_end_and_agrees_with_the_strip_numbering`. So Phase 2's second half
+needs a Rust edit outside its `Files touched:` list, and **"What this plan does NOT do" rules that
+edit out in as many words** (*"It does not change `shot`"*). The two cannot both hold.
+
+The first half — a per-family hop default beside `CARD_HOP_OVERRIDES` — is script-only and was not
+written, because the hop it would resolve to is the half that is blocked: the accumulating families'
+development horizons are measured in tens of seconds (backlog 0254 records `warp_ladder` still
+filling at the 30 s row, which is hop ~2812) and every hop this clip can offer is inside its first
+four seconds.
+
+**An observation for whoever re-plans Phase 3**, from the bounded bare run used to check Phase 1:
+of the first 33 manifest entries re-rendered on this machine, **12 came back with bytes different
+from the committed PNG** (`hero`, `walkthrough/step-5`, and ten of the one-per-system gallery
+images) while the other 21, `warp_tracery`'s card among them, were byte-identical. All were restored
+with `git restore -- docs/images`; the lane carries no image change. Whether that is driver drift,
+a different binary, or preset content that moved since those files were written is not something
+this session established.
+
+**Scope reading recorded rather than acted on:** Phase 3's `Files touched:` says
+`docs/images/gallery/*.png`, which is the one-per-system set, while every other sentence in the plan
+says *card*, and the cards are `docs/images/gallery/presets/*.png`. The per-system entries also
+carry hand-written per-entry hops with their own judgement comments, so a family default reaching
+them would overwrite those.
 
 ### Close triggers
 
