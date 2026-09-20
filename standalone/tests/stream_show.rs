@@ -79,6 +79,10 @@ const REPORT_OTHER_LINES: usize = 40;
 /// cannot be a coincidence.
 const PING_NONCE: i32 = 424_242;
 
+/// A preset name no roster in this file holds, sent to make the player refuse a
+/// selection.
+const ABSENT_PRESET: &str = "Show Nothing By This Name";
+
 /// A refusal this runner cannot help, recognised by the message the mode prints
 /// rather than by the exit code — a genuine defect exits 1 too, and telling the
 /// two apart is the whole point of skipping.
@@ -233,33 +237,171 @@ struct Ask {
     stdout_at_ask: u64,
     /// The nonce of a `ctl/ping` sent straight after the ask, if one was.
     ///
-    /// The listener keeps no count of `ctl/preset` datagrams and the player
-    /// reports nothing for a name that selects nothing, so an unanswered preset
-    /// ask alone cannot say whether it arrived. A `pong` for this nonce can: it
-    /// is emitted by the same drain that applies the preset, so a pong with no
-    /// `preset` event means the ask's frame was drained and the switch did not
-    /// show, and no pong means the datagrams or the drain never got there.
+    /// **A `pong` proves the ping was drained, and nothing about the ask in
+    /// front of it.** The two are separate datagrams on an unreliable
+    /// transport, so the preset may have been lost while the ping arrived; they
+    /// need not even land in the same drained frame. What the pong does prove is
+    /// that the listener, the queue and the render thread's drain were all alive
+    /// at that moment — which is why it is still worth sending and worth
+    /// reporting, and why it is evidence rather than an assertion. `health`'s
+    /// `ctl_received` is the reading that speaks to the ask itself.
     ping: Option<i32>,
+    /// The last `health` line read **before** the ask, which is the baseline
+    /// `ctl_received` is judged against. `None` when none had been read yet.
+    health_before: Option<String>,
 }
 
 impl Ask {
-    fn now(what: impl Into<String>, drain: &Drain) -> Self {
+    /// `lines` is read for the **previous** wait's record, which is still there
+    /// at this point: `wait_for` clears it, so the baseline has to be taken
+    /// before the wait this ask is about begins.
+    fn now(what: impl Into<String>, drain: &Drain, lines: &Lines) -> Self {
         Self {
             what: what.into(),
             since: Instant::now(),
             stdout_at_ask: drain.bytes(),
             ping: None,
+            health_before: lines
+                .read
+                .iter()
+                .rev()
+                .find(|line| is_event(line, "health"))
+                .cloned(),
         }
     }
+}
+
+/// A bare (unquoted) JSON scalar's text — a number or a boolean — or `None`
+/// when the key is absent.
+///
+/// The sibling of [`field`], which reads a quoted string and would return
+/// nothing for these. Parsed by hand for the same reason.
+fn bare(line: &str, key: &str) -> Option<String> {
+    let rest = line.split_once(&format!("\"{key}\":"))?.1;
+    let end = rest.find([',', '}'])?;
+    Some(rest.get(..end)?.to_owned())
+}
+
+/// Which of the candidates the last `health` line's listener readings convict,
+/// in one sentence (ADR-0221).
+///
+/// The walk's failure is that a `ctl/preset` was sent and no `preset` event
+/// followed. The readings settle where it stopped: a listener that has left its
+/// loop, a socket failing its receives, a `ctl_received` that did not move
+/// across the ask — meaning no datagram reached the socket — or one that did,
+/// which convicts everything after the socket and is where the `preset_error` a
+/// refused selection now raises would appear.
+///
+/// `health` is emitted once a second, so `before` is the reading from the last
+/// line seen **before** the ask and `lines` are the ones seen since; a walk that
+/// stalls produces plenty of both.
+fn listener_verdict(before: Option<&str>, since: &[&String]) -> String {
+    let Some(last) = since.last() else {
+        return "no health line arrived after the ask, so the listener's own \
+                readings say nothing: the player was not drawing frames"
+            .to_owned();
+    };
+    let reading = |line: &str, key: &str| bare(line, key).unwrap_or_else(|| "absent".to_owned());
+    let listening = reading(last, "ctl_listening");
+    let errors = reading(last, "ctl_recv_errors");
+    let received = reading(last, "ctl_received");
+    let was = before.map(|line| reading(line, "ctl_received"));
+    if listening == "false" {
+        return format!(
+            "LISTENING is false: the listener thread has left its receive loop \
+             (ctl_recv_errors {errors}, ctl_received {received})"
+        );
+    }
+    if errors != "0" && errors != "absent" {
+        return format!(
+            "RECV_ERRORS is {errors}: the socket is failing receives and the \
+             listener is still in its loop retrying them"
+        );
+    }
+    match was {
+        Some(was) if was == received => format!(
+            "RECEIVED did not move across the ask (ctl_received {received} \
+             before and after) on a live listener with no receive errors, so no \
+             datagram reached the socket"
+        ),
+        Some(was) => format!(
+            "RECEIVED moved across the ask (ctl_received {was} -> {received}): \
+             the datagram reached the socket and the loss is after it — look \
+             for a preset_error above, and at ctl_rejected and ctl_dropped"
+        ),
+        None => format!(
+            "no health line preceded the ask, so ctl_received ({received}) has \
+             no baseline to be read against; ctl_recv_errors {errors}, \
+             ctl_listening {listening}"
+        ),
+    }
+}
+
+/// Each of the four candidates a broken listener produces is named by the
+/// reading that convicts it, from the `health` lines alone.
+///
+/// The deliberate break, expressed as the readings it leaves behind: this test
+/// drives a real player and cannot break a socket inside it, and what a failing
+/// run is actually read for is that the report names a reading rather than
+/// leaving four candidates open (ADR-0221).
+#[test]
+fn each_broken_listener_is_named_by_the_reading_that_convicts_it() {
+    fn health(received: u64, errors: u64, listening: bool) -> String {
+        format!(
+            "{{\"v\":1,\"ev\":\"health\",\"fps\":30.0000,\"ctl_rejected\":0,\
+             \"ctl_dropped\":0,\"ctl_refused\":0,\"ctl_received\":{received},\
+             \"ctl_recv_errors\":{errors},\"ctl_listening\":{listening},\
+             \"preview_sent\":null,\"preview_dropped\":null}}"
+        )
+    }
+    let judge = |before: &str, after: String| {
+        let after = vec![&after];
+        listener_verdict(Some(before), &after)
+    };
+
+    let base = health(7, 0, true);
+    let lost = judge(&base, health(7, 0, true));
+    assert!(
+        lost.contains("RECEIVED did not move"),
+        "a live listener with no receive errors whose received count stood \
+         still across the ask convicts the path in front of the socket: {lost}"
+    );
+
+    let arrived = judge(&base, health(8, 0, true));
+    assert!(
+        arrived.contains("RECEIVED moved") && arrived.contains("7 -> 8"),
+        "a received count that moved across the ask convicts everything after \
+         the socket, and must show both ends of the move: {arrived}"
+    );
+
+    let dead = judge(&base, health(7, 3, false));
+    assert!(
+        dead.contains("LISTENING is false"),
+        "a listener thread that has left its loop must be named as such, not \
+         read as a quiet socket: {dead}"
+    );
+
+    let failing = judge(&base, health(7, 5, true));
+    assert!(
+        failing.contains("RECV_ERRORS is 5"),
+        "a socket failing its receives must be named as such: {failing}"
+    );
+
+    let silent = listener_verdict(Some(&base), &[]);
+    assert!(
+        silent.contains("no health line arrived after the ask"),
+        "health is tied to the drawn frame, so its absence is itself the \
+         reading and must not be read as any of the four: {silent}"
+    );
 }
 
 /// Everything a wait that ended without its line can say about the child, as
 /// one readable block: which ask went unanswered and how long after it was sent,
 /// whether the line turned up late, whether the child was alive, whether its
-/// standard output was still moving, and what it wrote on standard error since
-/// the ask — every non-`health` line (a `preset` or `roster` for something else,
-/// a `preset_error`) and the last few `health` lines, whose `ctl_*` counters say
-/// whether the listener rejected, dropped or refused anything.
+/// standard output was still moving, what the listener's own readings convict,
+/// and what it wrote on standard error since the ask — every non-`health` line
+/// (a `preset` or `roster` for something else, a `preset_error`) and the last
+/// few `health` lines.
 ///
 /// On a [`Missed::Deadline`] it keeps reading for one more [`LINE_DEADLINE`]
 /// before reporting, so the report tells a late answer from a missing one. The
@@ -277,6 +419,7 @@ fn missed_report<T>(
         since,
         stdout_at_ask,
         ping,
+        health_before,
     } = ask;
     let missed_after = since.elapsed();
     let late = match missed {
@@ -319,10 +462,12 @@ fn missed_report<T>(
     };
     let (health, other): (Vec<&String>, Vec<&String>) =
         lines.read.iter().partition(|line| is_event(line, "health"));
+    let verdict = listener_verdict(health_before.as_deref(), &health);
     let mut report = format!(
         "{what}: nothing after {:.1} s ({missed:?}, bound {LINE_DEADLINE:?}); {late}\n\
          child: {alive}\n\
          {pong}\n\
+         listener: {verdict}\n\
          stdout: {stdout_at_ask} bytes at the ask, {} bytes now\n\
          stderr since the ask: {} lines, {} of them health; the last {} other lines and \
          the last {} health lines follow\n",
@@ -474,8 +619,14 @@ fn a_headless_run_emits_the_roster_the_preset_and_a_preset_error() {
 }
 
 /// `--control` on the headless path binds a real socket, says which one in
-/// `hello`, and drains it between frames: a `ctl/preset` moves the show and a
-/// `ctl/ping` is answered.
+/// `hello`, and drains it between frames: a `ctl/preset` moves the show, a
+/// `ctl/ping` is answered, and a `ctl/preset` naming nothing in the roster is
+/// **reported** rather than silently doing nothing.
+///
+/// That last one is the studio's silent click (ADR-0221): before it, a name the
+/// renderer declined produced no event, no counter and no line, so a click on a
+/// preset the player would not select looked exactly like one it was about to
+/// select.
 #[test]
 fn a_headless_run_binds_the_control_listener_and_drains_it() {
     let dir = scratch("control");
@@ -498,6 +649,22 @@ fn a_headless_run_binds_the_control_listener_and_drains_it() {
         socket.send_to(&buf, target).expect("send ctl/preset");
         Action::Ping(PING_NONCE).encode(&mut buf);
         socket.send_to(&buf, target).expect("send ctl/ping");
+        // Awaited rather than sent straight after the good one: the queue keeps
+        // the **last** preset asked for per frame, so two in one drain would
+        // leave only this one and the switch above would never be applied.
+        let landed = lines.wait_for(lines.opened, |line| {
+            (is_event(line, "preset") && field(line, "name").as_deref() == Some("Show Target"))
+                .then_some(())
+        });
+        if landed.is_ok() {
+            Action::Preset {
+                name: Name::new(ABSENT_PRESET).expect("a name inside the inline cap"),
+            }
+            .encode(&mut buf);
+            socket
+                .send_to(&buf, target)
+                .expect("send the unselectable ctl/preset");
+        }
     }
     let Some(stderr) = finish(child, drain, collector) else {
         return;
@@ -520,6 +687,27 @@ fn a_headless_run_binds_the_control_listener_and_drains_it() {
             .any(|line| line.contains("Show Target")),
         "a ctl/preset should move the show, and the move should be reported \
          in:\n{stderr}"
+    );
+
+    let errors = events(&stderr, "preset_error");
+    let naming = errors
+        .iter()
+        .filter(|line| field(line, "file").as_deref() == Some(ABSENT_PRESET))
+        .count();
+    assert_eq!(
+        naming,
+        1,
+        "a ctl/preset naming a preset the roster does not hold should produce \
+         exactly one preset_error naming it; {naming} of the {} preset_error \
+         lines did:\n{stderr}",
+        errors.len()
+    );
+    assert!(
+        !errors
+            .iter()
+            .any(|line| field(line, "file").as_deref() == Some("Show Target")),
+        "the ctl/preset that landed must raise no preset_error, or the studio \
+         puts a red line on every preset click that worked:\n{stderr}"
     );
 }
 
@@ -687,6 +875,9 @@ fn every_system_is_reported_by_the_key_the_schema_labels_its_roster_with() {
         since: lines.opened,
         stdout_at_ask: 0,
         ping: None,
+        // `hello` precedes the first frame and so precedes every `health`
+        // line: there is no baseline to take, and the report says so.
+        health_before: None,
     };
     match lines.wait_for(hello.since, hello_control) {
         Err(missed) => {
@@ -722,6 +913,7 @@ fn every_system_is_reported_by_the_key_the_schema_labels_its_roster_with() {
                         SystemKind::VARIANT_COUNT
                     ),
                     &drain,
+                    &lines,
                 );
                 socket.send_to(&buf, target).expect("send ctl/preset");
                 // Evidence only, never asserted: see `Ask::ping`.

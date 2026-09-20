@@ -37,6 +37,15 @@ const HEALTH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 /// bounded by construction rather than by what a sender happens to send.
 const PING_SCRATCH: usize = 8;
 
+/// What a `preset_error` raised by a refused `ctl/preset` says.
+///
+/// Phrased as the request's outcome rather than as a cause, because the
+/// renderer returns a bare `false` and has no reason to offer: the roster may
+/// not hold the name, or may have been replaced between the click and the
+/// datagram.
+const UNRESOLVED_PRESET: &str =
+    "ctl/preset: the selection did not take, so this preset is not on screen";
+
 /// Everything a run manages around the renderer, in one owner.
 pub(crate) struct Show {
     /// Preset directory watched for hot-reload, with its last-seen signature and
@@ -267,17 +276,20 @@ impl Show {
         }
         self.next_health = now + HEALTH_INTERVAL;
         let metrics = renderer.metrics();
-        let (rejected, dropped, refused) = self
-            .control
-            .as_ref()
-            .map_or((0, 0, 0), |c| (c.rejected(), c.dropped(), c.refused()));
+        // A run with no listener reports zeros and `false`: there is no thread,
+        // so it is not listening, which is what `control` being `null` on
+        // `hello` already told the parent.
+        let control = self.control.as_ref();
         events.emit(&Event::Health {
             fps: metrics.fps,
             frame_ms_p50: renderer.frame_ms_p50(),
             frame_ms_p99: metrics.frame_ms_p99,
-            ctl_rejected: rejected,
-            ctl_dropped: dropped,
-            ctl_refused: refused,
+            ctl_rejected: control.map_or(0, Control::rejected),
+            ctl_dropped: control.map_or(0, Control::dropped),
+            ctl_refused: control.map_or(0, Control::refused),
+            ctl_received: control.map_or(0, Control::received),
+            ctl_recv_errors: control.map_or(0, Control::recv_errors),
+            ctl_listening: control.is_some_and(Control::listening),
             preview_sent: preview.map(|(sent, _)| sent),
             preview_dropped: preview.map(|(_, dropped)| dropped),
         });
@@ -320,6 +332,14 @@ impl Show {
     /// refused by the core and **counted**, not printed: OSC has no reply
     /// channel, and a sender scrubbing a mistyped name at slider rate would
     /// otherwise produce a line per frame.
+    ///
+    /// **A preset name the renderer declines is reported instead of counted**,
+    /// because it is the opposite population: a preset arrives from a click on
+    /// a roster the player itself published, so one refusal is one deliberate
+    /// request that did not take, and a parent that is not told shows a click
+    /// that did nothing (ADR-0221). It goes out as a `preset_error` naming the
+    /// asked-for name, which is the event a parent already renders for "what
+    /// you asked for is not on screen".
     pub(crate) fn apply_control_rest(&mut self, renderer: &mut Renderer) -> bool {
         // Moved out of `self` for the duration rather than borrowed from it: the
         // drained buffer borrows the listener, and the pongs below need `self`.
@@ -343,6 +363,18 @@ impl Show {
         if let Some(events) = self.events.as_mut() {
             for nonce in &scratch[..count] {
                 events.emit(&Event::Pong { nonce: *nonce });
+            }
+            if let Some(name) = applied.unresolved_preset.as_ref() {
+                events.emit(&Event::PresetError {
+                    // The asked-for name, which on this arm is not a path at
+                    // all. Spec 0003 says so rather than leaving a parent to
+                    // discover it.
+                    file: Path::new(name.as_str()),
+                    message: UNRESOLVED_PRESET,
+                    line: None,
+                    col: None,
+                    param: None,
+                });
             }
         }
         applied.switched

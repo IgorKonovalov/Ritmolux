@@ -253,9 +253,10 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   `cargo nextest run --workspace` yourself — the full run, not `-P fast` — and compare. A green
   full suite is precisely the claim a deferred gate makes cheapest to get wrong, and a missing or
   vague bullet is a **blocker**, not a `minor`: it means nothing is known about the drift guards.
-  Run `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` in the same sitting — CI runs it
-  over the whole workspace while the pre-push hook mirrors `-p rlx-core` alone, so a close that skips
-  it can tag a red `main` on any of the other four crates (backlog 0246).
+  Run `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` in the same sitting. Since
+  Plan 0196 the hook runs that same `--workspace` command rather than the `-p rlx-core` subset it
+  once did, so this is a re-run and not the only run — but the hook is opt-in per clone,
+  `--no-verify` skips it, and the close is the last gate in front of a tag.
 - **Silence in it is not
   certification:** done-when results are reported by exception, so a criterion with no note carries
   `dev`'s *belief* that it passed and nothing more — which is precisely the claim this lens exists
@@ -813,12 +814,13 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
    hook is **not** the backstop it looks like: it is opt-in per clone, `--no-verify` skips it, and
    its `nextest` step is narrowed (`-P fast`) rather than complete.
 
-   **The gate also owes `cargo doc`, because the hook mirrors it for `rlx-core` alone**
-   (backlog 0246 — `core-cabi`, `rlx-ring`, `milkconv` and `standalone` are documented in CI and
-   nowhere else). Plan 0137 made two items public whose doc comments linked private helpers; that
-   is an error under `-D warnings` only once the item is public, so the trigger is a visibility
-   change rather than a doc edit, and it shipped a red `main` under a release tag. Plan 0180 did it
-   again in `milkconv`, which the scoped hook step cannot see. Run it before the tag, beside the
+   **The gate also owes `cargo doc`, over the whole workspace.** Plan 0137 made two items public
+   whose doc comments linked private helpers; that is an error under `-D warnings` only once the
+   item is public, so the trigger is a visibility change rather than a doc edit, and it shipped a
+   red `main` under a release tag. Plan 0180 did it again in `milkconv`. **The hook now mirrors
+   this step** — Plan 0196 Phase 3 widened it from `-p rlx-core` to `--workspace` and closed
+   backlog 0246 — so what the close adds is a run that cannot be skipped by an uninstalled hook or
+   a `--no-verify`, on the exact tree about to be tagged. Run it before the tag, beside the
    `nextest` above:
 
    ```sh

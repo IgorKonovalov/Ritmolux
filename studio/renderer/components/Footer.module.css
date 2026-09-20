@@ -17,6 +17,13 @@
   font-weight: 500;
 }
 
+/* A listener that bound an address and stopped reading it: every later action
+   is discarded in silence, so the cell stops reading as a plain address. */
+.cell code.stopped,
+.cell strong.stopped {
+  color: var(--error);
+}
+
 .spacer {
   flex: 1;
 }

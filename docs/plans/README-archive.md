@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0198 - The control path stops failing quietly](#0198---the-control-path-stops-failing-quietly)
   - [0197 - The conductor becomes operable](#0197---the-conductor-becomes-operable)
   - [0196 - The gate roster stops drifting](#0196---the-gate-roster-stops-drifting)
   - [0194 - The analysis gains a stereo field](#0194---the-analysis-gains-a-stereo-field)
@@ -237,6 +238,50 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0198 - The control path stops failing quietly](done/0198-the-control-path-stops-failing-quietly.md)
+
+- closed 2026-09-19, conductor-run lane `plan-0198-the-control-path-stops-failing-quietly` in
+`WORK/rlx-plan-0198`. Five phases, `d2117b3c`, `5bf159f4`, `f7e13b9d`, `7a00199d` and `5e706521`,
+then the close. One review round: **no blockers, no majors, three minors and two nits; one minor
+repaired at the close, the rest carried to the followup plan.** Version **0.137.0** (minor).
+ADR-0221 accepted **with an `Outcome`**. Backlog 0219 and 0220 both **stay live** — the plan's
+header took the observability half of each and said so.
+- **What landed.** The control path now reports its non-events. `listen` counts every datagram
+`recv_from` hands over and, separately, every receive failure that is not the ordinary read timeout,
+and publishes whether the receive loop is still running; all three join `health` as additive fields
+under the same protocol version, beside `ctl_rejected`, `ctl_dropped` and `ctl_refused`. A
+`ctl/preset` whose `select_preset_by_name` returns `false` raises a `preset_error` naming what was
+asked for, where before it produced no event, no counter and no line — the studio's silent click.
+The two flaking tests read the new readings and print a one-sentence verdict naming which candidate
+the failure was. The studio parses the three fields as optional, distinguishes *listening*, *stopped*
+and *does not say*, and marks a stopped listener in the footer cell where the operator already looks
+for the connection.
+- **The reproduction is what the plan was for, and it answered.** Phase 4 re-ran the 2026-09-14 load
+19 times and 2 failed — a higher rate than the original 3-in-79, on heavier load. Both failures
+named the same candidate: `received` did not move, `recv_errors` did not move, `listening` was true.
+Three of ADR-0221's four candidates are now excluded **by evidence rather than by argument**, and for
+the roster walk a fourth — a refused selection — is excluded too, because that arm now reports itself
+and did not. What is left is the datagram never reaching `recv_from` at all, which per-process
+counters cannot localise: that is ADR-0221's first Negative, and naming it costs per-datagram
+sequencing, a protocol change this plan deliberately declined. The plan stopped there, as its own
+Phase 4 stop condition required, rather than inventing a fix for a cause it had not seen.
+- **Two findings outlive the plan, and both belong to the followup.** The delivery report in
+`control_loopback.rs` takes its `received` baseline **after** the send, so under the very load the
+test flakes under a datagram counted in that window reads as never having arrived — the sibling in
+`stream_show.rs` takes its baseline before the send and is correct. And on Windows an over-long
+datagram fails `recvfrom` with `WSAEMSGSIZE` rather than truncating, so it now counts as a receive
+error instead of a refusal and sixty-four consecutive ones end the listener; spec 0003's invariant
+says *"truncated, over-long or mistyped ... refused and counted, the run continues"*, and nothing in
+the repository probes the over-long case on either platform.
+- **What outlived the plan.** `preset_error` now carries a case that is not a load error, with its
+`file` holding a name that may not be a path — stated in spec 0003 rather than left for a parent to
+discover, and safe on the studio side, where `file` is an opaque display and identity string that
+nothing dereferences. The private `Receive` trait in `control.rs` is the pattern to reuse when a
+thread owns the only handle to the thing that has to be broken in a test. And the studio's
+three-valued reading of an optional protocol field — *true*, *false*, and *this player does not say*
+— is the shape every later additive `health` field should take: folding "does not say" into either
+neighbour is a claim nothing sent.
 
 ### [0197 - The conductor becomes operable](done/0197-the-conductor-becomes-operable.md)
 

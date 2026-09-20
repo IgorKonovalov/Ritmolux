@@ -25,7 +25,7 @@ export const EVENT_VERSION = 1
  * rule and a mismatch means the bundle was assembled wrong or a path in
  * settings points at a stale build.
  */
-export const EXPECTED_PLAYER_VERSION = '0.136.0'
+export const EXPECTED_PLAYER_VERSION = '0.137.0'
 
 export function isKnownPlayerVersion(version: string): boolean {
   return version === EXPECTED_PLAYER_VERSION
@@ -116,6 +116,25 @@ export const healthSchema = z.object({
   ctl_rejected: z.number().int(),
   ctl_dropped: z.number().int(),
   ctl_refused: z.number().int(),
+  /**
+   * The listener's own state: datagrams the socket handed it before anything
+   * was made of them, receive failures that were not the ordinary read timeout,
+   * and whether the receive loop is still running (ADR-0221).
+   *
+   * `ctl_received` is the superset the other `ctl_` totals are drawn from,
+   * which is what separates "nothing arrived" from "something arrived and was
+   * discarded". A run with no listener reports zeros and `ctl_listening` false,
+   * the same fact `hello`'s `control: null` already carries.
+   *
+   * Optional, and the three of them together: a player that predates the
+   * readings sends a `health` line without any of them, and dropping that line
+   * would cost the studio every figure on it. `undefined` therefore means "this
+   * player does not say", which is a different claim from `false` — only the
+   * latter is a listener that stopped.
+   */
+  ctl_received: z.number().int().optional(),
+  ctl_recv_errors: z.number().int().optional(),
+  ctl_listening: z.boolean().optional(),
   /**
    * The preview pipe's own totals, or `null` when no pipe is open.
    *
