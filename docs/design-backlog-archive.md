@@ -333,10 +333,6 @@ live entry citing this one.
 | 0101 | The mark roster cannot morph between silhouettes, and two other rosters already do | [Plan 0203](plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md). **Promoted** |
 | 0221 | The run-alone override costs `-P fast` 165 s, because 18 testcases each drain the machine | [Plan 0199](plans/0199-the-gates-cost-is-measured-before-it-is-cut.md). **Promoted** |
 | 0239 | Three per-preset suites are 54 % of the workspace suite and grow with every preset shipped | [Plan 0199](plans/0199-the-gates-cost-is-measured-before-it-is-cut.md). **Promoted** |
-| 0244 | A custom wave is neither smoothed nor scaled like the eight built-in figures | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
-| 0245 | The converted warp space has no pixel baseline, because every golden fixture is square | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
-| 0249 | `warp_mesh`'s `zoom` doc says the opposite of what the shader does | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
-| 0251 | `warp_mesh`'s level mode draws bands but not an ink class | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
 | 0257 | The standalone exe is 9.7 % over NFR §4's cap, and only the component would have noticed | [Plan 0207](plans/0207-the-commitments-get-their-instruments.md). **Promoted** |
 | 0126 | A render is one prompt, one seed and one preset from first frame to last | [Plan 0212](plans/0212-the-diffused-render-gains-a-timeline.md). **Promoted** |
 | 0236 | The `.claude/` park reads a phase's declared `Files touched`, and prose escapes it | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
@@ -632,6 +628,10 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0246 | The local `cargo doc` mirror covers one crate of five | [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phase 3. `--workspace`, `--features text` dropped; +2 s warm, 20.1 s doc-cold, reported not tuned. **Closed 2026-09-19** |
 | 0242 | The conductor's gate skips a check a lane never satisfies, and says nothing | [ADR-0218](adrs/0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md) + [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phase 4. Reported, and the lane installs. **Closed 2026-09-19** |
 | 0243 | The served version-line rule is anchored to a column and a basename, not to the section | [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phase 5. Read whole in its TOML section; the third probe is no longer what the claim rests on. **Closed 2026-09-19** |
+| 0249 | `warp_mesh`'s `zoom` doc says the opposite of what the shader does | [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) Phase 1. Both declarations and all five generated renderings of them; the preset sweep convicted nothing. **Closed 2026-09-20** |
+| 0244 | A custom wave is neither smoothed nor scaled like the eight built-in figures | [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) Phase 2 + ADR-0223. Smoothed unless it draws dots; the scaled half was never open. **Closed 2026-09-20** |
+| 0251 | `warp_mesh`'s level mode draws bands but not an ink class | [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) Phase 3 + ADR-0224. The ink class, not two exact values; it takes the threshold and a banded coordinate. **Closed 2026-09-20** |
+| 0245 | The converted warp space has no pixel baseline, because every golden fixture is square | [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) Phases 4-4b. One fixture at 160x120; a non-square size proved necessary and not sufficient. **Closed 2026-09-20** |
 <!-- roster:end -->
 
 ---
@@ -15060,9 +15060,16 @@ preset's custom wave against `foo_vis_milk2` side by side and finds it thinner o
 [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4's session, and the reason to
 have this written down before that session runs.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0201](plans/0201-the-warp-surface-stops-lying.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+**CLOSED 2026-09-20** — [ADR-0223](adrs/0223-the-figure-contract-reaches-a-custom-wave-because-the-source-applies-it-there.md)
++ [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) Phase 2. The contract reaches a custom
+wave in both halves: `SmoothWave`'s midpoint insertion unless the wave draws dots, which is the
+source's own exception, and `HOST_SAMPLE_FACTOR` on `value1`/`value2`. The *scaled* half of the
+title was never open — `draw::build` has applied `wave_smoothing` and `wave_scale` to the traces
+every figure indexes since Plan 0180.
 
 ---
 
@@ -15111,9 +15118,18 @@ computes is caught. The exposure is narrow: an incidental pixel change in a conv
 non-square target, which today means a test fixture and no shipped preset — `presets/` carries no
 `[milk]` bundle. It rises the day one ships.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0201](plans/0201-the-warp-surface-stops-lying.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+**CLOSED 2026-09-20** — [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) Phases 4, 4a and
+4b. `core/tests/suite/warp_mesh_wide.rs` captures `milk_wash_fog_tunnel.toml` at 160x120 against a
+baseline a person opened. **The entry's premise was right and incomplete**: a non-square size is
+necessary and not sufficient. The fixture's first subject, `warp_mesh_shader.toml`, rendered a smooth
+gradient the correction could not move, so it passed byte-identically with the correction removed at
+the converted chain's entry. The subject is now chosen by that probe — of four candidates all
+declaring `zoom`, `rot` or `warp`, only one moves past a tolerance — and the guard is documented
+against the probe rather than against its size.
 
 ---
 
@@ -15337,9 +15353,16 @@ outside what a conductor close may repair (ADR-0209), which is why it is here ra
 false paragraph and a close-review finding. It is not higher because nothing it touches is executable:
 every picture the engine draws is correct, and only the prose about it is wrong.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0201](plans/0201-the-warp-surface-stops-lying.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+**CLOSED 2026-09-20** — [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) Phase 1. Both
+declarations carry the replacement text this entry wrote, and the regeneration moved all five
+renderings of it: the parameter table, both strings in `presets/schema/warp_mesh.schema.json`, the
+two in `presets/preset.schema.json` (which the plan's `Files touched` did not name and which the
+same run writes), and `docs/specs/player-schema.json`. The preset sweep convicted nothing — the one
+shipped header this lie produced had already been repaired at Plan 0184's close.
 
 ---
 
@@ -15463,9 +15486,19 @@ second author asks `warp_mesh` for a print, or if the same question arrives from
 premultiplied-light scene — at which point it is ADR-0138's boundary being asked to move, not this
 scene's.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0201](plans/0201-the-warp-surface-stops-lying.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+**CLOSED 2026-09-20** — [ADR-0224](adrs/0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md)
++ [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) Phase 3. `coverage_threshold`, default
+off, resolves coverage to ink or paper. **The entry asked for more than the mechanism can give and
+the phase's own measurement said so**: two continua sit downstream of the ink and a coverage
+threshold removes one, so the deliverable is the ink *class* — paper plus two clusters, each within
+one encoded level of the ink its stop renders as, nothing between — and it takes a banded
+`palette_steps` as well as the threshold. 145 exact frame colours to 11 on the shipped `warp_ladder`,
+measured on one machine. ADR-0224's first Positive carried the same overreach and was corrected with
+it. ADR-0138's draw-seam guarantee does not move.
 
 ---
 

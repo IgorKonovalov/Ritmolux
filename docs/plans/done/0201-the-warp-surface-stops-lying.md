@@ -1,15 +1,21 @@
 # 0201 — The warp surface stops lying
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-20 at `v0.138.0`. Six phases in
+> `f14bcd47`, `48120eee`, `c832e76c`, `4c7f739b`, `79fa6b09`, `7681ccf7`, plus the close repairs in
+> `261aaafb`. Round-1 review: **no blockers, no majors**, two minors and four nits, four of them
+> repaired at the close. Verified against the tree: the corrected `zoom` direction on every surface
+> that renders it, a custom wave through `SmoothWave` and the host factor with the dots exception,
+> `coverage_threshold` inert at its default by construction, and a 4:3 converted-chain baseline that
+> its own probe convicts.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev
-> **Related ADRs:** [0223](../adrs/0223-the-figure-contract-reaches-a-custom-wave-because-the-source-applies-it-there.md)
-> (proposed), [0224](../adrs/0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md)
-> (proposed), [0199](../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md),
-> [0197](../adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md),
-> [0212](../adrs/0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md),
-> [0170](../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
+> **Related ADRs:** [0223](../../adrs/0223-the-figure-contract-reaches-a-custom-wave-because-the-source-applies-it-there.md)
+> (proposed), [0224](../../adrs/0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md)
+> (proposed), [0199](../../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md),
+> [0197](../../adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md),
+> [0212](../../adrs/0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md),
+> [0170](../../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
 > **Closes:** design-backlog 0244, 0245, 0249, 0251
 
 ## TL;DR
@@ -47,11 +53,11 @@ class a golden exists for and the class ADR-0037 was written about (backlog 0245
 ## Decision
 
 The doc repair is mechanical: correct both declarations and regenerate the three artifacts, per
-[ADR-0170](../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
+[ADR-0170](../../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
 — never a hand edit of a generated file. The figure contract reaches a custom wave per
-[ADR-0223](../adrs/0223-the-figure-contract-reaches-a-custom-wave-because-the-source-applies-it-there.md),
+[ADR-0223](../../adrs/0223-the-figure-contract-reaches-a-custom-wave-because-the-source-applies-it-there.md),
 because the source applies it there too. Level mode gets a default-off coverage threshold per
-[ADR-0224](../adrs/0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md).
+[ADR-0224](../../adrs/0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md).
 And the converted chain gets **one fixture at a non-square size**, the way `attractor_trails` is
 captured at 160x100 with its own baseline: we rejected a second size for the whole golden roster
 (it doubles every bless to catch one chain) and rejected closing the gap with reasoning alone (the
@@ -184,7 +190,7 @@ job of a baseline).
 ## Risks & open questions
 
 - **Phases 1 and 3 need an `RLX_UPDATE_*` regeneration**, which a conductor session cannot run
-  today (backlog 0250). [Plan 0197](done/0197-the-conductor-becomes-operable.md) Phase 4 makes it
+  today (backlog 0250). [Plan 0197](0197-the-conductor-becomes-operable.md) Phase 4 makes it
   runnable, so **this plan runs after 0197** or its first phase parks.
 - **Phase 2 changes what converted content draws.** No shipped preset is affected — `presets/`
   carries no `[milk]` bundle — so the blast radius is the conversion corpus, which lives outside
@@ -341,6 +347,221 @@ job of a baseline).
 - **Outstanding `human` phases:** none. Phase 4b was settled in an owner-directed session on
   2026-09-20 — the baseline is committed, the skip block is gone, and both readings the phase asks
   for are in the Notes above. Every phase is committed.
+
+## Close review
+
+Round 1, 2026-09-20, conductor mode, fresh session. Written to
+`tools/conductor/state/reviews/0201-round-1.md` and reproduced here in full, because a conductor-run
+close has no reader in the room and this section is the evidence of what was checked.
+
+**Verdict: Plan 0201 landed cleanly — no blockers, no majors; two minor items and four nits.**
+All six phases are committed and each does what its done-when asked. The `zoom` repair reaches every
+surface the repository offers, the custom-wave contract is implemented and tested as a property
+rather than a frozen figure, the level-mode threshold is inert at its default by construction, and
+the 4:3 fixture is the one of four candidates its own probe convicts — which is the difference
+between a baseline and a picture that cannot fail.
+
+### Lens 1 — alignment with the plan and the ADRs
+
+**The full suite.** Run as exactly `node …/with-lock.mjs suite -- cargo nextest run --workspace`. The
+wrapper did not re-run it; it printed the ledger record for this tree, which is the evidence
+(ADR-0207):
+
+```
+with-lock: skipped cargo nextest run --workspace: tree c6b9092 is green in the suite ledger,
+run by gate 0201-pre-review at 2026-09-20T05:39:17.444Z: 2029 tests run: 2029 passed (13 slow), 7 skipped
+```
+
+`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` is green in this worktree as well. The
+`### Close triggers` **Full suite** bullet says the run is owed to the conductor's pre-review gate,
+which in conductor mode is correct rather than a missing run — and the ledger record above is that
+gate.
+
+**Phases against the tree.**
+
+| phase | claimed | found |
+|---|---|---|
+| 1 — `zoom` says what the shader does | `f14bcd47` | both `ParamSpec` declarations corrected to the exact replacement text backlog 0249 recorded; `presets/README.md`, `presets/schema/warp_mesh.schema.json` (twice), `presets/preset.schema.json` (twice) and `docs/specs/player-schema.json` regenerated. A repository-wide grep for *"tunnels inward"* now finds it only in the archived backlog body and in this plan's own `## Context` — both dated records. The direction is right: `shaders.rs` `vs_main` computes `p = p / zoom`, so above 1 the source window shrinks and the past is magnified |
+| 2 — a custom wave draws through the contract | `48120eee` | `smooth_points` is `smooth_wave` over points that carry a light, sharing one extracted `inserted_point` kernel; `value1`/`value2` carry `HOST_SAMPLE_FACTOR`; the dots branch is excepted |
+| 3 — level mode can hold an ink | `c832e76c` + `473050e4` | `coverage_threshold` declared through `ParamSpec`, plumbed through `set_param`/`reset_params`, clamped and finite-checked in `encode.rs`, read at `pp.f.y` in the present pass |
+| 4 / 4a / 4b — the wide fixture | `4c7f739b`, `79fa6b09`, `7681ccf7` | `core/tests/suite/warp_mesh_wide.rs` + `core/tests/golden/warp_mesh_wide.png` |
+
+Every phase carries a single in-vocabulary `**Owner skill:**` tag (`dev` x5, `human` x1). The
+`## Implementation log` is shorter than `## Implementation phases`, and the three `Files touched`
+deviations (`presets/preset.schema.json`, `docs/milkdrop-conversion.md`, `core/tests/suite/main.rs`)
+are each disclosed in the log with a reason — which is the right handling.
+
+**The assertions, read rather than trusted.**
+
+- `a_custom_wave_is_smoothed_unless_it_draws_dots` — an 8-point wave must draw `2n - 2 = 14`
+  segments and a dots wave `n = 8`. The arithmetic is right: `smooth_points` emits `2n - 1` points
+  (every original plus one insert per gap), and `polyline(…, closed = false)` makes `2n - 2` of
+  them. The fixture is built from the bundle's own assembly rather than EEL2, so it runs inside
+  `core` without the compiler that lives on the far side of the `milkconv` seam. The outputs are
+  neutralized so the built-in `waveform_figure` returns before drawing — `wave_a = 0.0` — which is
+  what makes `geometry.segments.len()` a reading about the custom wave alone.
+- `a_custom_waves_sample_term_carries_the_host_factor` — a **ratio** of two world-space
+  y-coordinates against the constant, which is a property in ADR-0074's sense (both terms the same
+  kind of quantity) rather than a frozen pixel figure. It does not pin the constant's *value*, and
+  its own doc says so: what it holds is that the factor is applied at all. Correct, and honestly
+  stated. The `1e-4` tolerance is f32 rounding, not a threshold.
+- `the_converted_chain_matches_its_wide_baseline` — `golden.rs`'s own `FRAMES = 60`,
+  `MEAN_TOL = 0.02`, `MAX_OUTLIER = 48`, and a shape assertion on the committed baseline so a PNG at
+  another size cannot be silently compared. `common::headless` prefers the software adapter, so the
+  baseline is reproducible across runners exactly as every other baseline here is.
+- `the_capture_size_is_neither_square_nor_sixteen_by_nine` — GPU-free, so it runs on an adapterless
+  runner where the capture says nothing at all. `RATIO_SLACK = 0.02` is wide enough to convict
+  161x120, which the comment claims and the arithmetic confirms.
+
+**What Phase 3 did not get.** The amended Phase 3 done-when asks for a measurement, not a test, and
+the measurement is in the log. It was honoured. But the consequence is that nothing in the suite
+binds `coverage_threshold` at a non-zero value — see minor 2.
+
+**The baseline.** `core/tests/golden/warp_mesh_wide.png` was opened. It is a greyscale frame: a
+bright core, wider than tall, with radial streaks over a dark field, nothing clipped and no empty
+frame — the subject `Geiss - Fog Tunnel` names and the picture the log describes. The log's argument
+that a *round* core would have been the finding is correct: MilkDrop draws its waveform in the host's
+normalized square and the aspect pair corrects what the warp does, not what the waveform is drawn in.
+
+### Lens 2 — layering, coupling, real-time safety
+
+Clean. Nothing platform-specific or audio-source-specific entered `core/`; no raw GPU call escaped
+the wgpu layer; the C ABI and the control protocol are untouched by this plan. The draw path is the
+render thread, not the audio callback, and `smooth_points` writes into a buffer the caller owns and
+reuses across the frame's waves — the same shape the built-in figure's smoothing buffer takes. The
+growth is bounded: `ElementRuntime::spec` clamps a custom wave's `count` to `MAX_WAVE_POINTS = 512`,
+so the smoothed figure cannot exceed 1023 points whatever a bundle declares. `HOST_SAMPLE_FACTOR` was
+widened from private to `pub(crate)` for the new test — see nit 6.
+
+### Lens 3 — docs, generated surfaces, bookkeeping
+
+The generated set moved by regeneration rather than by hand: `presets/README.md`'s parameter table,
+both editor schemas and `docs/specs/player-schema.json` all carry the new `zoom` text and the new
+`coverage_threshold` row, and `preset_schema.rs` is green against them in the suite run above.
+
+Hand-written operator docs swept: `docs/preset-palettes.md` (the threshold, what it gives and what it
+does not, and the aliasing cost), `docs/milkdrop-conversion.md` (the custom-wave row moved from *not
+carried* to *carried*, with ADR-0223 cited), `docs/testing.md` (the fixture's row and its bless
+scope, added to the by-module bless list). `docs/presets.md` needed nothing — no grammar moved.
+`docs/preset-guide.md` needed nothing — no shipped look changed.
+
+Gate runs in this worktree, all green: `check-doc-links`, `check-comment-hygiene`,
+`check-index-rows`, `check-system-counts`, `check-filter-figures`, `check-reader-prose`,
+`toc --check`, `check-gate-carriers`, `check-backlog-claims`, `check-translations`.
+
+- **Backlog probes:** exit 0 — *59 stated reductions still hold across all 26 live entries
+  (4 unprobeable)*, 31 advisory moved-path rows. Nothing this plan landed convicts a live entry.
+- **Translation advisory:** one row, and it is not this plan's —
+  `packaging/foobar/READ-ME-FIRST.ru.md` is stamped `f2b0048b` while its English source is at
+  `d6e275e6` (2026-09-18). Routed, not repaired here.
+- **Preset curation (`presets/` touched):** the trigger fired on generated files only. No
+  `presets/*.toml` was added, removed or edited, so there is no set to curate. Phase 1's workaround
+  sweep is the other half and it convicted nothing: five shipped `warp_mesh` presets bind `zoom` and
+  every header already reasons from the shader's direction, re-checked here. `warp_millrace`'s *"just
+  under 1, so the field creeps inward"* is correct under the corrected doc, not despite it.
+- **Version bump:** a feature plan — a new engine parameter, a change to what a converted custom wave
+  draws, and a new golden fixture. **Minor**, chosen against what `main` reached (`0.137.0`), landing
+  at **0.138.0** with the studio's two copies following.
+
+### Lens 4 — correctness, determinism, geometry that varies with the target
+
+- **The default path is byte-identical, by construction.** With `coverage_threshold = 0` the shader
+  computes `cover = clamp(c.a, 0, 1)` and writes `vec4(ink * cover, cover)`; the line it replaced was
+  `vec4(ink * clamp(c.a, 0, 1), c.a)`, and the pass's own `return` already clamps the alpha to
+  `[0, 1]`. So the substitution changes no byte at the default, and the full suite's goldens and
+  cards — which render the shipped `warp_ladder` — are the evidence rather than the claim.
+- **The threshold is guarded at the boundary.** `encode.rs` rejects a non-finite binding and clamps
+  to `[0, 1]` on the CPU, so the shader's comparison is against a number in the range it reads
+  coverage in. A negative or NaN binding falls back to off rather than to "every pixel holds ink",
+  which is the failure mode a threshold of zero read literally would have.
+- **The aspect question is exactly the one this plan was written for**, and Phase 4a is the right
+  answer to it. The development configuration — 128x128 in `golden.rs` — is a shape where the two
+  correction terms are the identity, so no capture there could tell which source the code used. Phase
+  4a went further than the rule requires: it established that a fixture at a non-square size is
+  *still* not a guard unless the picture has geometry for a geometric correction to move, and it
+  chose the subject by the probe rather than by what the `[milk]` table declares. Three of the four
+  candidates declare `zoom`, `rot` or `warp` and read 0.0000 / 0 under the probe. That is the finding
+  the phase existed to force, and it is recorded where a reader will meet it.
+- **ADR-0071.** Every numeric assertion this plan adds is a property: two segment counts, a
+  dimensionless ratio, two aspect inequalities, and two golden tolerances inherited unchanged from
+  `golden.rs`. The measurements are reported in prose and in ADR-0224 with the machine and the date
+  named; two reader documents reported them less carefully, which is minor 1 and nit 3.
+- **Determinism.** No wall-clock read and no unseeded randomness entered any of this.
+  `smooth_points` is a pure function of its input slice.
+
+One observation that is not a finding. Phase 4b's logged readings under the `self.aspect = 1.0` probe
+include `warp_mesh 0.0002/2` and `warp_mesh_shader 0.0000/1` — non-zero, against a probe that at
+128x128 provably changes nothing (`aspect` is already `1.0` there, and `x * 1.0 == x` exactly). Those
+are the software rasterizer's own run-to-run noise, and the native `warp_mesh` fixture — which the
+probe cannot reach at all — is what establishes that. The log reports the numbers without saying so;
+the conclusion it draws from them is right either way.
+
+### Lens 5 — design integrity
+
+- **Dependency direction** unchanged; no shell type reaches `core`, no `core` type reaches a shell.
+- **The three seams** are all untouched: no function joined the C ABI, no OSC address or event joined
+  spec 0003, and the `Scene` trait gained nothing — `coverage_threshold` is a `ParamSpec` row read
+  through the existing `set_param`, which is the OCP-correct place for it.
+- **The kernel extraction is the right shape.** `inserted_point` is one function with two callers
+  rather than two copies of four coefficients, and its doc states the one non-obvious property (the
+  coefficients sum to 2, so the `* 0.5` is the kernel's normalization and not an average).
+- **The new test module is separate on purpose**, and the reason is real rather than tidiness:
+  `RLX_BLESS` is not scoped to a fixture, so an entry in `golden.rs`'s `EXTRA_FIXTURES` would mean one
+  bless rewrites every baseline of that binary. That is the `attractor_trails` posture, applied
+  correctly.
+- **ADR-0223 and ADR-0224 match what landed.** ADR-0223 does not state what colour an inserted point
+  takes; the implementation gives it the light of the point before it and the code comment carries the
+  argument, which is where a mechanism belongs.
+
+### Findings
+
+**minor 1 — `docs/testing.md`: the probe reading reads as if the mean convicts.** The
+`warp_mesh_wide` row said *"must fail this fixture, and does — mean 0.0139 against a 0.02 tolerance
+and a max outlier of 75 against 48"*. A reader takes that as both terms failing. 0.0139 is **inside**
+its 0.02 tolerance; only the outlier convicts, which is precisely the point `warp_mesh_wide.rs`'s own
+module docs make. The reader document stated the evidence less accurately than the test does.
+**Repaired in `261aaafb`.**
+
+**minor 2 — `coverage_threshold` ships with no automated guard at any non-zero value.** Nothing in
+the workspace binds it above `0`: the parameter appears in `encode.rs`, `mod.rs` and `shaders.rs` and
+in no test. Its default path is covered — the existing goldens are what prove byte-identity — but the
+branch the parameter exists for has no execution anywhere in the suite, and the only evidence that it
+produces the ink class is the hand measurement in the log, whose fixtures and counters live in the
+lane's `target/plan0201/`, uncommitted and gitignored, so the reading cannot be reproduced. This is
+**not a deviation** — the amended Phase 3 done-when asked for a measurement rather than a test, and
+`dev` delivered exactly that. It is a gap the plan created. A refactor of the present pass that
+dropped the `pp.f.y` branch, or an `encode.rs` edit that wrote the threshold into the wrong lane,
+would move no test in this repository. The fix is a capture of `warp_ladder` at
+`palette_steps = "12"` with the threshold on and off, asserting the class the done-when names —
+paper plus two clusters, nothing between — rather than a colour count. **Left open**; it is code, not
+text.
+
+**nit 3 — `docs/preset-palettes.md`: two measurements presented as bare facts.** The 145-to-11 and
+886-to-802 counts depend on the rasterizer — the LUT's linear sample and ADR-0096's dither both feed
+them — and ADR-0224 states the same numbers with *"Measured 2026-09-19 on the development machine"*.
+The reader document dropped the qualifier, which is the prose form of a measurement asserted
+universally. **Repaired in `261aaafb`.**
+
+**nit 4 — "the three `warp_mesh` fixtures" miscounts `golden`.** That binary holds four fixtures whose
+stem begins `warp_mesh`: the rostered `warp_mesh` plus `warp_mesh_milk`, `warp_mesh_shader` and
+`warp_mesh_stroke`. The three meant are the three carrying a `[milk]` table and so running the
+converted chain; the rostered `warp_mesh.toml` carries none, which `golden.rs`'s own comment says.
+Said in `core/tests/suite/warp_mesh_wide.rs` and in `docs/testing.md`. **Repaired in `261aaafb`.**
+
+**nit 5 — plan-relative narration in a comment.** `core/tests/suite/warp_mesh_wide.rs` described
+`warp_mesh_shader.toml` as *"the subject this fixture first carried"*, which is the shape CLAUDE.md
+forbids in a comment and which `check-comment-hygiene.mjs` cannot see. The evidence the sentence
+carries is worth keeping; the history is not. **Repaired in `261aaafb`.**
+
+**nit 6 — `core/src/render/scenes/warp_mesh/draw.rs`: `pub(crate)` where `pub(super)` reaches.**
+`HOST_SAMPLE_FACTOR` was widened from private to `pub(crate)` for `warp_mesh/tests.rs`. That module is
+a descendant of `warp_mesh`, so `pub(super)` — the visibility every other item shared out of `draw.rs`
+uses — reaches it. `pub(crate)` puts a MilkDrop-specific constant in view of every module in the
+crate. **Left open**; it is code, not text.
+
+### Earlier rounds
+
+None. This was round 1, and it closed the plan.
 
 ## Followups (after this lands)
 

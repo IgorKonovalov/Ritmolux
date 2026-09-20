@@ -1,8 +1,8 @@
 # ADR-0224 — Level mode gets a coverage threshold, and the ink class stays this scene's
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-20 (Plan 0201 Phase 3)
 > **Date:** 2026-09-19
-> **Related plan(s):** [0201](../plans/0201-the-warp-surface-stops-lying.md)
+> **Related plan(s):** [0201](../plans/done/0201-the-warp-surface-stops-lying.md)
 > **Extends:** [0197](0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md)
 > (whose `Outcome` routed the question here); leaves
 > [0138](0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) where it is
