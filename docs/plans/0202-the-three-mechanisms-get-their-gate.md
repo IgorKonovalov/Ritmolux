@@ -169,8 +169,8 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Settle the rate candidate | dev | done | committed with this row |
-| 2 — Repair what Phase 1 convicted | dev | not started | |
+| 1 — Settle the rate candidate | dev | done | `7568e511` |
+| 2 — Repair what Phase 1 convicted | dev | not run — Phase 1 falsified the candidate | committed with this row |
 | 3 — The echo nests | dev | not started | |
 | 4 — The waveform scale is measured per mode | dev | not started | |
 | 5 — The fourth look gate | human | not started | |
@@ -241,6 +241,12 @@ unattributed. Two per-frame mechanisms in this path cannot be `dt`-converted eve
 are where to look first — each frame is one bilinear resample of the whole field through the warp
 mesh, and each frame applies the 8-bit quantize floor (ADR-0118) once — but neither was tested here
 and neither has the candidate's shape.
+
+**Phase 2 did not run.** Its stated condition — *"this phase does not run if Phase 1 falsified the
+candidate"* — is met: there is no deposit path to convert, because no deposit path was convicted. No
+code changed and no baseline moved for it. The two washed pairs therefore leave Phase 1 with **no
+named mechanism**, which is the outcome the plan's own risk section anticipated, and Phase 5's
+verdict has to say so.
 
 ### Close triggers
 
