@@ -312,7 +312,7 @@ pub enum RotateSource {
 | 3 — The browser narrows | dev | done | 74b1e5c5 |
 | 4 — The keys and the HUD carry it | dev | done | fe2b682f |
 | 5 — The protocol carries a mark | dev | done | 5220ce99 |
-| 6 — The studio marks and filters | studio-builder | done | committed with this row |
+| 6 — The studio marks and filters | studio-builder | done | e5f95955 |
 
 ### Notes
 
@@ -423,8 +423,8 @@ pub enum RotateSource {
   untouched.
 - **Plan header `Closes:`** none
 - **What shipped:** feature — two preset marks and everything that spends them, in the standalone
-  only. `core/`, `core-cabi/`, `rlx-ring/`, `plugin-foobar/` and `presets/` are byte-unchanged, so
-  the C ABI does not move and the foobar component keeps rotating the whole set.
+  and in the studio. `core/`, `core-cabi/`, `rlx-ring/`, `plugin-foobar/` and `presets/` are
+  byte-unchanged, so the C ABI does not move and the foobar component keeps rotating the whole set.
 - **Operator docs touched:** [`docs/running.md`](../running.md) (the six new keys, marking, the
   browser's three narrowings, the A/B hold, the corner's marks and countdown),
   [`docs/configuration.md`](../configuration.md) (the `marks.toml` section, `[rotate] source`,
@@ -433,16 +433,18 @@ pub enum RotateSource {
   `ctl/mark` row, the `marks` event row, six invariants, two scenarios, a provenance entry and the
   corrected `prev` invariant).
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *43 stated reductions still
-  hold across all 20 live entries (4 unprobeable)*. The advisory half lists `standalone/src/show.rs`
-  as having moved past entry 0220's stamp, which is this plan's own edits.
-- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Every phase ran
+  hold across all 20 live entries (4 unprobeable)*, re-run after Phase 6. The advisory half lists
+  `standalone/src/show.rs` as having moved past entry 0220's stamp, which is this plan's own edits.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Phases 1–5 each ran
   `cargo nextest run -p standalone -P fast` green (455 tests at Phase 5), with
   `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` clean;
+  Phase 6 touched no Rust and ran the studio's own gate — `npm --prefix studio run typecheck`,
+  `run lint` and `test` (31 files, 294 tests) all green.
   `check-doc-links`, `check-comment-hygiene`, `check-index-rows`, `check-system-counts`,
   `check-reader-prose`, `check-gate-carriers`, `check-backlog-claims` and `toc --check` were run by
   hand at the close and are green.
-- **Outstanding `human` phases:** none. **Phase 6 (`studio-builder`) is not started** — this run
-  was the `dev` range 1–5, and the studio side of ADR-0229 is still owed.
+- **Outstanding `human` phases:** none. Every phase of the plan is committed; Phase 6 was a separate
+  `studio-builder` run over the same lane.
 
 ## Followups (after this lands)
 
