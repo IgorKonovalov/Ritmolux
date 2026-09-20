@@ -103,18 +103,53 @@ flowchart TB
 - **Owner skill:** dev
 - **What:** A per-family hop default beside the per-preset override roster, and the signal extended so
   the later hop still lands on a loud beat.
-- **Files touched:** `scripts/docs-shots.mjs`.
+- **Files touched:** `scripts/docs-shots.mjs`, `standalone/src/shot/args.rs`, and the CLI's two
+  reader documents (`docs/configuration.md`, `docs/capturing.md`).
+
+> **Amended 2026-09-20, and this phase is why the plan parked.** The clip is
+> `SIGNAL_SECS: f32 = 4.0` in `standalone/src/shot/args.rs` — at 48 kHz on a 512-sample hop, **375
+> analysis hops**, so hop 374 (the existing swarm override) is already the last one the clip has,
+> and `--frame-at 375` does not clamp but fails the run through `check_hops`. The accumulating
+> families' horizons are **tens of seconds** — backlog 0254 records `warp_ladder` still filling at
+> the 30 s row, hop ~2812 — so *every* hop this clip can offer is inside the first four seconds and
+> the second half of this phase is unreachable from the script alone. The plan's own exclusion
+> *"It does not change `shot`"* forbade the one file where it is reachable, so both could not hold.
+>
+> **The amendment: `shot` gains a `--signal-secs` flag, and `SIGNAL_SECS` becomes its default.**
+> Additive by construction — every existing caller omits the flag and gets 4.0, so no committed
+> capture, golden or test moves by a byte, and that byte-identity is the done-when below rather
+> than an expectation.
+>
+> **Rejected: raising `SIGNAL_SECS` itself.** One constant, no new surface — and it silently
+> relengthens every synthesized capture in the repository, including the ones tests pin. The blast
+> radius is every `--signal` caller rather than the four or five cards that need the longer clip,
+> and the failure mode is a golden that moves for a reason nobody connects to this plan.
 - **Done when:** the accumulating families — the feedback and trail-driven set ADR-0099 already
   enumerates for the horizon question — resolve to a hop past their development horizon, and the
   non-accumulating families still resolve to 300. The signal's own structure is what makes the late hop
   loud: state in the script's header which beat the new hop lands on, the way the existing header states
   it for 300, so the next reader can check the claim rather than trust it. A per-preset entry in
   `CARD_HOP_OVERRIDES` still wins over its family's default.
+- **Done when (the flag, added 2026-09-20):** `--signal-secs` takes a positive finite number of
+  seconds and every `--signal` kind is synthesized at that length; **omitting it is byte-identical
+  to today** — show that by re-rendering one non-accumulating card with no flag and diffing it
+  against the committed PNG, on the machine that committed it, rather than by asserting it; and
+  `check_hops` still refuses a `--frame-at` past the end of the *new* length, with its message
+  naming that length rather than 375.
+- **Stop condition:** if the accumulating families' horizons turn out to need a clip so long that a
+  card costs more than a minute to render, **stop and say so in the log** rather than shipping a
+  render nobody will re-run. A card that is too expensive to regenerate is the freshness problem
+  this plan exists to reduce, arriving by a different door.
 
 ### Phase 3 — the affected cards are re-rendered as sets
 - **Owner skill:** dev
 - **What:** Re-render every card whose hop moved, one family at a time, on one machine.
-- **Files touched:** `docs/images/gallery/*.png`.
+- **Files touched:** `docs/images/gallery/presets/*.png` — **corrected 2026-09-20**, from
+  `docs/images/gallery/*.png`. That spelling names the **one-per-system** set, which this plan never
+  meant: every other sentence here says *card*, and a card is
+  `docs/images/gallery/presets/<preset>.png`. The per-system entries also carry hand-written hops
+  with their own judgement comments in the manifest, so a family default reaching them would
+  overwrite a deliberate choice with a generic one.
 - **Done when:** each family's cards are re-rendered in one run on one machine and one commit per family,
   with the machine and adapter named in the commit body
   ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)) — because
@@ -137,6 +172,16 @@ flowchart TB
 
 ## Risks & open questions
 
+- **Twelve of thirty-three re-rendered manifest entries came back byte-different, and nobody knows
+  why** (recorded 2026-09-20 from the bounded run that checked Phase 1). `hero`,
+  `walkthrough/step-5` and ten of the one-per-system gallery images differed from their committed
+  PNGs on this machine, while the other twenty-one — `warp_tracery`'s card among them — were
+  byte-identical. All were restored; the lane carries no image change. **Phase 3 has to survive
+  this**: if a third of the set is already unstable against its own committed bytes, "one family per
+  run per machine, named in the commit body" is doing more work than it looks, and a Phase 3 diff
+  will contain cards whose hop did not move. Whether the cause is driver drift, a different binary
+  or preset content that has since moved is **not established**, and establishing it is not this
+  plan's — it is the kind of thing that becomes a backlog entry with a probe.
 - **Phase 2's "past their development horizon" is not a number yet, and deliberately.** The horizon
   differs per family — `warp_ladder`'s field fills for two minutes — and a single late hop for the whole
   accumulating set may be right or may be four different numbers. Phase 2 picks from the signal's
@@ -161,8 +206,14 @@ flowchart TB
 - **It does not re-render the gallery.** Only cards whose hop moved.
 - **It does not touch the two renderers that are not stills** — `docs-clip.mjs`'s demo clip and social
   preview are out of scope.
-- **It does not change `shot`**, the tier, or any preset. A card that is wrong because the preset is wrong
+- **It does not change the tier, or any preset.** A card that is wrong because the preset is wrong
   is a content finding, not this plan's.
+- **It changes `shot` in exactly one additive way** (amended 2026-09-20). This bullet read *"It does
+  not change `shot`"* and that exclusion is what parked Phase 2: the clip length lives in
+  `standalone/src/shot/args.rs` and nowhere else, so the plan forbade the only file its own
+  done-when could be satisfied from. The narrowed exclusion is that **no existing behaviour moves** —
+  a new optional flag, the old constant as its default, no other `shot` surface touched, and no
+  committed capture different by a byte.
 
 ## Implementation log
 
