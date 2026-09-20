@@ -2413,6 +2413,15 @@ const STRUCTURAL: &[(&str, &str)] = &[
     ("emitter", "points"),
     ("shape_field", "shape"),
     ("shape_field", "points"),
+    // `star_seed`: clamp then round, on the roster's own rule rather than on
+    // `mark_points`' tearing one — a seed names an arrangement of the star's
+    // jitter and wobble, and there is nothing between two arrangements. Its
+    // siblings `star_wobble` and `star_wobble_freq` are deliberately absent:
+    // both are amounts the arm reads the fraction of, so they are `Modal` like
+    // `star_jitter` beside them.
+    ("swarm", "star_seed"),
+    ("emitter", "star_seed"),
+    ("shape_field", "star_seed"),
     // `applied_coord_mode`: a two-entry roster, clamped and rounded.
     ("shape_field", "coord_mode"),
     // `family::roster_index`: rounds into the tuple roster.

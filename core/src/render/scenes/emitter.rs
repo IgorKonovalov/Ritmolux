@@ -202,11 +202,15 @@ const DEFAULT_ZOOM: f32 = 1.0;
 // as it was, so an unbound emitter is unchanged.
 const DEFAULT_SHAPE: f32 = marks::DEFAULT_SHAPE;
 const DEFAULT_POINTS: f32 = marks::DEFAULT_POINTS;
-/// The `star` arm's three shape params (Plan 0091 Phase 5), aliased beside the
-/// other two mark defaults so this scene states its whole vocabulary locally.
+/// The `star` arm's shape params (Plan 0091 Phase 5) and its hand-drawn
+/// controls, aliased beside the other two mark defaults so this scene states its
+/// whole vocabulary locally.
 const DEFAULT_STAR_VALLEY: f32 = marks::DEFAULT_STAR_VALLEY;
 const DEFAULT_STAR_CURVE: f32 = marks::DEFAULT_STAR_CURVE;
 const DEFAULT_STAR_JITTER: f32 = marks::DEFAULT_STAR_JITTER;
+const DEFAULT_STAR_SEED: f32 = marks::DEFAULT_STAR_SEED;
+const DEFAULT_STAR_WOBBLE: f32 = marks::DEFAULT_STAR_WOBBLE;
+const DEFAULT_STAR_WOBBLE_FREQ: f32 = marks::DEFAULT_STAR_WOBBLE_FREQ;
 
 /// The WGSL, with `%ANISO%` substituted from [`GLINT_ANISO`] at module creation
 /// so the elongation exists in exactly one place — a second copy in the shader
@@ -223,12 +227,19 @@ const ANISO: f32 = %ANISO%;
 struct Misc {
     // x: aspect, y: zoom, zw: pan (the shared ViewTransform, ADR-0018)
     v: vec4<f32>,
-    // x: mark shape index, y: quantized point count (ADR-0084). Per draw, not
-    // per instance.
+    // x: mark shape position, y: quantized point count (ADR-0084), z: the star
+    // arm's arrangement seed, w: its edge-wobble amplitude. Per draw, not per
+    // instance.
     m: vec4<f32>,
-    // xyz: the star arm's shape params (valley, curve, jitter), conditioned
-    // CPU-side (Plan 0091 Phase 5). Per draw, like `m`. Inert on every other
-    // shape, and at their defaults the arm takes its original closed form.
+    // xyz: the star arm's shape params (valley, curve, jitter), w: the edge
+    // wobble's frequency — all conditioned CPU-side (Plan 0091 Phase 5). Per
+    // draw, like `m`. Inert on every other shape, and at their defaults the arm
+    // takes its original closed form.
+    //
+    // The three hand-drawn controls sit in the padding these two rows already
+    // carried, so neither this uniform nor the layout over it changed shape —
+    // which on this scene in particular is not a free thing to do (see the
+    // layout comment below and ADR-0058).
     s: vec4<f32>,
 }
 
@@ -241,6 +252,7 @@ struct VsOut {
     @location(2) @interpolate(flat) shape: f32,
     @location(3) @interpolate(flat) points: f32,
     @location(4) @interpolate(flat) star: vec3<f32>,
+    @location(5) @interpolate(flat) rough: vec3<f32>,
 }
 
 @vertex
@@ -275,6 +287,7 @@ fn vs_main(
     out.shape = misc.m.x;
     out.points = misc.m.y;
     out.star = misc.s.xyz;
+    out.rough = vec3<f32>(misc.m.z, misc.m.w, misc.s.w);
     return out;
 }
 
@@ -289,7 +302,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     if (in.shape < 0.5) {
         d = length(vec2<f32>(in.local.x, in.local.y / ANISO));
     } else {
-        d = mark_distance(in.local, in.shape, in.points, in.star);
+        d = mark_distance(in.local, in.shape, in.points, in.star, in.rough);
     }
     let falloff = max(0.0, 1.0 - d);
     let g = falloff * falloff;
@@ -926,6 +939,9 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::marks::STAR_VALLEY,
     crate::render::scenes::marks::STAR_CURVE,
     crate::render::scenes::marks::STAR_JITTER,
+    crate::render::scenes::marks::STAR_SEED,
+    crate::render::scenes::marks::STAR_WOBBLE,
+    crate::render::scenes::marks::STAR_WOBBLE_FREQ,
 ];
 
 /// Objects that spawn, fall on a parabola, and die (ADR-0057).
@@ -998,13 +1014,16 @@ pub struct EmitterScene {
     /// (see [`marks::mark_points`]).
     shape: f32,
     points: f32,
-    /// The `star` arm's three shape params, raw as the preset bound them
-    /// (Plan 0091 Phase 5). `marks::star_*` condition them on the way to the
-    /// uniform. Inert on every other silhouette, and nothing warns —
-    /// `presets/README.md` carries that.
+    /// The `star` arm's shape params and its hand-drawn controls, raw as the
+    /// preset bound them (Plan 0091 Phase 5). `marks::star_*` condition them on
+    /// the way to the uniform. Inert on every other silhouette, and nothing
+    /// warns — `presets/README.md` carries that.
     star_valley: f32,
     star_curve: f32,
     star_jitter: f32,
+    star_seed: f32,
+    star_wobble: f32,
+    star_wobble_freq: f32,
 }
 
 impl EmitterScene {
@@ -1120,6 +1139,9 @@ impl EmitterScene {
             star_valley: DEFAULT_STAR_VALLEY,
             star_curve: DEFAULT_STAR_CURVE,
             star_jitter: DEFAULT_STAR_JITTER,
+            star_seed: DEFAULT_STAR_SEED,
+            star_wobble: DEFAULT_STAR_WOBBLE,
+            star_wobble_freq: DEFAULT_STAR_WOBBLE_FREQ,
         }
     }
 
@@ -1220,6 +1242,9 @@ impl Scene for EmitterScene {
         self.star_valley = DEFAULT_STAR_VALLEY;
         self.star_curve = DEFAULT_STAR_CURVE;
         self.star_jitter = DEFAULT_STAR_JITTER;
+        self.star_seed = DEFAULT_STAR_SEED;
+        self.star_wobble = DEFAULT_STAR_WOBBLE;
+        self.star_wobble_freq = DEFAULT_STAR_WOBBLE_FREQ;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -1252,6 +1277,9 @@ impl Scene for EmitterScene {
             "star_valley" => self.star_valley = value,
             "star_curve" => self.star_curve = value,
             "star_jitter" => self.star_jitter = value,
+            "star_seed" => self.star_seed = value,
+            "star_wobble" => self.star_wobble = value,
+            "star_wobble_freq" => self.star_wobble_freq = value,
             _ => {}
         }
     }
@@ -1344,14 +1372,14 @@ impl Scene for EmitterScene {
                 m: [
                     marks::mark_shape(self.shape),
                     marks::mark_points(self.points),
-                    0.0,
-                    0.0,
+                    marks::star_seed(self.star_seed),
+                    marks::star_wobble(self.star_wobble),
                 ],
                 s: [
                     marks::star_valley(self.star_valley),
                     marks::star_curve(self.star_curve),
                     marks::star_jitter(self.star_jitter),
-                    0.0,
+                    marks::star_wobble_freq(self.star_wobble_freq),
                 ],
             },
         );

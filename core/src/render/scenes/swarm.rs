@@ -175,6 +175,9 @@ const DEFAULT_POINTS: f32 = marks::DEFAULT_POINTS;
 const DEFAULT_STAR_VALLEY: f32 = marks::DEFAULT_STAR_VALLEY;
 const DEFAULT_STAR_CURVE: f32 = marks::DEFAULT_STAR_CURVE;
 const DEFAULT_STAR_JITTER: f32 = marks::DEFAULT_STAR_JITTER;
+const DEFAULT_STAR_SEED: f32 = marks::DEFAULT_STAR_SEED;
+const DEFAULT_STAR_WOBBLE: f32 = marks::DEFAULT_STAR_WOBBLE;
+const DEFAULT_STAR_WOBBLE_FREQ: f32 = marks::DEFAULT_STAR_WOBBLE_FREQ;
 
 /// The scene's own WGSL. The shared mark-silhouette chunk
 /// ([`marks::sdf_wgsl`]) is prepended at module creation, so `mark_distance` here
@@ -192,13 +195,19 @@ const SHADER: &str = r#"
 struct Misc {
     // x: aspect, y: zoom, zw: pan (the shared ViewTransform, ADR-0018)
     v: vec4<f32>,
-    // x: mark shape index, y: quantized point count (ADR-0084). Per draw, not
-    // per instance: the branch stays uniform across a warp and `Instance` does
-    // not grow.
+    // x: mark shape position, y: quantized point count (ADR-0084), z: the star
+    // arm's arrangement seed, w: its edge-wobble amplitude. Per draw, not per
+    // instance: the branch stays uniform across a warp and `Instance` does not
+    // grow.
     m: vec4<f32>,
-    // xyz: the star arm's shape params (valley, curve, jitter), conditioned
-    // CPU-side (Plan 0091 Phase 5). Per draw, like `m`. Inert on every other
-    // shape, and at their defaults the arm takes its original closed form.
+    // xyz: the star arm's shape params (valley, curve, jitter), w: the edge
+    // wobble's frequency — all conditioned CPU-side (Plan 0091 Phase 5). Per
+    // draw, like `m`. Inert on every other shape, and at their defaults the arm
+    // takes its original closed form.
+    //
+    // The three hand-drawn controls sit in the padding these two rows already
+    // carried, which is what keeps this uniform and the bind layout over it the
+    // shapes they were (ADR-0058).
     s: vec4<f32>,
 }
 
@@ -211,6 +220,7 @@ struct VsOut {
     @location(2) @interpolate(flat) shape: f32,
     @location(3) @interpolate(flat) points: f32,
     @location(4) @interpolate(flat) star: vec3<f32>,
+    @location(5) @interpolate(flat) rough: vec3<f32>,
 }
 
 @vertex
@@ -245,6 +255,7 @@ fn vs_main(
     out.shape = misc.m.x;
     out.points = misc.m.y;
     out.star = misc.s.xyz;
+    out.rough = vec3<f32>(misc.m.z, misc.m.w, misc.s.w);
     return out;
 }
 
@@ -254,7 +265,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // and nothing else, so an unshaped swarm is the arithmetic it always was; the
     // falloff below is untouched either way, so a visual change is attributable
     // to the shape alone.
-    let d = mark_distance(in.local, in.shape, in.points, in.star);
+    let d = mark_distance(in.local, in.shape, in.points, in.star, in.rough);
     let falloff = max(0.0, 1.0 - d);
     let g = falloff * falloff;
     // Premultiplied: colour AND alpha carry the same coverage `g`, so the four
@@ -378,6 +389,9 @@ pub struct SwarmScene {
     star_valley: f32,
     star_curve: f32,
     star_jitter: f32,
+    star_seed: f32,
+    star_wobble: f32,
+    star_wobble_freq: f32,
     /// Per-mark individuation (Plan 0077 Phase 2): the twinkle depth and the
     /// size-spread width, both resolved per particle at draw.
     twinkle: f32,
@@ -483,6 +497,9 @@ impl SwarmScene {
             star_valley: DEFAULT_STAR_VALLEY,
             star_curve: DEFAULT_STAR_CURVE,
             star_jitter: DEFAULT_STAR_JITTER,
+            star_seed: DEFAULT_STAR_SEED,
+            star_wobble: DEFAULT_STAR_WOBBLE,
+            star_wobble_freq: DEFAULT_STAR_WOBBLE_FREQ,
             twinkle: DEFAULT_TWINKLE,
             size_spread: DEFAULT_SIZE_SPREAD,
             reseed: 0.0,
@@ -668,6 +685,9 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::marks::STAR_VALLEY,
     crate::render::scenes::marks::STAR_CURVE,
     crate::render::scenes::marks::STAR_JITTER,
+    crate::render::scenes::marks::STAR_SEED,
+    crate::render::scenes::marks::STAR_WOBBLE,
+    crate::render::scenes::marks::STAR_WOBBLE_FREQ,
 ];
 
 impl Scene for SwarmScene {
@@ -705,6 +725,9 @@ impl Scene for SwarmScene {
         self.star_valley = DEFAULT_STAR_VALLEY;
         self.star_curve = DEFAULT_STAR_CURVE;
         self.star_jitter = DEFAULT_STAR_JITTER;
+        self.star_seed = DEFAULT_STAR_SEED;
+        self.star_wobble = DEFAULT_STAR_WOBBLE;
+        self.star_wobble_freq = DEFAULT_STAR_WOBBLE_FREQ;
         self.twinkle = DEFAULT_TWINKLE;
         self.size_spread = DEFAULT_SIZE_SPREAD;
         // `prev_reseed` is deliberately NOT reset: this runs every frame
@@ -736,6 +759,9 @@ impl Scene for SwarmScene {
             "star_valley" => self.star_valley = value,
             "star_curve" => self.star_curve = value,
             "star_jitter" => self.star_jitter = value,
+            "star_seed" => self.star_seed = value,
+            "star_wobble" => self.star_wobble = value,
+            "star_wobble_freq" => self.star_wobble_freq = value,
             "twinkle" => self.twinkle = value,
             "size_spread" => self.size_spread = value,
             "reseed" => self.reseed = value,
@@ -908,14 +934,14 @@ impl Scene for SwarmScene {
                 m: [
                     marks::mark_shape(self.shape),
                     marks::mark_points(self.points),
-                    0.0,
-                    0.0,
+                    marks::star_seed(self.star_seed),
+                    marks::star_wobble(self.star_wobble),
                 ],
                 s: [
                     marks::star_valley(self.star_valley),
                     marks::star_curve(self.star_curve),
                     marks::star_jitter(self.star_jitter),
-                    0.0,
+                    marks::star_wobble_freq(self.star_wobble_freq),
                 ],
             },
         );

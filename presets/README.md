@@ -475,6 +475,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
+| `star_seed` | `0` | `0` – `255` | Picks a different arrangement of the same amount of jitter and wobble - a whole number, and every value is as rough as every other. |
 
 **Modal**
 
@@ -501,6 +502,8 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. |
 | `star_jitter` | `0` | `0` – `1` | Randomises each point's length by a seeded amount, so the star reads as hand-drawn. |
+| `star_wobble` | `0` | `0` – `1` | Waves each edge in and out along its length, leaving the points where they are - the wander a hand-drawn outline has. |
+| `star_wobble_freq` | `1` | `0.5` – `2.5` | How many waves the edge wander fits between a point and the notch beside it. Does nothing while star_wobble is 0. |
 
 ### System: `parametric_curve`
 
@@ -737,6 +740,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
+| `star_seed` | `0` | `0` – `255` | Picks a different arrangement of the same amount of jitter and wobble - a whole number, and every value is as rough as every other. |
 
 **Modal**
 
@@ -770,6 +774,8 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. |
 | `star_jitter` | `0` | `0` – `1` | Randomises each point's length by a seeded amount, so the star reads as hand-drawn. |
+| `star_wobble` | `0` | `0` – `1` | Waves each edge in and out along its length, leaving the points where they are - the wander a hand-drawn outline has. |
+| `star_wobble_freq` | `1` | `0.5` – `2.5` | How many waves the edge wander fits between a point and the notch beside it. Does nothing while star_wobble is 0. |
 
 ### System: `shape_field`
 
@@ -779,6 +785,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 |---|---|---|---|
 | `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
+| `star_seed` | `0` | `0` – `255` | Picks a different arrangement of the same amount of jitter and wobble - a whole number, and every value is as rough as every other. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour_style` | `0` | `0` – `3` | Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink. |
 | `coord_mode` | `0` | `0` – `1` | Which coordinate frame the distance is measured in, which changes the shape's whole geometry. |
@@ -790,6 +797,8 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. |
 | `star_jitter` | `0` | `0` – `1` | Randomises each point's length by a seeded amount, so the star reads as hand-drawn. |
+| `star_wobble` | `0` | `0` – `1` | Waves each edge in and out along its length, leaving the points where they are - the wander a hand-drawn outline has. |
+| `star_wobble_freq` | `1` | `0.5` – `2.5` | How many waves the edge wander fits between a point and the notch beside it. Does nothing while star_wobble is 0. |
 | `scale` | `0.6` | `0.05` – `2` | Size of the shape within the frame. |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. |
@@ -1553,7 +1562,7 @@ Three things come with that:
   bands are the figure's at a whole index and approximate in between. The
   interior, the outline and the particle falloff are unaffected.
 
-#### The `star` arm's three shape params
+#### The `star` arm's shape params
 
 The star was one welded silhouette until a batch of six reference images turned
 out to be **five requests for parameters this arm did not have**. It has them
@@ -1564,7 +1573,10 @@ one roster, so a shape a particle wears and a figure a field draws cannot drift.
 |---|---|---|---|
 | `star_valley` | `0.05`..`0.95` | **`0.45`** | the valley radius as a fraction of the tip's. Low is a sharp, thin-spiked star; high is a bumpy polygon |
 | `star_curve` | `-0.9`..`0.9` | **`0`** | bows the edge between tip and valley. **Positive bows it inward** — the concave sparkle, which a straight-edged star cannot make at *any* valley radius. Negative bulges it out |
-| `star_jitter` | `0`..`1` | **`0`** | per-spike variation in tip length, for the hand-drawn / irregular "bang" look |
+| `star_jitter` | `0`..`1` | **`0`** | per-spike variation in tip **length**, for the irregular "bang" look |
+| `star_wobble` | `0`..`1` | **`0`** | waves each **edge** in and out along its length, leaving the tips and notches exactly where they are. This is the one that reads as *hand-drawn* |
+| `star_wobble_freq` | `0.5`..`2.5` | **`1`** | how many waves fit between a tip and the notch beside it. Inert while `star_wobble` is 0 |
+| `star_seed` | `0`..`255` | **`0`** | which arrangement the jitter and the wobble draw. A whole number; every value is exactly as rough as every other |
 
 **Every default is an exact identity**, and that is an obligation rather than
 taste: the shared chunk means these knobs reach the particle path, so anything
@@ -1579,29 +1591,49 @@ star_valley = "0.18"      # a long, sharp four-point sparkle
 star_curve  = "0.55"      # ...with concave edges
 ```
 
-Three things worth knowing before you tune them:
+Five things worth knowing before you tune them:
 
-- **`star_jitter` is seeded, not random.** The per-spike lengths come from an
-  integer hash of the spike index, so the same preset draws the same figure in
-  every run and on every machine. There is no separate lever to *re-scatter* the
-  pattern while keeping the amount — if a look needs one, that is engine
-  feedback.
+- **`star_jitter` and `star_wobble` are two different quantities, and only one of
+  them is what "hand-drawn" means.** The jitter makes spikes *unequal*; a star
+  whose spikes are ragged but whose edges are dead straight reads as damaged
+  rather than as drawn. The wobble waves the line *between* a tip and a notch
+  while leaving both ends where they are. Reach for the wobble for a drawn
+  outline and the jitter for a shape that was knocked about.
+- **`star_seed` re-scatters without re-sizing.** Both roughnesses come from an
+  integer hash, so the same preset draws the same figure in every run and on
+  every machine; the seed moves the hash's *input*, so it picks a different
+  arrangement of the same amount. If one seed's star has an ugly spike, try the
+  next one — you are not trading away roughness to do it.
+- **The wobble is radial, and the two edges of one spike mirror each other.**
+  The wander scales each point's radius rather than pushing it sideways, which
+  is what keeps the figure something `coord_mode = 1` can still measure. And the
+  engine folds a star into one half-wedge, so a spike is symmetric about its own
+  axis however much it wobbles. A figure whose every spike is internally
+  symmetric is what this arm can draw.
 - **`star_curve` is where the field's precision goes.** A bowed edge has no
   closed-form distance, so it is sampled; the contours `shape_field` draws are
   0.0032 off true, which is invisible. **`star_jitter` costs much more** — up to
   0.54 at seven points, because the angular fold measures against a point's own
-  spike and a longer neighbour can be nearer. On a particle mark none of this is
-  visible (the sprite reads only the interior); on a big banded field, a heavily
-  jittered star's outer rings are approximate.
+  spike and a longer neighbour can be nearer. **`star_wobble` costs about a
+  quarter of that**, up to 0.12 at full amplitude, and adding it on top of a
+  heavy jitter barely moves the jitter's own figure. On a particle mark none of
+  this is visible (the sprite reads only the interior); on a big banded field, a
+  heavily jittered star's outer rings are approximate.
 - **They are inert on the other four shapes**, and nothing warns — the name is
   known, so no unknown-parameter warning fires. This paragraph is the warning.
+  `star_wobble` at any non-zero value also takes the star off its closed-form
+  branch onto the sampled one, which is the same branch `star_curve` selects.
 
-#### These three MORPH the figure with the music, and that needs no engine work
+#### Most of them MORPH the figure with the music, and that needs no engine work
 
-**All three are clamp-only — no rounding — so a binding drives them continuously and the silhouette
-genuinely deforms.** That is worth stating because `points`, the param beside them, is rounded and
-therefore *steps*. Verified by rendering: `star_valley` on bass and `star_curve` on
-treble over a 120 BPM click visibly thickens and thins the arms and changes the spike proportions.
+**`star_valley`, `star_curve`, `star_jitter`, `star_wobble` and `star_wobble_freq` are clamp-only —
+no rounding — so a binding drives them continuously and the silhouette genuinely deforms.** That is
+worth stating because two params beside them are rounded and therefore *step*: `points`, and
+`star_seed`. A seed names an arrangement and there is nothing between two arrangements, so a binding
+that sweeps it flickers through unrelated figures instead of morphing — which is exactly what a
+re-scatter is, and why the seed is the knob you pick a look with rather than the one a phrase rides.
+Verified by rendering: `star_valley` on bass and `star_curve` on treble over a 120 BPM click visibly
+thickens and thins the arms and changes the spike proportions.
 
 ```toml
 [params]
@@ -1623,7 +1655,13 @@ Three things to know before binding them:
 - **A binding that sweeps `star_curve` through 0 crosses a small discontinuity.** At exactly zero
   the arm takes a closed-form straight-edge branch; either side of it takes a sampled one, and the
   two disagree by about `0.0032` (the polyline's sagitta). Small, but it sits in the middle of the
-  range you are most likely to animate through — bias the range to one side if it shows.
+  range you are most likely to animate through — bias the range to one side if it shows. **The same
+  seam sits under `star_wobble` at 0**, and under `star_jitter` at 0, for the same reason: any of
+  the three being non-zero is what selects the sampled branch.
+- **`star_wobble_freq` past about 2.5 has nowhere to go**, which is why the range stops there. The
+  edge is sampled into eight sub-segments, so a wave of 2.5 cycles gets about three samples per
+  cycle; a faster one would be read by the polyline as a slower, differently-shaped wave rather than
+  as the wave you asked for.
 - **A curved or jittered star's interior normalizes differently from a straight-edged one, and so
   does its contour spacing.** That branch divides by the figure's own deepest-point distance rather
   than by the straight edge plane's perpendicular, so a `color_span` carried over from a
@@ -1722,7 +1760,7 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 |---|---|
 | `shape` | the same numeric selector as the table above, same five names, same closed roster |
 | `points` | the same `3`..`12` count, for `polygon` and `star` |
-| `star_valley` / `star_curve` / `star_jitter` | the same three star shape params — see [The `star` arm](#the-star-arms-three-shape-params). `star_jitter` is the one whose *field* precision is worth reading about there |
+| `star_valley` / `star_curve` / `star_jitter` / `star_wobble` / `star_wobble_freq` / `star_seed` | the same star shape params — see [The `star` arm](#the-star-arms-shape-params). `star_jitter` is the one whose *field* precision is worth reading about there |
 | `scale` | the figure's size: its outline sits at `scale` of the frame's short half-axis. Default `0.6`, clamped to `0.01`..`20` |
 | `pan_x` / `pan_y` | move the figure's centre (the shared view transform) |
 | `rotation` | turns the figure **about its own centre**, in radians. Default `0`, an exact identity, unclamped — an angle wraps. Applied after `pan_*`, so a panned figure spins in place rather than orbiting the frame |

@@ -156,7 +156,7 @@ single shipped picture.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The roster travels | dev | done | 56915750 + committed with this row |
-| 2 — The star wobbles, and its scatter can be chosen | dev | not started | |
+| 2 — The star wobbles, and its scatter can be chosen | dev | done | committed with this row |
 | 3 — Judge the floor by rendering | dev | not started | |
 | 4 — The backdrop ramp converges | dev | not started | |
 
@@ -199,7 +199,87 @@ dissolve carrying `shape` from one whole setting to another now travels through 
 used to step at the rounding boundary. No shipped preset can reach that path, and no baseline
 renders one.
 
+### Phase 2 — what the done-when measured
+
+Three parameters landed: `star_seed` (0..255, rounded), `star_wobble` (0..1, amplitude) and
+`star_wobble_freq` (0.5..2.5). All three default to an identity and all three went into padding the
+two uniforms already carried, so no bind-group layout changed.
+
+**Two seeds, same amount.** Per-spike tip radii at sixteen seeds, 7 points, `star_jitter = 0.5`
+(band 1.0): no seed spans more than the band, none collapses, and the **mean range is 0.7364**
+against the 0.7500 a uniform draw of seven predicts. No seed's arrangement equals another's under
+any of the seven rotations — the rotation check is what the multiplicative stride buys, since a seed
+merely *added* to the hash's input would produce the same star turned by one spike. Seed 0's hash is
+bit-identical to the unseeded one.
+
+**The wobble moves the edge, not the tip**, measured separately on the arm's own outline:
+
+| wobble | tip moved by | edge moved by |
+|---|---|---|
+| amp 0.25, freq 1.0 | 0.0000002 | 0.04144 |
+| amp 0.5, freq 1.0 | 0.0000004 | 0.08282 |
+| amp 1.0, freq 1.0 | 0.0000009 | 0.16543 |
+| amp 1.0, freq 0.5 | 0.0000005 | 0.09127 |
+| amp 1.0, freq 2.5 | 0.0000011 | 0.13486 |
+
+Five orders apart, and linear in the amplitude at fixed frequency. The tip is a tolerance rather
+than a bit-equality: the probe names the angle `seg * spike` and the arm recovers it through
+`atan2`, which does not round-trip it — spike 4 of 7 lands about `1e-7` off its own axis, where the
+first sub-segment is wobbled. The window is algebraically exactly 0 at both ends.
+
+**Determinism, rendered on this machine's three adapters** at 160x160, on a figure carrying seed 11,
+`star_jitter` 0.5 and `star_wobble` 1.0. Two runs on the software adapter are **byte-identical**.
+Across adapters the spike order is the same list `[4, 6, 3, 0, 2, 1, 5]` on all three:
+
+| adapter | frame_diff against software |
+|---|---|
+| AMD Radeon(TM) Graphics | 0.00018 |
+| NVIDIA GeForce RTX 3080 Laptop GPU | 0.00021 |
+| Microsoft Basic Render Driver | 0.00000 |
+
+**The exterior field accuracy, re-measured against Plan 0091 Phase 5's 0.540.** Worst exterior error
+in sprite-local units, ground truth sampled 16x finer than the shader:
+
+| configuration | 5 points | 7 points |
+|---|---|---|
+| wobble 0.5, freq 1.0 | 0.06259 | 0.04667 |
+| wobble 1.0, freq 1.0 | 0.09332 | 0.07480 |
+| wobble 1.0, freq 2.5 | 0.07144 | 0.07032 |
+| wobble 1.0, freq 0.5 | 0.12123 | 0.09408 |
+| wobble 1.0, seed 9 | 0.09955 | 0.09006 |
+| wobble 1.0 + jitter 0.4 | 0.24931 | 0.54985 |
+
+**`star_wobble` alone costs at most 0.12123, about a quarter of the jitter's 0.540**, so the field is
+not materially worse and the phase did not hit its stop condition. On top of a `star_jitter` of 0.4
+the worst reading is 0.54985 against that configuration's own 0.54019 without the wobble — the
+jitter dominates and the wobble adds 0.0097. Interior error under the wobble alone is 0.004 to 0.053.
+
 ### Notes
+
+- **Phase 2 touched three files its `Files touched` list does not name**, and could not avoid it:
+  `core/src/render/scenes/swarm.rs`, `emitter.rs` and `shape_field.rs`. A shared mark parameter is
+  declared in `marks::PARAMS` but is *carried* by each scene — its field, its default, its `reset`,
+  its `set_param` arm, its uniform write and its varying — and `emitter.rs`'s
+  `both_particle_scenes_carry_the_same_shape_vocabulary` fails if the three rosters disagree. So
+  `star_seed` as an *input*, which the phase's `What` requires, is not reachable from `marks.rs`
+  alone. `core/tests/suite/preset.rs` is a fourth: its `STRUCTURAL` roster is a deliberate allowlist
+  that a newly-rounding parameter must join, and it failed until `star_seed` was added to it.
+- **`docs/presets.md` is in the list and was not touched.** It is the expression-language reference
+  and carries no star-arm material; the star's prose lives in `presets/README.md`, which was edited
+  by hand as well as regenerated. Nothing in `docs/presets.md` became false.
+- **The wobble is spelled inline at both of its call sites rather than called as a function**, which
+  is the opposite of `marks.rs`'s habit. Written as a function called inside the sub-segment loop —
+  the first user function in that loop — it stopped the DX12 backend producing a working
+  `shape_field` pipeline: all 26 of that scene's GPU tests and the golden roster came back on a lost
+  device, including presets that never reach the star arm, while every hardware render and every
+  `swarm`/`emitter` test passed. Inlining it made all of them green again. The constraint is
+  recorded at the code.
+- **The reference the curved arm normalizes by stays the unwobbled, unjittered figure's**, so the
+  wobble inherits the interior inexactness `star_jitter` already has rather than adding a new kind.
+- **`star_jitter`'s doc sentence still says "so the star reads as hand-drawn".** It is now the
+  weaker of the two roughnesses on that claim, and `presets/README.md`'s prose says so, but the
+  `ParamSpec` sentence was left as it is because changing it moves a generated surface for a
+  wording rather than for a fact.
 
 - **Phase 1's code did not land in this session's commit.** A prior session was cut off by the
   usage window mid-phase and its edits were committed unfinished as `56915750`
