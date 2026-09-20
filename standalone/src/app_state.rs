@@ -391,6 +391,19 @@ pub(crate) struct AppState {
 /// steady state never does.
 const TRANSPORT_SCRATCH: usize = 8;
 
+/// Whether a switch records the preset it is leaving on the back trail.
+///
+/// An enum rather than a `bool` at five call sites: the one that must **not**
+/// record is the step backwards itself, and a `false` there reads as nothing at
+/// all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Trail {
+    /// An ordinary switch: the preset being left joins the trail.
+    Record,
+    /// A step backwards: the trail is being walked, not extended.
+    Rewind,
+}
+
 /// Whether the display loop spends a console present on frame `frame`, at
 /// cadence `every_n`.
 ///
@@ -1210,7 +1223,15 @@ impl AppState {
     /// frame has rendered. Reading the title or the cap overflow here would describe
     /// the preset being left, so both wait one frame — see
     /// [`pending_switch_settle`](AppState::pending_switch_settle).
-    pub(crate) fn on_preset_switched(&mut self) {
+    pub(crate) fn on_preset_switched(&mut self, trail: Trail) {
+        // The preset being **left**, read here rather than passed in: a switch
+        // dissolves, so the roster still names the outgoing preset until the
+        // dissolve's capture frame runs, and this is the one moment every switch
+        // passes through with that name in hand.
+        if trail == Trail::Record {
+            let outgoing = self.renderer.preset_name().to_owned();
+            self.show.note_shown(&outgoing);
+        }
         self.pending_switch_settle = true;
         self.note_soak_switch();
         self.window.request_redraw();
@@ -1225,8 +1246,31 @@ impl AppState {
     /// and the scene never changed. Pairing the two here is what makes that
     /// unrepresentable.
     pub(crate) fn rotate_to_next(&mut self) {
-        self.renderer.cycle_preset();
-        self.on_preset_switched();
+        if self.show.rotate(&mut self.renderer).is_some() {
+            self.on_preset_switched(Trail::Record);
+        }
+    }
+
+    /// Step back to the preset shown before this one (`Backspace`, and the
+    /// console's `< prev`).
+    ///
+    /// Falls back to the roster's predecessor while nothing has been shown yet,
+    /// which is the whole of a run that has not switched: there is no trail to
+    /// walk, and an inert key would read as an unbound one.
+    pub(crate) fn step_previous(&mut self) {
+        if self.show.has_trail() {
+            if self.show.step_back(&mut self.renderer).is_some() {
+                // `Rewind`, so walking back three presets visits three rather
+                // than flipping between the last two.
+                self.on_preset_switched(Trail::Rewind);
+            }
+            return;
+        }
+        let count = self.renderer.preset_names().count();
+        if let Some(index) = console::previous_index(count, self.renderer.active_index()) {
+            self.renderer.select_preset(index);
+            self.on_preset_switched(Trail::Record);
+        }
     }
 
     /// Mark a GPU-resource rebuild in the soak log, if one is running

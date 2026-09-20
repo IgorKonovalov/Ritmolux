@@ -866,8 +866,15 @@ pub fn run(
         // decision and the change are paired here for the same reason the
         // shell pairs them: a rotation that is announced and not carried out
         // leaves the source on one scene for the whole set.
-        if let Some(reason) = show.director.advance(dt, &frame) {
-            let incoming = renderer.cycle_preset().to_owned();
+        // Through the show's own traversal, so a hidden preset stays off a
+        // four-hour source exactly as it stays off the window (ADR-0181): a path
+        // that held the marks and drew from the whole library anyway would be
+        // silently different rather than broken.
+        if let Some(reason) = show.director.advance(dt, &frame)
+            && let Some(incoming) = show.rotate(&mut renderer)
+        {
+            let outgoing = renderer.preset_name().to_owned();
+            show.note_shown(&outgoing);
             eprintln!("rotate   : frame {frames}, {reason:?} -> '{incoming}'");
         }
 
@@ -982,13 +989,24 @@ fn apply_transport(
         return;
     };
     match action {
+        // Both through the show's traversal, so the marks apply to a verb sent
+        // over the wire exactly as they apply to the dwell timer above.
         ConsoleAction::Next => {
-            renderer.cycle_preset();
+            if show.rotate(renderer).is_some() {
+                let outgoing = renderer.preset_name().to_owned();
+                show.note_shown(&outgoing);
+            }
         }
         ConsoleAction::Prev => {
-            let count = renderer.preset_names().count();
-            if let Some(index) = crate::console::previous_index(count, renderer.active_index()) {
-                renderer.select_preset(index);
+            if show.step_back(renderer).is_none() {
+                // Nothing has been shown yet, so there is no trail to walk.
+                let count = renderer.preset_names().count();
+                if let Some(index) = crate::console::previous_index(count, renderer.active_index())
+                {
+                    renderer.select_preset(index);
+                    let outgoing = renderer.preset_name().to_owned();
+                    show.note_shown(&outgoing);
+                }
             }
         }
         ConsoleAction::Settings(SettingsAction::ToggleAuto) => {

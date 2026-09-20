@@ -12,7 +12,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 
 use std::time::Instant;
 
-use crate::app_state::AppState;
+use crate::app_state::{AppState, Trail};
 use crate::console;
 use crate::hud::Modal;
 use crate::overlay::{OverlayAction, OverlayKey};
@@ -121,6 +121,17 @@ impl AppState {
             return;
         }
 
+        // A step backwards through what was actually shown, intercepted here for
+        // `Escape`'s reason: `decode_overlay_key` maps `Backspace`
+        // unconditionally, so with the browser **closed** the dispatch below
+        // would land on `OverlayAction::None => return` and this would never
+        // reach the shell's own match. With the browser open it stays the filter
+        // key it has always been, because the dispatch runs first.
+        if code == KeyCode::Backspace && self.modal().is_none() {
+            self.step_previous();
+            return;
+        }
+
         // Marking, before the overlay dispatch so the **same key** works with
         // the browser open and closed (ADR-0228). A function key is never a
         // filter character, which is what lets one binding serve both contexts
@@ -140,7 +151,7 @@ impl AppState {
                 OverlayAction::Redraw | OverlayAction::Close => {}
                 OverlayAction::Select(index) => {
                     self.renderer.select_preset(index);
-                    self.on_preset_switched();
+                    self.on_preset_switched(Trail::Record);
                 }
             }
             self.window.request_redraw();
@@ -263,13 +274,9 @@ impl AppState {
     pub(crate) fn apply_console_action(&mut self, action: console::ConsoleAction) {
         match action {
             console::ConsoleAction::Next => self.rotate_to_next(),
-            console::ConsoleAction::Prev => {
-                let count = self.renderer.preset_names().count();
-                if let Some(index) = console::previous_index(count, self.renderer.active_index()) {
-                    self.renderer.select_preset(index);
-                    self.on_preset_switched();
-                }
-            }
+            // One `prev`, whichever surface asked — the strip, the wire and the
+            // `Backspace` key — so the three cannot mean three things.
+            console::ConsoleAction::Prev => self.step_previous(),
             console::ConsoleAction::Random => {
                 let count = self.renderer.preset_names().count();
                 let seed = self.next_random();
@@ -277,7 +284,7 @@ impl AppState {
                     console::random_index(count, self.renderer.active_index(), seed)
                 {
                     self.renderer.select_preset(index);
-                    self.on_preset_switched();
+                    self.on_preset_switched(Trail::Record);
                 }
             }
             // The director's own reset comes with it, so the dwell restarts from
@@ -317,7 +324,7 @@ impl AppState {
                 }
             }
             if self.show.apply_control_rest(&mut self.renderer) {
-                self.on_preset_switched();
+                self.on_preset_switched(Trail::Record);
             }
         }
         self.control_transports = verbs;

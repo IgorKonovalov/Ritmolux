@@ -307,8 +307,8 @@ pub enum RotateSource {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The marks store, and one key that proves it | dev | done | committed with this row |
-| 2 — Rotation spends the marks | dev | not started | |
+| 1 — The marks store, and one key that proves it | dev | done | c3ed56cb |
+| 2 — Rotation spends the marks | dev | done | committed with this row |
 | 3 — The browser narrows | dev | not started | |
 | 4 — The keys and the HUD carry it | dev | not started | |
 | 5 — The protocol carries a mark | dev | not started | |
@@ -332,6 +332,28 @@ pub enum RotateSource {
   (`an_unusable_file_yields_empty_sets_rather_than_a_failure`).
 - Phase 1 binds `F1` (favourite) only. `F2` (hidden) waits for Phase 3, which is where the browser
   learns to show hidden presets again — a mark that cannot be found is a mark that cannot be undone.
+- **Phase 2 retired `console::next_up` and rewrote the two tests that read it**
+  (`standalone/src/console.rs`, `standalone/src/console/tests.rs`, outside the phase's file list).
+  That function *was* the "which preset does a rotation take" rule — the roster's successor — and
+  the shuffled traversal replaces it, so leaving it in place would have left the console's `next up`
+  line naming a preset the rotation was not about to take. The claim it made is now
+  `the_announced_preset_is_the_one_the_next_draw_takes` in `director/tests.rs`, and
+  `the_staged_name_is_the_one_the_rotation_then_takes` in `console/tests.rs` still drives a real
+  director against the shipped roster.
+- **`prev` is one behaviour across three surfaces**, not two. `Backspace`, the console strip's
+  `< prev` and `ctl/transport prev` all walk the trail of presets actually shown, falling back to
+  `console::previous_index` only while a run has shown nothing yet. Spec 0003 still describes that
+  row as "cut to the roster's predecessor", which stopped being accurate here; the correction rides
+  in Phase 5, which is the phase that owns the spec.
+- **Rotation now selects by name rather than by index** (`Show::rotate`), which is what ADR-0228's
+  name-keyed identity requires of anything the marks filter. The consequence: two presets sharing a
+  display name are one entry to the traversal, and the second copy is unreachable from rotation.
+  `rlx_core::preset::drift` already reports a contested display name, and nothing in the shipped set
+  has one.
+- Phase 2's reach beyond `director.rs` / `config.rs`: `show.rs` (the traversal's owner),
+  `app_state.rs` and `input.rs` (the `Trail` split and the `Backspace` binding), `hud.rs` (the
+  staging line reads the traversal's peek) and `stream.rs` (the headless path rotates through the
+  same traversal, so ADR-0181's invariant holds).
 
 ### Close triggers
 

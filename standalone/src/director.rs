@@ -11,7 +11,8 @@
 
 use rlx_core::dsp::AnalysisFrame;
 
-use standalone::config;
+use standalone::config::{self, RotateSource};
+use standalone::marks::{Mark, Marks};
 
 /// Time constant (seconds) for the smoothed energy baseline. ~1.5 s means the
 /// baseline follows sustained level changes but ignores per-beat spikes, so a
@@ -187,6 +188,215 @@ impl Director {
             self.dwell = 0.0;
         }
         self.auto
+    }
+}
+
+// ---------------------------------------------------------------------------
+// What a rotation draws from, and in what order
+// ---------------------------------------------------------------------------
+//
+// The director decides *when*. Everything below decides *which*, and it is a
+// separate concern with separate state: the eligible set is a pure function of
+// the roster and the user's marks, and the traversal over it is a pure function
+// of its own history plus a seeded counter. Neither reads a clock.
+
+/// The presets a rotation may land on, in roster order.
+///
+/// Hidden presets are excluded from every source — that is what the mark means.
+/// `Favourites` is a **hard filter with a fallback**: it narrows to the marked
+/// set, and falls back to the whole eligible set while nothing is marked,
+/// because a mode that can only ever show one preset is indistinguishable from
+/// a hang. A library whose every preset is hidden falls back the same way, for
+/// the same reason.
+pub fn eligible_names<'a>(
+    names: impl Iterator<Item = &'a str>,
+    marks: &Marks,
+    source: RotateSource,
+) -> Vec<&'a str> {
+    let all: Vec<&str> = names.collect();
+    let visible: Vec<&str> = all
+        .iter()
+        .copied()
+        .filter(|name| !marks.is(Mark::Hidden, name))
+        .collect();
+    if visible.is_empty() {
+        return all;
+    }
+    match source {
+        RotateSource::All => visible,
+        RotateSource::Favourites => {
+            let favourites: Vec<&str> = visible
+                .iter()
+                .copied()
+                .filter(|name| marks.is(Mark::Favourite, name))
+                .collect();
+            if favourites.is_empty() {
+                visible
+            } else {
+                favourites
+            }
+        }
+    }
+}
+
+/// The order rotation walks the eligible set in, and the trail of what it
+/// actually showed.
+///
+/// **A shuffled traversal, not a remembered-history window.** Every draw is
+/// taken uniformly from the eligible presets this cycle has not yet shown; when
+/// none are left the cycle restarts, excluding whatever was shown last so a
+/// preset never ends one cycle and begins the next. The property — *no repeat
+/// while an unseen preset remains* — needs no window length to defend, and it
+/// holds while the eligible set grows and shrinks between draws: a preset that
+/// becomes eligible mid-cycle is unseen and joins the pool immediately, and one
+/// that stops being eligible simply stops being drawn.
+///
+/// Deterministic from its seed: no clock, no dependency, the same bit mixer the
+/// console's `random` control uses.
+#[derive(Debug, Clone)]
+pub struct Traversal {
+    /// Eligible names already drawn this cycle.
+    seen: Vec<String>,
+    /// The name the last draw handed out, excluded when a cycle restarts.
+    last: Option<String>,
+    /// The next draw, and whether taking it restarts the cycle. Held so the
+    /// console can name what a rotation will take without the answer changing
+    /// between the announcement and the rotation.
+    upcoming: Option<(String, bool)>,
+    /// The presets actually **shown**, oldest first, with the one before the
+    /// current at the end. Every switch pushes here, whatever asked for it, so
+    /// "previous" means the preset that was on screen rather than an index one
+    /// lower — the two stopped being the same thing when rotation stopped being
+    /// sequential.
+    trail: Vec<String>,
+    /// lowbias32 counter state.
+    rng: u32,
+}
+
+impl Traversal {
+    /// A fresh traversal seeded from `seed`.
+    ///
+    /// Seeded rather than fixed so two machines with different libraries do not
+    /// walk the same order, and injected rather than read from a clock so a
+    /// test can state an exact sequence.
+    pub fn new(seed: u32) -> Self {
+        Self {
+            seen: Vec::new(),
+            last: None,
+            upcoming: None,
+            trail: Vec::new(),
+            rng: seed,
+        }
+    }
+
+    /// One step of the bit mixer — lowbias32, one round, so consecutive counter
+    /// values do not produce neighbouring positions the way a bare increment
+    /// would.
+    fn next_rand(&mut self) -> u32 {
+        let mut x = self.rng.wrapping_add(0x9E37_79B9);
+        self.rng = x;
+        x ^= x >> 16;
+        x = x.wrapping_mul(0x21F0_AAAD);
+        x ^= x >> 15;
+        x = x.wrapping_mul(0x735A_2D97);
+        x ^= x >> 15;
+        x
+    }
+
+    /// The preset the next rotation will take, computing it if there is none
+    /// cached or the cached one has stopped being eligible.
+    ///
+    /// Recomputed on ineligibility rather than kept, so hiding the preset that
+    /// was announced as next replaces it instead of drawing it anyway.
+    pub fn peek(&mut self, eligible: &[&str]) -> Option<&str> {
+        let stale = match &self.upcoming {
+            Some((name, _)) => !eligible.contains(&name.as_str()),
+            None => true,
+        };
+        if stale {
+            self.upcoming = self.pick(eligible);
+        }
+        self.upcoming.as_ref().map(|(name, _)| name.as_str())
+    }
+
+    /// The cached next preset, without computing one.
+    pub fn upcoming(&self) -> Option<&str> {
+        self.upcoming.as_ref().map(|(name, _)| name.as_str())
+    }
+
+    /// Take the next preset and record it as drawn.
+    ///
+    /// `None` only on an empty eligible set, which is an empty roster: the
+    /// fallbacks in [`eligible_names`] mean no combination of marks can produce
+    /// one.
+    pub fn draw(&mut self, eligible: &[&str]) -> Option<String> {
+        let pick = self.peek(eligible)?.to_owned();
+        let (_, restarts) = self.upcoming.take()?;
+        if restarts {
+            self.seen.clear();
+        }
+        self.seen.push(pick.clone());
+        self.last = Some(pick.clone());
+        // Drop names that have left the library, so the cycle's memory cannot
+        // outlive the set it is about.
+        self.seen.retain(|name| eligible.contains(&name.as_str()));
+        Some(pick)
+    }
+
+    /// Choose the next preset without recording it: an unseen eligible preset
+    /// if this cycle has one, otherwise a fresh cycle excluding the preset
+    /// drawn last.
+    ///
+    /// The `bool` is whether taking this pick restarts the cycle, carried out
+    /// rather than applied here so that peeking — which a console does once a
+    /// frame — never advances the traversal's own state.
+    fn pick(&mut self, eligible: &[&str]) -> Option<(String, bool)> {
+        let unseen: Vec<&str> = eligible
+            .iter()
+            .copied()
+            .filter(|name| !self.seen.iter().any(|held| held == name))
+            .collect();
+        let (pool, restarts) = if unseen.is_empty() {
+            let fresh: Vec<&str> = eligible
+                .iter()
+                .copied()
+                .filter(|name| self.last.as_deref() != Some(*name))
+                .collect();
+            // A one-preset eligible set has nothing but the preset it just
+            // showed, and holding it is the honest answer there.
+            if fresh.is_empty() {
+                (eligible.to_vec(), true)
+            } else {
+                (fresh, true)
+            }
+        } else {
+            (unseen, false)
+        };
+        let index = (self.next_rand() as usize) % pool.len().max(1);
+        pool.get(index).map(|name| ((*name).to_owned(), restarts))
+    }
+
+    /// Record `name` as having been on screen, so a step backwards can return
+    /// to it.
+    pub fn note_shown(&mut self, name: &str) {
+        if name.is_empty() {
+            return;
+        }
+        self.trail.push(name.to_owned());
+    }
+
+    /// The preset shown before the current one, removed from the trail so
+    /// repeated steps walk genuinely backwards rather than flipping between two.
+    ///
+    /// `None` once the trail is spent, which is a run that has not switched yet.
+    pub fn step_back(&mut self) -> Option<String> {
+        self.trail.pop()
+    }
+
+    /// How many steps backwards are left — what a caller checks before offering
+    /// the step at all.
+    pub fn trail_len(&self) -> usize {
+        self.trail.len()
     }
 }
 

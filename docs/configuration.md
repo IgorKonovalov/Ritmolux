@@ -311,6 +311,15 @@ The scene director's auto-rotate policy.
 | `min_dwell_secs` | `20` | Never rotate sooner than this many seconds after the last change |
 | `max_dwell_secs` | `90` | Always rotate by this many seconds, even through a steady passage |
 | `track_change` | `true` | Let the track-change novelty signal nudge rotation in on the same dwell |
+| `source` | `"all"` | Which part of the library rotation draws from: `"all"`, or `"favourites"` for the presets you have marked |
+
+**What rotation draws from, and in what order.** Hidden presets are excluded from both sources —
+that is what hiding one means. `"favourites"` is a hard filter with a fallback: it narrows to the
+marked presets, and while none are marked it draws from the whole eligible set rather than holding
+one scene forever. Within whichever set that leaves, rotation walks a **shuffled traversal**: it
+shows every eligible preset once before showing any of them twice, reshuffles when the cycle is
+exhausted, and never ends one cycle and begins the next on the same preset. `Backspace` steps back
+through what was actually shown.
 
 **Hold one scene by default.** Out of the box the app stays on a single scene until you opt in — the
 `A` hotkey, or `auto = true` here. Manual `Space` works either way. When auto is on the defaults
@@ -420,6 +429,7 @@ auto = false
 min_dwell_secs = 20
 max_dwell_secs = 90
 track_change = true
+source = "all"
 
 [quality]
 tier = "auto"

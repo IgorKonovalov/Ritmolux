@@ -324,6 +324,9 @@ pub struct Rotate {
     /// Let the experimental track-change novelty signal nudge rotation (wired in
     /// Phase 4). On by default but clearly experimental.
     pub track_change: bool,
+    /// Which part of the library rotation draws from (ADR-0228). Hidden presets
+    /// are excluded from every value.
+    pub source: RotateSource,
 }
 
 impl Default for Rotate {
@@ -333,6 +336,35 @@ impl Default for Rotate {
             min_dwell_secs: 20,
             max_dwell_secs: 90,
             track_change: true,
+            source: RotateSource::All,
+        }
+    }
+}
+
+/// Where rotation draws from. Serializes as the kebab-case strings the config
+/// uses (`"all"` / `"favourites"`).
+///
+/// **`Hidden` is excluded from both**, which is what makes hiding a preset mean
+/// "stop showing me this" rather than "stop promoting this".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RotateSource {
+    /// Every preset in the library that is not hidden.
+    #[default]
+    All,
+    /// Favourites only — falling back to the whole eligible set while nothing
+    /// is marked, because a mode that holds one preset forever looks exactly
+    /// like a hang from the window.
+    Favourites,
+}
+
+impl RotateSource {
+    /// The kebab-case word this source serializes as — one string for the config
+    /// file and any line that reports it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RotateSource::All => "all",
+            RotateSource::Favourites => "favourites",
         }
     }
 }
@@ -576,6 +608,41 @@ target = \"10.0.0.4:7700\"
         assert!(config.osc.enabled);
         assert_eq!(config.osc.target, "10.0.0.4:7700");
         assert_eq!(config.osc.rate_hz, 60, "the absent key did not default");
+    }
+
+    /// **An existing `config.toml` predates `[rotate] source`**, and the key
+    /// decides what the show draws from — so the key missing has to mean "the
+    /// whole library", which is what every such file already did.
+    #[test]
+    fn a_rotate_section_without_a_source_draws_from_the_whole_library() {
+        use super::RotateSource;
+
+        let config: Config = toml::from_str(
+            "[rotate]
+auto = true
+min_dwell_secs = 30
+",
+        )
+        .expect("a [rotate] section predating `source` must still parse");
+        assert!(config.rotate.auto, "the key that was there must hold");
+        assert_eq!(config.rotate.min_dwell_secs, 30);
+        assert_eq!(
+            config.rotate.source,
+            RotateSource::All,
+            "an absent source narrowed the library"
+        );
+
+        // And the narrowed value survives the write/read a settings change
+        // performs, so a choice made once outlives the restart.
+        let mut config = Config::default();
+        config.rotate.source = RotateSource::Favourites;
+        let text = toml::to_string_pretty(&config).expect("config serializes");
+        let back: Config = toml::from_str(&text).expect("its own output parses");
+        assert_eq!(back.rotate.source, RotateSource::Favourites);
+        assert!(
+            text.contains("favourites"),
+            "the source must be written as the word the document names: {text}"
+        );
     }
 
     /// The same guarantee for the banner: the settings row is only "survives a

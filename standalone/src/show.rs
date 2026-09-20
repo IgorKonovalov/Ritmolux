@@ -22,7 +22,7 @@ use standalone::events::{Event, Events};
 use standalone::marks::{Mark, Marks};
 use standalone::osc::decode::Transport;
 
-use crate::director::Director;
+use crate::director::{Director, Traversal, eligible_names};
 use crate::preset_dir::{PRESET_POLL, dir_signature, reload_presets, startup_preset_dir};
 
 /// How often a `health` event goes out while frames are being drawn.
@@ -64,6 +64,18 @@ pub(crate) struct Show {
     /// operator to press Space and a headless source does not — and that
     /// disagreement belongs to the caller rather than here.
     pub(crate) director: Director,
+
+    /// Which preset each rotation takes, and the trail of what was shown.
+    ///
+    /// Beside the director rather than inside it, because the two answer
+    /// different questions: the director decides *when* from the audio, and this
+    /// decides *which* from the library and the user's marks. Keeping them apart
+    /// is what lets the second one be a pure, seeded function with no clock in
+    /// it at all.
+    traversal: Traversal,
+
+    /// Which part of the library rotation draws from (`[rotate] source`).
+    source: config::RotateSource,
 
     /// The structured event stream (ADR-0176), present only when `--events`
     /// turned it on. Absent otherwise, so every emission below is a `None` test
@@ -132,6 +144,12 @@ impl Show {
             sig: None,
             last_poll: now,
             director: Director::from_config(rotate),
+            // Seeded from the roster this build ships, so two machines with
+            // different libraries do not walk the same order. The real roster is
+            // installed by the reload below; this is the embedded count, which
+            // differs per build and is all the seed needs to be.
+            traversal: Traversal::new(renderer.preset_names().count() as u32),
+            source: rotate.source,
             events,
             control,
             reported_preset: None,
@@ -151,7 +169,10 @@ impl Show {
         // loaded at all.
         let (favourite, hidden) = (show.marks.favourite.len(), show.marks.hidden.len());
         if favourite + hidden > 0 {
-            eprintln!("preset marks: {favourite} favourite, {hidden} hidden");
+            eprintln!(
+                "preset marks: {favourite} favourite, {hidden} hidden; rotation draws from {}",
+                show.source.as_str()
+            );
         }
         show
     }
@@ -159,6 +180,77 @@ impl Show {
     /// The resolved preset directory, or an empty path when none did.
     pub(crate) fn preset_dir(&self) -> &Path {
         &self.dir
+    }
+
+    /// Re-derive the preset a rotation will take next.
+    ///
+    /// Cached rather than computed per frame: the console names it once a frame
+    /// while it is open, and the eligible set moves only on a reload, a mark or
+    /// a rotation — so the three that move it refresh it, and the reader is a
+    /// borrow.
+    pub(crate) fn refresh_upcoming(&mut self, renderer: &Renderer) {
+        let Self {
+            marks,
+            traversal,
+            source,
+            ..
+        } = self;
+        let eligible = eligible_names(renderer.preset_names(), marks, *source);
+        traversal.peek(&eligible);
+    }
+
+    /// The preset the next rotation will take, or `None` on an empty roster.
+    pub(crate) fn next_up(&self) -> Option<&str> {
+        self.traversal.upcoming()
+    }
+
+    /// Rotate: draw the next preset out of the eligible set and dissolve to it,
+    /// returning its name.
+    ///
+    /// **The one place a rotation picks a preset**, whether the director's timer
+    /// asked or the operator did. The roster's successor is no longer the
+    /// answer — the traversal is — so a caller that stepped the roster itself
+    /// would show hidden presets and repeat while unseen ones remained.
+    pub(crate) fn rotate(&mut self, renderer: &mut Renderer) -> Option<String> {
+        let pick = {
+            let Self {
+                marks,
+                traversal,
+                source,
+                ..
+            } = self;
+            let eligible = eligible_names(renderer.preset_names(), marks, *source);
+            traversal.draw(&eligible)?
+        };
+        renderer.select_preset_by_name(&pick);
+        self.refresh_upcoming(renderer);
+        Some(pick)
+    }
+
+    /// Step back to the preset shown before the current one, returning its name.
+    ///
+    /// Walks past any name the roster no longer holds — a hot-reload can retire
+    /// a preset while it is still on the trail — and answers `None` once the
+    /// trail is spent.
+    pub(crate) fn step_back(&mut self, renderer: &mut Renderer) -> Option<String> {
+        while let Some(name) = self.traversal.step_back() {
+            if renderer.select_preset_by_name(&name) {
+                self.refresh_upcoming(renderer);
+                return Some(name);
+            }
+        }
+        None
+    }
+
+    /// Record `name` as having been on screen, so a step backwards can return
+    /// to it.
+    pub(crate) fn note_shown(&mut self, name: &str) {
+        self.traversal.note_shown(name);
+    }
+
+    /// Whether anything is left to step back to.
+    pub(crate) fn has_trail(&self) -> bool {
+        self.traversal.trail_len() > 0
     }
 
     /// Put `name` in or out of `mark`'s set, persisting the change.
@@ -191,6 +283,7 @@ impl Show {
     fn reload(&mut self, renderer: &mut Renderer) {
         reload_presets(renderer, &self.dir, self.events.as_mut());
         self.sig = dir_signature(&self.dir);
+        self.refresh_upcoming(renderer);
     }
 
     /// Re-scan the preset directory if the poll interval has elapsed and its
@@ -462,6 +555,8 @@ mod tests {
             sig: None,
             last_poll: now,
             director: Director::from_config(&config::Rotate::default()),
+            traversal: Traversal::new(0),
+            source: config::RotateSource::All,
             events: None,
             control: None,
             reported_preset: None,

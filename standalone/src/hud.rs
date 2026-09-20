@@ -259,16 +259,14 @@ impl AppState {
         if console_open.is_open() && self.modal().is_none() {
             // Built at the reference geometry like every routed line, so the one
             // scaling below moves all of them together.
-            let names: Vec<&str> = self.renderer.preset_names().collect();
             let staging = console::staging_line(
-                console::next_up(&names, self.renderer.active_index()),
+                self.show.next_up(),
                 self.show.director.auto_enabled(),
                 (
                     self.config.rotate.min_dwell_secs,
                     self.config.rotate.max_dwell_secs,
                 ),
             );
-            drop(names);
             let mut furniture = vec![console::header(self.renderer.preset_name())];
             furniture.extend(console::transport_lines(self.show.director.auto_enabled()));
             furniture.push(staging);

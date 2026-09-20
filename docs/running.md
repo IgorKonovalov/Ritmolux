@@ -29,6 +29,13 @@ By default the app **holds one scene** — pick a look and it stays. Press `A` t
 opt into auto-rotate (or set `auto = true` under `[rotate]` in `config.toml`);
 when it's on, a scene holds ~20–90 s and an energy drop can nudge a change early.
 
+**Rotation does not repeat itself.** `Space` and auto-rotate both draw from a shuffled traversal of
+your library: every preset is shown once before any of them is shown twice, and a new shuffle
+starts when the round is exhausted. Presets you have hidden are never drawn; setting
+`source = "favourites"` under `[rotate]` narrows the draw to the ones you have marked. `Backspace`
+steps back through the presets you actually saw — under a shuffle that is not the same thing as the
+preset one place lower in the list, and it is what "previous" means everywhere in the app.
+
 Every preset change — `Space`, a pick from the browser, or an auto-rotate — **dissolves**
 over about a second rather than cutting, so the show reads as continuous. The engine
 rotates through a small library of dissolves (crossfade, additive burn, luma dissolve,
@@ -38,6 +45,7 @@ one, so you always land where you asked.
 | Key       | Action                                                      |
 |-----------|-------------------------------------------------------------|
 | `Space`   | Next preset — dissolves (and restarts the auto-rotate timer) |
+| `Backspace` | Back to the preset you were on before — walks the presets actually shown, one step per press |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
 | `Tab`     | Open/close the preset browser — opens on the preset you're watching. Arrow keys walk the list and wrap at both ends, left/right step a column, holding an arrow scrolls, type to filter, `Enter` selects (also dissolves), `Esc` closes |
 | `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, console. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
