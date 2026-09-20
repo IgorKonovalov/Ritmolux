@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0216** (ADRs are a separate sequence — next free there is **0239**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0217** (ADRs are a separate sequence — next free there is **0239**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -56,6 +56,7 @@ place. The plan file carries the real link.
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
 | [0213](0213-the-hook-costs-what-the-push-is-worth.md) | The hook costs what the push is worth | approved | dev | ADR-0237 (proposed): the Node roster always runs; cargo runs only when the push moved Rust, and the suite is served by a ledger record for that tree. 0199 measured the cost untrimmable. |
 | [0215](0215-the-wide-seams-narrow-and-a-guard-holds-them.md) | The wide seams narrow, and a guard holds them | approved | dev | ADR-0238 (proposed): a scene declares a capability, not the engine enumerating kinds. Sweep 2026-09-20: capture pragma, Scene seam, preview owner - each gated. Lists are dated evidence. |
+| [0216](0216-the-operator-owns-the-order.md) | The operator owns the order | draft | dev | ADR-0239 (proposed): two rotation orders, each on a row and a hotkey, and `source` likewise. The shuffle seed stops being the embedded preset count - takes 0205 finding 5. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
