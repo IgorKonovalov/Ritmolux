@@ -80,8 +80,8 @@ const MAX_OUTLIER: u8 = 48;
 
 const STEM: &str = "warp_mesh_wide";
 const FIXTURE: &str = include_str!("../fixtures/milk_wash_fog_tunnel.toml");
-/// What captures the baseline, printed by both the skip and the drift failure so
-/// neither leaves a reader to reconstruct it.
+/// What captures the baseline, printed by the missing-baseline assertion and by
+/// the drift failure so neither leaves a reader to reconstruct it.
 const BLESS_CMD: &str = "RLX_BLESS=1 cargo test -p rlx-core --test suite warp_mesh_wide::";
 
 /// Largest absolute single-channel (RGB) byte difference across the two images.
@@ -118,24 +118,6 @@ fn capture() -> Option<CaptureImage> {
 fn the_converted_chain_matches_its_wide_baseline() {
     let path = common::golden_dir().join(format!("{STEM}.png"));
     let bless = std::env::var_os("RLX_BLESS").is_some();
-
-    // THE SKIP THAT HOLDS THIS TEST BACK, and the block to delete once the
-    // baseline is committed. A first baseline is compared against nothing, so it
-    // is captured and then looked at by a person (Plan 0201 Phase 4b) rather
-    // than written by a run; an absent one here is that capture outstanding, not
-    // a drift. ADR-0016's shape — print the reason, return — is what keeps it
-    // from reading as a pass. Delete this block and the `path.exists()`
-    // assertion below is the live guard, the one every other baseline carries,
-    // so a deleted baseline fails instead of skipping.
-    if !bless && !path.exists() {
-        eprintln!(
-            "skipped: {} is not captured yet — bless it with `{BLESS_CMD}`, open \
-             the PNG, then delete the skip in {} (ADR-0016)",
-            path.display(),
-            file!()
-        );
-        return;
-    }
 
     let Some(fresh) = capture() else {
         return;
@@ -179,8 +161,8 @@ fn the_converted_chain_matches_its_wide_baseline() {
 ///
 /// A baseline at 1:1 or 16:9 would pass forever and guard nothing (module docs),
 /// and the size is two `const`s an unrelated edit can move. No GPU, so this runs
-/// on an adapterless runner and while the baseline is absent — the two cases
-/// where the capture above says nothing at all.
+/// on an adapterless runner — the case where the capture above says nothing at
+/// all.
 #[test]
 fn the_capture_size_is_neither_square_nor_sixteen_by_nine() {
     /// How close to a forbidden ratio counts as being it. Both shapes are exact

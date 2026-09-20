@@ -217,10 +217,31 @@ job of a baseline).
 | 3 — Level mode can hold an ink | dev | done | c832e76c |
 | 4 — The converted chain gets a fixture that will see it | dev | done | 4c7f739b |
 | 4a — The fixture is made able to see what it guards | dev | done | committed with this row |
-| 4b — The baseline is captured by someone who looks at it | human | not started | |
+| 4b — The baseline is captured by someone who looks at it | human | done | committed with this row |
 
 ### Notes
 
+- **Phase 4b — the baseline was opened before the test was released, and by whom.** Captured with
+  `RLX_BLESS=1 cargo test -p rlx-core --test suite warp_mesh_wide::` and judged in an
+  owner-directed session rather than by the owner, who asked for the phase to be settled on their
+  behalf. `Geiss - Fog Tunnel` at 160x120 renders a bright core with radial streaks over a dark
+  field, the subject the source names: the waveform's light accumulated through an exponential zoom
+  (`zoom` 1.042, `zoomexp` 3.4) with `decay` 0.98 and the 1.289 echo, greyscale as the palette and
+  `wave_r/g/b` 0.65 declare, nothing clipped and no empty frame. Measured on the committed PNG, the
+  core's bounding box is 90x78 px above half luminance-peak (`w/h` 1.154) and 71x60 above 0.9
+  (1.183) — **not** round, and correctly so: MilkDrop's waveform is drawn in the host's normalized
+  square and stretches with the window, while the aspect pair corrects what the *warp* does. A
+  circular core here would have been the finding.
+- **Phase 4b — the one-term experiment, and the term the done-when named is the wrong one.**
+  Dropping `* aspect` from `mesh::vertex_position` leaves this fixture **byte-identical** — `mean
+  0.0000 / outlier 0` — because that function serves the native `warp_mesh` path and the converted
+  chain corrects at its own entry. The term that moves it is the one the fixture is documented
+  against: forcing `self.aspect = 1.0` in `milk::run_frame` fails it at **mean 0.0139 (tol 0.02) /
+  outlier 75 (tol 48)**, now against a committed baseline rather than Phase 4a's scratch capture.
+  Under that same probe `cargo test -p rlx-core --test golden` is 3 passed with
+  `warp_mesh 0.0002/2`, `warp_mesh_milk 0.0000/0`, `warp_mesh_shader 0.0000/1`,
+  `warp_mesh_stroke 0.0000/0` — **the same four readings as with the probe reverted**, so the square
+  fixtures do not move at all. Both probes reverted; the tree carries neither.
 - **Phase 4a — the subject changed, and the probe chose it.** The fixture now captures
   `milk_wash_fog_tunnel.toml`. Four candidates were measured at 160x120 with `self.aspect = 1.0`
   forced at the converted chain's entry, each probe applied alone and reverted: `milk_wash_fog_tunnel`
@@ -317,9 +338,9 @@ job of a baseline).
   hold across all 26 live entries (4 unprobeable)*, with 30 advisory moved-path rows.
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207). The per-phase gate run on this
   tree was `cargo nextest run --workspace -P fast`: 1725 passed, 0 failed, 311 skipped, in 459.5 s.
-- **Outstanding `human` phases:** Phase 4b — capture `core/tests/golden/warp_mesh_wide.png` under
-  `RLX_BLESS=1`, open it, delete the skip block, and run the one-term experiment. Phases 1–4 are
-  committed; the plan is not finished without it.
+- **Outstanding `human` phases:** none. Phase 4b was settled in an owner-directed session on
+  2026-09-20 — the baseline is committed, the skip block is gone, and both readings the phase asks
+  for are in the Notes above. Every phase is committed.
 
 ## Followups (after this lands)
 
