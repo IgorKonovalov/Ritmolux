@@ -1,6 +1,6 @@
 # 0203 — The figure gains the levers it was measured to lack
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev

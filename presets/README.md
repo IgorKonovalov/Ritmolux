@@ -473,7 +473,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
-| `shape` | `0` | `0` – `4` | Which silhouette each mark is drawn as - a disc, a square, a star, and so on. |
+| `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
 
 **Modal**
@@ -735,7 +735,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
-| `shape` | `0` | `0` – `4` | Which silhouette each mark is drawn as - a disc, a square, a star, and so on. |
+| `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
 
 **Modal**
@@ -777,7 +777,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `shape` | `0` | `0` – `4` | Which silhouette each mark is drawn as - a disc, a square, a star, and so on. |
+| `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour_style` | `0` | `0` – `3` | Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink. |
@@ -1520,8 +1520,8 @@ densities that make a figure one mark is a point, so a silhouette there would be
 invisible on principle rather than by tuning
 ([ADR-0084](../docs/adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md)).
 
-**`shape` is a numeric selector**, like `kaleido_edge` — the expression grammar
-has no strings, so a star is `shape = "3"`.
+**`shape` is numeric** — the expression grammar has no strings, so a star is
+`shape = "3"`.
 
 | `shape` | mark | what it draws |
 |---|---|---|
@@ -1534,6 +1534,24 @@ has no strings, so a star is `shape = "3"`.
 `points` is the count for `polygon` and `star`, `3` to `12`, default `5`. It does
 nothing on `disc`, `ring` or `heart`. Past a dozen the marks these are *for* — a
 few pixels across — are a disc with a rough edge.
+
+**A whole `shape` is that figure exactly; a value between two whole ones travels
+between them.** `shape = "2.5"` is half a polygon and half a star — the two arms'
+distance fields blended, so an eased or bound `shape` carries the figure from a
+heart to a star across a phrase instead of cutting on a beat
+([ADR-0226](../docs/adrs/0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md)).
+Three things come with that:
+
+- **Only adjacent pairs travel.** The table's order is the travel order, so a
+  `polygon` can reach a `star` and cannot reach a `heart` without passing through
+  one. A binding that sweeps `1` to `4` visits every arm in between.
+- **The in-between figure is nobody's design.** A blend of two silhouettes can
+  pinch, disconnect, or grow a lobe neither arm has. Some pairs read beautifully
+  and some do not; there is no lever but to pick a different pair.
+- **Mid-travel the field stops being a metric distance**, so anything measured in
+  it drifts: on `shape_field`, `stroke`'s width and the spacing between contour
+  bands are the figure's at a whole index and approximate in between. The
+  interior, the outline and the particle falloff are unaffected.
 
 #### The `star` arm's three shape params
 
@@ -1581,8 +1599,8 @@ Three things worth knowing before you tune them:
 #### These three MORPH the figure with the music, and that needs no engine work
 
 **All three are clamp-only — no rounding — so a binding drives them continuously and the silhouette
-genuinely deforms.** That is worth stating because the two params beside them, `shape` and `points`,
-are rounded and therefore *step*. Verified by rendering: `star_valley` on bass and `star_curve` on
+genuinely deforms.** That is worth stating because `points`, the param beside them, is rounded and
+therefore *steps*. Verified by rendering: `star_valley` on bass and `star_curve` on
 treble over a 120 BPM click visibly thickens and thins the arms and changes the spike proportions.
 
 ```toml
@@ -1635,9 +1653,9 @@ interpolates ([ADR-0060](../docs/adrs/0060-star-pattern-variants-interpolate.md)
 and the attractor's IFS morphs
 ([ADR-0075](../docs/adrs/0075-ifs-family-morphs-in-singular-value-space.md)). A
 star's angle fold is periodic in the count, so a fractional count is a
-discontinuity and not an intermediate figure. `shape` is stepped for the stricter
-version of the same reason — its values are names, and there is nothing halfway
-between a ring and a polygon.
+discontinuity and not an intermediate figure. **`shape` is the one that does not
+step**, and the difference is the fold: a roster position has two neighbouring
+fields to blend, and a fractional count has nothing to average — it tears.
 
 Two consequences worth planning around:
 
@@ -1709,7 +1727,7 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 | `pan_x` / `pan_y` | move the figure's centre (the shared view transform) |
 | `rotation` | turns the figure **about its own centre**, in radians. Default `0`, an exact identity, unclamped — an angle wraps. Applied after `pan_*`, so a panned figure spins in place rather than orbiting the frame |
 | `gamma` | the **response exponent** on the figure coordinate, before it becomes a palette coordinate — where the contours crowd. Default `1.0` (evenly spaced, and an exact identity), clamped to `0.05`..`20` |
-| `coord_mode` | **which coordinate the palette is handed.** `0` (default) is the distance, whose contours are offset curves; `1` is `r / r_boundary(theta)`, whose contours are **scaled copies** of the outline. Stepped, like `shape`. See [Two coordinates](#two-coordinates--offsets-and-scaled-copies) |
+| `coord_mode` | **which coordinate the palette is handed.** `0` (default) is the distance, whose contours are offset curves; `1` is `r / r_boundary(theta)`, whose contours are **scaled copies** of the outline. Stepped, like `points` — there is nothing halfway between an offset curve and a scaled copy. See [Two coordinates](#two-coordinates--offsets-and-scaled-copies) |
 | `stroke` | draws the figure's **outline** at this half-width instead of filling it, in coordinate units — `0.08` is a band 8 % of the figure's half-extent either side of the outline. Default `0`, the filled figure and an exact identity. Fill and stroke are the same field, so the outline cannot drift off the figure it belongs to |
 | `morph` | travels an authored `[path]` towards its `morph_to` silhouette, `0`..`1`. Inert on a roster figure and on a path that names no target |
 
@@ -1793,7 +1811,9 @@ those two differently would be broken.
 > more than once leaves the coordinate with no single value there. Two figures
 > fail it, and they fail it in the same way:
 >
-> - a **`ring`**, whose centre lies in its hole;
+> - a **`ring`**, whose centre lies in its hole — and any `shape` travelling
+>   towards or away from one, since a blend that has the ring on either side
+>   inherits its hole;
 > - an **authored `[path]` contour that is not star-shaped about its centre** — a
 >   crescent, a figure with fins, or a silhouette whose sinuses put one lobe
 >   across the ray into the next. `presets/shape_maple.toml` is one: its four

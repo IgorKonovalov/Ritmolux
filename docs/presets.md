@@ -516,7 +516,11 @@ The range that reads for each parameter, and the families it is inert on, is pri
 
 ### The `[path]` table
 
-The `shape_field` system draws a silhouette from a closed roster of five names.
+The `shape_field` system draws a silhouette from a closed roster of five names —
+or from a position *between* two of them, since a fractional `shape` blends the
+two arms it lies between and an eased binding carries the figure from one to the
+next
+([ADR-0226](adrs/0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md)).
 A `[path]` table is the escape hatch: **inline SVG path data**, parsed once at
 load into a closed contour and rendered as the same signed-distance field, so a
 preset can author a figure nobody put in the roster.

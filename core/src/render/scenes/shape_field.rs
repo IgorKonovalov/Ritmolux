@@ -704,6 +704,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // coordinate is that distance normalized to 1 on the outline, so the two
     // tests are the same two tests shifted by one.)
     //
+    // **`stroke` is a width in the coordinate, and the coordinate is a metric
+    // distance only at a WHOLE `shape`** (ADR-0226). Mid-travel `d` is a blend
+    // of two arms' fields, so `abs(d - 1) < stroke` still finds the blended
+    // outline — the two arms both read 1 there — but the band's thickness on
+    // screen is not the width a whole index would draw, and it varies around the
+    // figure. The same qualification covers the spacing of the bands above.
+    //
     // Exactly 0 is the identity and takes the branch away, which is what keeps
     // every shipped preset and every golden baseline on the arithmetic it has.
     if (stroke > 0.0) {
@@ -988,6 +995,11 @@ fn applied_rotation(rotation: f32) -> f32 {
 /// between the crossings reads as interior, which collapses the figure to a dot
 /// inside a few huge rays.
 ///
+/// A roster position that only *touches* the `ring` — anywhere in the open
+/// travel between `disc` and `polygon` (ADR-0226) — inherits the defect from the
+/// side it blends, so `marks::shape_touches_ring` is the test rather than
+/// equality. At a whole index the two are the same test.
+///
 /// `contour_star_shaped` is the verdict for the contour being drawn, or `None`
 /// where there is no `[path]` table — in which case the roster arm is the figure
 /// and the `ring` is the one arm that fails. A contour REPLACES the roster arm
@@ -1009,7 +1021,7 @@ fn applied_rotation(rotation: f32) -> f32 {
 fn applied_coord_mode(mode: f32, shape: f32, contour_star_shaped: Option<bool>) -> f32 {
     let single_valued = match contour_star_shaped {
         Some(star_shaped) => star_shaped,
-        None => shape != marks::RING_SHAPE,
+        None => !marks::shape_touches_ring(shape),
     };
     if !single_valued {
         return DEFAULT_COORD_MODE;

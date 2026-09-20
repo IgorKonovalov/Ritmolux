@@ -101,6 +101,25 @@
 //! deliberately does not cover, because nothing shipped evaluates the curved one
 //! on the particle path.
 //!
+//! # The roster travels, and the metric stops holding in between (ADR-0226)
+//!
+//! `shape` is a position on the roster rather than an index into it. A whole
+//! value selects one arm and is an **exact identity** — the same field, the same
+//! cost. A fractional value evaluates the two neighbouring arms and blends both
+//! [`mark_distance`](self) and the boundary radius linearly, so a figure travels
+//! from a heart to a star across a phrase.
+//!
+//! **Every accuracy number on this page is a whole-index claim.** A linear blend
+//! of two signed distance functions is not one: its zero set is an outline
+//! neither arm describes, its gradient magnitude is not 1, and the blend has no
+//! error bound against any figure at all. What survives mid-travel is the
+//! **sign** and the two endpoints of the normalization — `0` at the blended
+//! interior's deepest reading, `1` where both arms read 1 — so the particle
+//! falloff (`max(0, 1 - d)^2`) and the interior test `d < 1` mean what they
+//! meant. What does not survive is anything reading `d` as a length: the
+//! exterior error table below, `shape_field`'s `stroke` width, and the spacing
+//! between its contours.
+//!
 //! # What this deliberately is not
 //!
 //! A silhouette **in additive light**. There is no fill and no outline — black
@@ -121,13 +140,19 @@
 use crate::render::gpu;
 use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
-/// The `shape` roster, in the order the numeric parameter selects them.
+/// The `shape` roster, in the order the numeric parameter positions along.
 ///
-/// `shape` is a **numeric selector**, like `kaleido_edge`: the preset expression
-/// grammar has no strings, so a preset writes `shape = "3"` for a star. This
-/// list is the single statement of what each index means, and both particle
-/// scenes read it — a look wanting a shape that is not here routes back through
-/// `architect` (ADR-0084's closed-roster consequence).
+/// `shape` is **numeric**: the preset expression grammar has no strings, so a
+/// preset writes `shape = "3"` for a star. This list is the single statement of
+/// what each whole index means, and both particle scenes read it — a look
+/// wanting a shape that is not here routes back through `architect` (ADR-0084's
+/// closed-roster consequence).
+///
+/// The order is also the **travel order**, since a fractional index blends the
+/// two arms it lies between (ADR-0226): `2.5` is halfway from a polygon to a
+/// star because they are adjacent here, and nothing makes a polygon and a heart
+/// adjacent. Reordering the list therefore changes which pairs a preset can
+/// travel between as well as what each index means.
 pub(crate) const SHAPES: [&str; 5] = ["disc", "ring", "polygon", "star", "heart"];
 
 /// The `ring` index, named because three files have to test for it.
@@ -454,7 +479,9 @@ pub(crate) const SHAPE: ParamSpec = ParamSpec {
     name: "shape",
     default: 0.0,
     range: Some([0.0, 4.0]),
-    doc: "Which silhouette each mark is drawn as - a disc, a square, a star, and so on.",
+    doc: "Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; \
+          a whole number is that figure exactly and a value between two travels from one to \
+          the other.",
     kind: ParamKind::Structural,
 };
 
@@ -496,22 +523,41 @@ pub(crate) const STAR_JITTER: ParamSpec = ParamSpec {
 
 pub(crate) const PARAMS: &[ParamSpec] = &[SHAPE, POINTS, STAR_VALLEY, STAR_CURVE, STAR_JITTER];
 
-/// The `shape` index the shader is handed: clamped into the roster, then
-/// **rounded to an integer**, with a non-finite binding falling back to the
+/// The `shape` position the shader is handed: clamped into the roster and
+/// **passed through fractional**, with a non-finite binding falling back to the
 /// default.
 ///
-/// This is `kaleido_edge`'s treatment for `kaleido_edge`'s reason. A selector's
-/// values are *identities* rather than a quantity, and `[smoothing]` and preset
-/// dissolves interpolate a binding continuously from one setting to another — so
-/// easing `disc` to `star` passes through 1.4 and 2.6, and without this the
-/// shader would receive a value no arm defines. Rounding here rather than in
-/// WGSL keeps that precondition visible on the CPU side, where the roster lives.
+/// **It is a position on the roster, not an index into it** (ADR-0226). A whole
+/// value selects one arm and is an exact identity — the same field the rounded
+/// selector produced — and a fractional one blends the two arms it lies between,
+/// so an eased binding carries the figure from a heart to a star instead of
+/// stepping. `mark_points` next door keeps the rounding and says why its own
+/// parameter cannot follow: a star's angle fold is periodic in the count, so a
+/// fractional count tears the mark rather than intermediating it.
+///
+/// No rounding here is what makes the identity exact: an integer binding reaches
+/// the shader as an integer, `fract` is 0, and the blend takes its one-arm
+/// branch. Clamping stays CPU-side so the precondition is visible where the
+/// roster lives, and so a NaN never meets WGSL's implementation-defined `clamp`.
 pub(crate) fn mark_shape(v: f32) -> f32 {
     if v.is_finite() {
-        v.clamp(MIN_SHAPE, MAX_SHAPE).round()
+        v.clamp(MIN_SHAPE, MAX_SHAPE)
     } else {
         DEFAULT_SHAPE
     }
+}
+
+/// Whether a roster position draws the `ring` arm at all — either as the whole
+/// figure or as one side of a blend.
+///
+/// The scaled-copy coordinate (ADR-0111) needs a figure every ray from the
+/// centre leaves exactly once, and the annulus is the one arm that is not. A
+/// blend that has the ring on either side inherits the defect, so the test is
+/// "does this position touch the arm" rather than "is this the arm". At a whole
+/// index the two readings are the same, which is what keeps `shape = "1"`'s
+/// refusal and every other index's acceptance exactly where they were.
+pub(crate) fn shape_touches_ring(shape: f32) -> bool {
+    shape.floor() == RING_SHAPE || shape.ceil() == RING_SHAPE
 }
 
 /// The point count the shader is handed: clamped into `3..=12`, then **rounded
@@ -647,6 +693,9 @@ fn mark_heart_sd(p_in: vec2<f32>) -> f32 {
     return sqrt(min(dot(a, a), dot(b, b))) * sign(p.x - p.y);
 }
 
+// ONE arm of the roster, selected by a whole index. `mark_distance` below is
+// what callers use; this is the per-arm arithmetic it selects or blends.
+//
 // Normalized distance from a mark's silhouette: 0 at the shape's deepest
 // interior point, exactly 1 on its outline, greater than 1 outside it. The
 // caller's falloff is unchanged, so everything at d >= 1 is black and only the
@@ -658,7 +707,7 @@ fn mark_heart_sd(p_in: vec2<f32>) -> f32 {
 // neutral configuration cost nothing extra.
 //
 // `star` is `vec3(valley, curve, jitter)`, all three conditioned CPU-side.
-fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 {
+fn mark_distance_arm(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 {
     if (shape < 0.5) {
         // disc: sd = length(p) - 1, R = 1. The three lines this replaced.
         return length(p);
@@ -837,6 +886,38 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
     return 1.0 + mark_heart_sd(q) / MARK_HEART_INRADIUS;
 }
 
+// The roster's distance field at a position ON the roster, whole or fractional
+// (ADR-0226).
+//
+// A whole index is an EXACT IDENTITY: one arm, the same expression and the same
+// cost the rounded selector had. Between two whole indices the two neighbouring
+// arms are evaluated and their distances blended linearly, so the figure travels
+// from one silhouette to the next instead of cutting.
+//
+// `shape` is a per-draw uniform, so the branch is uniform across a warp and a
+// whole index pays for one arm rather than two.
+//
+// **The blend is NOT a distance function.** Its zero set is a shape neither arm
+// describes, its gradient magnitude is not 1, and no accuracy claim anywhere in
+// this module holds mid-travel. Everything that reads the return value as a
+// SIGN — the falloff's `1 - d`, the interior test `d < 1` — still means what it
+// meant; everything that reads it as a metric distance — an outline width, a
+// contour spacing, the measured exterior error — is undefined between the
+// integers. `shape` is clamped and never rounded CPU-side (`mark_shape`), which
+// is what puts a whole index on the identity branch exactly.
+fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 {
+    let lo = floor(shape);
+    let t = shape - lo;
+    if (t == 0.0) {
+        return mark_distance_arm(p, lo, points, star);
+    }
+    return mix(
+        mark_distance_arm(p, lo, points, star),
+        mark_distance_arm(p, lo + 1.0, points, star),
+        t
+    );
+}
+
 // The radius at which the ray from the figure's centre through `p` crosses the
 // outline — the denominator of the SCALED-COPY coordinate `r / r_boundary`
 // (ADR-0111, Plan 0098).
@@ -856,7 +937,10 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
 //
 // Only `shape_field` calls this. The particle scenes read `mark_distance` and
 // only its interior, so nothing on that path can notice it exists.
-fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 {
+//
+// ONE arm, selected by a whole index, the same way `mark_distance_arm` is;
+// `mark_boundary_radius` below is what callers use.
+fn mark_boundary_radius_arm(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 {
     if (shape < 0.5) {
         // disc: the unit circle, at every angle. Its offsets and its scaled
         // copies are the SAME circles, which is exactly what makes this arm the
@@ -976,6 +1060,25 @@ fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) 
         return t_lobe / MARK_HEART_SCALE;
     }
     return (MARK_HEART_CY / denom) / MARK_HEART_SCALE;
+}
+
+// The boundary radius at a position on the roster, whole or fractional
+// (ADR-0226). The distance and the boundary radius are the roster's TWO per-arm
+// quantities, so a travelling figure blends both or the scaled-copy coordinate
+// would keep one arm's outline while the distance left it.
+//
+// Same structure as `mark_distance`: a whole index takes one arm, unchanged.
+fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 {
+    let lo = floor(shape);
+    let t = shape - lo;
+    if (t == 0.0) {
+        return mark_boundary_radius_arm(p, lo, points, star);
+    }
+    return mix(
+        mark_boundary_radius_arm(p, lo, points, star),
+        mark_boundary_radius_arm(p, lo + 1.0, points, star),
+        t
+    );
 }
 "#;
 

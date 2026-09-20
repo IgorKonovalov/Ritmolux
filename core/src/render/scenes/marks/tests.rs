@@ -6,7 +6,7 @@ use super::{
     DEFAULT_POINTS, DEFAULT_SHAPE, DEFAULT_STAR_CURVE, DEFAULT_STAR_JITTER, DEFAULT_STAR_VALLEY,
     HEART_CY, HEART_INRADIUS, HEART_LOBE_R, HEART_SCALE, MAX_POINTS, MAX_SHAPE, MIN_POINTS, PARAMS,
     RING_HALF, RING_MID, RING_SHAPE, SHAPES, STAR_SEGMENTS, mark_points, mark_shape, sdf_wgsl,
-    spike_hash01, star_curve, star_jitter, star_valley,
+    shape_touches_ring, spike_hash01, star_curve, star_jitter, star_valley,
 };
 
 /// The neutral star configuration — `(valley, curve, jitter)` at their defaults.
@@ -26,7 +26,7 @@ pub(crate) const HEART: f32 = 4.0;
 /// same reason: it lets the arithmetic properties be asserted directly rather
 /// than argued, while the pixel-level claims stay on the shader itself (see
 /// `swarm.rs`'s seven-maxima capture, which renders the real pipeline).
-pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
+pub(super) fn mark_distance_arm(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
     let len = (p[0] * p[0] + p[1] * p[1]).sqrt();
     if shape < 0.5 {
         return len;
@@ -125,7 +125,32 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
     1.0 + heart_sd(q) / HEART_INRADIUS
 }
 
-/// **The CPU mirror of `mark_boundary_radius`** (Plan 0098 Phase 2). Kept
+/// **The CPU mirror of the WGSL `mark_distance`**: one arm at a whole index, a
+/// blend of the two neighbours between them (ADR-0226).
+pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
+    let lo = shape.floor();
+    let t = shape - lo;
+    if t == 0.0 {
+        return mark_distance_arm(p, lo, points, star);
+    }
+    let a = mark_distance_arm(p, lo, points, star);
+    let b = mark_distance_arm(p, lo + 1.0, points, star);
+    a * (1.0 - t) + b * t
+}
+
+/// The CPU mirror of the WGSL `mark_boundary_radius`, blending the same way.
+pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
+    let lo = shape.floor();
+    let t = shape - lo;
+    if t == 0.0 {
+        return mark_boundary_radius_arm(p, lo, points, star);
+    }
+    let a = mark_boundary_radius_arm(p, lo, points, star);
+    let b = mark_boundary_radius_arm(p, lo + 1.0, points, star);
+    a * (1.0 - t) + b * t
+}
+
+/// **The CPU mirror of `mark_boundary_radius_arm`** (Plan 0098 Phase 2). Kept
 /// identical by inspection, the same arrangement [`mark_distance`]'s own mirror
 /// uses and for the same reason.
 ///
@@ -138,7 +163,12 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
 /// figure's own centre, where the boundary radius is a ray's length from a point
 /// to itself and the coordinate it feeds is `0` either way — which is why the
 /// divergence is recorded rather than removed.
-pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
+pub(crate) fn mark_boundary_radius_arm(
+    p: [f32; 2],
+    shape: f32,
+    points: f32,
+    star: [f32; 3],
+) -> f32 {
     if shape < 0.5 {
         return 1.0;
     }
@@ -459,17 +489,133 @@ fn no_two_shapes_draw_the_same_figure() {
 /// The roster is closed at both ends and a broken binding lands on the
 /// default rather than on a bound (`kaleido_edge`'s rule: a selector has no
 /// "as far as you can go" reading).
+///
+/// **It does not round** (ADR-0226): a value between two arms is a position
+/// between them, so the conditioner's whole job is the clamp and the fallback.
+/// That an integer survives it unchanged is what makes the blend's identity
+/// branch exact rather than a hair off it.
 #[test]
-fn the_shape_selector_clamps_rounds_and_falls_back() {
+fn the_shape_selector_clamps_and_falls_back_without_rounding() {
     assert_eq!(mark_shape(-3.0), 0.0);
     assert_eq!(mark_shape(99.0), MAX_SHAPE);
-    assert_eq!(mark_shape(2.4), 2.0);
-    assert_eq!(mark_shape(2.6), 3.0);
+    assert_eq!(mark_shape(2.4), 2.4);
+    assert_eq!(mark_shape(2.6), 2.6);
     assert_eq!(mark_shape(f32::NAN), DEFAULT_SHAPE);
     assert_eq!(mark_shape(f32::INFINITY), DEFAULT_SHAPE);
-    // Every index the roster names survives the quantizer unchanged.
+    // Every index the roster names reaches the shader unchanged, which is what
+    // puts it on the identity branch rather than a hair off it.
     for (i, _) in SHAPES.iter().enumerate() {
         assert_eq!(mark_shape(i as f32), i as f32);
+    }
+
+    // The scaled-copy coordinate's refusal follows the arm rather than the
+    // index: a position that only touches the `ring` inherits its defect, and a
+    // whole index reads exactly as the equality it replaced.
+    for (i, _) in SHAPES.iter().enumerate() {
+        assert_eq!(
+            shape_touches_ring(i as f32),
+            i as f32 == RING_SHAPE,
+            "a whole index must read as the `== RING_SHAPE` test it replaced"
+        );
+    }
+    assert!(shape_touches_ring(0.5) && shape_touches_ring(1.5));
+    assert!(!shape_touches_ring(2.5) && !shape_touches_ring(3.5));
+}
+
+/// **The roster travels** (ADR-0226): a whole index is the arm it names, bit for
+/// bit, and a position between two arms is a figure that is neither.
+///
+/// The first half is the contract every shipped preset and every golden baseline
+/// rests on, so it is asserted as **bit equality** against the arm function
+/// directly — over the whole sprite quad, every arm, every point count the
+/// folds take, and the star's curved branch as well as its straight one.
+///
+/// The second half is the capability, and it is measured rather than asserted by
+/// construction: coverage (`max(0, 1 - d)^2`, what the shader emits) at the
+/// midpoint of each neighbouring pair, against both endpoints, in the same
+/// dimensionless units `no_two_shapes_draw_the_same_figure` uses. A blend that
+/// silently collapsed onto one neighbour — the failure a `select` or a
+/// mis-signed `t` would produce — reads 0 against that side.
+#[test]
+fn a_whole_index_is_an_identity_and_a_fractional_one_is_neither_neighbour() {
+    let stars = [NEUTRAL_STAR, [0.3, 0.5, 0.35]];
+    for (shape, name) in SHAPES.iter().enumerate() {
+        for points in [3.0f32, 5.0, 7.0, 12.0] {
+            for star in stars {
+                for i in 0..48 {
+                    for j in 0..48 {
+                        let p = [i as f32 / 23.5 - 1.0, j as f32 / 23.5 - 1.0];
+                        let got = mark_distance(p, shape as f32, points, star);
+                        let want = mark_distance_arm(p, shape as f32, points, star);
+                        assert_eq!(
+                            got.to_bits(),
+                            want.to_bits(),
+                            "{name} at {p:?} must be its own arm, bit for bit"
+                        );
+                        let got_b = mark_boundary_radius(p, shape as f32, points, star);
+                        let want_b = mark_boundary_radius_arm(p, shape as f32, points, star);
+                        assert_eq!(
+                            got_b.to_bits(),
+                            want_b.to_bits(),
+                            "{name}'s boundary radius at {p:?} must be its own arm, bit for bit"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    const N: usize = 96;
+    let n = 7.0;
+    let grid: Vec<[f32; 2]> = (0..N)
+        .flat_map(|i| {
+            (0..N).map(move |j| {
+                [
+                    i as f32 / (N as f32 - 1.0) * 2.0 - 1.0,
+                    j as f32 / (N as f32 - 1.0) * 2.0 - 1.0,
+                ]
+            })
+        })
+        .collect();
+    let coverage = |shape: f32| -> Vec<f32> {
+        grid.iter()
+            .map(|&p| {
+                (1.0 - mark_distance(p, shape, n, NEUTRAL_STAR))
+                    .max(0.0)
+                    .powi(2)
+            })
+            .collect()
+    };
+    let mean = |v: &[f32]| v.iter().sum::<f32>() / v.len() as f32;
+    let disc_mean = mean(&coverage(DISC));
+    let apart = |a: &[f32], b: &[f32]| -> f32 {
+        a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f32>() / a.len() as f32 / disc_mean
+    };
+
+    println!(
+        "{:<20} {:>14} {:>14}",
+        "travelling pair", "from lower", "from upper"
+    );
+    for lo in 0..SHAPES.len() - 1 {
+        let mid = lo as f32 + 0.5;
+        let (fa, fb, fm) = (
+            coverage(lo as f32),
+            coverage(lo as f32 + 1.0),
+            coverage(mid),
+        );
+        let (from_lo, from_hi) = (apart(&fm, &fa), apart(&fm, &fb));
+        println!(
+            "{:<20} {from_lo:>14.3} {from_hi:>14.3}",
+            format!("{} -> {}", SHAPES[lo], SHAPES[lo + 1])
+        );
+        assert!(
+            from_lo > 0.02 && from_hi > 0.02,
+            "{} -> {} at {mid} is not a third figure: {from_lo:.4} from the \
+             lower arm and {from_hi:.4} from the upper, of the disc's mean \
+             coverage",
+            SHAPES[lo],
+            SHAPES[lo + 1]
+        );
     }
 }
 
@@ -574,7 +720,9 @@ fn the_shader_chunk_substitutes_every_placeholder() {
         "unsubstituted placeholder in the mark SDF chunk:\n{wgsl}"
     );
     assert!(wgsl.contains("fn mark_distance("));
+    assert!(wgsl.contains("fn mark_distance_arm("));
     assert!(wgsl.contains("fn mark_boundary_radius("));
+    assert!(wgsl.contains("fn mark_boundary_radius_arm("));
 }
 
 // --- The exterior contract (Plan 0091 Phase 2) ---------------------------------
