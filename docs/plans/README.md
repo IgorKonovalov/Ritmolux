@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0214** (ADRs are a separate sequence — next free there is **0238**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0215** (ADRs are a separate sequence — next free there is **0238**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -41,7 +41,8 @@ place. The plan file carries the real link.
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
 | [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | draft | human | 0103's Phases 5-6 plus the release they stand on. Push ONE tag: the pipeline has published nothing since v0.126.0, two runs red on the foobar job and three tags with no run. |
-| [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Postponed 2026-09-18, off the queue: Phase 1's probe needs an Ubuntu box nobody has yet.** Folds backlog 0181 + 0208. |
+| [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1's probe ran 2026-09-20; the premise holds.** Implementation only - witnessing is 0214. Folds backlog 0181 + 0208. |
+| [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | draft | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four phases are `human`. Runs after 0120. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0199](0199-the-gates-cost-is-measured-before-it-is-cut.md) | The gate's cost is measured before it is cut | approved | dev | ADR-0222 (proposed): a sweep's fixed cost is per process, so the lever is the batch. Phases 1 and 3 measure first; Phase 3's stop condition can supersede the ADR. |
 | [0201](0201-the-warp-surface-stops-lying.md) | The warp surface stops lying | approved | dev | ADR-0223 + 0224 (proposed): the figure contract reaches a custom wave, level mode gets a coverage threshold, `zoom`'s doc stops inverting the shader. Regenerates surfaces, so after 0197. |
@@ -370,7 +371,9 @@ naming what moved. The order:
   behind.
   [0179] closed 2026-09-16 and [0183] 2026-09-17, moving no baseline.
   [0182] closed 2026-09-15 ahead of them; it touched only the report, so it constrains none.
-- **Still gated on a human:** [0120] Phase 1, [0133] Phase 9 and all three phases of [0192]. [0103]
+- **Still gated on a human:** [0133] Phase 9, all three phases of [0192], and three of
+  [0214]'s four — [0120] Phase 1 discharged 2026-09-20 on the owner's box, which is what let 0120
+  be re-cut into implementation here and witnessing there. [0103]
   closed 2026-09-18, its Phase 4 discharged by the owner the same day - topics and the social
   preview. [0166] Phase 3
   is discharged - the owner read the five translations on 2026-09-16, 44 corrections.
@@ -396,6 +399,7 @@ naming what moved. The order:
 [0174]: done/0174-the-clock-reading-tests-run-alone.md
 [0175]: done/0175-an-eased-value-arrives.md
 [0120]: 0120-the-standalone-ships-on-ubuntu.md
+[0214]: 0214-the-linux-arm-reports-back.md
 [0166]: done/0166-the-basics-read-in-russian.md
 
 **Rewritten 2026-08-18, and this is the live sequence.** What it replaced — the 2026-08-16

@@ -25,6 +25,29 @@
 > 0177 fixes the Windows arm first) and **0208** (Phase 5 — count-free platform wording; Plan 0178
 > adds the gate for system counts).
 
+> **Amended 2026-09-20 — this plan now ends at the last line of code it writes.** Phase 1 ran and
+> the premise holds (see `## Implementation log`), and it surfaced the shape problem: **every
+> remaining done-when that says "green" needs a push, and one needs the machine.** The conductor
+> never pushes and a Windows session cannot run the Linux arm, so each of those would stop a lane
+> that had already written the code. The split is therefore by **who can witness the evidence**,
+> not by what the work is: 0120 keeps all the implementation and is done when the code and config
+> are written and every gate this checkout can run is green;
+> [0214](0214-the-linux-arm-reports-back.md) carries the three readings that exist only after a
+> push — the `ubuntu-latest` arm's six steps, the adapter it resolves, the dry-run artifacts — plus
+> the on-box run, which was Phase 6 here. Phase 6 is gone from this plan; Phases 2, 3 and 4 keep
+> their work and hand their witnessing clauses across. **Nothing was cut** — every clause that left
+> is quoted in 0214 where it lands.
+>
+> **The hazard this creates, named rather than hidden.** Phase 3's backend is `cfg`-gated to Linux,
+> so **no machine in this loop compiles it** until CI does — the same shape as the standing finding
+> against `plugin-foobar/viz_session.cpp`, whose first compilation is a release job. Two things
+> blunt it, and neither is a gate: Phase 2 lands the CI arm **first**, so once the owner pushes
+> once, every later push compiles the Linux arm as the phases land; and
+> `cargo check --target x86_64-unknown-linux-gnu` type-checks Phase 2's `cfg` arms from Windows.
+> That second one does **not** reach Phase 3 — `cargo check` runs build scripts, and
+> `libpulse-sys`'s needs `pkg-config` and libpulse headers — which is a limit to know before the
+> phase starts rather than to discover inside it.
+
 ## TL;DR
 
 The standalone gets a third platform: **Ubuntu 24.04 x86_64**. A new
@@ -203,23 +226,28 @@ back to it) set to a scratch directory in the same helpers — so neither the ru
 Ubuntu box in Phase 6 has its real `~/.local/share/Ritmolux/` mutated by `cargo nextest run`. If
 0177 has not landed when this phase starts, take both arms here and say so in the log.
 
-**Done when:**
+**Done when** (amended 2026-09-20 — the witnessing clauses moved to
+[0214](0214-the-linux-arm-reports-back.md) Phase 1):
 
-- The `ubuntu-latest` arm runs all six existing steps green — `cargo build`,
-  `cargo nextest run --workspace -P fast`, `cargo test --workspace --doc`,
+- The `ubuntu-latest` arm is **declared** in `ci.yml` carrying all six existing steps —
+  `cargo build`, `cargo nextest run --workspace -P fast`, `cargo test --workspace --doc`,
   `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check`, and
   `cargo doc --workspace --no-deps` under `RUSTDOCFLAGS: -D warnings` — with the same `-P fast`
-  profile the other two arms use, not a loosened one.
+  profile the other two arms use, not a loosened one, and with the system packages the job needs.
+  **Whether it runs them green is 0214's first reading**, because nothing here can run it.
+- The third `cfg` arm **type-checks from this checkout**:
+  `cargo check --target x86_64-unknown-linux-gnu` is clean after `rustup target add`. This is the
+  one Linux compile available before a push, and it is available **only in this phase** — it runs
+  build scripts, so it stops working the moment Phase 3 puts `libpulse-sys` in the graph. Record in
+  the log that it ran and what it caught; a phase that skips it hands its first compile to CI for
+  no reason.
 - The subprocess tests that reach `main()` or `--stream` set the Linux data root to a scratch
-  directory; a run of `help_cli` and `stream_pipe` on the Ubuntu arm leaves `$HOME/.local/share`
-  untouched.
-- **The implementation log records which wgpu adapter, if any, resolves on the runner, and whether
-  any GPU-touching test actually executed there rather than skipping.** This is the phase's real
-  finding and it must not be absorbed silently: `ubuntu-latest` may ship Mesa's software Vulkan, in
-  which case tests that skip on macOS for want of an adapter will *run* on Linux — against a
-  rasterizer nothing in this repo has ever compared against. If any did run, name them.
-- No test's platform gate is widened or loosened to make the arm green. A test that should not run
-  on Linux gets a gate that says so, in ADR-0016's shape.
+  directory — `XDG_DATA_HOME` and `HOME`, since `preset_data_root` falls back to it — and the
+  Windows and macOS arms stay green with that change in. **That the Linux arm leaves
+  `$HOME/.local/share` untouched is 0214's to witness.**
+- No test's platform gate is widened or loosened in anticipation of the arm. A test that should not
+  run on Linux gets a gate that says so, in ADR-0016's shape — written from the gate's own
+  reasoning, never from a red CI run nobody in this plan can see.
 
 ### Phase 3 — The PulseAudio capture backend
 
@@ -268,8 +296,16 @@ sentence becomes false in this phase.
   names three platforms, not two.
 - `cargo deny check` is green with the widened target list. If it is not, the fix is a **reasoned
   `ignore` entry naming the advisory id and why**, never a narrowed target list — narrowing would
-  put the shipped Linux artifact back outside the gate.
-- The `check` arm from Phase 2 stays green with the new dependency present.
+  put the shipped Linux artifact back outside the gate. This one runs here: `deny` evaluates the
+  dependency graph for a target, it does not build for it.
+- **Amended 2026-09-20.** The retired clause *"the `check` arm from Phase 2 stays green with the
+  new dependency present"* is [0214](0214-the-linux-arm-reports-back.md) Phase 1's, and with it
+  goes the first compilation of everything this phase writes. So the done-whens above are the whole
+  bar here, and two of them — the no-allocation read loop and the partial-read framing — are
+  **properties a reader checks**, which is why they were written that way and why they still hold
+  when no compiler has seen the file. Put the framing helper where the test can reach it on every
+  platform: a pure function of a byte slice and a frame size belongs **outside** the `cfg`-gated
+  module, or its test compiles on exactly the machine that cannot run it.
 
 ### Phase 4 — The release tarball
 
@@ -310,7 +346,14 @@ directory that does not exist.
   uploaded is the same short release by a different route.
 - The release notes gain a Linux bullet naming the floor (Ubuntu 24.04 or newer, x86_64) and the
   runtime requirement (PipeWire or PulseAudio — the binary will not start without `libpulse.so.0`).
-- A `workflow_dispatch` dry run produces six artifacts and publishes nothing.
+- **Amended 2026-09-20.** *"`stage.sh` produces `target/dist/…tar.gz`"* and *"a `workflow_dispatch`
+  dry run produces six artifacts and publishes nothing"* are the two clauses only a run can
+  witness, and they are [0214](0214-the-linux-arm-reports-back.md) Phase 3's. What this phase owes
+  instead is that **the script asserts them**: every check above is written into `stage.sh` and
+  into the `release` job, so the run that eventually happens is checking itself rather than being
+  inspected by a person. The count guard is the one to get right blind — it asserts **5 `.zip` and
+  exactly 1 `.tar.gz`**, and a guard that still counts only zips passes a release that shipped
+  nothing for Linux.
 
 ### Phase 5 — The docs say Linux
 
@@ -353,28 +396,11 @@ And: `node scripts/check-doc-links.mjs`, `node scripts/check-index-rows.mjs`,
 `node scripts/check-backlog-claims.mjs`, `node scripts/check-reader-prose.mjs` and
 `node scripts/toc.mjs --check` all exit 0.
 
-### Phase 6 — Run it on the Ubuntu box
+### Phase 6 — moved to Plan 0214 on 2026-09-20
 
-- **Owner skill:** human
-
-Validate the artifact that actually ships, not a `cargo run`. Extract the tarball produced by
-Phase 4 (from a `workflow_dispatch` run, or from a local `stage.sh`) on the Ubuntu 24.04 machine.
-
-**Done when** each of these is reported, pass or fail:
-
-- It extracts and launches; `chmod +x` was or was not needed.
-- Music plays and the visuals react to it.
-- **F3's audio line reads `live PulseAudio 48000/2 <endpoint>`**, and the endpoint names a monitor
-  source. A `failed PulseAudio …` line is a finding with its reason attached; `unsupported` means
-  the wrong arm compiled.
-- `~/.local/share/Ritmolux/` appears and holds `config.toml`, a preset copy and
-  `diagnostics.log`; `diagnostics.log`'s `capture` column carries the same verdict token.
-- `F` (fullscreen) works. `D` (next monitor) works, or is a no-op — expected under Wayland, per
-  ADR-0131's Negative, and recorded either way rather than treated as a bug.
-- The frame rate F3 shows, and whether the quality tier was auto-dropped.
-
-Anything that fails here becomes a **backlog entry**, not a silent fix — the plan's `dev` phases are
-finished by this point and a repair belongs in its own scope.
+The on-box run is [0214](0214-the-linux-arm-reports-back.md) Phase 4, carried across with its
+done-when list intact. It is named here rather than deleted because three earlier sections still
+say "which Phase 6 then executes", and a phase that vanishes leaves those pointing at nothing.
 
 ## Implementation log
 
@@ -385,7 +411,7 @@ finished by this point and a repair belongs in its own scope.
 | 3 — The PulseAudio capture backend | dev | not started | |
 | 4 — The release tarball | dev | not started | |
 | 5 — The docs say Linux | dev | not started | |
-| 6 — Run it on the Ubuntu box | human | not started | |
+| 6 — Run it on the Ubuntu box | — | moved 2026-09-20 to Plan 0214 Phase 4 | |
 
 ### Notes
 
@@ -466,6 +492,12 @@ finished by this point and a repair belongs in its own scope.
   Audacious equivalent is a separate decision nobody has asked for.
 - **No change to `core/`.** Capture is a shell concern by ADR-0001. A diff touching `core/` in this
   plan is a finding.
+- **It does not witness any of its own work on Linux** (amended 2026-09-20). The `ubuntu-latest`
+  arm running green, the wgpu adapter it resolves, the dry run's six artifacts and the tarball
+  launching on the box are all [0214](0214-the-linux-arm-reports-back.md)'s, because each needs a
+  push or the machine and this plan's lanes have neither. **This plan closes with Linux code that
+  has never run**, which is a deliberate and stated position, not an oversight — and the reason
+  0214 exists rather than being folded into a close ceremony.
 - **No Linux studio build.** The studio ships as a zip per platform carrying its own player
   ([ADR-0178](../adrs/0178-the-studio-shell-conventions.md)), built for Windows and macOS only; a
   Linux studio zip is a separate decision.
