@@ -1,12 +1,33 @@
 use super::{
-    CAPTURE_TOP, ListLayout, NAME_CHARS, OverlayAction, OverlayKey, OverlayState, capture_line,
-    fit, layout,
+    CAPTURE_TOP, ListLayout, NAME_CHARS, OverlayAction, OverlayKey, OverlayState, Row,
+    capture_line, fit, header_text, layout, mark_glyph, row_text,
 };
 
 const NAMES: [&str; 4] = ["alpha", "bravo", "charlie", "delta"];
 
-fn names() -> Vec<&'static str> {
-    NAMES.to_vec()
+/// An unmarked row in a single family — what most tests below are about, since
+/// navigation does not read the marks.
+fn row(name: &str) -> Row<'_> {
+    Row {
+        name,
+        family: "curve",
+        favourite: false,
+        hidden: false,
+    }
+}
+
+fn rows<'a>(names: &[&'a str]) -> Vec<Row<'a>> {
+    names.iter().map(|name| row(name)).collect()
+}
+
+fn names() -> Vec<Row<'static>> {
+    rows(&NAMES)
+}
+
+/// `n` identical unmarked rows, for the layout and navigation tests that only
+/// care about the count.
+fn filler(n: usize) -> Vec<Row<'static>> {
+    (0..n).map(|_| row("x")).collect()
 }
 
 /// The roster's first preset is active. Most tests below predate open-on-
@@ -114,7 +135,7 @@ fn the_shipped_roster_flows_into_two_columns_at_1080p_and_one_at_1440p() {
 /// is exact rather than approximately.
 #[test]
 fn right_steps_one_column_and_clamps_at_the_last() {
-    let n: Vec<&str> = (0..20).map(|_| "x").collect();
+    let n = filler(20);
     let l = ListLayout {
         cols: 2,
         rows_per_col: 10,
@@ -148,7 +169,7 @@ fn right_steps_one_column_and_clamps_at_the_last() {
 /// column's last row.
 #[test]
 fn right_into_a_short_column_lands_on_its_last_row() {
-    let n: Vec<&str> = (0..SHIPPED).map(|_| "x").collect();
+    let n = filler(SHIPPED);
     let (w, h) = HD;
     let l = layout(SHIPPED, 0, w, h);
     let mut s = OverlayState::new();
@@ -238,6 +259,249 @@ fn a_name_is_only_shortened_past_the_column_budget() {
     assert_eq!(fit(&wide).chars().count(), NAME_CHARS);
 }
 
+// ---------------------------------------------------------------------------
+// The narrowings
+// ---------------------------------------------------------------------------
+
+/// A library of three families with two marks in it, so every filter has both
+/// something to keep and something to drop.
+fn library() -> Vec<Row<'static>> {
+    vec![
+        Row {
+            name: "Gyre",
+            family: "curve",
+            favourite: true,
+            hidden: false,
+        },
+        Row {
+            name: "Loom",
+            family: "curve",
+            favourite: false,
+            hidden: false,
+        },
+        Row {
+            name: "Multibrot",
+            family: "analytic",
+            favourite: false,
+            hidden: true,
+        },
+        Row {
+            name: "Seahorse",
+            family: "analytic",
+            favourite: true,
+            hidden: false,
+        },
+        Row {
+            name: "Ink",
+            family: "attractor",
+            favourite: false,
+            hidden: false,
+        },
+    ]
+}
+
+fn shown(state: &OverlayState, rows: &[Row<'_>]) -> Vec<String> {
+    state
+        .visible(rows)
+        .into_iter()
+        .map(|(_, row)| row.name.to_owned())
+        .collect()
+}
+
+/// **Hidden presets are absent from the default view and reachable through an
+/// explicit state.** A mark you cannot find again is a mark you cannot undo,
+/// which is the whole reason the second half of this exists.
+#[test]
+fn hidden_presets_leave_the_default_view_and_come_back_on_request() {
+    let n = library();
+    let mut s = OverlayState::new();
+    s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
+
+    assert!(!s.show_hidden(), "the default view hides them");
+    assert_eq!(shown(&s, &n), ["Gyre", "Loom", "Seahorse", "Ink"]);
+
+    s.handle_key(OverlayKey::ShowHidden, &n, FIRST, &WIDE);
+    assert!(s.show_hidden());
+    assert_eq!(
+        shown(&s, &n),
+        ["Gyre", "Loom", "Multibrot", "Seahorse", "Ink"],
+        "a hidden preset must be reachable, or its mark cannot be undone"
+    );
+
+    // And the absolute index still addresses the roster, so selecting the row
+    // that only exists in this state picks the right preset.
+    let visible = s.visible(&n);
+    assert_eq!(visible[2].0, 2, "Multibrot's absolute index");
+
+    s.handle_key(OverlayKey::ShowHidden, &n, FIRST, &WIDE);
+    assert!(!s.show_hidden(), "the state toggles rather than latching");
+}
+
+/// **One family, and favourites only, each toggling independently of the typed
+/// text** — and of each other, since a reader narrowing twice means both.
+#[test]
+fn the_family_and_favourite_filters_are_independent_of_the_query() {
+    let n = library();
+    let mut s = OverlayState::new();
+    s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
+
+    // Favourites alone.
+    s.handle_key(OverlayKey::FavouritesOnly, &n, FIRST, &WIDE);
+    assert_eq!(shown(&s, &n), ["Gyre", "Seahorse"]);
+    assert_eq!(s.filter(), "", "a narrowing typed nothing");
+
+    // The query narrows further without disturbing it.
+    type_str(&mut s, "sea", &n);
+    assert_eq!(shown(&s, &n), ["Seahorse"]);
+    assert!(s.favourites_only(), "typing cleared a narrowing");
+
+    // And backspacing the query out leaves the narrowing where it was.
+    for _ in 0..3 {
+        s.handle_key(OverlayKey::Backspace, &n, FIRST, &WIDE);
+    }
+    assert_eq!(shown(&s, &n), ["Gyre", "Seahorse"]);
+
+    // A family on top of it: both apply, so this is the intersection.
+    s.handle_key(OverlayKey::Family, &n, FIRST, &WIDE);
+    assert_eq!(s.family(), Some("curve"));
+    assert_eq!(
+        shown(&s, &n),
+        ["Gyre"],
+        "the two narrowings must combine rather than replace each other"
+    );
+
+    s.handle_key(OverlayKey::FavouritesOnly, &n, FIRST, &WIDE);
+    assert_eq!(shown(&s, &n), ["Gyre", "Loom"], "curve alone");
+}
+
+/// The family cycle walks the families **the roster actually holds**, in roster
+/// order, and comes back off the end to every family.
+#[test]
+fn the_family_filter_cycles_the_roster_s_own_families_and_back_off_the_end() {
+    let n = library();
+    let mut s = OverlayState::new();
+    s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
+
+    // `analytic` is present only on the hidden preset and on Seahorse, so the
+    // roster order is curve, analytic, attractor.
+    for expected in [Some("curve"), Some("analytic"), Some("attractor"), None] {
+        s.handle_key(OverlayKey::Family, &n, FIRST, &WIDE);
+        assert_eq!(s.family(), expected);
+    }
+
+    // A narrowing whose family has left the roster restarts the cycle rather
+    // than sticking on a name nothing matches.
+    let smaller = vec![library()[4]];
+    s.handle_key(OverlayKey::Family, &n, FIRST, &WIDE);
+    assert_eq!(s.family(), Some("curve"));
+    s.handle_key(OverlayKey::Family, &smaller, FIRST, &WIDE);
+    assert_eq!(s.family(), Some("attractor"));
+}
+
+/// A narrowing that leaves nothing yields an empty list, and `Enter` on it
+/// closes without picking — the same rule an over-narrow query already had.
+#[test]
+fn a_narrowing_that_matches_nothing_selects_nothing() {
+    let n = library();
+    let mut s = OverlayState::new();
+    s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
+    s.handle_key(OverlayKey::FavouritesOnly, &n, FIRST, &WIDE);
+    // `attractor` holds one preset and it is not a favourite.
+    for _ in 0..3 {
+        s.handle_key(OverlayKey::Family, &n, FIRST, &WIDE);
+    }
+    assert_eq!(s.family(), Some("attractor"));
+    assert!(shown(&s, &n).is_empty());
+    assert_eq!(
+        s.handle_key(OverlayKey::Enter, &n, FIRST, &WIDE),
+        OverlayAction::Close
+    );
+}
+
+/// **Reopening clears the query and keeps the narrowings.** A half-typed name
+/// belongs to one visit; narrowing to a family is a decision, and the header is
+/// what stops a kept one reading as a roster that shrank.
+#[test]
+fn reopening_keeps_the_narrowings_and_the_header_names_them() {
+    let n = library();
+    let mut s = OverlayState::new();
+    s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
+    s.handle_key(OverlayKey::FavouritesOnly, &n, FIRST, &WIDE);
+    s.handle_key(OverlayKey::Family, &n, FIRST, &WIDE);
+    type_str(&mut s, "gy", &n);
+
+    s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE); // close
+    s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE); // reopen
+    assert_eq!(s.filter(), "", "the query survived a reopen");
+    assert!(
+        s.favourites_only(),
+        "the narrowing did not survive a reopen"
+    );
+    assert_eq!(s.family(), Some("curve"));
+
+    let header = header_text(&s);
+    assert!(header.contains("favourites"), "{header}");
+    assert!(header.contains("family: curve"), "{header}");
+    assert!(
+        !header.contains("+hidden"),
+        "the header named a state that is off: {header}"
+    );
+
+    s.handle_key(OverlayKey::ShowHidden, &n, FIRST, &WIDE);
+    assert!(header_text(&s).contains("+hidden"));
+}
+
+/// **Every row names its system**, and says whether it is marked, in one line
+/// whose name column is a fixed width so the family lands in the same place on
+/// every row.
+#[test]
+fn a_row_carries_its_family_and_its_mark() {
+    let n = library();
+    let favourite = row_text(&n[0], "> ");
+    assert!(favourite.contains("Gyre"), "{favourite}");
+    assert!(favourite.contains("curve"), "{favourite}");
+    assert!(favourite.starts_with("> *"), "{favourite}");
+
+    let plain = row_text(&n[1], "  ");
+    assert!(plain.starts_with("   "), "an unmarked row wears no glyph");
+    assert_eq!(
+        favourite.find("curve"),
+        plain.find("curve"),
+        "the family column moved between two rows, so the list is ragged"
+    );
+
+    // Hidden wins over favourite: the mark that decides whether you see a
+    // preset is the one worth showing.
+    let both = Row {
+        favourite: true,
+        ..n[2]
+    };
+    assert_eq!(mark_glyph(&both), '-');
+    assert_eq!(mark_glyph(&n[0]), '*');
+    assert_eq!(mark_glyph(&n[1]), ' ');
+}
+
+/// The column budget holds the row this module actually draws — if it did not,
+/// a long name would run into the next column and nothing on screen would say
+/// why.
+#[test]
+fn a_drawn_row_fits_the_column_it_is_drawn_in() {
+    let longest = "a".repeat(NAME_CHARS + 20);
+    let row = Row {
+        name: &longest,
+        family: "attractor", // the longest family in the system roster
+        favourite: true,
+        hidden: false,
+    };
+    let text = row_text(&row, "> ");
+    assert!(
+        text.chars().count() <= super::COL_CHARS,
+        "a drawn row is {} characters and the column reserves {}: {text}",
+        text.chars().count(),
+        super::COL_CHARS
+    );
+}
+
 #[test]
 fn nav_keys_are_inert_while_closed() {
     let mut s = OverlayState::new();
@@ -308,7 +572,7 @@ fn escape_closes_without_selecting() {
 /// first preset in the list.
 #[test]
 fn opening_highlights_the_active_preset_and_enter_reselects_it() {
-    let n: Vec<&str> = (0..10).map(|_| "x").collect();
+    let n = filler(10);
     let mut s = OverlayState::new();
     assert_eq!(
         s.handle_key(OverlayKey::Toggle, &n, 7, &WIDE),
@@ -352,7 +616,7 @@ fn opening_on_an_unreachable_active_index_falls_back_into_the_list() {
     let mut s = OverlayState::new();
     s.handle_key(OverlayKey::Toggle, &n, 3, &WIDE);
     assert_eq!(s.highlight(), 3);
-    s.on_roster_changed(&["alpha", "bravo"]);
+    s.on_roster_changed(&rows(&["alpha", "bravo"]));
     assert_eq!(s.highlight(), 1);
 }
 
@@ -392,7 +656,7 @@ fn the_highlight_wraps_at_both_ends() {
 #[test]
 fn a_single_row_list_wraps_onto_itself() {
     let mut s = OverlayState::new();
-    let n = vec!["only"];
+    let n = rows(&["only"]);
     s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
     for key in [OverlayKey::Down, OverlayKey::Up, OverlayKey::Down] {
         s.handle_key(key, &n, FIRST, &WIDE);
@@ -417,14 +681,17 @@ fn only_navigation_keys_accept_key_repeat() {
         OverlayKey::Escape,
         OverlayKey::Backspace,
         OverlayKey::Char('a'),
+        OverlayKey::Family,
+        OverlayKey::FavouritesOnly,
+        OverlayKey::ShowHidden,
     ] {
         assert!(!key.is_nav(), "{key:?} must not be honoured on key repeat");
     }
 }
 
-fn type_str(s: &mut OverlayState, text: &str, names: &[&str]) {
+fn type_str(s: &mut OverlayState, text: &str, rows: &[Row<'_>]) {
     for c in text.chars() {
-        s.handle_key(OverlayKey::Char(c), names, FIRST, &WIDE);
+        s.handle_key(OverlayKey::Char(c), rows, FIRST, &WIDE);
     }
 }
 
@@ -432,12 +699,14 @@ fn type_str(s: &mut OverlayState, text: &str, names: &[&str]) {
 fn typing_filters_case_insensitively_and_selects_absolute_index() {
     let mut s = OverlayState::new();
     // "warp" sits at absolute index 2 and is capitalized.
-    let n = vec!["Aurora", "Ember", "Warp", "Glacier"];
+    let n = rows(&["Aurora", "Ember", "Warp", "Glacier"]);
     s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
     // Lowercase "war" matches "Warp" case-insensitively, nothing else.
     type_str(&mut s, "war", &n);
     let visible = s.visible(&n);
-    assert_eq!(visible, [(2, "Warp")]);
+    assert_eq!(visible.len(), 1);
+    assert_eq!(visible[0].0, 2);
+    assert_eq!(visible[0].1.name, "Warp");
     // Enter must carry Warp's ABSOLUTE index (2), not its filtered row (0).
     assert_eq!(
         s.handle_key(OverlayKey::Enter, &n, FIRST, &WIDE),
@@ -448,7 +717,7 @@ fn typing_filters_case_insensitively_and_selects_absolute_index() {
 #[test]
 fn backspace_widens_the_filtered_list() {
     let mut s = OverlayState::new();
-    let n = vec!["alpha", "altair", "beta"];
+    let n = rows(&["alpha", "altair", "beta"]);
     s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
     type_str(&mut s, "alt", &n);
     assert_eq!(s.visible(&n).len(), 1); // only "altair"
@@ -486,14 +755,14 @@ fn reopening_clears_the_prior_filter() {
 #[test]
 fn roster_change_reclamps_the_highlight_and_keeps_open() {
     let mut s = OverlayState::new();
-    let big = vec!["a", "b", "c", "d"];
+    let big = rows(&["a", "b", "c", "d"]);
     s.handle_key(OverlayKey::Toggle, &big, FIRST, &WIDE);
     for _ in 0..3 {
         s.handle_key(OverlayKey::Down, &big, FIRST, &WIDE);
     }
     assert_eq!(s.highlight(), 3);
     // A hot-reload shrinks the roster under the open overlay.
-    let small = vec!["a", "b"];
+    let small = rows(&["a", "b"]);
     s.on_roster_changed(&small);
     assert_eq!(s.highlight(), 1); // clamped to the new last row
     assert!(s.is_open()); // still open

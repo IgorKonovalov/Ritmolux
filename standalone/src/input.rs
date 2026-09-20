@@ -50,6 +50,14 @@ pub(crate) fn decode_overlay_key(code: KeyCode) -> Option<OverlayKey> {
         KeyCode::Enter | KeyCode::NumpadEnter => OverlayKey::Enter,
         KeyCode::Escape => OverlayKey::Escape,
         KeyCode::Backspace => OverlayKey::Backspace,
+        // The three narrowings. Function keys because **letters and digits are
+        // filter input while the browser is open** and this app binds no
+        // modifier combination anywhere — so `Ctrl`-anything would be new input
+        // plumbing rather than a free choice, and a letter would be swallowed by
+        // the query. `F3` was already a toggle, so the row is established.
+        KeyCode::F4 => OverlayKey::FavouritesOnly,
+        KeyCode::F5 => OverlayKey::Family,
+        KeyCode::F6 => OverlayKey::ShowHidden,
         _ => return None,
     })
 }
@@ -140,13 +148,17 @@ impl AppState {
             self.toggle_mark(Mark::Favourite);
             return;
         }
+        if code == KeyCode::F2 {
+            self.toggle_mark(Mark::Hidden);
+            return;
+        }
 
         if let Some(key) = overlay_key {
-            let name_refs = self.roster_names();
-            let refs: Vec<&str> = name_refs.iter().map(String::as_str).collect();
+            let names = self.roster_names();
+            let rows = self.browse_rows(&names);
             let active = self.renderer.active_index();
-            let layout = self.list_layout(self.hud.browse.visible(&refs).len());
-            match self.hud.browse.handle_key(key, &refs, active, &layout) {
+            let layout = self.list_layout(self.hud.browse.visible(&rows).len());
+            match self.hud.browse.handle_key(key, &rows, active, &layout) {
                 OverlayAction::None => return, // closed + non-toggle: let it fall away
                 OverlayAction::Redraw | OverlayAction::Close => {}
                 OverlayAction::Select(index) => {
@@ -162,10 +174,10 @@ impl AppState {
         // consumed so it can't reach Space-cycle / F3.
         if self.hud.browse.is_open() {
             if let Some(text) = &event.text {
-                let name_refs = self.roster_names();
-                let refs: Vec<&str> = name_refs.iter().map(String::as_str).collect();
+                let names = self.roster_names();
+                let rows = self.browse_rows(&names);
                 let active = self.renderer.active_index();
-                let layout = self.list_layout(self.hud.browse.visible(&refs).len());
+                let layout = self.list_layout(self.hud.browse.visible(&rows).len());
                 let mut changed = false;
                 for c in text
                     .chars()
@@ -173,7 +185,7 @@ impl AppState {
                 {
                     self.hud
                         .browse
-                        .handle_key(OverlayKey::Char(c), &refs, active, &layout);
+                        .handle_key(OverlayKey::Char(c), &rows, active, &layout);
                     changed = true;
                 }
                 if changed {

@@ -38,7 +38,7 @@ use crate::diaglog::DiagLog;
 use crate::downbeatlog::DownbeatLog;
 #[cfg(windows)]
 use crate::nowplaying_win;
-use crate::overlay::{OverlayKey, OverlayState};
+use crate::overlay::{OverlayKey, OverlayState, Row};
 use crate::run::{App, resolve_display};
 use crate::settings::{SettingsAction, SettingsState, SettingsView, TierState};
 use crate::show::Show;
@@ -951,8 +951,8 @@ impl AppState {
         // Keep the browse overlay's highlight valid if the roster just changed
         // shape under it (re-clamp; the open state and filter are preserved).
         let names = self.roster_names();
-        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
-        self.hud.browse.on_roster_changed(&refs);
+        let rows = self.browse_rows(&names);
+        self.hud.browse.on_roster_changed(&rows);
     }
 
     /// Open the windowed preview pipe, if `--preview stdout` asked for one.
@@ -1584,11 +1584,50 @@ impl AppState {
         self.window.request_redraw();
     }
 
-    /// The preset a mark key acts on: the one on screen.
+    /// The roster as the browser sees it: name, family and marks per entry.
+    ///
+    /// `names` is the caller's own owned roster, so the returned rows borrow it
+    /// and **not** `self` — a family is `&'static str` and the marks are read
+    /// out as `bool`. That is what lets a caller build the rows and then take
+    /// `&mut self.hud.browse` to feed them to the overlay.
+    pub(crate) fn browse_rows<'a>(&self, names: &'a [String]) -> Vec<Row<'a>> {
+        let families = self.show.families();
+        let marks = self.show.marks();
+        names
+            .iter()
+            .enumerate()
+            .map(|(index, name)| Row {
+                name,
+                // Empty rather than a guess when the two have somehow drifted:
+                // a wrong family would put a preset under a filter it does not
+                // belong to, which is worse than an unlabelled row.
+                family: families.get(index).copied().unwrap_or(""),
+                favourite: marks.is(Mark::Favourite, name),
+                hidden: marks.is(Mark::Hidden, name),
+            })
+            .collect()
+    }
+
+    /// The preset a mark key acts on: the **highlighted row** while the browser
+    /// is open, the preset on screen otherwise.
+    ///
+    /// One key, two contexts, and the target is whichever of them the operator
+    /// is looking at — marking the preset being rendered while the eye is on a
+    /// list would be the same key meaning two things.
     ///
     /// Owned rather than borrowed, because every caller goes on to take `&mut
     /// self` to record the mark.
     pub(crate) fn mark_target(&self) -> Option<String> {
+        if self.hud.browse.is_open() {
+            let names = self.roster_names();
+            let rows = self.browse_rows(&names);
+            return self
+                .hud
+                .browse
+                .visible(&rows)
+                .get(self.hud.browse.highlight())
+                .map(|(_, row)| row.name.to_owned());
+        }
         let name = self.renderer.preset_name();
         (!name.is_empty()).then(|| name.to_owned())
     }
@@ -1609,6 +1648,14 @@ impl AppState {
             if on { "marked" } else { "unmarked" },
             mark.as_str()
         );
+        // The mark moves both of the things that read it: what rotation is
+        // about to take, and which rows the browser is showing. Hiding the
+        // highlighted row is the case that needs the re-clamp — the row under
+        // the cursor leaves the list in the same keystroke that marked it.
+        self.show.refresh_upcoming(&self.renderer);
+        let names = self.roster_names();
+        let rows = self.browse_rows(&names);
+        self.hud.browse.on_roster_changed(&rows);
         self.window.request_redraw();
     }
 
@@ -1735,12 +1782,12 @@ impl AppState {
     /// Open the browse overlay on the active preset, as `Tab` does.
     pub(crate) fn open_browse(&mut self) {
         let names = self.roster_names();
-        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        let rows = self.browse_rows(&names);
         let active = self.renderer.active_index();
-        let layout = self.list_layout(refs.len());
+        let layout = self.list_layout(rows.len());
         self.hud
             .browse
-            .handle_key(OverlayKey::Toggle, &refs, active, &layout);
+            .handle_key(OverlayKey::Toggle, &rows, active, &layout);
     }
 
     /// Push any track change the metadata source picked up into the core's

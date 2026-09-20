@@ -198,19 +198,15 @@ impl AppState {
             }
         } else if self.modal() == Some(Modal::Browse) {
             let names = self.roster_names();
-            let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
-            let visible = self.hud.browse.visible(&name_refs);
+            let rows = self.browse_rows(&names);
+            let visible = self.hud.browse.visible(&rows);
             let highlight = self.hud.browse.highlight();
 
-            // Header echoes the filter query (or a hint) above the list, so the
-            // user sees what they've typed as it narrows the roster.
-            let header = if self.hud.browse.filter().is_empty() {
-                "type to filter  -  arrows  enter  esc".to_owned()
-            } else {
-                format!("filter: {}", self.hud.browse.filter())
-            };
+            // Header echoes the filter query (or a hint) above the list, plus
+            // every narrowing that is on — a list that shrank and said nothing
+            // reads as a roster that lost presets.
             modal.push(console::Line::new(
-                header,
+                overlay::header_text(&self.hud.browse),
                 LIST_INSET,
                 LIST_TOP,
                 ROW_SIZE,
@@ -221,7 +217,7 @@ impl AppState {
             // the pure `layout`, so this loop only turns `(column, row)` into
             // pixels. Rows the layout scrolls off answer `None` and are skipped.
             let layout = self.list_layout(visible.len());
-            for (row, &(_abs, name)) in visible.iter().enumerate() {
+            for (row, (_abs, entry)) in visible.iter().enumerate() {
                 let Some((col, r)) = layout.place(row) else {
                     continue;
                 };
@@ -233,7 +229,7 @@ impl AppState {
                     ("  ", ROW_COLOR)
                 };
                 modal.push(console::Line::new(
-                    format!("{marker}{}", overlay::fit(name)),
+                    overlay::row_text(entry, marker),
                     x,
                     y,
                     ROW_SIZE,

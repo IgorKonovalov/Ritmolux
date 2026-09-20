@@ -308,8 +308,8 @@ pub enum RotateSource {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The marks store, and one key that proves it | dev | done | c3ed56cb |
-| 2 — Rotation spends the marks | dev | done | committed with this row |
-| 3 — The browser narrows | dev | not started | |
+| 2 — Rotation spends the marks | dev | done | eaeca3bc |
+| 3 — The browser narrows | dev | done | committed with this row |
 | 4 — The keys and the HUD carry it | dev | not started | |
 | 5 — The protocol carries a mark | dev | not started | |
 | 6 — The studio marks and filters | studio-builder | not started | |
@@ -354,6 +354,26 @@ pub enum RotateSource {
   `app_state.rs` and `input.rs` (the `Trail` split and the `Backspace` binding), `hud.rs` (the
   staging line reads the traversal's peek) and `stream.rs` (the headless path rotates through the
   same traversal, so ADR-0181's invariant holds).
+
+- **Phase 3 took the plan's proposed bindings and added three of its own.** `F1` favourite and `F2`
+  hide, working identically inside and outside the browser, exactly as proposed. The three
+  narrowings needed keys too and the same constraint applies to them, so they are `F4` favourites
+  only, `F5` family, `F6` show hidden — browser-only, since none of them means anything outside it.
+- **"Every row names its system" is drawn as the system's family** — `curve`, `attractor`, the
+  filename prefix `SystemKind::family()` returns — not as the canonical key. The key is up to
+  eighteen characters (`reaction_diffusion`) and the column that would need is four characters wider
+  than the whole name column; the family is the same identity in a form that fits, and it is the
+  token the `F5` filter and the filename already use, so the row, the filter and the file all read
+  as one word.
+- The column budget moved with it: `NAME_CHARS` 24 -> 18 (the longest shipped name is 18,
+  `Tiled Rosette Mono`, so truncation still never fires on the embedded set) and the column widened
+  from 26 to 32 characters, which is four columns at 1920x1080 against the previous five — still
+  more than the 116-preset roster needs at 32 rows a column.
+- Phase 3's reach beyond `overlay.rs` / `overlay/tests.rs`: the browser needs a **family per roster
+  entry**, which nothing held. `preset_dir.rs` now returns the families of the set it installs and
+  `show.rs` keeps them beside the roster, falling back to the embedded set's when a load installed
+  nothing. `app_state.rs` builds the rows, `input.rs` decodes the three keys, `hud.rs` draws the row
+  and the header. No core change: `SystemKind::family()` was already public.
 
 ### Close triggers
 

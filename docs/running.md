@@ -54,20 +54,28 @@ one, so you always land where you asked.
 | `F`       | Toggle fullscreen                                           |
 | `Esc`     | Leave fullscreen (with no menu open). Does nothing in a window, and never quits |
 | `D`       | Cycle to the next display/monitor                           |
-| `F1`      | Mark the preset you are watching as a **favourite** (press again to unmark) — remembered across restarts |
+| `F1`      | Mark as a **favourite** (press again to unmark) — remembered across restarts |
+| `F2`      | **Hide** it: no more auto-rotate, and gone from the browser's default view |
 | `F3`      | Toggle the diagnostics overlay                              |
+| `F4`      | In the browser: show **favourites only**                    |
+| `F5`      | In the browser: narrow to **one family**, then the next, then all of them again |
+| `F6`      | In the browser: bring **hidden** presets back into the list |
 
 ### Marking a preset
 
-`F1` records an opinion about the preset on screen: a **favourite**. The mark is keyed by the
-preset's *name*, kept in a `marks.toml` file of its own beside `config.toml`, and it survives a
-restart — the app names the counts it loaded on the way up (`preset marks: 3 favourite, 0 hidden`)
-and each press reports what it did.
+`F1` and `F2` record an opinion: a **favourite**, and a **hidden**. They act on the preset on screen,
+or — with the browser open — on the row under the cursor, so one key means one thing in both places.
+Function keys, because letters and digits are filter input while the browser is open.
 
-Marking is personal, not editorial. Nothing about the shipped library changes, the preset files are
-untouched, and a mark never reaches the visualizer's own gates. Renaming a preset loses its marks,
-because the name *is* the identity; a mark on a preset that is no longer in your library is kept
-and does nothing.
+The marks are keyed by the preset's *name*, kept in a `marks.toml` file of its own beside
+`config.toml`, and they survive a restart: the app names the counts it loaded on the way up
+(`preset marks: 3 favourite, 1 hidden`) and each press reports what it did.
+
+**Hiding is not retiring.** A hidden preset never appears in auto-rotate and is not in the browser's
+default list, but it still ships, still loads and is still there behind `F6`. Nothing about the
+library changes, the preset files are untouched, and a mark never reaches the visualizer's own
+gates. Renaming a preset loses its marks, because the name *is* the identity; a mark on a preset
+that is no longer in your library is kept and does nothing.
 
 ## The browser and the settings menu
 
@@ -75,6 +83,13 @@ The browser lays the roster out in **as many columns as the window fits**, so a
 library taller than the screen is visible at once rather than scrolled past. When
 even the columns can't hold it, the list scrolls by whole columns and keeps the
 highlighted preset on screen.
+
+Every row reads `* Name              family` — the mark glyph (`*` favourite, `-` hidden), the name,
+and the **family** its system is named for, which is also the filename prefix. Three keys narrow
+the list, and they **combine**: `F4` favourites only, `F5` one family at a time, `F6` hidden
+presets back in. Each is independent of what you have typed, and the header above the list names
+every one that is on — so a short list is never a mystery. The typed query resets each time you
+open the browser; the three narrowings do not, because they are decisions rather than gestures.
 
 Both menus are modal and only one is open at a time: `S` opens settings when the
 browser is closed (while it's open, `s` is a filter character), and `Tab` from

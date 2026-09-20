@@ -23,7 +23,9 @@ use standalone::marks::{Mark, Marks};
 use standalone::osc::decode::Transport;
 
 use crate::director::{Director, Traversal, eligible_names};
-use crate::preset_dir::{PRESET_POLL, dir_signature, reload_presets, startup_preset_dir};
+use crate::preset_dir::{
+    PRESET_POLL, dir_signature, embedded_families, reload_presets, startup_preset_dir,
+};
 
 /// How often a `health` event goes out while frames are being drawn.
 ///
@@ -76,6 +78,16 @@ pub(crate) struct Show {
 
     /// Which part of the library rotation draws from (`[rotate] source`).
     source: config::RotateSource,
+
+    /// The family of each preset in the roster, positionally — the filename
+    /// prefix its system is named for, which is what the browser narrows by and
+    /// labels each row with.
+    ///
+    /// Held rather than asked of the renderer, which answers for the *active*
+    /// preset's system only. Refreshed by every reload that installs a set, and
+    /// re-derived from the embedded presets when the roster is one this module
+    /// did not load.
+    families: Vec<&'static str>,
 
     /// The structured event stream (ADR-0176), present only when `--events`
     /// turned it on. Absent otherwise, so every emission below is a `None` test
@@ -150,6 +162,7 @@ impl Show {
             // differs per build and is all the seed needs to be.
             traversal: Traversal::new(renderer.preset_names().count() as u32),
             source: rotate.source,
+            families: Vec::new(),
             events,
             control,
             reported_preset: None,
@@ -281,9 +294,28 @@ impl Show {
     /// that agree today. `sig` is re-baselined here so the next poll compares
     /// against what this load actually saw.
     fn reload(&mut self, renderer: &mut Renderer) {
-        reload_presets(renderer, &self.dir, self.events.as_mut());
+        if let Some(families) = reload_presets(renderer, &self.dir, self.events.as_mut()) {
+            self.families = families;
+        }
         self.sig = dir_signature(&self.dir);
+        // The roster the renderer is actually running is the embedded set
+        // whenever a load installed nothing — at startup, and after a reload
+        // that found no valid preset and kept what was there. A length that
+        // disagrees is the only symptom either case has.
+        if self.families.len() != renderer.preset_names().count() {
+            self.families = embedded_families();
+        }
         self.refresh_upcoming(renderer);
+    }
+
+    /// The family of each preset in the roster, positionally.
+    pub(crate) fn families(&self) -> &[&'static str] {
+        &self.families
+    }
+
+    /// The user's marks on the library.
+    pub(crate) fn marks(&self) -> &Marks {
+        &self.marks
     }
 
     /// Re-scan the preset directory if the poll interval has elapsed and its
@@ -557,6 +589,7 @@ mod tests {
             director: Director::from_config(&config::Rotate::default()),
             traversal: Traversal::new(0),
             source: config::RotateSource::All,
+            families: Vec::new(),
             events: None,
             control: None,
             reported_preset: None,
