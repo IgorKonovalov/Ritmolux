@@ -157,7 +157,7 @@ single shipped picture.
 |---|---|---|---|
 | 1 — The roster travels | dev | done | 56915750 + committed with this row |
 | 2 — The star wobbles, and its scatter can be chosen | dev | done | committed with this row |
-| 3 — Judge the floor by rendering | dev | not started | |
+| 3 — Judge the floor by rendering | dev | done | committed with this row |
 | 4 — The backdrop ramp converges | dev | not started | |
 
 ### Phase 1 — what the done-when measured
@@ -253,6 +253,61 @@ in sprite-local units, ground truth sampled 16x finer than the shader:
 not materially worse and the phase did not hit its stop condition. On top of a `star_jitter` of 0.4
 the worst reading is 0.54985 against that configuration's own 0.54019 without the wobble — the
 jitter dominates and the wobble adds 0.0097. Interior error under the wobble alone is 0.004 to 0.053.
+
+### Phase 3 — the two floors, rendered
+
+Three throwaway presets at 320x200, all sharing one construction so the only
+variable is **where the floor lives**. None was kept: they are minimal
+demonstrations of a decision, not teaching files, and `docs/examples/` is
+referenced by the guide rather than a scrapbook.
+
+**Route B — the floor as a scene in the chain.** A flat white ground as the base
+scene, the figure multiplied over it through the one `[layer]` slot. It draws the
+reference's treatment exactly: a flat red heart on white paper, the figure a
+uniform **97.3–99.0** luma down its middle against a ground of **230.0–232.0**.
+Dark-on-light, 133 luma points of separation, and the figure is flat because
+nothing is added to it.
+
+**Route A — the floor on the backdrop.** The same preset, with the striped floor
+moved to `[background]` and `occlude = 0`. The backdrop is added after the
+chain's junction, so the floor's light lands on the figure as well: the heart
+runs **109.7–210.1** down the same column — striped through, spanning a hundred
+luma points — while the floor runs 209.1–245.0. **The figure's brightest part
+(210.1) is brighter than the floor's darker stripes (209.1)**, so figure and
+floor are no longer separable by tone at all. This is Plan 0091 Phase 1's
+measurement taken from the other side, and it is exactly the limit
+[ADR-0225](../adrs/0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md)
+states in its own first Negative.
+
+**Route B's other half — the fan in the layer slot instead of the figure.** A
+white ground with a twelve-pointed star's scaled-copy coordinate multiplied over
+it, centred low. It converges on the named point and it is **not the reference's
+floor**: the scaled-copy coordinate draws nested chevrons rather than radiating
+lines, and at the band counts that make the convergence legible it aliases
+heavily. No scene tried here draws a fan of straight lines from a point.
+
+### Does ADR-0225 survive? Yes, and Phase 4 runs.
+
+The plan's stop condition is *"if the chain route wins the picture"*. It does not,
+and the reason is structural rather than a limit of the presets above: this engine
+draws additive light, so dark-on-light comes only from a multiply layer
+(ADR-0106), a preset has exactly **one** layer slot (ADR-0090), and **the fan and
+the figure cannot both be the thing that is darkened**. Route B therefore buys the
+figure's tone *or* a dark floor, never the collage. Route A buys a floor at no slot
+cost and can never darken a figure into it.
+
+So the two routes buy different halves and neither buys the whole reference image
+— which is the sentence ADR-0225 already wrote as *"the cheap route buys the
+picture's floor and not the picture"*. What the rendering adds is that **the
+expensive route does not buy the picture either**, so the slot is not a price that
+purchases the collage. The angular coordinate remains the only thing on the table
+that produces a converging floor, and it costs nothing.
+
+**The layer-slot cost, named:** a preset that draws its ground as a chain scene
+spends the one slot ADR-0090 gives it, on a floor, and then has no layer for the
+figure, the second colour, or anything else — and it must still pay for the ground
+as a full scene evaluation per frame rather than as the backdrop pass that already
+runs.
 
 ### Notes
 
