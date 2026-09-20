@@ -226,8 +226,8 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the renderer takes a name | dev | done | `655fa6a3` |
-| 2 — the accumulating set is named, and the hop follows the family | dev | done | committed with this row |
-| 3 — the affected cards are re-rendered as sets | dev | not started | |
+| 2 — the accumulating set is named, and the hop follows the family | dev | done | `36e254ef` |
+| 3 — the affected cards are re-rendered as sets | dev | done | `13838683` `4ae649b2` `9e47296f` `4d4365d6` `2102267c`, and the warp set committed with this row |
 | 4 — a person says whether the cards are now the look | human | not started | |
 
 ### Notes
@@ -260,7 +260,29 @@ the Windows development box, hardware adapter, release build (ADR-0071).
 `node scripts/docs-shots.mjs analytic_echoplate` re-rendered a non-accumulating card with no
 `--signal-secs` on the command line and left `git status` carrying no image change.
 
-**An observation for Phase 3**, from the bounded bare run used to check Phase 1:
+**Phase 3 re-rendered 45 cards in six runs, and every changed file was a card whose hop moved.**
+20 attractor, 5 cellular, 5 emitter, 7 reaction, 1 swarm, 7 warp; `git status` was read after each
+family's run and carried that family's cards and nothing else. **The instability the Phase 1 note
+below records did not appear** — but that is not evidence against it: nothing rendered here was
+expected to come back byte-identical, so a card that drifted and a card that moved for its hop are
+indistinguishable in this set.
+
+**Seven cards were named to the runner by their full `out` path rather than by preset stem**, and
+that is not cosmetic. `attractor_leviathan`, `cellular_ember_life`, `cellular_spiral_bloom`,
+`cellular_tide_bugs`, `emitter_perseids`, `reaction_verdigris` and `warp_wellhead` are each also the
+preset behind a one-per-system or teaching image, whose hop did **not** move; Phase 1's matcher
+reads `presetFile` as an alias, so the bare stem would have re-rendered those too.
+
+**Attractor's twenty cards exceeded the ten-minute ceiling this session can hold a foreground
+command for**, and the harness moved the run to the background rather than the run being split. It
+completed, exit 0, all twenty written in the one run the phase asks for.
+
+**Measured per card at hop 2754, 640x360, Rich, on the box named in each commit body** (ADR-0071):
+`warp_tracery` 5.1 s, `attractor_walkknot` 11.1 s, `reaction_verdigris` 11.8 s,
+`attractor_valentine` 20.4 s. The phase's stop condition is a card costing more than a minute; the
+slowest measured is a third of that, so it was not reached.
+
+**An observation from Phase 1**, from the bounded bare run used to check it:
 of the first 33 manifest entries re-rendered on this machine, **12 came back with bytes different
 from the committed PNG** (`hero`, `walkthrough/step-5`, and ten of the one-per-system gallery
 images) while the other 21, `warp_tracery`'s card among them, were byte-identical. All were restored
