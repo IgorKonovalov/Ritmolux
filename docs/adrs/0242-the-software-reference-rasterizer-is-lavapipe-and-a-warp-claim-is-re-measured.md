@@ -6,7 +6,7 @@
 > **Related ADRs:** [0241](0241-linux-leads-and-windows-is-a-peer.md) (the stance this serves),
 > [0023](0023-golden-drift-guard-uses-frozen-fixtures.md) (the drift guard),
 > [0016](0016-gpu-tests-opt-in-ci-scope.md) (the skip shape),
-> [0071](0071-a-numeric-assertion-states-a-property-or-names-the-machine.md) (a measurement names
+> [0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) (a measurement names
 > its machine), [0058](0058-bind-group-layout-collisions-carry-evidence.md) (the hardware-vs-software
 > comparison)
 
@@ -33,7 +33,7 @@ checkout:
 The trap is in the second and third figures rather than the first. Most of those 274 are not the
 token "WARP" waiting to be swapped — they are **claims about what WARP does**: *"WARP mis-renders
 both"*, *"blessed on WARP, so it is coverage, not evidence of correctness"*, *"the two-level moves
-are the blessing adapter's"*. [ADR-0071](0071-a-numeric-assertion-states-a-property-or-names-the-machine.md)
+are the blessing adapter's"*. [ADR-0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 says a measurement names the machine it was taken on and does not travel; a sentence about WARP
 rewritten to say lavapipe is a measurement nobody took. And a skip that exists because WARP
 mis-renders a pipeline set is, on lavapipe, a skip whose reason is unverified in **both**
