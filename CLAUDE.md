@@ -392,6 +392,16 @@ audio + graphics**, where the usual "just allocate and log it" habits cause glit
   runtime.
 - **Validate at the boundary, trust inside.** Sample-rate, channel count, and buffer sizes get
   checked once where audio enters the core; the hot path downstream assumes them valid.
+- **Every setting has a file, and the in-app menu edits that file.** A setting is defined by a key
+  in a user-editable file — `config.toml` for the standalone and for any plugin setting,
+  `settings.json` for the studio — and the settings menu, the hotkeys and the studio panels are
+  **editors of that file**, never the only way to reach a value. A flag or an environment variable
+  is second priority: it overrides the file for one run, it is added only where a run genuinely
+  needs to override the rig, and it never writes the file. **A choice reachable only from inside a
+  running window is the bug**, in whichever of the three applications it appears. Momentary view
+  state — a browser filter, which preset is on screen, an A/B hold — is not a setting and owes no
+  key; state that outlives the session without being a choice gets its own file (`marks.toml`).
+  [ADR-0240](docs/adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md).
 - **Lightweight is a feature.** Small binaries, few dependencies, low idle CPU/GPU. Every new
   crate is a cost — justify it. Pin direct dependencies to exact versions in `Cargo.toml`.
 - **A comment carries the mechanism; the decision record stays in `docs/`.** A comment states what
