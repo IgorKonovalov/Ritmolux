@@ -7,7 +7,7 @@
 > [0242](../adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md),
 > [0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md),
 > [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
-> [0071](../adrs/0071-a-numeric-assertion-states-a-property-or-names-the-machine.md)
+> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > **Runs after:** [0120](0120-the-standalone-ships-on-ubuntu.md) and
 > [0214](0214-the-linux-arm-reports-back.md) — this plan assumes a Linux build that captures audio
 > and a green `ubuntu-latest` arm. It does not repeat any of that work.
