@@ -124,6 +124,33 @@ conductor.** The conductor is not verified on Linux until Phase 5, and 0120 is c
   `cargo-deny`, and `uv` for Phase 6's interpreter. `libpulse`, `pkgconf`, `wayland`,
   `libxkbcommon`, `ffmpeg`, `node` and `python3` are already present. Then
   `git config core.hooksPath .githooks` and `npm --prefix studio ci`.
+- **Carry from the Windows box first** (recorded there 2026-09-22, the day development moved). None
+  of this is in the repository, so a fresh clone on this box does not have it:
+  - **`WORK/milkdrop2-src`**, the MilkDrop reference (`xeiraex/milkdrop2` at `d4c843a`), and
+    **`WORK/milkdrop-corpus`**. Plan 0202 Phases 3-6 read both, and so does any MilkDrop look gate.
+  - **`tools/conductor/local.json`** (gitignored). The conductor refuses to start without it. Copy it,
+    or rebuild it from `local.example.json`.
+  - **The lane branches that were never pushed**: `plan-0202-the-three-mechanisms-get-their-gate`
+    (Phases 1-2 landed, Phase 3 re-scoped 2026-09-22, resumable) and
+    `plan-0133-the-engine-drives-the-lights` (postponed until the rig is back). Check
+    `git branch -r` for both after the Windows-side push.
+  - **Plans left on Windows's queue, not started:** 0207 and 0206 (lane a). They stay in
+    `queue.json` and wait for Phase 5 below, like everything else the conductor runs here.
+  - **0202 Phase 5 and 0192 need the Windows boot**: the first is a live foobar2000 look gate, the
+    second the component's release. ADR-0241 keeps Windows a peer for exactly this.
+- **The Windows readings Phase 3 compares against.** These are from the conductor's gitignored suite
+  ledger, 2026-09-15 to 2026-09-22, and they were taken on the same laptop (G15 GA503QS, Windows 10,
+  WARP for the software suites), often while another lane was building:
+
+  | Command | Runs | Min | Median | Max |
+  |---|---|---|---|---|
+  | `cargo nextest run --workspace` (about 1,774 tests) | 58 | 606 s | 765 s | 8,014 s, a single outlier, cause not recorded |
+  | `cargo nextest run --workspace -P fast` | 14 | 359 s | 406 s | 638 s |
+
+  Also: `CLAUDE.md`'s cold build of every test binary took 171 s with the default linker and 145 s
+  with `rust-lld`; the dependency graph rebuilds in 87 s at `opt-level = 2`. One whole conductor
+  plan (0213: four `dev` phases, a review, two gates) took 3 h 16 min end to end, with 26 min of
+  that in the implement session.
 - **Done when** the log carries, verbatim:
   - `vulkaninfo --summary` naming **three** physical devices: the NVIDIA dGPU, RADV on the Vega, and
     llvmpipe/lavapipe. If lavapipe is missing, the software half of the suite cannot run and this
