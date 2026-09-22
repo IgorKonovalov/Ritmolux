@@ -54,8 +54,7 @@ place. The plan file carries the real link.
 | [0215](0215-the-wide-seams-narrow-and-a-guard-holds-them.md) | The wide seams narrow, and a guard holds them | approved | dev | ADR-0238 (proposed): a scene declares a capability, not the engine enumerating kinds. Sweep 2026-09-20: capture pragma, Scene seam, preview owner - each gated. Lists are dated evidence. |
 | [0216](0216-the-operator-owns-the-order.md) | The operator owns the order | approved | dev | ADR-0239 (proposed): two rotation orders, each on a row and a hotkey, and `source` likewise. The shuffle seed stops being the embedded preset count - takes 0205 finding 5. |
 | [0217](0217-every-setting-has-a-file-and-a-gate-says-so.md) | Every setting has a file, and a gate says so | approved | dev, studio-builder | ADR-0240: a file defines every setting and the menu edits it. Repairs the one violation - the F3 overlay persists nowhere - then a Rust test and a Node gate hold all three. |
-| [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | **BLOCKED on 0219** (re-pointed 2026-09-22; the box exists). ADR-0241 + 0242: Linux leads, goldens re-bless on lavapipe. Phase 3 can stop the plan. |
-| [0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) | The Arch box builds, tests and runs every lane | in-progress | human, dev, studio-builder | ADR-0243 (proposed). Phases 1-4 landed 2026-09-22; Phase 5 waits on one conductor run of 0221, then Phase 6. |
+| [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | Unblocked 2026-09-22 (0219 closed); runs after 0214. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). Phase 3 can stop the plan. |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 <!-- roster:end -->
 
@@ -294,6 +293,7 @@ close. The queue dropped the rest on purpose. [0120] is done. [0202] is mid-flig
 `origin/plan-0202-...` branch, and its Phases 5-6 need the rig. [0207] and [0206] come off lane `a`
 so that `run` picks up the fixture alone. 0206's `after: ["0207"]` stays in `plans`, where an
 unlisted plan's entry is inert. Re-queue 0207 and 0206 once 0219 Phase 5 closes.
+**Due 2026-09-22:** 0219 closed; the re-queue of 0207 and 0206 is the owner's to make before the next `run`.
 
 [0221]: done/0221-the-arch-block-names-the-studios-settings-file.md
 [0207]: 0207-the-commitments-get-their-instruments.md
@@ -981,6 +981,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0219 - The Arch box builds, tests and runs every lane](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md) - closed 2026-09-22. Review: **one major (routed to 0218), six minors (four fixed).** Version: none (docs/tooling). ADR-0243 stays proposed. Closes nothing. [Write-up](README-archive.md).
 - [0222 - A repaired finding follows its file into done/](done/0222-a-repaired-finding-follows-its-file-into-done.md) - closed 2026-09-22. Review: **no blockers, no majors, one minor, one nit (fixed).** Version: **0.143.1** (patch). Closes nothing. [Write-up](README-archive.md).
 - [0221 - The Arch block names the studio's settings file](done/0221-the-arch-block-names-the-studios-settings-file.md) - closed 2026-09-22. Review: **no blockers, no majors, one nit (fixed).** Version: none (docs-only). Closes nothing. [Write-up](README-archive.md).
 - [0120 - The standalone ships on Ubuntu](done/0120-the-standalone-ships-on-ubuntu.md) - closed 2026-09-22. Review: **round 1 one blocker, round 2 five minors + one nit (four fixed).** Version: **0.143.0**. ADR-0131 accepted. Closes nothing. [Write-up](README-archive.md).

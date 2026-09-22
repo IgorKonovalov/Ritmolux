@@ -104,7 +104,8 @@ In this order (ADR-0178), first hit wins:
    a tester who unzips one configures nothing.
 2. **Settings** — `"playerPath"` in `settings.json` in the per-user application
    directory (`%APPDATA%/ritmolux-studio` on Windows,
-   `~/Library/Application Support/ritmolux-studio` on macOS). This is the
+   `~/Library/Application Support/ritmolux-studio` on macOS,
+   `~/.config/ritmolux-studio` on Linux). This is the
    developer's route: point it at a `target/release/ritmolux` of your own. The
    same file carries `"playerMode"`; the settings panel writes it, and an unset
    or unrecognised value reads as `windowed`.

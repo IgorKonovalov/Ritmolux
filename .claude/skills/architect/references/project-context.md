@@ -182,6 +182,4 @@ deciding what to design next.
   PipeWire serves through `pipewire-pulse`. ADR-0241 makes Linux the lead platform, with Windows a
   peer.
 - **wgpu backends differ per OS**: Metal on macOS, DX12 on Windows, Vulkan on Linux. Write to wgpu;
-  don't branch on backend. *(2026-09-22: `core/Cargo.toml` declares no Linux backend and
-  `standalone/` has no Linux capture arm yet. Plan 0120 Phases 2-3 add both, so until they land
-  a Linux build finds no adapter and renders silence.)*
+  don't branch on backend.

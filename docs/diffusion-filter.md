@@ -43,7 +43,11 @@ This is creator tooling you build yourself from a source checkout.
 ```bash
 python -m venv .venv
 .venv/Scripts/python -m pip install -r tools/sd-filter/requirements.txt   # Windows
+.venv/bin/python -m pip install -r tools/sd-filter/requirements.txt       # Linux
 ```
+
+On Linux the pinned `torch` has no wheel for CPython 3.14 or newer, so a newer system `python`
+needs the venv built from an older interpreter: `tools/sd-filter/README.md` gives the `uv` line.
 
 **Do not install `diffusers` and friends on top of an existing CUDA `torch`
 without pinning it.** `controlnet_aux` declares a bare `torch`, and a plain
@@ -56,7 +60,8 @@ two are version-locked. The comments in that file record the failure in full.
 Check the environment before spending a render on it:
 
 ```bash
-.venv/Scripts/python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+.venv/Scripts/python -c "import torch; print(torch.__version__, torch.cuda.is_available())"   # Windows
+.venv/bin/python -c "import torch; print(torch.__version__, torch.cuda.is_available())"       # Linux
 ```
 
 `2.6.0+cu124 True` is the answer. A bare version with `False` is the CPU trap.

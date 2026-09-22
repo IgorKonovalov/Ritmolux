@@ -60,7 +60,7 @@
 > so a green arm would say nothing about it. Phase 2 gains the arm and a done-when below.
 
 > **Amended 2026-09-22 (architect) — this plan runs on the Arch box, inside
-> [Plan 0219](../0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s sequence.** The Windows-only
+> [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s sequence.** The Windows-only
 > premise behind the 2026-09-20 split is gone. The phases, their code and 0214's ownership of the
 > CI and release readings are **unchanged**. Two things change:
 > - **A clause that needs a Linux compiler, not a runner, is witnessed on the box and logged here.**

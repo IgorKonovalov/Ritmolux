@@ -2,7 +2,7 @@
 
 > **Status:** proposed
 > **Date:** 2026-09-22
-> **Related plan(s):** [0219](../plans/0219-the-arch-box-builds-tests-and-runs-every-lane.md),
+> **Related plan(s):** [0219](../plans/done/0219-the-arch-box-builds-tests-and-runs-every-lane.md),
 > [0218](../plans/0218-the-reference-machine-becomes-arch.md)
 > **Related ADRs:** [0241](0241-linux-leads-and-windows-is-a-peer.md) (Linux leads),
 > [0242](0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)
@@ -98,3 +98,13 @@ report has ever shown.
 Rejected because it puts the choice in the shell rather than in the engine. A run started without
 the variable would pick an adapter nobody chose, and a reading would depend on how it was launched.
 The engine's own preference already expresses the choice.
+
+## Not yet true, 2026-09-22 (Plan 0219's close)
+
+Plan 0219 Phase 3 ran the hardware tests on the Arch box, and every `headless_hardware*` site
+resolved the AMD iGPU (`AMD Radeon Graphics (RADV RENOIR)`), not the dGPU. The Decision's premise
+holds for the live path and not for the test harness: `core/tests/common/mod.rs` asks for
+`AdapterChoice::Default`, which is wgpu's default options with no power preference, rather than
+`HighPerformance`. The repair moves the harness's hardware path to `HighPerformance`. It was routed
+to [Plan 0218](../plans/0218-the-reference-machine-becomes-arch.md) Phase 2, and this ADR stays
+`proposed` until that phase's log names the dGPU from a hardware test.

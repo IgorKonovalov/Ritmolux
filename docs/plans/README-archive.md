@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0219 - The Arch box builds, tests and runs every lane](#0219---the-arch-box-builds-tests-and-runs-every-lane)
   - [0222 - A repaired finding follows its file into done/](#0222---a-repaired-finding-follows-its-file-into-done)
   - [0221 - The Arch block names the studio's settings file](#0221---the-arch-block-names-the-studios-settings-file)
   - [0120 - The standalone ships on Ubuntu](#0120---the-standalone-ships-on-ubuntu)
@@ -247,6 +248,34 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0219 - The Arch box builds, tests and runs every lane](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)
+
+- closed 2026-09-22, human-started, on `main` in `~/Work/Ritmolux`. Phase 1 `1f4678f1`, Phase 2
+`ae5b3724`, Phase 3 `eb2c67c3`, Phase 4 `b8e9148e`, Phase 5 `a42f7c38` + `eab62d65`, Phase 6
+`1b0801b4`; Phase 7 (human) waived by the owner. Review: **one major, six minors (four fixed at the
+close), no blockers.** Version: none (docs, lane contracts, conductor tooling and one studio test;
+0222 had already moved the tree to 0.143.1). ADR-0243 stays `proposed` with a dated note.
+- **What landed.** The Arch box carries every lane: lavapipe beside both hardware GPUs, the pre-push
+hook green (333 s) and the full suite green (1774 passed, 7 skipped; re-run at the close, 443 s).
+Every commit instruction names its mechanism per platform. The studio dev loop drives a Linux player,
+and `windowless.test.ts` asks Hyprland for the player's windows. The conductor's spike holds on
+2.1.278 on Linux and ran two plans here (0221, 0222). The diffusion sidecar runs on CUDA from a `uv`
+CPython 3.12 venv. `mold` was measured and declined.
+- **The major.** Phase 3's bullet that the hardware tests resolve the NVIDIA dGPU is not met: the
+harness asks for `AdapterChoice::Default` and gets the iGPU. The owner routed the fix to Plan 0218
+Phase 2 (amended); ADR-0243 is accepted at 0218's close, not here.
+- **Minors.** Fixed: `CLAUDE.md` still said `mold` was unmeasured; both `project-context.md` files
+kept the dated "no Linux backend yet" note after 0120 landed; `docs/diffusion-filter.md` and
+`studio/README.md` named no Linux venv or settings directory. Open: the log outweighs the phases
+section; the Windows arm of `windowless.test.ts` changed and has not run on Windows.
+- **What outlived the plan, not yet routed.** The studio's missing-player banner does not say where
+`settings.json` lives; `npm run dev` leaves Vite and the esbuild watchers running after the window
+closes; the conductor allowlist refuses `env RUSTDOCFLAGS=...`, `git -C <lane>` and an `ls` of
+`state/transcripts/`. Phase 7's five checks (a push through the hook, `shot --report`, ten minutes of
+capture, the Windows peer pulling `main`) happen in the ordinary course of work. `queue.json` still
+owes the re-queue of 0207 and 0206. Translation advisory: `how-it-works.ru.md`, `running.ru.md`,
+the foobar `READ-ME-FIRST.ru.md` stale, none moved by this plan. No preset touched; no curation owed.
 
 ### [0222 - A repaired finding follows its file into done/](done/0222-a-repaired-finding-follows-its-file-into-done.md)
 

@@ -10,7 +10,7 @@
 > **Related ADRs:** [0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
 > [0210](../../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md),
 > [0243](../../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md) (proposed)
-> **Serves:** [Plan 0219](../0219-the-arch-box-builds-tests-and-runs-every-lane.md) Phase 5, the done-when
+> **Serves:** [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) Phase 5, the done-when
 > "one real conductor run on this box".
 
 ## TL;DR

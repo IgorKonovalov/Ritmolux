@@ -211,8 +211,7 @@ per "When the plan is wrong".
 - **Source-agnostic core** — no WASAPI/ScreenCaptureKit/foobar/winit types in `core/`.
 - **wgpu-only rendering** — no raw Metal/DX/Vulkan outside the wgpu layer; scenes don't branch on
   backend. The shipped backend per OS is Metal on macOS, DX12 on Windows and Vulkan on Linux
-  (`core/Cargo.toml`'s per-target `wgpu` features). *(2026-09-22: the Linux `vulkan` arm is not
-  declared yet, so a Linux build finds no adapter until Plan 0120 Phase 2 adds it.)*
+  (`core/Cargo.toml`'s per-target `wgpu` features).
 - **Deterministic DSP** — FFT/onset/beat are pure functions of the input window; seed any visual
   randomness.
 - **C ABI is a contract** — minimal, versioned, explicit ownership/lifetimes; don't let Rust

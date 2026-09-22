@@ -1,19 +1,19 @@
 # 0219 — The Arch box builds, tests and runs every lane
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-22. Phases 1-6 landed (`1f4678f1`, `ae5b3724`, `eb2c67c3`, `b8e9148e`, `a42f7c38` + `eab62d65`, `1b0801b4`); Phase 7 (human) waived by the owner. Mode 4: **one major** (Phase 3's dGPU bullet not met; routed by the owner to Plan 0218 Phase 2, ADR-0243 stays proposed), **six minors** (four fixed at the close), no blockers. Full suite re-run at the close: 1774 passed, 7 skipped; `cargo doc -D warnings` clean. Version: none (docs/tooling only).
 > **Created:** 2026-09-22
 > **Owner skill(s):** human, dev, studio-builder
-> **Related ADRs:** [0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md) (proposed),
-> [0241](../adrs/0241-linux-leads-and-windows-is-a-peer.md),
-> [0242](../adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md),
-> [0131](../adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md),
-> [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
-> [0208](../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md),
-> [0122](../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md),
-> [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md)
-> **Interleaves with:** [0120](done/0120-the-standalone-ships-on-ubuntu.md) — its Phases 2-5 run on this
+> **Related ADRs:** [0243](../../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md) (proposed),
+> [0241](../../adrs/0241-linux-leads-and-windows-is-a-peer.md),
+> [0242](../../adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md),
+> [0131](../../adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md),
+> [0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
+> [0208](../../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md),
+> [0122](../../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md),
+> [0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md)
+> **Interleaves with:** [0120](0120-the-standalone-ships-on-ubuntu.md) — its Phases 2-5 run on this
 > box **between this plan's Phase 2 and Phase 3**. See "Sequencing" below.
-> **Unblocks:** [0218](0218-the-reference-machine-becomes-arch.md), whose "the machine does not
+> **Unblocks:** [0218](../0218-the-reference-machine-becomes-arch.md), whose "the machine does not
 > exist yet" block this plan clears.
 
 ## TL;DR
@@ -64,7 +64,7 @@ What the box needs was established on 2026-09-22 by probing it and sweeping the 
 A new bootstrap plan, run in the order the dependencies force: provision the box, repair the lane
 contracts, **run 0120 on this box**, then prove the gate, the studio, the conductor and the sidecar
 one at a time. It ends with a human phase in which each lane does one real task. The hardware
-adapter for every reading is the NVIDIA dGPU ([ADR-0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)).
+adapter for every reading is the NVIDIA dGPU ([ADR-0243](../../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)).
 
 Rejected during the interview:
 - **Replacing 0120, 0214 and 0218 with one umbrella plan.** It would re-author approved work to get
@@ -695,5 +695,5 @@ unchanged.
 - **A Linux CI arm for the golden roster on lavapipe.** ADR-0242's Positive says `ubuntu-latest` can
   run it. It becomes possible once 0218 Phase 2 lands.
 - **The iGPU as a second hardware configuration**, if a RADV-only defect is ever reported
-  ([ADR-0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)
+  ([ADR-0243](../../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)
   Alternative B).

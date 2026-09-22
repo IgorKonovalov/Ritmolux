@@ -1,6 +1,6 @@
 # 0218 — The reference machine becomes Arch
 
-> **Status:** draft — blocked on [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) (re-pointed 2026-09-22; was the Arch migration)
+> **Status:** draft — blocked on [Plan 0219](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md) (re-pointed 2026-09-22; was the Arch migration)
 > **Created:** 2026-09-20
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0241](../adrs/0241-linux-leads-and-windows-is-a-peer.md),
@@ -19,7 +19,7 @@
 > **Unblocks** when there is an Arch box with the tree checked out and 0120 + 0214 landed.
 
 > **Amended 2026-09-22 (architect) — the machine exists; the block moves to
-> [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md).** This plan now runs after 0219
+> [Plan 0219](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md).** This plan now runs after 0219
 > closes, not after "the migration". 0219 provisions the box, repairs the lane contracts, runs 0120
 > there and proves the gate green. Three things carry over:
 > - **Phase 2's gate may already exist.** If 0219 Phase 3 had to gate the pinned-baseline modules to
@@ -47,6 +47,23 @@
 >   `.config/nextest.toml` names it under `success-output = "immediate"`, and the six are not named
 >   there. Adding them is how Phase 2 gets its per-fixture diff against the WARP predecessor from an
 >   ordinary run. It is also what keeps the Windows arm's readings visible after the move.
+
+> **Amended 2026-09-22 (architect, Plan 0219's close) — the hardware tests do not reach the dGPU,
+> and Phase 2 makes them.** [Plan 0219](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)
+> Phase 3 found every `headless_hardware*` site resolving the AMD iGPU (RADV RENOIR), not the RTX
+> 3080 Laptop. The cause is the test harness, not the engine: `core/tests/common/mod.rs` `build`
+> passes `prefer_software: false`, which maps to `AdapterChoice::Default`, while
+> [ADR-0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)'s
+> Decision rests on the `HighPerformance` preference the live path already uses. The owner routed
+> the repair here at 0219's close. Phase 2 therefore also:
+> - **moves the harness's hardware path to `AdapterChoice::HighPerformance`**, which changes which
+>   adapter every hardware test picks on every hybrid machine, the Windows box included (it has one
+>   GPU, so it should read the same; the log says whether it did);
+> - **makes each hardware site print `adapter.get_info()`'s `name` and `driver_info`** next to its
+>   reading, where one does not already;
+> - and gains a done-when: the log carries the adapter line one `headless_hardware*` site printed on
+>   the Arch box, naming the NVIDIA dGPU. ADR-0243 stays `proposed` until that line exists, and this
+>   plan's close accepts it.
 
 ## TL;DR
 

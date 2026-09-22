@@ -261,8 +261,8 @@ every test binary from 171 s to 145 s while moving no golden (ADR-0141's `Outcom
 
 **The override is Windows-only.** A Linux checkout has no `WORK/.cargo/config.toml` and currently
 needs none: since Rust 1.90, `x86_64-unknown-linux-gnu` already links with the bundled `rust-lld`
-by default. Whether a faster linker such as `mold` is worth its own machine-local file has not
-been measured yet.
+by default. `mold` was measured against it on the Arch box on 2026-09-22. It saved under 20 ms per
+warm relink of the largest test binary and nothing on a cold rebuild, so Linux has no override.
 
 **It is never committed, and it cannot be.** The macOS arm has a different linker story, and
 reaching `rust-lld` any other way means naming a sysroot path specific to one machine. Like

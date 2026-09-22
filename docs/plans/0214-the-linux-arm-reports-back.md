@@ -10,7 +10,7 @@
 > [0203](../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)
 > **Depends on:** [0120](done/0120-the-standalone-ships-on-ubuntu.md) — every phase landed and on `main`
 
-> **Amended 2026-09-22 (architect).** [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md)
+> **Amended 2026-09-22 (architect).** [Plan 0219](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)
 > runs 0120 on an Arch box, so the **local** compile and test readings are taken there and live in
 > 0120's log. Phases 1-3 of this plan are unchanged. They read GitHub's runners, which no local box
 > can stand in for. Phase 4 still runs the tarball on the **Ubuntu** box, because that is the
