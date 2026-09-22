@@ -375,8 +375,8 @@ conductor.** The conductor is not verified on Linux until Phase 5, and 0120 is c
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Provision the box, and read what it has | human | done; readings below | `1f4678f1` |
-| 2 — The lane contracts stop assuming Windows | dev | done | committed with this row |
-| 3 — The gate is green on this box | dev | not started | |
+| 2 — The lane contracts stop assuming Windows | dev | done | `ae5b3724` |
+| 3 — The gate is green on this box | dev | done; hardware-adapter bullet not met, see Notes | committed with this row |
 | 4 — The studio drives a Linux player | studio-builder | not started | |
 | 5 — The conductor's claims are checked on Linux | dev | not started | |
 | 6 — The diffusion sidecar runs on CUDA | dev | not started | |
@@ -423,6 +423,63 @@ tools: `ci.yml` takes `taiki-e/install-action@nextest` and `@cargo-deny` at thei
 `tools/conductor/local.json` was copied and is gitignored. `origin/plan-0202-the-three-mechanisms-get-their-gate`
 and `origin/plan-0133-the-engine-drives-the-lights` are present after `git fetch`.
 
+### Phase 3 readings (2026-09-22)
+
+All on tree `3bbec47` (`main` at `3e7cb237`), `target/` already built.
+
+**Pre-push hook**, `sh .githooks/pre-push </dev/null`, so every cargo step ran
+(`no ref on stdin`): exit 0, **333 s** wall. Per step: the Node roster 2 s, `test_sd_filter.py` 1 s,
+studio `typecheck` 7 s, `lint` 1 s, `test` 7 s, `cargo fmt` 1 s, `clippy` 11 s, `cargo doc` 6 s,
+`cargo nextest run -P fast` 297 s (`Summary [ 277.212s] 1695 tests run: 1695 passed, 86 skipped`).
+The ledger did not serve the test step (`tree 3bbec47 has no green full-suite record`). Inside the
+sd-filter suite two groups skipped on their own terms: `no numpy` and `no built shot`.
+
+**Full suite**, `cargo nextest run --workspace --no-fail-fast`: exit 0, 454 s wall,
+`Summary [ 453.794s] 1774 tests run: 1774 passed (5 slow), 7 skipped`.
+
+Every skip and in-test skip notice, bucketed:
+
+- *Expected until 0218*: a WARP baseline compared on
+  `llvmpipe (LLVM 22.1.8, 256 bits) (Vulkan, Cpu), driver llvmpipe Mesa 26.2.2-arch1.1`, with a
+  `common::baseline_adapter` notice (six tests, all passing):
+  - `golden scenes_match_golden_baselines`: 2 comparisons past WARP's tolerance.
+  - `suite attractor_trails::the_attractor_over_the_trails_stage_matches_its_baseline`: 1.
+  - `suite composite::composite_stages_match_golden_baselines`,
+    `suite line_joints::the_joined_polyline_holds_its_shape_and_its_pixels`,
+    `suite layer::layered_fixtures_match_golden_baselines` and
+    `suite warp_mesh_wide::the_converted_chain_matches_its_wide_baseline`: 0 each.
+- *A gate working as designed*:
+  - `dsp raw_levels_are_bit_identical_to_the_pre_normalization_build`: the frozen bits are an
+    `x86_64-pc-windows-msvc` measurement.
+  - `suite collage_layout::the_sample_sheet_renders`: opt-in through `RLX_SAMPLE_DIR`.
+  - The seven `#[ignore]` tests, each a measurement and not a gate:
+    `shape_field::tests::the_adapters_agree_on_the_authored_contour`,
+    `warp_mesh::tests::mesh_cost_by_grid`, `warp_mesh::tests::the_level_the_field_works_at`,
+    `animation the_resolution_ladder_against_the_two_designs_it_penalizes`,
+    `sanity each_candidate_ground_is_tabled_against_the_library`,
+    `sanity each_structure_candidate_is_tabled_against_the_library` and
+    `suite warp_mesh::the_adapters_agree_on_the_warp_mesh`.
+- *A finding*: none failed. No hardware test skipped, but the hardware tests ran on the iGPU (see
+  Notes).
+
+**Hardware adapter.** The cost reports the `headless_hardware_for` sites print name
+`AMD Radeon Graphics (RADV RENOIR) (Vulkan, IntegratedGpu), driver radv Mesa 26.2.2-arch1.1`
+(`field_cost`, `arc_cost`, `collage_cost` among them). None resolved the NVIDIA dGPU.
+
+**Linker**, the `suite` test binary (52 MB), through a timing wrapper around `cc` in a scratch
+`target/linkprobe` (since removed). *Cold* means `cargo clean -p rlx-core` and then rebuilding all
+19 of its test binaries, with the links contending with compiles. *Warm* means touching
+`core/tests/suite/main.rs` and relinking the one binary, five runs. `readelf -p .comment` confirmed
+which linker took each binary.
+
+| Linker | Cold: cargo wall / `suite` link / all 19 links | Warm `suite` link (5 runs) | Warm cargo wall |
+|---|---|---|---|
+| default, `LLD 22.1.6` (rust-lld) | 14.4 s / 288 ms / 9.6 s | 195-202 ms | 0.80-0.88 s |
+| `mold 2.42.0` | 15.2 s / 195 ms / 7.7 s | 177-190 ms | 0.76-0.82 s |
+
+The decision was not to add an override. `CLAUDE.md` is unchanged, and `docs/developing.md` says
+Linux needs none.
+
 ### Notes
 
 - **Phase 2, heredoc probe.** A throwaway repository in the session scratchpad took a commit through
@@ -448,6 +505,32 @@ and `origin/plan-0133-the-engine-drives-the-lights` are present after `git fetch
   `cargo clippy --workspace --all-targets -- -D warnings` exits 101 on exactly those three, plus
   the `Live`/`Failed` variants, so the pre-push hook is red on this box until 0120 Phase 3 lands.
   `docs/developing.md`'s Arch block says so.
+- **Phase 3, the hardware-adapter bullet is not met.** Every `headless_hardware*` site resolved the
+  AMD iGPU (RADV RENOIR), not the RTX 3080 Laptop. The cause is in the test harness:
+  `core/tests/common/mod.rs` `build` passes `prefer_software: false`, which maps to
+  `AdapterChoice::Default`, meaning wgpu's default options with no power preference. It does not
+  map to `AdapterChoice::HighPerformance`. ADR-0243 (proposed) says the dGPU is "reached by the
+  engine's existing `HighPerformance` preference". That holds for the live path but not for the
+  headless test path. Changing the harness's preference is not a one-line platform gate, because it
+  moves every hardware test on every machine, Windows included. It is reported here and not
+  repaired, and it is `architect`'s to settle against ADR-0243.
+- **Phase 3, beyond the file list's letter.** None of the done-whens can hold until the box's
+  studio install is repaired, and that repair touched no repository file. Phase 1's
+  `npm --prefix studio ci` left `studio/node_modules/electron/dist` holding only `locales/` and no
+  `path.txt`. The first hook run failed at `npm --prefix studio test` with
+  *Electron failed to install correctly*. `node node_modules/electron/install.js` exits 0 on Node
+  v26.8.2 without extracting anything: its `extract-zip` promise never settles, and the cached zip
+  passes `unzip -t`. It was extracted by hand, and `docs/developing.md`'s Arch block carries the
+  three commands. CI pins Node 22, so CI would not hit this.
+- **Phase 3, the conditional did not fire.** The fast tier is green. The three pinned-baseline
+  modules ADR-0242 names already sit behind `common::baseline_adapter`, from Plan 0120 Phase 7, so
+  nothing was gated here and `core/tests/` is untouched.
+- **Phase 3, observed.** `cargo build -p rlx-core --tests`, run alone, warns that
+  `RenderContext::instance` and `gpu` are never read (`core/src/render/context.rs:363`). Under
+  `--workspace`, feature unification turns the reading code on, so clippy and the hook stay green.
+  The sd-filter colour-table group skips because this box's `python` has no `numpy`.
+  `docs/developing.md`'s cost table is left as the Windows reading. The Arch figures went into the
+  Arch block.
 
 ### Close triggers
 

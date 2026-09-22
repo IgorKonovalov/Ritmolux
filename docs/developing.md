@@ -47,12 +47,38 @@ CPython that the diffusion sidecar's pinned torch needs. Desktop audio reaches t
 PulseAudio's monitor source, which PipeWire serves via `pipewire-pulse`
 ([ADR-0131](adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md)).
 
-**As of 2026-09-22 the Linux build is not yet a working one.** `core/Cargo.toml` enables no `wgpu`
-backend on Linux, and the standalone has no Linux capture arm. So `cargo build` succeeds, but with
-dead-code warnings in `standalone/src/capture_verdict.rs` that `clippy -D warnings` rejects, wgpu has
-no backend to find an adapter with, and the app renders silence. That holds until
-[Plan 0120](plans/done/0120-the-standalone-ships-on-ubuntu.md) Phases 2 and 3 land. No green pre-push
-gate on Linux has been recorded yet.
+**The whole gate is green on Arch.** Measured on 2026-09-22 on an Arch laptop (RTX 3080 Laptop
+dGPU, AMD Vega iGPU, lavapipe from Mesa 26.2.2), with `target/` already built:
+
+| Run | Wall time | Result |
+|-----|----------:|--------|
+| `.githooks/pre-push`, run by hand so every step runs | **333 s** | green, no step skipped; the test step alone took 297 s, 1695 passed and 86 skipped |
+| `cargo nextest run --workspace` | **454 s** | 1774 passed, 7 skipped |
+
+Two parts of that green are expected skips, not coverage:
+
+- **The pinned-baseline tests skip on lavapipe with a notice.** The golden baselines were blessed on
+  DX12 WARP. On any other adapter, `common::baseline_adapter` prints how many comparisons would have
+  failed and skips the assertion, until the baselines are recaptured on lavapipe
+  ([ADR-0242](adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)).
+  So on Linux a golden mismatch is reported, not failed. Only a Windows run asserts one.
+- **The hardware tests take whichever GPU wgpu's default picks.** On that laptop this is the Vega
+  iGPU, not the dGPU. They pass there, but their timing reports name the iGPU.
+
+**`npm --prefix studio ci` under Node 26 can leave Electron half-installed.** Electron's postinstall
+extracts only `locales/` and exits 0 without writing `node_modules/electron/path.txt`. The studio's
+tests then fail with *Electron failed to install correctly*. The download itself is intact, so
+extracting it by hand fixes it:
+
+```sh
+rm -rf studio/node_modules/electron/dist
+unzip -q ~/.cache/electron/*/electron-v*-linux-x64.zip -d studio/node_modules/electron/dist
+printf electron > studio/node_modules/electron/path.txt
+```
+
+**No linker override on Linux.** The toolchain's default `rust-lld` relinks the 52 MB `suite` test
+binary in about 200 ms. `mold` 2.42 saves about 15 ms of that, and makes no measurable difference to
+a cold rebuild of `rlx-core`'s tests, so no machine-local config file is suggested.
 
 ## Editing presets in VS Code
 
@@ -307,10 +333,12 @@ adapter. **Which nine is not written here** — since
 the list is the `fast` profile's `default-filter` in `.config/nextest.toml`, and the hook and CI's
 `check` job both cite `-P fast` rather than restating it.
 The test runner **names the skipped binaries itself** on every run, on the profile's
-authority, so the narrowing is never silent, and **CI runs
-all of them regardless** — though since [ADR-0073](adrs/0073-the-windows-ci-critical-path.md)
-it runs those nine in the `coverage` job alone rather than in two Windows jobs, so
-the promise is now underwritten by one job instead of a redundancy between two.
+authority, so the narrowing is never silent. **CI runs all of them regardless, but on Windows
+only.** The `check` matrix runs `-P fast` on Windows, macOS and Ubuntu. Since
+[ADR-0073](adrs/0073-the-windows-ci-critical-path.md), the nine run in the `coverage` job alone,
+on `windows-latest`, so one Windows job underwrites that promise. No CI job runs them on Linux.
+Locally, the full `cargo nextest run --workspace` runs them on any machine, and it is green on
+Arch (see [A fresh Arch Linux checkout](#a-fresh-arch-linux-checkout)).
 
 The **rustdoc step** fails a broken or private intra-doc link in **any of the five workspace
 members** before CI's `cargo doc --workspace` job does. Scoping it to `-p rlx-core` left the other
