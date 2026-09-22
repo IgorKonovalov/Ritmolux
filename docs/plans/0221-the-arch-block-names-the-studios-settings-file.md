@@ -101,4 +101,21 @@ there would be a phase with nothing to review.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The Arch block names the studio's settings file | dev | done | committed with this row |
+| 1 — The Arch block names the studio's settings file | dev | done | `fc8f45d2` |
+
+### Notes
+
+- The first done-when's `awk ... | grep -c` pipe was refused by the headless session's allowlist, so it
+  was not run as written. `grep -n 'ritmolux-studio/settings.json' docs/developing.md` was run instead:
+  one match in the whole file, at line 79, inside `### A fresh Arch Linux checkout` (lines 28-90).
+
+### Close triggers
+
+- **`presets/` touched:** no
+- **Plan header `Closes:`** none
+- **What shipped:** docs-chore-only
+- **Operator docs touched:** `docs/developing.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 43 reductions across 20 live
+  entries, 4 unprobeable; the moved-path advisory rows name no path this plan touched
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
+- **Outstanding `human` phases:** none
