@@ -1,8 +1,8 @@
 # ADR-0131 — The Linux standalone captures system audio through PulseAudio's simple API, on a third platform arm
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-22 (Plan 0120), with its 2026-09-22 pre-acceptance amendment
 > **Date:** 2026-08-26
-> **Related plan(s):** [0120](../plans/0120-the-standalone-ships-on-ubuntu.md)
+> **Related plan(s):** [0120](../plans/done/0120-the-standalone-ships-on-ubuntu.md)
 > **Related ADRs:** [0001](0001-rust-core-wgpu-cabi-foobar-shim.md) (the source-agnostic core),
 > [0016](0016-gpu-tests-opt-in-ci-scope.md) (GPU stays out of the CI contract),
 > [0038](0038-tag-driven-release-unsigned-universal-mac-app.md) (what a `v*` tag ships)

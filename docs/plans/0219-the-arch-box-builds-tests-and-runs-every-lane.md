@@ -11,7 +11,7 @@
 > [0208](../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md),
 > [0122](../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md),
 > [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md)
-> **Interleaves with:** [0120](0120-the-standalone-ships-on-ubuntu.md) — its Phases 2-5 run on this
+> **Interleaves with:** [0120](done/0120-the-standalone-ships-on-ubuntu.md) — its Phases 2-5 run on this
 > box **between this plan's Phase 2 and Phase 3**. See "Sequencing" below.
 > **Unblocks:** [0218](0218-the-reference-machine-becomes-arch.md), whose "the machine does not
 > exist yet" block this plan clears.

@@ -8,7 +8,7 @@
 > [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
 > [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
 > [0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
-> **Runs after:** [0120](0120-the-standalone-ships-on-ubuntu.md) for Phases 5-6 only. Both edit
+> **Runs after:** [0120](done/0120-the-standalone-ships-on-ubuntu.md) for Phases 5-6 only. Both edit
 > `core/Cargo.toml`'s `wgpu` lines and `.github/workflows/ci.yml`, which 0120 has open on `main`
 > today. Phases 1-4 touch only `studio/` and can run now.
 

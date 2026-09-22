@@ -41,8 +41,7 @@ place. The plan file carries the real link.
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
 | [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | approved | human | 0103's Phases 5-6 plus the release they stand on. Push ONE tag: the pipeline has published nothing since v0.126.0, two runs red on the foobar job and three tags with no run. |
-| [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1's probe ran 2026-09-20; the premise holds.** Implementation only - witnessing is 0214. Folds backlog 0181 + 0208. |
-| [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | approved | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four phases are `human`. Runs after 0120. |
+| [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | approved | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four are `human`. Unblocked: 0120 closed 2026-09-22. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | approved | dev, human | ADR-0113's third Outcome is the brief: the rate candidate, the echo, the per-mode wave scale, then a fourth look gate. Phases 5-6 need the rig and the corpus, so the conductor parks. |
 | [0207](0207-the-commitments-get-their-instruments.md) | The commitments get their instruments | approved | dev, human | ADR-0231 + 0232 (proposed): the exe cap re-derived and a build that prints it; an ADVISORY frame-cost column; the Floor read on a named machine. Phase 1 sets the constant. Closes backlog 0257. |
@@ -56,8 +55,8 @@ place. The plan file carries the real link.
 | [0216](0216-the-operator-owns-the-order.md) | The operator owns the order | approved | dev | ADR-0239 (proposed): two rotation orders, each on a row and a hotkey, and `source` likewise. The shuffle seed stops being the embedded preset count - takes 0205 finding 5. |
 | [0217](0217-every-setting-has-a-file-and-a-gate-says-so.md) | Every setting has a file, and a gate says so | approved | dev, studio-builder | ADR-0240: a file defines every setting and the menu edits it. Repairs the one violation - the F3 overlay persists nowhere - then a Rust test and a Node gate hold all three. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | **BLOCKED on 0219** (re-pointed 2026-09-22; the box exists). ADR-0241 + 0242: Linux leads, goldens re-bless on lavapipe. Phase 3 can stop the plan. |
-| [0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) | The Arch box builds, tests and runs every lane | in-progress | human, dev, studio-builder | ADR-0243 (proposed). Phases 1-2 landed 2026-09-22; 0120 runs next, then Phase 3. |
-| [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. Phases 5-6 wait for 0120. |
+| [0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) | The Arch box builds, tests and runs every lane | in-progress | human, dev, studio-builder | ADR-0243 (proposed). Phases 1-2 landed 2026-09-22 and 0120 closed on the box the same day. Phase 3 is next. |
+| [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -428,7 +427,7 @@ naming what moved. The order:
 [0186]: done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md
 [0174]: done/0174-the-clock-reading-tests-run-alone.md
 [0175]: done/0175-an-eased-value-arrives.md
-[0120]: 0120-the-standalone-ships-on-ubuntu.md
+[0120]: done/0120-the-standalone-ships-on-ubuntu.md
 [0214]: 0214-the-linux-arm-reports-back.md
 [0166]: done/0166-the-basics-read-in-russian.md
 
@@ -963,6 +962,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0120 - The standalone ships on Ubuntu](done/0120-the-standalone-ships-on-ubuntu.md) - closed 2026-09-22. Review: **round 1 one blocker, round 2 five minors + one nit (four fixed).** Version: **0.143.0**. ADR-0131 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0210 - The gallery card shows the world it names](done/0210-the-gallery-card-shows-the-world-it-names.md) - closed 2026-09-22. Review: **no blockers, no majors, four minors (two fixed).** Version: **0.142.0**. ADR-0235 accepted. Closed 0254, 0255. [Write-up](README-archive.md).
 - [0213 - The hook costs what the push is worth](done/0213-the-hook-costs-what-the-push-is-worth.md) - closed 2026-09-22. Review: **no blockers, no majors, three minors + one nit (two fixed).** Version: **0.141.0**. ADR-0237 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0203 - The figure gains the levers it lacked](done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) - closed 2026-09-20. Review: **round 1 one major, round 2 three minors + one nit (three fixed).** Version: **0.140.0**. ADR-0225 + 0226 accepted. Closed 0095, 0100, 0101. [Write-up](README-archive.md).

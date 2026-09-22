@@ -1,16 +1,19 @@
 # 0120 — The standalone ships on Ubuntu
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-22. Phases 2-5 `120d9f5e`, `9346e3ae`, `ed74dad1`, `486c7041`,
+> `d3550166`; Phase 7 `c687bb9e`, added by round 1's blocker. Round 2 review: **no blockers, no majors,
+> five minors, one nit.** The full suite ran green on the Arch box, 1774 passed. The CI arm, the dry run and
+> the on-box run are [0214](../0214-the-linux-arm-reports-back.md)'s.
 > **Created:** 2026-08-26
 > **Approved:** 2026-08-26
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0131](../adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md) (proposed),
-> [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
-> [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
-> [0025](../adrs/0025-foobar-component-version-single-sourced.md),
-> [0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)
-> **Coordinates with:** [0133](0133-the-engine-drives-the-lights.md) (also edits `standalone/src/run.rs`)
-> and [0174](done/0174-the-clock-reading-tests-run-alone.md) (owns `.config/nextest.toml`'s groups) —
+> **Related ADRs:** [0131](../../adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md) (accepted 2026-09-22),
+> [0038](../../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
+> [0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md),
+> [0025](../../adrs/0025-foobar-component-version-single-sourced.md),
+> [0001](../../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)
+> **Coordinates with:** [0133](../0133-the-engine-drives-the-lights.md) (also edits `standalone/src/run.rs`)
+> and [0174](0174-the-clock-reading-tests-run-alone.md) (owns `.config/nextest.toml`'s groups) —
 > sequence or merge `main` before Phase 2.
 
 > **Amended 2026-09-14** (architect backlog sweep): line references follow the shell's split — the
@@ -32,7 +35,7 @@
 > that had already written the code. The split is therefore by **who can witness the evidence**,
 > not by what the work is: 0120 keeps all the implementation and is done when the code and config
 > are written and every gate this checkout can run is green;
-> [0214](0214-the-linux-arm-reports-back.md) carries the three readings that exist only after a
+> [0214](../0214-the-linux-arm-reports-back.md) carries the three readings that exist only after a
 > push — the `ubuntu-latest` arm's six steps, the adapter it resolves, the dry-run artifacts — plus
 > the on-box run, which was Phase 6 here. Phase 6 is gone from this plan; Phases 2, 3 and 4 keep
 > their work and hand their witnessing clauses across. **Nothing was cut** — every clause that left
@@ -53,11 +56,11 @@
 > `dx12` under `[target.'cfg(windows)'.dependencies]` and `metal` under `cfg(target_os = "macos")`.
 > **There is no Linux arm**, so a Linux build compiles wgpu with no backend and resolves **no
 > adapter** at run time. It compiles clean, `cargo check --target x86_64-unknown-linux-gnu` is
-> clean, and the GPU suites skip through [ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md) —
+> clean, and the GPU suites skip through [ADR-0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md) —
 > so a green arm would say nothing about it. Phase 2 gains the arm and a done-when below.
 
 > **Amended 2026-09-22 (architect) — this plan runs on the Arch box, inside
-> [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s sequence.** The Windows-only
+> [Plan 0219](../0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s sequence.** The Windows-only
 > premise behind the 2026-09-20 split is gone. The phases, their code and 0214's ownership of the
 > CI and release readings are **unchanged**. Two things change:
 > - **A clause that needs a Linux compiler, not a runner, is witnessed on the box and logged here.**
@@ -99,7 +102,7 @@ for the project's whole life without a compiler ever seeing it.
 What the user asked for is not that compile — it is **parity**: the Ubuntu build should do what the
 Windows and macOS builds do, which means capturing system audio. On Linux that is a sound-server
 concept rather than a kernel one, and the decision of which client protocol to speak is
-[ADR-0131](../adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md).
+[ADR-0131](../../adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md).
 
 Three things are true about this work that shape the phasing:
 
@@ -252,7 +255,7 @@ Ubuntu box in Phase 6 has its real `~/.local/share/Ritmolux/` mutated by `cargo 
 0177 has not landed when this phase starts, take both arms here and say so in the log.
 
 **Done when** (amended 2026-09-20 — the witnessing clauses moved to
-[0214](0214-the-linux-arm-reports-back.md) Phase 1):
+[0214](../0214-the-linux-arm-reports-back.md) Phase 1):
 
 - The `ubuntu-latest` arm is **declared** in `ci.yml` carrying all six existing steps —
   `cargo build`, `cargo nextest run --workspace -P fast`, `cargo test --workspace --doc`,
@@ -263,7 +266,7 @@ Ubuntu box in Phase 6 has its real `~/.local/share/Ritmolux/` mutated by `cargo 
 - **`core/Cargo.toml` carries a Linux wgpu arm** — `[target.'cfg(target_os = "linux")'.dependencies]`
   enabling at least `vulkan` — and the job installs a Vulkan ICD (Mesa's lavapipe) so the runner can
   resolve one. Without the feature the build has no backend at all and `request_adapter` returns
-  nothing; **that it resolves an adapter is [0214](0214-the-linux-arm-reports-back.md) Phase 1's
+  nothing; **that it resolves an adapter is [0214](../0214-the-linux-arm-reports-back.md) Phase 1's
   reading**, as with every other clause here that needs the arm to run.
 - The third `cfg` arm **type-checks from this checkout**:
   `cargo check --target x86_64-unknown-linux-gnu` is clean after `rustup target add`. This is the
@@ -329,7 +332,7 @@ sentence becomes false in this phase.
   put the shipped Linux artifact back outside the gate. This one runs here: `deny` evaluates the
   dependency graph for a target, it does not build for it.
 - **Amended 2026-09-20.** The retired clause *"the `check` arm from Phase 2 stays green with the
-  new dependency present"* is [0214](0214-the-linux-arm-reports-back.md) Phase 1's, and with it
+  new dependency present"* is [0214](../0214-the-linux-arm-reports-back.md) Phase 1's, and with it
   goes the first compilation of everything this phase writes. So the done-whens above are the whole
   bar here, and two of them — the no-allocation read loop and the partial-read framing — are
   **properties a reader checks**, which is why they were written that way and why they still hold
@@ -359,7 +362,7 @@ directory that does not exist.
 - `stage.sh` produces `target/dist/ritmolux-v<version>-linux-x64.tar.gz`, whose single
   top-level entry is a folder of that name holding `ritmolux`, `presets/*.toml` and `READ-ME-FIRST.txt`.
 - The version is parsed **section-anchored** from `[workspace.package]` in root `Cargo.toml` per
-  [ADR-0025](../adrs/0025-foobar-component-version-single-sourced.md), not by a first-match
+  [ADR-0025](../../adrs/0025-foobar-component-version-single-sourced.md), not by a first-match
   `version =` — a naive match reads a member crate's line or a `[profile]` key.
 - The script **verifies from the archive it wrote**, not from the staging directory, and mirrors
   the Windows job's assertions minus Spout: `ritmolux` and `READ-ME-FIRST.txt` are at the top level
@@ -378,7 +381,7 @@ directory that does not exist.
   runtime requirement (PipeWire or PulseAudio — the binary will not start without `libpulse.so.0`).
 - **Amended 2026-09-20.** *"`stage.sh` produces `target/dist/…tar.gz`"* and *"a `workflow_dispatch`
   dry run produces six artifacts and publishes nothing"* are the two clauses only a run can
-  witness, and they are [0214](0214-the-linux-arm-reports-back.md) Phase 3's. What this phase owes
+  witness, and they are [0214](../0214-the-linux-arm-reports-back.md) Phase 3's. What this phase owes
   instead is that **the script asserts them**: every check above is written into `stage.sh` and
   into the `release` job, so the run that eventually happens is checking itself rather than being
   inspected by a person. The count guard is the one to get right blind — it asserts **5 `.zip` and
@@ -419,7 +422,7 @@ a gate for system counts; it does not cover platform counts, so this phase is th
   log if nothing changed.
 - `site/src/plugins/rewrite-links.mjs` — **a new `packaging/linux/READ-ME-FIRST.md` reaches the
   site only if it is added to `PUBLISHED`** beside the Windows, macOS and foobar install pages
-  ([ADR-0167](../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md)).
+  ([ADR-0167](../../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md)).
   Decide deliberately whether it joins; do not assume it does by existing.
 
 And: `node scripts/check-doc-links.mjs`, `node scripts/check-index-rows.mjs`,
@@ -428,7 +431,7 @@ And: `node scripts/check-doc-links.mjs`, `node scripts/check-index-rows.mjs`,
 
 ### Where the sixth phase went
 
-The on-box run moved to [0214](0214-the-linux-arm-reports-back.md) Phase 4 on 2026-09-20, carried
+The on-box run moved to [0214](../0214-the-linux-arm-reports-back.md) Phase 4 on 2026-09-20, carried
 across with its done-when list intact. It is named here rather than deleted because three earlier
 sections still say "which Phase 6 then executes", and a phase that vanishes leaves those pointing at
 nothing.
@@ -448,7 +451,7 @@ saying so (ADR-0131 now carries the amendment). As a result the arm runs WARP-bl
 rasterizer they were never blessed on, and the first push turns it red. The full suite on the Arch box
 reads the same four failures, and since Plan 0219 that box runs the suite every close. Each failure is
 a **measurement asserted outside its configuration** or a **statistic that is not a property**
-([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
+([ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
 None of them is fixed by a wider tolerance. This phase edits `core/` **tests only**, and the "No change
 to `core/`" exclusion below is amended to say so.
 
@@ -669,7 +672,42 @@ to `core/`" exclusion below is amended to say so.
   exit 0 — `1774 tests run: 1774 passed (11 slow), 7 skipped`. Before Phase 7 it was exit 100,
   4 failed. `-P fast`: `1695 tests run: 1695 passed (2 slow), 86 skipped`.
 - **Outstanding `human` phases:** none in this plan. The on-box run and the CI and release
-  readings are [0214](0214-the-linux-arm-reports-back.md)'s.
+  readings are [0214](../0214-the-linux-arm-reports-back.md)'s.
+
+## Close review
+
+**Round 1 (2026-09-22): one blocker.** The full suite was red on four `core/` tests. Each was a
+measurement asserted outside its configuration. Phase 7 was added (`31f5d563`) and resolved it in
+`c687bb9e`.
+
+**Round 2 (2026-09-22): no blockers, no majors, five minors, one nit.**
+
+- **Evidence re-run, not read off the log.** `cargo nextest run --workspace --no-fail-fast` on the
+  Arch box: `1774 tests run: 1774 passed (5 slow), 7 skipped`, exit 0.
+  `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: exit 0. `cargo fmt --check` is
+  clean, and every Node gate on the close roster exits 0.
+- **Phase 7 read against its done-whens.** `baseline_adapter` is the single predicate, and all six
+  baseline modules call it: a grep for `golden_dir`/`RLX_BLESS` finds no seventh comparing module.
+  The property checks before each comparison still assert on every adapter. The DSP bits gate on
+  the full MSVC target. The marks test's counter-assertion (seed 12 must exceed the bound) is what
+  keeps its new per-pixel bound from being vacuous. `core/` outside `Cargo.toml` and its tests has
+  no diff.
+- **Phases 2-5 re-read at the real-time seam.** `capture_linux::read_loop` allocates both buffers
+  before the loop and inside it only reads, frames and pushes. The framing helper sits outside the
+  `cfg` gate with its tests.
+- **minor, repaired:** the exclusion "No GPU test coverage on Linux CI" contradicted the ADR-0131
+  amendment. It now reads as half of Alternative H.
+- **minor, repaired:** NFR §4 did not record the Linux binary's 12,711,688 B against the
+  10,000,000 B soft cap. It is recorded now, with the open question named.
+- **minor, repaired:** Plan 0218 attributed the WARP gate to 0219 Phase 3, named four modules and
+  a wrong `golden.rs` path, and did not know that `RLX_BLESS` panics off WARP. It is amended.
+- **minor, open, routed to Plan 0218 Phase 2:** the six off-WARP skips print their readings into a
+  passing test's captured output. nextest hides that output because `.config/nextest.toml` does not
+  name them under `success-output`, so Phase 7's "the reading is kept" holds only under
+  `--no-capture`.
+- **minor, open, content work:** `docs/running.ru.md` and `docs/how-it-works.ru.md` are stamped
+  behind their sources, which Phase 5 moved (`d3550166`).
+- **nit, repaired:** a 136-column module doc line in `standalone/src/capture_start.rs` was rewrapped.
 
 ## Risks & open questions
 
@@ -700,7 +738,9 @@ to `core/`" exclusion below is amended to say so.
   over D-Bus and it is not in scope. The banner exists and is simply never fed, the same asymmetry
   macOS already carries.
 - **No AppImage, `.deb` or Flatpak.** ADR-0131 Alternative F.
-- **No GPU test coverage on Linux CI.** ADR-0131 Alternative H.
+- **No GPU baseline coverage on Linux CI.** ADR-0131 Alternative H, half taken by the 2026-09-22
+  amendment: the arm installs lavapipe, so property tests on the GPU run there, and every comparison
+  against a WARP-blessed baseline prints its reading and skips (Phase 7).
 - **No 22.04 or ARM64 Linux build.** One target: `x86_64-unknown-linux-gnu`.
 - **No Linux media-player plugin.** The foobar component is Windows-only and stays so; a DeaDBeeF or
   Audacious equivalent is a separate decision nobody has asked for.
@@ -709,14 +749,14 @@ to `core/`" exclusion below is amended to say so.
   under `core/tests/` and `core/src/**/tests.rs`. Any other diff touching `core/` is a finding.
 - **It does not witness any of its own work on Linux** (amended 2026-09-20). The `ubuntu-latest`
   arm running green, the wgpu adapter it resolves, the dry run's six artifacts and the tarball
-  launching on the box are all [0214](0214-the-linux-arm-reports-back.md)'s, because each needs a
+  launching on the box are all [0214](../0214-the-linux-arm-reports-back.md)'s, because each needs a
   push or the machine and this plan's lanes have neither. **This plan closes with Linux code that
   has never run**, which is a deliberate and stated position, not an oversight — and the reason
   0214 exists rather than being folded into a close ceremony.
 - **No Linux studio build.** The studio ships as a zip per platform carrying its own player
-  ([ADR-0178](../adrs/0178-the-studio-shell-conventions.md)), built for Windows and macOS only; a
+  ([ADR-0178](../../adrs/0178-the-studio-shell-conventions.md)), built for Windows and macOS only; a
   Linux studio zip is a separate decision.
 - **No `--stream` / Spout on Linux.** Spout is a Windows texture-sharing SDK behind the `spout`
   feature; the Linux binary is built without it.
-- **No Art-Net sink work.** [Plan 0133](0133-the-engine-drives-the-lights.md) builds the lighting
+- **No Art-Net sink work.** [Plan 0133](../0133-the-engine-drives-the-lights.md) builds the lighting
   output; whether it runs on the Linux binary is that plan's question, not this one's.

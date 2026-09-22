@@ -51,7 +51,7 @@ PulseAudio's monitor source, which PipeWire serves via `pipewire-pulse`
 backend on Linux, and the standalone has no Linux capture arm. So `cargo build` succeeds, but with
 dead-code warnings in `standalone/src/capture_verdict.rs` that `clippy -D warnings` rejects, wgpu has
 no backend to find an adapter with, and the app renders silence. That holds until
-[Plan 0120](plans/0120-the-standalone-ships-on-ubuntu.md) Phases 2 and 3 land. No green pre-push
+[Plan 0120](plans/done/0120-the-standalone-ships-on-ubuntu.md) Phases 2 and 3 land. No green pre-push
 gate on Linux has been recorded yet.
 
 ## Editing presets in VS Code

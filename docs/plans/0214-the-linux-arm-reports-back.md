@@ -8,7 +8,7 @@
 > [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
 > [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
 > [0203](../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)
-> **Depends on:** [0120](0120-the-standalone-ships-on-ubuntu.md) — every phase landed and on `main`
+> **Depends on:** [0120](done/0120-the-standalone-ships-on-ubuntu.md) — every phase landed and on `main`
 
 > **Amended 2026-09-22 (architect).** [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md)
 > runs 0120 on an Arch box, so the **local** compile and test readings are taken there and live in
@@ -29,7 +29,7 @@ session. `dev` appears once, between two of them, to repair what the first readi
 
 ## Context & problem
 
-The split is [0120](0120-the-standalone-ships-on-ubuntu.md)'s 2026-09-20 amendment, and the reason
+The split is [0120](done/0120-the-standalone-ships-on-ubuntu.md)'s 2026-09-20 amendment, and the reason
 is mechanical rather than editorial: **the conductor never pushes, and a Windows session cannot run
 a Linux CI arm.** Every remaining 0120 done-when phrased as *"the arm runs green"* would therefore
 stop a lane that had already written the code correctly — the work would be done and the phase

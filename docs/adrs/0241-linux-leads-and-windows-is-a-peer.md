@@ -3,7 +3,7 @@
 > **Status:** accepted
 > **Date:** 2026-09-20
 > **Related plan(s):** [0218](../plans/0218-the-reference-machine-becomes-arch.md),
-> [0120](../plans/0120-the-standalone-ships-on-ubuntu.md),
+> [0120](../plans/done/0120-the-standalone-ships-on-ubuntu.md),
 > [0214](../plans/0214-the-linux-arm-reports-back.md)
 > **Related ADRs:** [0131](0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md)
 > (the PulseAudio capture arm), [0038](0038-tag-driven-release-unsigned-universal-mac-app.md)
@@ -16,7 +16,7 @@ its hardware matrix lists a primary Windows dev box, an older Windows PC for the
 and foobar2000 — and §2's platform baseline names two platforms. Every golden baseline in
 `core/tests/golden/` was blessed on **WARP**, the DX12 software rasterizer, which exists only on
 Windows. The release ships three zips and, once
-[Plan 0120](../plans/0120-the-standalone-ships-on-ubuntu.md) lands, a Linux tarball beside them.
+[Plan 0120](../plans/done/0120-the-standalone-ships-on-ubuntu.md) lands, a Linux tarball beside them.
 
 The owner is migrating the development machine to **Arch**. That is not the same event as "Linux
 becomes a supported target", which 0120 and [0214](../plans/0214-the-linux-arm-reports-back.md)

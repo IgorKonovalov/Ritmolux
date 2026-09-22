@@ -178,6 +178,11 @@ the decision that moved it is linked.
 - **Soft cap 10,000,000 B** for the standalone release exe. The unit is in the number because
   "~10 MB" reads two ways 4.9 % apart and nothing here said which; the *value* is the inherited
   one, and it has never been measured against what the exe actually contains.
+  **The Linux binary is over it: 12,711,688 B** for `ritmolux` from `packaging/linux/stage.sh`,
+  v0.142.0, built on the Arch box (measured 2026-09-22,
+  [Plan 0120](plans/done/0120-the-standalone-ships-on-ubuntu.md)). The cap is soft, so nothing
+  fails. What the extra 2.7 MB is, and whether the cap should name each platform's binary, has
+  not been measured or decided.
 - **Soft cap 12,582,912 B (12 MiB)** for the foobar2000 component, `foo_ritmolux.dll` — its own figure
   rather than "the same ballpark", because the two artifacts do not carry the same things. The
   component carries the whole core, the embedded preset library and the SDK shim, and carries

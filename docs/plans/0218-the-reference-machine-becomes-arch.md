@@ -8,7 +8,7 @@
 > [0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md),
 > [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
 > [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
-> **Runs after:** [0120](0120-the-standalone-ships-on-ubuntu.md) and
+> **Runs after:** [0120](done/0120-the-standalone-ships-on-ubuntu.md) and
 > [0214](0214-the-linux-arm-reports-back.md) — this plan assumes a Linux build that captures audio
 > and a green `ubuntu-latest` arm. It does not repeat any of that work.
 > **BLOCKED, and the block is the machine.** Every phase needs the migrated Arch box, so nothing
@@ -32,6 +32,21 @@
 >   fixture whose drift is in doubt can be rendered on WARP again, rather than judged only against
 >   the committed predecessor. Every hardware reading names the NVIDIA dGPU
 >   ([ADR-0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)).
+
+> **Amended 2026-09-22 (architect, Plan 0120's close) — the gate exists, and it was 0120's, not
+> 0219's.** [Plan 0120](done/0120-the-standalone-ships-on-ubuntu.md) Phase 7 put it in one helper,
+> `baseline_adapter` in `core/tests/common/mod.rs` (`cfg!(windows) && adapter_is_software()`).
+> Phase 2 changes that predicate to lavapipe and rewrites its doc comment. Three things follow:
+> - **Six modules call it, not four.** They are `golden.rs`, `attractor_trails`, `composite`,
+>   `layer`, `line_joints` and `warp_mesh_wide`. The golden suite is `core/tests/golden.rs`, not
+>   `core/tests/suite/golden.rs`.
+> - **`RLX_BLESS` panics off the blessing adapter** (`bless_requested`). Until the predicate moves,
+>   the recapture cannot run on the box. That is by design, and it is the first edit Phase 2 makes.
+> - **The off-adapter readings are printed and then hidden.** Each skip prints the mean and max
+>   outlier it would have asserted, but nextest hides a passing test's output unless
+>   `.config/nextest.toml` names it under `success-output = "immediate"`, and the six are not named
+>   there. Adding them is how Phase 2 gets its per-fixture diff against the WARP predecessor from an
+>   ordinary run. It is also what keeps the Windows arm's readings visible after the move.
 
 ## TL;DR
 

@@ -12752,7 +12752,7 @@ same one-line fix in the helper covers it.
 - **Verified 2026-09-14** — while the loop they reach now opens the per-user log:
   `present: DiagLog::new\(crate::cli::resolve_log_path\(\)\) in: standalone/src/stream.rs`
 
-- **Promoted 2026-09-14** to [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 1: every spawned binary gets a scratch data root through one helper, held by a `hygiene.rs` guard. The re-derivation found `stream_split` and `shot_cli` reach the real root too. [Plan 0120](plans/0120-the-standalone-ships-on-ubuntu.md) Phase 2 carries the Linux arm.
+- **Promoted 2026-09-14** to [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 1: every spawned binary gets a scratch data root through one helper, held by a `hygiene.rs` guard. The re-derivation found `stream_split` and `shot_cli` reach the real root too. [Plan 0120](plans/done/0120-the-standalone-ships-on-ubuntu.md) Phase 2 carries the Linux arm.
 
 - **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
 
@@ -13338,7 +13338,7 @@ to `system` in the reader documents and in `.rs` comments.
 reviewer attention rather than a wrong build. It is worth an entry because the catching is the
 expensive part and it recurs on a fixed schedule: once per new system, forever.
 
-- **Promoted 2026-09-14** to [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 4 and [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md): a count gate over the reader documents and `.rs` comments, and the gate inventory rewritten without numbers. [Plan 0120](plans/0120-the-standalone-ships-on-ubuntu.md) Phase 5 uses count-free platform wording.
+- **Promoted 2026-09-14** to [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 4 and [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md): a count gate over the reader documents and `.rs` comments, and the gate inventory rewritten without numbers. [Plan 0120](plans/done/0120-the-standalone-ships-on-ubuntu.md) Phase 5 uses count-free platform wording.
 
 - **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
 

@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0120 - The standalone ships on Ubuntu](#0120---the-standalone-ships-on-ubuntu)
   - [0210 - The gallery card shows the world it names](#0210---the-gallery-card-shows-the-world-it-names)
   - [0213 - The hook costs what the push is worth](#0213---the-hook-costs-what-the-push-is-worth)
   - [0203 - The figure gains the levers it was measured to lack](#0203---the-figure-gains-the-levers-it-was-measured-to-lack)
@@ -244,6 +245,26 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0120 - The standalone ships on Ubuntu](done/0120-the-standalone-ships-on-ubuntu.md)
+
+- closed 2026-09-22, human-started on `main` on the Arch box, inside Plan 0219's sequence. Phase 1
+the owner's probe (2026-09-20), Phases 2-5 `120d9f5e`, `9346e3ae`, `ed74dad1`, `486c7041`,
+`d3550166`, Phase 7 `c687bb9e`. Round 1: **one blocker**. The full suite was red on four `core/`
+tests, each a measurement asserted outside its configuration, and Phase 7 was added for it. Round 2:
+**no blockers, no majors, five minors, one nit**, four repaired at the close. Version **0.143.0**
+(minor: a third platform). ADR-0131 accepted.
+- **What landed.** `capture_linux.rs` records `@DEFAULT_MONITOR@` through PulseAudio's simple API,
+which `pipewire-pulse` serves. CI has an `ubuntu-latest` arm on lavapipe, and a `v*` tag builds a
+tarball on `ubuntu-24.04`, guarded at 5 zips + 1 tarball. Every comparison against a WARP-blessed
+baseline now asserts only on WARP, through one predicate (`common::baseline_adapter`).
+- **What the review checked that the log could not.** That no seventh module compares against a
+committed PNG, and that the full suite is green when re-run rather than read off the log (1774
+passed).
+- **What outlived the plan.** None of the Linux code has run in CI. That, the dry run and the run on
+the Ubuntu box are Plan 0214's. The off-WARP readings are printed into captured output nextest hides,
+which is routed to Plan 0218 Phase 2. The Linux binary is 12.7 MB against the 10 MB soft cap. Two
+`.ru.md` translations are stale.
 
 ### [0210 - The gallery card shows the world it names](done/0210-the-gallery-card-shows-the-world-it-names.md)
 
@@ -1187,7 +1208,8 @@ convention for, and half of its Decision had shipped as exactly that: *"the clos
 which translations have drifted"*, wired into pre-push and CI and into no close. The architect skill
 gained step 1e and a sweep row, and `CLAUDE.md`'s close-ceremony sentence now names the gate. The
 fifth was Phase 5's unverified done-when, honestly recorded and routed to on-device validation and
-not written there; it is a checklist row now. The three nits stay open for `dev`: a `?
+not written there; it is a checklist row now. The three nits stay open for `dev`: a `
+?
 ` in
 `build-component.ps1`'s strip pattern that reached the file as a literal LF and is correct only
 because `.gitattributes` forces `eol=lf`, six stray spaces of indent in `astro.config.mjs`, and a
@@ -11139,5 +11161,5 @@ had been wrong since Plan 0048 gave it a `BandNormalizer`.
 
 - **It contends with nothing.** Its only tracked edit is `plugin-foobar/build.ps1` (Phase 5) plus doc lines (Phase 7); everything else lives in a file outside every checkout. No plan on this roster touches either.
 - **Take it in the main checkout, not a lane.** Opening a worktree to fix the cost of opening worktrees pays the very build this plan removes, and Phase 1's baseline wants a cold scratch tree it creates and deletes itself.
-- **Approved 2026-08-28, and sequenced by the user: it goes next, once the two lanes in flight ([0123] and [0127]) close — both closed 2026-08-28, so it is clear to start.** That ordering is deliberate rather than incidental — taking it while either lane is live would measure a baseline against a machine whose store is being written by someone else, and Phase 3's headline number is a cold-versus-warm comparison that wants a quiet box. The five plans behind it ([0120](0120-the-standalone-ships-on-ubuntu.md), [0124], [0125], [0126], [0128]) each open a lane and are each the beneficiary.
+- **Approved 2026-08-28, and sequenced by the user: it goes next, once the two lanes in flight ([0123] and [0127]) close — both closed 2026-08-28, so it is clear to start.** That ordering is deliberate rather than incidental — taking it while either lane is live would measure a baseline against a machine whose store is being written by someone else, and Phase 3's headline number is a cold-versus-warm comparison that wants a quiet box. The five plans behind it ([0120](done/0120-the-standalone-ships-on-ubuntu.md), [0124], [0125], [0126], [0128]) each open a lane and are each the beneficiary.
 - **Phase 6 is a measurement that may become an ADR** — whether `lmv-core`'s own `opt-level = 0` is a large share of the GPU suites' wall time. It reports and stops; acting on it reopens ADR-0033's ratchet derivation and is out of scope here.
