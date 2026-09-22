@@ -1,6 +1,6 @@
 # 0219 — The Arch box builds, tests and runs every lane
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-09-22
 > **Owner skill(s):** human, dev, studio-builder
 > **Related ADRs:** [0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md) (proposed),
@@ -370,17 +370,58 @@ conductor.** The conductor is not verified on Linux until Phase 5, and 0120 is c
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by the implementer)_
+**Lane:** `main`, directly, in `~/Work/Ritmolux`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Provision the box, and read what it has | human | not started | |
+| 1 — Provision the box, and read what it has | human | done; readings below | committed with this row |
 | 2 — The lane contracts stop assuming Windows | dev | not started | |
 | 3 — The gate is green on this box | dev | not started | |
 | 4 — The studio drives a Linux player | studio-builder | not started | |
 | 5 — The conductor's claims are checked on Linux | dev | not started | |
 | 6 — The diffusion sidecar runs on CUDA | dev | not started | |
 | 7 — A working day on the box | human | not started | |
+
+### Phase 1 readings (2026-09-22)
+
+The owner ran the installs. `dev` took the readings below and copied the carried files from the
+Windows disk, which was mounted from the BitLocker partition.
+
+**Vulkan** (`vulkan-swrast 1:26.2.2-1`, `vulkan-tools 1.4.357.0-1`, `mesa 1:26.2.2-1`,
+`nvidia-open-dkms 610.57.04-1`, `vulkan-radeon 1:26.2.2-1`). `vulkaninfo --summary`, device lines:
+
+```
+GPU0: deviceType = PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU  deviceName = AMD Radeon Graphics (RADV RENOIR)  driverInfo = Mesa 26.2.2-arch1.1
+GPU1: deviceType = PHYSICAL_DEVICE_TYPE_DISCRETE_GPU    deviceName = NVIDIA GeForce RTX 3080 Laptop GPU  driverInfo = 610.57.04
+GPU2: deviceType = PHYSICAL_DEVICE_TYPE_CPU             deviceName = llvmpipe (LLVM 22.1.8, 256 bits)  driverInfo = Mesa 26.2.2-arch1.1 (LLVM 22.1.8)
+```
+
+**ADR-0131 premise.** `pactl info`:
+
+```
+Server Name: PulseAudio (on PipeWire 1.6.8)
+Server Version: 15.0.0
+Default Sample Specification: float32le 2ch 48000Hz
+Default Sink: alsa_output.pci-0000_07_00.6.analog-stereo
+```
+
+`timeout 5 parec -d @DEFAULT_MONITOR@ --format=s16le --rate=48000 --channels=2`, with music playing
+(one sink input): 589,824 bytes, non-zero share 0.9860, peak 20571. The same capture with no sink
+input read 589,824 bytes, all zero. The byte count is about 3.07 s of the 5 s window.
+
+**Versions.** `rustc 1.97.1 (8bab26f4f 2026-07-14)` via `rustup 1.29.1`, active through
+`rust-toolchain.toml`. `cargo-nextest 0.9.143`, `cargo-release 1.1.5`, `cargo-deny 0.20.2`,
+`uv 0.12.10`, `node v26.8.2`, `Python 3.14.7`, `claude 2.1.278`. CI pins none of the three cargo
+tools: `ci.yml` takes `taiki-e/install-action@nextest` and `@cargo-deny` at their latest, and
+`docs/releasing.md` installs `cargo-release` with a bare `cargo install`.
+
+**Hook and studio.** `git config core.hooksPath` prints `.githooks`. `npm --prefix studio ci` ran.
+
+**Carried from Windows.** `git -C ~/Work/milkdrop2-src rev-parse HEAD` prints
+`d4c843a4fb4f53aef755957fc9478780325748cd` (re-cloned, not copied).
+`find ~/Work/milkdrop-corpus -name '*.milk' | wc -l` prints `10347`, the same count as the source.
+`tools/conductor/local.json` was copied and is gitignored. `origin/plan-0202-the-three-mechanisms-get-their-gate`
+and `origin/plan-0133-the-engine-drives-the-lights` are present after `git fetch`.
 
 ### Notes
 
