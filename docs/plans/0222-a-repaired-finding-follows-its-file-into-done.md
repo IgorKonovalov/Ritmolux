@@ -1,6 +1,6 @@
 # 0222 — A repaired finding follows its file into `done/`
 
-> **Status:** draft
+> **Status:** approved (2026-09-22; queued in lane `a` after 0221)
 > **Created:** 2026-09-22
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) (the `fixed_in` check; not amended), [ADR-0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md), [ADR-0233](../adrs/0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md)
