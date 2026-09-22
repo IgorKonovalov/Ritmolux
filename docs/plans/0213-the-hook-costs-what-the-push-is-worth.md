@@ -136,7 +136,7 @@ lookup on the suite step. The Node roster is untouched.
 | 1 — The path set is data, and a self-test convicts it | dev | done | `e3498a57` |
 | 2 — The hook asks before it spends | dev | done | `4e08e759` |
 | 3 — The suite step is served by the record that already exists | dev | done | `60f4c282` |
-| 4 — What the operator reads is true | dev | done | committed with this row |
+| 4 — What the operator reads is true | dev | done | `4ef1ffff` |
 
 ### Notes
 
@@ -150,3 +150,13 @@ lookup on the suite step. The Node roster is untouched.
 - Phase 4: the ~410 s test-step figure was replaced by the new 544.8 s reading; the 165 s idle figure was kept, dated to its 2026-09-14 reading.
 - Followup: `push-scope.mjs --self-test` is not on the gate roster (`gates.manifest.mjs`, CI `links`), so nothing runs it but a person.
 - Followup: CLAUDE.md's `scripts/` inventory does not name `push-scope.mjs` or its manifest.
+
+### Close triggers
+
+- **`presets/` touched:** no
+- **Plan header `Closes:`** none
+- **What shipped:** feature (the pre-push hook's cargo steps become conditional)
+- **Operator docs touched:** `docs/developing.md` (the pre-push section)
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
+- **Outstanding `human` phases:** none
