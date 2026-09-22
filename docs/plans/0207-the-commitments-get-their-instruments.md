@@ -1,6 +1,6 @@
 # 0207 — The commitments get their instruments
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev, human
@@ -164,11 +164,11 @@ so a conductor run parks in front of it.
 > Written by the lane — one row per phase as that phase's commit lands, and the close block after
 > the last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled)_
+**Lane:** `plan-0207-the-commitments-get-their-instruments` at `/home/igor/Work/rlx-plan-0207`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The exe is measured, capped and reported | dev | not started | |
+| 1 — The exe is measured, capped and reported | dev | done | committed with this row |
 | 2 — The report says what a preset costs | dev | not started | |
 | 3 — The floor is measured where it is claimed | human | not started | |
 
