@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0222** (ADRs are a separate sequence — next free there is **0245**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0223** (ADRs are a separate sequence — next free there is **0245**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -58,6 +58,7 @@ place. The plan file carries the real link.
 | [0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) | The Arch box builds, tests and runs every lane | in-progress | human, dev, studio-builder | ADR-0243 (proposed). Phases 1-4 landed 2026-09-22; Phase 5 waits on one conductor run of 0221, then Phase 6. |
 | [0221](0221-the-arch-block-names-the-studios-settings-file.md) | The Arch block names the studio's settings file | approved | dev | A fixture for 0219 Phase 5's conductor run: one docs-only `dev` phase, no version bump. The only plan in `queue.json`. Do not run it by hand. |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
+| [0222](0222-a-repaired-finding-follows-its-file-into-done.md) | A repaired finding follows its file into `done/` | draft | dev | No ADR (a defect against ADR-0209). The `fixed_in` check follows renames; the prompts spell the shell forms the allowlist allows. 0221 settles without it. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
