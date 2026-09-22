@@ -445,8 +445,8 @@ wording.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Probe the Ubuntu box before any code is written | human | done | — |
-| 2 — The tree compiles, lints and tests on Ubuntu | dev | done | committed with this row |
-| 3 — The PulseAudio capture backend | dev | not started | |
+| 2 — The tree compiles, lints and tests on Ubuntu | dev | done | `120d9f5e` |
+| 3 — The PulseAudio capture backend | dev | done | committed with this row |
 | 4 — The release tarball | dev | not started | |
 | 5 — The docs say Linux | dev | not started | |
 | 6 — Run it on the Ubuntu box | — | moved 2026-09-20 to Plan 0214 Phase 4 | |
@@ -517,6 +517,28 @@ wording.
     — frame_diff 0.00096 against llvmpipe, spike order `[4, 6, 3, 0, 2, 1, 5]` against
     `[4, 6, 0, 3, 2, 1, 5]` on RADV. Needs a second adapter, so the single-adapter runner will not
     reach it.
+- **Phase 3 — the framing helper is a new file, `standalone/src/capture_frames.rs`**, declared
+  unconditionally in `main.rs` with `dead_code` allowed off Linux, so its three tests build on every
+  arm. The Phase 3 file list did not name it.
+- **Phase 3 — `cargo deny check` went red on the widened targets and was repaired by a lockfile
+  update, not an `ignore`.** RUSTSEC-2026-0194 and RUSTSEC-2026-0195 (quick-xml 0.39.4, via
+  `wayland-scanner` 0.31.10 under winit's Wayland backend). `cargo update -p wayland-scanner` took it
+  to 0.31.11 and quick-xml to 0.41.0; `deny.toml` gained no entry.
+- **Phase 3 — `failed_at_activation`** is true for `ConnectionRefused`, `ConnectionTerminated`,
+  `InvalidServer`, `Access` and `AuthKey` from `pa_simple_new` (no server reached), false otherwise.
+- **Phase 3 — the stream asks for `fragsize` = one 10 ms read**; the drop path waits 250 x 1 ms polls
+  for the thread and detaches it if a read is still blocked. `Instant::now` is a disallowed method
+  here, so the wait is counted.
+- **Phase 3 — `capture_lost` gained a Linux arm**: a failed read sets the handle's `lost` flag, so
+  the shell's bounded recovery reopens `@DEFAULT_MONITOR@`. The endpoint in the verdict is the
+  special name; `CaptureStart.endpoint` is `None`, as on macOS.
+- **Phase 3 — first compilation and a live run on the Arch box** (PipeWire 1.6.8, default sink
+  `alsa_output.pci-0000_07_00.6.analog-stereo` RUNNING). `cargo clippy --workspace --all-targets
+  -D warnings`, `cargo fmt --check` and `cargo doc --workspace --no-deps` under `-D warnings` are
+  clean. An 8 s windowed run against a scratch data root wrote `diagnostics.log` rows reading
+  `live PulseAudio 48000/2 @DEFAULT_MONITOR@` with bass/mid/treb moving (e.g. `0.4316 0.4397
+  0.1463`), on `AMD Radeon Graphics (RADV RENOIR)` at 164.9 fps; the process was gone after SIGINT.
+  `-P fast` after the phase: 1695 run, 1692 passed, the same 3 failed, 86 skipped.
 
 ## Risks & open questions
 

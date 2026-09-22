@@ -7,6 +7,16 @@
 //! windowed and headless paths manage identically around the renderer.
 
 mod app_state;
+#[cfg_attr(
+    not(target_os = "linux"),
+    allow(
+        dead_code,
+        reason = "only the Linux capture backend reads bytes; built everywhere so its tests run"
+    )
+)]
+mod capture_frames;
+#[cfg(target_os = "linux")]
+mod capture_linux;
 #[cfg(target_os = "macos")]
 mod capture_mac;
 mod capture_start;

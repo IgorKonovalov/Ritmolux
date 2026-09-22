@@ -9,19 +9,23 @@
 # `wildcard-dependencies` / registry ban.
 
 [graph]
-# Evaluate only the platforms we actually ship (ADR-0001: Windows + macOS).
-# This prunes crates pulled in solely by other targets - e.g. winit's Linux
-# Wayland backend - so the gate reflects our shipped artifacts rather than deps
-# we never build.
+# Evaluate exactly the platforms we ship: Windows, macOS, and the Linux
+# tarball (ADR-0131). This prunes crates pulled in solely by targets we never
+# build, so the gate reflects the shipped artifacts. The Linux entry brings in
+# the Linux-only tree - winit's Wayland and X11 backends, wgpu's Vulkan, the
+# PulseAudio bindings - and narrowing the list to silence one of them would
+# put the shipped Linux binary back outside this gate; a finding there gets a
+# reasoned `ignore` instead.
 #
-# NOTE: this does NOT prune ttf-parser. That crate enters via the glyphon text
-# stack (ttf-parser -> fontdb -> cosmic-text -> glyphon -> rlx-core, ADR-0009's
-# `text` feature) and is present on BOTH shipped targets, so the target list
-# has no effect on it - see the RUSTSEC-2026-0192 ignore below.
+# NOTE: the target list does NOT prune ttf-parser. That crate enters via the
+# glyphon text stack (ttf-parser -> fontdb -> cosmic-text -> glyphon ->
+# rlx-core, ADR-0009's `text` feature) and is present on every shipped target -
+# see the RUSTSEC-2026-0192 ignore below.
 targets = [
     { triple = "x86_64-pc-windows-msvc" },
     { triple = "aarch64-apple-darwin" },
     { triple = "x86_64-apple-darwin" },
+    { triple = "x86_64-unknown-linux-gnu" },
 ]
 
 [advisories]
@@ -32,7 +36,7 @@ ignore = [
     # notice, NOT a vulnerability or unsound finding (those stay hard errors).
     # ttf-parser is load-bearing via the glyphon text stack
     # (ttf-parser -> fontdb -> cosmic-text -> glyphon -> rlx-core), enabled by
-    # ADR-0009's `text` feature on both shipped targets. cosmic-text 0.19 pins
+    # ADR-0009's `text` feature on every shipped target. cosmic-text 0.19 pins
     # ttf-parser 0.25 (both latest), so there is no update or clean drop without
     # reversing ADR-0009 or patching upstream. cargo-deny silences only this
     # exact id; a real future advisory on ttf-parser would still fail.

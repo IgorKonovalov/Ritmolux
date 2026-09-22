@@ -76,7 +76,7 @@ pub enum CaptureVerdict {
     },
     /// The platform capture path failed; `reason` is the error's `Display`.
     ///
-    /// **Deliberately carries no format.** Both platform arms fall back to a
+    /// **Deliberately carries no format.** Every platform arm falls back to a
     /// hardcoded 48 kHz stereo so the analyzer has something valid to start on,
     /// and reporting that fallback here would have the log state a format nothing
     /// is delivering.
@@ -86,12 +86,13 @@ pub enum CaptureVerdict {
     },
     /// Built for a platform with no capture path at all.
     ///
-    /// Constructed only by the `not(any(windows, target_os = "macos"))` arm of
-    /// `start_capture`, so on either shipping platform it is dead by
-    /// construction — which is the point: the third arm has to render as
-    /// something, and "nothing was ever tried" is not a success.
+    /// Constructed only by the `not(any(windows, target_os = "macos",
+    /// target_os = "linux"))` arm of `start_capture`, so on Windows, macOS and
+    /// Linux it is dead by construction — which is the point: the fallback arm
+    /// has to render as something, and "nothing was ever tried" is not a
+    /// success.
     #[cfg_attr(
-        any(windows, target_os = "macos"),
+        any(windows, target_os = "macos", target_os = "linux"),
         allow(
             dead_code,
             reason = "only the no-capture-path arm constructs it; that arm is cfg'd out here"

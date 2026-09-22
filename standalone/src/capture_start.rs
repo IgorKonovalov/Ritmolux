@@ -1,9 +1,9 @@
 //! Starting, losing and reopening the capture stream.
 //!
-//! The three `start_capture` arms are the whole of the platform branch the
-//! shell carries: Windows opens WASAPI, macOS opens ScreenCaptureKit, and every
-//! other target reports [`CaptureVerdict::Unsupported`] rather than failing to
-//! build. Each returns the same [`CaptureStart`], so the caller never asks which
+//! The `start_capture` arms are the whole of the platform branch the shell
+//! carries: Windows opens WASAPI, macOS opens ScreenCaptureKit, Linux opens
+//! PulseAudio's default monitor, and every other target reports
+//! [`CaptureVerdict::Unsupported`] rather than failing to build. Each returns the same [`CaptureStart`], so the caller never asks which
 //! platform it is on.
 //!
 //! [`RecoveryPolicy`] is the other half: a stream that dies is reopened a
@@ -11,6 +11,8 @@
 
 use rlx_core::audio::{AudioFormat, SampleConsumer};
 
+#[cfg(target_os = "linux")]
+use crate::capture_linux;
 #[cfg(target_os = "macos")]
 use crate::capture_mac;
 use crate::capture_verdict::{CaptureVerdict, LossCause};
@@ -18,14 +20,15 @@ use crate::capture_verdict::{CaptureVerdict, LossCause};
 use crate::capture_win;
 use standalone::config;
 
-/// Narrow alias so the non-Windows build, which has no capture, compiles the
-/// same struct shape.
+/// Narrow alias so a build with no capture path compiles the same struct shape.
 pub(crate) mod capture_handle {
     #[cfg(target_os = "macos")]
     pub type Handle = crate::capture_mac::CaptureHandle;
     #[cfg(windows)]
     pub type Handle = crate::capture_win::CaptureHandle;
-    #[cfg(not(any(windows, target_os = "macos")))]
+    #[cfg(target_os = "linux")]
+    pub type Handle = crate::capture_linux::CaptureHandle;
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     pub type Handle = ();
 }
 
@@ -246,14 +249,19 @@ impl RecoveryIncident {
 
 /// Whether the running capture stream has reported itself dead.
 ///
-/// Only the Windows path reports it; elsewhere a stream is either running or was
-/// never started, and there is nothing to observe.
+/// The Windows and Linux paths report it; on macOS a stream is either running
+/// or was never started, and there is nothing to observe.
 #[cfg(windows)]
 pub(crate) fn capture_lost(handle: Option<&capture_handle::Handle>) -> bool {
     handle.is_some_and(capture_win::CaptureHandle::lost)
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+pub(crate) fn capture_lost(handle: Option<&capture_handle::Handle>) -> bool {
+    handle.is_some_and(capture_linux::CaptureHandle::lost)
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
 pub(crate) fn capture_lost(_handle: Option<&capture_handle::Handle>) -> bool {
     false
 }
@@ -265,7 +273,9 @@ pub(crate) fn capture_lost(_handle: Option<&capture_handle::Handle>) -> bool {
 pub(crate) const CAPTURE_BACKEND: &str = "WASAPI";
 #[cfg(target_os = "macos")]
 pub(crate) const CAPTURE_BACKEND: &str = "SCK";
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(target_os = "linux")]
+pub(crate) const CAPTURE_BACKEND: &str = "PulseAudio";
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 pub(crate) const CAPTURE_BACKEND: &str = "none";
 
 /// The device name that means "the mode's default endpoint" — the value
@@ -273,7 +283,7 @@ pub(crate) const CAPTURE_BACKEND: &str = "none";
 /// match", and the leading entry of the settings menu's endpoint roster.
 pub(crate) const DEFAULT_ENDPOINT: &str = "default";
 
-/// The format both platform arms fall back to when capture fails, so the analyzer
+/// The format every platform arm falls back to when capture fails, so the analyzer
 /// has something valid to start on. **The verdict never reports it** — a log
 /// stating a format nothing is delivering is worse than no log.
 pub(crate) const FALLBACK_FORMAT: AudioFormat = AudioFormat {
@@ -393,7 +403,40 @@ pub(crate) fn start_capture(_input: &config::Input) -> CaptureStart {
     }
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(target_os = "linux")]
+pub(crate) fn start_capture(_input: &config::Input) -> CaptureStart {
+    match capture_linux::start() {
+        Ok((handle, consumer)) => {
+            let format = handle.format();
+            // The simple API opens the server's special name and cannot ask what
+            // it resolved to, so the special name is what the verdict reports.
+            let verdict = CaptureVerdict::live(CAPTURE_BACKEND, format, capture_linux::DEVICE);
+            CaptureStart {
+                handle: Some(handle),
+                consumer: Some(consumer),
+                format,
+                verdict,
+                // No enumeration on this path, so it positions no roster row.
+                endpoint: None,
+                failed_at_activation: false,
+            }
+        }
+        Err(err) => {
+            let failed_at_activation = err.is_activation();
+            eprintln!("PulseAudio capture unavailable ({err}); rendering without audio");
+            CaptureStart {
+                handle: None,
+                consumer: None,
+                format: FALLBACK_FORMAT,
+                verdict: CaptureVerdict::failed(CAPTURE_BACKEND, err),
+                endpoint: None,
+                failed_at_activation,
+            }
+        }
+    }
+}
+
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 pub(crate) fn start_capture(_input: &config::Input) -> CaptureStart {
     // No capture path on this platform; render silence-driven visuals.
     CaptureStart {
