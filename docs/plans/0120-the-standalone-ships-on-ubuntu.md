@@ -500,7 +500,7 @@ to `core/`" exclusion below is amended to say so.
 | 4 — The release tarball | dev | done | `ed74dad1` |
 | 5 — The docs say Linux | dev | done | `d3550166` |
 | 6 — Run it on the Ubuntu box | — | moved 2026-09-20 to Plan 0214 Phase 4 | |
-| 7 — A measurement asserts only on the machine it was taken on | dev | done | committed with this row |
+| 7 — A measurement asserts only on the machine it was taken on | dev | done | `c687bb9e` |
 
 ### Notes
 
@@ -665,8 +665,9 @@ to `core/`" exclusion below is amended to say so.
   (new), and on the site `site/src/plugins/rewrite-links.mjs`, `site/astro.config.mjs`,
   `site/src/content/docs/start-here.mdx`. No generated file regenerated.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0.
-- **Full suite:** `cargo nextest run --workspace --no-fail-fast` on the Arch box, exit 100 —
-  `1774 tests run: 1770 passed (3 slow), 4 failed, 7 skipped`. The four are named in the Notes.
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast` on the Arch box after Phase 7,
+  exit 0 — `1774 tests run: 1774 passed (11 slow), 7 skipped`. Before Phase 7 it was exit 100,
+  4 failed. `-P fast`: `1695 tests run: 1695 passed (2 slow), 86 skipped`.
 - **Outstanding `human` phases:** none in this plan. The on-box run and the CI and release
   readings are [0214](0214-the-linux-arm-reports-back.md)'s.
 
