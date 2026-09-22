@@ -14,7 +14,82 @@
 //! Everything here is a pure function over rosters passed in, so it is testable
 //! with no GPU, no audio device and no Spout SDK.
 
-use rlx_core::render::AdapterChoice;
+use rlx_core::render::{AdapterChoice, RenderError};
+
+/// Which of the window's two carriers named its adapter, so the startup line
+/// can say where the choice came from — the shape `TierSource` gives the tier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdapterSource {
+    /// `--gpu <name|index>` on the command line.
+    Flag,
+    /// `config.toml`'s `[output] gpu`.
+    Config,
+    /// Neither named one: the window's default preference.
+    Default,
+}
+
+/// How the `renderer adapter:` line names the unflagged, unstored request —
+/// the one word both the plain default and a fall-back onto it print.
+const DEFAULT_WORD: &str = "default";
+
+impl AdapterSource {
+    /// The suffix the `renderer adapter:` line carries, naming the carrier.
+    pub fn note(self) -> String {
+        match self {
+            AdapterSource::Flag => " (pinned by --gpu)".to_owned(),
+            AdapterSource::Config => " (from config.toml [output] gpu)".to_owned(),
+            AdapterSource::Default => format!(" ({DEFAULT_WORD})"),
+        }
+    }
+}
+
+/// Resolve the **window's** adapter across its two carriers, highest
+/// precedence first: `--gpu`, then `[output] gpu`, then the default preference
+/// — the precedence `--tier` has over `[quality] tier` (ADR-0246).
+///
+/// Pure: both carriers arrive already read, so the rule is testable without
+/// a command line or a file, and a carrier that is absent is simply `None`
+/// here.
+pub fn resolve_window_choice(
+    flag: Option<&str>,
+    config: Option<&str>,
+) -> (AdapterChoice, AdapterSource) {
+    match (flag, config) {
+        (Some(raw), _) => (named_or_index(raw), AdapterSource::Flag),
+        (None, Some(raw)) => (named_or_index(raw), AdapterSource::Config),
+        (None, None) => (window_choice(None), AdapterSource::Default),
+    }
+}
+
+/// Whether a window that could not get the adapter `source` named may start
+/// on the default preference instead — or must refuse to start.
+///
+/// **The two carriers deliberately differ, and this is the one place the
+/// difference is decided.** A stored `[output] gpu` outlives the machine state
+/// that made it valid — an undocked laptop, a driver update, an eGPU
+/// unplugged — and a show binary that will not start is the wrong failure for
+/// a persisted preference, so the file falls back. `--gpu` was typed for this
+/// run and can be wrong loudly, so the flag keeps ADR-0155's hard refusal.
+///
+/// Only the three *resolution* errors fall back: the adapter is absent, the
+/// name is ambiguous, or the adapter cannot present to this window. A device
+/// that enumerates and then fails to open is the failure a default launch
+/// would hit too, and falling back would only hide which one it was.
+pub fn fallback_permitted(source: AdapterSource, err: &RenderError) -> bool {
+    source == AdapterSource::Config
+        && matches!(
+            err,
+            RenderError::NoSuchAdapter { .. }
+                | RenderError::AmbiguousAdapter { .. }
+                | RenderError::AdapterCannotPresent { .. }
+        )
+}
+
+/// The `renderer adapter:` suffix after a fall-back, naming both what the
+/// file asked for and that the default was taken instead.
+pub fn fallback_note(wanted: &str) -> String {
+    format!(" ({DEFAULT_WORD}; \"{wanted}\" from config.toml [output] gpu did not resolve)")
+}
 
 /// What the sender should do about its adapter, and what to tell the operator.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -222,6 +297,88 @@ mod tests {
         assert_eq!(window_choice(None), AdapterChoice::Default);
         assert_eq!(renderer_choice(None), AdapterChoice::HighPerformance);
         assert_ne!(window_choice(None), renderer_choice(None));
+    }
+
+    /// **`--gpu` wins over `[output] gpu`, which wins over the default** — the
+    /// precedence `--tier` has over `[quality] tier` — and the source says
+    /// which carrier decided, so the startup line can name it.
+    #[test]
+    fn the_flag_beats_the_file_and_the_file_beats_the_default() {
+        assert_eq!(
+            resolve_window_choice(Some("RTX 3080"), Some("radeon")),
+            (
+                AdapterChoice::Named("RTX 3080".to_owned()),
+                AdapterSource::Flag
+            )
+        );
+        assert_eq!(
+            resolve_window_choice(None, Some("radeon")),
+            (
+                AdapterChoice::Named("radeon".to_owned()),
+                AdapterSource::Config
+            )
+        );
+        // The file is read by the same name-or-index rule the flag is.
+        assert_eq!(
+            resolve_window_choice(None, Some("1")),
+            (AdapterChoice::Index(1), AdapterSource::Config)
+        );
+        assert_eq!(
+            resolve_window_choice(None, None),
+            (window_choice(None), AdapterSource::Default)
+        );
+    }
+
+    /// **A stored adapter falls back; a flagged one refuses — asserted in one
+    /// place so the difference reads as a rule rather than an inconsistency.**
+    /// The file outlives the machine state that made it valid, so a show that
+    /// will not start is the wrong failure for it; the flag was typed for this
+    /// run and keeps ADR-0155's hard refusal (ADR-0246).
+    #[test]
+    fn a_stored_adapter_falls_back_where_a_flagged_one_refuses() {
+        let unresolved = [
+            RenderError::NoSuchAdapter {
+                requested: "Matrox".to_owned(),
+                available: hybrid(),
+            },
+            RenderError::AmbiguousAdapter {
+                requested: "NVIDIA".to_owned(),
+                matched: hybrid(),
+            },
+            RenderError::AdapterCannotPresent {
+                requested: "radeon".to_owned(),
+                adapter: HYBRID[0].to_owned(),
+            },
+        ];
+        for err in &unresolved {
+            assert!(
+                fallback_permitted(AdapterSource::Config, err),
+                "a stored adapter must fall back on: {err}"
+            );
+            assert!(
+                !fallback_permitted(AdapterSource::Flag, err),
+                "a flagged adapter must refuse on: {err}"
+            );
+            assert!(
+                !fallback_permitted(AdapterSource::Default, err),
+                "the default has nothing to fall back to"
+            );
+        }
+        // Only a *resolution* failure falls back: a device that enumerates and
+        // then cannot be used is the same failure a default launch would hit.
+        assert!(!fallback_permitted(
+            AdapterSource::Config,
+            &RenderError::UnsupportedSurface
+        ));
+
+        // The line names both what was asked for and that the default was
+        // taken, so the fall-back is never silent.
+        let note = fallback_note("Matrox");
+        assert!(note.contains("\"Matrox\""), "{note}");
+        assert!(note.contains("config.toml [output] gpu"), "{note}");
+        assert!(note.contains(DEFAULT_WORD), "{note}");
+        assert!(AdapterSource::Flag.note().contains("--gpu"));
+        assert!(AdapterSource::Config.note().contains("config.toml"));
     }
 
     /// An explicit choice means the same thing on both paths — the operator

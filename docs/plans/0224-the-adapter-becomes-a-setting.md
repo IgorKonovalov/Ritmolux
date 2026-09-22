@@ -1,6 +1,6 @@
 # 0224 — The adapter becomes a setting
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-22
 > **Approved:** 2026-09-22 (user)
 > **Owner skill(s):** dev, human
@@ -302,11 +302,11 @@ renderer adapter: AMD Radeon Graphics (RADV RENOIR) ... (default: high performan
 
 ## Implementation log
 
-**Lane:** _(not started)_
+**Lane:** `plan-0224-the-adapter-becomes-a-setting` at `/home/igor/Work/rlx-plan-0224`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `[output] gpu`, with a fall-back that says so | dev | not started | |
+| 1 — `[output] gpu`, with a fall-back that says so | dev | committed with this row | |
 | 2 — the unflagged window prefers high performance | dev | not started | |
 | 3 — `Renderer::set_adapter` on the live context | dev | not started | |
 | 4 — the menu row moves the running show | dev | not started | |

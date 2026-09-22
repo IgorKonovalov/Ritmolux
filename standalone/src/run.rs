@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use rlx_core::render::{AdapterChoice, Tier};
+use standalone::gpu::AdapterSource;
 use standalone::osc::OscSink;
 use standalone::{
     AppDirMigration, PresetDir, migrate_app_dir, resolve_preset_dir, resolve_tier, tier_env,
@@ -50,12 +51,13 @@ pub(crate) struct App {
     /// The quality-tier pin, already resolved across `--tier` / `RLX_TIER` /
     /// config (Plan 0044). `None` is auto — rich, governed.
     pub(crate) tier: Option<Tier>,
-    /// Which adapter `--gpu` named, already resolved.
-    /// [`AdapterChoice::Default`] is the unflagged request and is exactly what
-    /// the window asked for before the flag could reach it (ADR-0155). Held
-    /// beside `config` like the other per-launch flags, so it pins this run
-    /// without persisting itself.
+    /// Which adapter the window asks for, already resolved across `--gpu` and
+    /// `[output] gpu`, and which of the two named it. Held beside `config`
+    /// like the other per-launch flags, so `--gpu` pins this run without
+    /// persisting itself; the source is what decides whether a choice that
+    /// cannot be honoured falls back or refuses (ADR-0246).
     pub(crate) adapter: AdapterChoice,
+    pub(crate) adapter_source: AdapterSource,
     /// The preset `--preset` holds for this run, already checked against the
     /// roster this launch will load. `None` rotates on the operator's config.
     pub(crate) held_preset: Option<String>,
@@ -784,9 +786,13 @@ pub fn run() {
 
     // Resolved before the event loop exists, so a `--gpu` with no value is a
     // usage error rather than a window that opens and then reports one — the
-    // shape `--tier` and `--osc` already follow.
-    let adapter = match windowed_flag("--gpu") {
-        Ok(wanted) => standalone::gpu::window_choice(wanted.as_deref()),
+    // shape `--tier` and `--osc` already follow. The flag wins over
+    // `[output] gpu`, which wins over the default, as `--tier` wins over
+    // `[quality] tier` (ADR-0246).
+    let (adapter, adapter_source) = match windowed_flag("--gpu") {
+        Ok(wanted) => {
+            standalone::gpu::resolve_window_choice(wanted.as_deref(), config.output.gpu.as_deref())
+        }
         Err(err) => {
             eprintln!("{err}");
             std::process::exit(2);
@@ -828,6 +834,7 @@ pub fn run() {
         downbeat_log_path,
         tier,
         adapter,
+        adapter_source,
         held_preset,
         input,
         osc,

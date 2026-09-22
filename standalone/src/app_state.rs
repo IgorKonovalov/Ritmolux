@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 use rlx_core::audio::{AudioFormat, SampleConsumer};
 use rlx_core::dsp::Analyzer;
 use rlx_core::render::{AdapterChoice, CapOverflow, Renderer, RendererOptions, Tier};
+use standalone::gpu;
 use standalone::marks::Mark;
 use standalone::osc::{OscSink, Telemetry, rms_of};
 use standalone::rss;
@@ -452,33 +453,19 @@ impl AppState {
         let downbeat_log_path = app.downbeat_log_path.take();
         let tier = app.tier;
         let adapter = std::mem::take(&mut app.adapter);
+        let adapter_source = app.adapter_source;
         let held_preset = app.held_preset.take();
         let input = std::mem::take(&mut app.input);
         let osc = app.osc.take();
         let size = window.inner_size();
-        let pinned = adapter != AdapterChoice::Default;
-        let mut renderer = Renderer::new(
-            Arc::clone(&window),
-            size.width,
-            size.height,
-            // The window is the live path by definition, so the live sample
-            // ceiling (ADR-0140) - spelled out rather than left to `..default()`
-            // because this is the call site the choice is *about*.
-            RendererOptions {
-                tier,
-                adapter,
-                budget: rlx_core::render::SampleBudget::Live,
-            },
-        )
-        .unwrap_or_else(|err| {
-            eprintln!("renderer init failed: {err}");
-            // An operator who named an adapter and did not get it must not be
-            // left with a window on a different GPU, so the refusal is fatal
-            // rather than a degrade (ADR-0155). Exit 1: the flag was recognized
-            // and its effect failed, against 2 for an argument list wrong in
-            // shape.
-            std::process::exit(1);
-        });
+        let (mut renderer, adapter_note) = build_renderer(
+            &window,
+            (size.width, size.height),
+            tier,
+            adapter,
+            adapter_source,
+            config.output.gpu.as_deref(),
+        );
         // Say which tier the show is running at. The same preset looks different
         // on different machines now (ADR-0045), so this is the first line an odd
         // look should be checked against — and F3's overlay repeats it live.
@@ -605,16 +592,14 @@ impl AppState {
             // verbs reuses this rather than growing it on the render thread.
             control_transports: Vec::with_capacity(TRANSPORT_SCRATCH),
         };
-        // **Which GPU is rendering the show**, once, at startup. Unflagged, the
-        // window takes whatever wgpu returns for the surface, which on a hybrid
-        // machine is not necessarily the discrete GPU; every frame-time figure
-        // taken from this run is a property of that choice (ADR-0071). The line
-        // names whether an operator pinned it, so a measurement can say which of
-        // the two it is rather than leaving the reader to guess.
+        // **Which GPU is rendering the show**, once, at startup. Every
+        // frame-time figure taken from this run is a property of that choice
+        // (ADR-0071), so the line names the adapter and which carrier chose it
+        // — the flag, the file, or the default — and, after a fall-back, what
+        // the file asked for that was not taken.
         state.diagnostics.diag_log.note(&format!(
-            "renderer adapter: {}{}",
-            state.renderer.adapter_description(),
-            if pinned { " (pinned by --gpu)" } else { "" }
+            "renderer adapter: {}{adapter_note}",
+            state.renderer.adapter_description()
         ));
         state
     }
@@ -1902,6 +1887,57 @@ impl AppState {
     /// renderer afterward without holding a live borrow of the preset list.
     pub(crate) fn roster_names(&self) -> Vec<String> {
         self.renderer.preset_names().map(str::to_owned).collect()
+    }
+}
+
+/// Build the window's renderer on the adapter `source` named, and the suffix
+/// the `renderer adapter:` line carries for it.
+///
+/// A choice that cannot be honoured ends in one of two ways, and
+/// [`gpu::fallback_permitted`] is what decides which: a stored `[output] gpu`
+/// that is absent, ambiguous or cannot present falls back to the default
+/// preference and says so on stderr and in the note; anything else is fatal.
+/// An operator who typed `--gpu` and did not get it must not be left with a
+/// window on a different GPU, so the flag's refusal stays fatal rather than a
+/// degrade (ADR-0155). Exit 1: the flag was recognized and its effect failed,
+/// against 2 for an argument list wrong in shape.
+fn build_renderer(
+    window: &Arc<Window>,
+    (width, height): (u32, u32),
+    tier: Option<Tier>,
+    adapter: AdapterChoice,
+    source: gpu::AdapterSource,
+    stored: Option<&str>,
+) -> (Renderer, String) {
+    // The window is the live path by definition, so the live sample ceiling
+    // (ADR-0140) - spelled out rather than left to `..default()` because this
+    // is the call site the choice is *about*.
+    let options = |adapter| RendererOptions {
+        tier,
+        adapter,
+        budget: rlx_core::render::SampleBudget::Live,
+    };
+    let err = match Renderer::new(Arc::clone(window), width, height, options(adapter)) {
+        Ok(renderer) => return (renderer, source.note()),
+        Err(err) => err,
+    };
+    if !gpu::fallback_permitted(source, &err) {
+        eprintln!("renderer init failed: {err}");
+        std::process::exit(1);
+    }
+    let wanted = stored.unwrap_or_default();
+    eprintln!("[output] gpu = \"{wanted}\": {err}; starting on the default adapter instead");
+    match Renderer::new(
+        Arc::clone(window),
+        width,
+        height,
+        options(gpu::window_choice(None)),
+    ) {
+        Ok(renderer) => (renderer, gpu::fallback_note(wanted)),
+        Err(err) => {
+            eprintln!("renderer init failed: {err}");
+            std::process::exit(1);
+        }
     }
 }
 

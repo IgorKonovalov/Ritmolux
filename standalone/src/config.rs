@@ -391,6 +391,20 @@ pub struct Output {
     /// Open borderless-fullscreen on the target display when true; windowed
     /// otherwise. Default false, so a first run with no config is windowed.
     pub fullscreen: bool,
+    /// The graphics adapter to render on, spelled as `--gpu` spells it: a name
+    /// (a case-insensitive substring of the adapter's own, an exact one winning
+    /// over a partial) or a bare roster index. Unset means the default
+    /// preference. `--gpu` overrides it for one run without writing it.
+    ///
+    /// Stored by **name** for the reason `display_name` is stored before
+    /// `display`: the adapter roster orders differently per operating system
+    /// and driver, so an index alone can name the wrong GPU after an update.
+    /// A stored adapter that is absent, ambiguous or cannot present to the
+    /// window falls back to the default preference with a startup line naming
+    /// both — a file outlives the machine state that made it valid, and a show
+    /// that will not start is the wrong failure for a persisted preference
+    /// (ADR-0246). The flag keeps its hard refusal.
+    pub gpu: Option<String>,
 }
 
 impl Config {
@@ -666,6 +680,41 @@ min_dwell_secs = 30
         assert!(
             text.contains("favourites"),
             "the source must be written as the word the document names: {text}"
+        );
+    }
+
+    /// **Every existing `config.toml` predates `[output] gpu`**, so a section
+    /// without it has to mean the default preference rather than a parse
+    /// failure — and the key, once written, has to come back as the string the
+    /// operator (or the settings row) put there, because it is resolved by
+    /// name at the next launch.
+    #[test]
+    fn the_adapter_key_defaults_unset_and_round_trips_by_name() {
+        let config: Config = toml::from_str(
+            "[output]
+fullscreen = true
+display = 1
+",
+        )
+        .expect("an [output] section predating `gpu` must still parse");
+        assert_eq!(config.output.gpu, None, "an absent key named an adapter");
+        assert!(
+            config.output.fullscreen,
+            "the keys that were there must hold"
+        );
+
+        let config: Config = toml::from_str("[output]\ngpu = \"NVIDIA\"\n")
+            .expect("a config naming an adapter must parse");
+        assert_eq!(config.output.gpu.as_deref(), Some("NVIDIA"));
+
+        let mut config = Config::default();
+        config.output.gpu = Some("NVIDIA GeForce RTX 3080 Laptop GPU".to_owned());
+        let text = toml::to_string_pretty(&config).expect("config serializes");
+        let back: Config = toml::from_str(&text).expect("its own output parses");
+        assert_eq!(
+            back.output.gpu.as_deref(),
+            Some("NVIDIA GeForce RTX 3080 Laptop GPU"),
+            "the adapter name did not survive a save"
         );
     }
 
