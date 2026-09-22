@@ -40,6 +40,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [Entries 0227-0235 — from the Plan 0189 Phase 8 watched runs (2026-09-15), all archived](#entries-0227-0235--from-the-plan-0189-phase-8-watched-runs-2026-09-15-all-archived)
 - [0248 — nothing in this repo asks whether a groundless luminous field is a composition or a fill, and four shipped presets are the open cases](#0248--nothing-in-this-repo-asks-whether-a-groundless-luminous-field-is-a-composition-or-a-fill-and-four-shipped-presets-are-the-open-cases)
 - [0256 — the only report that asks whether two presets look alike covers nine of fourteen families, and both places naming the absent ones are stale](#0256--the-only-report-that-asks-whether-two-presets-look-alike-covers-nine-of-fourteen-families-and-both-places-naming-the-absent-ones-are-stale)
+- [0259 — the attractor rasterizes 600 000 sprites a frame, and a compute scatter would cut that term tenfold at the price of the look](#0259--the-attractor-rasterizes-600-000-sprites-a-frame-and-a-compute-scatter-would-cut-that-term-tenfold-at-the-price-of-the-look)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1702,3 +1703,41 @@ is that the set grows in the dark on a third of its families, and that the one d
 wants to make (ship less, better) has no evidence under it. Step 2 is cheap: it needs a person, an
 evening and the app, and it is the only step that cannot be skipped or automated.
 
+
+## 0259 — the attractor rasterizes 600 000 sprites a frame, and a compute scatter would cut that term tenfold at the price of the look
+
+The attractor draws each particle as a six-vertex instanced quad, about five texels a side at
+1080p, blended `One, One` into an `Rgba16Float` accumulation (`core/src/render/scenes/particles/
+encode.rs`, `resources.rs`). At the Rich live ceiling that is 600 000 quads and some 300 MB of
+scattered read-modify-write a frame. Measured on the reference laptop's integrated GPU (RADV
+RENOIR, headless, Rich, 1920x1080, 2026-09-22): **about 3.9 ms per 100 000 particles, linear**,
+so the fill alone is roughly twenty of Leviathan's thirty-eight milliseconds; the table is in
+[ADR-0245](adrs/0245-an-internal-grid-is-a-fraction-of-the-target-resolved-per-tier-and-adapter-class.md).
+
+**The only lever that attacks the fill term itself is not rasterizing it.** A compute pass can
+splat each particle into the field with atomic adds — one to four texels of a packed fixed-point
+buffer, then a resolve pass that unpacks to `Rgba16Float` — which turns 600 000 x ~30 blended
+fragments into a few million L2 atomics. Fractal-flame renderers work this way. Two costs make it a
+decision rather than a repair:
+
+- **The look moves.** The sprite's `(1 - d)^2` falloff and its per-particle size
+  (`POINT_BASE * size * magnify(dn)`, so `perspective` makes near particles larger) become a
+  uniform post-blur over a point histogram. `size` would mean a blur radius; `perspective`'s
+  magnification would be lost or need a per-particle radius, which is a splat loop again.
+- **Every attractor golden re-blesses**, eyes-on per preset, and the continuous families' streak
+  (ADR-0069) needs a line splat rather than a point.
+
+**Why it is deferred and not designed:** [Plan 0223](plans/0223-the-heavy-presets-fit-the-integrated-gpu.md)
+makes the internal grid a fraction of the target, which cuts the fill by the square of the fraction
+with no look change beyond softness. If Phase 6 finds a scale at which Rich holds 60 fps on the
+integrated GPU, this entry stays a note. If it finds none, this is the next ADR, and it will have
+Phase 1's per-pass timings to argue from.
+
+- **Raised:** 2026-09-22 by `architect`, from the heavy-preset analysis the owner asked for.
+  **Owner if taken:** `architect` for the ADR; `dev` for the compute path.
+- **Verified 2026-09-22** — the draw is a rasterized instanced quad, not a compute splat:
+  `present: 0\.\.active\.min\(pipelines\.count\) in: core/src/render/scenes/particles/encode.rs`
+- **Verified 2026-09-22** — the deposit is an additive blend into the float field:
+  `present: dst_factor: wgpu::BlendFactor::One in: core/src/render/scenes/particles/resources.rs`
+- **Verified 2026-09-22** — no compute scatter exists anywhere in the scene:
+  `absent: atomicAdd in: core/src/render/scenes/particles/shaders.rs`

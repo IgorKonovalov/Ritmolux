@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0223** (ADRs are a separate sequence — next free there is **0245**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0224** (ADRs are a separate sequence — next free there is **0246**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -56,6 +56,7 @@ place. The plan file carries the real link.
 | [0217](0217-every-setting-has-a-file-and-a-gate-says-so.md) | Every setting has a file, and a gate says so | approved | dev, studio-builder | ADR-0240: a file defines every setting and the menu edits it. Repairs the one violation - the F3 overlay persists nowhere - then a Rust test and a Node gate hold all three. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | Unblocked 2026-09-22 (0219 closed); runs after 0214. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). Phase 3 can stop the plan. |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
+| [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -659,6 +660,15 @@ function (`arc_cost`, `attractor`, `backdrop_palette`, `backdrop_ramp`, `backgro
 new test can still be written by pasting. And `check-comment-hygiene.mjs` now walks `.c/.h/.cc/.cpp/.hpp`
 as well as `.rs`, which puts `foo_ritmolux.cpp` under the gate for the first time; 0126's Phase on that
 file is the one that meets it.
+
+**Added 2026-09-22, from the heavy-preset analysis: [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md)
+runs after [0214](0214-the-linux-arm-reports-back.md) and beside [0218](0218-the-reference-machine-becomes-arch.md),
+not before them.** Its Phase 6 is a reading on the laptop's integrated adapter and 0218 Phase 2 is
+what moves the hardware tests onto the discrete one, so the two readings should name their adapters
+in the same vocabulary. Phases 1-2 (per-pass timings, the pipelined stream readback) change what
+`scripts/bench/` measures: every reading after them is a new dated file, and
+[0207](0207-the-commitments-get-their-instruments.md) Phase 2's frame-cost column should read the
+per-pass table rather than grow its own instrument.
 
 ### What this sequence assumes
 
