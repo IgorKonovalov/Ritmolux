@@ -379,8 +379,8 @@ conductor.** The conductor is not verified on Linux until Phase 5, and 0120 is c
 | 3 — The gate is green on this box | dev | done; hardware-adapter bullet not met, see Notes | `eb2c67c3` |
 | 4 — The studio drives a Linux player | studio-builder | done | `b8e9148e` |
 | 5 — The conductor's claims are checked on Linux | dev | done; the run parked on a conductor defect, see Notes | `a42f7c38`, `eab62d65` |
-| 6 — The diffusion sidecar runs on CUDA | dev | done | committed with this row |
-| 7 — A working day on the box | human | not started | |
+| 6 — The diffusion sidecar runs on CUDA | dev | done | `1b0801b4` |
+| 7 — A working day on the box | human | not run; the owner waived it at close, see Notes | |
 
 ### Phase 1 readings (2026-09-22)
 
@@ -668,16 +668,25 @@ unchanged.
 - **Phase 6, not edited.** `docs/diffusion-filter.md`'s "Setup" and its environment check show only
   the Windows `.venv/Scripts/python` lines, and `tools/sd-filter/README.md` carries the Linux ones.
   That page is outside Phase 6's file list. `docs/developing.md` cites no venv, so it is unchanged.
+- **Phase 7 was not run.** On 2026-09-22 the owner asked to close without it: development now happens
+  on this box, so its five checks will happen in the ordinary course of work. None of the five was
+  recorded. Some were exercised along the way: Phase 3's hook run, Phase 4's live param edit, and
+  Phase 6's `shot` render. Not exercised: a push through the hook, `shot --report`, a ten-minute
+  capture through PipeWire, and the Windows peer pulling `main`.
+- **Phase 5, settled after the phase.** The defect that parked 0221 was fixed by Plan 0222
+  (`a90b3d3`). 0221 was then adopted closed and merged (`2156504`), and 0222 closed as v0.143.1. Both
+  ran through the conductor on this box, 2 merged and 0 parked. After the fix, each of 0222's two
+  sessions was still denied an `ls` of `tools/conductor/state/transcripts/`.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** docs/chore/tooling only, with no engine or player code. The changes are the lane contracts (`CLAUDE.md`, the four skills and their references), `docs/developing.md`, a studio test (`windowless.test.ts`), the conductor (`VERIFIED_CLI`, two test files, the spike README and the README), and the sd-filter README plus `requirements.txt` comments. Plans 0221 and 0222 ran under this plan's Phase 5 and closed on their own; 0222 moved the version to 0.143.1.
+- **Operator docs touched:** `docs/developing.md` (the Arch block, and CI's split of the heavy suites), `tools/conductor/README.md`, `tools/conductor/spike/README.md`, `tools/sd-filter/README.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0.
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast` on `ce5001ca`: exit 0, `1774 tests run: 1774 passed (5 slow), 7 skipped`, 476 s. The Phase 3 run on `3bbec47` was the same: 1774 passed, 7 skipped.
+- **Outstanding `human` phases:** Phase 7, not run. The owner waived it at close (see Notes).
 
 ## Followups (after this lands)
 
