@@ -311,20 +311,31 @@ renderer adapter: AMD Radeon Graphics (RADV RENOIR) ... (default: high performan
 | 3 — `Renderer::set_adapter` on the live context | dev | done | 1009340c |
 | 4 — the menu row moves the running show | dev | done | c95ad331 |
 | 5 — the console and the sender follow the switch | dev | done | 854ae8d8 |
-| 6 — the operator documentation catches up | dev | committed with this row | |
+| 6 — the operator documentation catches up | dev | done | 596f3f8a |
 | 7 — the machine says whether the default was right | human | not started | |
 
 ### Notes
 
+- Phase 1 names `standalone/src/config/tests.rs`; the config tests are inline in `standalone/src/config.rs` and the new one went there (82b134fa).
+- Phase 1 says `--gpu`'s refusal "exits 2"; the shell exits 1 on that path and it was left unchanged (82b134fa).
+- Phase 3: `set_adapter` takes the window target again — the Risks' fallback branch, taken by construction rather than after a backend refused: re-configuring one surface object against a second device hands that device the first device's swapchain to release. The surfaced rebuild ran nowhere in this session (no window); the suite case pins the headless refusal and the exact-name rule, and ran against this box's two adapters rather than skipping (1009340c).
+- Phase 4: `SettingsView` gained three fields, so its construction sites outside the phase's file list — `standalone/src/console/tests.rs`, `standalone/src/stream.rs` — were widened (c95ad331).
+- Phase 4, "refused while an offline `--render` take is in flight": no windowed `--render` exists; `--render` is the headless `shot` CLI, whose renderer refuses `set_adapter` with `RenderError::Headless` by construction. Nothing added.
+- Phase 5, the `--stream` bullet: a `--stream` run is headless and refuses the switch by Phase 3's own guard, so no switch can reach the sender. `standalone/src/stream.rs` and `standalone/src/gpu.rs` are unchanged, and `docs/capturing.md` records the sender's adapter as fixed for the run rather than a receiver drop (854ae8d8, 596f3f8a). ADR-0246's Negative bullet on a live `--stream` switch describes the same unreachable case.
+- Phase 5, backlog 0165's console degrade branch: did not execute here — the session opened no window.
+- Phase 6: `standalone/tests/suite/configuration_doc.rs` populates the new key so the page is held to name it (596f3f8a). `README.md` needed no edit; `docs/nfr.md`'s note landed in Phase 2 (421bd32e).
+- Followup: a switch whose new adapter negotiates a different surface format changes the preview pipe's pixel order after the `stream` event announced it once (ADR-0187); `set_adapter` re-opens the readback and announces nothing.
+- Followup: two of backlog 0165's probes are broken by Phase 2 — `present: None => AdapterChoice::Default` and `present: fn the_window_and_the_stream_disagree_when_unflagged`, both in `standalone/src/gpu.rs`.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature — a `config.toml` key, a changed unflagged default, `Renderer::set_adapter`, a settings row — plus the operator docs for them.
+- **Operator docs touched:** `docs/configuration.md`, `docs/running.md` (`docs/running.ru.md`'s source moved; `check-translations.mjs` lists it as an advisory), `docs/capturing.md`, `docs/nfr.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit non-zero — 2 broken, both entry 0165, named in the Notes above.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Narrowed runs per phase, all green: `standalone --lib gpu:: config::`; `standalone --bin ritmolux settings:: console:: input:: app_state:: hud::`; `rlx-core --test suite adapter_switch:: tier_switch::`; `rlx-core --lib render::` (683 passed); `standalone --test suite configuration_doc::`.
+- **Outstanding `human` phases:** 7.
 
 ## Followups (after this lands)
 
