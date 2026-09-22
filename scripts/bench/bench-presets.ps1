@@ -1,5 +1,7 @@
 # Per-preset headless frame cost: no vsync, no present. Usage: .\bench-presets.ps1 [-Gpu NVIDIA] [-Size 1920x1080]
 param([string]$Gpu = "NVIDIA", [string]$Size = "1920x1080")
+# Invariant culture: a comma-decimal locale would otherwise print 5,68 into the tab-separated output.
+[System.Threading.Thread]::CurrentThread.CurrentCulture = [cultureinfo]::InvariantCulture
 $Bin = ".\target\release\ritmolux.exe"
 $Presets = "Nebula","Leviathan","Clifford","Volute","Dragon","Ink on Paper","Barnsley Fern","Braid","Murmuration","Shatter"
 $err = Join-Path $env:TEMP "rlx-bench-stderr.txt"

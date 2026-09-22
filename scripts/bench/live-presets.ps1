@@ -3,6 +3,8 @@
 # Fullscreen comes from [output] fullscreen in config.toml, which this script sets to true for
 # the run and restores afterwards. Keep the window in front: an occluded window throttles.
 param([string[]]$Gpus = @("NVIDIA", "AMD"))
+# Invariant culture: a comma-decimal locale would otherwise print 5,68 into the tab-separated output.
+[System.Threading.Thread]::CurrentThread.CurrentCulture = [cultureinfo]::InvariantCulture
 Set-Location (git rev-parse --show-toplevel)
 $Bin = Resolve-Path ".\target\release\ritmolux.exe"
 $Dir = Join-Path $env:APPDATA "Ritmolux"

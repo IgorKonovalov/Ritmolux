@@ -1,0 +1,14 @@
+# windows 2026-09-22, Windows 10 Home 22H2 (Version 10.0.19045.6466), build ff474fee
+# bench-presets.ps1 -Gpu NVIDIA: headless --stream 1920x1080, 1440 frames x3, MUSIC PLAYING (the linux bench had none)
+# renderer : NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu), driver 32.0.15.8142
+preset	run1	run2	run3	median_ms	fps_equiv
+Nebula	5.70	5.67	5.68	5.68	176
+Leviathan	5.78	5.76	5.73	5.76	174
+Clifford	5.43	5.46	5.48	5.46	183
+Volute	5.13	5.10	5.06	5.10	196
+Dragon	5.11	5.11	5.10	5.11	196
+Ink on Paper	4.79	4.72	4.73	4.73	211
+Barnsley Fern	5.00	5.03	5.04	5.03	199
+Braid	7.28	7.40	7.43	7.40	135
+Murmuration	7.46	7.53	7.45	7.46	134
+Shatter	6.83	6.75	6.76	6.76	148

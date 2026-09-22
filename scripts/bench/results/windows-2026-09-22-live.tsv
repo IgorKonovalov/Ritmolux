@@ -1,0 +1,24 @@
+# windows 2026-09-22, Windows 10 Home 22H2 (Version 10.0.19045.6466), build ff474fee
+# live fullscreen ([output] fullscreen = true, DISPLAY1 internal 2560x1440 165 Hz), 32 s per preset, first 6 samples dropped, music playing, capture live WASAPI 48000/2
+# NVIDIA = NVIDIA GeForce RTX 3080 Laptop GPU (Dx12), driver 32.0.15.8142; AMD = AMD Radeon(TM) Graphics (Dx12), driver 30.0.13002.1001
+gpu	preset	samples	fps_med	fps_min	avg_ms_med	p99_ms_med	p99_ms_max	dropped	samples_under_60
+NVIDIA	Nebula	22	165.0	164.9	6.06	7.54	7.89	0	0
+NVIDIA	Leviathan	23	165.0	164.7	6.06	7.52	7.94	0	0
+NVIDIA	Clifford	22	165.0	164.9	6.06	7.23	7.78	0	0
+NVIDIA	Volute	22	165.0	164.9	6.06	7.09	7.29	0	0
+NVIDIA	Dragon	22	165.0	164.9	6.06	7.11	7.43	0	0
+NVIDIA	Ink on Paper	22	165.0	165.0	6.06	6.74	7.34	0	0
+NVIDIA	Barnsley Fern	22	165.0	165.0	6.06	7.04	7.54	0	0
+NVIDIA	Braid	22	165.0	165.0	6.06	6.91	7.29	0	0
+NVIDIA	Murmuration	22	165.0	164.9	6.06	7.01	7.63	0	0
+NVIDIA	Shatter	22	165.0	165.0	6.06	6.93	7.17	0	0
+AMD	Nebula	22	26.4	26.2	38.00	49.83	53.01	0	22
+AMD	Leviathan	22	27.2	26.4	36.77	48.69	50.55	0	22
+AMD	Clifford	22	33.2	31.5	30.15	40.79	41.28	0	22
+AMD	Volute	22	60.7	40.3	17.13	32.40	37.64	0	11
+AMD	Dragon	22	47.0	44.7	21.53	30.96	33.13	0	22
+AMD	Ink on Paper	22	42.5	39.9	23.74	35.87	37.66	0	22
+AMD	Barnsley Fern	22	52.1	49.4	19.79	27.43	30.64	0	16
+AMD	Braid	22	86.1	81.4	11.65	14.71	15.29	0	0
+AMD	Murmuration	22	93.9	89.1	10.70	13.88	16.14	0	0
+AMD	Shatter	23	107.1	99.7	9.34	15.96	16.98	0	0
