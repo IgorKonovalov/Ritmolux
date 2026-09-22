@@ -228,7 +228,7 @@ flowchart TB
 | 1 — the renderer takes a name | dev | done | `655fa6a3` |
 | 2 — the accumulating set is named, and the hop follows the family | dev | done | `36e254ef` |
 | 3 — the affected cards are re-rendered as sets | dev | done | `13838683` `4ae649b2` `9e47296f` `4d4365d6` `2102267c`, and the warp set committed with this row |
-| 4 — a person says whether the cards are now the look | human | not started | |
+| 4 — a person says whether the cards are now the look | human | done — every family *the card is now the look* | committed with this row |
 
 ### Notes
 
@@ -286,6 +286,37 @@ with `git restore -- docs/images`; the lane carries no image change. Whether tha
 a different binary, or preset content that moved since those files were written is not something
 this session established.
 
+**Phase 4: every re-rendered family is *the card is now the look*, so no hop goes back to Phase 2
+and ADR-0235 gains no `Outcome`.** Taken 2026-09-22 in the `preset-author` lane on the owner's
+behalf, not by the owner. The same machine rendered the cards, and a local re-render of
+`warp_tracery` at its card settings came back byte-identical to the committed PNG. Each late render
+keeps the card's command line and changes only `--frame-at`, moved a whole number of phrases
+(409.09 hops) so it lands at the same point in the phrase, with `--signal-secs` set to
+`ceil((H+1)*512/48000)`:
+
+| family | late hops read | verdict | reason |
+|---|---|---|---|
+| attractor (20) | 4390, 6027 | the card is now the look | density and fill match both late renders; what still changes is the walk's figure, not development |
+| cellular (5) | 4390 | the card is now the look | texture, scale and coverage match; only the arrangement differs |
+| emitter (5) | 4390 | the card is now the look | the population is steady by about 3.5 s, so the hop bought nothing visible and cost nothing |
+| reaction (7) | 4390, 10936 | the card is now the look | the largest gain: hop 300 showed seeds and sparse rings, the card shows the settled field |
+| swarm (1) | 4464 | the card is now the look | `swarm_murmuration` was a uniform carpet at hop 300; at 2828 it has the late render's sheets and gaps |
+| warp (7) | 4390, 10936 | the card is now the look | structure matches both late renders; only palette, glow and ring phase differ |
+
+**`warp_tracery`**, the named case: hop 300 showed seven separate lobes. The card shows the
+seven-petal rosette around a hollow centre ring, and hops 4390 and 10936 show the same rosette.
+The world does not develop past the card.
+
+**One card is not the look, and a family hop would not fix it.** `attractor_thomasgallery` cycles
+rather than settles. Across hops 2345, 2754 (the card), 3163, 3572, 3981 and 4390 it reads clean
+knot, dissolved blob, bigger blob, messy knot, twisted knot, clean knot. The card lands on the
+dissolved part of the cycle. A `CARD_HOP_OVERRIDES` entry at 2345 would need no longer clip, and is
+left as a followup rather than done here: it is a per-preset choice, the thing ADR-0235 declined to
+make the default. `attractor_torusknot`, `attractor_walkdejong` and `attractor_walkthomas` also
+landed mid-walk on a less characteristic figure, while `attractor_valentine`'s late render is worse
+than its card. Walk timing is luck of the frame at any hop. `emitter_perseids` still bunches its
+fan to the right, which the roster already records as content work.
+
 ### Close triggers
 
 - **`presets/` touched:** no. No preset file, pending or shipped, was read or written by any phase.
@@ -305,10 +336,8 @@ this session established.
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207). The last narrowed run on this
   tree, at Phase 2, was `cargo nextest run --workspace -P fast` — 1688 passed, 86 skipped, exit 0.
   Phase 3 changed only committed PNGs.
-- **Outstanding `human` phases:** Phase 4 — a person judging each re-rendered card against a late
-  render of the same preset, `warp_tracery` explicitly. Nothing in Phases 2 or 3 records a verdict;
-  the four pictures read during the re-render were checked for "did this render at all", not for
-  whether the card is now the look.
+- **Outstanding `human` phases:** none. Phase 4 was taken 2026-09-22 in the `preset-author` lane
+  on the owner's behalf; its verdicts are in the Notes above.
 
 ## Followups (after this lands)
 
