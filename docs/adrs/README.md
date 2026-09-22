@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0243.** *(0120 was reserved for
+**Next free number: 0244.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -264,4 +264,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0240](0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md) | A setting lives in a file, and the in-app menu edits that file | accepted 2026-09-20, Plan 0217 |
 | [0241](0241-linux-leads-and-windows-is-a-peer.md) | Linux leads, and Windows stays a peer | accepted 2026-09-20, Plan 0218 |
 | [0242](0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md) | The software reference rasterizer is lavapipe, and a WARP claim is re-measured rather than renamed | accepted 2026-09-20, Plan 0218; extends 0023, 0071 |
+| [0243](0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md) | The reference box's hardware adapter is its discrete GPU, and a reading names it | proposed 2026-09-22, Plan 0219 |
 <!-- roster:end -->

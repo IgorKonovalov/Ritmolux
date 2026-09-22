@@ -56,6 +56,23 @@
 > clean, and the GPU suites skip through [ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md) —
 > so a green arm would say nothing about it. Phase 2 gains the arm and a done-when below.
 
+> **Amended 2026-09-22 (architect) — this plan runs on the Arch box, inside
+> [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s sequence.** The Windows-only
+> premise behind the 2026-09-20 split is gone. The phases, their code and 0214's ownership of the
+> CI and release readings are **unchanged**. Two things change:
+> - **A clause that needs a Linux compiler, not a runner, is witnessed on the box and logged here.**
+>   The first compilation of Phase 3, the Phase 3 unit tests, the subprocess tests leaving
+>   `$HOME/.local/share` untouched, and the adapter a local run resolves are recorded in this plan's
+>   log. The `ubuntu-latest` arm going green, and the adapter *it* resolves, stay 0214's. The Phase 2
+>   `cargo check --target x86_64-unknown-linux-gnu` step becomes a native `cargo check`.
+> - **The package names in Phases 2-3 are apt's**, and they are still right for the CI arm. On the Arch
+>   box they are `libpulse`, `pkgconf`, `wayland`, `libxkbcommon` and `vulkan-swrast`, installed by
+>   0219 Phase 1.
+>
+> Runs **after 0219 Phase 2** and **before 0219 Phase 3**, as a human-started session. It stays in
+> `tools/conductor/queue.json`, but the conductor is not started on the Arch box until 0219 Phase 5
+> has verified it there.
+
 ## TL;DR
 
 The standalone gets a third platform: **Ubuntu 24.04 x86_64**. A new

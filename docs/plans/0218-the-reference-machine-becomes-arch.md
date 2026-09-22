@@ -1,6 +1,6 @@
 # 0218 — The reference machine becomes Arch
 
-> **Status:** draft — blocked on the Arch migration (noted 2026-09-20)
+> **Status:** draft — blocked on [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) (re-pointed 2026-09-22; was the Arch migration)
 > **Created:** 2026-09-20
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0241](../adrs/0241-linux-leads-and-windows-is-a-peer.md),
@@ -17,6 +17,21 @@
 > that the migration is not also a design exercise. It is **not approved** and does not belong in
 > `tools/conductor/queue.json`: a lane would park on Phase 1 at the first judgement it cannot make.
 > **Unblocks** when there is an Arch box with the tree checked out and 0120 + 0214 landed.
+
+> **Amended 2026-09-22 (architect) — the machine exists; the block moves to
+> [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md).** This plan now runs after 0219
+> closes, not after "the migration". 0219 provisions the box, repairs the lane contracts, runs 0120
+> there and proves the gate green. Three things carry over:
+> - **Phase 2's gate may already exist.** If 0219 Phase 3 had to gate the pinned-baseline modules to
+>   the adapter their baselines were blessed on (WARP), Phase 2 moves that constant to lavapipe
+>   instead of introducing the gate.
+> - **Phase 5 loses the dev-loop half.** `docs/developing.md`'s Arch prerequisites and `CLAUDE.md`'s
+>   Linux linker paragraph are 0219's. Phase 5 keeps the stance: `nfr.md` §2/§9,
+>   `on-device-validation.md`'s Linux column, and the README.
+> - **Phase 3 can cross-check on the Windows box**, which the owner confirmed stays reachable. A
+>   fixture whose drift is in doubt can be rendered on WARP again, rather than judged only against
+>   the committed predecessor. Every hardware reading names the NVIDIA dGPU
+>   ([ADR-0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)).
 
 ## TL;DR
 

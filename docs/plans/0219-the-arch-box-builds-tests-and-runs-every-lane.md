@@ -1,0 +1,366 @@
+# 0219 — The Arch box builds, tests and runs every lane
+
+> **Status:** draft
+> **Created:** 2026-09-22
+> **Owner skill(s):** human, dev, studio-builder
+> **Related ADRs:** [0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md) (proposed),
+> [0241](../adrs/0241-linux-leads-and-windows-is-a-peer.md),
+> [0242](../adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md),
+> [0131](../adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md),
+> [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
+> [0208](../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md),
+> [0122](../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md),
+> [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md)
+> **Interleaves with:** [0120](0120-the-standalone-ships-on-ubuntu.md) — its Phases 2-5 run on this
+> box **between this plan's Phase 2 and Phase 3**. See "Sequencing" below.
+> **Unblocks:** [0218](0218-the-reference-machine-becomes-arch.md), whose "the machine does not
+> exist yet" block this plan clears.
+
+## TL;DR
+
+The Arch box exists now: Omarchy on Hyprland, PipeWire 1.6.8, an RTX 3080 Laptop GPU next to an AMD
+Vega iGPU. But nothing in the development loop has ever run on it. There is no Rust toolchain, no
+Vulkan software rasterizer, the pre-push hook is not installed, every lane's skill tells it to commit
+through a PowerShell tool that does not exist here, and wgpu is compiled with no Linux backend, so a
+build would find no GPU at all.
+
+This plan takes the box from bare to the point where **each of the four lanes can do real work on
+it**: `dev` pushes through a green hook, `studio-builder` drives a Linux player, `preset-author`
+renders and reports, and the conductor runs a lane. The engine work in the middle, a Vulkan backend
+and PulseAudio capture, is already written down as Plan 0120. This plan runs 0120 here instead of
+duplicating it, and wraps the machine, the tooling and the lane contracts around it.
+
+## Context & problem
+
+ADR-0241 decided that Linux leads. Plans 0120, 0214 and 0218 carry that decision out, but all three
+were written from the Windows checkout, before this box existed, and their shape reflects that:
+
+- **0120 splits by who can witness the evidence.** Its 2026-09-20 amendment moved every
+  *"it runs green"* clause to 0214, because a Windows session could not compile the Linux arm. From
+  this box, most of those clauses can be witnessed locally. Only the CI arm and the release dry run
+  still need a push.
+- **0218 is marked blocked on a machine that did not exist.** It now does. 0218 is about making this
+  box the *reference* (goldens, WARP claims, the documents' stance). It assumes someone has already
+  made the box *work*, and no plan owns that step. This plan is that step.
+
+What the box needs was established on 2026-09-22 by probing it and sweeping the tree:
+
+| Area | Reading | Consequence |
+|---|---|---|
+| Toolchain | `cargo`, `rustup`, `cargo-nextest`, `cargo-release`, `cargo-deny` all absent; `rust-toolchain.toml` pins 1.97.1 | nothing builds |
+| GPU | `nvidia-open-dkms` 610.57.04 + `vulkan-radeon`; **no `vulkan-swrast`, no `vulkaninfo`** | no software adapter, so every `force_fallback_adapter` test would skip even with a backend |
+| wgpu | `core/Cargo.toml:73-83` enables `dx12` on Windows and `metal` on macOS, and nothing on Linux | no adapter at all; Plan 0120 Phase 2 adds the `vulkan` arm |
+| Capture | no `capture_linux.rs`; `capture_start.rs` falls through to `Unsupported` | silence-driven visuals; Plan 0120 Phase 3 |
+| Audio stack | `libpulse` 17.0, `pipewire-pulse` 1.6.8 | ADR-0131's premise was probed on Ubuntu, not on this box |
+| Hook | `git config core.hooksPath` unset | no pre-push gate |
+| Lane contracts | the PowerShell here-string commit rule appears in `CLAUDE.md`, `dev/SKILL.md`, `dev/references/commit-conventions.md` (unconditionally), `architect/SKILL.md`, `preset-author/SKILL.md` and `studio-builder/SKILL.md`; `preset-author/references/render-loop.md` gives the render loop in PowerShell syntax; the project-context references list Windows + macOS only | every lane is told to use a tool that does not exist here, and gets no replacement |
+| Studio | `package.json` has no `package:linux`, `electron-builder.yml` has no `linux:` target, `windowless.test.ts` checks only on win32; the player path resolves `ritmolux` on Linux | the dev loop should work; packaging does not |
+| Conductor | `claude` 2.1.278 against `VERIFIED_CLI` 2.1.270-2.1.273, verified only on "Windows 10, Node v22"; `settings.conductor.json` has parallel PowerShell and Bash rules; one test is win32-only | runs with ADR-0208's warning, but none of its safety claims has been checked on Linux |
+| sd-filter | `torch==2.6.0+cu124` publishes wheels for CPython up to 3.13; Arch's `python3` is **3.14.7**; the docs name only `.venv/Scripts/python` | the CUDA environment cannot be installed as written |
+| Linker | Rust 1.90+ already links `x86_64-unknown-linux-gnu` with `rust-lld` by default | the Windows `WORK/.cargo/config.toml` override has no Linux counterpart, and probably needs none. Unmeasured |
+
+## Decision
+
+A new bootstrap plan, run in the order the dependencies force: provision the box, repair the lane
+contracts, **run 0120 on this box**, then prove the gate, the studio, the conductor and the sidecar
+one at a time. It ends with a human phase in which each lane does one real task. The hardware
+adapter for every reading is the NVIDIA dGPU ([ADR-0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)).
+
+Rejected during the interview:
+- **Replacing 0120, 0214 and 0218 with one umbrella plan.** It would re-author approved work to get
+  one sequence, and 0218's subject (which machine judges) is a different subject from this one
+  (whether the machine works).
+- **Leaving 0120 and 0214 exactly as written.** 0120 would keep handing to CI compiles this box can
+  run in seconds.
+
+For the commit-message rule, a lane on Linux or macOS commits a multi-line message through the Bash
+tool's quoted heredoc (`git commit -F - <<'EOF'`), and Windows keeps the PowerShell here-string. The
+rejected alternative is one file-based mechanism everywhere (`-F <scratch path>`). It is the only
+uniform option, but it needs a write permission outside the worktree that a headless conductor
+session may not be given, and it adds a tool call to every commit on the platforms where the Bash
+tool already works. This is recorded here and not in an ADR because the rule only picks a tool per
+platform. Phase 2 proves the Linux mechanism before any skill says to use it.
+
+## Sequencing
+
+```mermaid
+flowchart LR
+    subgraph p0219a["0219, first half"]
+        P1["P1 human<br/>provision + readings"]
+        P2["P2 dev<br/>lane contracts + dev docs"]
+    end
+    subgraph p0120["0120 on this box"]
+        Q2["P2 vulkan arm<br/>+ CI arm declared"]
+        Q3["P3 PulseAudio capture"]
+        Q45["P4-5 tarball + docs"]
+    end
+    subgraph p0219b["0219, second half"]
+        P3["P3 dev<br/>the gate is green here"]
+        P4["P4 studio-builder<br/>studio drives a Linux player"]
+        P5["P5 dev<br/>conductor verified on Linux"]
+        P6["P6 dev<br/>sd-filter on CUDA"]
+        P7["P7 human<br/>a working day"]
+    end
+    P1 --> P2 --> Q2 --> Q3 --> Q45 --> P3 --> P4 --> P5 --> P6 --> P7
+    P7 --> R["0214: push, CI readings"] --> S["0218: the box becomes the reference"]
+```
+
+0120 starts after Phase 2 because Phase 2 is what makes a `dev` session on this box able to commit
+by the rules. Phase 3 comes after 0120 because the gate cannot mean anything until wgpu has a Linux
+backend and the capture arm exists. **0120 runs as a human-started session, not under the
+conductor.** The conductor is not verified on Linux until Phase 5, and 0120 is currently listed in
+`tools/conductor/queue.json` lane `b`. Until Phase 5 closes, do not start the conductor on this box.
+
+## Implementation phases
+
+### Phase 1 — Provision the box, and read what it has
+- **Owner skill:** `human`
+- **What:** install the toolchain and system packages, install the hook, and record the readings
+  every later phase is written against. Nothing in this phase is a design decision.
+- **Files touched:** this plan's `## Implementation log` only.
+- **Install** (Arch package names; the log records exact versions):
+  `rustup` (then `rustup show` inside the checkout installs the pinned 1.97.1 with rustfmt and
+  clippy), `vulkan-swrast` (lavapipe), `vulkan-tools`, `cargo-nextest`, `cargo-release`,
+  `cargo-deny`, and `uv` for Phase 6's interpreter. `libpulse`, `pkgconf`, `wayland`,
+  `libxkbcommon`, `ffmpeg`, `node` and `python3` are already present. Then
+  `git config core.hooksPath .githooks` and `npm --prefix studio ci`.
+- **Done when** the log carries, verbatim:
+  - `vulkaninfo --summary` naming **three** physical devices: the NVIDIA dGPU, RADV on the Vega, and
+    llvmpipe/lavapipe. If lavapipe is missing, the software half of the suite cannot run and this
+    phase is not done.
+  - ADR-0131's premise re-probed on this box, in 0120 Phase 1's shape: `pactl info` (server name
+    and version) and a 5 s `parec -d @DEFAULT_MONITOR@` capture with music playing, with its byte
+    count and non-zero share. A negative answer is recorded and stops 0120 Phase 3, as 0120's own
+    risk section says.
+  - `claude --version`, `node --version`, `rustc --version` after `rustup show`, and the versions of
+    `cargo-nextest`, `cargo-release` and `cargo-deny` next to the ones CI installs.
+  - `git config core.hooksPath` printing `.githooks`.
+
+### Phase 2 — The lane contracts stop assuming Windows
+- **Owner skill:** `dev`
+- **What:** every instruction a lane follows either works on Linux or says which platform it is for,
+  and the developer documents walk an Arch checkout to a first build. This phase writes no Rust.
+- **Files touched:** `CLAUDE.md` (commit hygiene; machine setup, which gains a Linux paragraph;
+  the platform lines at the top and in the diagram), `.claude/skills/{dev,architect,preset-author,studio-builder}/SKILL.md`,
+  `.claude/skills/dev/references/{commit-conventions,project-context}.md`,
+  `.claude/skills/architect/references/project-context.md`,
+  `.claude/skills/preset-author/references/render-loop.md`,
+  `.claude/hooks/` tests if a case is added, `docs/developing.md`, `tools/sd-filter/README.md`
+  (the `.venv/bin/python` line beside the Windows one).
+- **Probe first, then write.** Before any skill says to use the Bash heredoc, the log records one
+  real commit on this box made with `git commit -F - <<'EOF'` and a multi-line, plain-ASCII body,
+  whose `git log -1 --format=%B` matches the input byte for byte. It also records that
+  `block-attribution-trailers.js` **denies** the same form when the body carries a
+  `Co-Authored-By:` line. If the hook does not deny it, the hook is fixed in this phase with a
+  regression case in its test, before any skill points at the form.
+- **Done when:**
+  - Every commit instruction under `.claude/skills/` and in `CLAUDE.md` names a mechanism per
+    platform: the Bash heredoc on Linux and macOS, the PowerShell here-string on Windows. No
+    instruction is unconditional. `commit-conventions.md:20` is the one known unconditional
+    instance, so this bullet is checked with a grep for `here-string`, not from memory.
+  - `render-loop.md`'s PowerShell block has a POSIX-shell sibling, and its `ritmolux.exe` /
+    `%APPDATA%` lines name the Linux path next to them (`target/release/ritmolux`,
+    `~/.local/share/Ritmolux/`). The Windows-only BOM advice in `preset-author/SKILL.md` says it is
+    Windows-only.
+  - Both `project-context.md` files and `CLAUDE.md` list Linux as a platform, with Vulkan as its
+    wgpu backend. They describe the tree as it will be after 0120 Phase 2, and a dated line says
+    that until then the Linux build has no backend.
+  - `docs/developing.md` gains an Arch prerequisites block: the Phase 1 package list, `rustup show`,
+    the hook, `npm --prefix studio ci`. A reader following it on a fresh Arch install reaches
+    `cargo build` without needing a Windows-only step. The PowerShell-only lines it keeps are
+    labelled Windows. It does **not** yet claim a green gate; Phase 3 adds that.
+  - `CLAUDE.md`'s machine-setup section says the `WORK/.cargo/config.toml` linker override is
+    Windows-only, and that Linux currently has none. The Linux arm of that question is Phase 3's
+    measurement, not this phase's opinion.
+  - The gates that read these files stay green: `check-doc-links.mjs`, `check-reader-prose.mjs`,
+    `toc.mjs --check`, `check-system-counts.mjs`, and the hooks' own test suite.
+
+### Phase 3 — The gate is green on this box
+- **Owner skill:** `dev`
+- **Runs after:** 0120 Phases 2-5 have landed on `main`.
+- **What:** the whole pre-push hook, then the full suite, run on the box. Every skip and failure is
+  classified before it is called a finding, and the linker question is measured.
+- **Files touched:** `core/tests/common/mod.rs` and the golden / pinned-baseline modules only if the
+  conditional below fires, `docs/developing.md`, `docs/testing.md` (only the conditional's notice),
+  `CLAUDE.md` machine setup (only if the linker measurement says to add something).
+- **Done when:**
+  - `.githooks/pre-push` runs **end to end green** on this box, with no step skipped for a missing
+    tool. The log carries its step list and wall time.
+  - `cargo nextest run --workspace` (the full run, not `-P fast`) has run once. The log carries the
+    `Summary` line and **every** failure and skip, sorted into three buckets: *expected until 0218*
+    (a baseline blessed on WARP compared on lavapipe), *a gate working as designed* (an ADR-0016
+    skip with its notice), and *a finding*. A finding is reported, not repaired, unless its fix is a
+    one-line platform gate. If it touches rendering, it goes to 0218 Phase 3's judging.
+  - **Conditional, and only if the fast tier is red for the first bucket.** The golden roster is
+    excluded from `-P fast` (`.config/nextest.toml:90`), but the sibling pinned-baseline modules
+    that ADR-0242 names (`line_joints`, `attractor_trails`, `warp_mesh_wide`) may not be. If they go
+    red on lavapipe, gate them to **the adapter their baselines were blessed on**, which is WARP
+    today, with an ADR-0016 printed skip elsewhere. This is ADR-0242's mechanism with its constant
+    set to where the baselines currently stand, and 0218 Phase 2 moves that constant to lavapipe
+    when it recaptures them. Nothing is re-blessed here.
+  - The hardware tests (ADR-0243's eleven `headless_hardware*` sites) resolve the **NVIDIA dGPU**,
+    and the log carries the `adapter.get_info()` name and driver string one of them printed. If they
+    resolve the iGPU, that is recorded and this bullet is not met.
+  - The linker is measured: the cold and warm link time of one large test binary with the toolchain
+    default, and with `mold` if it is installed. The log carries the numbers. `CLAUDE.md` gains a
+    Linux override only if the difference is worth a machine-local file, and the log says which way
+    the decision went.
+  - `docs/developing.md`'s Arch block now claims the green gate, and its line about the heavy suites
+    running only on Windows CI is corrected to name what runs where.
+
+### Phase 4 — The studio drives a Linux player
+- **Owner skill:** `studio-builder`
+- **What:** the studio's development loop on Wayland. `npm run dev` spawns a Linux player, paints
+  its frames and round-trips an edit. No Linux packaging (see "What this plan does NOT do").
+- **Files touched:** `studio/electron/player/windowless.test.ts` (a Linux arm of the
+  window-handle assertion, or an ADR-0016-shaped skip that says why there is none), `studio/package.json`
+  only if a dev script needs an Ozone/Wayland flag, `.claude/skills/studio-builder/references/project-context.md`.
+- **Done when:**
+  - `npm --prefix studio run typecheck`, `lint` and `test` are green on this box. The studio's
+    integration tests that spawn the real player run against the Linux `target/` build, not skip.
+  - The log records a manual `npm --prefix studio run dev` session: the player spawned (its PID and
+    the resolved binary path), frames painted in the preview, one param edited with the change
+    visible in the player's output, and the player gone after the studio closes, with no orphan
+    process (`pgrep ritmolux` empty).
+  - Whether Electron ran under native Wayland or XWayland is recorded, and so is what the headless
+    player's window did on Hyprland. `windowless.test.ts`'s win32-only assertion has either a Linux
+    counterpart or a skip whose notice says what cannot be asserted from a Wayland client.
+
+### Phase 5 — The conductor's claims are checked on Linux
+- **Owner skill:** `dev`
+- **What:** re-take the conductor spike's readings on this box, with this CLI, before the conductor
+  runs a plan here.
+- **Files touched:** `tools/conductor/spike/README.md` (a Linux column), `tools/conductor/conductor.mjs`
+  (`VERIFIED_CLI`, only if the probes hold), `tools/conductor/test/` (the win32-only case gets a
+  Linux sibling or a stated reason), `tools/conductor/settings.conductor.json` (only if a Bash rule
+  turns out to be missing), `tools/conductor/README.md`.
+- **Run by a human-started session, never by the conductor.** A conductor cannot verify itself, and
+  this phase changes what the conductor trusts.
+- **Done when:**
+  - Every probe row in `spike/README.md` has a Linux reading next to its Windows one, taken with
+    `claude` 2.1.278 on Node 26. The rows on the deny half, the `.claude/` write refusal and the
+    foreground rule are the ones that matter. A row whose Linux reading differs is reported in the
+    log. It is not reconciled here if reconciling it changes a safety claim; that is a backlog
+    entry to `architect`.
+  - Every PowerShell allow or deny rule in `settings.conductor.json` has a Bash rule that denies or
+    allows the same thing, or a comment saying why none is needed.
+  - `node --test tools/conductor/test/` is green on this box with no win32-only skip left unexplained.
+  - `VERIFIED_CLI` gains 2.1.278 **only if** every probe held. Otherwise it is left alone, and the
+    conductor keeps running with ADR-0208's warning.
+  - One real conductor run on this box: a docs-only plan, or the smallest approved plan the owner
+    picks, taken from `start` to a parked or closed outcome. The log names the run's state
+    directory, and `git worktree list` shows the lane at `~/Work/rlx-plan-NNNN`.
+
+### Phase 6 — The diffusion sidecar runs on CUDA
+- **Owner skill:** `dev`
+- **What:** the `tools/sd-filter` environment installed on Linux on a CPython that torch 2.6.0+cu124
+  publishes wheels for, and one filter pass on the RTX 3080 Laptop.
+- **Files touched:** `tools/sd-filter/README.md`, `tools/sd-filter/requirements.txt` (comments only,
+  unless the pin itself has to move, which is reported first), `docs/developing.md` if it cites the
+  venv.
+- **Done when:**
+  - The README's setup names the interpreter (`uv venv --python 3.12` or 3.13, whichever the install
+    succeeded on) and the Linux venv path. The log records `torch.cuda.is_available()` as `True` and
+    `torch.cuda.get_device_name(0)`.
+  - `python3 tools/sd-filter/test_sd_filter.py` (the pre-push suite) is green, and one real filter
+    pass over a `shot` render completes on CUDA. The log carries its wall time **as a reading that
+    names the machine**. `docs/diffusion-filter.md`'s figures are Windows readings and stay exactly
+    as they are; `check-filter-figures.mjs` holds them there.
+  - If torch 2.6.0+cu124 will not run on driver 610, that is reported and the phase stops. Moving
+    the pin is its own change, with `docs/diffusion-filter.md`'s figures to re-take.
+
+### Phase 7 — A working day on the box
+- **Owner skill:** `human`
+- **What:** each lane does one ordinary task here, which is the only evidence that "developable" is
+  true and not just "green".
+- **Files touched:** this plan's log.
+- **Done when** the log carries one line each for:
+  - **dev**: a small change, committed by the Phase 2 rule, pushed through the hook without
+    `--no-verify`.
+  - **preset-author**: a preset rendered with `shot`, plus `shot --presets presets --report` read on
+    this box.
+  - **studio-builder**: one param tuned live in the studio against the running player.
+  - **the standalone**: run for at least ten minutes against real music through PipeWire, with the
+    capture verdict line and the `diagnostics.log` path it wrote to.
+  - **the peer**: the Windows box pulls the same `main` and its hook is green. ADR-0241 keeps
+    Windows a peer, and this is the first commit written somewhere else.
+
+## Risks & open questions
+
+- **0120 was written for Ubuntu 24.04 and its package names are apt's.** Its code is
+  distribution-neutral, but its done-whens mention `libpulse-dev` and friends. On this box those are
+  just `libpulse` and `pkgconf`. The amendment on 0120 says so; nothing else changes.
+- **Wayland on a hybrid NVIDIA laptop is the least tested configuration here.** The live window
+  presents across GPUs (ADR-0243, Negative), and winit on Hyprland with the proprietary driver may
+  show problems neither the Windows box nor the Ubuntu probe could. Phase 3 reads only headless
+  tests. A live-window defect first shows up in Phase 4 or Phase 7, and is recorded, not solved.
+  Display placement (`C`, `D`) is 0218 Phase 1's probe and is not duplicated here.
+- **The fast tier may be red on day one for a reason nobody owns yet.** That is the conditional in
+  Phase 3. The risk is the *other* direction: that a genuine lavapipe mis-render gets swept into
+  "expected until 0218". The three-bucket log exists so that sorting is reviewed at the close, not
+  decided silently.
+- **Phase 5 costs money.** The spike probes and the real run are headless `claude -p` sessions.
+  `local.json`'s spend caps must exist before it starts; the conductor refuses to start without them.
+- **CPython 3.14 is ahead of the torch pin.** Phase 6 takes a second interpreter through `uv`, not a
+  system downgrade. If the owner prefers a system `python312` package, that works too; the README
+  names whichever one worked.
+- **`pacman -Syu` moves the ground.** Rust is pinned by `rust-toolchain.toml`, but Mesa, the NVIDIA
+  driver, Node and Electron's system dependencies are not. A reading in this log is dated and names
+  its versions for that reason.
+- **The Windows box becomes the one nobody develops on day to day.** ADR-0241 names that decay.
+  Phase 7's last bullet is the first check that it still works, not a standing guarantee.
+
+## What this plan does NOT do
+
+- **It does not write the Vulkan arm or the capture backend.** That is 0120, which runs inside this
+  plan's sequence and keeps its own phases, log and close.
+- **It does not move a golden or sweep a WARP claim.** That is 0218 Phases 2-4. The one exception is
+  Phase 3's conditional, which gates baselines to where they already stand and re-blesses nothing.
+- **It does not make this box the reference in the documents.** `docs/nfr.md` §2/§9,
+  `on-device-validation.md`'s Linux column and the README's stance stay with 0218 Phase 5. This plan
+  writes only the *how to build here* half of `developing.md` and `CLAUDE.md`.
+- **It does not package the studio for Linux** or add a Linux studio release job. A new release
+  artifact is ADR-0038's territory and gets its own interview.
+- **It does not add MPRIS, device enumeration, a Linux video-out or a Linux player host.** Those are
+  0218's Followups and remain so.
+- **It does not touch `plugin-foobar/`.** foobar2000 has no Linux build, the plugin is not a cargo
+  member, and it stays a Windows-box activity (ADR-0241).
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** _(to be filled by the implementer)_
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — Provision the box, and read what it has | human | not started | |
+| 2 — The lane contracts stop assuming Windows | dev | not started | |
+| 3 — The gate is green on this box | dev | not started | |
+| 4 — The studio drives a Linux player | studio-builder | not started | |
+| 5 — The conductor's claims are checked on Linux | dev | not started | |
+| 6 — The diffusion sidecar runs on CUDA | dev | not started | |
+| 7 — A working day on the box | human | not started | |
+
+### Notes
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`** none
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Full suite:**
+- **Outstanding `human` phases:**
+
+## Followups (after this lands)
+
+- **A Linux studio package**, meaning `package:linux`, a `linux:` target in `electron-builder.yml`
+  and a `packaging/studio/` recipe. It needs an interview and an ADR-0038 amendment.
+- **A Linux CI arm for the golden roster on lavapipe.** ADR-0242's Positive says `ubuntu-latest` can
+  run it. It becomes possible once 0218 Phase 2 lands.
+- **The iGPU as a second hardware configuration**, if a RADV-only defect is ever reported
+  ([ADR-0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)
+  Alternative B).
