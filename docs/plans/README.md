@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0224** (ADRs are a separate sequence — next free there is **0246**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0225** (ADRs are a separate sequence — next free there is **0247**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -57,6 +57,7 @@ place. The plan file carries the real link.
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | Unblocked 2026-09-22 (0219 closed); runs after 0214. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). Phase 3 can stop the plan. |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 | [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
+| [0224](0224-the-adapter-becomes-a-setting.md) | The adapter becomes a setting | approved | dev, human | ADR-0246 (proposed): a `[output] gpu` key, the unflagged window prefers the fast adapter, and set_adapter rebuilds on the live context. Runs BEFORE 0223, which is then tuned against what an operator gets. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -669,6 +670,15 @@ in the same vocabulary. Phases 1-2 (per-pass timings, the pipelined stream readb
 `scripts/bench/` measures: every reading after them is a new dated file, and
 [0207](0207-the-commitments-get-their-instruments.md) Phase 2's frame-cost column should read the
 per-pass table rather than grow its own instrument.
+
+**Added 2026-09-22: [0224](0224-the-adapter-becomes-a-setting.md) runs before
+[0223](0223-the-heavy-presets-fit-the-integrated-gpu.md).** 0224 flips what an unflagged window asks
+for, from the power-saving adapter to the high-performance one (ADR-0246), so it changes the machine
+0223 is tuning against. Measured on the Arch box on 2026-09-22, one preset and one tier: 25 fps with
+a 79 ms p99 on the integrated part against 164.9 fps and 6.5 ms on the discrete one. Running 0223
+first would tune the presets for an adapter most operators would stop landing on one plan later;
+0223 is still worth doing after, because the integrated part stays the default on any machine whose
+config names it and on every single-adapter box.
 
 ### What this sequence assumes
 

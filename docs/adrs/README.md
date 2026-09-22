@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0246.** *(0120 was reserved for
+**Next free number: 0247.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -267,4 +267,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0243](0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md) | The reference box's hardware adapter is its discrete GPU, and a reading names it | proposed 2026-09-22, Plan 0219 |
 | [0244](0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md) | The npm graphs are gated like the cargo graph, and an install script runs by name | proposed 2026-09-22, Plan 0220 |
 | [0245](0245-an-internal-grid-is-a-fraction-of-the-target-resolved-per-tier-and-adapter-class.md) | An internal grid is a fraction of the render target, resolved per tier and adapter class, and the sample budget counts against the grid | proposed 2026-09-22, Plan 0223; supplements 0034, 0140 |
+| [0246](0246-the-adapter-is-a-setting-and-the-window-prefers-high-performance.md) | The adapter is a setting, not a launch constant: the window prefers high performance, a file key holds the choice, and it moves without a restart | proposed 2026-09-22, Plan 0224; amends 0155 |
 <!-- roster:end -->
