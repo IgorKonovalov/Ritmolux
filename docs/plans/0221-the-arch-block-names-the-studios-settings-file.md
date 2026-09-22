@@ -62,8 +62,9 @@ there would be a phase with nothing to review.
   points it at their own `target/release/ritmolux`. The directory is named after `studio/package.json`'s
   `"name"` and is lowercase, unlike the player's `~/.local/share/Ritmolux/`. Check the location against
   `settingsFile` in `studio/electron/settings.ts` and Electron's `userData` rule. Read those files but
-  edit neither. Cite no Plan or ADR in the paragraph: `docs/developing.md` is in
-  `scripts/check-reader-prose.mjs`'s list, and a bare citation there fails the gate.
+  edit neither. Cite no Plan or ADR in the paragraph: it addresses a developer bringing up the box,
+  not the record. (`docs/developing.md` is in the Contribute group that
+  `scripts/check-reader-prose.mjs` leaves out, so no gate would fail on a bare citation.)
 - **Files touched:** `docs/developing.md`
 - **Done when:**
   - `awk '/^### A fresh Arch Linux checkout/,/^## Editing presets/' docs/developing.md | grep -c 'ritmolux-studio/settings.json'`
