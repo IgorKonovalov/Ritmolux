@@ -133,8 +133,8 @@ lookup on the suite step. The Node roster is untouched.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The path set is data, and a self-test convicts it | dev | done | committed with this row |
-| 2 — The hook asks before it spends | dev | not started | |
+| 1 — The path set is data, and a self-test convicts it | dev | done | `e3498a57` |
+| 2 — The hook asks before it spends | dev | done | committed with this row |
 | 3 — The suite step is served by the record that already exists | dev | not started | |
 | 4 — What the operator reads is true | dev | not started | |
 
@@ -142,5 +142,7 @@ lookup on the suite step. The Node roster is untouched.
 
 - Phase 1: the manifest is `scripts/push-scope.manifest.mjs`. Beyond the plan's list it names the five workspace crate directories whole, `.taplo.toml`, rustfmt/clippy configs, and eight paths outside the crates that a Rust test opens (`docs/configuration.md`, `docs/embedding.md`, `docs/nfr.md`, `docs/examples/**`, `docs/images/gallery/**`, `docs/specs/player-schema.json`, `scripts/docs-shots.mjs`, `packaging/foobar/build-component.ps1`).
 - Phase 1: the fixture's explanation is `scripts/fixtures/push-scope/README.md`; `scripts/fixtures/README.md` was not given a section.
+- Phase 2: the docs-only case was run through the real hook (stdin fed by a scratch Node driver, since a conductor session may not run `sh`); the one-`.rs`, empty, unparseable, new-branch and deletion-only cases were run against `rust_relevant` extracted from the hook, not through the whole hook. The whole hook on a Rust range ran at Phase 4.
+- Phase 2: a push of nothing but branch deletions runs the cargo steps (no range to read).
 - Followup: `push-scope.mjs --self-test` is not on the gate roster (`gates.manifest.mjs`, CI `links`), so nothing runs it but a person.
 - Followup: CLAUDE.md's `scripts/` inventory does not name `push-scope.mjs` or its manifest.
