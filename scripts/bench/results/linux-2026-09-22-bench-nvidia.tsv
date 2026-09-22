@@ -1,0 +1,14 @@
+# linux 2026-09-22, Arch kernel 7.2.5, Hyprland 0.56.2, build 144b137c
+# bench-presets.sh NVIDIA: headless --stream 1920x1080, 1440 frames x3, no music
+# renderer : NVIDIA GeForce RTX 3080 Laptop GPU (Vulkan, DiscreteGpu), driver NVIDIA 610.57.04
+preset	run1	run2	run3	median_ms	fps_equiv
+Nebula	4.27	4.12	4.08	4.12	243
+Leviathan	4.51	4.61	4.25	4.51	222
+Clifford	3.83	3.86	3.85	3.85	260
+Volute	4.00	3.91	3.81	3.91	256
+Dragon	3.89	3.90	4.14	3.90	256
+Ink on Paper	3.31	3.27	3.33	3.31	302
+Barnsley Fern	3.46	4.02	3.82	3.82	262
+Braid	5.68	5.80	5.81	5.80	172
+Murmuration	5.90	5.88	5.97	5.90	169
+Shatter	5.27	5.30	4.91	5.27	190

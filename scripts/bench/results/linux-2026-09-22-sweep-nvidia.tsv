@@ -1,0 +1,120 @@
+# linux 2026-09-22, Arch kernel 7.2.5, Hyprland 0.56.2, build 144b137c
+# headless --stream 1920x1080, 720 frames, one run per preset, no music
+# renderer: NVIDIA GeForce RTX 3080 Laptop GPU (Vulkan, DiscreteGpu), driver NVIDIA 610.57.04
+render_readback_ms	preset	file
+5.65	Murmuration	swarm_murmuration.toml
+5.57	Braid	swarm_braid.toml
+5.12	Drift	swarm_drift.toml
+5.09	Shatter	swarm_shatter.toml
+4.77	Leviathan	attractor_leviathan.toml
+4.74	Stipple	swarm_stipple.toml
+4.50	Nebula	fragment_nebula.toml
+4.36	Clifford	attractor_clifford.toml
+4.35	Gyre	curve_gyre.toml
+4.32	Parabolic Dust	analytic_parabolicdust.toml
+4.24	Phosphor	curve_phosphor.toml
+4.17	Lacework	curve_lacework.toml
+4.16	Cogwheel	curve_cogwheel.toml
+4.12	Ring Orbit	analytic_ringorbit.toml
+4.01	Dragon	attractor_dragon.toml
+3.99	Volute	attractor_volute.toml
+3.97	Barnsley Fern	attractor_fern.toml
+3.95	Seahorse	analytic_seahorse.toml
+3.91	Julia Circuit	analytic_juliacircuit.toml
+3.75	Prismscope	curve_prismscope.toml
+3.70	Pearl String	analytic_pearlstring.toml
+3.65	Turnabout	curve_turnabout.toml
+3.56	Ink on Paper	attractor_ink.toml
+3.52	Wellhead	warp_wellhead.toml
+3.48	Sumi	fragment_sumi.toml
+3.39	Searchlight	analytic_searchlight.toml
+3.34	Sirocco	warp_sirocco.toml
+3.31	Two-Band Julia	analytic_twobandjulia.toml
+3.30	Path Maple	shape_maple.toml
+3.28	Blueprint	curve_blueprint.toml
+3.27	Stained Glass	analytic_stainedglass.toml
+3.27	Ice Crystal	lsystem_icecrystal.toml
+3.26	Verdigris	reaction_verdigris.toml
+3.22	Path Lion	shape_lion.toml
+3.21	Ink Pendulum	curve_inkpendulum.toml
+3.20	Vitrail	fragment_vitrail.toml
+3.20	De Jong Walk	attractor_walkdejong.toml
+3.18	Neon Tunnel	fragment_tunnel.toml
+3.14	Loom	curve_loom.toml
+3.14	Flux Mono	reaction_fluxmono.toml
+3.12	Millrace	warp_millrace.toml
+3.11	Smoke	warp_smoke.toml
+3.10	Cauldron	warp_cauldron.toml
+3.06	Banded Mandala	fragment_mandala.toml
+3.05	Mitosis	reaction_mitosis.toml
+3.04	Radial Bloom	spectrum_radialbloom.toml
+3.04	Ember Jet	emitter_emberjet.toml
+3.04	Drift Field	emitter_driftfield.toml
+3.02	Spot Mono	reaction_spotmono.toml
+3.02	Rho Walk	attractor_walkrho.toml
+3.01	Echo Plate	analytic_echoplate.toml
+2.99	Facet	shape_facet.toml
+2.97	Etching	reaction_etching.toml
+2.96	Thomas Gallery	attractor_thomasgallery.toml
+2.96	Corona	star_corona.toml
+2.96	Bower	lsystem_bower.toml
+2.94	Tiled Rosette	fragment_tiled.toml
+2.94	Strata Heart	shape_strataheart.toml
+2.94	Ridge	spectrum_ridge.toml
+2.93	Whorl	fragment_whorl.toml
+2.93	Thomas on Red	attractor_thomasred.toml
+2.91	Thomas Walk	attractor_walkthomas.toml
+2.91	Lorenz Gallery	attractor_lorenzgallery.toml
+2.90	Lichen	reaction_lichen.toml
+2.89	Rime	lsystem_rime.toml
+2.89	Lorenz Knot	attractor_lorenzknot.toml
+2.89	Lace Grid	analytic_lacegrid.toml
+2.88	Ion Wake	curve_ionwake.toml
+2.87	Clifford Gallery	attractor_cliffordgallery.toml
+2.84	Perseids	emitter_perseids.toml
+2.84	Droste Mono	fragment_drostemono.toml
+2.81	Torus Knot	attractor_torusknot.toml
+2.81	Multibrot	analytic_multibrot.toml
+2.80	Supernova	fragment_supernova.toml
+2.80	Rose Window	star_rosewindow.toml
+2.80	Petalfall	emitter_petalfall.toml
+2.80	Nightbloom	curve_nightbloom.toml
+2.80	Glacier Mono	reaction_glaciermono.toml
+2.80	Coral	lsystem_coral.toml
+2.79	Fern Mono	attractor_fernmono.toml
+2.79	Collage Mono	collage_mono.toml
+2.76	Valentine	attractor_valentine.toml
+2.76	Ladder	warp_ladder.toml
+2.73	On White	collage_onwhite.toml
+2.73	Butterfly to Knot	attractor_walkknot.toml
+2.70	Aperture	shape_aperture.toml
+2.69	Tide Bugs	cellular_tide_bugs.toml
+2.69	Ember Life	cellular_ember_life.toml
+2.68	Nocturne	collage_nocturne.toml
+2.68	Curve Mono	curve_rosemono.toml
+2.65	Interference Mono	fragment_interferencemono.toml
+2.65	De Jong Gallery	attractor_dejonggallery.toml
+2.64	Tracery	warp_tracery.toml
+2.61	Skyline	spectrum_skyline.toml
+2.61	Broadside	curve_broadside.toml
+2.60	Tiled Rosette Mono	fragment_tiledmono.toml
+2.57	Suprematist	collage_suprematist.toml
+2.55	Wavefront	cellular_wavefront.toml
+2.55	Standing Wave	analytic_standingwave.toml
+2.55	Contour Mono	shape_contourmono.toml
+2.53	Star Mandala Bordered	star_mandala_bordered.toml
+2.50	Thomas	attractor_thomas.toml
+2.43	Meter Mono	spectrum_metermono.toml
+2.41	Anemone	spectrum_anemone.toml
+2.40	Heart Mono	shape_heartmono.toml
+2.38	Sumi Mono	lsystem_sumimono.toml
+2.35	Drift Mono	fragment_driftmono.toml
+2.33	Zellij	star_zellij.toml
+2.30	Labyrinth	cellular_labyrinth.toml
+2.29	Etching Plate	fragment_etchingplate.toml
+2.20	Vellum	lsystem_vellum.toml
+2.19	Marbled Strata	fragment_strata.toml
+2.18	Spiral Bloom	cellular_spiral_bloom.toml
+2.17	Heartfall	emitter_heartfall.toml
+2.16	Ring Mono	shape_ringmono.toml
+2.07	Pulse	shape_pulse.toml

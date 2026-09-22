@@ -1,0 +1,24 @@
+# linux 2026-09-22, Arch kernel 7.2.5, Hyprland 0.56.2, build 144b137c
+# live fullscreen 2560x1440 (hyprland logical 2048x1152 at scale 1.25), 32 s per preset, first 6 samples dropped, music playing
+# NVIDIA = NVIDIA GeForce RTX 3080 Laptop GPU (Vulkan), driver NVIDIA 610.57.04; AMD = AMD Radeon Graphics (RADV RENOIR), Mesa 26.2.2
+gpu	preset	window	samples	fps_med	fps_min	avg_ms_med	p99_ms_med	p99_ms_max	dropped	samples_under_60
+NVIDIA	Nebula	2048x1152 fs2	25	164.9	164.8	6.07	6.60	6.92	0	0
+NVIDIA	Leviathan	2048x1152 fs2	25	164.9	164.9	6.06	6.49	7.17	0	0
+NVIDIA	Clifford	2048x1152 fs2	25	164.9	164.9	6.06	6.50	6.71	0	0
+NVIDIA	Volute	2048x1152 fs2	25	164.9	164.9	6.07	6.47	6.69	0	0
+NVIDIA	Dragon	2048x1152 fs2	25	164.9	164.9	6.07	6.45	6.62	0	0
+NVIDIA	Ink on Paper	2048x1152 fs2	25	164.9	164.9	6.07	6.30	6.36	0	0
+NVIDIA	Barnsley Fern	2048x1152 fs2	25	164.9	164.9	6.06	6.45	6.73	0	0
+NVIDIA	Braid	2048x1152 fs2	25	164.9	164.8	6.06	6.72	6.89	0	0
+NVIDIA	Murmuration	2048x1152 fs2	25	164.9	164.8	6.07	6.75	7.07	0	0
+NVIDIA	Shatter	2048x1152 fs2	25	164.9	164.8	6.06	6.63	6.74	0	0
+AMD	Nebula	2048x1152 fs2	25	25.3	25.1	39.49	43.79	68.19	0	25
+AMD	Leviathan	2048x1152 fs2	25	25.4	25.1	39.40	49.38	82.47	0	25
+AMD	Clifford	2048x1152 fs2	25	31.2	30.1	32.01	38.12	64.08	0	25
+AMD	Volute	2048x1152 fs2	25	46.1	36.5	21.68	28.16	33.46	0	20
+AMD	Dragon	2048x1152 fs2	25	44.1	41.8	22.70	30.96	32.21	0	25
+AMD	Ink on Paper	2048x1152 fs2	25	36.8	33.7	27.17	36.58	62.62	0	25
+AMD	Barnsley Fern	2048x1152 fs2	25	50.4	44.0	19.84	25.61	31.47	0	25
+AMD	Braid	2048x1152 fs2	25	77.6	71.4	12.89	14.70	15.49	0	0
+AMD	Murmuration	2048x1152 fs2	25	86.9	83.7	11.51	13.49	14.22	0	0
+AMD	Shatter	2048x1152 fs2	25	102.0	88.1	9.80	13.48	15.03	0	0
