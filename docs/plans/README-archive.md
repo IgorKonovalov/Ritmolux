@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0221 - The Arch block names the studio's settings file](#0221---the-arch-block-names-the-studios-settings-file)
   - [0120 - The standalone ships on Ubuntu](#0120---the-standalone-ships-on-ubuntu)
   - [0210 - The gallery card shows the world it names](#0210---the-gallery-card-shows-the-world-it-names)
   - [0213 - The hook costs what the push is worth](#0213---the-hook-costs-what-the-push-is-worth)
@@ -245,6 +246,18 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0221 - The Arch block names the studio's settings file](done/0221-the-arch-block-names-the-studios-settings-file.md)
+
+- closed 2026-09-22, conductor-run lane `plan-0221-the-arch-block-names-the-studios-settings-file`
+on the Arch box: the fixture for Plan 0219 Phase 5's first Linux conductor run. Phase 1 `fc8f45d2`.
+Round 1: **no blockers, no majors, one nit**, repaired at the close in `19a2f9d6`. Version: none
+(docs-only, by design: the one close path the conductor had not yet run on this box).
+- **What landed.** `docs/developing.md`'s Arch block says the studio run from source reads
+`"playerPath"` from `~/.config/ritmolux-studio/settings.json`, the Electron `userData` directory
+named after `studio/package.json`'s `"name"`.
+- **What outlived the plan.** `studio/README.md` "Finding the player" still names the directory for
+Windows and macOS only; that is `studio-builder`'s. Recording the run is 0219 Phase 5's.
 
 ### [0120 - The standalone ships on Ubuntu](done/0120-the-standalone-ships-on-ubuntu.md)
 

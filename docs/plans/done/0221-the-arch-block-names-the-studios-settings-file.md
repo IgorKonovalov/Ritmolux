@@ -1,12 +1,16 @@
 # 0221 — The Arch block names the studio's settings file
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-22 by a conductor-run close review. Phase 1 `fc8f45d2`, close
+> block `d9a9f6e0`, one nit repaired in `19a2f9d6`. Review round 1: **no blockers, no majors, one
+> nit (fixed).** Verified: the paragraph against `studio/electron/settings.ts` and Electron's
+> `userData` rule, the diff's file list, the three docs gates, and the full suite from the ledger.
+> Version: none (docs-only).
 > **Created:** 2026-09-22
 > **Owner skill(s):** dev
-> **Related ADRs:** [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
-> [0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md),
-> [0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md) (proposed)
-> **Serves:** [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) Phase 5, the done-when
+> **Related ADRs:** [0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
+> [0210](../../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md),
+> [0243](../../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md) (proposed)
+> **Serves:** [Plan 0219](../0219-the-arch-box-builds-tests-and-runs-every-lane.md) Phase 5, the done-when
 > "one real conductor run on this box".
 
 ## TL;DR
@@ -120,3 +124,54 @@ there would be a phase with nothing to review.
   entries, 4 unprobeable; the moved-path advisory rows name no path this plan touched
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
 - **Outstanding `human` phases:** none
+
+## Close review
+
+### Round 1
+
+**Verdict:** Plan 0221 landed cleanly: one docs paragraph, correct against the studio source, no
+blockers, no majors, one nit.
+
+**Lens 1 — alignment.** Phase 1 (`fc8f45d2`) adds one paragraph to `docs/developing.md` inside
+`### A fresh Arch Linux checkout`, after the Electron half-install block and before
+`**No linker override on Linux.**`, exactly where the plan placed it. The single phase carries an
+in-vocabulary `**Owner skill:** dev` tag. `git diff --name-only main...HEAD` lists
+`docs/developing.md` and the plan file, and nothing else. The first done-when's `awk | grep -c` pipe
+was refused by the allowlist in this session too; `grep -c 'ritmolux-studio/settings.json'
+docs/developing.md` over the whole file prints `1`, and that one match sits at line 79, inside the
+section, so the narrower count is also `1`. `check-reader-prose.mjs`, `check-doc-links.mjs` and
+`toc.mjs --check` each exit 0. The implementation log is present, shorter than the phases section,
+and its claims match the tree.
+
+**Full suite:** `with-lock: skipped cargo nextest run --workspace: tree 131e6b5 is green in the suite
+ledger, run by gate 0221-pre-review at 2026-09-22T14:14:55.589Z: 1774 tests run: 1774 passed (3 slow),
+7 skipped`. That ledger record is the full-suite evidence (ADR-0207). The diff touches no Rust, so
+`cargo doc` cannot move; it runs in the close gate anyway.
+
+**Content check.** `studio/electron/main.ts:67` builds the path as
+`settingsFile(app.getPath('userData'))`, and `studio/electron/settings.ts:23` joins `settings.json`
+onto it. `studio/package.json` has `"name": "ritmolux-studio"` and no `productName`, so Electron's
+`userData` is `$XDG_CONFIG_HOME/ritmolux-studio` (falling back to `~/.config`) on Linux. `playerPath`
+is the key `settings.ts:18,44` reads. The player's `~/.local/share/Ritmolux/` matches
+`docs/configuration.md:258`. The paragraph cites no Plan or ADR.
+
+**Lenses 2, 4, 5** — nothing in scope: no Rust, no C++, no studio code, no ABI or protocol surface.
+
+**Lens 3 — bookkeeping.** The plan is docs/chore-only and says so; no version bump, so the outcome
+carries `null` version and tag. `presets/` untouched, so no curation. No `Closes:`. Backlog probes:
+exit 0, 43 reductions across 20 live entries, 4 unprobeable; no moved-path row names a path this plan
+touched. Translation advisory: three stale rows (`docs/how-it-works.ru.md`, `docs/running.ru.md`,
+`packaging/foobar/READ-ME-FIRST.ru.md`), none caused by this plan, whose edit is in a document with no
+translation.
+
+#### Findings
+
+- **nit** — `docs/plans/0221-the-arch-block-names-the-studios-settings-file.md:65` — the plan states
+  that `docs/developing.md` is in `scripts/check-reader-prose.mjs`'s list, but that script's list
+  holds 16 reader documents and names `docs/developing.md` only as part of the Contribute group it
+  leaves out (`scripts/check-reader-prose.mjs:38`). Harmless, since the paragraph cites nothing, but
+  the record is wrong. Repair: correct the sentence in the plan. **Fixed in `19a2f9d6`.**
+
+### Earlier rounds
+
+None: round 1 closed the plan.

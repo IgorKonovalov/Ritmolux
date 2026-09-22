@@ -56,7 +56,6 @@ place. The plan file carries the real link.
 | [0217](0217-every-setting-has-a-file-and-a-gate-says-so.md) | Every setting has a file, and a gate says so | approved | dev, studio-builder | ADR-0240: a file defines every setting and the menu edits it. Repairs the one violation - the F3 overlay persists nowhere - then a Rust test and a Node gate hold all three. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | **BLOCKED on 0219** (re-pointed 2026-09-22; the box exists). ADR-0241 + 0242: Linux leads, goldens re-bless on lavapipe. Phase 3 can stop the plan. |
 | [0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) | The Arch box builds, tests and runs every lane | in-progress | human, dev, studio-builder | ADR-0243 (proposed). Phases 1-4 landed 2026-09-22; Phase 5 waits on one conductor run of 0221, then Phase 6. |
-| [0221](0221-the-arch-block-names-the-studios-settings-file.md) | The Arch block names the studio's settings file | approved | dev | A fixture for 0219 Phase 5's conductor run: one docs-only `dev` phase, no version bump. The only plan in `queue.json`. Do not run it by hand. |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 <!-- roster:end -->
 
@@ -288,7 +287,7 @@ close. The queue dropped the rest on purpose. [0120] is done. [0202] is mid-flig
 so that `run` picks up the fixture alone. 0206's `after: ["0207"]` stays in `plans`, where an
 unlisted plan's entry is inert. Re-queue 0207 and 0206 once 0219 Phase 5 closes.
 
-[0221]: 0221-the-arch-block-names-the-studios-settings-file.md
+[0221]: done/0221-the-arch-block-names-the-studios-settings-file.md
 [0207]: 0207-the-commitments-get-their-instruments.md
 [0206]: 0206-the-browser-shows-the-look.md
 
@@ -974,6 +973,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0221 - The Arch block names the studio's settings file](done/0221-the-arch-block-names-the-studios-settings-file.md) - closed 2026-09-22. Review: **no blockers, no majors, one nit (fixed).** Version: none (docs-only). Closes nothing. [Write-up](README-archive.md).
 - [0120 - The standalone ships on Ubuntu](done/0120-the-standalone-ships-on-ubuntu.md) - closed 2026-09-22. Review: **round 1 one blocker, round 2 five minors + one nit (four fixed).** Version: **0.143.0**. ADR-0131 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0210 - The gallery card shows the world it names](done/0210-the-gallery-card-shows-the-world-it-names.md) - closed 2026-09-22. Review: **no blockers, no majors, four minors (two fixed).** Version: **0.142.0**. ADR-0235 accepted. Closed 0254, 0255. [Write-up](README-archive.md).
 - [0213 - The hook costs what the push is worth](done/0213-the-hook-costs-what-the-push-is-worth.md) - closed 2026-09-22. Review: **no blockers, no majors, three minors + one nit (two fixed).** Version: **0.141.0**. ADR-0237 accepted. Closes nothing. [Write-up](README-archive.md).
