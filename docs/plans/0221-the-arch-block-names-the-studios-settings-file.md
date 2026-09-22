@@ -1,6 +1,6 @@
 # 0221 — The Arch block names the studio's settings file
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-22
 > **Owner skill(s):** dev
 > **Related ADRs:** [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
@@ -96,3 +96,9 @@ there would be a phase with nothing to review.
 - Move the version.
 
 ## Implementation log
+
+**Lane:** `/home/igor/Work/rlx-plan-0221` on `plan-0221-the-arch-block-names-the-studios-settings-file`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The Arch block names the studio's settings file | dev | done | committed with this row |

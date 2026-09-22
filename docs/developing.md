@@ -76,6 +76,13 @@ unzip -q ~/.cache/electron/*/electron-v*-linux-x64.zip -d studio/node_modules/el
 printf electron > studio/node_modules/electron/path.txt
 ```
 
+**The studio run from source reads `"playerPath"` from `~/.config/ritmolux-studio/settings.json`.**
+That is `settings.json` in Electron's per-user directory, which on Linux is
+`$XDG_CONFIG_HOME/ritmolux-studio/`, falling back to `~/.config/` when `XDG_CONFIG_HOME` is unset.
+Set `"playerPath"` there to point the studio at your own `target/release/ritmolux`. The directory is
+named after the `"name"` in `studio/package.json`, so it is lowercase, unlike the player's own
+`~/.local/share/Ritmolux/`.
+
 **No linker override on Linux.** The toolchain's default `rust-lld` relinks the 52 MB `suite` test
 binary in about 200 ms. `mold` 2.42 saves about 15 ms of that, and makes no measurable difference to
 a cold rebuild of `rlx-core`'s tests, so no machine-local config file is suggested.
