@@ -717,6 +717,18 @@ an accumulating family can have before the rest. The arithmetic is in
 [`scripts/docs-shots.mjs`](../scripts/docs-shots.mjs)'s header, which is also
 where a per-image deviation from 300 has to say why.
 
+It shares everything with the strip except the write: the same hop numbering, the
+same `capture_audio` call, and the same level table on stdout. A hop past the end
+of the clip is an error, as `--at`'s is. Passing both `--frame-at` and `--at` is
+an error — they answer the same question two ways — and `--frame-at` without
+`--signal`/`--audio` is an error naming what is missing, since there is no clip to
+advance through.
+
+Two captures of the same `(preset, signal, hop, size, tier)` on **one machine and
+binary** are byte-identical. That is a same-adapter claim only: the golden suite
+treats a `0.02` mean channel difference as ordinary rasterizer drift, so
+cross-machine byte equality does not hold and nothing here asserts it.
+
 #### A late hop photographs a world that is still assembling
 
 The paragraph above buys the loudest hop a four-second clip has. What it cannot
@@ -760,18 +772,6 @@ box (hardware adapter, release build, 640x360, Rich) a hop-2754 card takes
 well under a second at hop 300 — a different machine or profile is a different
 measurement
 ([ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
-
-It shares everything with the strip except the write: the same hop numbering, the
-same `capture_audio` call, and the same level table on stdout. A hop past the end
-of the clip is an error, as `--at`'s is. Passing both `--frame-at` and `--at` is
-an error — they answer the same question two ways — and `--frame-at` without
-`--signal`/`--audio` is an error naming what is missing, since there is no clip to
-advance through.
-
-Two captures of the same `(preset, signal, hop, size, tier)` on **one machine and
-binary** are byte-identical. That is a same-adapter claim only: the golden suite
-treats a `0.02` mean channel difference as ordinary rasterizer drift, so
-cross-machine byte equality does not hold and nothing here asserts it.
 
 ### What the report's columns mean
 
