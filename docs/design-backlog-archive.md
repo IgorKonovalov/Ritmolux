@@ -333,8 +333,6 @@ live entry citing this one.
 | 0236 | The `.claude/` park reads a phase's declared `Files touched`, and prose escapes it | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
 | 0237 | The allowlist bounds a deletion by literal path shapes, so an expansion escapes the lane | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
 | 0241 | The allowlist is asserted against a model of the CLI's matcher, which one run falsified | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
-| 0254 | Every gallery card is captured at hop 300, before an accumulating world exists | [Plan 0210](plans/0210-the-gallery-card-shows-the-world-it-names.md). **Promoted** |
-| 0255 | `docs-shots.mjs` renders all or nothing, so adding one card is done by hand | [Plan 0210](plans/0210-the-gallery-card-shows-the-world-it-names.md). **Promoted** |
 | 0258 | The content lane's scene catalogue covers ten of fourteen systems | [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md). **Promoted** |
 <!-- roster:end -->
 
@@ -632,6 +630,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0101 | The mark roster cannot morph between silhouettes, and two other rosters already do | [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) Phase 1 + ADR-0226. The travel needed a second declaration changed as well as the shader. **Closed 2026-09-20** |
 | 0100 | "Hand-drawn" is edge wobble, not spike-length variation, and the star arm has no lever | [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) Phase 2. Wobble, seed and frequency; the accuracy cost is a quarter of the jitter's. **Closed 2026-09-20** |
 | 0095 | The backdrop ramp makes parallel stripes only, and a converging fan cannot be lit *and* darkened | [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) Phases 3-4 + ADR-0225. Judged by rendering; neither route buys the collage. **Closed 2026-09-20** |
+| 0255 | `docs-shots.mjs` renders all or nothing, so adding one card is done by hand | [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phase 1. A name filter, exact match, unknown name exits 1. **Closed 2026-09-22** |
+| 0254 | Every gallery card is captured at hop 300, before an accumulating world exists | [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phases 2-4 + ADR-0235. Six families at hop 2754/2828 over a 30 s clip. **Closed 2026-09-22** |
 <!-- roster:end -->
 
 ---
@@ -16049,9 +16049,22 @@ shows, and `every_shipped_preset_has_a_gallery_card` deliberately checks existen
 freshness. What it costs is the gallery's actual job. It rises as the accumulating share of the
 library grows, and it is cheapest to take alongside any other edit to the manifest.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0210](plans/0210-the-gallery-card-shows-the-world-it-names.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-22 by [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phases 2-4 — both halves of the shape this entry guessed, taken together
+
+The hop now resolves per family in `scripts/docs-shots.mjs`: attractor, cellular, emitter,
+reaction-diffusion and warp at hop 2754, swarm at 2828, every other family still at 300, and
+`CARD_HOP_OVERRIDES` still winning over its family. Neither late hop exists in `shot`'s four-second
+clip, so `shot` gained `--signal-secs` with the old constant as its default; the phrase repeats, so
+2754 is the loudest-beat position of hop 300 six phrases on. 45 cards were re-rendered, one family per
+run and commit, and a `preset-author` session on the owner's behalf judged every family *the card is
+now the look* against renders at 4390 and beyond. `warp_tracery` now shows the rosette. What this
+did not reach: the family grain keys on the name prefix, so a preset with its own `[feedback]` table
+in another system (`fragment_whorl`, `curve_ionwake`) still resolves to 300 unexamined, and
+`attractor_thomasgallery`'s card lands on the dissolved part of a cycle no family hop can fix.
 
 ---
 
@@ -16095,9 +16108,19 @@ settings then stay in the one place they are already written down, which is the 
 landed, by whoever lands it, and the failure it invites — a card captured at settings the manifest
 does not name — is invisible to every gate that runs.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0210](plans/0210-the-gallery-card-shows-the-world-it-names.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-22 by [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phase 1 — built as this entry guessed, with exact matching rather than a substring
+
+`node scripts/docs-shots.mjs <name> ...` renders only the manifest entries whose `out` or
+`presetFile`, or either one's stem, equals a name; a bare run still renders everything, and a name
+matching nothing exits 1 before the first render and lists the names the manifest knows. The match
+is exact because `attractor_clifford` is a prefix of `attractor_cliffordgallery`. One trap the
+plan's own Phase 3 hit: a preset that is also behind a one-per-system image re-renders both under
+its bare stem, so seven cards were named by their full `out` path. The settings still live only in
+the manifest, which was the point.
 
 ---
 

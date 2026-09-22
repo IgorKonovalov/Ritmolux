@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0210 - The gallery card shows the world it names](#0210---the-gallery-card-shows-the-world-it-names)
   - [0213 - The hook costs what the push is worth](#0213---the-hook-costs-what-the-push-is-worth)
   - [0203 - The figure gains the levers it was measured to lack](#0203---the-figure-gains-the-levers-it-was-measured-to-lack)
   - [0199 - The gate's cost is measured before it is cut](#0199---the-gates-cost-is-measured-before-it-is-cut)
@@ -243,6 +244,31 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0210 - The gallery card shows the world it names](done/0210-the-gallery-card-shows-the-world-it-names.md)
+
+- closed 2026-09-22, conductor-run lane `plan-0210-the-gallery-card-shows-the-world-it-names` in
+`WORK/rlx-plan-0210`. Phase 1 `655fa6a3`, Phase 2 `36e254ef` after the park-and-amend pair
+`4b33f25c`/`81c78c0f`, Phase 3 as six per-family image commits `13838683` to `cb59cc92`, Phase 4 and
+the close block `314cd962`; the close's prose repairs `d7ae798b` and `1e407782`. One review round:
+**no blockers, no majors, four minors**, two repaired. Version **0.142.0** (minor: `shot` gained a
+flag). ADR-0235 accepted. Closed backlog 0254 and 0255.
+- **What landed.** `scripts/docs-shots.mjs` takes names and renders only the manifest entries they
+match exactly, exiting 1 on a name it does not know. A card's hop resolves per family: attractor,
+cellular, emitter, reaction-diffusion and warp at 2754, swarm at 2828, the rest at 300, with the
+per-preset roster still winning. `shot` gained `--signal-secs`, default the old four seconds, because
+neither late hop exists in a four-second clip. 45 cards were re-rendered, one family per run and
+commit, and every family was judged *the card is now the look* by a `preset-author` session on the
+owner's behalf.
+- **What the review checked that the log could not.** That every synthesized kind is a prefix of its
+longer self, so a longer clip cannot move an earlier hop: `dynamic_groove` soft-clips per sample
+rather than normalizing over the clip, and the other kinds draw from a seeded stream or evaluate at
+`t`. And that `capture_audio` is causal over the clip, so a hop-300 card is the same whatever the
+clip's length.
+- **What outlived the plan.** The family grain keys on the name prefix, so a preset carrying its own
+`[feedback]` table in another system (`fragment_whorl`, `curve_ionwake`) still resolves to 300 and
+nobody has looked at its card. `attractor_thomasgallery`'s card lands on the dissolved part of a
+cycle; the plan's Followups name a per-preset override at 2345 as the repair.
 
 ### [0213 - The hook costs what the push is worth](done/0213-the-hook-costs-what-the-push-is-worth.md)
 

@@ -256,7 +256,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0232](0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md) | A preset's frame cost is measured and reported, never asserted | proposed |
 | [0233](0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md) | A session-allowlist safety claim is asserted against a transcript, not a model | proposed |
 | [0234](0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md) | An instrument's system roster is derived from the enum the engine reads | proposed |
-| [0235](0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md) | A gallery card's hop is chosen per family, and the signal outlasts it | proposed |
+| [0235](0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md) | A gallery card's hop is chosen per family, and the signal outlasts it | accepted 2026-09-22 (Plan 0210) |
 | [0236](0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md) | A diffused render varies by prompt on bar boundaries, and the seed stays fixed | proposed |
 | [0237](0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md) | The hook runs cargo only when the push moved Rust, and serves the rest from the ledger | accepted 2026-09-22 (Plan 0213), supersedes 0033 in part |
 | [0238](0238-a-scene-declares-a-capability-and-the-engine-stops-enumerating-kinds.md) | A scene declares a capability, and the engine stops enumerating kinds | proposed |

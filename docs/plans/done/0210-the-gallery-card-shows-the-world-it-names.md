@@ -1,12 +1,15 @@
 # 0210 — The gallery card shows the world it names
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-22. Phases `655fa6a3`, `36e254ef`, six family image commits
+> `13838683`..`cb59cc92`, Phase 4 `314cd962`. Conductor close review round 1: no blockers, no
+> majors, four minors (two repaired). Full suite green on the reviewed tree (ledger record,
+> 1767 passed). Version 0.142.0.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user) — approved and deliberately NOT in `tools/conductor/queue.json`
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0235](../adrs/0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md)
-> (proposed), [0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md),
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+> **Related ADRs:** [0235](../../adrs/0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md)
+> (accepted 2026-09-22), [0099](../../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md),
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > **Closes:** design-backlog 0254, 0255
 
 ## TL;DR
@@ -32,7 +35,7 @@ minutes. `warp_tracery`'s committed card, rendered 2026-09-18 at hop 300, shows 
 around each of seven lobes; the same file at 30 s shows them merged into the rosette. Both pictures are
 true and only one is the look. It is not one family: trails, a `[feedback]` table,
 reaction-diffusion and the particle worlds all accumulate, and
-[ADR-0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) already names
+[ADR-0099](../../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) already names
 that set for a different purpose.
 
 **Raising the constant for everyone is the wrong repair, and the script says why.** Hop 300 is argued
@@ -54,7 +57,7 @@ That last point is why it comes first here: the fix for 0254 is a re-render of a
 
 ## Decision
 
-Per [ADR-0235](../adrs/0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md),
+Per [ADR-0235](../../adrs/0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md),
 **a card's hop is a per-family default and the synthesized signal is long enough that a late hop is
 still a loud one.** Both halves are required: a later hop on today's signal captures a lull, and a longer
 signal with one global hop captures the non-accumulating presets later for no benefit. The per-preset
@@ -152,7 +155,7 @@ flowchart TB
   overwrite a deliberate choice with a generic one.
 - **Done when:** each family's cards are re-rendered in one run on one machine and one commit per family,
   with the machine and adapter named in the commit body
-  ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)) — because
+  ([ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)) — because
   the renders are not byte-reproducible and a mixed-machine set is a diff nobody can read. No card whose
   hop did not move is rewritten, which Phase 1 is what makes possible.
 
@@ -196,7 +199,7 @@ flowchart TB
 - **Nothing will notice this decaying again.** `every_shipped_preset_has_a_gallery_card` stays an
   existence check, so a family added later with no hop entry inherits the default silently. ADR-0235's
   Negative says so and this plan does not fix it;
-  [Plan 0209](0209-a-system-joins-the-instruments-by-existing.md)'s derived-roster shape is what would.
+  [Plan 0209](../0209-a-system-joins-the-instruments-by-existing.md)'s derived-roster shape is what would.
 
 ## What this plan does NOT do
 
@@ -338,6 +341,87 @@ fan to the right, which the roster already records as content work.
   Phase 3 changed only committed PNGs.
 - **Outstanding `human` phases:** none. Phase 4 was taken 2026-09-22 in the `preset-author` lane
   on the owner's behalf; its verdicts are in the Notes above.
+
+## Close review
+
+> Conductor close review, round 1 (2026-09-22), in a fresh session (ADR-0205). No earlier round.
+
+**Verdict: Plan 0210 landed as amended; no blockers, no majors, four minors (two repaired at the close).**
+
+Reviewed in the lane over `main..314cd962`. The phase commits are `655fa6a3` (Phase 1),
+`4b33f25c` + `81c78c0f` (the park and the amendment), `36e254ef` (Phase 2), `13838683`, `4ae649b2`,
+`9e47296f`, `4d4365d6`, `2102267c` and `cb59cc92` (Phase 3, one per family), and `19848867` +
+`314cd962` (the close block and Phase 4).
+
+### Evidence
+
+- **Full suite.** The wrapped `cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 25fd0e5 is green in the suite ledger, run by
+  gate 0210-pre-review at 2026-09-22T08:06:58.992Z: 1767 tests run: 1767 passed (30 slow), 7 skipped`.
+  `git rev-parse HEAD^{tree}` on the reviewed tip is `25fd0e5f…`, so the record covers this tree.
+- **Backlog probes.** `node scripts/check-backlog-claims.mjs` exits 0: 43 reductions across 20 live
+  entries, 4 unprobeable. It prints 30 moved-path advisory rows, none of them on this plan's paths.
+- **Translations.** `node scripts/check-translations.mjs` exits 0. The advisory names two
+  translations whose English source has moved since their stamp: `docs/running.ru.md` and
+  `packaging/foobar/READ-ME-FIRST.ru.md`. This plan moved neither source.
+- `fmt`, `clippy`, `cargo doc -D warnings` and the full suite run again on the close tip, after the
+  merge with `main`.
+
+### Lens 1 — alignment
+
+- **Phase 1.** Names are matched **exactly** against `out`, `presetFile` and both of their stems,
+  with backslashes folded. An unknown name exits 1 before the first render and lists the names the
+  manifest knows. No argument renders the whole manifest. The code meets all three done-whens.
+  Exact matching is the right call: `attractor_clifford` is a prefix of
+  `attractor_cliffordgallery`, so a substring match would render both.
+- **Phase 2 (as amended).** `CARD_FAMILY_HOPS` sends attractor, cellular, emitter, reaction and warp
+  to hop 2754, swarm to 2828, and every other family to 300. `CARD_HOP_OVERRIDES` still wins over
+  the family. The header says which beat each hop lands on, and the arithmetic holds: a phrase is
+  8 x 26,182 = 209,456 samples, 153,600 + 6 x 209,456 = 1,410,336, and 1,410,336 / 512 = 2754.56.
+  `parse_signal_secs` rejects zero, negative, NaN and inf, and `synth_signal` is now
+  `synth_signal_secs(spec, SIGNAL_SECS)`. I read the three tests. Their assertions match the
+  done-whens, including `"only 2812 analysis hops"` for the refusal at the new length. The
+  byte-identity done-when was shown by rendering, as the plan asked. **I checked the claim that a
+  longer clip appends rather than re-times against the generators themselves.** `dynamic_groove`
+  soft-clips each sample with no clip-wide normalization, and the other kinds draw from a seeded
+  stream or evaluate at `t`, so every shorter clip is a prefix of the longer one. Capture walks the
+  clip hop by hop, so an early hop cannot depend on the clip's length. The Notes explain why
+  `standalone/examples/shot.rs` was edited and `docs/configuration.md` was not, and both reasons
+  are correct.
+- **Phase 3.** 45 cards changed (20 + 5 + 5 + 7 + 1 + 7), all under
+  `docs/images/gallery/presets/`, with one commit per family. The diff contains no one-per-system
+  image and no card whose hop did not move.
+- **Phase 4 (`human`).** A `preset-author` session took it on the owner's behalf, which the phase
+  allows. Every family has a recorded verdict, and `warp_tracery` is judged by name.
+- Every phase carries exactly one in-vocabulary `**Owner skill:**` tag.
+
+### Lenses 2-5
+
+The plan changed nothing in `core/`. The new flag belongs to `shot`, a development example, and
+touches no audio callback, no C ABI surface and no control-protocol message. The synthesis is still
+a pure function of its arguments. 375 and 2812 are exact integer arithmetic, not measurements.
+`docs/capturing.md` names the machine its timing figures came from (ADR-0071). The family grain is
+ADR-0235's decision, implemented as written, with one gap (finding 3).
+
+### Findings
+
+#### minor
+
+1. **`docs/capturing.md:720` — the late-hop subsection was inserted inside
+   `### A full-size frame under real audio`.** That left the section's two closing paragraphs about
+   `--frame-at` under the wrong heading. **Repaired at the close:** the paragraphs now sit above the
+   subsection again.
+2. **This plan, Phase 4's note — it says `attractor_thomasgallery`'s card is "left as a followup",
+   but the `## Followups` section did not name it.** **Repaired at the close:** a Followups bullet
+   now carries it.
+3. **`scripts/docs-shots.mjs:224` — the family is read from the preset-name prefix.** A preset that
+   carries its own `[feedback]` table inside a system not in the list still resolves to hop 300, and
+   `fragment_whorl` and `curve_ionwake` both do. ADR-0235 names "its feedback configuration" as
+   part of what accumulates, and nobody has compared these two cards against a late render. Left
+   open for the content lane.
+4. **This plan — the `## Implementation log` (about 120 lines) is longer than
+   `## Implementation phases` (about 85).** Left open: trimming another lane's record is not a
+   close repair.
 
 ## Followups (after this lands)
 

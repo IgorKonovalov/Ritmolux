@@ -1,8 +1,8 @@
 # ADR-0235 — A gallery card's hop is chosen per family, and the signal outlasts it
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-22 (Plan 0210)
 > **Date:** 2026-09-19
-> **Related plan(s):** [0210](../plans/0210-the-gallery-card-shows-the-world-it-names.md)
+> **Related plan(s):** [0210](../plans/done/0210-the-gallery-card-shows-the-world-it-names.md)
 
 ## Context
 
