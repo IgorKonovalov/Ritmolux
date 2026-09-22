@@ -173,7 +173,7 @@ architect skill and is not a phase here.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The `fixed_in` check follows the file across a rename | dev | done | `a90b3d3c` |
-| 2 — The prompts spell what the allowlist allows | dev | committed with this row | |
+| 2 — The prompts spell what the allowlist allows | dev | done | `aeaf6b3e` |
 
 ### Notes
 
@@ -183,3 +183,13 @@ architect skill and is not a phase here.
 - Phase 2: `state/transcripts/0221-*.jsonl` lies outside the lane and was not read; the refused
   cases take the commands as the plan's Context table records them, with the 0221 pipe written as
   `awk '/^## Disk/,/^## /' docs/developing.md | grep -c config.toml`.
+
+### Close triggers
+
+- **`presets/` touched:** no
+- **Plan header `Closes:`** none (the header carries no `Closes:` line)
+- **What shipped:** fix-only (conductor tooling and its session prompts; nothing shipped in a release artifact)
+- **Operator docs touched:** `tools/conductor/README.md` (the **The checks** paragraph)
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0; 43 reductions hold across 20 live entries, 4 unprobeable
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207); `node --test tools/conductor/test/` ran green at Phase 2 (384 tests, 382 pass, 2 skipped)
+- **Outstanding `human` phases:** none
