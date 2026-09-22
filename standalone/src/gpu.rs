@@ -29,8 +29,11 @@ pub enum AdapterSource {
 }
 
 /// How the `renderer adapter:` line names the unflagged, unstored request —
-/// the one word both the plain default and a fall-back onto it print.
-const DEFAULT_WORD: &str = "default";
+/// the words both the plain default and a fall-back onto it print. Named as a
+/// preference rather than a pin, because that is what it is: wgpu chose the
+/// adapter under a preference, and an operator reading the line should not
+/// take it for something they or a file asked for.
+const DEFAULT_WORD: &str = "default: high performance";
 
 impl AdapterSource {
     /// The suffix the `renderer adapter:` line carries, naming the carrier.
@@ -120,20 +123,23 @@ pub fn renderer_choice(wanted: Option<&str>) -> AdapterChoice {
 
 /// Which adapter the **window** should ask for.
 ///
-/// An explicit choice is spelled exactly as [`renderer_choice`] spells it, and
-/// `None` is deliberately different: the window asks for
-/// [`AdapterChoice::Default`], which is what it asked for before `--gpu` could
-/// reach it. The flag is an operator's lever, and moving what an *unflagged*
-/// window selects would re-base every windowed frame-time figure this project
-/// has published, inside a change that only added a flag (ADR-0155).
+/// Spelled exactly as [`renderer_choice`] spells it, `None` included: the
+/// unflagged window prefers the high-performance adapter, as the stream always
+/// has (ADR-0246). On a hybrid machine wgpu's plain default is the
+/// power-saving part, and a show that comes up at a sixth of the hardware's
+/// frame rate unless the operator knows a flag exists is the failure this
+/// arm ends.
 ///
-/// **The two `None` arms must not converge** —
-/// `the_window_and_the_stream_disagree_when_unflagged` is what holds them apart.
+/// **This is the standalone's preference and not the engine's.**
+/// `RendererOptions::default()` still carries [`AdapterChoice::Default`], so
+/// the foobar shim's window, which builds its renderer through the C ABI with
+/// no flag surface, asks for exactly what it always asked for.
+///
+/// **The two `None` arms must agree** —
+/// `the_window_and_the_stream_agree_when_unflagged` is what holds them
+/// together, so one path cannot quietly move off the other.
 pub fn window_choice(wanted: Option<&str>) -> AdapterChoice {
-    match wanted {
-        None => AdapterChoice::Default,
-        Some(raw) => named_or_index(raw),
-    }
+    renderer_choice(wanted)
 }
 
 /// A bare integer is a roster position; anything else is a name to match.
@@ -286,17 +292,34 @@ mod tests {
         );
     }
 
-    /// **The window's unflagged default is not the stream's.** A live source
-    /// wants the fast GPU; the window keeps asking for exactly what it asked
-    /// for before `--gpu` reached it, because every published windowed
-    /// frame-time figure was measured against that request. Reusing
-    /// `renderer_choice` for the window would move all of them silently
-    /// (ADR-0155).
+    /// **The window's unflagged default is the stream's: high performance.**
+    /// Both are live paths, and a live path on the power-saving GPU of a
+    /// hybrid machine runs at a sixth of what the hardware allows (ADR-0246).
+    /// The relation is pinned as agreement, so neither arm can quietly move
+    /// off the other; the value itself is pinned too, so "agree" cannot be
+    /// satisfied by both drifting to the plain default.
     #[test]
-    fn the_window_and_the_stream_disagree_when_unflagged() {
-        assert_eq!(window_choice(None), AdapterChoice::Default);
+    fn the_window_and_the_stream_agree_when_unflagged() {
+        assert_eq!(window_choice(None), AdapterChoice::HighPerformance);
         assert_eq!(renderer_choice(None), AdapterChoice::HighPerformance);
-        assert_ne!(window_choice(None), renderer_choice(None));
+        assert_eq!(window_choice(None), renderer_choice(None));
+    }
+
+    /// **The flip is the standalone's, and the engine's default does not
+    /// move.** `Renderer::new_from_surface_target` — the C ABI path the
+    /// foobar shim builds its renderer through — takes
+    /// `RendererOptions::default()`, so this is what keeps the plugin's
+    /// window asking for exactly the adapter it asked for before (ADR-0246,
+    /// ADR-0155).
+    #[test]
+    fn the_engine_default_the_foobar_shim_builds_on_is_unchanged() {
+        use rlx_core::render::RendererOptions;
+        assert_eq!(RendererOptions::default().adapter, AdapterChoice::Default);
+        assert_ne!(
+            RendererOptions::default().adapter,
+            window_choice(None),
+            "the standalone's preference leaked into the engine's default"
+        );
     }
 
     /// **`--gpu` wins over `[output] gpu`, which wins over the default** — the

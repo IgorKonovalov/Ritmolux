@@ -112,6 +112,16 @@ the decision that moved it is linked.
   ([ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md): a frame-time figure names the machine that produced it), so the floor commitment is met
   on the part that is *not* being measured whenever a published figure carries no adapter.
 
+  **Provenance, 2026-09-22.** Every unflagged windowed row in this section — the three-minute table
+  and the `unflagged` column of the pair above — was measured under the previous default, which
+  asked the graphics layer for its plain choice and on a hybrid machine received the integrated
+  part. An unflagged window now prefers the high-performance adapter
+  ([ADR-0246](adrs/0246-the-adapter-is-a-setting-and-the-window-prefers-high-performance.md)), so a
+  fresh unflagged run no longer reproduces the integrated-part rows; the numbers are not edited,
+  because each names its adapter and stays readable as history. What is void is the sentence
+  before this note: an unflagged run is no longer what lands on the integrated part, and reading
+  any figure here as "what you get by default" needs the adapter column, not the flag column.
+
   The instrument for the third response exists anyway: `--soak` writes **`frame_ms_p99_steady`**
   beside the raw `frame_ms_p99`, the same statistic with the frames following a switch or
   reconfigure left out, alongside a monotone `switches` counter ([Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phase 3,
