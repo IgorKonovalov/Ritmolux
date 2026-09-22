@@ -343,3 +343,7 @@ fan to the right, which the roster already records as content work.
 
 - The site's gallery page reads these PNGs. If a re-render changes a card's aspect or framing enough to
   disturb that layout, it is a `site/` question rather than a renderer one.
+- `attractor_thomasgallery`'s card lands on the dissolved part of a cycle the world never settles
+  out of (Phase 4's note). A `CARD_HOP_OVERRIDES` entry at hop 2345 reaches the clean knot inside the
+  same 30 s clip; it is a per-preset choice, so it is the owner's or the content lane's to take, not
+  a family default's.
