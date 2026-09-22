@@ -378,7 +378,7 @@ conductor.** The conductor is not verified on Linux until Phase 5, and 0120 is c
 | 2 — The lane contracts stop assuming Windows | dev | done | `ae5b3724` |
 | 3 — The gate is green on this box | dev | done; hardware-adapter bullet not met, see Notes | `eb2c67c3` |
 | 4 — The studio drives a Linux player | studio-builder | done | `b8e9148e` |
-| 5 — The conductor's claims are checked on Linux | dev | in progress: probes, rule parity, tests and `VERIFIED_CLI` landed; the real run waits on a fixture plan | committed with this row |
+| 5 — The conductor's claims are checked on Linux | dev | done: probes, parity, tests, `VERIFIED_CLI` in `a42f7c38`; the real run with this row | committed with this row |
 | 6 — The diffusion sidecar runs on CUDA | dev | not started | |
 | 7 — A working day on the box | human | not started | |
 
@@ -530,6 +530,26 @@ is unchanged.
 of three. The two skips are the `.cmd`-shim cases in `gate.test.mjs` and `with-lock.test.mjs`. They
 now skip with the reason `a .cmd shim and its PATHEXT lookup exist only on Windows`.
 
+**Real run.** `node tools/conductor/conductor.mjs run --lane a --once` on Plan 0221, the docs-only
+fixture `architect` wrote for this (`f3af5df0`), with the queue holding only that plan.
+`conductor: 0221 opened its lane at /home/igor/Work/rlx-plan-0221`, and `git worktree list` shows
+`/home/igor/Work/rlx-plan-0221  7b1a4811 [plan-0221-the-arch-block-names-the-studios-settings-file]`.
+The steps:
+
+- `implement-01`: phases_done in 1 min, $1.01, 28 turns. Commits `fc8f45d` and `d9a9f6e`.
+- `gate pre-review`: green in 8m46s. Checks ok (17, 15 s). The studio's three steps skipped, since
+  the lane has no `studio/node_modules`. `cargo nextest` ran 7m46s: 1774 passed, 0 failed, 7
+  skipped.
+- `review-02`: closed in 9 min, $2.68, 55 turns. Commits `19a2f9d` and `7b1a481`. Its first suite
+  run was served from the ledger. After the close commit it ran the suite again: 6m41s, ok.
+
+The outcome was **`0221 parked (disagreement)`**: `close: finding 0 is fixed_in 19a2f9d6, which does
+not change docs/plans/done/0221-the-arch-block-names-the-studios-settings-file.md` (see Notes).
+`run ended - 0 merged, 1 parked. Nothing was pushed.` The state directory is
+`tools/conductor/state/`: `conductor.json`, `inbox.md`, `live.log`, `transcripts/0221-01-implement.jsonl`
+and `transcripts/0221-02-review.jsonl`. The lane still holds the worktree, pending the owner's
+`resume` or `adopt-close`.
+
 ### Notes
 
 - **Phase 2, heredoc probe.** A throwaway repository in the session scratchpad took a commit through
@@ -602,14 +622,19 @@ now skip with the reason `a .cmd shim and its PATHEXT lookup exist only on Windo
   `conductor-no-background.js`'s cases in `hooks.test.mjs` are green here, and the probe shows the
   project `PreToolUse:Bash` hooks running in a Linux headless session. No `run_in_background` call
   was made from a headless session. `VERIFIED_CLI` gained 2.1.278 on the probe rows alone.
-- **Phase 5, resume note (scaffolding; remove when Phase 5 lands).** One done-when is still open:
-  the real conductor run. The owner chose a docs-only fixture plan written by `architect`, not a
-  queued plan. Before resuming, the fixture must be `approved` and listed in
-  `tools/conductor/queue.json`. The queue also still lists 0120, which is done, and 0202, which is
-  mid-flight on `origin/plan-0202-…`. To resume: `node tools/conductor/conductor.mjs check`, then
-  the run. Record the state directory and `git worktree list` showing `~/Work/rlx-plan-NNNN`, flip
-  the row to done, and move on to Phase 6, where the owner has approved the torch and weight
-  downloads.
+- **Phase 5, the real run parked on a conductor defect.** The review of Plan 0221 repaired finding 0
+  in `19a2f9d6`, which edited the plan file at `docs/plans/0221-…md`. The close then moved the plan
+  to `docs/plans/done/`, and its outcome named the finding's `file` by the `done/` path.
+  `repairProblems` in `tools/conductor/lib/close.mjs:123` requires the `fixed_in` commit's changed
+  paths to include `file` as written. It does not follow the rename, so a repaired finding in the
+  plan's own file reports as `disagreement`. Nothing about this is Linux-specific. It is reported
+  here and not repaired. The rule is ADR-0209's, so the repair belongs to `architect`.
+- **Phase 5, four Bash denials in the run's sessions.** In the implement session, the allowlist
+  denied `awk …`, `git -C <lane> add …` and `git -C <lane> commit …`, and the session then committed
+  with plain `git`. In the review session, it denied `env RUSTDOCFLAGS="-D warnings" cargo doc …`.
+  The allowlist carries `RUSTDOCFLAGS=* cargo doc *` but not the `env` spelling, so the session
+  passed the flags through `--config`. The first attempt exited 101, and the quoted form then ran.
+  No rule was changed.
 
 ### Close triggers
 
