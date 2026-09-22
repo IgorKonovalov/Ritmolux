@@ -371,8 +371,19 @@ run_step "cargo doc --workspace --no-deps (RUSTDOCFLAGS=-D warnings)" env "RUSTD
 # copy that goes stale when the profile changes, which is exactly what happened
 # to the "9 binaries skipped" this comment used to quote. Since ADR-0157 the
 # skip is partly per TEST rather than per binary, so read nextest's own line.
-echo "pre-push: deferring most of the GPU-heavy suites via profile.fast, minus the preset sample (CI runs the rest)"
-run_step "cargo nextest run -P fast" cargo nextest run --workspace -P fast
+#
+# The step is served, not run, when the suite ledger holds a green `cargo nextest run --workspace`
+# for this exact tree (ADR-0237): the full suite is a superset of `-P fast`, and the ledger records a
+# run only on a tree that was clean when it started and when it ended. A dirty worktree, a tree with
+# only a `-P fast` record, or a red newest record runs the step. suite-record.mjs answers exit 0 only
+# for a record, so a missing node or a crash there runs the step too.
+if command -v node >/dev/null 2>&1 && suite_record=$(node tools/conductor/suite-record.mjs); then
+    echo "pre-push: serving cargo nextest run -P fast from the suite ledger: $suite_record"
+else
+    [ -n "${suite_record:-}" ] && echo "pre-push: no ledger record serves the tests: $suite_record"
+    echo "pre-push: deferring most of the GPU-heavy suites via profile.fast, minus the preset sample (CI runs the rest)"
+    run_step "cargo nextest run -P fast" cargo nextest run --workspace -P fast
+fi
 
 echo ""
 echo "pre-push: OK"
