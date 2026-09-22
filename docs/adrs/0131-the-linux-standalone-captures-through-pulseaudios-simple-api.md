@@ -66,6 +66,19 @@ which sets the glibc floor at Ubuntu 24.04. CI gains an `ubuntu-latest` arm on t
 running the same five steps as the other two, with the GPU suites skipping through
 [ADR-0016](0016-gpu-tests-opt-in-ci-scope.md)'s existing mechanism.
 
+> **Amended 2026-09-22 (Plan 0120's Mode 4 review), before acceptance.** Two parts of the paragraph
+> above did not survive, and Alternative H is **half taken**:
+> - **The arm installs lavapipe, so the GPU suites execute rather than skip.** Without the Vulkan
+>   feature and an ICD, a Linux build resolves no adapter, and nothing would have reported it
+>   (Plan 0120's 2026-09-20 amendment). An adapter that resolves is the only evidence that the Linux
+>   backend exists. What H lost on still stands: **the WARP baselines keep their meaning**. A test
+>   that compares against a WARP-blessed capture asserts only on WARP, and on any other software
+>   adapter it skips with a notice and prints what it read. A baseline is never blessed off WARP.
+>   Property tests, which hold on any correct rasterizer, run on lavapipe like anywhere else.
+> - **The release job runs on `ubuntu-24.04`, not `ubuntu-latest`.** The floor this paragraph
+>   names is the runner's glibc, and a moving label would move the floor without the release notes
+>   saying so.
+
 ## Consequences
 
 ### Positive

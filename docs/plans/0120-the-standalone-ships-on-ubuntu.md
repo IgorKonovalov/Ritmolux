@@ -438,6 +438,56 @@ out of exactly that shape and then demands an owner tag under each one, so a stu
 ownerless phase and refuses the entire queue — which is what it did on 2026-09-20 before this
 wording.
 
+### Phase 7 — A measurement asserts only on the machine it was taken on
+
+- **Owner skill:** dev
+
+**Added 2026-09-22 by the Mode 4 review, which found a blocker.** Phase 2's amended done-when installs
+lavapipe on the `ubuntu-latest` arm. That is ADR-0131's rejected Alternative H, taken without the ADR
+saying so (ADR-0131 now carries the amendment). As a result the arm runs WARP-blessed baselines against a
+rasterizer they were never blessed on, and the first push turns it red. The full suite on the Arch box
+reads the same four failures, and since Plan 0219 that box runs the suite every close. Each failure is
+a **measurement asserted outside its configuration** or a **statistic that is not a property**
+([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
+None of them is fixed by a wider tolerance. This phase edits `core/` **tests only**, and the "No change
+to `core/`" exclusion below is amended to say so.
+
+**Done when:**
+
+- **`raw_levels_are_bit_identical_to_the_pre_normalization_build`** (`core/tests/dsp.rs`) asserts its
+  frozen bits only on the target they were measured on, `x86_64-pc-windows-msvc`, and not on
+  `target_arch = "x86_64"`. Everywhere else it takes the existing skip branch, which prints what it
+  observed. Its doc comment names the configuration as the target, not the architecture. The 3 ULP gap on
+  x86_64 Linux is the fixture's `sin` resolved by glibc, not by the MSVC CRT. Architecture and OS
+  agreed on every configuration this test had run on, which is how the wrong key survived.
+- **Every WARP-blessed baseline comparison asserts only on WARP.** That means at least
+  `scenes_match_golden_baselines` (`core/tests/golden.rs`) and
+  `the_attractor_over_the_trails_stage_matches_its_baseline` (`core/tests/suite/attractor_trails.rs`).
+  Read every other test that compares against a committed capture and gate those the same way. On any
+  other software adapter (llvmpipe, lavapipe) the test skips with an ADR-0016-shaped notice naming the
+  adapter it found, and prints the statistics it would have asserted (mean and max outlier per fixture),
+  so the reading is kept rather than discarded. Put the "is this WARP" question in one helper in
+  `core/tests/common/mod.rs`, built from `adapter_is_software()` and `adapter_description()`. Add
+  no public engine API for it. **The bless path (`RLX_UPDATE_*`) refuses to write a baseline off WARP**,
+  because a baseline blessed on lavapipe is the "blessed garbage" failure ADR-0131 Alternative H names.
+- **`a_seeded_wobbled_star_is_the_same_figure_on_two_runs_and_two_adapters`**
+  (`core/src/render/scenes/marks/tests.rs`) stops asserting a ranking of near-equal sums. RADV and
+  llvmpipe differ by `frame_diff` 0.00096 and swap two spikes whose brightness sums are nearly tied.
+  A spike hash disagreeing across adapters would move a whole spike, and that is what the test exists
+  to catch. The assertion states a property that survives rasterizer drift and still fails on a
+  different figure: for example, an ordering taken only over gaps larger than a margin derived from the
+  mechanism, or a per-spike comparison. Show that it fails when it should. Swapping the seed on one
+  adapter must still go red.
+- **The release floor is pinned.** `release.yml`'s `linux` job runs on `ubuntu-24.04`, not
+  `ubuntu-latest`, and its comment says why: the notes promise "Ubuntu 24.04 or newer", and the runner
+  image is that promise. `ci.yml`'s arm may stay on `ubuntu-latest`.
+- `cargo nextest run --workspace` on the Arch box has **no failures**, and the log names each test that
+  skipped *because of this phase*. `-P fast` has no failures either, which is what the `ubuntu-latest`
+  arm runs. The Windows arm's behaviour is unchanged: on WARP every gated test still asserts.
+- `ci.yml`'s comment above the `-P fast` step stops claiming the filter "keeps them where WARP hosts
+  them". Rewrite it to say what happens now: the fast tier runs on lavapipe, and the WARP baselines inside
+  it skip there.
+
 ## Implementation log
 
 **Lane:** `main` directly, on the Arch box (Plan 0219's sequence).
@@ -450,6 +500,7 @@ wording.
 | 4 — The release tarball | dev | done | `ed74dad1` |
 | 5 — The docs say Linux | dev | done | `d3550166` |
 | 6 — Run it on the Ubuntu box | — | moved 2026-09-20 to Plan 0214 Phase 4 | |
+| 7 — A measurement asserts only on the machine it was taken on | dev | added 2026-09-22 by the review | |
 
 ### Notes
 
@@ -631,8 +682,9 @@ wording.
 - **No 22.04 or ARM64 Linux build.** One target: `x86_64-unknown-linux-gnu`.
 - **No Linux media-player plugin.** The foobar component is Windows-only and stays so; a DeaDBeeF or
   Audacious equivalent is a separate decision nobody has asked for.
-- **No change to `core/`.** Capture is a shell concern by ADR-0001. A diff touching `core/` in this
-  plan is a finding.
+- **No change to `core/`'s code.** Capture is a shell concern by ADR-0001. Two exceptions are stated
+  (amended 2026-09-22): Phase 2's wgpu `vulkan` arm in `core/Cargo.toml`, and Phase 7's test gates
+  under `core/tests/` and `core/src/**/tests.rs`. Any other diff touching `core/` is a finding.
 - **It does not witness any of its own work on Linux** (amended 2026-09-20). The `ubuntu-latest`
   arm running green, the wgpu adapter it resolves, the dry run's six artifacts and the tarball
   launching on the box are all [0214](0214-the-linux-arm-reports-back.md)'s, because each needs a
