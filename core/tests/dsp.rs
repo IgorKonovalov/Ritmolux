@@ -123,8 +123,11 @@ fn sine_energy_concentrates_in_expected_band() {
 /// input with `f32::sin`, which lowers to the platform libm, and `rustfft`
 /// dispatches NEON on aarch64 where it dispatches AVX/SSE here — two sets of
 /// rounding applied to two slightly different inputs. On `macos-26-arm64`
-/// `bass_raw` lands about 71 ULP away and always has. So the comparison names the
-/// architecture it came from and does not run outside it; elsewhere it prints
+/// `bass_raw` lands about 71 ULP away and always has. The architecture alone does
+/// not name the configuration either: on `x86_64-unknown-linux-gnu` the fixture's
+/// `f32::sin` resolves to glibc's libm rather than the MSVC CRT's, and `bass_raw`
+/// lands 3 ULP away. So the comparison names the **target** it came from,
+/// `x86_64-pc-windows-msvc`, and does not run outside it; elsewhere it prints
 /// every observed level with its relative error, in the ADR-0016 skip-with-notice
 /// shape, so the configuration it declines to gate is still visible in the log.
 ///
@@ -171,7 +174,7 @@ fn raw_levels_are_bit_identical_to_the_pre_normalization_build() {
     }
     let frame = at_200.expect("the fixture is long enough to reach hop 200");
 
-    // The reference reading, as `92579ef` produced it on x86_64.
+    // The reference reading, as `92579ef` produced it on x86_64-pc-windows-msvc.
     let reference = [
         ("bass_raw", frame.bass_raw, 0x3865_9855u32),
         ("mid_raw", frame.mid_raw, 0x3bd5_81b5),
@@ -179,7 +182,11 @@ fn raw_levels_are_bit_identical_to_the_pre_normalization_build() {
         ("onset_raw", frame.onset_raw, 0x3486_5371),
     ];
 
-    if cfg!(target_arch = "x86_64") {
+    if cfg!(all(
+        target_arch = "x86_64",
+        target_os = "windows",
+        target_env = "msvc"
+    )) {
         for (name, actual, expected) in reference {
             assert_eq!(
                 actual.to_bits(),
@@ -189,9 +196,11 @@ fn raw_levels_are_bit_identical_to_the_pre_normalization_build() {
         }
     } else {
         eprintln!(
-            "skipped: the frozen raw-level bits are a measurement taken on x86_64 \
-             against 92579ef and do not reproduce on {} (ADR-0071). Observed here:",
-            std::env::consts::ARCH
+            "skipped: the frozen raw-level bits are a measurement taken on \
+             x86_64-pc-windows-msvc against 92579ef and do not reproduce on {}-{} \
+             (ADR-0071). Observed here:",
+            std::env::consts::ARCH,
+            std::env::consts::OS
         );
         // Printed in full rather than compared: reporting every level, not just the
         // first divergent one, is the whole point of not asserting them here.

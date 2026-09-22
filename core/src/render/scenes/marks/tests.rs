@@ -2025,9 +2025,15 @@ fn the_wobbled_star_exterior_is_measured_against_the_jitters_own_cost() {
 ///   Two fresh renderers, so nothing is being compared against a cached frame.
 /// - **Two adapters**: every adapter this machine enumerates, against the
 ///   software one. A picture is not expected bit-for-bit across rasterizers, so
-///   the frame is held to the golden suite's own drift tolerance — and the
-///   **arrangement**, which is what the hash decides, is compared exactly by
-///   the per-spike brightness ordering.
+///   the frame is held to the golden suite's own two tolerances — the mean, and
+///   the largest single-channel difference at any pixel. The second is what
+///   sees the **arrangement** the hash decides: a spike of another length moves
+///   the outline, and the outline is where this palette steps from near-white to
+///   near-black. A ranking of per-spike brightness is not used, because two
+///   spikes can tie to within rasterizer noise and swap places on a frame that
+///   differs by one LSB.
+/// - **Another seed**, same adapter, must fail that second tolerance, or it
+///   could not tell one figure from another.
 ///
 /// Skips where no adapter exists at all (ADR-0016), and the cross-adapter half
 /// is a no-op on a machine with only one.
@@ -2041,7 +2047,6 @@ fn a_seeded_wobbled_star_is_the_same_figure_on_two_runs_and_two_adapters() {
     };
 
     const SIZE: u32 = 160;
-    const POINTS: usize = 7;
     // The roughest figure the arm can draw, so every one of the three controls
     // is exercised at once rather than one at a time.
     const TOML: &str = "name = \"rough\"\nsystem = \"shape_field\"\n\
@@ -2052,7 +2057,7 @@ fn a_seeded_wobbled_star_is_the_same_figure_on_two_runs_and_two_adapters() {
          star_wobble = \"1.0\"\nstar_wobble_freq = \"1.5\"\nstar_seed = \"11\"\n\
          scale = \"0.7\"\ncolor_span = \"0.9\"\n";
 
-    let shoot = |choice: &AdapterChoice| -> Option<CaptureImage> {
+    let shoot_toml = |choice: &AdapterChoice, toml: &str| -> Option<CaptureImage> {
         let opts = HeadlessOptions {
             width: SIZE,
             height: SIZE,
@@ -2064,13 +2069,14 @@ fn a_seeded_wobbled_star_is_the_same_figure_on_two_runs_and_two_adapters() {
             Err(e) => panic!("headless renderer build failed: {e}"),
         };
         r.set_presets(vec![
-            Preset::from_toml_str(TOML).unwrap_or_else(|e| panic!("rough failed to load: {e}")),
+            Preset::from_toml_str(toml).unwrap_or_else(|e| panic!("rough failed to load: {e}")),
         ]);
         Some(
             r.capture_preset("rough", &AnalysisFrame::default(), 2)
                 .unwrap_or_else(|e| panic!("capture rough: {e}")),
         )
     };
+    let shoot = |choice: &AdapterChoice| shoot_toml(choice, TOML);
 
     let Some(soft_a) = shoot(&AdapterChoice::Software) else {
         eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
@@ -2085,41 +2091,44 @@ fn a_seeded_wobbled_star_is_the_same_figure_on_two_runs_and_two_adapters() {
     );
     println!("two runs on the software adapter: byte-identical");
 
-    // The arrangement the hash decides, read off the picture: how bright the
-    // frame is along each spike's own axis, at the radius where a tip reaches
-    // and a valley does not. A reordering here IS a different figure, whatever
-    // the mean says.
-    let arrangement = |img: &CaptureImage| -> Vec<u8> {
-        let c = (SIZE / 2) as f32;
-        let mut rank: Vec<(usize, f32)> = (0..POINTS)
-            .map(|s| {
-                let theta = std::f32::consts::TAU * s as f32 / POINTS as f32;
-                let sum: f32 = (1..=12)
-                    .map(|k| {
-                        let r = c * 0.5 * k as f32 / 12.0;
-                        let x = (c + theta.cos() * r).round().clamp(0.0, (SIZE - 1) as f32) as u32;
-                        let y = (c + theta.sin() * r).round().clamp(0.0, (SIZE - 1) as f32) as u32;
-                        let i = ((y * img.width + x) * 4) as usize;
-                        f32::from(img.rgba[i])
-                    })
-                    .sum();
-                (s, sum)
-            })
-            .collect();
-        rank.sort_by(|a, b| b.1.total_cmp(&a.1));
-        rank.iter().map(|(s, _)| *s as u8).collect()
+    // The golden suite's per-pixel bound between rasterizers (`golden.rs`'s
+    // `MAX_OUTLIER`): the largest single-channel difference two correct
+    // rasterizers are allowed on one picture. A different hash moves the
+    // outline, which puts the figure's near-white interior where the dark band
+    // outside it was — a difference of about 230 on this palette.
+    const MAX_OUTLIER: u8 = 48;
+    let max_outlier = |x: &CaptureImage, y: &CaptureImage| -> u8 {
+        x.rgba
+            .chunks_exact(4)
+            .zip(y.rgba.chunks_exact(4))
+            .flat_map(|(p, q)| p.iter().zip(q.iter()).take(3).map(|(a, b)| a.abs_diff(*b)))
+            .max()
+            .unwrap_or(0)
     };
-    let want = arrangement(&soft_a);
-    println!("spike order on the software adapter: {want:?}");
+
+    // The counter-assertion that keeps the bound from being vacuous: one seed
+    // over, on the same adapter, must fail it.
+    let reseeded = shoot_toml(
+        &AdapterChoice::Software,
+        &TOML.replace("star_seed = \"11\"", "star_seed = \"12\""),
+    )
+    .expect("the software adapter was there a moment ago");
+    let seed_outlier = max_outlier(&soft_a, &reseeded);
+    println!("seed 11 against seed 12 on the software adapter: max outlier {seed_outlier}");
+    assert!(
+        seed_outlier > MAX_OUTLIER,
+        "a different seed moved no pixel past {MAX_OUTLIER} (max {seed_outlier}), so \
+         the bound below cannot tell one figure from another"
+    );
 
     for (i, a) in list_adapters().iter().enumerate() {
         let Some(img) = shoot(&AdapterChoice::Index(i)) else {
             continue;
         };
         let diff = frame_diff(&soft_a, &img);
-        let got = arrangement(&img);
+        let outlier = max_outlier(&soft_a, &img);
         println!(
-            "adapter [{i}] {:<44} frame_diff {diff:.5} order {got:?}",
+            "adapter [{i}] {:<44} frame_diff {diff:.5} max outlier {outlier}",
             a.name
         );
         // The golden suite's own mean tolerance: the bar a picture has to clear
@@ -2130,11 +2139,12 @@ fn a_seeded_wobbled_star_is_the_same_figure_on_two_runs_and_two_adapters() {
              past the drift the golden suite tolerates between rasterizers",
             a.name
         );
-        assert_eq!(
-            got, want,
-            "adapter [{i}] ({}) put the spikes in a different order — that is \
-             the hash disagreeing between GPUs, which is the failure integer \
-             arithmetic was chosen to prevent",
+        assert!(
+            outlier <= MAX_OUTLIER,
+            "adapter [{i}] ({}) differs from the software adapter by {outlier} in \
+             one channel — past what two rasterizers may differ by, which is the \
+             outline moving: the hash disagreeing between GPUs, the failure \
+             integer arithmetic was chosen to prevent",
             a.name
         );
     }

@@ -24,7 +24,7 @@
 # libpulse on Arch), plus the xkbcommon and wayland headers winit links.
 #
 # The glibc the binary requires is the build machine's. CI builds on the
-# ubuntu-latest runner, so that image's glibc is the floor the release notes
+# ubuntu-24.04 runner, so that image's glibc is the floor the release notes
 # name; a tarball built on a newer distribution will not start on an older one.
 
 set -euo pipefail

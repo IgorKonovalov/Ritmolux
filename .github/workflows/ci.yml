@@ -119,9 +119,10 @@ jobs:
       #
       # Applied on EVERY matrix arm, not branched per-OS: macOS already skips
       # every GPU suite (ADR-0016), so the filter removes nothing there, and a
-      # per-OS branch is a second thing to keep true. On Linux the deferred
-      # suites would otherwise run against lavapipe, which nothing here has
-      # compared against - the filter keeps them where WARP hosts them.
+      # per-OS branch is a second thing to keep true. On Linux the fast tier
+      # runs on lavapipe: property tests assert there as anywhere, and every
+      # comparison against a committed baseline under core/tests/golden/ - a
+      # measurement taken on WARP - prints its reading and skips (ADR-0131).
       - run: cargo nextest run --workspace -P fast
       - run: cargo test --workspace --doc
       - run: cargo clippy --workspace --all-targets -- -D warnings

@@ -164,10 +164,12 @@ jobs:
   # packaging/linux/stage.sh, so a developer running it on their own Linux box
   # is held to this job's bar rather than to a looser one.
   #
-  # The runner's glibc is the floor the tarball runs on, which is why it is
-  # built here rather than on anything newer.
+  # The runner's glibc is the floor the tarball runs on, and the release notes
+  # below promise "Ubuntu 24.04 or newer". So the image is named, not
+  # `ubuntu-latest`: a label that moves would raise the floor with nothing
+  # saying so, and a 24.04 user's download would stop starting.
   linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       # The same build packages ci.yml's check job installs, minus the Vulkan

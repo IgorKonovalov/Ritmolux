@@ -16,8 +16,10 @@
 //! The tolerance absorbs cross-GPU rasterization drift (the software adapter
 //! keeps it small); a genuine engine change — a perturbed shader or scene math —
 //! moves a frame well past it. Baselines are ordinary PNGs, viewable in the repo
-//! and PR diffs; they are WARP-only (macOS has no software Metal fallback, so
-//! the test skips there per ADR-0016) and must be blessed on WARP. Eyeball each
+//! and PR diffs; they are WARP-only. The comparison asserts only on WARP, and
+//! on any other adapter — llvmpipe, lavapipe — prints its readings and skips
+//! (`common::baseline_adapter`); macOS has no software Metal fallback and skips
+//! earlier, per ADR-0016. `RLX_BLESS` panics off WARP. Eyeball each baseline
 //! before blessing (Plan 0013 Phase 8 habit).
 
 use rlx_core::preset::{Preset, SystemKind};
@@ -205,7 +207,8 @@ fn scenes_match_golden_baselines() {
         return;
     };
     let frame = common::fixed_frame_spectrum();
-    let bless = std::env::var_os("RLX_BLESS").is_some();
+    let bless = common::bless_requested(&renderer);
+    let home = common::baseline_adapter(&renderer);
     std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
 
     let mut failures = Vec::new();
@@ -253,6 +256,10 @@ fn scenes_match_golden_baselines() {
         check(&mut renderer, stem, toml);
     }
 
+    if let Err(adapter) = home {
+        common::skip_off_baseline(&adapter, &failures);
+        return;
+    }
     assert!(
         failures.is_empty(),
         "golden drift beyond tolerance (bless with RLX_BLESS=1 if intended): {failures:#?}"

@@ -733,7 +733,8 @@ fn layered_fixtures_match_golden_baselines() {
         return;
     };
     let frame = fixed_frame();
-    let bless = std::env::var_os("RLX_BLESS").is_some();
+    let bless = common::bless_requested(&renderer);
+    let home = common::baseline_adapter(&renderer);
     std::fs::create_dir_all(&golden_dir).expect("create tests/golden");
 
     let decode = |path: &PathBuf| -> CaptureImage {
@@ -803,6 +804,10 @@ fn layered_fixtures_match_golden_baselines() {
                 "{stem}: mean {mean:.4} / outlier {outlier} exceeds tolerance"
             ));
         }
+    }
+    if let Err(adapter) = home {
+        common::skip_off_baseline(&adapter, &failures);
+        return;
     }
     assert!(
         failures.is_empty(),

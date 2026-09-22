@@ -51,7 +51,7 @@
 
 use rlx_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
 use rlx_core::preset::Preset;
-use rlx_core::render::{CaptureImage, metrics::frame_diff};
+use rlx_core::render::{CaptureImage, Renderer, metrics::frame_diff};
 
 use crate::common;
 
@@ -339,11 +339,11 @@ fn assert_the_outer_ends_are_free(img: &CaptureImage, dimmest_interior: f32) {
 /// every baseline in the repository, and without the `line_joints::` filter every
 /// baseline in the `suite` binary — bless by that filter and check `git status`,
 /// the trap that cost Plan 0039 two manual restores.
-fn compare_against_baseline(img: &CaptureImage) {
+fn compare_against_baseline(img: &CaptureImage, renderer: &Renderer) {
     std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
     let path = common::golden_dir().join(format!("{BASELINE_STEM}.png"));
 
-    if std::env::var_os("RLX_BLESS").is_some() {
+    if common::bless_requested(renderer) {
         common::encode(img, &path);
         println!("blessed {}", path.display());
         return;
@@ -360,6 +360,17 @@ fn compare_against_baseline(img: &CaptureImage) {
     println!(
         "{BASELINE_STEM:<18} mean {mean:.4} (tol {MEAN_TOL}) max_outlier {outlier} (tol {MAX_OUTLIER})"
     );
+    if let Err(adapter) = common::baseline_adapter(renderer) {
+        let drifted = if mean <= MEAN_TOL && outlier <= MAX_OUTLIER {
+            Vec::new()
+        } else {
+            vec![format!(
+                "{BASELINE_STEM}: mean {mean:.4} / outlier {outlier}"
+            )]
+        };
+        common::skip_off_baseline(&adapter, &drifted);
+        return;
+    }
     assert!(
         mean <= MEAN_TOL && outlier <= MAX_OUTLIER,
         "the joined polyline has drifted from its baseline: mean {mean:.4} / outlier \
@@ -388,5 +399,5 @@ fn the_joined_polyline_holds_its_shape_and_its_pixels() {
 
     let dimmest_interior = assert_no_notch(&img);
     assert_the_outer_ends_are_free(&img, dimmest_interior);
-    compare_against_baseline(&img);
+    compare_against_baseline(&img, &renderer);
 }

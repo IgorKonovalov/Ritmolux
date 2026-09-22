@@ -190,7 +190,8 @@ fn composite_stages_match_golden_baselines() {
         return;
     };
     let frame = common::fixed_frame();
-    let bless = std::env::var_os("RLX_BLESS").is_some();
+    let bless = common::bless_requested(&renderer);
+    let home = common::baseline_adapter(&renderer);
     std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
 
     let mut failures = Vec::new();
@@ -250,6 +251,10 @@ fn composite_stages_match_golden_baselines() {
         }
     }
 
+    if let Err(adapter) = home {
+        common::skip_off_baseline(&adapter, &failures);
+        return;
+    }
     assert!(
         failures.is_empty(),
         "composite drift beyond tolerance — a stage's routing, grid, or the aspect it \

@@ -106,7 +106,7 @@ green, publishes a GitHub **prerelease** carrying five zips and one tarball:
 ```text
 ritmolux-v<version>-macos-universal.zip          # universal .app, ad-hoc signed
 ritmolux-v<version>-windows-x64.zip              # ritmolux.exe
-ritmolux-v<version>-linux-x64.tar.gz             # ritmolux, x86_64, built on ubuntu-latest
+ritmolux-v<version>-linux-x64.tar.gz             # ritmolux, x86_64, built on ubuntu-24.04
 ritmolux-v<version>-foobar2000-component.zip     # foo_ritmolux.fb2k-component, x64
 ritmolux-studio-v<version>-macos-universal.zip   # universal Studio.app, ad-hoc signed
 ritmolux-studio-v<version>-windows-x64.zip       # Ritmolux Studio.exe
@@ -186,7 +186,7 @@ bash packaging/linux/stage.sh             # --skip-build reuses target/release/r
 ```
 
 It is **not** the shippable tarball when built anywhere newer than the runner: the binary requires
-the glibc of the machine that linked it, and CI's `ubuntu-latest` is the floor the release notes
+the glibc of the machine that linked it, and the release job's `ubuntu-24.04` is the floor the release notes
 name.
 
 The Windows studio's macOS sibling is `packaging/studio/bundle-studio.sh`, and like

@@ -64,7 +64,7 @@
 //! not a guard (Plan 0201 Phase 4a).
 
 use rlx_core::preset::Preset;
-use rlx_core::render::{CaptureImage, metrics::frame_diff};
+use rlx_core::render::{CaptureImage, Renderer, metrics::frame_diff};
 
 use crate::common;
 
@@ -102,29 +102,28 @@ fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
         .unwrap_or(0)
 }
 
-/// Capture the fixture once, or `None` on an adapterless runner.
-fn capture() -> Option<CaptureImage> {
+/// Capture the fixture once, with the renderer that drew it (for the adapter
+/// question the baseline asks), or `None` on an adapterless runner.
+fn capture() -> Option<(CaptureImage, Renderer)> {
     let mut renderer = common::headless(WIDTH, HEIGHT)?;
     let preset = Preset::from_toml_str(FIXTURE)
         .unwrap_or_else(|e| panic!("milk_wash_fog_tunnel.toml is invalid: {e}"));
     let name = preset.name.clone();
     renderer.set_presets(vec![preset]);
-    Some(
-        renderer
-            .capture_preset(&name, &common::fixed_frame_spectrum(), FRAMES)
-            .expect("capture the converted warp_mesh fixture at a non-square target"),
-    )
+    let fresh = renderer
+        .capture_preset(&name, &common::fixed_frame_spectrum(), FRAMES)
+        .expect("capture the converted warp_mesh fixture at a non-square target");
+    Some((fresh, renderer))
 }
 
 /// The converted chain's picture at 4:3, against its committed baseline.
 #[test]
 fn the_converted_chain_matches_its_wide_baseline() {
     let path = common::golden_dir().join(format!("{STEM}.png"));
-    let bless = std::env::var_os("RLX_BLESS").is_some();
-
-    let Some(fresh) = capture() else {
+    let Some((fresh, renderer)) = capture() else {
         return;
     };
+    let bless = common::bless_requested(&renderer);
     std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
 
     if bless {
@@ -152,6 +151,15 @@ fn the_converted_chain_matches_its_wide_baseline() {
     println!(
         "{STEM:<18} mean {mean:.4} (tol {MEAN_TOL}) max_outlier {outlier} (tol {MAX_OUTLIER}) at {WIDTH}x{HEIGHT}"
     );
+    if let Err(adapter) = common::baseline_adapter(&renderer) {
+        let drifted = if mean <= MEAN_TOL && outlier <= MAX_OUTLIER {
+            Vec::new()
+        } else {
+            vec![format!("{STEM}: mean {mean:.4} / outlier {outlier}")]
+        };
+        common::skip_off_baseline(&adapter, &drifted);
+        return;
+    }
     assert!(
         mean <= MEAN_TOL && outlier <= MAX_OUTLIER,
         "{STEM}: mean {mean:.4} / outlier {outlier} exceeds tolerance — the \

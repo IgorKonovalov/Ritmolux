@@ -168,6 +168,53 @@ pub fn fixed_frame_spectrum() -> AnalysisFrame {
     frame
 }
 
+/// Whether `renderer` sits on the adapter every PNG under `tests/golden/` was
+/// blessed on — `Ok(())` — or on another one, named in the `Err`.
+///
+/// The baselines are a **measurement taken on DX12 WARP**, not a property of a
+/// correct rasterizer: their tolerance absorbs WARP's own run-to-run drift, and
+/// llvmpipe or lavapipe drift further than that on the stateful and chaotic
+/// fixtures without anything being wrong (ADR-0071, ADR-0131). So a comparison
+/// asserts only on WARP, and elsewhere reports what it read through
+/// [`skip_off_baseline`].
+///
+/// "Software on Windows" *is* WARP: DX12 is the only wgpu backend
+/// `core/Cargo.toml` compiles for Windows, and WARP is its only software
+/// adapter. Enabling a second Windows backend breaks that equivalence.
+pub fn baseline_adapter(renderer: &Renderer) -> Result<(), String> {
+    if cfg!(windows) && renderer.adapter_is_software() {
+        Ok(())
+    } else {
+        Err(renderer.adapter_description().to_owned())
+    }
+}
+
+/// Whether `RLX_BLESS` asks this run to rewrite baselines — **panicking** if it
+/// does and `renderer` is not on the blessing adapter, since a baseline written
+/// anywhere else would hold every later WARP run to another rasterizer's frame.
+pub fn bless_requested(renderer: &Renderer) -> bool {
+    let bless = std::env::var_os("RLX_BLESS").is_some();
+    if bless && let Err(adapter) = baseline_adapter(renderer) {
+        panic!(
+            "RLX_BLESS refused: baselines are blessed on DX12 WARP only, and this \
+             run is on {adapter}"
+        );
+    }
+    bless
+}
+
+/// The skip notice a baseline comparison prints off WARP, in ADR-0016's shape.
+/// `drifted` lists what would have failed on WARP — printed, never asserted —
+/// so the reading is kept rather than discarded.
+pub fn skip_off_baseline(adapter: &str, drifted: &[String]) {
+    eprintln!(
+        "skipped: the baselines are a measurement taken on DX12 WARP, and this run \
+         is on {adapter} (ADR-0071). {} comparison(s) past WARP's tolerance here: \
+         {drifted:#?}",
+        drifted.len()
+    );
+}
+
 /// The committed baseline directory, `core/tests/golden/`.
 pub fn golden_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))

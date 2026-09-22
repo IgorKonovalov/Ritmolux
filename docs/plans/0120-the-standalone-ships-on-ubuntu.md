@@ -500,7 +500,7 @@ to `core/`" exclusion below is amended to say so.
 | 4 — The release tarball | dev | done | `ed74dad1` |
 | 5 — The docs say Linux | dev | done | `d3550166` |
 | 6 — Run it on the Ubuntu box | — | moved 2026-09-20 to Plan 0214 Phase 4 | |
-| 7 — A measurement asserts only on the machine it was taken on | dev | added 2026-09-22 by the review | |
+| 7 — A measurement asserts only on the machine it was taken on | dev | done | committed with this row |
 
 ### Notes
 
@@ -630,6 +630,27 @@ to `core/`" exclusion below is amended to say so.
   0.0110 / max outlier 190 and `attractor` mean 0.0018 / max outlier 114, against tolerances 0.02 /
   48. The other 26 golden scenes are within tolerance. The owner chose to close with the red
   recorded rather than hold the close for it.
+- **Phase 7 — "is this WARP" is `cfg!(windows) && adapter_is_software()`**
+  (`common::baseline_adapter`), not a match on the adapter description: DX12 is the only Windows
+  backend `core/Cargo.toml` compiles, so a software adapter there is WARP by construction. The helper's
+  comment names the trap: a second Windows backend breaks the equivalence.
+- **Phase 7 — six tests compare against a committed PNG, and all six are gated:** `golden`,
+  `attractor_trails`, `composite`, `layer`, `line_joints`, `warp_mesh_wide`. Their pre-comparison
+  property checks (lit coverage, the overlap no-clip count, the joint notch) still assert on every
+  adapter. `RLX_BLESS=1` off WARP panics before writing; checked on `line_joints::`, and
+  `core/tests/golden/` was left clean.
+- **Phase 7 — the `marks` test's cross-adapter statistic is now `golden.rs`'s per-pixel bound (48)**, in
+  place of the spike ranking, with an in-test counter-assertion that seed 12 fails it. Readings on the
+  box against llvmpipe: RADV max outlier 9, the NVIDIA RTX 3080 Laptop 7, llvmpipe itself 0; seeds 12,
+  13, 200 and 99999 read 231-232. A difference image of RADV against llvmpipe showed scattered 1-LSB
+  noise and no structural edge.
+- **Phase 7 — skipping on this box because of this phase** (each prints its notice and reports PASS):
+  `raw_levels_are_bit_identical_to_the_pre_normalization_build`, and the six baseline tests above.
+  Off WARP on llvmpipe, golden reads 2 fixtures past WARP's tolerance, attractor_trails 1, the other
+  four 0. The WARP arm was not run here.
+- **Phase 7 — files touched beyond the list:** `packaging/linux/stage.sh`'s header comment,
+  `docs/releasing.md` and `docs/nfr.md` §8 each named `ubuntu-latest` as the release build image. They
+  now say `ubuntu-24.04`.
 
 ### Close triggers
 

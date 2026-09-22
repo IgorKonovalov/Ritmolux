@@ -320,7 +320,7 @@ studio's archives are its own
   unnotarized**. Ad-hoc signing buys a stable code identity for the Screen Recording grant to
   bind to; it is *not* Developer ID, so Gatekeeper still quarantines the download and the grant
   does not survive a rebuild. Requires macOS 13+.
-- **Linux**: `ritmolux`, x86_64, in a `.tar.gz`, built on `ubuntu-latest`, so that image's glibc is
+- **Linux**: `ritmolux`, x86_64, in a `.tar.gz`, built on `ubuntu-24.04`, so that image's glibc is
   the floor (Ubuntu 24.04). Links `libpulse.so.0` and will not start without it
   ([ADR-0131](adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md)).
 - **foobar2000 component**: `foo_ritmolux.fb2k-component`, **x64 only**, for foobar2000 v2. Built
