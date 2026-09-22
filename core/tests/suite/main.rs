@@ -29,6 +29,7 @@
 #[path = "../common/mod.rs"]
 mod common;
 
+mod adapter_switch;
 mod analytic_field;
 mod attractor_trails;
 mod backdrop_palette;

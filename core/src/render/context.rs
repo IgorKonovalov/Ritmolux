@@ -89,6 +89,12 @@ pub enum RenderError {
     /// is a child process, and a mystery broken pipe is the obvious way this
     /// path goes wrong.
     Sink(String),
+    /// An adapter change was asked of a context that has no surface — the
+    /// headless capture path, which renders on the adapter it was built on
+    /// for the life of the run (ADR-0246). Refused by name rather than
+    /// ignored, so a caller cannot take a switch that never happened for one
+    /// that did; [`adapter_change_permitted`] is the condition.
+    Headless,
 }
 
 impl std::fmt::Display for RenderError {
@@ -134,8 +140,29 @@ impl std::fmt::Display for RenderError {
                  pick an adapter that can drive the display this window is on"
             ),
             RenderError::Sink(msg) => write!(f, "{msg}"),
+            RenderError::Headless => write!(
+                f,
+                "this renderer has no window surface, so it cannot change adapter; a \
+                 headless capture renders on the adapter it was built on"
+            ),
         }
     }
+}
+
+/// **Whether a runtime adapter change is allowed at all** (ADR-0246): only on
+/// a context that has a surface.
+///
+/// The same guard [`super::tier::tier_change_permitted`] gives the tier, and
+/// for the same reason: a surface-less context is the headless capture path,
+/// where the adapter is part of what makes a capture a pure function of its
+/// inputs (NFR 6) — a baseline is blessed on one rasterizer, and a public
+/// mutator that could move a capture onto another mid-run would be the hole in
+/// that guarantee. Expressed as a value rather than a branch so both
+/// directions are assertable: a `Renderer` **with** a surface cannot be built
+/// in CI, and a test that only observed the headless refusal would pass
+/// against a `set_adapter` that did nothing at all.
+pub fn adapter_change_permitted(has_surface: bool) -> bool {
+    has_surface
 }
 
 impl std::error::Error for RenderError {}
@@ -189,7 +216,10 @@ pub enum AdapterChoice {
     /// machine.
     HighPerformance,
     /// The one enumerated adapter whose name contains this string, matched
-    /// case-insensitively. More than one match is an error, not a pick.
+    /// case-insensitively — an adapter whose whole name **equals** it wins
+    /// over any that merely contain it, so a full name read back from the
+    /// roster resolves to exactly that adapter even where it is a prefix of
+    /// another's. More than one match is an error, not a pick.
     Named(String),
     /// The adapter at this position in [`list_adapters`]'s roster.
     Index(usize),
@@ -302,12 +332,26 @@ fn resolve_adapter(
         AdapterChoice::Named(wanted) => {
             let needle = wanted.to_lowercase();
             let roster = describe_roster(instance);
-            let hits: Vec<usize> = roster
+            // Exact before containment: a name written back from this roster
+            // — by the settings row into `[output] gpu` — must select the
+            // adapter it was read from, and a substring rule alone would call
+            // `RTX 3080` ambiguous beside `RTX 3080 Ti`.
+            let exact: Vec<usize> = roster
                 .iter()
                 .enumerate()
-                .filter(|(_, entry)| entry.name.to_lowercase().contains(&needle))
+                .filter(|(_, entry)| entry.name.to_lowercase() == needle)
                 .map(|(at, _)| at)
                 .collect();
+            let hits: Vec<usize> = if exact.len() == 1 {
+                exact
+            } else {
+                roster
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, entry)| entry.name.to_lowercase().contains(&needle))
+                    .map(|(at, _)| at)
+                    .collect()
+            };
             match hits.as_slice() {
                 [] => Err(RenderError::NoSuchAdapter {
                     requested: wanted.clone(),
@@ -579,4 +623,119 @@ impl RenderContext {
             surface.configure(&self.device, &self.config);
         }
     }
+
+    /// Stage a move onto another adapter (ADR-0246): resolve `choice` against
+    /// this context's window, request its device, negotiate the surface
+    /// configuration, and create a fresh surface for `target` — **without
+    /// touching anything this context owns**. Every step that can fail is
+    /// here, so an `Err` leaves the running context exactly as it was, and
+    /// [`commit`](Self::commit) is the one step that cannot.
+    ///
+    /// `Ok(None)` when `choice` resolves to the adapter already in use: the
+    /// device that would be built is the one that exists, and rebuilding onto
+    /// it would restart every accumulation for no change.
+    ///
+    /// The window's surface is **re-created rather than re-configured**. A
+    /// surface is instance-scoped and the instance is retained, but a
+    /// swapchain belongs to the device it was configured on, and
+    /// `Surface::configure` replaces the previous swapchain through whichever
+    /// device it is handed — sound only while that is the same device. A new
+    /// surface for the same window carries no swapchain until it is
+    /// configured, and dropping the old one releases its swapchain through
+    /// the device that made it.
+    ///
+    /// Refused with [`RenderError::Headless`] on a context without a surface:
+    /// there is no window to re-create a surface for, and the headless path is
+    /// the one [`adapter_change_permitted`] excludes.
+    pub(crate) fn stage_adapter(
+        &self,
+        choice: &AdapterChoice,
+        target: impl Into<SurfaceTarget<'static>>,
+    ) -> Result<Option<StagedContext>, RenderError> {
+        let Some(current) = self.surface.as_ref() else {
+            return Err(RenderError::Headless);
+        };
+        // Resolved against the surface the window already has: the new one
+        // below is for the same window, so presentability is the same question.
+        let adapter = resolve_adapter(&self.instance, choice, Some(current))?;
+        let info = adapter.get_info();
+        let description = describe_adapter(&info);
+        if description == self.adapter {
+            return Ok(None);
+        }
+        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+            label: Some("rlx-device"),
+            ..Default::default()
+        }))
+        .map_err(RenderError::RequestDevice)?;
+        let mut config = current
+            .get_default_config(
+                &adapter,
+                self.config.width.max(1),
+                self.config.height.max(1),
+            )
+            .ok_or(RenderError::UnsupportedSurface)?;
+        // The same three choices `from_surface` makes for a fresh window, so a
+        // switched context is configured exactly as a launched one.
+        config.present_mode = wgpu::PresentMode::AutoVsync;
+        config.desired_maximum_frame_latency = 2;
+        if current
+            .get_capabilities(&adapter)
+            .usages
+            .contains(wgpu::TextureUsages::COPY_DST)
+        {
+            config.usage |= wgpu::TextureUsages::COPY_DST;
+        }
+        // Created last, after everything that can refuse: a surface is a
+        // handle on the window and not yet a swapchain, so two of them on one
+        // window coexist until one is configured.
+        let surface = self
+            .instance
+            .create_surface(target)
+            .map_err(RenderError::CreateSurface)?;
+        Ok(Some(StagedContext {
+            surface,
+            device,
+            queue,
+            config,
+            gpu: adapter,
+            is_software: info.device_type == wgpu::DeviceType::Cpu,
+            adapter: description,
+        }))
+    }
+
+    /// Make a staged context this context, releasing the old device.
+    ///
+    /// Order is load-bearing. The old surface goes first, because dropping it
+    /// is what releases its swapchain through the device that made it, and
+    /// because DXGI allows one swap chain per window: the new surface is
+    /// configured only once the old swapchain is gone. The old device, queue
+    /// and adapter are dropped last; every resource built on them holds its
+    /// own reference, so the caller's replacements can be built before this
+    /// and the old ones dropped after it.
+    pub(crate) fn commit(&mut self, staged: StagedContext) {
+        self.surface = None;
+        staged.surface.configure(&staged.device, &staged.config);
+        self.surface = Some(staged.surface);
+        self.config = staged.config;
+        self.device = staged.device;
+        self.queue = staged.queue;
+        self.gpu = staged.gpu;
+        self.is_software = staged.is_software;
+        self.adapter = staged.adapter;
+    }
+}
+
+/// A device on another adapter, requested and validated, with a fresh surface
+/// for the same window — not yet the context's own. Built by
+/// [`RenderContext::stage_adapter`], consumed by [`RenderContext::commit`],
+/// and dropped whole if the caller's own rebuild between the two fails.
+pub(crate) struct StagedContext {
+    surface: wgpu::Surface<'static>,
+    pub(crate) device: wgpu::Device,
+    pub(crate) queue: wgpu::Queue,
+    pub(crate) config: wgpu::SurfaceConfiguration,
+    gpu: wgpu::Adapter,
+    is_software: bool,
+    adapter: String,
 }

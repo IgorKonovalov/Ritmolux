@@ -87,7 +87,10 @@ pub use aux_target::{AuxCounts, AuxPresentMode};
 use background::Background;
 pub use capture::{CaptureImage, FrameTap};
 pub use capture_api::AudioCapture;
-pub use context::{AdapterChoice, AdapterDescription, RenderContext, RenderError, list_adapters};
+pub use context::{
+    AdapterChoice, AdapterDescription, RenderContext, RenderError, adapter_change_permitted,
+    list_adapters,
+};
 use ink::Ink;
 use now_playing::NowPlaying;
 use overlay::Overlay;
@@ -753,6 +756,108 @@ impl Renderer {
         // open-coded: a tier-sized resource added to a new scene is then covered
         // by construction instead of by remembering two call sites.
         self.apply_tier(TierConfig::for_tier(tier));
+    }
+
+    /// **Move the running renderer onto another graphics adapter** (ADR-0246)
+    /// — the sibling of [`set_tier`](Self::set_tier) one level down.
+    ///
+    /// A new adapter, device and queue come off the retained instance, a
+    /// fresh surface for `target` — the same window the renderer was built on —
+    /// is configured against the new device, and every GPU-owning member is
+    /// rebuilt on it: the scene roster, the composite side, the blend, the
+    /// tonemap, ink, the overlay, the text layer, and the program preview and
+    /// its readback where they are open. The preset roster, the active preset,
+    /// the engine clock, the now-playing banner and the diagnostics survive,
+    /// so the operator stays on the preset they were watching. A dissolve in
+    /// flight is dropped, as `set_tier` drops one. **Accumulated GPU state does
+    /// not survive**: trail fields and simulation domains live in the old
+    /// device's memory, so the picture visibly starts afresh.
+    ///
+    /// **Transactional.** The new device is requested and validated, and every
+    /// replacement member is built on it, *before* the old device is released;
+    /// a choice that cannot produce a device — absent, ambiguous, unable to
+    /// present, or refusing a device — returns its named error with the
+    /// running picture untouched. A switch can never leave the application
+    /// with no renderer. Two devices are briefly alive at the commit, which
+    /// is the memory cost of that guarantee.
+    ///
+    /// The secondary present target is **released, not carried**: its
+    /// swapchain and atlas belong to the old device, so a shell with a console
+    /// open re-attaches it afterwards with [`attach_aux`](Self::attach_aux).
+    ///
+    /// Asking for the adapter already in use is a no-op returning `Ok`.
+    /// Refused with [`RenderError::Headless`] on a surface-less context, the
+    /// guard [`adapter_change_permitted`] states as a value.
+    pub fn set_adapter(
+        &mut self,
+        choice: &AdapterChoice,
+        target: impl Into<wgpu::SurfaceTarget<'static>>,
+    ) -> Result<(), RenderError> {
+        if !adapter_change_permitted(self.ctx.surface.is_some()) {
+            return Err(RenderError::Headless);
+        }
+        let Some(staged) = self.ctx.stage_adapter(choice, target)? else {
+            return Ok(());
+        };
+        // Every member that holds GPU state, built on the new device while the
+        // old one still runs the picture. `set_tier`'s `apply_tier` rebuilds
+        // the first two of these; the rest are what a device change adds — a
+        // member that is rebuilt here and forgotten there, or the reverse,
+        // fails at runtime as a stale handle rather than at compile time.
+        let scenes = scenes::create_all(&staged.device, COMPOSITE_FORMAT, &self.tier, self.budget);
+        let side = CompositeSide::new(&staged.device, COMPOSITE_FORMAT, &self.tier);
+        let blend = Blend::new(&staged.device, COMPOSITE_FORMAT);
+        let tonemap = Tonemap::new(&staged.device, staged.config.format);
+        let ink = Ink::new(&staged.device, staged.config.format);
+        let overlay = Overlay::new(&staged.device, staged.config.format);
+        #[cfg(feature = "text")]
+        let text_layer = TextLayer::new(&staged.device, &staged.queue, staged.config.format);
+        let preview_size = self.preview.as_ref().map(preview::PreviewTarget::size);
+        let readback_size = self.preview_readback_size();
+
+        // The commit point: nothing below can fail.
+        self.cancel_transition();
+        self.incoming_side = None;
+        #[cfg(feature = "text")]
+        {
+            self.aux = None;
+        }
+        self.preview = None;
+        self.preview_readback = None;
+        self.preview_frame = None;
+        self.ctx.commit(staged);
+        self.scenes = scenes;
+        self.side = side;
+        self.blend = blend;
+        self.tonemap = tonemap;
+        self.ink = ink;
+        self.overlay = overlay;
+        #[cfg(feature = "text")]
+        {
+            self.text_layer = text_layer;
+        }
+        // The preview follows at the output's size and the readback at its
+        // own, so a consumer told the readback's geometry once is not told
+        // again (ADR-0187). The readback's one refusal — a surface format with
+        // no nameable order — is a property of the new adapter's negotiation,
+        // not of this switch, which has already happened: the readback then
+        // stays closed and `preview_readback_size` says so, rather than an
+        // `Err` claiming the picture was left untouched.
+        if preview_size.is_some() {
+            self.preview = Some(preview::PreviewTarget::new(
+                &self.ctx.device,
+                self.ctx.surface_format(),
+                self.ctx.config.width,
+                self.ctx.config.height,
+            ));
+        }
+        if let Some((width, height)) = readback_size
+            && self.open_preview_readback(width, height).is_err()
+        {
+            self.preview_readback = None;
+        }
+        self.configure_active_scene();
+        Ok(())
     }
 
     /// The active preset's index in the roster — what the browse overlay opens
