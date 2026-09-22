@@ -219,3 +219,32 @@ this point and a repair belongs in its own scope.
 - **It does not push or tag.** The owner pushes, here as everywhere.
 - **It does not absorb its own findings.** A failure becomes a backlog entry or a repair phase; it
   does not become a quietly loosened assertion.
+
+## Implementation log
+
+> Written as the phases land. **The phases above are the contract; everything here is what
+> happened.**
+
+### Phase 1 readings, partial (2026-09-22, recorded by `architect` at the owner's request)
+
+**Run [35753544726](https://github.com/IgorKonovalov/Ritmolux/actions/runs/35753544726)** on
+`144b137c`, and before it run 35731385874 on `3e7cb237`, the first push carrying 0120's Linux code.
+Both failed in the same place. Every other job was green, including the `windows-latest` and
+`macos-latest` arms of `check`.
+
+- **`check (ubuntu-latest)`:** `cargo build` green. `cargo nextest run --workspace -P fast` red:
+  `885/1695 tests run: 884 passed (1 slow), 1 failed, 86 skipped`. nextest then cancelled, so the
+  remaining 810 tests and the job's later steps (doctests, clippy, fmt, doc) **did not run** and
+  are still unread. The adapter line and the release dry run are also still owed.
+- **The one failure:** `rlx-core render::tonemap::tests::the_scan_reads_the_visibility_the_helpers_actually_set`,
+  at `core/src/render/tonemap/tests.rs:1431`: *"`pub(crate) fn texture(` now sets ShaderStages::,
+  but MARKERS says its entries are FRAGMENT-visible"*, `left: ""`, `right: "FRAGMENT"`.
+- **Cause (read from source, not yet run):** this is not a Linux defect. The test concatenates every
+  `core/src` file in `rs_files`'s `read_dir` order, which is unsorted and filesystem-dependent, and
+  then takes the **first** `find("pub(crate) fn texture(")`. That string matches three places:
+  `render/gpu.rs:66` (the helper meant), `render/preview.rs:245` (an unrelated accessor with no
+  `ShaderStages`), and the test's own literal at `tonemap/tests.rs:1421`. On NTFS and on this Arch
+  box `gpu.rs` came first; on the runner's ext4 another match did. The repair is `dev`'s in Phase 2:
+  make the file order deterministic, **and** make each needle identify its one definition (for
+  example `pub(crate) fn texture(binding`), since sorting alone keeps a match that depends on
+  filenames sorting in a particular order.
