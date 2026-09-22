@@ -1,13 +1,15 @@
-# NFR section 7: build, test, doctests, clippy, fmt on Windows + macOS for every
-# push, plus five single-runner gates - the `spout` feature compile (ADR-0181),
-# the doc-link and roster checks, cargo-deny (supply chain), the rlx-core
+# NFR section 7: build, test, doctests, clippy, fmt on Windows, macOS and Linux
+# for every push, plus five single-runner gates - the `spout` feature compile
+# (ADR-0181), the doc-link and roster checks, cargo-deny (supply chain), the rlx-core
 # coverage ratchet (ADR-0033), and Miri over rlx-ring's unsafe.
 #
 # Live audio is out of CI scope. GPU rendering partly is not: on Windows the DX12
 # WARP software adapter makes headless rendering deterministic, which the golden
 # suite and the tier-4 chain test ride on. macOS has no software Metal fallback
-# (ADR-0016), so the GPU suites skip there. Real-vendor GPU and live-loopback
-# checks stay manual - see docs/on-device-validation.md.
+# (ADR-0016), so the GPU suites skip there. Linux resolves Mesa's lavapipe, a
+# software Vulkan rasterizer this repo's goldens were never blessed against
+# (ADR-0131 Alternative H). Real-vendor GPU and live-loopback checks stay manual
+# - see docs/on-device-validation.md.
 name: CI
 
 on:
@@ -52,10 +54,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      # What the Linux arm compiles and links against, none of it on the runner
+      # image by default: winit's Wayland and X11 backends need the xkbcommon
+      # and wayland headers, the standalone's capture backend needs libpulse
+      # (ADR-0131), found through pkg-config by its build script, and
+      # mesa-vulkan-drivers carries lavapipe, the Vulkan ICD without which wgpu
+      # resolves no adapter at all. A new ubuntu job that compiles `standalone`
+      # needs the same step: a missing package is a build failure, not a
+      # degraded build.
+      - name: Install the Linux build packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libpulse-dev libxkbcommon-dev libwayland-dev \
+            mesa-vulkan-drivers
       # rustup on the runner auto-installs the toolchain pinned in rust-toolchain.toml.
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@nextest
@@ -100,9 +117,11 @@ jobs:
       # becomes the critical path ADR-0073 is fighting, that union is the first
       # thing to re-derive by measurement.
       #
-      # Applied on BOTH matrix arms, not branched per-OS: macOS already skips
+      # Applied on EVERY matrix arm, not branched per-OS: macOS already skips
       # every GPU suite (ADR-0016), so the filter removes nothing there, and a
-      # per-OS branch is a second thing to keep true.
+      # per-OS branch is a second thing to keep true. On Linux the deferred
+      # suites would otherwise run against lavapipe, which nothing here has
+      # compared against - the filter keeps them where WARP hosts them.
       - run: cargo nextest run --workspace -P fast
       - run: cargo test --workspace --doc
       - run: cargo clippy --workspace --all-targets -- -D warnings

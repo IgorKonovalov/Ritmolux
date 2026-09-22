@@ -71,9 +71,10 @@ text = ["dep:glyphon"]
 image = { version = "=0.25.10", default-features = false, features = ["png"] }
 
 # Per-OS wgpu backend (NFR 12). Only the shipped backend compiles: DX12 on
-# Windows, Metal on macOS. NFR 2 already fixes DX12 as the Windows baseline and
-# NFR does the same for Metal on macOS, so no supported machine loses rendering
-# by dropping the Vulkan/GL fallback (recorded in Plan 0011 risks, not an ADR).
+# Windows, Metal on macOS, Vulkan on Linux. NFR 2 already fixes DX12 as the
+# Windows baseline and NFR does the same for Metal on macOS, so no supported
+# machine loses rendering by dropping the Vulkan/GL fallback there (recorded in
+# Plan 0011 risks, not an ADR).
 # default-features stays off here too so these declarations don't re-enable the
 # dropped backends when Cargo unions the feature sets.
 [target.'cfg(windows)'.dependencies]
@@ -81,3 +82,10 @@ wgpu = { version = "=30.0.0", default-features = false, features = ["dx12"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 wgpu = { version = "=30.0.0", default-features = false, features = ["metal"] }
+
+# Without this arm a Linux build compiles wgpu with no backend at all: it builds
+# and lints clean, and `request_adapter` then finds nothing at run time. Vulkan
+# is the only backend enabled - a machine with no Vulkan driver gets no adapter,
+# and CI's runner resolves Mesa's lavapipe as its software one.
+[target.'cfg(target_os = "linux")'.dependencies]
+wgpu = { version = "=30.0.0", default-features = false, features = ["vulkan"] }

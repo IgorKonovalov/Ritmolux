@@ -1,6 +1,6 @@
 # 0120 — The standalone ships on Ubuntu
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-26
 > **Approved:** 2026-08-26
 > **Owner skill(s):** dev, human
@@ -440,10 +440,12 @@ wording.
 
 ## Implementation log
 
+**Lane:** `main` directly, on the Arch box (Plan 0219's sequence).
+
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Probe the Ubuntu box before any code is written | human | done | — |
-| 2 — The tree compiles, lints and tests on Ubuntu | dev | not started | |
+| 2 — The tree compiles, lints and tests on Ubuntu | dev | done | committed with this row |
 | 3 — The PulseAudio capture backend | dev | not started | |
 | 4 — The release tarball | dev | not started | |
 | 5 — The docs say Linux | dev | not started | |
@@ -492,6 +494,29 @@ wording.
   (`vkGetPhysicalDeviceDisplayP*PropertiesKHR` not exported) are about the direct-display
   extensions, which a Wayland surface does not use; `vulkaninfo` prints them on this driver
   whatever the session.
+
+- **Phase 2 — the Linux compile is native, not `--target`** (the 2026-09-22 amendment). `cargo check
+  --workspace --all-targets` on the Arch box is clean of errors; it reports the three `dead_code`
+  warnings in `standalone/src/capture_verdict.rs` (`Live`/`Failed`, `live`/`failed`, `sanitize`),
+  so `cargo clippy -D warnings` stays red on Linux until Phase 3 constructs them.
+- **Phase 2 — the data-root isolation was already in the tree.** Plan 0177's
+  `standalone/tests/common/mod.rs` `with_data_root` sets `XDG_DATA_HOME` and `HOME` beside
+  `APPDATA`; this phase added nothing to it. After a full `-P fast` run on the box,
+  `~/.local/share/Ritmolux/` does not exist.
+- **Phase 2 — with the `vulkan` arm the box resolves adapters, and `-P fast` is not green on Linux.**
+  `cargo nextest run --workspace -P fast --no-fail-fast`: 1692 run, 1689 passed, 3 failed, 86
+  skipped. The adapters are `AMD Radeon Graphics (RADV RENOIR)` and llvmpipe. All three failures are
+  `core/` tests, left alone per "No change to `core/`":
+  - `rlx-core::dsp raw_levels_are_bit_identical_to_the_pre_normalization_build`
+    (`core/tests/dsp.rs:184`) — `bass_raw` bits `946182226` against `946182229`, 3 ULP. No GPU in
+    it, so the `ubuntu-latest` arm will read the same.
+  - `rlx-core::suite attractor_trails::the_attractor_over_the_trails_stage_matches_its_baseline`
+    — mean 0.0009 (tol 0.02), max outlier 89 (tol 48), on the software adapter (llvmpipe here,
+    lavapipe on the runner).
+  - `rlx-core render::scenes::marks::tests::a_seeded_wobbled_star_is_the_same_figure_on_two_runs_and_two_adapters`
+    — frame_diff 0.00096 against llvmpipe, spike order `[4, 6, 3, 0, 2, 1, 5]` against
+    `[4, 6, 0, 3, 2, 1, 5]` on RADV. Needs a second adapter, so the single-adapter runner will not
+    reach it.
 
 ## Risks & open questions
 
