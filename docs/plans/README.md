@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0222** (ADRs are a separate sequence — next free there is **0245**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0223** (ADRs are a separate sequence — next free there is **0245**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -57,6 +57,7 @@ place. The plan file carries the real link.
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | **BLOCKED on 0219** (re-pointed 2026-09-22; the box exists). ADR-0241 + 0242: Linux leads, goldens re-bless on lavapipe. Phase 3 can stop the plan. |
 | [0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) | The Arch box builds, tests and runs every lane | in-progress | human, dev, studio-builder | ADR-0243 (proposed). Phases 1-4 landed 2026-09-22; Phase 5 waits on one conductor run of 0221, then Phase 6. |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
+| [0222](0222-a-repaired-finding-follows-its-file-into-done.md) | A repaired finding follows its file into `done/` | approved | dev | No ADR (a defect against ADR-0209). Queued in lane `a` after 0221 (`after: ["0221"]`). The `fixed_in` check follows renames; the prompts spell what the allowlist allows. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -279,6 +280,13 @@ sized in samples, so 21 of 64 bands are bin-starved at 96 kHz — pinned by a te
 waiting on someone reporting a mushy low end on a 96 kHz interface).
 
 ## Recommended execution sequence
+
+**Added 2026-09-22, later - [0222] is approved and queued in lane `a` behind [0221], with `after: ["0221"]`.**
+0222 repairs the check that parked 0221, but 0221 settles without it (`adopt-close 0221`, then
+`resume 0221`), since an adopted close carries no findings for the check to read. The `after` holds
+0222 until 0221 has merged, so the lane never runs the fix beside the plan it was found on.
+
+[0222]: 0222-a-repaired-finding-follows-its-file-into-done.md
 
 **Added 2026-09-22 - `queue.json` holds [0221] and nothing else, until 0219 Phase 5's run is recorded.**
 [0221] is a docs-only fixture written so the conductor's first Linux run has a plan to take to a

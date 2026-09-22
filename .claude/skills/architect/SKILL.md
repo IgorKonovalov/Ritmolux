@@ -175,6 +175,13 @@ real but measuring it is its own design problem — **state the property instead
 have not earned**: "the rise is dramatically faster than the fall, and one constant provably would
 not have done" is checkable, honest, and invents nothing.
 
+**A done-when a conductor session will run is runnable under its allowlist, one command per call.**
+The allowlist in `tools/conductor/settings.conductor.json` reads each shell command on its own and
+allows neither `grep`, `awk` nor `sed`, so a pipe is refused at its first part. 0221's
+`awk … | grep -c …` was refused, and the session had to improvise the check. Write the check as
+`git grep -c <pattern> -- <path>`, as a `node` one-liner, or as a property the session checks with
+the Grep tool.
+
 **A plan that adds a user-visible choice names the file key that holds it** —
 [ADR-0240](../../../docs/adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md).
 `config.toml` for the standalone and for any plugin setting, `settings.json` for the studio; the

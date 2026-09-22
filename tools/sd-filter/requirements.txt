@@ -6,7 +6,12 @@
 # sidecar, not so the project can depend on it.
 #
 #   python -m venv .venv
-#   .venv/Scripts/python -m pip install -r tools/sd-filter/requirements.txt
+#   .venv/Scripts/python -m pip install -r tools/sd-filter/requirements.txt    (Windows)
+#   .venv/bin/python -m pip install -r tools/sd-filter/requirements.txt        (Linux)
+#
+# torch 2.6.0 publishes no wheel for CPython 3.14 or newer. Where the system
+# python is newer than that, `uv venv --seed --python 3.12 .venv` builds the
+# venv from 3.12 instead (see README.md).
 #
 # The first run then downloads several gigabytes of weights from Hugging Face.
 #

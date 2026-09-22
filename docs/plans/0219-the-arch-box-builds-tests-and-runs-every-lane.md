@@ -378,8 +378,8 @@ conductor.** The conductor is not verified on Linux until Phase 5, and 0120 is c
 | 2 — The lane contracts stop assuming Windows | dev | done | `ae5b3724` |
 | 3 — The gate is green on this box | dev | done; hardware-adapter bullet not met, see Notes | `eb2c67c3` |
 | 4 — The studio drives a Linux player | studio-builder | done | `b8e9148e` |
-| 5 — The conductor's claims are checked on Linux | dev | in progress: probes, rule parity, tests and `VERIFIED_CLI` landed; the real run waits on a fixture plan | committed with this row |
-| 6 — The diffusion sidecar runs on CUDA | dev | not started | |
+| 5 — The conductor's claims are checked on Linux | dev | done; the run parked on a conductor defect, see Notes | `a42f7c38`, `eab62d65` |
+| 6 — The diffusion sidecar runs on CUDA | dev | done | committed with this row |
 | 7 — A working day on the box | human | not started | |
 
 ### Phase 1 readings (2026-09-22)
@@ -530,6 +530,54 @@ is unchanged.
 of three. The two skips are the `.cmd`-shim cases in `gate.test.mjs` and `with-lock.test.mjs`. They
 now skip with the reason `a .cmd shim and its PATHEXT lookup exist only on Windows`.
 
+**Real run.** `node tools/conductor/conductor.mjs run --lane a --once` on Plan 0221, the docs-only
+fixture `architect` wrote for this (`f3af5df0`), with the queue holding only that plan.
+`conductor: 0221 opened its lane at /home/igor/Work/rlx-plan-0221`, and `git worktree list` shows
+`/home/igor/Work/rlx-plan-0221  7b1a4811 [plan-0221-the-arch-block-names-the-studios-settings-file]`.
+The steps:
+
+- `implement-01`: phases_done in 1 min, $1.01, 28 turns. Commits `fc8f45d` and `d9a9f6e`.
+- `gate pre-review`: green in 8m46s. Checks ok (17, 15 s). The studio's three steps skipped, since
+  the lane has no `studio/node_modules`. `cargo nextest` ran 7m46s: 1774 passed, 0 failed, 7
+  skipped.
+- `review-02`: closed in 9 min, $2.68, 55 turns. Commits `19a2f9d` and `7b1a481`. Its first suite
+  run was served from the ledger. After the close commit it ran the suite again: 6m41s, ok.
+
+The outcome was **`0221 parked (disagreement)`**: `close: finding 0 is fixed_in 19a2f9d6, which does
+not change docs/plans/done/0221-the-arch-block-names-the-studios-settings-file.md` (see Notes).
+`run ended - 0 merged, 1 parked. Nothing was pushed.` The state directory is
+`tools/conductor/state/`: `conductor.json`, `inbox.md`, `live.log`, `transcripts/0221-01-implement.jsonl`
+and `transcripts/0221-02-review.jsonl`. The lane still holds the worktree, pending the owner's
+`resume` or `adopt-close`.
+
+### Phase 6 readings (2026-09-22)
+
+**Environment.** `uv venv --seed --python 3.12 .venv`, then CPython 3.12.14 and
+`.venv/bin/python -m pip install -r tools/sd-filter/requirements.txt`: exit 0 in 270 s, with the pins
+unchanged. `import torch` prints `2.6.0+cu124 True`, `torch.cuda.get_device_name(0)` is
+`NVIDIA GeForce RTX 3080 Laptop GPU`, and `torch.version.cuda` is `12.4`, on driver 610.57.04
+(8192 MiB).
+
+**Check.** `python3 tools/sd-filter/test_sd_filter.py` (system 3.14.7) prints `all checks passed`.
+The colour-table group skips with `no numpy`. `.venv/bin/python tools/sd-filter/test_sd_filter.py`
+also prints `all checks passed`, with no group skipped, including the end-to-end subprocess group
+against `target/release/examples/shot`.
+
+**One real pass.** This is a reading from the Arch box, not a portable figure: RTX 3080 Laptop 8 GB,
+driver 610.57.04, torch 2.6.0+cu124, CPython 3.12.14, Arch Linux. It was the first run, so the
+Hugging Face cache started empty and holds 2.9 GB afterwards. The pipeline was the page's canonical
+one, `shot --preset "Leviathan" --render <4 s synthetic wav> --fps 30 --size 1920x1080 --tier rich`,
+into `sd_filter.py --profile fast --prompt "a vast canyon of luminous glowing rock strata"`, into the
+canonical `ffmpeg` line. `PIPESTATUS 0 0 0`, 289 s of wall time. The filter's own report:
+
+```
+sd-filter: 120 emitted in 286.0 s = 2.383 s per emitted frame, WALL CLOCK (model load 214.9 s of that)
+sd-filter: 40 diffused, mean 1.333 s in the diffusion CALL alone (stride 3), peak VRAM 3.81 GiB
+```
+
+`ffprobe` counts 120 frames at 1920x1080 in the output. `docs/diffusion-filter.md`'s figures are
+unchanged.
+
 ### Notes
 
 - **Phase 2, heredoc probe.** A throwaway repository in the session scratchpad took a commit through
@@ -602,14 +650,24 @@ now skip with the reason `a .cmd shim and its PATHEXT lookup exist only on Windo
   `conductor-no-background.js`'s cases in `hooks.test.mjs` are green here, and the probe shows the
   project `PreToolUse:Bash` hooks running in a Linux headless session. No `run_in_background` call
   was made from a headless session. `VERIFIED_CLI` gained 2.1.278 on the probe rows alone.
-- **Phase 5, resume note (scaffolding; remove when Phase 5 lands).** One done-when is still open:
-  the real conductor run. The owner chose a docs-only fixture plan written by `architect`, not a
-  queued plan. Before resuming, the fixture must be `approved` and listed in
-  `tools/conductor/queue.json`. The queue also still lists 0120, which is done, and 0202, which is
-  mid-flight on `origin/plan-0202-…`. To resume: `node tools/conductor/conductor.mjs check`, then
-  the run. Record the state directory and `git worktree list` showing `~/Work/rlx-plan-NNNN`, flip
-  the row to done, and move on to Phase 6, where the owner has approved the torch and weight
-  downloads.
+- **Phase 5, the real run parked on a conductor defect.** The review of Plan 0221 repaired finding 0
+  in `19a2f9d6`, which edited the plan file at `docs/plans/0221-…md`. The close then moved the plan
+  to `docs/plans/done/`, and its outcome named the finding's `file` by the `done/` path.
+  `repairProblems` in `tools/conductor/lib/close.mjs:123` requires the `fixed_in` commit's changed
+  paths to include `file` as written. It does not follow the rename, so a repaired finding in the
+  plan's own file reports as `disagreement`. Nothing about this is Linux-specific. It is reported
+  here and not repaired. The rule is ADR-0209's, so the repair belongs to `architect`.
+- **Phase 5, four Bash denials in the run's sessions.** In the implement session, the allowlist
+  denied `awk …`, `git -C <lane> add …` and `git -C <lane> commit …`, and the session then committed
+  with plain `git`. In the review session, it denied `env RUSTDOCFLAGS="-D warnings" cargo doc …`.
+  The allowlist carries `RUSTDOCFLAGS=* cargo doc *` but not the `env` spelling, so the session
+  passed the flags through `--config`. The first attempt exited 101, and the quoted form then ran.
+  No rule was changed.
+- **Phase 6, the venv is seeded.** A bare `uv venv` has no `pip`, so the README's
+  `.venv/bin/python -m pip install` line would fail. The README now gives `uv venv --seed`.
+- **Phase 6, not edited.** `docs/diffusion-filter.md`'s "Setup" and its environment check show only
+  the Windows `.venv/Scripts/python` lines, and `tools/sd-filter/README.md` carries the Linux ones.
+  That page is outside Phase 6's file list. `docs/developing.md` cites no venv, so it is unchanged.
 
 ### Close triggers
 
