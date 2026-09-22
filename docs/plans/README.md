@@ -57,7 +57,7 @@ place. The plan file carries the real link.
 | [0217](0217-every-setting-has-a-file-and-a-gate-says-so.md) | Every setting has a file, and a gate says so | approved | dev, studio-builder | ADR-0240: a file defines every setting and the menu edits it. Repairs the one violation - the F3 overlay persists nowhere - then a Rust test and a Node gate hold all three. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | **BLOCKED on 0219** (re-pointed 2026-09-22; the box exists). ADR-0241 + 0242: Linux leads, goldens re-bless on lavapipe. Phase 3 can stop the plan. |
 | [0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) | The Arch box builds, tests and runs every lane | in-progress | human, dev, studio-builder | ADR-0243 (proposed). Phases 1-2 landed 2026-09-22; 0120 runs next, then Phase 3. |
-| [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | draft | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. Phases 5-6 wait for 0120. |
+| [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. Phases 5-6 wait for 0120. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two

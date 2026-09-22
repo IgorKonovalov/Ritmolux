@@ -1,6 +1,6 @@
 # 0220 — The dependencies catch up, and npm gets its gate
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-22
 > **Owner skill(s):** studio-builder, dev, human
 > **Related ADRs:** [0244](../adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md) (proposed),
