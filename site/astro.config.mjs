@@ -331,6 +331,7 @@ export default defineConfig({
             { label: 'Start here', slug: 'start-here' },
             doc('packaging/windows/READ-ME-FIRST.md'),
             doc('packaging/macos/READ-ME-FIRST.md'),
+            doc('packaging/linux/READ-ME-FIRST.md'),
             doc('packaging/foobar/READ-ME-FIRST.md'),
           ],
         },

@@ -7,10 +7,10 @@ it *starts* are in [Configuration](configuration.md).
 
 ## Starting it
 
-A [release download](https://github.com/IgorKonovalov/Ritmolux/releases/latest) unzips and runs;
-nothing installs into the system, and the READ-ME-FIRST file in each zip walks the first launch on
-[Windows](../packaging/windows/READ-ME-FIRST.md), [macOS](../packaging/macos/READ-ME-FIRST.md) and
-[foobar2000](../packaging/foobar/READ-ME-FIRST.md).
+A [release download](https://github.com/IgorKonovalov/Ritmolux/releases/latest) unpacks and runs;
+nothing installs into the system, and the READ-ME-FIRST file in each archive walks the first launch
+on [Windows](../packaging/windows/READ-ME-FIRST.md), [macOS](../packaging/macos/READ-ME-FIRST.md),
+[Linux](../packaging/linux/READ-ME-FIRST.md) and [foobar2000](../packaging/foobar/READ-ME-FIRST.md).
 
 From a source checkout you need a recent stable **Rust** toolchain (the workspace is edition 2024 —
 Rust 1.85+). From the repo root:
@@ -19,8 +19,10 @@ Rust 1.85+). From the repo root:
 cargo run -p standalone --release
 ```
 
-That builds and launches `ritmolux`, the standalone window. **On Windows it captures whatever is
-already playing** (system audio, via WASAPI loopback) — start some music, and the visuals react.
+That builds and launches `ritmolux`, the standalone window. **It captures whatever is already
+playing** — WASAPI loopback on Windows, ScreenCaptureKit on macOS, the default output's monitor
+through PipeWire or PulseAudio on Linux — so start some music, and the visuals react. A Linux build
+needs pkg-config and libpulse's headers (`libpulse-dev` on Ubuntu).
 `--release` is recommended: this is real-time graphics, and the debug build is noticeably slower.
 
 ## Controls
@@ -194,6 +196,9 @@ On **macOS** the standalone gets no metadata: the OS has no supported equivalent
 (`MediaRemote` is private and restricted), which is the same asymmetry loopback
 capture already has. The foobar2000 plugin is the answer on that platform.
 
+On **Linux** the standalone gets no metadata either. The desktop's equivalent is MPRIS over D-Bus,
+and nothing here reads it yet, so the banner simply never fires.
+
 To turn it off entirely, use the settings menu's **Now playing** row — that is
 `[hud] now_playing` in `config.toml`, and like the preset name it survives a
 restart. Off means no track ever reaches the visualizer.
@@ -218,7 +223,9 @@ to are in [Non-functional requirements](nfr.md).
 ## Displays and fullscreen
 
 `D` cycles the window to the next monitor and `F` toggles borderless fullscreen on the one it is
-on; `Esc` leaves fullscreen and never quits. Both write themselves to `config.toml` under
+on; `Esc` leaves fullscreen and never quits. Under a Wayland session on Linux the compositor, not
+the application, decides where a window goes, so `D` may do nothing there — use the desktop's own
+move-to-monitor shortcut. Both write themselves to `config.toml` under
 `[output]`, so a rig set up once opens the same way tomorrow.
 
 A monitor is remembered **by name before index** — `[output] display_name` first, then
@@ -234,3 +241,8 @@ app says so and reopens on that mode's default endpoint, a few times and then no
 Re-plugging does **not** restore the device, and that is why a recovery is the one input change
 that is *not* written to `config.toml`: your `[input] device` still names the interface you chose,
 so the next launch goes back to it. Pick it again from the `S` menu to return to it in this run.
+
+On **Linux** there is one endpoint and no picker: the app always opens the default output's
+monitor, so the `S` menu's input rows are read-only and `[input] device` is inert. If the sound
+server goes away mid-show — `pipewire-pulse` restarted, say — the same bounded reopen applies; to
+listen to a different output, change the system default and restart the app.

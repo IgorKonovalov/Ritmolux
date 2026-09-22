@@ -28,7 +28,7 @@ telemetry.
 | `--events` | — | Report as JSON lines on stderr, for a parent process |
 | `--preview` | `stdout` \| `stdout@WxH` | Mirror the windowed show to a parent process, as a fixed-size copy |
 | `--input` | `loopback` \| `line-in` | Where audio comes from (Windows-only) |
-| `--device` | `"<friendly name>"` | Which capture endpoint to open |
+| `--device` | `"<friendly name>"` | Which capture endpoint to open (Windows-only) |
 | `--tier` | `floor` \| `rich` | Pin the quality tier instead of letting the engine pick |
 | `--osc` | `<host:port>` | Publish analyzer telemetry as OSC over UDP, and turn the sink on |
 | `--control` | `<host:port>` | Listen for studio control messages as OSC over UDP, and turn the listener on |
@@ -254,7 +254,9 @@ capture and a live run resolve the same library.
 ## `config.toml`
 
 A small per-user file under the same directory the presets live in — `%APPDATA%\Ritmolux\` on
-Windows. It is read once at startup and written back whenever a hotkey or a settings row changes a
+Windows, `~/Library/Application Support/Ritmolux/` on macOS, and `$XDG_DATA_HOME/Ritmolux/` on
+Linux, which is `~/.local/share/Ritmolux/` when `XDG_DATA_HOME` is unset (the capital R matters
+there). It is read once at startup and written back whenever a hotkey or a settings row changes a
 choice, so a stage setup survives a restart.
 
 **Every key is optional.** A missing file, a missing section and an unknown extra key all degrade
@@ -293,8 +295,8 @@ boot or a hotplug, so a stored index alone may point at the wrong screen.
 
 ### `[input]`
 
-Where audio comes from. Windows-only; the macOS path taps system audio and takes no endpoint
-choice.
+Where audio comes from. Windows-only; the macOS path taps system audio and the Linux path the
+default output's monitor, and neither takes an endpoint choice — the keys are read and inert there.
 
 | Key | Default | What it means |
 |---|---|---|
@@ -532,6 +534,16 @@ reports nothing**, which looks exactly like a fixture that happens not to be mov
 address by hand, and keep the old show file until each one is confirmed against a playing track.
 **`/v1` did not move**, because no payload, type tag, address suffix, vocabulary or send cadence
 changed: re-point the root, change nothing else, and the mapping is correct.
+
+## Linux
+
+Capture opens the **default output's monitor** — the PulseAudio special source
+`@DEFAULT_MONITOR@` — through PulseAudio's protocol, which PipeWire's `pipewire-pulse` also serves,
+so it works on either sound server with nothing to grant. There is no endpoint choice: `--input`,
+`--device`, `--list-devices` and `[input]` are Windows-only, and changing what the app hears means
+changing the system's default output. The binary links `libpulse.so.0` and will not start on a
+machine with neither server installed. `F3`'s audio line reads `live PulseAudio 48000/2
+@DEFAULT_MONITOR@` when it works.
 
 ## macOS
 

@@ -33,8 +33,9 @@ rustfft = "=6.4.1"
 # The GPU abstraction ADR-0001 commits to; its transitive weight is the one
 # accepted fixed cost (NFR 4). Backends are gated per-OS (NFR 12 primary memory
 # lever): default features are off and the shipped backend is added below, so
-# only one backend's code compiles - dropping the Vulkan/GL/WebGPU paths that are
-# dead weight on the shipped target. `wgsl` keeps our shader frontend; `std` and
+# only one backend's code compiles per target - dropping the paths (GL, WebGPU,
+# and whichever of DX12/Metal/Vulkan is not that target's) that are dead weight
+# there. `wgsl` keeps our shader frontend; `std` and
 # `parking_lot` match wgpu's native defaults.
 wgpu = { version = "=30.0.0", default-features = false, features = [
     "std",

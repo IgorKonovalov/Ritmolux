@@ -1789,7 +1789,7 @@ The engine reports what it could not parse and keeps rendering what it had.
    |----|------------------|
    | Windows | `%APPDATA%\Ritmolux\presets` |
    | macOS | `~/Library/Application Support/ritmolux/presets` |
-   | Linux/other | `$XDG_DATA_HOME/ritmolux/presets` (or `~/.local/share/ritmolux/presets`) |
+   | Linux/other | `$XDG_DATA_HOME/Ritmolux/presets` (or `~/.local/share/Ritmolux/presets`) — the capital R matters |
 
 ### A custom preset folder: `RLX_PRESET_DIR`
 

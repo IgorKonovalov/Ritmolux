@@ -27,8 +27,9 @@ export const REPO_ROOT = fileURLToPath(REPO_ROOT_URL);
  * A file not listed here does not join the site by existing. Adding one means
  * this map AND the sidebar in `astro.config.mjs`.
  *
- * The set is `docs/` plus `presets/README.md` plus the three `READ-ME-FIRST.md`
- * under `packaging/`.
+ * The set is `docs/` plus `presets/README.md` plus the standalone's and the
+ * component's `READ-ME-FIRST.md` under `packaging/` - one per shipped platform
+ * and the component; the studio's is not published.
  * The packaging files are here so the site's installation pages ARE the file a
  * tester finds inside the release zip: a drift between the two is not merely
  * unlikely, it is unrepresentable (ADR-0167).
@@ -86,6 +87,7 @@ export const PUBLISHED = {
   // Get it - the tester's own files, published as they ship (ADR-0167)
   'packaging/windows/READ-ME-FIRST.md': { route: 'install/windows', title: 'Install on Windows' },
   'packaging/macos/READ-ME-FIRST.md': { route: 'install/macos', title: 'Install on macOS' },
+  'packaging/linux/READ-ME-FIRST.md': { route: 'install/linux', title: 'Install on Linux' },
   'packaging/foobar/READ-ME-FIRST.md': {
     route: 'install/foobar',
     title: 'Install the foobar2000 component',

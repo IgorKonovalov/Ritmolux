@@ -33,8 +33,8 @@
 // first, and both needed a gate (ADR-0116).
 //
 // SCOPE IS EVERY PUBLISHED READER DOCUMENT, and the boundary is the list below
-// rather than a rule a script could infer. Two groups are out: the three install
-// pages, which are published exactly as they ship inside a release zip, and the
+// rather than a rule a script could infer. Two groups are out: the install pages,
+// which are published exactly as they ship inside a release archive, and the
 // **Contribute** group — `docs/developing.md`, `docs/testing.md`,
 // `docs/milkdrop-conversion.md`, `docs/releasing.md`,
 // `docs/on-device-validation.md`, `docs/diffusion-filter.md` — which KEEPS its

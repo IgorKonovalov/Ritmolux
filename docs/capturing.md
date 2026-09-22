@@ -1233,7 +1233,8 @@ Highest precedence first:
 3. **`RLX_PRESET_DIR`** — the environment override
    ([ADR-0014](adrs/0014-preset-dir-override-for-dev-iteration.md)).
 4. The per-user preset directory (`%APPDATA%\Ritmolux\presets` on
-   Windows; see [`presets.md`](presets.md#where-preset-files-live)).
+   Windows, `~/.local/share/Ritmolux/presets` on Linux; see
+   [`presets.md`](presets.md#where-preset-files-live)).
 5. The presets compiled into the binary.
 
 The `[source]` label printed after every capture names the winner, so a PNG's
@@ -1836,8 +1837,9 @@ frames emitted against `fps x wall` to see whether the rate was held.
 
 ### What it does not do
 
-- **`--sink spout` is Windows only.** Spout has no macOS form; the analogue there
-  is Syphon, a different SDK against a Metal/IOSurface seam. `--sink stdout` runs
+- **`--sink spout` is Windows only.** Spout has no macOS or Linux form; the
+  macOS analogue is Syphon, a different SDK against a Metal/IOSurface seam, and
+  the Linux build carries no sender at all. `--sink stdout` runs
   wherever the player does.
 - **No audio, on either sink.** Both are video transports. A receiver takes audio
   from its own source.

@@ -447,8 +447,8 @@ wording.
 | 1 — Probe the Ubuntu box before any code is written | human | done | — |
 | 2 — The tree compiles, lints and tests on Ubuntu | dev | done | `120d9f5e` |
 | 3 — The PulseAudio capture backend | dev | done | `9346e3ae` |
-| 4 — The release tarball | dev | done | committed with this row |
-| 5 — The docs say Linux | dev | not started | |
+| 4 — The release tarball | dev | done | `ed74dad1` |
+| 5 — The docs say Linux | dev | done | committed with this row |
 | 6 — Run it on the Ubuntu box | — | moved 2026-09-20 to Plan 0214 Phase 4 | |
 
 ### Notes
@@ -554,6 +554,24 @@ wording.
 - **Followup, not acted on: `ubuntu-latest` is the glibc floor the release notes name as 24.04.**
   The job follows the plan and ADR-0131 in naming `ubuntu-latest`; when GitHub moves that label to
   a newer image the floor moves with it and the notes' "Ubuntu 24.04 or newer" goes false silently.
+- **Phase 3 follow-up commit `486c7041`**: `check-comment-hygiene.mjs` flagged "any more" in
+  `capture_linux.rs`'s drop comment as plan-relative narration once the file was tracked; it passed
+  at Phase 3 only because the file was still untracked when the gate ran.
+- **Phase 5 — the Linux install page joins the site.** `packaging/linux/READ-ME-FIRST.md` is in
+  `PUBLISHED` at `install/linux`, which by that map's own rule also needed the sidebar entry in
+  `site/astro.config.mjs`; `site/src/content/docs/start-here.mdx` gained a Linux card. None of the
+  three `site/` files was built: this checkout has no `site/node_modules`, so `check-site-links.mjs`
+  and `check-site-routes.mjs` did not run.
+- **Phase 5 — files touched beyond the list:** `docs/presets.md` (its Linux path row spelled
+  `ritmolux` lower-case), `core/Cargo.toml` (a comment still saying the Vulkan path is dropped),
+  `scripts/check-reader-prose.mjs` (a comment counting "the three install pages"). `docs/capturing.md`
+  changed in two lines: the per-user directory gains the Linux path, and `--sink spout`'s
+  no-counterpart line names Linux. `docs/nfr.md` §8 read "**Three** zips" before this phase, with
+  five shipping; it is now count-free. §9 gained a row for the Arch box.
+- **Finding, not acted on: the Linux release binary is over NFR §4's standalone soft cap.**
+  `ritmolux` from `stage.sh` measures 12,711,688 B against 10,000,000 B.
+- **Advisory, unchanged by this plan's intent:** `check-translations.mjs` reports `docs/running.ru.md`
+  behind `docs/running.md`, which this phase edited again; the Russian slice was not touched.
 
 ## Risks & open questions
 

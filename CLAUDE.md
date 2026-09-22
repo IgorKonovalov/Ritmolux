@@ -104,16 +104,17 @@ site/                # The documentation front end (ADR-0154): an
                      #   PUBLISHED map in src/plugins/rewrite-links.mjs, which also rewrites every
                      #   relative link at build time: inside the set to a site route, outside it to
                      #   a github.com blob URL. A new doc does not join the site by existing.
-packaging/           # What a `v*` tag ships (ADR-0038) — FIVE zips since Plan 0159. macos/ holds
+packaging/           # What a `v*` tag ships (ADR-0038) — zips, plus the Linux .tar.gz (ADR-0131);
+                     #   the release job's guard holds the exact count per kind. macos/ holds
                      #   bundle.sh — build both Apple targets, lipo, substitute the plist version,
                      #   ad-hoc sign, zip AND verify — so packaging runs the same on a Mac as in CI,
-                     #   not CI-only magic. studio/ holds the same recipe for the studio, once per
-                     #   platform, each carrying a player into resources/player/. foobar/ and spout/
-                     #   stage their pinned SDKs before the build that needs them; windows/ carries
-                     #   no recipe of its own, only its reader. Plus the four
-                     #   READ-ME-FIRST.md a tester finds in the zips; the site publishes THREE of
-                     #   them as its install pages (ADR-0167) — the studio's is not in the
-                     #   PUBLISHED map, and a new one does not join by existing.
+                     #   not CI-only magic; linux/stage.sh does the same for the tarball. studio/
+                     #   holds the same recipe for the studio, once per platform, each carrying a
+                     #   player into resources/player/. foobar/ and spout/ stage their pinned SDKs
+                     #   before the build that needs them; windows/ carries no recipe of its own,
+                     #   only its reader. Plus the READ-ME-FIRST.md a tester finds in each archive;
+                     #   the site publishes every one but the studio's as its install pages
+                     #   (ADR-0167), and a new one does not join the PUBLISHED map by existing.
 docs/                # Full one-line-per-doc map: README.md "Repository layout". Five *.ru.md carry a
                      #   translated slice, each stamped with the commit it was made from (ADR-0185).
                      #   The load-bearing set:
@@ -427,17 +428,18 @@ audio + graphics**, where the usual "just allocate and log it" habits cause glit
 
 ## Platform realities (don't rediscover these)
 
-- **Loopback capture is not symmetric.** Windows has first-class WASAPI loopback. macOS does
-  **not** — it needs ScreenCaptureKit (macOS 13+) or a virtual device (BlackHole). So
-  "capture any app's audio" is Windows-first; the Mac capture path is a later, asterisked phase.
-  The foobar-plugin path sidesteps capture entirely (foobar hands us samples), which is one
-  reason plugin parity is valuable on Mac. Linux reads the desktop's audio from PulseAudio's
-  monitor source, which PipeWire serves through `pipewire-pulse` (ADR-0131).
+- **Loopback capture is not symmetric.** Windows has first-class WASAPI loopback, with device
+  selection. macOS does **not** — it needs ScreenCaptureKit (macOS 13+) or a virtual device
+  (BlackHole), and that path has never run on Apple hardware. Linux has no kernel-level answer:
+  it reads the default sink's `@DEFAULT_MONITOR@` through PulseAudio's simple API, which
+  PipeWire serves through `pipewire-pulse`, with no device picker (ADR-0131). So only Windows
+  selects an endpoint. The foobar-plugin path sidesteps capture entirely (foobar hands us
+  samples), which is one reason plugin parity is valuable on Mac.
 - **foobar2000's plugin SDK is C++ and Windows-centric.** The plugin is a C++ shim; it does
   not reuse Rust source directly — it links the core's compiled C ABI. Keep that seam thin.
-- **wgpu targets differ per OS.** Metal on macOS, DX12 on Windows, Vulkan on Linux. Write to wgpu;
-  don't branch on the backend in scene code. *(2026-09-22: `core/Cargo.toml` declares no Linux
-  backend yet, so a Linux build finds no adapter until Plan 0120 Phase 2 adds the `vulkan` arm.)*
+- **wgpu targets differ per OS.** Metal on macOS, DX12 on Windows, Vulkan on Linux — one backend
+  compiled per target in `core/Cargo.toml`. Write to wgpu; don't branch on the backend in scene
+  code.
 
 ## Commit hygiene
 

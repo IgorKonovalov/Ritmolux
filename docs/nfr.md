@@ -129,6 +129,9 @@ the decision that moved it is linked.
 
 - **Windows:** Windows 10 1903+, any DX12-capable GPU **including integrated** (~2015+ Intel/AMD iGPU).
 - **macOS:** macOS 13+ (ScreenCaptureKit floor), Metal via wgpu.
+- **Linux:** Ubuntu 24.04 or newer, x86_64 (the release runner's glibc is the floor), Vulkan via
+  wgpu, and a PulseAudio-protocol sound server — PipeWire's `pipewire-pulse` or PulseAudio itself
+  ([ADR-0131](adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md)).
 - **foobar2000:** current stable release, Windows only (per [ADR-0001](adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)).
 - Scene code never branches on backend or OS; the baseline constrains shader features globally.
 
@@ -222,8 +225,8 @@ the decision that moved it is linked.
 
 ## 7. CI
 
-- GitHub Actions from the start (right after the workspace scaffold): Windows + macOS
-  runners running `cargo build`, `cargo nextest run`, `cargo test --doc`,
+- GitHub Actions from the start (right after the workspace scaffold): a runner for every shipped
+  standalone platform — Windows, macOS and Linux — running `cargo build`, `cargo nextest run`, `cargo test --doc`,
   `cargo clippy --all-targets -- -D warnings`, `cargo fmt --all --check` on every push.
   **All of those carry `--workspace` since [ADR-0072](adrs/0072-the-c-abi-ships-from-its-own-crate.md)**,
   and it is load-bearing rather than stylistic: `rlx-core-cabi` is deliberately outside the workspace
@@ -307,19 +310,24 @@ the decision that moved it is linked.
 Delivered by `.github/workflows/release.yml` on a pushed `v*` tag
 ([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
 [ADR-0115](adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md)).
-**Three** zips, attached to a GitHub **prerelease** — a plain download URL, no account needed,
-because the repository is public.
+One archive per artifact — zips, and a `.tar.gz` for Linux — attached to a GitHub
+**prerelease**: a plain download URL, no account needed, because the repository is public. The
+studio's archives are its own
+([ADR-0178](adrs/0178-the-studio-shell-conventions.md)) and are not listed here.
 
 - **Windows**: `ritmolux.exe`, x64, **unsigned** (SmartScreen warning accepted).
 - **macOS**: a **universal** (arm64 + Intel) `Ritmolux.app`, **ad-hoc signed and
   unnotarized**. Ad-hoc signing buys a stable code identity for the Screen Recording grant to
   bind to; it is *not* Developer ID, so Gatekeeper still quarantines the download and the grant
   does not survive a rebuild. Requires macOS 13+.
+- **Linux**: `ritmolux`, x86_64, in a `.tar.gz`, built on `ubuntu-latest`, so that image's glibc is
+  the floor (Ubuntu 24.04). Links `libpulse.so.0` and will not start without it
+  ([ADR-0131](adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md)).
 - **foobar2000 component**: `foo_ritmolux.fb2k-component`, **x64 only**, for foobar2000 v2. Built
   by `packaging/foobar/build-component.ps1` against a **pinned, checksummed** SDK release that
   the workflow fetches (`packaging/foobar/sdk-pin.ps1`). Unsigned, like the rest.
-- All three zips carry a `READ-ME-FIRST.txt`; the two standalone ones also carry a reference
-  copy of `presets/*.toml`.
+- Every archive carries a `READ-ME-FIRST.txt`; the standalone ones also carry a reference copy of
+  `presets/*.toml`.
 
 **The component ships as of [Plan 0102](plans/done/0102-the-component-ships.md)** (2026-08-16). This paragraph previously read
 "Standalone only — CI does not ship a `.fb2k-component`", on the grounds that the SDK is
@@ -344,6 +352,7 @@ later plan + human task.
 |---------|-----------|
 | Primary Windows dev box | Standalone Windows path, plugin, day-to-day dev |
 | Older Windows PC (iGPU) | The performance floor (§1) on baseline hardware (§2) |
+| Arch Linux laptop (AMD iGPU + NVIDIA dGPU, PipeWire) | The Linux standalone path, live monitor capture, Vulkan on hardware and llvmpipe |
 | foobar2000 (installed) | Plugin loading + `visualisation_stream` behavior |
 
 **There is no Mac in this matrix, and that is the point of §8's macOS artifact.** An earlier

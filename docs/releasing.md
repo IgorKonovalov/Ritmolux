@@ -97,29 +97,34 @@ git push origin vX.Y.Z
 That fires [`.github/workflows/release.yml`](../.github/workflows/release.yml)
 ([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
 [ADR-0115](adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md)),
-which builds the macOS standalone, the Windows standalone, the foobar2000 component and the two
-studio zips ([ADR-0178](adrs/0178-the-studio-shell-conventions.md)) in parallel and, only if
-**all five** are green, publishes a GitHub **prerelease** carrying five zips:
+which builds the macOS, Windows and Linux standalone
+([ADR-0131](adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md)), the
+foobar2000 component and the two studio zips
+([ADR-0178](adrs/0178-the-studio-shell-conventions.md)) in parallel and, only if **every one** is
+green, publishes a GitHub **prerelease** carrying five zips and one tarball:
 
 ```text
 ritmolux-v<version>-macos-universal.zip          # universal .app, ad-hoc signed
 ritmolux-v<version>-windows-x64.zip              # ritmolux.exe
+ritmolux-v<version>-linux-x64.tar.gz             # ritmolux, x86_64, built on ubuntu-latest
 ritmolux-v<version>-foobar2000-component.zip     # foo_ritmolux.fb2k-component, x64
 ritmolux-studio-v<version>-macos-universal.zip   # universal Studio.app, ad-hoc signed
 ritmolux-studio-v<version>-windows-x64.zip       # Ritmolux Studio.exe
 ```
 
-Each carries a `READ-ME-FIRST.txt`; the two standalone zips also carry a reference copy of
+Each carries a `READ-ME-FIRST.txt`; the standalone archives also carry a reference copy of
 `presets/*.toml`. **The two studio zips carry a player of their own**, at `resources/player/`
 inside the application, so a tester who takes the studio needs nothing else — that is the whole
 reason the studio is a release artifact rather than a checkout-only tool. If any build fails, the
 release job is **skipped** and no release exists — there is no half-published state. Re-running
 the same tag's workflow replaces the assets rather than failing.
 
-The publish step asserts the count is exactly five, so a job that silently stopped producing
-its artifact fails the release instead of shortening it.
+The publish step asserts exactly five zips **and** exactly one tarball, counted per kind, so a job
+that silently stopped producing its artifact fails the release instead of shortening it — a count
+of zips alone would pass a release that shipped nothing for Linux. Both `gh release` commands
+upload the two kinds it counted.
 
-**Every zip's name carries the version from `[workspace.package]`, the studio's included.**
+**Every archive's name carries the version from `[workspace.package]`, the studio's included.**
 `studio/package.json` has a `version` field of its own and `cargo-release` does not touch it, so
 the two packaging scripts override it at build time (`-c.extraMetadata.version`) rather than read
 it. The macOS script then reads the version back out of the built `Info.plist` and fails if it
@@ -143,7 +148,7 @@ gh auth refresh -s workflow
 ```
 
 To rehearse the builds, run the workflow from the Actions tab (`workflow_dispatch`): it produces
-all five zips as **run artifacts**. Note that a `workflow_dispatch` is only offered once the
+every archive as **run artifacts**. Note that a `workflow_dispatch` is only offered once the
 workflow file exists on the default branch.
 
 **A dispatch never publishes, on any ref — a tag included.** The `release` job's condition names
@@ -173,8 +178,19 @@ with the feature:
 .\packaging\studio\build-studio.ps1       # same script, same checks, as CI runs
 ```
 
-Its macOS sibling is `packaging/studio/bundle-studio.sh`, and like `packaging/macos/bundle.sh` it
-needs a Mac — the ad-hoc signature, the `lipo` calls and the `plutil` assertions have no Windows
+The Linux tarball rehearses on any Linux box with pkg-config and libpulse's headers installed —
+the same script and the same checks as CI's `linux` job:
+
+```sh
+bash packaging/linux/stage.sh             # --skip-build reuses target/release/ritmolux
+```
+
+It is **not** the shippable tarball when built anywhere newer than the runner: the binary requires
+the glibc of the machine that linked it, and CI's `ubuntu-latest` is the floor the release notes
+name.
+
+The Windows studio's macOS sibling is `packaging/studio/bundle-studio.sh`, and like
+`packaging/macos/bundle.sh` it needs a Mac — the ad-hoc signature, the `lipo` calls and the `plutil` assertions have no Windows
 equivalent. Both take `--skip-build` / `-SkipBuild` to reuse the release binaries and the
 installed `node_modules`, for iterating on the zip's layout without paying for an `lto = "fat"`
 rebuild.

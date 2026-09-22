@@ -4,9 +4,9 @@ The checks CI cannot run, because they need a real GPU, live system audio, a foo
 lighting rig. This is a **maintainer's checklist** — the person who has that hardware works through
 it by hand and reports what they saw.
 
-> **Status:** standing / mostly hardware-gated — **does not block plan closes.** (Two items, the
-> Plan 0044 `Rich` calibration and the Plan 0102 foobar2000 component install, are runnable on the
-> dev box today; each has its own section. A third, the Plan 0152 OSC re-point, is gated on the
+> **Status:** standing / mostly hardware-gated — **does not block plan closes.** (Three items, the
+> Plan 0044 `Rich` calibration, the Plan 0102 foobar2000 component install and the Linux
+> standalone on a real desktop, are runnable today; each has its own section. A third, the Plan 0152 OSC re-point, is gated on the
 > lighting rig rather than on a GPU — the file's purpose is the same for it.)
 > **Owner:** human (the user; only runnable on the target hardware, or at the rig).
 > **Created:** 2026-07-22 (extracted from Plan 0012 Phase 3).
@@ -738,6 +738,43 @@ than a reading; the number this item exists to produce is the release one, at th
       frames is not a reading**: the frame count on the exit line is ADR-0172's witness that the
       readback actually ran.
       _(Plan 0158 Phase 7, extracted at that plan's close 2026-09-10.)_
+
+## Runnable now — the Linux standalone on a real desktop ([ADR-0131](adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md))
+
+**Not hardware-gated for any one vendor**, and it is the only functional check the Linux capture
+path has: no CI runner has a sound server with something playing, so `capture_linux.rs` is
+compiled and linted on every push and executed only here. The scope is the **artifact that
+ships** — the `.tar.gz` from a `v*` tag or a `workflow_dispatch` run, unpacked on a real desktop
+— not a `cargo run`, whose binary was linked against the box's own glibc and says nothing about
+the runner's. [Plan 0214](plans/0214-the-linux-arm-reports-back.md) Phase 4 runs this list on the
+Ubuntu box.
+
+Run it from the graphical session, not over SSH — there is no user sound server to reach there —
+with music playing at a normal volume.
+
+- [ ] **It extracts and launches.** Record whether `chmod +x ritmolux` was needed (the tar header
+      carries the bit; `packaging/linux/stage.sh` asserts it), and the distribution, version and
+      `$XDG_SESSION_TYPE`.
+- [ ] **F3's `audio` line reads `live PulseAudio 48000/2 @DEFAULT_MONITOR@`, and the visuals react.**
+      The endpoint is the server's special name because the simple API cannot ask what it resolved
+      to; `pactl get-default-sink` names the sink behind it. A `failed PulseAudio …` line is a
+      finding with its reason attached; `unsupported` means the wrong arm compiled.
+- [ ] **`~/.local/share/Ritmolux/` appears** (capital R) and holds `config.toml`, the preset copy
+      and `diagnostics.log`, whose `capture` column carries the same token.
+- [ ] **`F` toggles fullscreen. `D` moves to the next monitor, or is a no-op** — expected under
+      Wayland, where the compositor places windows. Recorded either way, not treated as a bug.
+- [ ] **The frame rate F3 shows, the adapter the `# renderer adapter` line of `diagnostics.log`
+      names, and whether the tier auto-dropped.** On a laptop with two GPUs, note which one wgpu
+      picked; `ritmolux --list-adapters` prints the roster.
+- [ ] **Capture follows a change of default sink.** Stop the app, switch the default output in the
+      desktop's sound settings (or `pactl set-default-sink`), relaunch: the bands move with what
+      the new sink plays. A Bluetooth sink is worth one run, since that is what Plan 0120 Phase 1
+      probed against.
+- [ ] **Stopping the sound server mid-run degrades rather than hangs.** `systemctl --user restart
+      pipewire-pulse` while it runs: the `capture` column moves off `live`, the shell's bounded
+      recovery reopens `@DEFAULT_MONITOR@`, and closing the window afterwards exits at once.
+
+Anything that fails becomes a backlog entry, not a silent fix.
 
 ## How to run
 

@@ -14,7 +14,7 @@ where they came from, which is the single abstraction that lets one visual codeb
 ```mermaid
 flowchart TD
     subgraph external["Audio sources"]
-        loop["OS loopback capture<br/>(WASAPI / ScreenCaptureKit)"]
+        loop["OS system-audio capture<br/>(WASAPI / ScreenCaptureKit / PulseAudio monitor)"]
         fb["foobar2000<br/>visualisation_stream"]
     end
 
@@ -36,7 +36,8 @@ flowchart TD
     standalone -->|"push PCM frames"| ring
     plugin -->|"push PCM frames (C ABI)"| ring
     render -->|Metal| macos["macOS"]
-    render -->|"DX12 / Vulkan"| windows["Windows"]
+    render -->|DX12| windows["Windows"]
+    render -->|Vulkan| linux["Linux"]
 ```
 
 The seam between audio and picture is that **lock-free ring buffer**. Audio arrives at the sound
@@ -161,8 +162,8 @@ out of.
 
 ### Present
 
-The frame goes to the display through the graphics abstraction — Metal on macOS, DX12 or Vulkan on
-Windows. Nothing in a scene knows which; that is the point of writing to one abstraction, and it is
+The frame goes to the display through the graphics abstraction — Metal on macOS, DX12 on Windows,
+Vulkan on Linux. Nothing in a scene knows which; that is the point of writing to one abstraction, and it is
 [the founding decision](adrs/0001-rust-core-wgpu-cabi-foobar-shim.md).
 
 ## Quality tiers

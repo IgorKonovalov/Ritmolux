@@ -6,8 +6,8 @@ petals, with pale swept arcs opening outward into black](docs/images/hero.png)
 A lightweight, real-time music visualizer built around one **shared Rust core** that turns a
 stream of PCM audio samples into GPU-rendered visuals. Two frontends consume that core:
 
-- **Standalone app** (Windows + macOS) — pure Rust (`winit` + `wgpu`), fed by OS loopback
-  audio capture.
+- **Standalone app** (Windows, macOS and Linux) — pure Rust (`winit` + `wgpu`), fed by the OS's
+  system-audio capture.
 - **foobar2000 plugin** (Windows-first) — a thin **C++ shim** over the core's **C ABI**, fed by
   foobar's own `visualisation_stream` (no loopback needed on that path).
 
@@ -33,7 +33,8 @@ preset that ships.
 > picture anywhere of the preset browser, the settings menu or the `F3` overlay.
 
 > **Status: pre-1.0, in active development.** Both frontends run **and both ship**: the standalone
-> app renders live WASAPI loopback on Windows, and the foobar2000 component links the core's C ABI
+> app renders live WASAPI loopback on Windows (and ships for macOS and Linux beside it), and the
+> foobar2000 component links the core's C ABI
 > and is attached to every `v*` tag since `v0.70.0`. The preset format and the C ABI may still
 > change between releases — stability begins at 1.0.0. See [`docs/plans/`](docs/plans/) for what's
 > in flight.
@@ -41,18 +42,19 @@ preset that ships.
 ## Download
 
 Prebuilt binaries are attached to each tag on the
-[Releases page](https://github.com/IgorKonovalov/Ritmolux/releases). One zip per artifact, each
+[Releases page](https://github.com/IgorKonovalov/Ritmolux/releases). One archive per artifact, each
 carrying a `READ-ME-FIRST.txt`:
 
-| Zip | What's in it |
+| Archive | What's in it |
 |-----|--------------|
 | `ritmolux-…-macos-universal.zip` | `Ritmolux.app` — universal (Apple Silicon + Intel), **macOS 13+** |
 | `ritmolux-…-windows-x64.zip` | `ritmolux.exe` — Windows x64 |
+| `ritmolux-…-linux-x64.tar.gz` | `ritmolux` — Linux x86_64, **Ubuntu 24.04 or newer**, needs PipeWire or PulseAudio |
 | `ritmolux-…-foobar2000-component.zip` | `foo_ritmolux.fb2k-component` — foobar2000 v2, **x64 only** |
 | `ritmolux-studio-…-macos-universal.zip` | `Ritmolux Studio.app` — the editor, universal, **macOS 13+** |
 | `ritmolux-studio-…-windows-x64.zip` | `Ritmolux Studio.exe` — the editor, Windows x64 |
 
-The two standalone zips also carry a reference copy of the presets.
+The standalone archives also carry a reference copy of the presets. There is no Linux studio.
 
 The **studio** is the window where you change what the visualizer draws while it is drawing it: it
 starts a player and edits a preset live. Each studio zip carries its own copy of that player, so it
@@ -69,8 +71,10 @@ xattr -dr com.apple.quarantine Ritmolux.app
 ```
 
 The macOS build then asks for the **Screen Recording** permission — that is the only first-party
-way to tap system audio — and needs a **relaunch** after you grant it. Releases are marked
-prerelease while the app is `0.x`. The `READ-ME-FIRST.txt` in each zip has the rest.
+way to tap system audio — and needs a **relaunch** after you grant it. The Linux build is a
+tarball: unpack it and run `./ritmolux`; it hears the default output's monitor through PipeWire's
+or PulseAudio's server, and will not start at all without `libpulse.so.0`. Releases are marked
+prerelease while the app is `0.x`. The `READ-ME-FIRST.txt` in each archive has the rest.
 
 ### The foobar2000 component
 
@@ -147,9 +151,11 @@ site/                # The documentation site: an Astro Starlight front end publ
                      #   copied, and links are rewritten at build time. See ADR-0154.
 packaging/           # What a `v*` tag ships, one recipe per artifact, each doing its own verification
                      #   so a local run is held to CI's bar: macos/bundle.sh (build, lipo, sign, zip,
-                     #   verify), foobar/ (fetch the pinned SDK, build, stamp, package, verify) and
-                     #   studio/ (the same recipe per platform for the studio zip).
-                     #   Plus the READ-ME-FIRST.md testers get in each zip. See ADR-0038, ADR-0115.
+                     #   verify), linux/stage.sh (build, stage, tar, verify), foobar/ (fetch the
+                     #   pinned SDK, build, stamp, package, verify) and studio/ (the same recipe per
+                     #   platform for the studio zip).
+                     #   Plus the READ-ME-FIRST.md testers get in each archive. See ADR-0038,
+                     #   ADR-0115, ADR-0131.
 docs/
 ├── running.md       # What the app does once it is open: keys, menus, console, tiers, displays.
 ├── configuration.md # Every flag, environment variable and config.toml key, with defaults and precedence.
@@ -190,15 +196,16 @@ Running an approved plan with nobody at the keyboard is the conductor's job, and
 commands, what to read the next morning, and how it stays safe.
 
 A Russian slice publishes beside the English: `docs/running.ru.md`, `docs/how-it-works.ru.md` and
-three of the four `packaging/*/READ-ME-FIRST.md`. Each carries a `translated-from` stamp naming the
+three of the `packaging/*/READ-ME-FIRST.md` (Windows, macOS and the foobar2000 component). Each carries a `translated-from` stamp naming the
 commit it was made from, so staleness is visible rather than assumed
 ([ADR-0185](docs/adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)).
 
 ## Running it
 
-From a source checkout, `cargo run -p standalone --release` builds and launches `ritmolux`. **On
-Windows it captures whatever is already playing** (system audio, via WASAPI loopback) — start some
-music, and the visuals react.
+From a source checkout, `cargo run -p standalone --release` builds and launches `ritmolux`. **It
+captures whatever is already playing** — WASAPI loopback on Windows, ScreenCaptureKit on macOS, the
+default sink's monitor through PulseAudio's protocol on Linux — so start some music, and the
+visuals react. A Linux build needs pkg-config and libpulse's headers.
 
 | Key       | Action                                                      |
 |-----------|-------------------------------------------------------------|
@@ -359,15 +366,20 @@ OpenGL) recorded.
   permission; macOS has no equivalent, so the Mac path goes through **ScreenCaptureKit** (macOS
   13+) and a user-granted Screen Recording permission. Both are implemented; only the Windows
   one has been exercised on real hardware. A virtual device (BlackHole) remains the fallback if
-  the SCK route disappoints — set it as the output and no capture code is needed. The foobar
-  plugin sidesteps capture entirely, which is part of why plugin parity is valuable on Mac.
+  the SCK route disappoints — set it as the output and no capture code is needed. Linux has no
+  kernel-level answer: recording what the machine plays is a sound-server concept, so the Linux
+  path opens the default sink's **monitor** source through PulseAudio's protocol, which
+  `pipewire-pulse` also serves
+  ([ADR-0131](docs/adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md)). It
+  has no device picker. The foobar plugin sidesteps capture entirely, which is part of why plugin
+  parity is valuable on Mac.
 - **The Mac build is made by CI, not here.** The dev box is Windows and cannot link a Mach-O
   binary, so a macOS runner is the only build host — which is why the `.app` arrives through a
   tag-driven release rather than from anyone's machine
   ([ADR-0038](docs/adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)). `packaging/macos/bundle.sh`
   is checked in and runs standalone on any Mac, so that is not a permanent condition.
-- **wgpu targets differ per OS** — Metal on macOS, DX12/Vulkan on Windows. Scene code writes to
-  wgpu and does not branch on the backend.
+- **wgpu targets differ per OS** — Metal on macOS, DX12 on Windows, Vulkan on Linux. Scene code
+  writes to wgpu and does not branch on the backend.
 
 ## License
 
