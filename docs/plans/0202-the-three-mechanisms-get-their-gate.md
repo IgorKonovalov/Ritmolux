@@ -13,6 +13,29 @@
 > go/no-go waits on). **Neither entry is closed by this plan** — both stay live, each with a dated
 > bullet naming what this plan recorded.
 
+> **Amended 2026-09-22 (architect), unparking Phase 3.** The park asked two narrow questions of the
+> reference, and `xeiraex/milkdrop2` `d4c843a` answers both.
+> - **At `fVideoEchoAlpha = 1` MilkDrop discards the base, as ADR-0119 does.**
+>   `ShowToUser_NoShaders` (`vis_milk2/milkdropfs.cpp:4202`) weights pass 0 by `1 - alpha` and pass 1
+>   by `alpha`, which is `mix(base, echo, alpha)`.
+> - **The echo is not recursive.** Both passes sample `m_lpVS[1]` (`:4058`), which is this frame's
+>   warped image with the waves drawn in. The composite writes only to the back buffer, and nothing
+>   copies it back into `VS`.
+>
+> So Phase 3's premise, *"the previous frame composited at the bound scale"*, does not describe the
+> reference, and ADR-0119 stands. It gains an `Outcome` recording this. *Songflower* is a MilkDrop 1
+> preset with no `comp_` lines, so our `PRESENT_SHADER` is the right path for it. The only feedback
+> loop that can build a nested weave is `VS` -> warp -> `VS`. That is inference, and attributing the
+> weave is now Phase 5's question, not Phase 3's.
+>
+> **The reading found one real divergence, and Phase 3 is re-scoped to it: the orientation
+> quantizer.** The reference takes `(int)echo_orient % 4` (`:4149`), which truncates toward zero and
+> keeps C's sign. It flips x when that value is odd and y when it is `>= 2` (`:4191-4199`).
+> `echo_orientation` in `core/src/render/scenes/warp_mesh/mod.rs` rounds instead, and wraps with
+> `rem_euclid`. *Songflower* drives `echo_orient` over roughly `0.76..1.24` around its stored `1`:
+> the reference switches between no flip and an x-flip with the sign of its `pfdy_r`, and ours is
+> always x-flipped. Negative values also differ: the reference never flips y for them.
+
 ## TL;DR
 
 The MilkDrop import's motivating claim — that the same preset should look better here — has come
@@ -89,18 +112,28 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
   state) rather than as a frozen level; and every baseline the repair moved is re-blessed with the
   move named in the log.
 
-### Phase 3 — The echo nests
+### Phase 3 — The echo orientation truncates as the reference does
 - **Owner skill:** dev
-- **What:** make `fVideoEchoAlpha`, `echo_zoom` and `echo_orient` produce the reference's nesting —
-  the previous frame composited at the bound scale and orientation, at the bound alpha, as
-  `xeiraex/milkdrop2` `d4c843a` composites it. *Songflower (Moss Posy)* is the case that reads wrong
-  and the one to judge against.
-- **Files touched:** `core/src/render/scenes/warp_mesh/` (the composite path and its shaders),
-  `core/src/milk/outputs.rs` if the binding does not reach the composite, the scene's tests
-- **Done when:** a converted *Songflower* draws a nested weave rather than the bare grid; a test
-  asserts the echo composite reads its three bound parameters, each moved independently and each
-  changing the frame in the direction the source's own arithmetic says; and no preset without an
-  echo binding changes at all, shown by the golden set staying green.
+- **Re-scoped 2026-09-22** (see the amendment under the header). The nesting this phase first asked
+  for is not what the reference does, so the composite's blend and source stay exactly as ADR-0119
+  has them.
+- **What:** `echo_orientation` maps a continuous `echo_orient` onto its two flip bits the way
+  `d4c843a` does. Truncate toward zero, take the remainder with the dividend's sign, flip x when it is
+  odd, and flip y when it is `2` or `3`. A non-finite value stays `0`, because the reference's
+  `(int)NaN` is undefined and losing the echo over it would be worse. The function's doc comment
+  describes the new mapping, and the old *"wraps rather than clamping"* rationale goes.
+- **Files touched:** `core/src/render/scenes/warp_mesh/mod.rs`, the scene's tests
+  (`core/src/render/scenes/warp_mesh/tests.rs`).
+- **Done when:**
+  - A table-driven test asserts the flip bits for inputs covering both sides of each integer and
+    both signs: `0.76`, `0.99`, `1.0`, `1.24`, `1.99`, `2.5`, `3.7`, `4.2`, `-0.5`, `-1.2`, `-2.5`,
+    `-3.7`, and `NaN`. The expected values are derived in the test's comments from the two quoted
+    reference lines, not from running the new code.
+  - No preset whose `echo_orient` is a non-negative integer changes, shown by the golden set staying
+    green. That is every shipped preset: an integer rounds and truncates alike.
+  - The phase log records, for a converted *Songflower* at `shot --signal dynamic:110`, two frames on
+    either side of an `echo_orient` crossing of `1.0` showing the flip changing. This is a reading,
+    not a look verdict; the look is Phase 5's.
 
 ### Phase 4 — The waveform scale is measured per mode
 - **Owner skill:** dev
@@ -143,9 +176,10 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 - **Phase 1 may falsify its own candidate**, and then two washed pairs have no named mechanism and
   Phase 5's verdict will say so. That is the plan working, and it is why Phase 2 carries a
   do-not-run condition rather than an assumption.
-- **Phase 3 is the least-scoped phase here.** The reference's echo is a composite stage this engine
-  approximates; if reading `d4c843a` shows it is a larger divergence than a binding that does not
-  reach the composite, the phase should stop and report rather than grow.
+- ~~**Phase 3 is the least-scoped phase here.**~~ Discharged 2026-09-22: it stopped and reported as
+  this line asked, and the reading re-scoped it to the orientation quantizer. **Songflower's missing
+  weave is now unattributed**, and Phase 5 names it as such unless the orientation fix alone
+  restores it.
 - **Phases 5 and 6 are `human` and both need the rig and the corpus**, which live outside this
   checkout. Under the conductor the plan parks in front of Phase 5; that is expected and correct.
 - **A fourth "not better" is a real possibility.** The plan's value does not depend on the verdict

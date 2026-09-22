@@ -1,6 +1,6 @@
 # ADR-0119 — The video echo blends toward its copy rather than adding it
 
-> **Status:** accepted 2026-08-19 (Plan 0109)
+> **Status:** accepted 2026-08-19 (Plan 0109) — with an **Outcome** (2026-09-22) confirming the blend and correcting the orientation quantizer
 > **Date:** 2026-08-19
 > **Related plan(s):** [0109](../plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phases 3 and 7
 
@@ -118,3 +118,22 @@ The gate that produced this ADR also retracted a second Plan 0108 observation �
 "hue magenta where the reference is green", which is three independent per-channel LFOs on `time` and
 so measures only the phase difference between two renderers started at different moments. Recorded
 here because both retractions came from the same sitting and neither is about this decision.
+
+## Outcome (added 2026-09-22, at Plan 0202's Phase 3 park)
+
+**The decision is confirmed against the source.** `xeiraex/milkdrop2` `d4c843a` does what this ADR
+chose. `ShowToUser_NoShaders` (`vis_milk2/milkdropfs.cpp:4202`) weights the base pass by
+`1 - fVideoEchoAlpha` and the echo pass by `fVideoEchoAlpha`, and the generated default comp shader
+(`plugin.cpp:9594-9632`) writes the same `lerp`. At `alpha = 1` the reference discards the base,
+exactly as `mix(base, echo, alpha)` does here. The echo is also not recursive in the reference: both
+passes sample this frame's warped texture (`:4058`), and nothing copies the composite back into the
+feedback field. Plan 0202 Phase 3 had asked for a previous-frame echo, and was re-scoped rather than
+built.
+
+**One claim in this record is falsified.** Alternative C calls the orientation quantizer
+*"correct ... verified independently"*. The reference truncates `(int)echo_orient % 4` toward zero
+and keeps C's sign (`:4149`, flips at `:4191-4199`), while ours rounds and wraps with `rem_euclid`.
+The two agree on every non-negative integer, which is every value a stored `nVideoEchoOrientation`
+can take. They disagree on a per-frame program that sweeps the value. *Songflower (Moss Posy)*
+sweeps `0.76..1.24` and alternates between no flip and an x-flip in the reference, where ours is
+always x-flipped. The repair is Plan 0202 Phase 3.
