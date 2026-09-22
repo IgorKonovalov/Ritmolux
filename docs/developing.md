@@ -170,9 +170,12 @@ When they run, the line names the first path that matched:
 pre-push: running the cargo steps: push-scope: f2bf1dd..60f4c28 touches Cargo.lock (rule Cargo.lock): yes
 ```
 
-**Whatever the hook cannot read runs all four, and the line says why**: a branch that is new on the
+**Whatever the hook cannot read runs all four, and the line says why**: a ref that is new on the
 remote (there is no range to compare against), an empty or unparseable stdin, a push of nothing but
 deletions, a shallow clone, a sha this clone does not hold, or the hook run by hand from a terminal.
+**A new tag is a new ref too**, so a push carrying a release tag — every close push made with
+`git push --follow-tags` — runs the cargo steps even when the branch beside it moved no Rust; the
+test step can still be served from the ledger.
 
 **The test step is served instead of run when the suite ledger already proves the tree.** Before it,
 `node tools/conductor/suite-record.mjs` asks the ledger

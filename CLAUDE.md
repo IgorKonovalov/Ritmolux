@@ -236,6 +236,10 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   everyday loop's cargo JSON no longer reports from <target>/debug/deps/
                      #   (dry run by default, --apply, --verify-fresh). A person runs it when
                      #   the disk fills; it judges no build (docs/developing.md "Disk").
+                     #   A HOOK HELPER, the fourth kind: push-scope.mjs answers whether a pushed
+                     #   range touches a path in push-scope.manifest.mjs - data, like the gate
+                     #   manifest - and pre-push runs its cargo steps only when it does
+                     #   (ADR-0237). The hook calls it; its --self-test runs only by hand.
 ```
 
 ## Machine setup: the linker override (opt-in, and inert if skipped)
