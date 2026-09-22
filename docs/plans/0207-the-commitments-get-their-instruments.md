@@ -168,8 +168,8 @@ so a conductor run parks in front of it.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The exe is measured, capped and reported | dev | done | committed with this row |
-| 2 — The report says what a preset costs | dev | not started | |
+| 1 — The exe is measured, capped and reported | dev | done | 0b018885 |
+| 2 — The report says what a preset costs | dev | done | committed with this row |
 | 3 — The floor is measured where it is claimed | human | not started | |
 
 ### Notes

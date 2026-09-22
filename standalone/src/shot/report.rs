@@ -13,6 +13,7 @@
 //! part of the library while `image` stays a dev-dependency.
 
 use std::fmt::Write as _;
+use std::time::Instant;
 
 use rlx_core::audio::AudioFormat;
 use rlx_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS};
@@ -108,6 +109,48 @@ const CLOCK_BEATS_PER_BAR: u32 = 4;
 /// give `time_since_beat` the seconds the capture actually renders between
 /// frames.
 const CAPTURE_DT: f32 = 1.0 / 60.0;
+
+/// The size the frame-cost reading is taken at: 1080p, because that is the size
+/// NFR section 1 states its floor budget at (ADR-0232). A scene's cost is per
+/// pixel for every fill-bound stage, so the reading at [`REPORT_SIZE`] would
+/// understate exactly the presets the column exists to rank.
+const COST_WIDTH: u32 = 1920;
+const COST_HEIGHT: u32 = 1080;
+/// Frame counts either side of the cost slope. Both legs pay the same fixed
+/// costs — the scene rebuild `reset_for_capture` does, first-frame allocation,
+/// the one readback — so the difference divided by the gap is the per-frame
+/// cost with all of that subtracted out. Shorter legs than `collage_cost`'s
+/// 10 and 110, because this runs once per shipped preset inside a report that
+/// already renders hundreds of small frames per preset: the whole pass is
+/// `COST_FRAMES_SHORT + COST_REPEATS * (COST_FRAMES_SHORT + COST_FRAMES_LONG)`
+/// frames at 1080p per preset.
+const COST_FRAMES_SHORT: u32 = 8;
+const COST_FRAMES_LONG: u32 = 48;
+/// How many times each leg is measured. The **minimum** of each leg is kept and
+/// the two are subtracted once, after the loop: a hiccup can only add time, so
+/// the smallest reading of a duration is the least contaminated one, and a
+/// minimum over the *difference* would keep the repeat whose short leg was most
+/// inflated (ADR-0173).
+const COST_REPEATS: usize = 2;
+/// The frame budget NFR section 1 commits to at [`COST_WIDTH`]x[`COST_HEIGHT`]
+/// on the floor tier: 60 fps. A reading past it is **marked**, never failed.
+const COST_BUDGET_MS: f64 = 1000.0 / 60.0;
+
+/// Where a report's frame-cost readings were taken (ADR-0071): a frame time is
+/// a fact about a GPU, a driver and a build profile rather than about the
+/// code, so the report has to say which.
+#[derive(Clone, Debug)]
+pub struct Machine {
+    /// The adapter as wgpu names it — [`Renderer::adapter_description`].
+    pub adapter: String,
+    /// `"debug"` or `"release"`. The two differ by an order of magnitude on the
+    /// CPU side of a frame, and `cargo run --example shot` is a debug build
+    /// unless told otherwise.
+    pub profile: &'static str,
+    /// Whether the adapter is a CPU rasterizer. A frame cost on one is a fact
+    /// about the rasterizer, so the reading is not taken there.
+    pub software: bool,
+}
 
 struct PresetReport {
     name: String,
@@ -210,6 +253,19 @@ struct PresetReport {
     /// under the author's eyes — which is the only place it can be caught for
     /// new content.
     geometry: Option<f32>,
+    /// Mean milliseconds per frame at [`COST_WIDTH`]x[`COST_HEIGHT`], fully
+    /// driven, on the report's tier — the slope between a
+    /// [`COST_FRAMES_LONG`]- and a [`COST_FRAMES_SHORT`]-frame capture, best of
+    /// [`COST_REPEATS`] (ADR-0232). `None` on a software adapter, where the
+    /// reading would describe the rasterizer.
+    ///
+    /// **Comparative between presets, never a prediction of the app.** The
+    /// headless path has no window, no present, no compositor and no audio
+    /// thread competing with it, so a reading under the budget here says
+    /// nothing about a frame rate on a screen — and a number that looks like
+    /// one will be read as one unless the block that prints it says otherwise.
+    /// It is marked past [`COST_BUDGET_MS`] and it never fails a run.
+    cost: Option<f32>,
     transient: Transient,
     /// Gates this preset's expressions never exercised under the realistic
     /// probe — suspects, not convictions (see [`probe_reachability`]).
@@ -271,6 +327,15 @@ pub fn run(
     // renderer is about to take ownership of them.
     let gates = reachability_pass(&presets)?;
     let mut r = super::renderer(REPORT_SIZE, REPORT_SIZE, presets, tier)?;
+    let machine = Machine {
+        adapter: r.adapter_description().to_string(),
+        profile: if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        },
+        software: r.adapter_is_software(),
+    };
 
     // The roster, not a copy of it: a hand-maintained list here silently omitted
     // a new system from the report instead of failing to build.
@@ -287,13 +352,15 @@ pub fn run(
         if names.is_empty() {
             continue;
         }
-        reports.push(build_family_report(&mut r, system, &names, &gates)?);
+        reports.push(build_family_report(
+            &mut r, system, &names, &gates, &machine,
+        )?);
     }
 
     if json {
-        print!("{}", render_json(source, &reports, tier));
+        print!("{}", render_json(source, &reports, tier, &machine));
     } else {
-        print!("{}", text_report(source, &reports, tier));
+        print!("{}", text_report(source, &reports, tier, &machine));
     }
     Ok(())
 }
@@ -303,6 +370,7 @@ fn build_family_report(
     system: SystemKind,
     names: &[String],
     structural: &[(String, Structural)],
+    machine: &Machine,
 ) -> Result<FamilyReport, String> {
     let silent = AnalysisFrame::default();
     let loud = AnalysisFrame::fully_driven();
@@ -411,6 +479,9 @@ fn build_family_report(
             coverage: cov,
             level,
             geometry,
+            // Filled by the cost pass below, which runs after every other
+            // reading so no existing column's capture changes.
+            cost: None,
             transient: transients.get(index).copied().unwrap_or(Transient {
                 response: StepResponse {
                     rise_frames: 0,
@@ -424,6 +495,16 @@ fn build_family_report(
             holds: found.holds,
         });
         fixed_caps.push(fixed);
+    }
+
+    // The frame-cost reading, last and at its own size (ADR-0232). Not on a
+    // software adapter: a CPU rasterizer's frame time is a fact about the
+    // rasterizer, and CI has no GPU contract to take one on (ADR-0016).
+    if !machine.software {
+        let costs = frame_costs(r, names, &loud)?;
+        for (preset, cost) in presets.iter_mut().zip(costs) {
+            preset.cost = Some(cost);
+        }
     }
 
     // Pairwise pixel + shape matrices over the fixed-frame captures.
@@ -460,6 +541,81 @@ fn capture(
 ) -> Result<CaptureImage, String> {
     r.capture_preset(name, frame, frames)
         .map_err(|e| format!("capture `{name}`: {e}"))
+}
+
+/// Milliseconds per frame for each of `names` at [`COST_WIDTH`]x[`COST_HEIGHT`]
+/// under `frame`, in `names` order — the method `core/tests/collage_cost.rs`
+/// prices the collage with, applied to whole presets.
+///
+/// One untimed pass first, so shader compilation and first-use allocation are
+/// behind every timed leg. The presets are then **interleaved inside the repeat
+/// loop** rather than measured one series after another: whichever preset ran
+/// last would otherwise inherit a GPU that had finished ramping its clocks,
+/// which over a family is worth more than the differences being read
+/// (ADR-0071's "control taken in the same run", applied to time).
+///
+/// Leaves the renderer at the cost size; the caller's next family resizes.
+///
+/// The wall-clock reads are the CLI's own instrumentation of a headless run,
+/// off any hot path and outside the core: the renderer is driven by an
+/// injected frame count and analysis stays clock-free.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reporting a headless CLI's own wall-clock cost; core analysis stays clock-free"
+)]
+fn frame_costs(
+    r: &mut Renderer,
+    names: &[String],
+    frame: &AnalysisFrame,
+) -> Result<Vec<f32>, String> {
+    r.resize(COST_WIDTH, COST_HEIGHT);
+    let timed = |r: &mut Renderer, name: &str, frames: u32| -> Result<f64, String> {
+        let start = Instant::now();
+        capture(r, name, frame, frames)?;
+        Ok(start.elapsed().as_secs_f64() * 1000.0)
+    };
+
+    for name in names {
+        timed(r, name, COST_FRAMES_SHORT)?;
+    }
+    let mut best_short = vec![f64::INFINITY; names.len()];
+    let mut best_long = vec![f64::INFINITY; names.len()];
+    for _ in 0..COST_REPEATS {
+        for (index, name) in names.iter().enumerate() {
+            let short = timed(r, name, COST_FRAMES_SHORT)?;
+            let long = timed(r, name, COST_FRAMES_LONG)?;
+            if let Some(best) = best_short.get_mut(index) {
+                *best = best.min(short);
+            }
+            if let Some(best) = best_long.get_mut(index) {
+                *best = best.min(long);
+            }
+        }
+    }
+    Ok(best_short
+        .iter()
+        .zip(&best_long)
+        .map(|(&short, &long)| slope_ms(short, long))
+        .collect())
+}
+
+/// The per-frame cost two legs imply: the long leg's time less the short leg's,
+/// over the frames between them. Printed as measured — a reading at or below
+/// zero means the two legs were within noise of each other, which is itself
+/// what the reader needs to know.
+fn slope_ms(short_ms: f64, long_ms: f64) -> f32 {
+    ((long_ms - short_ms) / f64::from(COST_FRAMES_LONG - COST_FRAMES_SHORT)) as f32
+}
+
+/// One `cost` cell: the reading to three places, suffixed ` !` past
+/// [`COST_BUDGET_MS`], or `-` where no reading was taken. The mark is a flag,
+/// not a verdict — the block that prints it says what the number is not.
+fn cost_cell(cost: Option<f32>) -> String {
+    match cost {
+        Some(ms) if f64::from(ms) > COST_BUDGET_MS => format!("{ms:.3} !"),
+        Some(ms) => format!("{ms:.3}"),
+        None => "-".to_owned(),
+    }
 }
 
 /// The log-band index ranges each named band roughly occupies, so a report
@@ -1209,12 +1365,29 @@ fn is_saturated(gate: &GateReport) -> bool {
 ///
 /// Returns rather than prints so the formatting is directly testable - that is
 /// the whole reason this module moved into the library (Plan 0061 Phase 4).
-fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
+fn text_report(source: &str, reports: &[FamilyReport], tier: Tier, machine: &Machine) -> String {
     let mut out = String::new();
     // The tier is in the header because every number below is measured at it: a
     // report read against a preset rendered on another tier is comparing two
     // different capacity budgets (ADR-0045).
     let _ = writeln!(out, "visual-QA report [{source}] tier {}", tier.as_str());
+    // The machine is in the header because the cost block below is a
+    // measurement of it (ADR-0071): every other number here is a property of
+    // the frame, and this one is a property of a GPU, a driver and a profile.
+    if machine.software {
+        let _ = writeln!(
+            out,
+            "  frame cost not taken: {} is a software rasterizer, and a frame time on it \
+             is a fact about the rasterizer (ADR-0232)",
+            machine.adapter
+        );
+    } else {
+        let _ = writeln!(
+            out,
+            "  frame cost on {}, {} profile",
+            machine.adapter, machine.profile
+        );
+    }
     for fam in reports {
         let _ = writeln!(
             out,
@@ -1335,6 +1508,38 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
                 );
             }
         }
+        // The frame-cost reading (ADR-0232), its own block because the table
+        // above has no width left, and because it is the one number here that
+        // is not a property of the frame. The caveat rides beside the cells
+        // rather than in a footnote: a number in milliseconds per frame reads
+        // as a frame rate, and this one is not a frame rate the app will hit.
+        let _ = writeln!(
+            out,
+            "\n  cost is the mean ms per frame at {COST_WIDTH}x{COST_HEIGHT} on tier {}, fully \
+             driven: the slope between a {COST_FRAMES_LONG}- and a {COST_FRAMES_SHORT}-frame \
+             capture, best of {COST_REPEATS} (ADR-0232). HEADLESS — no window, no present, no \
+             audio thread — so it compares presets and predicts nothing about the app; `!` \
+             marks a reading past the {COST_BUDGET_MS:.2} ms budget NFR section 1 states at \
+             60 fps, and marks only",
+            tier.as_str()
+        );
+        let _ = writeln!(
+            out,
+            "  {:<name_w$} {:>10}",
+            "preset",
+            "ms/frame",
+            name_w = NAME_WIDTH
+        );
+        for p in &fam.presets {
+            let _ = writeln!(
+                out,
+                "  {:<name_w$} {:>10}",
+                fit_name(&p.name),
+                cost_cell(p.cost),
+                name_w = NAME_WIDTH
+            );
+        }
+
         // The footprint reading (Plan 0077 Phase 4, backlog 0088), its own
         // block for the same reason the realistic-levels one is: the table
         // above stays un-widened and every historical number stays in place.
@@ -1474,11 +1679,20 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
 // Hand-rolled JSON (fixed numeric schema, no serde)
 // ---------------------------------------------------------------------------
 
-fn render_json(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
+fn render_json(source: &str, reports: &[FamilyReport], tier: Tier, machine: &Machine) -> String {
     let mut out = String::new();
     out.push('{');
     out.push_str(&format!("\"source\":{},", json_string(source)));
     out.push_str(&format!("\"tier\":{},", json_string(tier.as_str())));
+    // The machine travels with the document, once: every `frame_cost` below
+    // was taken on it, and a consumer that compares two reports' costs is
+    // comparing two machines unless these agree (ADR-0071).
+    out.push_str(&format!(
+        "\"machine\":{{\"adapter\":{},\"profile\":{},\"software\":{}}},",
+        json_string(&machine.adapter),
+        json_string(machine.profile),
+        if machine.software { "true" } else { "false" }
+    ));
     out.push_str("\"families\":{");
     for (fi, fam) in reports.iter().enumerate() {
         if fi > 0 {
@@ -1543,6 +1757,24 @@ fn render_json(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
             // table's omission rather than inventing a null convention.
             if let Some(fraction) = p.geometry {
                 out.push_str(&format!("\"in_frame_geometry\":{},", num(fraction)));
+            }
+            // Omitted on a software adapter, like `in_frame_geometry` where no
+            // seam measured — a fabricated reading would read as a finding.
+            // The size and the budget travel with the number: a cost at
+            // another size is a different statistic, and `over_budget` is the
+            // text block's `!`, a flag and not a verdict (ADR-0232).
+            if let Some(ms) = p.cost {
+                out.push_str(&format!(
+                    "\"frame_cost\":{{\"ms_per_frame\":{},\"width\":{COST_WIDTH},\
+                     \"height\":{COST_HEIGHT},\"budget_ms\":{},\"over_budget\":{}}},",
+                    num(ms),
+                    num(COST_BUDGET_MS as f32),
+                    if f64::from(ms) > COST_BUDGET_MS {
+                        "true"
+                    } else {
+                        "false"
+                    }
+                ));
             }
             out.push_str(&format!(
                 "\"transient\":{},",
