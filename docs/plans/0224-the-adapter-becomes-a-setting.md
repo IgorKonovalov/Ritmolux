@@ -309,8 +309,8 @@ renderer adapter: AMD Radeon Graphics (RADV RENOIR) ... (default: high performan
 | 1 — `[output] gpu`, with a fall-back that says so | dev | done | 82b134fa |
 | 2 — the unflagged window prefers high performance | dev | done | 421bd32e |
 | 3 — `Renderer::set_adapter` on the live context | dev | done | 1009340c |
-| 4 — the menu row moves the running show | dev | committed with this row | |
-| 5 — the console and the sender follow the switch | dev | not started | |
+| 4 — the menu row moves the running show | dev | done | c95ad331 |
+| 5 — the console and the sender follow the switch | dev | committed with this row | |
 | 6 — the operator documentation catches up | dev | not started | |
 | 7 — the machine says whether the default was right | human | not started | |
 

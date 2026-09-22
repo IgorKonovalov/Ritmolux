@@ -707,6 +707,22 @@ impl AppState {
                 return;
             }
         };
+        self.attach_console(window, "opened");
+    }
+
+    /// Attach `window` to the renderer as the console's surface, and adopt it
+    /// as the open console.
+    ///
+    /// The one attach path: `open_console` reaches it with a window it just
+    /// created, and an adapter switch with the window the console already had —
+    /// the switch releases the surface, which belonged to the old device, and
+    /// this builds a new one on the new device rather than re-using anything.
+    /// `label` says which of the two the log line is.
+    ///
+    /// A surface the renderer's adapter cannot drive is not fatal: the window
+    /// is dropped, so nothing is left on screen, the reason is logged once, and
+    /// the show is untouched. That is the dual-GPU path.
+    pub(crate) fn attach_console(&mut self, window: Arc<Window>, label: &str) {
         let size = window.inner_size();
         match self.renderer.attach_aux(
             Arc::clone(&window),
@@ -740,7 +756,7 @@ impl AppState {
                 self.hud.console_decimated = 0;
                 self.hud.console_census_secs = 0.0;
                 self.diagnostics.diag_log.note(&format!(
-                    "console opened: {}x{}, present mode {}, frame latency {latency}, \
+                    "console {label}: {}x{}, present mode {}, frame latency {latency}, \
                      presented every {every_n} frame(s), {preview}",
                     size.width,
                     size.height,
@@ -1370,6 +1386,13 @@ impl AppState {
             return;
         };
         let choice = AdapterChoice::Named(entry.name.clone());
+        // The console's totals for the session so far, taken **before** the
+        // switch: its present and skip counts live on the target the switch
+        // releases, and a session that ends in a switch would otherwise
+        // publish no count (ADR-0172).
+        if self.hud.console_window.is_some() {
+            self.note_console_totals("before adapter switch");
+        }
         match self.renderer.set_adapter(&choice, Arc::clone(&self.window)) {
             Ok(()) => {
                 self.config.output.gpu = Some(entry.name);
@@ -1385,6 +1408,14 @@ impl AppState {
                 );
                 eprintln!("{line}");
                 self.diagnostics.diag_log.note(&line);
+                // The console follows: the switch released its surface with
+                // the old device, so its window is re-attached through the
+                // one attach path, with a new surface on the new device. A
+                // console the new adapter cannot drive degrades exactly as one
+                // that could not open — the window goes, the show does not.
+                if let Some(window) = self.hud.console_window.take() {
+                    self.attach_console(window, "re-attached after the adapter switch");
+                }
                 self.update_title();
             }
             Err(err) => {

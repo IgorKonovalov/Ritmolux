@@ -1000,6 +1000,11 @@ impl Renderer {
     /// cannot drive that surface — the dual-GPU case — and the caller is
     /// expected to degrade rather than treat it as fatal: the show is on the
     /// primary surface, which is unaffected.
+    ///
+    /// This is also the re-entry after [`set_adapter`](Self::set_adapter),
+    /// which releases the attached target with the device it belonged to: a
+    /// shell hands the same window back and a new surface is built on the new
+    /// device, with the `Err` above meaning what it means on a first attach.
     #[cfg(feature = "text")]
     pub fn attach_aux(
         &mut self,
