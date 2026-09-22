@@ -4,6 +4,18 @@
 # Runs the fast subset of what CI runs, so a broken push costs seconds here
 # instead of minutes there. Stops at the first failure and names the step.
 #
+# THE CARGO STEPS ARE CONDITIONAL; NOTHING ELSE IS (ADR-0237). The Node roster,
+# the sd-filter suite and the studio's three run on every push. fmt, clippy,
+# rustdoc and nextest run only when a pushed range touches a path listed in
+# scripts/push-scope.manifest.mjs, and nextest is then SERVED rather than run
+# when the suite ledger holds a green `cargo nextest run --workspace` for this
+# exact, clean tree (tools/conductor/suite-record.mjs). A skip and a serve each
+# print one line saying why. Whatever the hook cannot read - an empty or
+# unparseable stdin, a ref new on the remote, a shallow clone, a sha this clone
+# lacks, a run by hand from a terminal - runs all four. A red still refuses the
+# push; CI runs every step unconditionally and is what catches a build input
+# the manifest does not list.
+#
 # NOT run here, by design (ADR-0033 Alternative F): `cargo deny`, doctests,
 # Miri, and the coverage job. Those push the gate from tens of seconds into
 # minutes, and a gate that hurts gets disabled — at which point it is worth less

@@ -135,8 +135,8 @@ lookup on the suite step. The Node roster is untouched.
 |---|---|---|---|
 | 1 — The path set is data, and a self-test convicts it | dev | done | `e3498a57` |
 | 2 — The hook asks before it spends | dev | done | `4e08e759` |
-| 3 — The suite step is served by the record that already exists | dev | done | committed with this row |
-| 4 — What the operator reads is true | dev | not started | |
+| 3 — The suite step is served by the record that already exists | dev | done | `60f4c282` |
+| 4 — What the operator reads is true | dev | done | committed with this row |
 
 ### Notes
 
@@ -146,5 +146,7 @@ lookup on the suite step. The Node roster is untouched.
 - Phase 2: a push of nothing but branch deletions runs the cargo steps (no range to read).
 - Phase 3: the entry point is `tools/conductor/suite-record.mjs`, reading the ledger through `with-lock.mjs`'s `suiteLedger` and `lib/ledger.mjs`'s `greenRecord`; `lib/ledger.mjs`'s header comment was edited to name it as a third reader. The hook writes no skip line to the ledger.
 - Phase 3: the three done-when cases were checked against scratch ledgers handed over `RLX_SUITE_LEDGER`, with the entry point alone and not through the whole hook; no real full-suite record existed for any tree of this lane.
+- Phase 4: the three readings were taken through the whole hook at `60f4c282` (before Phase 4's comment-only hook edit), in this lane with `target/` pre-built by a separate clippy, rustdoc and `nextest --no-run` pass, and with no `studio/node_modules`, so the studio steps skipped. The served reading's record came from a scratch ledger handed over `RLX_SUITE_LEDGER`, not from a real run; `docs/developing.md` says so.
+- Phase 4: the ~410 s test-step figure was replaced by the new 544.8 s reading; the 165 s idle figure was kept, dated to its 2026-09-14 reading.
 - Followup: `push-scope.mjs --self-test` is not on the gate roster (`gates.manifest.mjs`, CI `links`), so nothing runs it but a person.
 - Followup: CLAUDE.md's `scripts/` inventory does not name `push-scope.mjs` or its manifest.
