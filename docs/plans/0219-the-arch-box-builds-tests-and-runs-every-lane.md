@@ -376,8 +376,8 @@ conductor.** The conductor is not verified on Linux until Phase 5, and 0120 is c
 |---|---|---|---|
 | 1 — Provision the box, and read what it has | human | done; readings below | `1f4678f1` |
 | 2 — The lane contracts stop assuming Windows | dev | done | `ae5b3724` |
-| 3 — The gate is green on this box | dev | done; hardware-adapter bullet not met, see Notes | committed with this row |
-| 4 — The studio drives a Linux player | studio-builder | not started | |
+| 3 — The gate is green on this box | dev | done; hardware-adapter bullet not met, see Notes | `eb2c67c3` |
+| 4 — The studio drives a Linux player | studio-builder | done | committed with this row |
 | 5 — The conductor's claims are checked on Linux | dev | not started | |
 | 6 — The diffusion sidecar runs on CUDA | dev | not started | |
 | 7 — A working day on the box | human | not started | |
@@ -480,6 +480,38 @@ which linker took each binary.
 The decision was not to add an override. `CLAUDE.md` is unchanged, and `docs/developing.md` says
 Linux needs none.
 
+### Phase 4 readings (2026-09-22)
+
+**Gate.** `npm --prefix studio run typecheck`, `lint` and `test` are green:
+`Test Files 31 passed (31)`, `Tests 294 passed (294)`, and no `skipped` line. The tests that spawn
+or read the player used `target/release/ritmolux`. It was rebuilt first with
+`cargo build --release -p standalone --bin ritmolux`, because the binary on disk dated from before
+0120's last commits. `windowless.test.ts` now asserts the no-window half here: with
+`HYPRLAND_INSTANCE_SIGNATURE` set it counts `hyprctl clients -j` entries under the player's pid, and
+it read 0.
+
+**Does the check catch a window?** A windowed player
+(`--preview stdout --events --control 127.0.0.1:0`) run by hand showed up in `hyprctl clients -j` as
+one client under its own pid: `xwayland: false`, `class: ''`, and a title starting `Ritmolux 0.143.0`.
+A copy of the test switched to the `windowed` vector did not reach the window assertion. It failed
+earlier, at `the run announced no stream` after 29 ms, under the test's emptied `HOME`/`APPDATA`
+environment. So the check was proven by the hand run, not by the test.
+
+**Manual `npm --prefix studio run dev` session.** Settings:
+`~/.config/ritmolux-studio/settings.json` =
+`{"playerPath": "/home/igor/Work/Ritmolux/target/release/ritmolux", "playerMode": "windowed"}`,
+written by hand because the Settings panel does not edit the path.
+
+- The player was spawned as pid 373645. `/proc/373645/exe` is
+  `/home/igor/Work/Ritmolux/target/release/ritmolux`, its parent is Electron main (pid 373581), and
+  its command line is `--preview stdout --events --control 127.0.0.1:0`.
+- The owner saw frames painted in the preview, matching the player window. The owner edited one
+  param and saw the change in the player window.
+- After the studio closed, `pgrep ritmolux` printed nothing.
+- Electron ran under **XWayland** (`class: ritmolux-studio`, `xwayland: true`). The player's show
+  window was a **native Wayland** client with an empty class, tiled (not floating) beside the studio
+  on monitor 0, each 1005x544.
+
 ### Notes
 
 - **Phase 2, heredoc probe.** A throwaway repository in the session scratchpad took a commit through
@@ -531,6 +563,18 @@ Linux needs none.
   The sd-filter colour-table group skips because this box's `python` has no `numpy`.
   `docs/developing.md`'s cost table is left as the Windows reading. The Arch figures went into the
   Arch block.
+- **Phase 4, the Windows arm changed as well.** The Windows half of `windowless.test.ts` moved
+  into `windowsOwnedBy`. Two things differ now. An empty PowerShell answer reads as unanswered,
+  where before `Number('')` made it `0`, meaning no window, which passed for the wrong reason. And a
+  `Get-Process` that throws reads as unanswered, where before it threw. This has not run on Windows.
+- **Phase 4, the edit wrote no fork.** Nothing new appeared under `~/.local/share/Ritmolux/presets`
+  during the session. The param change reached the player live, and the fork-on-first-gesture
+  write (ADR-0189) was not exercised.
+- **Phase 4, outside the file list, not edited.** `studio/README.md` "Finding the player" names the
+  settings directory for Windows and macOS only. The Linux one is `~/.config/ritmolux-studio`. The
+  studio's missing-player banner says to set `playerPath` in the settings file without saying where
+  that file is. `concurrently` in `npm run dev` has no `--kill-others`, so Vite and the esbuild
+  watchers outlive the Electron window. The player exits with it.
 
 ### Close triggers
 

@@ -8,11 +8,13 @@
  * is ADR-0016's shape applied to a subprocess and the rule the studio's other
  * spawned test already follows.
  *
- * The no-window half is asserted on Windows only, through the process's own
- * `MainWindowHandle`. There is no cross-platform way to ask the OS whether a
- * child opened a window; on the other platforms the run still has to produce
- * whole frames of the geometry it announced, and the flags it was given are
- * pinned by the argument-vector test beside this one.
+ * The no-window half needs something that can list another process's
+ * windows. On Windows that is the process's own `MainWindowHandle`. Under
+ * Hyprland it is the compositor's client list, `hyprctl clients -j`. A Wayland
+ * client cannot list other clients' windows, so on any other Wayland desktop
+ * and on macOS that half skips. The run still has to produce whole frames of
+ * the geometry it announced, and the argument-vector test beside this one pins
+ * the flags it was given.
  */
 import { spawn } from 'node:child_process'
 import { execFileSync } from 'node:child_process'
@@ -25,27 +27,57 @@ import { builtPlayer } from '../testing/player'
 import { playerArgs } from './supervisor'
 
 /**
- * The window handle the OS has for `pid`, or `undefined` where the question
- * cannot be asked. `0` is "this process has no main window".
+ * Why this machine cannot be asked which windows a process owns, or
+ * `undefined` when it can.
  */
-function mainWindowHandle(pid: number): number | undefined {
-  if (process.platform !== 'win32') return undefined
-  const out = execFileSync(
-    'powershell',
-    ['-NoProfile', '-Command', `(Get-Process -Id ${pid}).MainWindowHandle`],
-    { encoding: 'utf8' },
-  )
-  const value = Number(out.trim())
-  // A process that has gone away, or a shell that answered nothing, must not
-  // read as "no window" — that would pass this test for the wrong reason.
-  return Number.isFinite(value) ? value : undefined
+function whyWindowsUnasked(): string | undefined {
+  if (process.platform === 'win32') return undefined
+  if (process.platform === 'linux' && process.env.HYPRLAND_INSTANCE_SIGNATURE) return undefined
+  return process.platform === 'linux'
+    ? "a Wayland client cannot list other clients' windows, and only Hyprland is asked here"
+    : "only Windows and Hyprland are asked for a process's windows here"
+}
+
+/**
+ * How many windows the OS or compositor shows for `pid`. It is `undefined`
+ * where the question cannot be asked, or where the answer could not be read.
+ */
+function windowsOwnedBy(pid: number): number | undefined {
+  if (whyWindowsUnasked() !== undefined) return undefined
+  try {
+    if (process.platform === 'win32') {
+      const out = execFileSync(
+        'powershell',
+        ['-NoProfile', '-Command', `(Get-Process -Id ${pid}).MainWindowHandle`],
+        { encoding: 'utf8' },
+      )
+      const handle = Number(out.trim())
+      // A process that has gone away, or a shell that answered nothing, must
+      // not read as "no window". That would pass this test for the wrong reason.
+      if (out.trim() === '' || !Number.isFinite(handle)) return undefined
+      return handle === 0 ? 0 : 1
+    }
+    // Hyprland lists every mapped client, XWayland ones included, with the
+    // pid that owns it. A player that opened a window shows up here under its
+    // own pid.
+    const clients: unknown = JSON.parse(
+      execFileSync('hyprctl', ['clients', '-j'], { encoding: 'utf8' }),
+    )
+    if (!Array.isArray(clients)) return undefined
+    return clients.filter(
+      (client: unknown) =>
+        typeof client === 'object' && client !== null && (client as { pid?: unknown }).pid === pid,
+    ).length
+  } catch {
+    return undefined
+  }
 }
 
 interface Run {
   stream: StreamEvent | undefined
   health: HealthEvent[]
   stdoutBytes: number
-  handle: number | undefined
+  windows: number | undefined
   stderr: string
 }
 
@@ -68,7 +100,7 @@ async function windowlessRun(player: string): Promise<Run> {
     stream: undefined,
     health: [],
     stdoutBytes: 0,
-    handle: undefined,
+    windows: undefined,
     stderr: '',
   }
   // A chunk boundary can fall inside a line, so only complete lines are parsed
@@ -79,8 +111,8 @@ async function windowlessRun(player: string): Promise<Run> {
     // Asked once the frames are actually flowing: by then a windowed run's
     // window is up, so a zero here is a fact about this mode and not about
     // being early.
-    if (run.handle === undefined && child.pid !== undefined) {
-      run.handle = mainWindowHandle(child.pid)
+    if (run.windows === undefined && child.pid !== undefined) {
+      run.windows = windowsOwnedBy(child.pid)
     }
   })
   child.stderr.setEncoding('utf8')
@@ -134,11 +166,12 @@ describe('a windowless player', () => {
     expect(last, `the run reported no health in three seconds:\n${run.stderr}`).toBeDefined()
     expect(last?.fps ?? 0).toBeGreaterThan(0)
 
-    if (process.platform !== 'win32') {
-      console.warn('skipped the no-window half: only Windows is asked for a window handle here')
+    const unasked = whyWindowsUnasked()
+    if (unasked !== undefined) {
+      console.warn(`skipped the no-window half: ${unasked}`)
       return
     }
-    expect(run.handle, 'the process was gone before it could be asked').toBeDefined()
-    expect(run.handle).toBe(0)
+    expect(run.windows, 'the process was gone before it could be asked').toBeDefined()
+    expect(run.windows).toBe(0)
   }, 300_000)
 })

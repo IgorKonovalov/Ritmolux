@@ -63,6 +63,26 @@ The player the studio drives is built by cargo: `cargo build -p standalone --rel
 `target/release/ritmolux(.exe)`. In development the studio finds it through its settings path or
 `PATH`; a packaged studio carries it at `resources/player/`.
 
+**Linux: the development loop works, and packaging does not.** `package.json` has no
+`package:linux`, and `electron-builder.yml` has no `linux:` target. That is a followup that needs
+its own ADR-0038 interview, not a missing script to add. `npm run dev` works on Arch under
+Hyprland, as observed on 2026-09-22, with these particulars:
+
+- **`playerPath` lives in `~/.config/ritmolux-studio/settings.json`.** The Settings panel shows it
+  and does not edit it. On a fresh box the file does not exist, and the studio reports a missing
+  player until you write the file.
+- **Electron runs under XWayland** with no Ozone flag. The player's show window is a native
+  Wayland client with an **empty app_id**, so a Hyprland window rule cannot match it by class. It
+  tiles beside the studio.
+- **`npm run dev` outlives Electron.** `concurrently` has no `--kill-others`, so closing the studio
+  window leaves Vite and the esbuild watchers running until the terminal stops them. The player
+  itself does exit with the studio.
+- **Under Node 26, `npm ci` can leave Electron half-installed**, with only `dist/locales/` and no
+  `path.txt`. `docs/developing.md`'s Arch block has the hand extraction.
+- **`windowless.test.ts` asserts the no-window half through `hyprctl clients -j`** when
+  `HYPRLAND_INSTANCE_SIGNATURE` is set. On any other Wayland desktop it skips with a notice,
+  because a Wayland client cannot list other clients' windows.
+
 **The version travels in three files.** `Cargo.toml`'s `[workspace.package] version`, `version` in
 `studio/package.json`, and `EXPECTED_PLAYER_VERSION` in `studio/shared/protocol.ts`.
 `cargo release` moves only the first; `studio/shared/version.test.ts` fails until the other two
