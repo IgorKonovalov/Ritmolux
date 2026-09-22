@@ -1,6 +1,6 @@
 # 0213 — The hook costs what the push is worth
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-20 (user)
 > **Owner skill(s):** dev
@@ -120,3 +120,27 @@ lookup on the suite step. The Node roster is untouched.
 - **It does not touch CI.** The `links` job and the workflow gates stay unconditional, which is what
   makes narrowing the hook affordable.
 - **It does not revisit opt-in per clone.** ADR-0033's installation rule stands.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+> **Observations, never conclusions:** this says where to look, architect decides how it went.
+> No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
+> an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
+
+**Lane:** `WORK/rlx-plan-0213` on `plan-0213-the-hook-costs-what-the-push-is-worth` (conductor)
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The path set is data, and a self-test convicts it | dev | done | committed with this row |
+| 2 — The hook asks before it spends | dev | not started | |
+| 3 — The suite step is served by the record that already exists | dev | not started | |
+| 4 — What the operator reads is true | dev | not started | |
+
+### Notes
+
+- Phase 1: the manifest is `scripts/push-scope.manifest.mjs`. Beyond the plan's list it names the five workspace crate directories whole, `.taplo.toml`, rustfmt/clippy configs, and eight paths outside the crates that a Rust test opens (`docs/configuration.md`, `docs/embedding.md`, `docs/nfr.md`, `docs/examples/**`, `docs/images/gallery/**`, `docs/specs/player-schema.json`, `scripts/docs-shots.mjs`, `packaging/foobar/build-component.ps1`).
+- Phase 1: the fixture's explanation is `scripts/fixtures/push-scope/README.md`; `scripts/fixtures/README.md` was not given a section.
+- Followup: `push-scope.mjs --self-test` is not on the gate roster (`gates.manifest.mjs`, CI `links`), so nothing runs it but a person.
+- Followup: CLAUDE.md's `scripts/` inventory does not name `push-scope.mjs` or its manifest.
