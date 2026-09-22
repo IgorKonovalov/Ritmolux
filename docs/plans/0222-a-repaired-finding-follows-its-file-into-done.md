@@ -1,6 +1,6 @@
 # 0222 — A repaired finding follows its file into `done/`
 
-> **Status:** approved (2026-09-22; queued in lane `a` after 0221)
+> **Status:** in-progress (2026-09-22; conductor lane)
 > **Created:** 2026-09-22
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) (the `fixed_in` check; not amended), [ADR-0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md), [ADR-0233](../adrs/0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md)
@@ -161,3 +161,22 @@ architect skill and is not a phase here.
   conductor that runs it loads `close.mjs` from the main checkout, not from the lane.
 
 ## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+> **Observations, never conclusions:** this says where to look, architect decides how it went.
+> No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
+> an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
+
+**Lane:** `/home/igor/Work/rlx-plan-0222` on `plan-0222-a-repaired-finding-follows-its-file-into-done`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The `fixed_in` check follows the file across a rename | dev | committed with this row | |
+| 2 — The prompts spell what the allowlist allows | dev | not started | |
+
+### Notes
+
+- Phase 1: the five `close.test.mjs` cases were run against the unmodified `close.mjs` first. Case 1
+  failed with `finding 0 is fixed_in <sha>, which does not change docs/plans/done/0101-fixture.md`;
+  cases 3 and 4 failed the same way, case 5 on the missing second path, case 2 passed.

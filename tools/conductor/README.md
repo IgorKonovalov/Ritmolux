@@ -349,7 +349,9 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   exist and be new, the plan's log rows must match, the tree must be clean, and a close must leave
   the plan under `done/` with a `## Close review` and an annotated tag on the branch tip. A finding
   the close marks repaired (`fixed_in`, ADR-0209) must name a commit on the branch that changes that
-  finding's file.
+  finding's file, under the path the finding names or the path it had at that commit, following
+  every rename git pairs between the commit and the tip and, whatever the similarity, the plan's own
+  move to `done/`.
 
 ## The gate
 

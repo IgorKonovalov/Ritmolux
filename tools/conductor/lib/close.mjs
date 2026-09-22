@@ -110,17 +110,52 @@ function changedPaths(sha, cwd) {
 }
 
 /**
- * Each finding a close marked repaired (ADR-0209): its `fixed_in` commit must exist, be on the
- * branch, and change that finding's file.
+ * The paths `file` had at commit `sha`, other than `file` itself. Two sources: every rename git
+ * pairs between the `sha` tree and the `HEAD` tree, at git's default similarity - a tree-to-tree
+ * diff, so a merge in between neither hides a rename nor needs walking - and the plan's own move,
+ * which is known by construction: the plan's `done/` path came from the same basename directly under
+ * `docs/plans/`, however much the close grew the file past git's similarity line.
  */
-function repairProblems(outcome, cwd) {
+function earlierPaths(file, sha, cwd, plan) {
+  const paths = new Set();
+  const r = git(["diff", "--name-status", "-z", "-M", sha, "HEAD"], cwd);
+  if (r.code === 0) {
+    // -z: `R<score>\0<old>\0<new>\0` for a rename, `<status>\0<path>\0` for everything else.
+    const t = r.stdout.split("\0");
+    for (let k = 0; k < t.length; ) {
+      if (/^[RC]\d*$/.test(t[k])) {
+        if (t[k][0] === "R" && t[k + 2] === file) paths.add(t[k + 1]);
+        k += 3;
+      } else k += 2;
+    }
+  }
+  const found = findPlan(cwd, plan);
+  if (found?.done && file === `docs/plans/done/${found.file}`) paths.add(`docs/plans/${found.file}`);
+  paths.delete(file);
+  return [...paths];
+}
+
+/**
+ * Each finding a close marked repaired (ADR-0209): its `fixed_in` commit must exist, be on the
+ * branch, and change that finding's file - under the path the finding names, or under a path the
+ * file had at that commit, since a close moves the plan file after repairing it.
+ */
+function repairProblems(outcome, cwd, plan) {
   const problems = [];
   for (const [i, f] of (outcome.verdict?.findings ?? []).entries()) {
     if (!f.fixed_in) continue;
     const full = resolveCommit(f.fixed_in, cwd);
     if (!full) problems.push(`finding ${i} is fixed_in ${f.fixed_in}, which does not exist`);
     else if (!isAncestor(full, "HEAD", cwd)) problems.push(`finding ${i} is fixed_in ${f.fixed_in}, which is not on the branch`);
-    else if (!changedPaths(full, cwd).includes(f.file.replace(/\\/g, "/"))) problems.push(`finding ${i} is fixed_in ${f.fixed_in}, which does not change ${f.file}`);
+    else {
+      const file = f.file.replace(/\\/g, "/");
+      const changed = changedPaths(full, cwd);
+      const earlier = earlierPaths(file, full, cwd, plan);
+      if (![file, ...earlier].some((p) => changed.includes(p))) {
+        const also = earlier.length ? ` (nor ${earlier.join(", ")}, its path at ${f.fixed_in})` : "";
+        problems.push(`finding ${i} is fixed_in ${f.fixed_in}, which does not change ${f.file}${also}`);
+      }
+    }
   }
   return problems;
 }
@@ -141,7 +176,7 @@ export function verifyClose({ cwd, plan, outcome }) {
     if (!doc.hasCloseReview) problems.push(`plan ${plan} has no ## Close review section`);
   }
   if (!isClean(cwd)) problems.push("the worktree is not clean");
-  problems.push(...repairProblems(outcome, cwd));
+  problems.push(...repairProblems(outcome, cwd, plan));
   if (outcome.tag) {
     const type = tagObjectType(outcome.tag, cwd);
     if (!type) problems.push(`tag ${outcome.tag} does not exist`);
