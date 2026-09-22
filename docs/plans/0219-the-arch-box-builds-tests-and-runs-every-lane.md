@@ -377,8 +377,8 @@ conductor.** The conductor is not verified on Linux until Phase 5, and 0120 is c
 | 1 — Provision the box, and read what it has | human | done; readings below | `1f4678f1` |
 | 2 — The lane contracts stop assuming Windows | dev | done | `ae5b3724` |
 | 3 — The gate is green on this box | dev | done; hardware-adapter bullet not met, see Notes | `eb2c67c3` |
-| 4 — The studio drives a Linux player | studio-builder | done | committed with this row |
-| 5 — The conductor's claims are checked on Linux | dev | not started | |
+| 4 — The studio drives a Linux player | studio-builder | done | `b8e9148e` |
+| 5 — The conductor's claims are checked on Linux | dev | in progress: probes, rule parity, tests and `VERIFIED_CLI` landed; the real run waits on a fixture plan | committed with this row |
 | 6 — The diffusion sidecar runs on CUDA | dev | not started | |
 | 7 — A working day on the box | human | not started | |
 
@@ -512,6 +512,24 @@ written by hand because the Settings panel does not edit the path.
   window was a **native Wayland** client with an empty class, tiled (not floating) beside the studio
   on monitor 0, each 1005x544.
 
+### Phase 5 readings (2026-09-22)
+
+**Probe.** `node tools/conductor/spike/probe.mjs --model haiku`, with `claude 2.1.278` on
+Node v26.8.2, all four sessions: $0.27 in total, 80 s. Every row of `spike/README.md`'s two tables
+holds. Each row now carries its Linux reading in a column beside the Windows one, under a
+"Re-verified on 2.1.278, on Linux" section. Raw output is in
+`target/conductor-spike/2026-09-22T13-51-56-840Z/`. `VERIFIED_CLI` gained `2.1.278`.
+
+**Rule parity.** Every PowerShell rule in `settings.conductor.json` already has a Bash rule that
+allows or denies the same thing. 19 of the 22 allow rules are verbatim twins, and the other three
+map `New-Item`→`mkdir`, `Remove-Item`→`rm` and `Get-Content`→`cat`. Of the 8 deny rules, the six
+`Remove-Item` patterns map to the same six `rm` patterns and the other two are verbatim. The file
+is unchanged.
+
+**Tests.** `node --test tools/conductor/test/` gives `pass 371, fail 0, skipped 2`, three runs out
+of three. The two skips are the `.cmd`-shim cases in `gate.test.mjs` and `with-lock.test.mjs`. They
+now skip with the reason `a .cmd shim and its PATHEXT lookup exist only on Windows`.
+
 ### Notes
 
 - **Phase 2, heredoc probe.** A throwaway repository in the session scratchpad took a commit through
@@ -575,6 +593,23 @@ written by hand because the Settings panel does not edit the path.
   studio's missing-player banner says to set `playerPath` in the settings file without saying where
   that file is. `concurrently` in `npm run dev` has no `--kill-others`, so Vite and the esbuild
   watchers outlive the Electron window. The player exits with it.
+- **Phase 5, a Node 26 test fault, fixed in the phase.** Before the fix,
+  `with-lock.test.mjs`'s "a wrapped full suite with RLX_SUITE_LEDGER records its run…" failed on
+  every run. Its `quietly` helper swaps out `process.stdout.write`, and it captured the test
+  runner's own serialized `test:complete` event for a sibling test, which is a Buffer, along with
+  the notice. `quietly` now captures only strings and passes a Buffer on to the real stream.
+- **Phase 5, the foreground rule was not probed live.** No probe row covers it.
+  `conductor-no-background.js`'s cases in `hooks.test.mjs` are green here, and the probe shows the
+  project `PreToolUse:Bash` hooks running in a Linux headless session. No `run_in_background` call
+  was made from a headless session. `VERIFIED_CLI` gained 2.1.278 on the probe rows alone.
+- **Phase 5, resume note (scaffolding; remove when Phase 5 lands).** One done-when is still open:
+  the real conductor run. The owner chose a docs-only fixture plan written by `architect`, not a
+  queued plan. Before resuming, the fixture must be `approved` and listed in
+  `tools/conductor/queue.json`. The queue also still lists 0120, which is done, and 0202, which is
+  mid-flight on `origin/plan-0202-…`. To resume: `node tools/conductor/conductor.mjs check`, then
+  the run. Record the state directory and `git worktree list` showing `~/Work/rlx-plan-NNNN`, flip
+  the row to done, and move on to Phase 6, where the owner has approved the torch and weight
+  downloads.
 
 ### Close triggers
 

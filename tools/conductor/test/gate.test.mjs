@@ -377,7 +377,7 @@ test("a gate in a tree with no studio/node_modules names the three studio steps 
   );
 });
 
-test("a .cmd shim named without its extension reports the shim's own exit code and output, not the failed direct spawn's", { skip: process.platform !== "win32" }, async () => {
+test("a .cmd shim named without its extension reports the shim's own exit code and output, not the failed direct spawn's", { skip: process.platform !== "win32" && "a .cmd shim and its PATHEXT lookup exist only on Windows" }, async () => {
   const dir = tmp();
   writeFileSync(join(dir, "rlx-shim.cmd"), "@echo shim ran\r\n@exit /b 3\r\n");
   const g = await runGate({ cwd: dir, logDir: tmp(), label: "shim", commands: [{ name: "shim", cmd: [join(dir, "rlx-shim")] }] });

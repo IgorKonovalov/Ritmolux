@@ -139,8 +139,11 @@ function wrapperScratch() {
 async function quietly(fn) {
   const out = [];
   const [o, e] = [process.stdout.write, process.stderr.write];
-  process.stdout.write = (s) => (out.push(String(s)), true);
-  process.stderr.write = (s) => (out.push(String(s)), true);
+  // Only strings are captured. A test file runs as a child of `node --test`, and the runner reports
+  // through this process's stdout as serialized Buffers, which on Node 26 can land while a sibling
+  // test completes inside the patched window. A Buffer goes on to the real stream.
+  process.stdout.write = (s, ...rest) => (typeof s === "string" ? (out.push(s), true) : o.call(process.stdout, s, ...rest));
+  process.stderr.write = (s, ...rest) => (typeof s === "string" ? (out.push(s), true) : e.call(process.stderr, s, ...rest));
   try {
     return { value: await fn(), out: out.join("") };
   } finally {
@@ -224,7 +227,7 @@ test("the wrapper exits with the command's exit code and logs the run", async ()
   assert.equal(typeof entry.waited_ms, "number");
 });
 
-test("a .cmd shim named without its extension exits with the shim's own code, not the failed direct spawn's", { skip: process.platform !== "win32" }, async () => {
+test("a .cmd shim named without its extension exits with the shim's own code, not the failed direct spawn's", { skip: process.platform !== "win32" && "a .cmd shim and its PATHEXT lookup exist only on Windows" }, async () => {
   const dir = freshDir();
   writeFileSync(join(dir, "rlx-shim.cmd"), "@exit /b 3\r\n");
   const logFile = join(dir, "locks.jsonl");
