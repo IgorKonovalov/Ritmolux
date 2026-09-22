@@ -169,20 +169,53 @@ so a conductor run parks in front of it.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The exe is measured, capped and reported | dev | done | 0b018885 |
-| 2 — The report says what a preset costs | dev | done | committed with this row |
+| 2 — The report says what a preset costs | dev | done | add3d174 |
 | 3 — The floor is measured where it is claimed | human | not started | |
 
 ### Notes
 
+- **Deviation, Phase 1 (0b018885):** `.github/workflows/release.yml` is edited and is not in the
+  phase's file list. The windows job's inline staging block moved into the new
+  `packaging/windows/stage.ps1` and the job became a thin caller of it, the shape the linux, macos
+  and foobar jobs already have. Without that edit the script runs nowhere and the done-when
+  "prints on every build" is not met.
+- **Phase 1, the step size and the boundary.** No feature-sized diff of this exe was available
+  (the standalone does not compile without the `text` feature), so the step is ADR-0159's
+  measured `text` diff on the component, 2,104,320 B; the font stack attributes to 1,584,263 B of
+  named symbols on the Linux build, a floor consistent with it. "Next round binary boundary" was
+  read as ADR-0231's own candidates, 12 MiB and 16 MiB, giving 16,777,216 B; the whole-MiB
+  reading gives 13,631,488 B and NFR §4 records why it was not taken. ADR-0231's `Outcome` is
+  not written here.
+- **Phase 1, unexercised on this box.** The session ran on Linux, so neither
+  `packaging/windows/stage.ps1` nor `packaging/macos/bundle.sh` was executed; both measurement
+  blocks were written against `build-component.ps1`'s and reviewed by eye. The Windows exe with
+  `--features spout` and both Apple slices are unmeasured; the first tag build prints them.
+- **Phase 1, noticed and not acted on:** `packaging/linux/stage.sh` does not measure (not in the
+  phase's file list, and the Linux binary is not the capped one); no hygiene guard holds the exe's
+  two constants across `stage.ps1`, `bundle.sh` and NFR §4 the way guard (e) holds the
+  component's; `CLAUDE.md`'s layout line still says `packaging/windows/` carries no recipe;
+  `packaging/foobar/rlx-version.ps1`'s comment still names a workflow copy of the version regex
+  that no longer exists.
+- **Phase 2, what it costs.** The cost pass adds 120 frames at 1080p per preset. On the
+  development box the report's console process landed on the AMD iGPU (RADV RENOIR) and a
+  five-preset family read 0.542 to 3.589 ms/frame in the debug profile; the eight `shot_cli`
+  report tests took 14.3 s together on it.
+- **Phase 2, the fast profile.** The first `cargo nextest run --workspace -P fast` exited 100 with
+  its output truncated before the summary, so the failing test is not identified; the immediate
+  re-run passed 1699 of 1699 with 86 skipped.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** design-backlog 0257
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no
+- **Plan header `Closes:`** design-backlog 0257 (already in the archive as promoted)
+- **What shipped:** feature — a Windows packaging recipe that measures the exe, the macOS
+  recipe's measurement, the re-derived cap, and the report's frame-cost block; no engine change
+- **Operator docs touched:** `docs/nfr.md`, `docs/releasing.md`, `docs/developing.md`,
+  `docs/capturing.md`, `docs/testing.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 46 stated reductions hold
+  across 21 live entries, 4 unprobeable
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
+- **Outstanding `human` phases:** Phase 3 — the floor is measured where it is claimed
 
 ## Followups (after this lands)
 
