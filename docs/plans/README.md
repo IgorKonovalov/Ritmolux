@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0221** (ADRs are a separate sequence — next free there is **0245**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0222** (ADRs are a separate sequence — next free there is **0245**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -55,7 +55,8 @@ place. The plan file carries the real link.
 | [0216](0216-the-operator-owns-the-order.md) | The operator owns the order | approved | dev | ADR-0239 (proposed): two rotation orders, each on a row and a hotkey, and `source` likewise. The shuffle seed stops being the embedded preset count - takes 0205 finding 5. |
 | [0217](0217-every-setting-has-a-file-and-a-gate-says-so.md) | Every setting has a file, and a gate says so | approved | dev, studio-builder | ADR-0240: a file defines every setting and the menu edits it. Repairs the one violation - the F3 overlay persists nowhere - then a Rust test and a Node gate hold all three. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | **BLOCKED on 0219** (re-pointed 2026-09-22; the box exists). ADR-0241 + 0242: Linux leads, goldens re-bless on lavapipe. Phase 3 can stop the plan. |
-| [0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) | The Arch box builds, tests and runs every lane | in-progress | human, dev, studio-builder | ADR-0243 (proposed). Phases 1-2 landed 2026-09-22 and 0120 closed on the box the same day. Phase 3 is next. |
+| [0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md) | The Arch box builds, tests and runs every lane | in-progress | human, dev, studio-builder | ADR-0243 (proposed). Phases 1-4 landed 2026-09-22; Phase 5 waits on one conductor run of 0221, then Phase 6. |
+| [0221](0221-the-arch-block-names-the-studios-settings-file.md) | The Arch block names the studio's settings file | approved | dev | A fixture for 0219 Phase 5's conductor run: one docs-only `dev` phase, no version bump. The only plan in `queue.json`. Do not run it by hand. |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 <!-- roster:end -->
 
@@ -279,6 +280,17 @@ sized in samples, so 21 of 64 bands are bin-starved at 96 kHz — pinned by a te
 waiting on someone reporting a mushy low end on a 96 kHz interface).
 
 ## Recommended execution sequence
+
+**Added 2026-09-22 - `queue.json` holds [0221] and nothing else, until 0219 Phase 5's run is recorded.**
+[0221] is a docs-only fixture written so the conductor's first Linux run has a plan to take to a
+close. The queue dropped the rest on purpose. [0120] is done. [0202] is mid-flight on its
+`origin/plan-0202-...` branch, and its Phases 5-6 need the rig. [0207] and [0206] come off lane `a`
+so that `run` picks up the fixture alone. 0206's `after: ["0207"]` stays in `plans`, where an
+unlisted plan's entry is inert. Re-queue 0207 and 0206 once 0219 Phase 5 closes.
+
+[0221]: 0221-the-arch-block-names-the-studios-settings-file.md
+[0207]: 0207-the-commitments-get-their-instruments.md
+[0206]: 0206-the-browser-shows-the-look.md
 
 **Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster above.**
 It carries the three structural findings of that day's architecture sweep, and its position is
