@@ -1,8 +1,8 @@
 # ADR-0225 — The backdrop ramp gets an angular coordinate, and the floor stays out of the chain
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-20, Plan 0203. **Outcome** below.
 > **Date:** 2026-09-19
-> **Related plan(s):** [0203](../plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md)
+> **Related plan(s):** [0203](../plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md)
 > **Rests on:** [0090](0090-a-preset-composes-two-scene-layers.md) (the one layer slot),
 > [0106](0106-two-tone-graphics-come-from-a-multiply-layer.md) and Plan 0091 Phase 1's measurement
 > of what a multiply layer does over a lit backdrop
@@ -83,6 +83,30 @@ moving it would change every preset that has a backdrop at all.
 Raised as backlog 0095, 2026-08-16, at Plan 0091's close, from that plan's Phase 7 — which was
 designed as a cut point and was cut. That entry's own instruction is that the two routes *"should be
 judged by rendering, not by argument, which is what Phase 7's own first done-when said"*, so
-[Plan 0203](../plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) renders both before
+[Plan 0203](../plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) renders both before
 building either, and this decision is superseded rather than implemented if the rendering disagrees
 with it.
+
+## Outcome — 2026-09-20, Plan 0203 Phases 3 and 4
+
+**The rendering agreed, and it agreed for a stronger reason than this decision gave.** Plan 0203
+Phase 3 drew the reference collage's floor both ways from one construction, and measured the
+figure's own luma down the same column: over a chain-drawn ground the figure reads a flat 97.3-99.0
+against 230.0-232.0, and over the lit backdrop it reads 109.7-210.1 against a floor whose darker
+bands read 209.1 — so figure and floor stop being separable by tone at all, which is this ADR's own
+first Negative reached in practice.
+
+What the rendering **added** is that the expensive route does not buy the picture either. This
+engine draws additive light, so dark-on-light comes only from a multiply layer (ADR-0106) and a
+preset has exactly one layer slot (ADR-0090) — so the fan and the figure cannot both be the thing
+that is darkened. The Context here says the cheap route buys the picture's floor and not the
+picture; the finding is that **the slot is not a price that purchases the collage**, so the slot
+cost is not a tradeoff against a better result. No scene tried there draws a fan of straight lines
+from a point: the scaled-copy coordinate draws nested chevrons instead, and aliases at the band
+counts that make its convergence legible.
+
+One authoring cost this decision did not anticipate, routed rather than taken: an angular sweep
+spends `bg_hue_span` on a whole turn while the frame sees perhaps a fifth of one, and the span is
+declared at `±0.5`, so a legible stripe count has to come from a palette repeating its tones a
+dozen or more times. Widening that range would remove it, would move no pixel, and belongs to a
+decision about `bg_hue_span` rather than to this one.

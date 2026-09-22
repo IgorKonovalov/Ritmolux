@@ -371,6 +371,13 @@ The plan and relevant ADRs win on specifics. Defaults when the plan is silent:
   `scripts/check-comment-hygiene.mjs` gates those two classes in `.rs` and `.cpp`/`.h` comments, at
   pre-push and in CI's `links` job; `hygiene-allow: <reason>`
   escapes a false positive. Length is not gated, and it is a Mode 4 review lens.
+- **Every setting has a file** — [ADR-0240](../../../docs/adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md).
+  A user choice is defined by a key in `config.toml`, and the settings menu and the hotkeys write
+  it back; foobar's `cfg_var` store holds resume state only, never a setting. **A toggle reachable
+  only from the running window does not ship**, however small it is — that is the shape ADR-0240
+  exists to refuse, and the diagnostics overlay is the one that got through. A flag or an `RLX_*`
+  variable is second priority: it overrides the file for one run, never writes it, and is added only
+  where a run genuinely needs to override the rig. Momentary view state owes no key.
 - **No secrets** in code, tests, or commit messages.
 - **Tests live where the plan says**, and test the behavior the plan's done-when names. No
   unrelated tests in the same phase — that's scope creep.

@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0239.** *(0120 was reserved for
+**Next free number: 0244.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -53,7 +53,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0030](0030-scene-target-size-hot-path-hook.md) | Third `Scene` widening: a per-frame target-size hook; hot-path notifications are now in scope | accepted |
 | [0031](0031-post-stage-trait-instantiable-composite-chain.md) | Post-composite stages behind a `PostStage` trait; the composite becomes an instantiable ordered chain | accepted (membership revised by 0032) |
 | [0032](0032-ink-leaves-the-chain-blend-between-chain-and-ink.md) | Ink leaves the `PostChain`: a terminal engine post-pass, with the transition blend between chain and ink | accepted |
-| [0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) | Testing strategy: named tiers, a core-only coverage ratchet, and a local pre-push gate | accepted |
+| [0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) | Testing strategy: named tiers, a core-only coverage ratchet, and a local pre-push gate | accepted, superseded in part by 0237 |
 | [0034](0034-internal-resolution-follows-the-target.md) | Internal render resolutions follow the target (quantized and capped); the reaction-diffusion **simulation** grid does not | accepted (Plan 0033; Outcome) |
 | [0035](0035-asymmetric-attack-release-easing.md) | Asymmetric easing: `[smoothing]` accepts an `{ attack, release }` pair (supplements ADR-0019) | accepted |
 | [0037](0037-internal-grid-is-a-resolution-not-a-shape.md) | An internal grid is a **resolution**, not a **shape**: aspect comes from the render target | accepted (Plan 0035) |
@@ -246,8 +246,8 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0222](0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md) | A preset sweep's fixed cost is paid per process, so the lever is the batch | accepted 2026-09-19 (Plan 0199), amends 0157, Outcome |
 | [0223](0223-the-figure-contract-reaches-a-custom-wave-because-the-source-applies-it-there.md) | The figure contract reaches a custom wave, because the source applies it there | accepted 2026-09-20 (Plan 0201), extends 0199 |
 | [0224](0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md) | Level mode gets a coverage threshold, and the ink class stays this scene's | accepted 2026-09-20 (Plan 0201), extends 0197 |
-| [0225](0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md) | The backdrop ramp gets an angular coordinate, and the floor stays out of the chain | proposed |
-| [0226](0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md) | The mark roster travels by blending its fields, and an integer index is an identity | proposed |
+| [0225](0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md) | The backdrop ramp gets an angular coordinate, and the floor stays out of the chain | accepted 2026-09-20, Plan 0203, Outcome |
+| [0226](0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md) | The mark roster travels by blending its fields, and an integer index is an identity | accepted 2026-09-20, Plan 0203, Outcome |
 | [0227](0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md) | A borrowed look is authored natively, and the reference never enters the repository | proposed |
 | [0228](0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md) | A preset mark is user state, keyed by name, in its own file | accepted 2026-09-20, Plan 0205 |
 | [0229](0229-the-studio-marks-a-preset-over-the-control-protocol.md) | The studio marks a preset over the control protocol, never by opening the file | accepted 2026-09-20, Plan 0205 |
@@ -258,6 +258,11 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0234](0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md) | An instrument's system roster is derived from the enum the engine reads | proposed |
 | [0235](0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md) | A gallery card's hop is chosen per family, and the signal outlasts it | proposed |
 | [0236](0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md) | A diffused render varies by prompt on bar boundaries, and the seed stays fixed | proposed |
-| [0237](0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md) | The hook runs cargo only when the push moved Rust, and serves the rest from the ledger | proposed, supersedes 0033 in part |
+| [0237](0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md) | The hook runs cargo only when the push moved Rust, and serves the rest from the ledger | accepted 2026-09-22 (Plan 0213), supersedes 0033 in part |
 | [0238](0238-a-scene-declares-a-capability-and-the-engine-stops-enumerating-kinds.md) | A scene declares a capability, and the engine stops enumerating kinds | proposed |
+| [0239](0239-rotation-carries-two-orders-and-the-shuffles-seed-varies-per-launch.md) | Rotation carries two orders, and the shuffle's seed varies per launch | proposed |
+| [0240](0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md) | A setting lives in a file, and the in-app menu edits that file | accepted 2026-09-20, Plan 0217 |
+| [0241](0241-linux-leads-and-windows-is-a-peer.md) | Linux leads, and Windows stays a peer | accepted 2026-09-20, Plan 0218 |
+| [0242](0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md) | The software reference rasterizer is lavapipe, and a WARP claim is re-measured rather than renamed | accepted 2026-09-20, Plan 0218; extends 0023, 0071 |
+| [0243](0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md) | The reference box's hardware adapter is its discrete GPU, and a reading names it | proposed 2026-09-22, Plan 0219 |
 <!-- roster:end -->

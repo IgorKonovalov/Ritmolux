@@ -164,6 +164,24 @@ const DEFAULT_HUE_SPAN: f32 = default_of(PARAMS, "bg_hue_span");
 /// aspect term cancels exactly (see the shader), so the default is the identity
 /// rather than an approximation of it.
 const DEFAULT_ANGLE: f32 = default_of(PARAMS, "bg_angle");
+
+/// `bg_coord_mode` default — **0, the straight ramp**, and an exact identity:
+/// the shader's mode-0 arm is the expression that shipped, bit for bit
+/// (ADR-0225).
+const DEFAULT_COORD_MODE: f32 = default_of(PARAMS, "bg_coord_mode");
+/// The last mode the shader defines. Values past it clamp here rather than
+/// falling through to an arm that does not exist.
+const MAX_COORD_MODE: f32 = 1.0;
+
+/// The vanishing point's defaults — **the frame's own middle**, which is where a
+/// fan with no centre named should radiate from.
+const DEFAULT_CENTER_X: f32 = default_of(PARAMS, "bg_center_x");
+const DEFAULT_CENTER_Y: f32 = default_of(PARAMS, "bg_center_y");
+/// How far off-frame the centre may sit. The frame spans `-1..1` in `y`, so
+/// twice that reaches a vanishing point a whole frame below the picture — which
+/// is where a shallow floor's is — without letting a broken binding send it to
+/// infinity, where every band would be parallel again.
+const MAX_CENTER: f32 = 2.0;
 /// The brightness ramp's two ends, on the same axis as the colour sweep. These
 /// two numbers **are** the fixed `mix(0.72, 1.0, ·)` tilt: the shader runs
 /// that instruction with these as its constants, so an unbound preset pays no
@@ -251,7 +269,12 @@ struct Bg {
     // The band's own palette segment. x: bg_band_hue, y: bg_band_hue_span,
     // zw: unused
     n: vec4<f32>,
+    // The ramp's coordinate mode (ADR-0225). x: bg_coord_mode (CPU-clamped and
+    // rounded), yz: the vanishing point in NDC, w: unused.
+    r: vec4<f32>,
 }
+
+const BG_TAU: f32 = 6.28318530718;
 
 @group(0) @binding(0) var<uniform> u: Bg;
 
@@ -286,6 +309,35 @@ fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
 fn axis_pos(ndc: vec2<f32>, dir: vec2<f32>, aspect: f32) -> f32 {
     let q = vec2<f32>(ndc.x * aspect, ndc.y);
     return 0.5 + 0.5 * dot(q, dir) / (aspect * abs(dir.x) + abs(dir.y));
+}
+
+// The ramp's ANGULAR position: where `ndc` sits on one turn about `centre`,
+// as `[0, 1)` (ADR-0225). This is the whole of what turns the swept,
+// repeat-addressed ramp into a fan — the bands are already there, and only the
+// coordinate they are addressed by changes.
+//
+// **Square units on both sides.** `q` and the centre are both stretched by the
+// aspect, so a wedge is an equal angle ON SCREEN rather than an equal angle in a
+// frame that has been squashed (ADR-0037). `bg_center_x` is given in NDC so that
+// `1` is the right edge whatever the window's shape, and it is multiplied by the
+// aspect here rather than by the author.
+//
+// `atan2(rel.x, rel.y)` — x over y, not the usual y over x — measures from the
+// +y ray toward +x, which is `bg_angle`'s own convention and the same one
+// `vec2(sin a, cos a)` encodes above. So `bg_angle` turns the fan exactly as it
+// turns the straight ramp, and the coordinate's own wrap seam runs from the
+// centre along the direction `bg_angle` names.
+//
+// **It WRAPS where the straight ramp CLAMPS**, and that is the one behavioural
+// difference an author meets. A turn is periodic: the coordinate returns to
+// where it started, so `bg_hue_span` and `bg_shade`..`bg_shade_end` both jump
+// across that seam unless the palette closes on itself there.
+fn angle_pos(ndc: vec2<f32>, centre: vec2<f32>, angle: f32, aspect: f32) -> f32 {
+    let q = vec2<f32>(ndc.x * aspect, ndc.y);
+    let c = vec2<f32>(centre.x * aspect, centre.y);
+    let rel = q - c;
+    let t = (atan2(rel.x, rel.y) - angle) / BG_TAU;
+    return t - floor(t);
 }
 
 // One point of the preset's gradient, through the crossfade and the shared
@@ -335,8 +387,21 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // `aspect * 0 + 1`. That is why this reduces to the pre-ramp expression bit
     // for bit — and why no default-angle test can tell a right aspect from a
     // wrong one, which is what `backdrop_ramp.rs`'s negative control exists for.
+    // **The coordinate mode (ADR-0225).** A per-draw uniform, so the branch is
+    // uniform across a warp and mode 0 costs one arm rather than two — and mode
+    // 0's arm is the expression above written out unchanged, which is what makes
+    // the default an exact identity rather than a near one.
+    //
+    // The two arms end their coordinate differently on purpose: a straight ramp
+    // is CLAMPED because it has two ends, and a fan WRAPS because it does not.
+    // See `angle_pos` for what that costs at the seam.
     let d = vec2<f32>(sin(angle), cos(angle));
-    let s = clamp(axis_pos(in.ndc, d, aspect), 0.0, 1.0);
+    var s: f32;
+    if (u.r.x < 0.5) {
+        s = clamp(axis_pos(in.ndc, d, aspect), 0.0, 1.0);
+    } else {
+        s = angle_pos(in.ndc, u.r.yz, angle, aspect);
+    }
 
     // The ramp is linear in screen space and light is not, so one exponent shapes
     // *where* things sit along the axis. It is applied to the position, ahead of
@@ -451,6 +516,7 @@ struct Bg {
     g: [f32; 4],
     b: [f32; 4],
     n: [f32; 4],
+    r: [f32; 4],
 }
 
 /// The gradient pipeline, its uniform and its LUT pair, built lazily on the first
@@ -631,6 +697,12 @@ pub struct Background {
     vignette: f32,
     angle: f32,
     hue_span: f32,
+    /// The ramp's coordinate mode and the point its angular arm radiates from
+    /// (ADR-0225), raw as the preset bound them; `applied_coord_mode` and
+    /// `applied_center` condition them on the way to the uniform.
+    coord_mode: f32,
+    center_x: f32,
+    center_y: f32,
     shade: f32,
     shade_end: f32,
     ramp_gamma: f32,
@@ -692,6 +764,30 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 0.0,
         range: Some([-0.5, 0.5]),
         doc: "How far along the palette the ramp travels from `bg_hue`; 0 is a flat colour.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
+        name: "bg_coord_mode",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Which way the backdrop ramp is measured: 0 straight across the frame, 1 around a \
+              point, which turns its bands into a fan converging on that point.",
+        kind: ParamKind::Structural,
+    },
+    ParamSpec {
+        name: "bg_center_x",
+        default: 0.0,
+        range: Some([-2.0, 2.0]),
+        doc: "Horizontal point the angular ramp's bands converge on; 0 is the frame's middle and \
+              1 its right edge. Does nothing while bg_coord_mode is 0.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
+        name: "bg_center_y",
+        default: 0.0,
+        range: Some([-2.0, 2.0]),
+        doc: "Vertical point the angular ramp's bands converge on; 0 is the frame's middle and \
+              -1 its bottom edge. Does nothing while bg_coord_mode is 0.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
@@ -796,6 +892,38 @@ fn applied_band_width(width: f32) -> f32 {
     }
 }
 
+/// The coordinate mode the shader will **actually apply**: clamped into the
+/// roster and **rounded**, with a non-finite binding falling back to the default
+/// (ADR-0225).
+///
+/// It rounds because a mode names an arm and there is nothing between two arms —
+/// `shape_field`'s own `coord_mode` rule, and `applied_ramp_gamma`'s two guards
+/// besides: the value is conditioned on the CPU so `0.0` reaches the uniform
+/// exactly, which is what puts the straight ramp on the identity branch, and so
+/// a NaN never meets WGSL's implementation-defined `clamp`.
+fn applied_coord_mode(mode: f32) -> f32 {
+    if mode.is_finite() {
+        mode.clamp(DEFAULT_COORD_MODE, MAX_COORD_MODE).round()
+    } else {
+        DEFAULT_COORD_MODE
+    }
+}
+
+/// One axis of the vanishing point, held inside the frame's own reach.
+///
+/// The bound is not a safety guard — `atan2` is defined everywhere — but a
+/// meaning one: past a frame or so off-screen the rays through the visible
+/// region are near-parallel and the mode stops being a fan, so a binding that
+/// swept the centre to infinity would silently return to mode 0's picture
+/// without saying so.
+fn applied_center(v: f32, fallback: f32) -> f32 {
+    if v.is_finite() {
+        v.clamp(-MAX_CENTER, MAX_CENTER)
+    } else {
+        fallback
+    }
+}
+
 /// The two colour modulations the backdrop **shares with the scene** rather than
 /// owning (ADR-0086).
 ///
@@ -819,6 +947,9 @@ impl Background {
             vignette: DEFAULT_VIGNETTE,
             angle: DEFAULT_ANGLE,
             hue_span: DEFAULT_HUE_SPAN,
+            coord_mode: DEFAULT_COORD_MODE,
+            center_x: DEFAULT_CENTER_X,
+            center_y: DEFAULT_CENTER_Y,
             shade: DEFAULT_SHADE,
             shade_end: DEFAULT_SHADE_END,
             ramp_gamma: DEFAULT_RAMP_GAMMA,
@@ -866,6 +997,9 @@ impl Background {
         self.vignette = DEFAULT_VIGNETTE;
         self.angle = DEFAULT_ANGLE;
         self.hue_span = DEFAULT_HUE_SPAN;
+        self.coord_mode = DEFAULT_COORD_MODE;
+        self.center_x = DEFAULT_CENTER_X;
+        self.center_y = DEFAULT_CENTER_Y;
         self.shade = DEFAULT_SHADE;
         self.shade_end = DEFAULT_SHADE_END;
         self.ramp_gamma = DEFAULT_RAMP_GAMMA;
@@ -891,6 +1025,9 @@ impl Background {
             "bg_vignette" => self.vignette = value,
             "bg_angle" => self.angle = value,
             "bg_hue_span" => self.hue_span = value,
+            "bg_coord_mode" => self.coord_mode = value,
+            "bg_center_x" => self.center_x = value,
+            "bg_center_y" => self.center_y = value,
             "bg_shade" => self.shade = value,
             "bg_shade_end" => self.shade_end = value,
             "bg_ramp_gamma" => self.ramp_gamma = value,
@@ -987,6 +1124,12 @@ impl Background {
                     self.band_curve,
                 ],
                 n: [self.band_hue, self.band_hue_span, 0.0, 0.0],
+                r: [
+                    applied_coord_mode(self.coord_mode),
+                    applied_center(self.center_x, DEFAULT_CENTER_X),
+                    applied_center(self.center_y, DEFAULT_CENTER_Y),
+                    0.0,
+                ],
             }),
         );
         // The backdrop owns the clear: establish the frame here so no scene

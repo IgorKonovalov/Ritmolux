@@ -51,6 +51,9 @@
         "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
         "bg_angle": { "$ref": "#/definitions/param.bg_angle" },
         "bg_hue_span": { "$ref": "#/definitions/param.bg_hue_span" },
+        "bg_coord_mode": { "$ref": "#/definitions/param.bg_coord_mode" },
+        "bg_center_x": { "$ref": "#/definitions/param.bg_center_x" },
+        "bg_center_y": { "$ref": "#/definitions/param.bg_center_y" },
         "bg_shade": { "$ref": "#/definitions/param.bg_shade" },
         "bg_shade_end": { "$ref": "#/definitions/param.bg_shade_end" },
         "bg_ramp_gamma": { "$ref": "#/definitions/param.bg_ramp_gamma" },
@@ -841,6 +844,21 @@
       "type": "string",
       "description": "How far along the palette the ramp travels from `bg_hue`; 0 is a flat colour.",
       "markdownDescription": "How far along the palette the ramp travels from `bg_hue`; 0 is a flat colour.\n\n- default `0.0`\n- typical range `-0.5` to `0.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.bg_coord_mode": {
+      "type": "string",
+      "description": "Which way the backdrop ramp is measured: 0 straight across the frame, 1 around a point, which turns its bands into a fan converging on that point.",
+      "markdownDescription": "Which way the backdrop ramp is measured: 0 straight across the frame, 1 around a point, which turns its bands into a fan converging on that point.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.bg_center_x": {
+      "type": "string",
+      "description": "Horizontal point the angular ramp's bands converge on; 0 is the frame's middle and 1 its right edge. Does nothing while bg_coord_mode is 0.",
+      "markdownDescription": "Horizontal point the angular ramp's bands converge on; 0 is the frame's middle and 1 its right edge. Does nothing while bg_coord_mode is 0.\n\n- default `0.0`\n- typical range `-2.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.bg_center_y": {
+      "type": "string",
+      "description": "Vertical point the angular ramp's bands converge on; 0 is the frame's middle and -1 its bottom edge. Does nothing while bg_coord_mode is 0.",
+      "markdownDescription": "Vertical point the angular ramp's bands converge on; 0 is the frame's middle and -1 its bottom edge. Does nothing while bg_coord_mode is 0.\n\n- default `0.0`\n- typical range `-2.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.bg_shade": {
       "type": "string",

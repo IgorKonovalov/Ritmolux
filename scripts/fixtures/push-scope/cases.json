@@ -1,0 +1,87 @@
+{
+  "paths": [
+    { "path": "core/src/lib.rs", "expect": "match" },
+    { "path": "tools/some/deep/thing.rs", "expect": "match" },
+    { "path": "standalone/build.rs", "expect": "match" },
+    { "path": "Cargo.toml", "expect": "match" },
+    { "path": "core/Cargo.toml", "expect": "match" },
+    { "path": "Cargo.lock", "expect": "match" },
+    { "path": "rust-toolchain.toml", "expect": "match" },
+    { "path": ".cargo/config.toml", "expect": "match" },
+    { "path": ".config/nextest.toml", "expect": "match" },
+    { "path": "presets/aurora.toml", "expect": "match" },
+    { "path": "presets/schema/cellular.schema.json", "expect": "match" },
+    { "path": "presets/README.md", "expect": "match" },
+    { "path": "core/shaders/composite.wgsl", "expect": "match" },
+    { "path": "core/tests/golden/spectrum.png", "expect": "match" },
+    { "path": "core-cabi/include/rlx_core.h", "expect": "match" },
+    { "path": "docs/configuration.md", "expect": "match" },
+    { "path": "docs/examples/tuning/step1.toml", "expect": "match" },
+    { "path": "docs/plans/0213-the-hook-costs-what-the-push-is-worth.md", "expect": "none" },
+    { "path": "docs/adrs/README.md", "expect": "none" },
+    { "path": "docs/images/hero.png", "expect": "none" },
+    { "path": "README.md", "expect": "none" },
+    { "path": "studio/src/main.ts", "expect": "none" },
+    { "path": "tools/conductor/queue.json", "expect": "none" },
+    { "path": "site/astro.config.mjs", "expect": "none" },
+    { "path": "sub/Cargo.lock", "expect": "none" },
+    { "path": "docs/nextest.toml", "expect": "none" },
+    { "path": "corerust/notes.md", "expect": "none" }
+  ],
+  "base": [
+    "README.md",
+    "Cargo.toml",
+    "Cargo.lock",
+    "core/src/lib.rs",
+    "docs/plans/README.md",
+    "presets/aurora.toml"
+  ],
+  "ranges": [
+    {
+      "name": "docs-only",
+      "write": ["docs/plans/0999-a-plan.md", "docs/adrs/0999-an-adr.md", "README.md"],
+      "expect": "none"
+    },
+    {
+      "name": "preset-only",
+      "write": ["presets/x.toml"],
+      "expect": "match",
+      "path": "presets/x.toml"
+    },
+    {
+      "name": "lockfile-only",
+      "write": ["Cargo.lock"],
+      "expect": "match",
+      "path": "Cargo.lock"
+    },
+    {
+      "name": "no-common-ancestor",
+      "write": ["docs/plans/README.md"],
+      "orphan": true,
+      "expect": "match",
+      "reason": "no common ancestor"
+    },
+    {
+      "name": "one-rs-file",
+      "write": ["core/src/extra.rs"],
+      "expect": "match",
+      "path": "core/src/extra.rs"
+    },
+    {
+      "name": "rs-file-deleted",
+      "delete": ["core/src/lib.rs"],
+      "expect": "match",
+      "path": "core/src/lib.rs"
+    },
+    {
+      "name": "docs-a-test-reads",
+      "write": ["docs/plans/0998-another.md", "docs/configuration.md"],
+      "expect": "match",
+      "path": "docs/configuration.md"
+    },
+    {
+      "name": "empty-commit",
+      "expect": "none"
+    }
+  ]
+}

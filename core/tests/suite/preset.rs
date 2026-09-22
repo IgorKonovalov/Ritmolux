@@ -2226,6 +2226,11 @@ fn declared_params_match_set_param() {
                 // two ends of a ramp on that same axis.
                 "bg_angle",
                 "bg_hue_span",
+                // The coordinate that ramp is measured in (ADR-0225), which is
+                // what turns its bands into a fan about a vanishing point.
+                "bg_coord_mode",
+                "bg_center_x",
+                "bg_center_y",
                 "bg_shade",
                 "bg_shade_end",
                 "bg_ramp_gamma",
@@ -2405,16 +2410,32 @@ fn declared_params_match_set_param() {
 /// which is why `n`, `d`, `samples`, `contour`, `count`, `seed` and `variant`
 /// are absent despite integer-sounding names.
 const STRUCTURAL: &[(&str, &str)] = &[
-    // `mark_shape` / `mark_points`: clamp then round, CPU-side, because a
-    // fractional point count tears the angle fold along `atan2`'s branch cut.
-    ("swarm", "shape"),
+    // `mark_points`: clamp then round, CPU-side, because a fractional point
+    // count tears the angle fold along `atan2`'s branch cut. Its neighbour
+    // `shape` is deliberately absent, and it is the one name that ever left this
+    // roster: the roster of silhouettes blends between two arms, so the scene
+    // reads the index's fraction on purpose and rounding it here would leave the
+    // travel reachable only from an unquantized live override (ADR-0226).
     ("swarm", "points"),
-    ("emitter", "shape"),
     ("emitter", "points"),
-    ("shape_field", "shape"),
     ("shape_field", "points"),
-    // `applied_coord_mode`: a two-entry roster, clamped and rounded.
+    // `star_seed`: clamp then round, on the roster's own rule rather than on
+    // `mark_points`' tearing one — a seed names an arrangement of the star's
+    // jitter and wobble, and there is nothing between two arrangements. Its
+    // siblings `star_wobble` and `star_wobble_freq` are deliberately absent:
+    // both are amounts the arm reads the fraction of, so they are `Modal` like
+    // `star_jitter` beside them.
+    ("swarm", "star_seed"),
+    ("emitter", "star_seed"),
+    ("shape_field", "star_seed"),
+    // `applied_coord_mode`: a two-entry roster, clamped and rounded. Twice over
+    // and in two files — the shape field's chooses how a figure's distance is
+    // measured, the backdrop ramp's chooses whether its bands run straight
+    // across the frame or around a point (ADR-0225). The backdrop's two centre
+    // params are deliberately absent from this roster: a vanishing point is a
+    // position and the shader reads its fraction, so they are `Modal`.
     ("shape_field", "coord_mode"),
+    ("background", "bg_coord_mode"),
     // `family::roster_index`: rounds into the tuple roster.
     ("attractor", "tuple"),
     // `Grammar::from_param` / `Roster::from_param`: round into a closed set.

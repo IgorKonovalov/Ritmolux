@@ -4,6 +4,18 @@
 # Runs the fast subset of what CI runs, so a broken push costs seconds here
 # instead of minutes there. Stops at the first failure and names the step.
 #
+# THE CARGO STEPS ARE CONDITIONAL; NOTHING ELSE IS (ADR-0237). The Node roster,
+# the sd-filter suite and the studio's three run on every push. fmt, clippy,
+# rustdoc and nextest run only when a pushed range touches a path listed in
+# scripts/push-scope.manifest.mjs, and nextest is then SERVED rather than run
+# when the suite ledger holds a green `cargo nextest run --workspace` for this
+# exact, clean tree (tools/conductor/suite-record.mjs). A skip and a serve each
+# print one line saying why. Whatever the hook cannot read - an empty or
+# unparseable stdin, a ref new on the remote, a shallow clone, a sha this clone
+# lacks, a run by hand from a terminal - runs all four. A red still refuses the
+# push; CI runs every step unconditionally and is what catches a build input
+# the manifest does not list.
+#
 # NOT run here, by design (ADR-0033 Alternative F): `cargo deny`, doctests,
 # Miri, and the coverage job. Those push the gate from tens of seconds into
 # minutes, and a gate that hurts gets disabled — at which point it is worth less
@@ -59,6 +71,70 @@ run_step() {
     shift
     echo "pre-push: $label"
     "$@" || fail "$label"
+}
+
+# git hands the hook one `<local ref> <local sha> <remote ref> <remote sha>` line per pushed ref on
+# stdin. It is read here, before any step runs, because a step that inherits stdin could consume it.
+# A terminal on stdin - the hook run by hand - is read as no refs at all, which runs everything.
+if [ -t 0 ]; then
+    push_refs=""
+else
+    push_refs=$(cat)
+fi
+
+# Decides whether the cargo steps run (ADR-0237). Returns 0 to run them and 1 to skip them, and
+# leaves the reason in `scope_note`. The only way to reach 1 is for every pushed range to be read
+# and for `scripts/push-scope.mjs` to answer exit 3 - "no Rust-relevant path" - for each; anything
+# else runs all four: no node, an empty or unparseable stdin, a ref new on the remote (an all-zero
+# remote sha, so there is no range), a push of nothing but deletions, or any other exit from the
+# helper, which answers yes itself for a shallow clone or a sha this clone does not hold.
+rust_relevant() {
+    if ! command -v node >/dev/null 2>&1; then
+        scope_note="no node on PATH to read the pushed range"
+        return 0
+    fi
+    if [ -z "$push_refs" ]; then
+        scope_note="no ref on stdin, so the pushed range is unknown"
+        return 0
+    fi
+    scope_ranges=""
+    while read -r local_ref local_sha remote_ref remote_sha extra; do
+        [ -z "$local_ref" ] && continue
+        if [ -z "$remote_sha" ] || [ -n "$extra" ]; then
+            scope_note="cannot parse the ref line '$local_ref $local_sha $remote_ref $remote_sha $extra'"
+            return 0
+        fi
+        case "$local_sha$remote_sha" in
+        *[!0-9a-f]*)
+            scope_note="cannot parse the ref line '$local_ref $local_sha $remote_ref $remote_sha'"
+            return 0
+            ;;
+        esac
+        # An all-zero local sha deletes the remote ref and pushes no tree.
+        case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+        case "$remote_sha" in
+        *[!0]*) ;;
+        *)
+            scope_note="$remote_ref is new on the remote, so the pushed range is unknown"
+            return 0
+            ;;
+        esac
+        scope_verdict=$(node scripts/push-scope.mjs "$remote_sha" "$local_sha")
+        scope_code=$?
+        if [ "$scope_code" -ne 3 ]; then
+            scope_note="${scope_verdict:-node scripts/push-scope.mjs exited $scope_code}"
+            return 0
+        fi
+        scope_ranges="$scope_ranges $(printf '%.7s..%.7s' "$remote_sha" "$local_sha")"
+    done <<EOF
+$push_refs
+EOF
+    if [ -z "$scope_ranges" ]; then
+        scope_note="the push carries no range to read"
+        return 0
+    fi
+    scope_note="${scope_ranges# } touches no Rust-relevant path (scripts/push-scope.manifest.mjs)"
+    return 1
 }
 
 echo "pre-push: running the fast subset (doc links, backlog claims, comment hygiene, reader prose, release tag, translations, sd-filter, studio, fmt, clippy, rustdoc, tests)"
@@ -262,6 +338,16 @@ else
     echo "pre-push: skipping the studio's typecheck, lint and tests (no studio/node_modules; run: npm --prefix studio ci)"
 fi
 
+# Everything below is cargo, and it runs only when the push moved a Rust-relevant path (ADR-0237).
+# The Node roster, the sd-filter suite and the studio above ran unconditionally.
+if ! rust_relevant; then
+    echo "pre-push: skipping cargo fmt, clippy, rustdoc and tests: $scope_note"
+    echo ""
+    echo "pre-push: OK"
+    exit 0
+fi
+echo "pre-push: running the cargo steps: $scope_note"
+
 run_step "cargo fmt --all --check" cargo fmt --all --check
 # `--workspace` matches what CI now runs, and is load-bearing since ADR-0072:
 # `rlx-core-cabi` sits outside the workspace default-members, so a bare `cargo
@@ -297,8 +383,19 @@ run_step "cargo doc --workspace --no-deps (RUSTDOCFLAGS=-D warnings)" env "RUSTD
 # copy that goes stale when the profile changes, which is exactly what happened
 # to the "9 binaries skipped" this comment used to quote. Since ADR-0157 the
 # skip is partly per TEST rather than per binary, so read nextest's own line.
-echo "pre-push: deferring most of the GPU-heavy suites via profile.fast, minus the preset sample (CI runs the rest)"
-run_step "cargo nextest run -P fast" cargo nextest run --workspace -P fast
+#
+# The step is served, not run, when the suite ledger holds a green `cargo nextest run --workspace`
+# for this exact tree (ADR-0237): the full suite is a superset of `-P fast`, and the ledger records a
+# run only on a tree that was clean when it started and when it ended. A dirty worktree, a tree with
+# only a `-P fast` record, or a red newest record runs the step. suite-record.mjs answers exit 0 only
+# for a record, so a missing node or a crash there runs the step too.
+if command -v node >/dev/null 2>&1 && suite_record=$(node tools/conductor/suite-record.mjs); then
+    echo "pre-push: serving cargo nextest run -P fast from the suite ledger: $suite_record"
+else
+    [ -n "${suite_record:-}" ] && echo "pre-push: no ledger record serves the tests: $suite_record"
+    echo "pre-push: deferring most of the GPU-heavy suites via profile.fast, minus the preset sample (CI runs the rest)"
+    run_step "cargo nextest run -P fast" cargo nextest run --workspace -P fast
+fi
 
 echo ""
 echo "pre-push: OK"

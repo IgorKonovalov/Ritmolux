@@ -1,8 +1,8 @@
 # ADR-0237 — The hook runs cargo only when the push moved Rust, and serves the rest from the ledger
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-22 (Plan 0213)
 > **Date:** 2026-09-19
-> **Related plan(s):** [0213](../plans/0213-the-hook-costs-what-the-push-is-worth.md)
+> **Related plan(s):** [0213](../plans/done/0213-the-hook-costs-what-the-push-is-worth.md)
 > **Supersedes in part:** [0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) — its
 > roster, its opt-in-per-clone nature and its Alternative F exclusions all stand; what this replaces
 > is the rule that the hook's cargo steps run on every push

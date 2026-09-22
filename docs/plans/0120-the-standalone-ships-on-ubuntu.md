@@ -48,6 +48,31 @@
 > `libpulse-sys`'s needs `pkg-config` and libpulse headers — which is a limit to know before the
 > phase starts rather than to discover inside it.
 
+> **Amended 2026-09-20 (architect) — the Linux build has no GPU backend, and nothing here
+> would have said so.** `core/Cargo.toml` declares wgpu `default-features = false` and enables
+> `dx12` under `[target.'cfg(windows)'.dependencies]` and `metal` under `cfg(target_os = "macos")`.
+> **There is no Linux arm**, so a Linux build compiles wgpu with no backend and resolves **no
+> adapter** at run time. It compiles clean, `cargo check --target x86_64-unknown-linux-gnu` is
+> clean, and the GPU suites skip through [ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md) —
+> so a green arm would say nothing about it. Phase 2 gains the arm and a done-when below.
+
+> **Amended 2026-09-22 (architect) — this plan runs on the Arch box, inside
+> [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s sequence.** The Windows-only
+> premise behind the 2026-09-20 split is gone. The phases, their code and 0214's ownership of the
+> CI and release readings are **unchanged**. Two things change:
+> - **A clause that needs a Linux compiler, not a runner, is witnessed on the box and logged here.**
+>   The first compilation of Phase 3, the Phase 3 unit tests, the subprocess tests leaving
+>   `$HOME/.local/share` untouched, and the adapter a local run resolves are recorded in this plan's
+>   log. The `ubuntu-latest` arm going green, and the adapter *it* resolves, stay 0214's. The Phase 2
+>   `cargo check --target x86_64-unknown-linux-gnu` step becomes a native `cargo check`.
+> - **The package names in Phases 2-3 are apt's**, and they are still right for the CI arm. On the Arch
+>   box they are `libpulse`, `pkgconf`, `wayland`, `libxkbcommon` and `vulkan-swrast`, installed by
+>   0219 Phase 1.
+>
+> Runs **after 0219 Phase 2** and **before 0219 Phase 3**, as a human-started session. It stays in
+> `tools/conductor/queue.json`, but the conductor is not started on the Arch box until 0219 Phase 5
+> has verified it there.
+
 ## TL;DR
 
 The standalone gets a third platform: **Ubuntu 24.04 x86_64**. A new
@@ -235,6 +260,11 @@ Ubuntu box in Phase 6 has its real `~/.local/share/Ritmolux/` mutated by `cargo 
   `cargo doc --workspace --no-deps` under `RUSTDOCFLAGS: -D warnings` — with the same `-P fast`
   profile the other two arms use, not a loosened one, and with the system packages the job needs.
   **Whether it runs them green is 0214's first reading**, because nothing here can run it.
+- **`core/Cargo.toml` carries a Linux wgpu arm** — `[target.'cfg(target_os = "linux")'.dependencies]`
+  enabling at least `vulkan` — and the job installs a Vulkan ICD (Mesa's lavapipe) so the runner can
+  resolve one. Without the feature the build has no backend at all and `request_adapter` returns
+  nothing; **that it resolves an adapter is [0214](0214-the-linux-arm-reports-back.md) Phase 1's
+  reading**, as with every other clause here that needs the arm to run.
 - The third `cfg` arm **type-checks from this checkout**:
   `cargo check --target x86_64-unknown-linux-gnu` is clean after `rustup target add`. This is the
   one Linux compile available before a push, and it is available **only in this phase** — it runs

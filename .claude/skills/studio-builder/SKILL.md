@@ -277,6 +277,14 @@ Every event line main parses and every action main forwards goes through the sch
 is parsed, never `as Foo`. Past the boundary, trust the types; do not validate the same payload
 three times down the stack.
 
+### Every setting the studio holds has a key in `settings.json`
+ADR-0240. A choice the user expects to outlive the window is defined by a key in `StudioSettings`
+(`studio/electron/settings.ts`), documented in `studio/README.md`, and written back by the panel
+that changes it. **Browser storage is not persistence here** — `localStorage`, `sessionStorage` and
+`indexedDB` hold nothing the user chose, and a gate refuses them outside the allowlist. Momentary
+view state — a panel width, a scroll position, which view is open — is not a setting and stays in
+React state.
+
 ### A preset the studio did not create is never written to
 ADR-0189. The first editing gesture against a preset — a slider release, a palette edit, `Ctrl+S`
 — prompts once for a name and **forks** it: the whole document, taken from the text the studio

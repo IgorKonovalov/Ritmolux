@@ -328,9 +328,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0095 | The backdrop ramp makes parallel stripes only, and a converging fan cannot be lit *and* darkened | [Plan 0203](plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md). **Promoted** |
-| 0100 | "Hand-drawn" is edge wobble, not spike-length variation, and the star arm has no lever | [Plan 0203](plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md). **Promoted** |
-| 0101 | The mark roster cannot morph between silhouettes, and two other rosters already do | [Plan 0203](plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md). **Promoted** |
 | 0257 | The standalone exe is 9.7 % over NFR §4's cap, and only the component would have noticed | [Plan 0207](plans/0207-the-commitments-get-their-instruments.md). **Promoted** |
 | 0126 | A render is one prompt, one seed and one preset from first frame to last | [Plan 0212](plans/0212-the-diffused-render-gains-a-timeline.md). **Promoted** |
 | 0236 | The `.claude/` park reads a phase's declared `Files touched`, and prose escapes it | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
@@ -632,6 +629,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0244 | A custom wave is neither smoothed nor scaled like the eight built-in figures | [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) Phase 2 + ADR-0223. Smoothed unless it draws dots; the scaled half was never open. **Closed 2026-09-20** |
 | 0251 | `warp_mesh`'s level mode draws bands but not an ink class | [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) Phase 3 + ADR-0224. The ink class, not two exact values; it takes the threshold and a banded coordinate. **Closed 2026-09-20** |
 | 0245 | The converted warp space has no pixel baseline, because every golden fixture is square | [Plan 0201](plans/done/0201-the-warp-surface-stops-lying.md) Phases 4-4b. One fixture at 160x120; a non-square size proved necessary and not sufficient. **Closed 2026-09-20** |
+| 0101 | The mark roster cannot morph between silhouettes, and two other rosters already do | [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) Phase 1 + ADR-0226. The travel needed a second declaration changed as well as the shader. **Closed 2026-09-20** |
+| 0100 | "Hand-drawn" is edge wobble, not spike-length variation, and the star arm has no lever | [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) Phase 2. Wobble, seed and frequency; the accuracy cost is a quarter of the jitter's. **Closed 2026-09-20** |
+| 0095 | The backdrop ramp makes parallel stripes only, and a converging fan cannot be lit *and* darkened | [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) Phases 3-4 + ADR-0225. Judged by rendering; neither route buys the collage. **Closed 2026-09-20** |
 <!-- roster:end -->
 
 ---
@@ -14530,9 +14530,25 @@ this engine is not a collage tool. It becomes worth taking when someone authors 
 a vanishing point — at which point the two routes above should be judged by rendering, not by
 argument, which is what Phase 7's own first done-when said.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0203](plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-20 by [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) Phases 3 and 4 — judged by rendering, exactly as this entry demanded, and **the verdict was stronger than either route's case**
+
+Phase 3 drew the reference's floor both ways from one construction and measured the figure's own
+luma down the same column: over a chain-drawn ground the figure is a flat 97.3-99.0 against
+230.0-232.0, and over the lit backdrop it runs 109.7-210.1 against a floor whose darker bands read
+209.1 — figure and floor no longer separable by tone at all. So the backdrop route's limit is real
+and measured. **What this entry did not anticipate is that the chain route does not buy the picture
+either**: a preset has one layer slot (ADR-0090) and dark-on-light needs a multiply layer
+(ADR-0106), so the fan and the figure cannot both be the thing that is darkened, and no scene tried
+there draws a fan of straight lines from a point at all. Phase 4 then built the cheap route —
+`bg_coord_mode`, `bg_center_x`, `bg_center_y`, default an identity, the existing backdrops
+byte-identical, the convergence measured as falling spacing *and* rising boundary count along a
+radius. One cost this entry did not predict and the plan routed rather than took: `bg_hue_span`
+spends its declared `±0.5` on a whole turn while the frame sees a fifth of one, so a legible stripe
+count has to come from a palette that repeats its tones.
 
 ---
 
@@ -14594,9 +14610,24 @@ computes.
 **Low.** The look gate passed the silhouette. Take it when someone wants a *deliberately* rough
 figure rather than a slightly irregular one, and read the exterior-accuracy number first.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0203](plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-20 by [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) Phase 2 — built as specified, and **this entry's instruction to read the accuracy number first is what kept it honest**
+
+`star_wobble` and `star_wobble_freq` wave the edge between a tip and the notch beside it along its
+length, with both ends pinned by a `sin(pi * t)` window that is exactly zero there, and `star_seed`
+re-scatters the existing tip jitter without changing its amount — striding through the hash's
+*input* with an odd multiplicative constant, which is what makes a seed a re-scatter rather than the
+same star turned by one spike. Measured separately, the wobble moves the edge by 0.04-0.17 and the
+tip by about 1e-7: five orders apart. The exterior field accuracy this entry told the taker to read
+first came back at **at most 0.12 for the wobble alone, about a quarter of `star_jitter`'s own
+0.54**, and on top of a jitter of 0.4 the wobble adds 0.0097 to that configuration's 0.540 — so the
+phase did not hit its own stop condition. One thing left as it was, deliberately: `star_jitter`'s
+generated doc sentence still claims the star reads as hand-drawn, which this entry's whole argument
+says is the weaker of the two roughnesses; `presets/README.md`'s prose says so in words rather than
+moving a generated surface for a wording.
 
 ---
 
@@ -14653,9 +14684,28 @@ three continuous star params. This is filed so that if someone later wants a fig
 from a heart to a star across a phrase, the precedents and the constraints are in one place instead
 of being re-derived.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0203](plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-20 by [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) Phase 1 — built as specified, and **the first attempt shipped it unreachable from the very surface that asked for it**
+
+A fractional `shape` blends the two neighbouring arms' distance fields and their boundary radii, and
+a whole index is an exact identity — ten byte-identical rendered pairs against the same three files
+restored to their pre-phase state and rebuilt, across both the shape-field and the particle paths.
+The entry's own instruction to read [ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)
+first is what put the boundary radius in the same decision rather than in a later one, and it earned
+its place twice over: the scaled-copy coordinate's disqualification of the `ring` had to widen from
+an index to the whole open span that *touches* the ring, which nothing would have noticed until an
+author eased `shape` from `0` to `2`.
+
+**The failure worth recording is the close review's.** The scene stopped rounding; the *binding
+pipeline* did not, because `shape` was still declared `ParamKind::Structural` and that declaration
+is read by a second quantizer a layer above the scene. So an eased or expression-bound `shape` — the
+exact thing the user's *"can we morph the shape with music"* asked for, at a preset's authoring —
+still stepped, while three generated documentation surfaces already promised travel. Every test in
+the lane called the scene's own conditioner, where the two roundings had agreed for as long as both
+existed. Repaired in `5174d516` with the assertion that drives both stages.
 
 ---
 

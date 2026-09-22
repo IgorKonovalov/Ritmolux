@@ -235,7 +235,8 @@ pub(crate) const MIN_INTERIOR_TEXELS: f32 = 16.0;
 
 const SHADER: &str = r#"
 struct Params {
-    // x: aspect (from the RENDER TARGET), y: shape index (quantized CPU-side),
+    // x: aspect (from the RENDER TARGET), y: shape position (clamped CPU-side
+    // and NOT rounded, so a fractional value blends two arms - ADR-0226),
     // z: points (quantized CPU-side), w: scale
     a: vec4<f32>,
     // xy: pan (the shared ViewTransform, ADR-0018), z: color_span,
@@ -582,6 +583,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let coord_mode = params.d.z;
     let rotation = params.d.w;
     let star = params.e.xyz;
+    // The star arm's hand-drawn controls (seed, wobble amplitude, wobble
+    // frequency), which live in the three padding slots `e` and `g` already
+    // carried rather than in a wider uniform.
+    let rough = vec3<f32>(params.e.w, params.g.z, params.g.w);
     let path_n = u32(params.f.x);
     let path_inradius = params.f.y;
     let stroke = params.f.z;
@@ -662,13 +667,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // Mode 0 — a band of the coordinate is a band of constant DISTANCE,
         // which is the definition of an offset curve (ADR-0105). This is the
         // default and it is bit-for-bit the arithmetic that shipped.
-        d = mark_distance(p, shape, points, star);
+        d = mark_distance(p, shape, points, star, rough);
     } else {
         // Mode 1 — a band of the coordinate is a band of constant SCALING, so
         // its level sets are scaled copies of the outline (ADR-0111). On a
         // polygon that keeps the corners the offsets round off; on a heart it
         // keeps the notch, which is the construction the reference images are.
-        d = length(p) / max(mark_boundary_radius(p, shape, points, star), 1e-6);
+        d = length(p) / max(mark_boundary_radius(p, shape, points, star, rough), 1e-6);
     }
 
     // **The stroke's screen width, taken before any branch.** A derivative has
@@ -703,6 +708,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // as `d < 0` and `abs(d) < w` against a raw signed distance; this scene's
     // coordinate is that distance normalized to 1 on the outline, so the two
     // tests are the same two tests shifted by one.)
+    //
+    // **`stroke` is a width in the coordinate, and the coordinate is a metric
+    // distance only at a WHOLE `shape`** (ADR-0226). Mid-travel `d` is a blend
+    // of two arms' fields, so `abs(d - 1) < stroke` still finds the blended
+    // outline — the two arms both read 1 there — but the band's thickness on
+    // screen is not the width a whole index would draw, and it varies around the
+    // figure. The same qualification covers the spacing of the bands above.
     //
     // Exactly 0 is the identity and takes the branch away, which is what keeps
     // every shipped preset and every golden baseline on the arithmetic it has.
@@ -745,18 +757,23 @@ pub struct ShapeFieldScene {
     /// group this scene binds.
     gpu: gpu::FullscreenScene,
     /// The silhouette and its point count, raw as the preset bound them —
-    /// `marks::mark_shape` / `mark_points` quantize on the way to the uniform,
-    /// which is where a selector's precondition belongs (the `kaleido_edge`
-    /// precedent).
+    /// `marks::mark_shape` / `mark_points` condition them on the way to the
+    /// uniform, which is where a selector's precondition belongs (the
+    /// `kaleido_edge` precedent). Only `mark_points` quantizes; `mark_shape`
+    /// clamps and leaves the fraction, which is what lets a bound `shape`
+    /// travel between two arms (ADR-0226).
     shape: f32,
     points: f32,
-    /// The `star` arm's three shape params, raw as the preset bound them
-    /// (Plan 0091 Phase 5). `marks::star_*` condition them on the way to the
-    /// uniform. Inert on every other silhouette, and nothing warns —
-    /// `presets/README.md` carries that.
+    /// The `star` arm's shape params and its hand-drawn controls, raw as the
+    /// preset bound them (Plan 0091 Phase 5). `marks::star_*` condition them on
+    /// the way to the uniform. Inert on every other silhouette, and nothing
+    /// warns — `presets/README.md` carries that.
     star_valley: f32,
     star_curve: f32,
     star_jitter: f32,
+    star_seed: f32,
+    star_wobble: f32,
+    star_wobble_freq: f32,
     scale: f32,
     /// The shared palette knobs (ADR-0021). This scene has no `hue` or
     /// `brightness`.
@@ -912,6 +929,9 @@ impl ShapeFieldScene {
             star_valley: marks::DEFAULT_STAR_VALLEY,
             star_curve: marks::DEFAULT_STAR_CURVE,
             star_jitter: marks::DEFAULT_STAR_JITTER,
+            star_seed: marks::DEFAULT_STAR_SEED,
+            star_wobble: marks::DEFAULT_STAR_WOBBLE,
+            star_wobble_freq: marks::DEFAULT_STAR_WOBBLE_FREQ,
             scale: DEFAULT_SCALE,
             colour: common::PaletteParams::new(0.0, common::DEFAULT_BRIGHTNESS),
             pan: common::PanParams::default(),
@@ -969,13 +989,15 @@ fn applied_rotation(rotation: f32) -> f32 {
 /// default — and **forced back to the distance on a figure the scaled copy has
 /// no single value on**.
 ///
-/// The quantizing half is `marks::mark_shape`'s treatment for
-/// `marks::mark_shape`'s reason, and the `kaleido_edge` precedent behind both. A
-/// mode's values are **identities** rather than a quantity: `[smoothing]` and
-/// preset dissolves interpolate a binding continuously from one setting to
-/// another, so easing the distance to the radius passes through 0.4 and 0.6, and
-/// there is nothing halfway between an offset curve and a scaled copy for the
-/// shader to draw there.
+/// The quantizing half is the `kaleido_edge` precedent, and `marks::mark_points`
+/// beside it. A mode's values are **identities** rather than a quantity:
+/// `[smoothing]` and preset dissolves interpolate a binding continuously from
+/// one setting to another, so easing the distance to the radius passes through
+/// 0.4 and 0.6, and there is nothing halfway between an offset curve and a
+/// scaled copy for the shader to draw there. `marks::mark_shape` is the
+/// contrasting case rather than the parallel one: a position between two
+/// silhouettes is a figure (ADR-0226), and a position between two coordinate
+/// modes is not.
 ///
 /// # The fallback, and why it is not silent
 ///
@@ -987,6 +1009,11 @@ fn applied_rotation(rotation: f32) -> f32 {
 /// another. On both the shader takes the outermost crossing and everything
 /// between the crossings reads as interior, which collapses the figure to a dot
 /// inside a few huge rays.
+///
+/// A roster position that only *touches* the `ring` — anywhere in the open
+/// travel between `disc` and `polygon` (ADR-0226) — inherits the defect from the
+/// side it blends, so `marks::shape_touches_ring` is the test rather than
+/// equality. At a whole index the two are the same test.
 ///
 /// `contour_star_shaped` is the verdict for the contour being drawn, or `None`
 /// where there is no `[path]` table — in which case the roster arm is the figure
@@ -1009,7 +1036,7 @@ fn applied_rotation(rotation: f32) -> f32 {
 fn applied_coord_mode(mode: f32, shape: f32, contour_star_shaped: Option<bool>) -> f32 {
     let single_valued = match contour_star_shaped {
         Some(star_shaped) => star_shaped,
-        None => shape != marks::RING_SHAPE,
+        None => !marks::shape_touches_ring(shape),
     };
     if !single_valued {
         return DEFAULT_COORD_MODE;
@@ -1175,6 +1202,9 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::marks::STAR_VALLEY,
     crate::render::scenes::marks::STAR_CURVE,
     crate::render::scenes::marks::STAR_JITTER,
+    crate::render::scenes::marks::STAR_SEED,
+    crate::render::scenes::marks::STAR_WOBBLE,
+    crate::render::scenes::marks::STAR_WOBBLE_FREQ,
     ParamSpec {
         name: "scale",
         default: 0.6,
@@ -1372,6 +1402,9 @@ impl Scene for ShapeFieldScene {
         self.star_valley = marks::DEFAULT_STAR_VALLEY;
         self.star_curve = marks::DEFAULT_STAR_CURVE;
         self.star_jitter = marks::DEFAULT_STAR_JITTER;
+        self.star_seed = marks::DEFAULT_STAR_SEED;
+        self.star_wobble = marks::DEFAULT_STAR_WOBBLE;
+        self.star_wobble_freq = marks::DEFAULT_STAR_WOBBLE_FREQ;
         self.scale = DEFAULT_SCALE;
         self.colour.reset();
         self.pan.reset();
@@ -1443,6 +1476,9 @@ impl Scene for ShapeFieldScene {
             "star_valley" => self.star_valley = value,
             "star_curve" => self.star_curve = value,
             "star_jitter" => self.star_jitter = value,
+            "star_seed" => self.star_seed = value,
+            "star_wobble" => self.star_wobble = value,
+            "star_wobble_freq" => self.star_wobble_freq = value,
             "scale" => self.scale = value,
             "color_span" => self.color_span = value,
             "color_center" => self.color_center = value,
@@ -1501,7 +1537,7 @@ impl Scene for ShapeFieldScene {
                 marks::star_valley(self.star_valley),
                 marks::star_curve(self.star_curve),
                 marks::star_jitter(self.star_jitter),
-                0.0,
+                marks::star_seed(self.star_seed),
             ],
             f: [
                 path_count as f32,
@@ -1512,8 +1548,8 @@ impl Scene for ShapeFieldScene {
             g: [
                 palette::band_contour_style(self.colour.contour_style),
                 self.colour.contour_ink,
-                0.0,
-                0.0,
+                marks::star_wobble(self.star_wobble),
+                marks::star_wobble_freq(self.star_wobble_freq),
             ],
             path: *self.path,
         };

@@ -473,8 +473,8 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
-| `shape` | `0` | `0` – `4` | Which silhouette each mark is drawn as - a disc, a square, a star, and so on. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
+| `star_seed` | `0` | `0` – `255` | Picks a different arrangement of the same amount of jitter and wobble - a whole number, and every value is as rough as every other. |
 
 **Modal**
 
@@ -498,9 +498,12 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `twinkle` | `0` | `0` – `1` | Per-particle brightness flicker, seeded so it is reproducible. |
 | `size_spread` | `0` | `0` – `1` | How much particle sizes vary about `size`; 0 makes them uniform. |
 | `reseed` | `0` | `0` – `1` | Crossing zero throws every particle back to a fresh start position. |
+| `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. |
 | `star_jitter` | `0` | `0` – `1` | Randomises each point's length by a seeded amount, so the star reads as hand-drawn. |
+| `star_wobble` | `0` | `0` – `1` | Waves each edge in and out along its length, leaving the points where they are - the wander a hand-drawn outline has. |
+| `star_wobble_freq` | `1` | `0.5` – `2.5` | How many waves the edge wander fits between a point and the notch beside it. Does nothing while star_wobble is 0. |
 
 ### System: `parametric_curve`
 
@@ -735,8 +738,8 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
-| `shape` | `0` | `0` – `4` | Which silhouette each mark is drawn as - a disc, a square, a star, and so on. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
+| `star_seed` | `0` | `0` – `255` | Picks a different arrangement of the same amount of jitter and wobble - a whole number, and every value is as rough as every other. |
 
 **Modal**
 
@@ -767,9 +770,12 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. |
+| `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. |
 | `star_jitter` | `0` | `0` – `1` | Randomises each point's length by a seeded amount, so the star reads as hand-drawn. |
+| `star_wobble` | `0` | `0` – `1` | Waves each edge in and out along its length, leaving the points where they are - the wander a hand-drawn outline has. |
+| `star_wobble_freq` | `1` | `0.5` – `2.5` | How many waves the edge wander fits between a point and the notch beside it. Does nothing while star_wobble is 0. |
 
 ### System: `shape_field`
 
@@ -777,8 +783,8 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `shape` | `0` | `0` – `4` | Which silhouette each mark is drawn as - a disc, a square, a star, and so on. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
+| `star_seed` | `0` | `0` – `255` | Picks a different arrangement of the same amount of jitter and wobble - a whole number, and every value is as rough as every other. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour_style` | `0` | `0` – `3` | Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink. |
 | `coord_mode` | `0` | `0` – `1` | Which coordinate frame the distance is measured in, which changes the shape's whole geometry. |
@@ -787,9 +793,12 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
+| `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. |
 | `star_jitter` | `0` | `0` – `1` | Randomises each point's length by a seeded amount, so the star reads as hand-drawn. |
+| `star_wobble` | `0` | `0` – `1` | Waves each edge in and out along its length, leaving the points where they are - the wander a hand-drawn outline has. |
+| `star_wobble_freq` | `1` | `0.5` – `2.5` | How many waves the edge wander fits between a point and the notch beside it. Does nothing while star_wobble is 0. |
 | `scale` | `0.6` | `0.05` – `2` | Size of the shape within the frame. |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. |
@@ -968,6 +977,12 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 ### Engine stage: `background`
 
+**Structural**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `bg_coord_mode` | `0` | `0` – `1` | Which way the backdrop ramp is measured: 0 straight across the frame, 1 around a point, which turns its bands into a fan converging on that point. |
+
 **Modal**
 
 | Parameter | Default | Range | What it does |
@@ -977,6 +992,8 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `bg_vignette` | `0` | `0` – `1` | Darkens the backdrop toward the corners, pulling the eye to the middle. |
 | `bg_angle` | `0` | `0` – `6.2831855` | Direction the backdrop ramp runs in, in radians; 0 runs bottom to top. |
 | `bg_hue_span` | `0` | `-0.5` – `0.5` | How far along the palette the ramp travels from `bg_hue`; 0 is a flat colour. |
+| `bg_center_x` | `0` | `-2` – `2` | Horizontal point the angular ramp's bands converge on; 0 is the frame's middle and 1 its right edge. Does nothing while bg_coord_mode is 0. |
+| `bg_center_y` | `0` | `-2` – `2` | Vertical point the angular ramp's bands converge on; 0 is the frame's middle and -1 its bottom edge. Does nothing while bg_coord_mode is 0. |
 | `bg_shade` | `0.72` | `0` – `1` | Brightness multiplier at the ramp's start, so a sky can be dark at one edge. |
 | `bg_shade_end` | `1` | `0` – `1` | Brightness multiplier at the ramp's far end. |
 | `bg_ramp_gamma` | `1` | `0.25` – `4` | Bends the ramp's progress: below 1 the far colour arrives early, above 1 it holds off. |
@@ -1521,8 +1538,8 @@ densities that make a figure one mark is a point, so a silhouette there would be
 invisible on principle rather than by tuning
 ([ADR-0084](../docs/adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md)).
 
-**`shape` is a numeric selector**, like `kaleido_edge` — the expression grammar
-has no strings, so a star is `shape = "3"`.
+**`shape` is numeric** — the expression grammar has no strings, so a star is
+`shape = "3"`.
 
 | `shape` | mark | what it draws |
 |---|---|---|
@@ -1536,7 +1553,35 @@ has no strings, so a star is `shape = "3"`.
 nothing on `disc`, `ring` or `heart`. Past a dozen the marks these are *for* — a
 few pixels across — are a disc with a rough edge.
 
-#### The `star` arm's three shape params
+**A whole `shape` is that figure exactly; a value between two whole ones travels
+between them.** `shape = "2.5"` is half a polygon and half a star — the two arms'
+distance fields blended, so an eased or bound `shape` carries the figure from a
+heart to a star across a phrase instead of cutting on a beat
+([ADR-0226](../docs/adrs/0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md)).
+Four things come with that:
+
+- **Only adjacent pairs travel.** The table's order is the travel order, so a
+  `polygon` can reach a `star` and cannot reach a `heart` without passing through
+  one. A binding that sweeps `1` to `4` visits every arm in between.
+- **The in-between figure is nobody's design.** A blend of two silhouettes can
+  pinch, disconnect, or grow a lobe neither arm has. Some pairs read beautifully
+  and some do not; there is no lever but to pick a different pair.
+- **Mid-travel the field stops being a metric distance**, so anything measured in
+  it drifts: on `shape_field`, `stroke`'s width and the spacing between contour
+  bands are the figure's at a whole index and approximate in between. The
+  interior, the outline and the particle falloff are unaffected.
+- **On `shape_field`, travelling anywhere between `disc` and `polygon` turns
+  `coord_mode = "1"` off.** That whole open span touches the `ring`, and a blend
+  with the ring on either side inherits its hole, so the scaled-copy coordinate
+  has no single value there and the scene falls back to the distance — see
+  [Two coordinates](#two-coordinates--offsets-and-scaled-copies). A binding
+  easing `shape` from `0` to `2` therefore draws scaled copies at each end and
+  offset curves through the middle, which is a change of contour *kind* rather
+  than a drift. **Nothing warns**: the load-time notice reads the resting value,
+  and a preset resting on a whole, off-ring `shape` rests off the combination.
+  Travel from `polygon` through `star` to `heart` is unaffected.
+
+#### The `star` arm's shape params
 
 The star was one welded silhouette until a batch of six reference images turned
 out to be **five requests for parameters this arm did not have**. It has them
@@ -1547,7 +1592,10 @@ one roster, so a shape a particle wears and a figure a field draws cannot drift.
 |---|---|---|---|
 | `star_valley` | `0.05`..`0.95` | **`0.45`** | the valley radius as a fraction of the tip's. Low is a sharp, thin-spiked star; high is a bumpy polygon |
 | `star_curve` | `-0.9`..`0.9` | **`0`** | bows the edge between tip and valley. **Positive bows it inward** — the concave sparkle, which a straight-edged star cannot make at *any* valley radius. Negative bulges it out |
-| `star_jitter` | `0`..`1` | **`0`** | per-spike variation in tip length, for the hand-drawn / irregular "bang" look |
+| `star_jitter` | `0`..`1` | **`0`** | per-spike variation in tip **length**, for the irregular "bang" look |
+| `star_wobble` | `0`..`1` | **`0`** | waves each **edge** in and out along its length, leaving the tips and notches exactly where they are. This is the one that reads as *hand-drawn* |
+| `star_wobble_freq` | `0.5`..`2.5` | **`1`** | how many waves fit between a tip and the notch beside it. Inert while `star_wobble` is 0 |
+| `star_seed` | `0`..`255` | **`0`** | which arrangement the jitter and the wobble draw. A whole number; every value is exactly as rough as every other |
 
 **Every default is an exact identity**, and that is an obligation rather than
 taste: the shared chunk means these knobs reach the particle path, so anything
@@ -1562,29 +1610,49 @@ star_valley = "0.18"      # a long, sharp four-point sparkle
 star_curve  = "0.55"      # ...with concave edges
 ```
 
-Three things worth knowing before you tune them:
+Five things worth knowing before you tune them:
 
-- **`star_jitter` is seeded, not random.** The per-spike lengths come from an
-  integer hash of the spike index, so the same preset draws the same figure in
-  every run and on every machine. There is no separate lever to *re-scatter* the
-  pattern while keeping the amount — if a look needs one, that is engine
-  feedback.
+- **`star_jitter` and `star_wobble` are two different quantities, and only one of
+  them is what "hand-drawn" means.** The jitter makes spikes *unequal*; a star
+  whose spikes are ragged but whose edges are dead straight reads as damaged
+  rather than as drawn. The wobble waves the line *between* a tip and a notch
+  while leaving both ends where they are. Reach for the wobble for a drawn
+  outline and the jitter for a shape that was knocked about.
+- **`star_seed` re-scatters without re-sizing.** Both roughnesses come from an
+  integer hash, so the same preset draws the same figure in every run and on
+  every machine; the seed moves the hash's *input*, so it picks a different
+  arrangement of the same amount. If one seed's star has an ugly spike, try the
+  next one — you are not trading away roughness to do it.
+- **The wobble is radial, and the two edges of one spike mirror each other.**
+  The wander scales each point's radius rather than pushing it sideways, which
+  is what keeps the figure something `coord_mode = 1` can still measure. And the
+  engine folds a star into one half-wedge, so a spike is symmetric about its own
+  axis however much it wobbles. A figure whose every spike is internally
+  symmetric is what this arm can draw.
 - **`star_curve` is where the field's precision goes.** A bowed edge has no
   closed-form distance, so it is sampled; the contours `shape_field` draws are
   0.0032 off true, which is invisible. **`star_jitter` costs much more** — up to
   0.54 at seven points, because the angular fold measures against a point's own
-  spike and a longer neighbour can be nearer. On a particle mark none of this is
-  visible (the sprite reads only the interior); on a big banded field, a heavily
-  jittered star's outer rings are approximate.
+  spike and a longer neighbour can be nearer. **`star_wobble` costs about a
+  quarter of that**, up to 0.12 at full amplitude, and adding it on top of a
+  heavy jitter barely moves the jitter's own figure. On a particle mark none of
+  this is visible (the sprite reads only the interior); on a big banded field, a
+  heavily jittered star's outer rings are approximate.
 - **They are inert on the other four shapes**, and nothing warns — the name is
   known, so no unknown-parameter warning fires. This paragraph is the warning.
+  `star_wobble` at any non-zero value also takes the star off its closed-form
+  branch onto the sampled one, which is the same branch `star_curve` selects.
 
-#### These three MORPH the figure with the music, and that needs no engine work
+#### Most of them MORPH the figure with the music, and that needs no engine work
 
-**All three are clamp-only — no rounding — so a binding drives them continuously and the silhouette
-genuinely deforms.** That is worth stating because the two params beside them, `shape` and `points`,
-are rounded and therefore *step*. Verified by rendering: `star_valley` on bass and `star_curve` on
-treble over a 120 BPM click visibly thickens and thins the arms and changes the spike proportions.
+**`star_valley`, `star_curve`, `star_jitter`, `star_wobble` and `star_wobble_freq` are clamp-only —
+no rounding — so a binding drives them continuously and the silhouette genuinely deforms.** That is
+worth stating because two params beside them are rounded and therefore *step*: `points`, and
+`star_seed`. A seed names an arrangement and there is nothing between two arrangements, so a binding
+that sweeps it flickers through unrelated figures instead of morphing — which is exactly what a
+re-scatter is, and why the seed is the knob you pick a look with rather than the one a phrase rides.
+Verified by rendering: `star_valley` on bass and `star_curve` on treble over a 120 BPM click visibly
+thickens and thins the arms and changes the spike proportions.
 
 ```toml
 [params]
@@ -1606,7 +1674,13 @@ Three things to know before binding them:
 - **A binding that sweeps `star_curve` through 0 crosses a small discontinuity.** At exactly zero
   the arm takes a closed-form straight-edge branch; either side of it takes a sampled one, and the
   two disagree by about `0.0032` (the polyline's sagitta). Small, but it sits in the middle of the
-  range you are most likely to animate through — bias the range to one side if it shows.
+  range you are most likely to animate through — bias the range to one side if it shows. **The same
+  seam sits under `star_wobble` at 0**, and under `star_jitter` at 0, for the same reason: any of
+  the three being non-zero is what selects the sampled branch.
+- **`star_wobble_freq` past about 2.5 has nowhere to go**, which is why the range stops there. The
+  edge is sampled into eight sub-segments, so a wave of 2.5 cycles gets about three samples per
+  cycle; a faster one would be read by the polyline as a slower, differently-shaped wave rather than
+  as the wave you asked for.
 - **A curved or jittered star's interior normalizes differently from a straight-edged one, and so
   does its contour spacing.** That branch divides by the figure's own deepest-point distance rather
   than by the straight edge plane's perpendicular, so a `color_span` carried over from a
@@ -1636,9 +1710,9 @@ interpolates ([ADR-0060](../docs/adrs/0060-star-pattern-variants-interpolate.md)
 and the attractor's IFS morphs
 ([ADR-0075](../docs/adrs/0075-ifs-family-morphs-in-singular-value-space.md)). A
 star's angle fold is periodic in the count, so a fractional count is a
-discontinuity and not an intermediate figure. `shape` is stepped for the stricter
-version of the same reason — its values are names, and there is nothing halfway
-between a ring and a polygon.
+discontinuity and not an intermediate figure. **`shape` is the one that does not
+step**, and the difference is the fold: a roster position has two neighbouring
+fields to blend, and a fractional count has nothing to average — it tears.
 
 Two consequences worth planning around:
 
@@ -1705,12 +1779,12 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 |---|---|
 | `shape` | the same numeric selector as the table above, same five names, same closed roster |
 | `points` | the same `3`..`12` count, for `polygon` and `star` |
-| `star_valley` / `star_curve` / `star_jitter` | the same three star shape params — see [The `star` arm](#the-star-arms-three-shape-params). `star_jitter` is the one whose *field* precision is worth reading about there |
+| `star_valley` / `star_curve` / `star_jitter` / `star_wobble` / `star_wobble_freq` / `star_seed` | the same star shape params — see [The `star` arm](#the-star-arms-shape-params). `star_jitter` is the one whose *field* precision is worth reading about there |
 | `scale` | the figure's size: its outline sits at `scale` of the frame's short half-axis. Default `0.6`, clamped to `0.01`..`20` |
 | `pan_x` / `pan_y` | move the figure's centre (the shared view transform) |
 | `rotation` | turns the figure **about its own centre**, in radians. Default `0`, an exact identity, unclamped — an angle wraps. Applied after `pan_*`, so a panned figure spins in place rather than orbiting the frame |
 | `gamma` | the **response exponent** on the figure coordinate, before it becomes a palette coordinate — where the contours crowd. Default `1.0` (evenly spaced, and an exact identity), clamped to `0.05`..`20` |
-| `coord_mode` | **which coordinate the palette is handed.** `0` (default) is the distance, whose contours are offset curves; `1` is `r / r_boundary(theta)`, whose contours are **scaled copies** of the outline. Stepped, like `shape`. See [Two coordinates](#two-coordinates--offsets-and-scaled-copies) |
+| `coord_mode` | **which coordinate the palette is handed.** `0` (default) is the distance, whose contours are offset curves; `1` is `r / r_boundary(theta)`, whose contours are **scaled copies** of the outline. Stepped, like `points` — there is nothing halfway between an offset curve and a scaled copy. See [Two coordinates](#two-coordinates--offsets-and-scaled-copies) |
 | `stroke` | draws the figure's **outline** at this half-width instead of filling it, in coordinate units — `0.08` is a band 8 % of the figure's half-extent either side of the outline. Default `0`, the filled figure and an exact identity. Fill and stroke are the same field, so the outline cannot drift off the figure it belongs to |
 | `morph` | travels an authored `[path]` towards its `morph_to` silhouette, `0`..`1`. Inert on a roster figure and on a path that names no target |
 
@@ -1794,7 +1868,9 @@ those two differently would be broken.
 > more than once leaves the coordinate with no single value there. Two figures
 > fail it, and they fail it in the same way:
 >
-> - a **`ring`**, whose centre lies in its hole;
+> - a **`ring`**, whose centre lies in its hole — and any `shape` travelling
+>   towards or away from one, since a blend that has the ring on either side
+>   inherits its hole;
 > - an **authored `[path]` contour that is not star-shaped about its centre** — a
 >   crescent, a figure with fins, or a silhouette whose sinuses put one lobe
 >   across the ray into the next. `presets/shape_maple.toml` is one: its four
@@ -1802,7 +1878,10 @@ those two differently would be broken.
 >   ray gap of **0.40** against a tolerance of 0.02. It ships under `"0"`, so
 >   nothing about it moves — but write `"1"` on it and you get the warning.
 >
-> On both the scene draws the distance instead and warns at load:
+> On both the scene draws the distance instead, and it warns at load **when the
+> preset rests on the combination** — a `shape` that only *travels* through the
+> ring's neighbourhood gets the fallback in silence, because a resting value is
+> all the loader can see:
 >
 > ```text
 > parameter 'coord_mode' is ignored on a `ring`: an annulus's centre lies in its
@@ -2947,6 +3026,64 @@ around the other side. `bg_hue = 0.8` with `bg_hue_span = 0.5` sweeps `0.8 -> 1.
 a hard seam where it wraps. That is occasionally what you want and usually a surprise; if the ramp
 has a bright band you did not author, check whether the span left the range. It is not clamped, and
 deliberately: two shipped presets already drive `bg_hue` outside `[0, 1]` and depend on the wrap.
+
+#### The ramp can be measured around a point — `bg_coord_mode`, `bg_center_x`, `bg_center_y`
+
+The same swept, repeat-addressed ramp measured **angularly about a movable point** turns its bands
+into a **fan converging on a vanishing point**
+([ADR-0225](../docs/adrs/0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md)).
+It is the floor of a perspective picture, and unlike a ground drawn as a scene it costs nothing —
+no `[layer]` slot, no second scene evaluation, just a different coordinate into the pass that was
+already running.
+
+| Param | Default | What it does |
+|-------|---------|--------------|
+| `bg_coord_mode` | `0` | `0` measures the ramp straight across the frame — everything above. `1` measures it around `bg_center_*`. Rounded: there is nothing between the two. |
+| `bg_center_x` | `0.0` | The point the bands converge on, horizontally. `0` is the frame's middle, `1` its right edge whatever the window's shape, and values past `±1` sit off-frame. Clamped to `±2`. |
+| `bg_center_y` | `0.0` | The same vertically. `-1` is the bottom edge; a floor's vanishing point usually sits a little below it. |
+
+Both defaults are identities: the centre params are inert at `bg_coord_mode = 0`, and mode `0`'s
+arm is the straight ramp's own expression, so every backdrop already authored renders byte-for-byte
+unchanged.
+
+```toml
+[palette]
+# Repeat the two tones many times - see the stripe-count note below.
+stops = [ { at = 0.00, color = "#101010" }, { at = 0.041, color = "#101010" },
+          { at = 0.042, color = "#f0f0f0" }, { at = 0.083, color = "#f0f0f0" },
+          # ...twelve more pairs...
+          { at = 1.00,  color = "#101010" } ]
+
+[params]
+bg_bright     = "0.9"
+bg_hue_span   = "0.5"
+bg_shade      = "1.0"    # equal, because an angular ramp WRAPS - see below
+bg_shade_end  = "1.0"
+bg_angle      = "3.1416" # aim the wrap seam down, away from the frame
+bg_coord_mode = "1"
+bg_center_x   = "0"
+bg_center_y   = "-1.2"   # the vanishing point, just below the frame
+```
+
+**Three things to know, and the first is the reason this is a floor rather than a picture.**
+
+- **It buys the floor, not the collage.** The backdrop is painted *outside* the post chain and added
+  after it, so a figure drawn over a lit fan can only ever be **brighter** than the fan, never
+  darker. A dark figure on a light ground needs a multiply `[layer]`
+  ([ADR-0106](../docs/adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md)) over a ground drawn
+  *inside* the chain — and that ground then spends the one `[layer]` slot
+  ([ADR-0090](../docs/adrs/0090-a-preset-composes-two-scene-layers.md)) the figure would have used.
+  The two routes buy different halves of a perspective collage and neither buys both; choose by which
+  half your world actually needs.
+- **The angular coordinate wraps where the straight one clamps.** A turn comes back to where it
+  started, so both the palette segment *and* the `bg_shade -> bg_shade_end` brightness jump across
+  one seam ray. Keep the two shades equal for a fan, and point the seam out of frame: it runs from
+  the centre along the direction `bg_angle` names, so a centre below the frame wants `bg_angle` near
+  `3.1416`.
+- **The stripe count comes from your stops, not from the span.** `bg_hue_span` covers at most half
+  the gradient, an angular sweep spends that half on a **whole turn**, and the frame sees perhaps a
+  fifth of one. So a fan with a handful of visible bands needs a palette that repeats its two tones
+  a dozen times or more — the hard-edged poster palette, not the dusk ramp.
 
 **The old fixed brightness tilt is gone.** The pass used to multiply its tint by a hardcoded
 `0.72 -> 1.0` gradient welded to the vertical, always brighter at the top and unexplained by any

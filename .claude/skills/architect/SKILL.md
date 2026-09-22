@@ -175,6 +175,15 @@ real but measuring it is its own design problem — **state the property instead
 have not earned**: "the rise is dramatically faster than the fall, and one constant provably would
 not have done" is checkable, honest, and invents nothing.
 
+**A plan that adds a user-visible choice names the file key that holds it** —
+[ADR-0240](../../../docs/adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md).
+`config.toml` for the standalone and for any plugin setting, `settings.json` for the studio; the
+menu row, hotkey or panel that changes it is an editor of that file, and a flag is second priority
+and only where a run genuinely needs to override the rig. A phase whose done-when is "the menu row
+toggles X" and never names a key has designed the exact thing that rule refuses — and the
+documentation sweep that follows is where the key earns its row in
+[`docs/configuration.md`](../../../docs/configuration.md).
+
 If the decision has a revisitable tradeoff (a dependency choice, a second GPU backend, an ABI
 shape), **also write an ADR** (Mode 2). A plan says *what we're building*; an ADR says *why this
 way over alternatives*.

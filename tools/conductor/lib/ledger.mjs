@@ -16,7 +16,8 @@
 // `-P fast` never chains off another.
 //
 // Two writers and two readers: the conductor's gate, and the suite wrapper in a conductor-run session
-// (RLX_SUITE_LEDGER names the file). Nothing else reads or writes it.
+// (RLX_SUITE_LEDGER names the file). A third reader, `suite-record.mjs`, answers the pre-push hook
+// through `greenRecord` and writes nothing. Nothing else reads or writes it.
 //
 // The key leaves out everything outside the tree: gitignored files, the GPU adapter, the installed
 // toolchain. ADR-0207 records that risk rather than guarding it.

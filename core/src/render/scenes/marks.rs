@@ -101,6 +101,53 @@
 //! deliberately does not cover, because nothing shipped evaluates the curved one
 //! on the particle path.
 //!
+//! # The roster travels, and the metric stops holding in between (ADR-0226)
+//!
+//! `shape` is a position on the roster rather than an index into it. A whole
+//! value selects one arm and is an **exact identity** — the same field, the same
+//! cost. A fractional value evaluates the two neighbouring arms and blends both
+//! [`mark_distance`](self) and the boundary radius linearly, so a figure travels
+//! from a heart to a star across a phrase.
+//!
+//! **Every accuracy number on this page is a whole-index claim.** A linear blend
+//! of two signed distance functions is not one: its zero set is an outline
+//! neither arm describes, its gradient magnitude is not 1, and the blend has no
+//! error bound against any figure at all. What survives mid-travel is the
+//! **sign** and the two endpoints of the normalization — `0` at the blended
+//! interior's deepest reading, `1` where both arms read 1 — so the particle
+//! falloff (`max(0, 1 - d)^2`) and the interior test `d < 1` mean what they
+//! meant. What does not survive is anything reading `d` as a length: the
+//! exterior error table below, `shape_field`'s `stroke` width, and the spacing
+//! between its contours.
+//!
+//! # "Hand-drawn" is an edge that wanders, not a spike that is short
+//!
+//! `star_jitter` varies each spike's **tip radius** — one scalar per spike — and
+//! a figure whose spikes are unequal but whose edges are perfectly straight
+//! reads as a *damaged* star rather than a drawn one. `star_wobble` is the
+//! quantity the look actually wants: the line between a tip and the notch beside
+//! it waves in and out along its length, while both ends stay exactly where
+//! they are.
+//!
+//! Three properties are load-bearing, each stated at its own code:
+//!
+//! - **The wander is radial.** A perpendicular displacement moves the outline
+//!   sideways in angle and past a small amplitude a ray from the centre crosses
+//!   it twice, which is the one thing
+//!   [`mark_boundary_radius`](self) cannot survive. Scaling the radius keeps the
+//!   boundary single-valued at every amplitude.
+//! - **A spike's two edges are mirror images.** The angular fold measures a
+//!   half-wedge and reflects it, so the wobble's phase is per *spike*. A figure
+//!   whose spikes are each internally symmetric is what this fold can express.
+//! - **`star_seed` strides through the hash's input, not its output.** Every
+//!   seed therefore draws from one distribution, and *how* rough the figure is
+//!   stays `star_jitter`'s and `star_wobble`'s business alone. Seed `0` is the
+//!   identity, so every jittered star that ever shipped is unmoved.
+//!
+//! The wobble takes the sampled-polyline branch, so its accuracy is that
+//! branch's, and the reference the normalization divides by stays the
+//! **unwobbled** figure's for the same reason it stays the unjittered one's.
+//!
 //! # What this deliberately is not
 //!
 //! A silhouette **in additive light**. There is no fill and no outline — black
@@ -121,13 +168,19 @@
 use crate::render::gpu;
 use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
-/// The `shape` roster, in the order the numeric parameter selects them.
+/// The `shape` roster, in the order the numeric parameter positions along.
 ///
-/// `shape` is a **numeric selector**, like `kaleido_edge`: the preset expression
-/// grammar has no strings, so a preset writes `shape = "3"` for a star. This
-/// list is the single statement of what each index means, and both particle
-/// scenes read it — a look wanting a shape that is not here routes back through
-/// `architect` (ADR-0084's closed-roster consequence).
+/// `shape` is **numeric**: the preset expression grammar has no strings, so a
+/// preset writes `shape = "3"` for a star. This list is the single statement of
+/// what each whole index means, and both particle scenes read it — a look
+/// wanting a shape that is not here routes back through `architect` (ADR-0084's
+/// closed-roster consequence).
+///
+/// The order is also the **travel order**, since a fractional index blends the
+/// two arms it lies between (ADR-0226): `2.5` is halfway from a polygon to a
+/// star because they are adjacent here, and nothing makes a polygon and a heart
+/// adjacent. Reordering the list therefore changes which pairs a preset can
+/// travel between as well as what each index means.
 pub(crate) const SHAPES: [&str; 5] = ["disc", "ring", "polygon", "star", "heart"];
 
 /// The `ring` index, named because three files have to test for it.
@@ -191,17 +244,22 @@ pub(crate) struct QuadInstance {
 ///
 /// Three `vec4` rows because that is WGSL's uniform layout rule, not because
 /// twelve slots are wanted: `v` is the view (`aspect`, `zoom`, `pan_x`,
-/// `pan_y`), `m` is `[shape, points, 0, 0]` (ADR-0084) and `s` is
-/// `[star_valley, star_curve, star_jitter, 0]`. Both scenes quantize on the way
-/// in, so no fractional point count reaches an angular fold.
+/// `pan_y`), `m` is `[shape, points, star_seed, star_wobble]` (ADR-0084) and `s`
+/// is `[star_valley, star_curve, star_jitter, star_wobble_freq]`. Both scenes
+/// quantize on the way in, so no fractional point count reaches an angular fold.
+///
+/// **The three hand-drawn controls went into the padding the rows already
+/// had**, which is why this struct is the same size and the two bind-group
+/// layouts are the same descriptors they were. Growing it is not a free edit —
+/// see the layout comment below and ADR-0058.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct QuadUniform {
     /// `[aspect, zoom, pan_x, pan_y]`.
     pub v: [f32; 4],
-    /// `[shape, points, 0, 0]`.
+    /// `[shape, points, star_seed, star_wobble]`.
     pub m: [f32; 4],
-    /// `[star_valley, star_curve, star_jitter, 0]`.
+    /// `[star_valley, star_curve, star_jitter, star_wobble_freq]`.
     pub s: [f32; 4],
 }
 
@@ -401,6 +459,61 @@ pub(crate) const DEFAULT_STAR_JITTER: f32 = default_of(PARAMS, "star_jitter");
 /// valley circle, which is the end of the range rather than a useful value.
 const MAX_STAR_JITTER: f32 = 1.0;
 
+/// `star_seed` default — **0**, which reaches the hash as the spike index itself
+/// and is therefore the arrangement every jittered star has drawn since
+/// ADR-0084.
+pub(crate) const DEFAULT_STAR_SEED: f32 = default_of(PARAMS, "star_seed");
+/// The largest seed a preset may name. The cap is legibility rather than
+/// arithmetic — the stride below is a bijection on `u32`, so any seed works —
+/// and 255 is more arrangements than a twelve-spike figure has distinguishable
+/// ones.
+const MAX_STAR_SEED: f32 = 255.0;
+
+/// How far one step of `star_seed` moves through the hash's input space.
+///
+/// Knuth's 32-bit golden-ratio constant, and the multiply is what makes a seed a
+/// **re-scatter** rather than a rotation. Adding the seed directly would give
+/// spike `i` at seed 1 the value spike `i + 1` had at seed 0 — the same
+/// arrangement turned by one spike, which on a figure whose spikes sit at fixed
+/// angles reads as the same star. A large odd stride lands each seed in an
+/// unrelated region of the hash instead. Seed 0 multiplies to 0, which is what
+/// keeps the default arrangement bit-identical.
+const STAR_SEED_STRIDE: u32 = 2_654_435_761;
+
+/// The salt that separates the wobble's per-spike phase from the same spike's
+/// tip jitter, so the two are independent draws rather than one value used
+/// twice. Any constant does; this is the golden-ratio stride's odd sibling.
+const STAR_PHASE_SALT: u32 = 1_640_531_527;
+
+/// `star_wobble` default — **0**, no displacement at all, and the exact identity
+/// that keeps the straight-edge closed form selected.
+pub(crate) const DEFAULT_STAR_WOBBLE: f32 = default_of(PARAMS, "star_wobble");
+/// The most the edge may wander. One-sided: it is an amplitude.
+const MAX_STAR_WOBBLE: f32 = 1.0;
+
+/// The radial swing `star_wobble = 1` buys, as a fraction of the local radius.
+///
+/// A quarter is where the edge reads as wandered rather than as a second shape.
+/// The displacement is **radial**, so it can never make the figure non-star-shaped
+/// about its own centre however large it gets — see the wobble function in the
+/// chunk for why that property is what chose radial over perpendicular.
+const STAR_WOBBLE_MAX: f32 = 0.25;
+
+/// `star_wobble_freq` default — how many wave cycles fit along one tip-to-valley
+/// edge. Inert at zero amplitude, so this default is a starting point rather
+/// than an identity.
+pub(crate) const DEFAULT_STAR_WOBBLE_FREQ: f32 = default_of(PARAMS, "star_wobble_freq");
+/// The range the wobble's frequency is held in.
+///
+/// **The top is set by [`STAR_SEGMENTS`], not by taste.** The edge is sampled
+/// into eight sub-segments, so a wave of `f` cycles gets `8 / f` samples per
+/// cycle; at 2.5 that is 3.2, already close enough to Nyquist that the polyline
+/// reads the wave as a smaller, differently-shaped one. Past it the sampling
+/// aliases and the frequency stops meaning what it says. The floor is half a
+/// cycle — one bulge — below which the window below flattens the wave away.
+const MIN_STAR_WOBBLE_FREQ: f32 = 0.5;
+const MAX_STAR_WOBBLE_FREQ: f32 = 2.5;
+
 /// How many sub-segments the curved edge is sampled into.
 ///
 /// The exact distance to a quadratic Bezier is a cubic solve; this samples it
@@ -450,12 +563,21 @@ const HEART_CY: f32 = 0.552;
 /// spellings of the same idea. `emitter.rs`'s
 /// `both_particle_scenes_carry_the_same_shape_vocabulary` is what holds the
 /// rosters to it.
+///
+/// **`shape` is `Modal` and its neighbour `points` is not**, which is the one
+/// asymmetry in this block: the blend reads the index's fraction on purpose
+/// (ADR-0226), so quantizing it in the binding pipeline would round every eased
+/// or expression-bound value back to a whole arm and leave the travel reachable
+/// only from an unquantized live override. A fractional `points` still tears the
+/// angle fold, so that one keeps its rounding.
 pub(crate) const SHAPE: ParamSpec = ParamSpec {
     name: "shape",
     default: 0.0,
     range: Some([0.0, 4.0]),
-    doc: "Which silhouette each mark is drawn as - a disc, a square, a star, and so on.",
-    kind: ParamKind::Structural,
+    doc: "Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; \
+          a whole number is that figure exactly and a value between two travels from one to \
+          the other.",
+    kind: ParamKind::Modal,
 };
 
 /// `points`, shared by the three shaped-mark scenes: the silhouette's count.
@@ -494,24 +616,82 @@ pub(crate) const STAR_JITTER: ParamSpec = ParamSpec {
     kind: ParamKind::Modal,
 };
 
-pub(crate) const PARAMS: &[ParamSpec] = &[SHAPE, POINTS, STAR_VALLEY, STAR_CURVE, STAR_JITTER];
+/// `star_seed`, shared: which arrangement the jitter and the wobble draw.
+pub(crate) const STAR_SEED: ParamSpec = ParamSpec {
+    name: "star_seed",
+    default: 0.0,
+    range: Some([0.0, 255.0]),
+    doc: "Picks a different arrangement of the same amount of jitter and wobble - a whole number, \
+          and every value is as rough as every other.",
+    kind: ParamKind::Structural,
+};
 
-/// The `shape` index the shader is handed: clamped into the roster, then
-/// **rounded to an integer**, with a non-finite binding falling back to the
+/// `star_wobble`, shared: how far a star's edges wander between tip and valley.
+pub(crate) const STAR_WOBBLE: ParamSpec = ParamSpec {
+    name: "star_wobble",
+    default: 0.0,
+    range: Some([0.0, 1.0]),
+    doc: "Waves each edge in and out along its length, leaving the points where they are - the \
+          wander a hand-drawn outline has.",
+    kind: ParamKind::Modal,
+};
+
+/// `star_wobble_freq`, shared: how many waves fit along one edge.
+pub(crate) const STAR_WOBBLE_FREQ: ParamSpec = ParamSpec {
+    name: "star_wobble_freq",
+    default: 1.0,
+    range: Some([0.5, 2.5]),
+    doc: "How many waves the edge wander fits between a point and the notch beside it. Does \
+          nothing while star_wobble is 0.",
+    kind: ParamKind::Modal,
+};
+
+pub(crate) const PARAMS: &[ParamSpec] = &[
+    SHAPE,
+    POINTS,
+    STAR_VALLEY,
+    STAR_CURVE,
+    STAR_JITTER,
+    STAR_SEED,
+    STAR_WOBBLE,
+    STAR_WOBBLE_FREQ,
+];
+
+/// The `shape` position the shader is handed: clamped into the roster and
+/// **passed through fractional**, with a non-finite binding falling back to the
 /// default.
 ///
-/// This is `kaleido_edge`'s treatment for `kaleido_edge`'s reason. A selector's
-/// values are *identities* rather than a quantity, and `[smoothing]` and preset
-/// dissolves interpolate a binding continuously from one setting to another — so
-/// easing `disc` to `star` passes through 1.4 and 2.6, and without this the
-/// shader would receive a value no arm defines. Rounding here rather than in
-/// WGSL keeps that precondition visible on the CPU side, where the roster lives.
+/// **It is a position on the roster, not an index into it** (ADR-0226). A whole
+/// value selects one arm and is an exact identity — the same field the rounded
+/// selector produced — and a fractional one blends the two arms it lies between,
+/// so an eased binding carries the figure from a heart to a star instead of
+/// stepping. `mark_points` next door keeps the rounding and says why its own
+/// parameter cannot follow: a star's angle fold is periodic in the count, so a
+/// fractional count tears the mark rather than intermediating it.
+///
+/// No rounding here is what makes the identity exact: an integer binding reaches
+/// the shader as an integer, `fract` is 0, and the blend takes its one-arm
+/// branch. Clamping stays CPU-side so the precondition is visible where the
+/// roster lives, and so a NaN never meets WGSL's implementation-defined `clamp`.
 pub(crate) fn mark_shape(v: f32) -> f32 {
     if v.is_finite() {
-        v.clamp(MIN_SHAPE, MAX_SHAPE).round()
+        v.clamp(MIN_SHAPE, MAX_SHAPE)
     } else {
         DEFAULT_SHAPE
     }
+}
+
+/// Whether a roster position draws the `ring` arm at all — either as the whole
+/// figure or as one side of a blend.
+///
+/// The scaled-copy coordinate (ADR-0111) needs a figure every ray from the
+/// centre leaves exactly once, and the annulus is the one arm that is not. A
+/// blend that has the ring on either side inherits the defect, so the test is
+/// "does this position touch the arm" rather than "is this the arm". At a whole
+/// index the two readings are the same, which is what keeps `shape = "1"`'s
+/// refusal and every other index's acceptance exactly where they were.
+pub(crate) fn shape_touches_ring(shape: f32) -> bool {
+    shape.floor() == RING_SHAPE || shape.ceil() == RING_SHAPE
 }
 
 /// The point count the shader is handed: clamped into `3..=12`, then **rounded
@@ -572,6 +752,47 @@ pub(crate) fn star_jitter(v: f32) -> f32 {
     }
 }
 
+/// The `star_seed` the shader is handed: clamped, then **rounded**, with a
+/// non-finite binding falling back to the default.
+///
+/// It rounds for `mark_points`' reason rather than `mark_shape`'s: a seed names
+/// an arrangement, and there is nothing between two arrangements. An eased
+/// `star_seed` therefore **steps**, and a binding that sweeps it flickers
+/// through unrelated figures rather than morphing between them — which is what
+/// a re-scatter is, and why the seed is the parameter that picks a look while
+/// `star_jitter` is the one a phrase can ride.
+///
+/// Rounded CPU-side so the value reaches `u32()` in WGSL already whole; a
+/// truncation there would make 1.999 and 1.0 the same seed while 2.0 was a
+/// different one.
+pub(crate) fn star_seed(v: f32) -> f32 {
+    if v.is_finite() {
+        v.clamp(0.0, MAX_STAR_SEED).round()
+    } else {
+        DEFAULT_STAR_SEED
+    }
+}
+
+/// The `star_wobble` the shader is handed. One-sided: it is an amplitude, and 0
+/// is the identity that keeps the straight-edge closed form selected.
+pub(crate) fn star_wobble(v: f32) -> f32 {
+    if v.is_finite() {
+        v.clamp(0.0, MAX_STAR_WOBBLE)
+    } else {
+        DEFAULT_STAR_WOBBLE
+    }
+}
+
+/// The `star_wobble_freq` the shader is handed, held inside the band the edge's
+/// eight-sub-segment sampling can actually represent.
+pub(crate) fn star_wobble_freq(v: f32) -> f32 {
+    if v.is_finite() {
+        v.clamp(MIN_STAR_WOBBLE_FREQ, MAX_STAR_WOBBLE_FREQ)
+    } else {
+        DEFAULT_STAR_WOBBLE_FREQ
+    }
+}
+
 /// The per-spike hash the jitter draws from — **integer arithmetic only**, so a
 /// spike's length is bit-identical on every GPU and in every run.
 ///
@@ -593,6 +814,30 @@ pub(crate) fn spike_hash01(index: u32) -> f32 {
     h as f32 * 2.328_306_4e-10
 }
 
+/// The same hash, moved to `star_seed`'s arrangement: the seed strides through
+/// the hash's **input** rather than perturbing its output, so every seed draws
+/// from one distribution and the amount of jitter is a property of
+/// `star_jitter` alone.
+///
+/// `salt` separates the two independent draws one spike needs — its tip radius
+/// and its edge's wobble phase — so raising the wobble does not also re-cut the
+/// spike lengths.
+///
+/// Test-only on the Rust side, like [`spike_hash01`] itself.
+#[cfg(test)]
+pub(crate) fn seeded_spike_hash01(index: u32, seed: f32, salt: u32) -> f32 {
+    spike_hash01(
+        index
+            .wrapping_add((seed as u32).wrapping_mul(STAR_SEED_STRIDE))
+            .wrapping_add(salt),
+    )
+}
+
+/// The salt the wobble's phase draws at, exposed so the mirror and the tests
+/// name one constant rather than two copies of a number.
+#[cfg(test)]
+pub(crate) const PHASE_SALT: u32 = STAR_PHASE_SALT;
+
 /// The shared distance-function chunk, with its constants substituted in.
 ///
 /// Prepended to each particle scene's shader source, so both scenes evaluate the
@@ -605,6 +850,9 @@ pub(crate) fn sdf_wgsl() -> String {
         .replace("%RING_MID%", &format!("{RING_MID:?}"))
         .replace("%RING_HALF%", &format!("{RING_HALF:?}"))
         .replace("%STAR_SEGMENTS%", &format!("{STAR_SEGMENTS}"))
+        .replace("%STAR_SEED_STRIDE%", &format!("{STAR_SEED_STRIDE}"))
+        .replace("%STAR_PHASE_SALT%", &format!("{STAR_PHASE_SALT}"))
+        .replace("%STAR_WOBBLE_MAX%", &format!("{STAR_WOBBLE_MAX:?}"))
         .replace("%HEART_LOBE_R%", &format!("{HEART_LOBE_R:?}"))
         .replace("%HEART_INRADIUS%", &format!("{HEART_INRADIUS:?}"))
         .replace("%HEART_SCALE%", &format!("{HEART_SCALE:?}"))
@@ -614,9 +862,13 @@ pub(crate) fn sdf_wgsl() -> String {
 /// The chunk itself. `%NAME%` placeholders are substituted by [`sdf_wgsl`].
 const SDF_WGSL: &str = r#"
 const MARK_TAU: f32 = 6.28318530718;
+const MARK_PI: f32 = 3.14159265359;
 const MARK_RING_MID: f32 = %RING_MID%;
 const MARK_RING_HALF: f32 = %RING_HALF%;
 const MARK_STAR_SEGMENTS: i32 = %STAR_SEGMENTS%;
+const MARK_STAR_SEED_STRIDE: u32 = %STAR_SEED_STRIDE%u;
+const MARK_STAR_PHASE_SALT: u32 = %STAR_PHASE_SALT%u;
+const MARK_STAR_WOBBLE_MAX: f32 = %STAR_WOBBLE_MAX%;
 const MARK_HEART_LOBE_R: f32 = %HEART_LOBE_R%;
 const MARK_HEART_INRADIUS: f32 = %HEART_INRADIUS%;
 const MARK_HEART_SCALE: f32 = %HEART_SCALE%;
@@ -633,6 +885,49 @@ fn mark_spike_hash01(index: u32) -> f32 {
     return f32(h) * 2.3283064e-10;
 }
 
+// The same hash at `star_seed`'s arrangement. The seed strides through the
+// hash's INPUT rather than perturbing its output, so every seed draws from one
+// distribution and how rough the figure is stays `star_jitter`'s business
+// alone. `salt` separates a spike's two independent draws - its tip radius and
+// its edge's wobble phase - so raising one does not re-cut the other.
+//
+// Seed 0 multiplies to 0 and, at the tip's salt of 0, leaves the index itself:
+// the default arrangement is the one every jittered star has drawn.
+fn mark_seeded_hash01(index: u32, seed: f32, salt: u32) -> f32 {
+    return mark_spike_hash01(index + u32(seed) * MARK_STAR_SEED_STRIDE + salt);
+}
+
+// The edge's RADIAL wander is written INLINE at both of its call sites, as
+//
+//     swell = 1 + amp * sin(MARK_TAU * freq * t + phase) * sin(MARK_PI * t)
+//
+// where `t` runs 0 at the tip to 1 at the valley and `amp` is `star_wobble`
+// scaled by MARK_STAR_WOBBLE_MAX. It is stated once here and spelled twice
+// there, which is the opposite of this file's habit and is a measured
+// constraint rather than a preference: as a FUNCTION CALLED INSIDE the
+// sub-segment loop it was the first user function in that loop, and the DX12
+// backend's shader compiler stopped producing a working `shape_field` pipeline
+// - every one of that scene's captures came back on a lost device, including
+// presets that never reach the star arm.
+//
+// **Radial, not perpendicular, and that is the whole of why this is safe.** A
+// perpendicular displacement moves the outline sideways in ANGLE, and past a
+// small amplitude a ray from the centre would cross it twice - which breaks the
+// one property `mark_boundary_radius` rests on and would put a hole through the
+// scaled-copy coordinate. Scaling the radius leaves the boundary a
+// single-valued function of angle at every amplitude below 1.
+//
+// `sin(MARK_PI * t)` is a window, not decoration: it is exactly 0 at both ends,
+// which pins the tip and the valley where they are. Without it the two mirrored
+// halves of a spike would each displace their shared endpoint the other way and
+// the outline would tear open at every tip and every notch.
+//
+// `star_wobble = 0` multiplies to an exact 0 rather than taking a branch, so
+// the identity is the arithmetic's and not a test's. What it does not buy is
+// the two transcendentals per sub-segment: those are paid by every fragment on
+// the sampled branch, which is the branch `star_curve` and `star_jitter`
+// already select. The straight-edge closed form is unreached by all of it.
+
 // Inigo Quilez's heart, in its own frame: two lobe circles centred
 // (+-0.25, 0.75), closed underneath by the 45-degree rays from the origin that
 // are tangent to them, notched at (0, 1).
@@ -647,6 +942,9 @@ fn mark_heart_sd(p_in: vec2<f32>) -> f32 {
     return sqrt(min(dot(a, a), dot(b, b))) * sign(p.x - p.y);
 }
 
+// ONE arm of the roster, selected by a whole index. `mark_distance` below is
+// what callers use; this is the per-arm arithmetic it selects or blends.
+//
 // Normalized distance from a mark's silhouette: 0 at the shape's deepest
 // interior point, exactly 1 on its outline, greater than 1 outside it. The
 // caller's falloff is unchanged, so everything at d >= 1 is black and only the
@@ -657,8 +955,11 @@ fn mark_heart_sd(p_in: vec2<f32>) -> f32 {
 // including the star arm's straight/curved split, which is what makes the
 // neutral configuration cost nothing extra.
 //
-// `star` is `vec3(valley, curve, jitter)`, all three conditioned CPU-side.
-fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 {
+// `star` is `vec3(valley, curve, jitter)` and `rough` is
+// `vec3(seed, wobble, wobble_freq)`, all six conditioned CPU-side. The split is
+// packing rather than meaning: the two uniforms that carry them had three free
+// slots between them and no room for a sixth in either alone.
+fn mark_distance_arm(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>, rough: vec3<f32>) -> f32 {
     if (shape < 0.5) {
         // disc: sd = length(p) - 1, R = 1. The three lines this replaced.
         return length(p);
@@ -711,7 +1012,10 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
         let k = star.x;
         let curve = star.y;
         let jitter = star.z;
-        if (curve == 0.0 && jitter == 0.0) {
+        let seed = rough.x;
+        let wobble = rough.y;
+        let wobble_freq = rough.z;
+        if (curve == 0.0 && jitter == 0.0 && wobble == 0.0) {
             // The straight edge's plane, written as `x + b*y = 1`. Its
             // perpendicular from the origin is what this branch normalizes by,
             // and it is an APPROXIMATION of the figure's inradius rather than
@@ -751,7 +1055,7 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
             return 1.0 + length(q - (tip + t * edge)) / inradius;
         }
 
-        // Curved and/or jittered. The edge becomes a quadratic Bezier and the
+        // Curved, jittered and/or wobbled. The edge becomes a quadratic Bezier and the
         // exact distance to one is a cubic solve, so it is SAMPLED into
         // MARK_STAR_SEGMENTS sub-segments and measured against the polyline —
         // the same trade this project's own ground-truth harness makes. The
@@ -759,8 +1063,17 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
         let n = max(points, 1.0);
         let index = u32(max(spike - floor(spike / n) * n, 0.0));
         // Symmetric about the unjittered radius, so the figure keeps its size
-        // rather than only ever shrinking.
-        let rt = 1.0 + jitter * (mark_spike_hash01(index) * 2.0 - 1.0);
+        // rather than only ever shrinking. Salt 0 is the tip's draw, and at
+        // `seed == 0` this is `mark_spike_hash01(index)` exactly.
+        let rt = 1.0 + jitter * (mark_seeded_hash01(index, seed, 0u) * 2.0 - 1.0);
+        // The spike's own wobble phase, a second independent draw at the phase
+        // salt. Per SPIKE rather than per edge: the angular fold measures the
+        // half-wedge and mirrors it, so a spike's two edges are each other's
+        // reflection and cannot wander apart. A figure whose every spike is
+        // internally symmetric is what this fold can express; breaking that
+        // would mean unfolding the wedge and doubling the sample count.
+        let wobble_phase = mark_seeded_hash01(index, seed, MARK_STAR_PHASE_SALT) * MARK_TAU;
+        let wobble_amp = wobble * MARK_STAR_WOBBLE_MAX;
         let tip = vec2<f32>(rt, 0.0);
         let valley = vec2<f32>(k * cos(h), k * sin(h));
         // The control point is the edge's midpoint pulled toward the origin, so
@@ -800,7 +1113,14 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
         for (var i = 1; i <= MARK_STAR_SEGMENTS; i = i + 1) {
             let t = f32(i) / f32(MARK_STAR_SEGMENTS);
             let s = 1.0 - t;
-            let cur = s * s * tip + 2.0 * s * t * ctrl + t * t * valley;
+            // The edge, then its radial wander (see the wobble's own note
+            // above, which is why this is written out rather than called). The
+            // wobble multiplies the sampled point's RADIUS, so the tip
+            // (t = 0, and `prev`'s seed) and the valley (t = 1) are untouched by
+            // construction and only the line between them moves.
+            let swell = 1.0
+                + wobble_amp * sin(MARK_TAU * wobble_freq * t + wobble_phase) * sin(MARK_PI * t);
+            let cur = (s * s * tip + 2.0 * s * t * ctrl + t * t * valley) * swell;
             let e = cur - prev;
             let w = q - prev;
             let along = clamp(dot(w, e) / max(dot(e, e), 1e-12), 0.0, 1.0);
@@ -809,6 +1129,14 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
             // the unjittered edge. At `jitter == 0` the two polylines are the
             // same expressions, so this is `nearest` evaluated at the origin —
             // which is what makes `d` there exactly 0 rather than nearly 0.
+            //
+            // **Unwobbled as well as unjittered, for the same reason.** The
+            // wobble's phase is per-spike, so a reference that carried it would
+            // be a property of whichever spike the fragment folded onto rather
+            // than of the figure, and the field would step across every spike
+            // seam. The cost is the same cost the jitter already pays: the
+            // interior reads a little off 0 at the centre, bounded by the
+            // `max` below.
             let cur0 = s * s * tip0 + 2.0 * s * t * ctrl0 + t * t * valley;
             let e0 = cur0 - prev0;
             let along0 = clamp(dot(-prev0, e0) / max(dot(e0, e0), 1e-12), 0.0, 1.0);
@@ -837,6 +1165,38 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
     return 1.0 + mark_heart_sd(q) / MARK_HEART_INRADIUS;
 }
 
+// The roster's distance field at a position ON the roster, whole or fractional
+// (ADR-0226).
+//
+// A whole index is an EXACT IDENTITY: one arm, the same expression and the same
+// cost the rounded selector had. Between two whole indices the two neighbouring
+// arms are evaluated and their distances blended linearly, so the figure travels
+// from one silhouette to the next instead of cutting.
+//
+// `shape` is a per-draw uniform, so the branch is uniform across a warp and a
+// whole index pays for one arm rather than two.
+//
+// **The blend is NOT a distance function.** Its zero set is a shape neither arm
+// describes, its gradient magnitude is not 1, and no accuracy claim anywhere in
+// this module holds mid-travel. Everything that reads the return value as a
+// SIGN — the falloff's `1 - d`, the interior test `d < 1` — still means what it
+// meant; everything that reads it as a metric distance — an outline width, a
+// contour spacing, the measured exterior error — is undefined between the
+// integers. `shape` is clamped and never rounded CPU-side (`mark_shape`), which
+// is what puts a whole index on the identity branch exactly.
+fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>, rough: vec3<f32>) -> f32 {
+    let lo = floor(shape);
+    let t = shape - lo;
+    if (t == 0.0) {
+        return mark_distance_arm(p, lo, points, star, rough);
+    }
+    return mix(
+        mark_distance_arm(p, lo, points, star, rough),
+        mark_distance_arm(p, lo + 1.0, points, star, rough),
+        t
+    );
+}
+
 // The radius at which the ray from the figure's centre through `p` crosses the
 // outline — the denominator of the SCALED-COPY coordinate `r / r_boundary`
 // (ADR-0111, Plan 0098).
@@ -856,7 +1216,10 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
 //
 // Only `shape_field` calls this. The particle scenes read `mark_distance` and
 // only its interior, so nothing on that path can notice it exists.
-fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 {
+//
+// ONE arm, selected by a whole index, the same way `mark_distance_arm` is;
+// `mark_boundary_radius` below is what callers use.
+fn mark_boundary_radius_arm(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>, rough: vec3<f32>) -> f32 {
     if (shape < 0.5) {
         // disc: the unit circle, at every angle. Its offsets and its scaled
         // copies are the SAME circles, which is exactly what makes this arm the
@@ -903,8 +1266,11 @@ fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) 
         let k = star.x;
         let curve = star.y;
         let jitter = star.z;
+        let seed = rough.x;
+        let wobble = rough.y;
+        let wobble_freq = rough.z;
 
-        if (curve == 0.0 && jitter == 0.0) {
+        if (curve == 0.0 && jitter == 0.0 && wobble == 0.0) {
             // Solve the straight branch's own `r cos(f) + r sin(f) * B = 1`.
             // The denominator cannot vanish: `f` is folded into `[0, h]`, so
             // `cos(f) > 0`, and `B > 0` for every valley radius in range.
@@ -912,13 +1278,17 @@ fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) 
             return 1.0 / (cos(f) + b * sin(f));
         }
 
-        // Curved and/or jittered: the boundary is the sampled Bezier, so this is
-        // the ray-versus-sub-segment crossing `mark_distance` already finds in
-        // its own loop. Only the crossing is computed here — no distance — which
-        // is what keeps this arm cheaper than the one beside it.
+        // Curved, jittered and/or wobbled: the boundary is the sampled Bezier,
+        // so this is the ray-versus-sub-segment crossing `mark_distance` already
+        // finds in its own loop. Only the crossing is computed here — no
+        // distance — which is what keeps this arm cheaper than the one beside
+        // it. Every line of the outline's construction is the SAME expression
+        // there, wobble included, or the two would describe two outlines.
         let n = max(points, 1.0);
         let index = u32(max(spike - floor(spike / n) * n, 0.0));
-        let rt = 1.0 + jitter * (mark_spike_hash01(index) * 2.0 - 1.0);
+        let rt = 1.0 + jitter * (mark_seeded_hash01(index, seed, 0u) * 2.0 - 1.0);
+        let wobble_phase = mark_seeded_hash01(index, seed, MARK_STAR_PHASE_SALT) * MARK_TAU;
+        let wobble_amp = wobble * MARK_STAR_WOBBLE_MAX;
         let tip = vec2<f32>(rt, 0.0);
         let valley = vec2<f32>(k * cos(h), k * sin(h));
         let ctrl = 0.5 * (tip + valley) * (1.0 - curve);
@@ -931,7 +1301,9 @@ fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) 
         for (var i = 1; i <= MARK_STAR_SEGMENTS; i = i + 1) {
             let t = f32(i) / f32(MARK_STAR_SEGMENTS);
             let s = 1.0 - t;
-            let cur = s * s * tip + 2.0 * s * t * ctrl + t * t * valley;
+            let swell = 1.0
+                + wobble_amp * sin(MARK_TAU * wobble_freq * t + wobble_phase) * sin(MARK_PI * t);
+            let cur = (s * s * tip + 2.0 * s * t * ctrl + t * t * valley) * swell;
             let e = cur - prev;
             let denom = u.x * e.y - u.y * e.x;
             if (abs(denom) > 1e-9) {
@@ -976,6 +1348,25 @@ fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) 
         return t_lobe / MARK_HEART_SCALE;
     }
     return (MARK_HEART_CY / denom) / MARK_HEART_SCALE;
+}
+
+// The boundary radius at a position on the roster, whole or fractional
+// (ADR-0226). The distance and the boundary radius are the roster's TWO per-arm
+// quantities, so a travelling figure blends both or the scaled-copy coordinate
+// would keep one arm's outline while the distance left it.
+//
+// Same structure as `mark_distance`: a whole index takes one arm, unchanged.
+fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>, rough: vec3<f32>) -> f32 {
+    let lo = floor(shape);
+    let t = shape - lo;
+    if (t == 0.0) {
+        return mark_boundary_radius_arm(p, lo, points, star, rough);
+    }
+    return mix(
+        mark_boundary_radius_arm(p, lo, points, star, rough),
+        mark_boundary_radius_arm(p, lo + 1.0, points, star, rough),
+        t
+    );
 }
 "#;
 

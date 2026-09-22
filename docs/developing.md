@@ -146,10 +146,56 @@ It stops at the first failure and names the step that failed:
 | Studio typecheck | `npm --prefix studio run typecheck` (skips with no `studio/node_modules`) |
 | Studio lint | `npm --prefix studio run lint` (same guard) |
 | Studio tests | `npm --prefix studio test` (same guard) |
-| Format | `cargo fmt --all --check` |
-| Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
-| Rustdoc | `cargo doc --workspace --no-deps` under `RUSTDOCFLAGS=-D warnings` |
-| Tests | `cargo nextest run --workspace -P fast` (narrowed — see below) |
+| Format | `cargo fmt --all --check` (only when the push moved a Rust-relevant path — below) |
+| Lint | `cargo clippy --workspace --all-targets -- -D warnings` (same condition) |
+| Rustdoc | `cargo doc --workspace --no-deps` under `RUSTDOCFLAGS=-D warnings` (same condition) |
+| Tests | `cargo nextest run --workspace -P fast` (same condition, narrowed, and served from the suite ledger when it can be — below) |
+
+**Everything above the cargo steps runs on every push; the four cargo steps do not**
+([ADR-0237](adrs/0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md)).
+Git hands the hook one line per pushed ref, and the hook asks
+`node scripts/push-scope.mjs <remote sha> <local sha>` about each range. The cargo steps run when
+any range touches a path listed in `scripts/push-scope.manifest.mjs` — Rust source, a manifest or
+the lockfile, the toolchain and cargo configuration, anything under a workspace crate's directory,
+`presets/`, and the few files outside the crates that a Rust test opens, such as
+`docs/configuration.md`. When nothing does, one line names the ranges it read and the push is done:
+
+```
+pre-push: skipping cargo fmt, clippy, rustdoc and tests: 7f7ed2c..e3498a5 touches no Rust-relevant path (scripts/push-scope.manifest.mjs)
+```
+
+When they run, the line names the first path that matched:
+
+```
+pre-push: running the cargo steps: push-scope: f2bf1dd..60f4c28 touches Cargo.lock (rule Cargo.lock): yes
+```
+
+**Whatever the hook cannot read runs all four, and the line says why**: a ref that is new on the
+remote (there is no range to compare against), an empty or unparseable stdin, a push of nothing but
+deletions, a shallow clone, a sha this clone does not hold, or the hook run by hand from a terminal.
+**A new tag is a new ref too**, so a push carrying a release tag — every close push made with
+`git push --follow-tags` — runs the cargo steps even when the branch beside it moved no Rust; the
+test step can still be served from the ledger.
+
+**The test step is served instead of run when the suite ledger already proves the tree.** Before it,
+`node tools/conductor/suite-record.mjs` asks the ledger
+([ADR-0207](adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md))
+whether this worktree's tree, clean, has a green `cargo nextest run --workspace`. Who wrote the
+record does not matter — a conductor gate, a review session, or your own full suite run through
+`tools/conductor/with-lock.mjs` — and the line names it:
+
+```
+pre-push: serving cargo nextest run -P fast from the suite ledger: tree <tree> is green in the suite ledger, run by <writer> at <time>: <nextest summary>
+```
+
+A dirty worktree, a tree whose only record is a `-P fast` run, and a tree whose newest full run was
+red all run the step, after a line saying why the ledger did not serve it. So the saving lands on a tip a full suite already
+proved — `main` after a conductor fast-forward — and not on every intermediate commit.
+
+**The path list is a judgement, and it will be wrong once**: some build input nobody listed will let
+a push skip a suite that would have gone red. CI runs every step unconditionally and is what catches
+it. The repair is a line in the manifest and a case in `scripts/fixtures/push-scope/cases.json`,
+checked by `node scripts/push-scope.mjs --self-test`.
 
 **The two guarded groups skip rather than fail, and say so.** A clone with no
 `python3` on PATH and one that has never run `npm --prefix studio ci` are both
@@ -208,9 +254,20 @@ skip and are not bypassable.
 
 ### What it costs
 
-**Measured warm wall time of the test step: ~410 s** (2026-09-14, one run on the reference
-machine; `fmt` and `clippy` add under two seconds between them). About 165 s of that is idle.
-Every test that asserts on wall-clock time runs **alone**: nextest waits for the running tests to
+**What a push costs depends on which of the three shapes above it takes.** Measured on 2026-09-22,
+one run each, the whole hook driven with a real ref line on stdin, on the Windows reference machine
+(AMD Radeon integrated, DX12), in a worktree whose `target/` was already built and which had no
+`studio/node_modules` — so the studio's three steps skipped, and add their 15.2 s wherever they run:
+
+| Push | Wall time | What ran |
+|------|----------:|----------|
+| A range touching no Rust-relevant path | **8.2 s** | the Node roster and the Python suite; every cargo step skipped |
+| A Rust range whose tree has a full-suite record | **12.1 s** | the same, plus `fmt`, `clippy` and `rustdoc` with nothing to rebuild, and the ledger lookup; the test step served. The record was seeded into a scratch ledger for the reading, since no tree of the measuring lane had a real one |
+| A Rust range whose tree has no record | **557.2 s** | everything; the test step alone took 544.8 s, 1695 tests passed and 86 skipped |
+
+**The test step is the whole difference between the last two rows.** On 2026-09-14 an earlier
+~410 s reading of it on the same machine was about 165 s idle, and the reason is still true:
+every test that asserts on wall-clock time runs **alone**: nextest waits for the running tests to
 drain, runs it, and starts nothing beside it. So you will see the run pause on those tests.
 `.config/nextest.toml` names them, and a guard in `core/tests/suite/hygiene.rs` holds that list to
 the tests that read the clock

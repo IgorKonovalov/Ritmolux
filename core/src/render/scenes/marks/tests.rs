@@ -3,16 +3,28 @@
 use crate::render::scenes::spec_names;
 
 use super::{
-    DEFAULT_POINTS, DEFAULT_SHAPE, DEFAULT_STAR_CURVE, DEFAULT_STAR_JITTER, DEFAULT_STAR_VALLEY,
-    HEART_CY, HEART_INRADIUS, HEART_LOBE_R, HEART_SCALE, MAX_POINTS, MAX_SHAPE, MIN_POINTS, PARAMS,
-    RING_HALF, RING_MID, RING_SHAPE, SHAPES, STAR_SEGMENTS, mark_points, mark_shape, sdf_wgsl,
-    spike_hash01, star_curve, star_jitter, star_valley,
+    DEFAULT_POINTS, DEFAULT_SHAPE, DEFAULT_STAR_CURVE, DEFAULT_STAR_JITTER, DEFAULT_STAR_SEED,
+    DEFAULT_STAR_VALLEY, DEFAULT_STAR_WOBBLE, DEFAULT_STAR_WOBBLE_FREQ, HEART_CY, HEART_INRADIUS,
+    HEART_LOBE_R, HEART_SCALE, MAX_POINTS, MAX_SHAPE, MIN_POINTS, PARAMS, PHASE_SALT, POINTS,
+    RING_HALF, RING_MID, RING_SHAPE, SHAPE, SHAPES, STAR_SEGMENTS, STAR_WOBBLE_MAX, mark_points,
+    mark_shape, sdf_wgsl, seeded_spike_hash01, shape_touches_ring, spike_hash01, star_curve,
+    star_jitter, star_seed, star_valley, star_wobble, star_wobble_freq,
 };
 
 /// The neutral star configuration — `(valley, curve, jitter)` at their defaults.
 /// Every pre-Phase-5 caller of `mark_distance` means this.
 pub(crate) const NEUTRAL_STAR: [f32; 3] =
     [DEFAULT_STAR_VALLEY, DEFAULT_STAR_CURVE, DEFAULT_STAR_JITTER];
+
+/// The neutral hand-drawn configuration — `(seed, wobble, wobble_freq)` at their
+/// defaults, which is zero displacement and therefore the straight-edge closed
+/// form. Every caller that does not name a `rough` means this, which is what the
+/// four-argument wrappers below exist to say.
+pub(crate) const NEUTRAL_ROUGH: [f32; 3] = [
+    DEFAULT_STAR_SEED,
+    DEFAULT_STAR_WOBBLE,
+    DEFAULT_STAR_WOBBLE_FREQ,
+];
 
 /// Roster indices, by name, so the tests below read as shapes.
 pub(crate) const DISC: f32 = 0.0;
@@ -26,7 +38,13 @@ pub(crate) const HEART: f32 = 4.0;
 /// same reason: it lets the arithmetic properties be asserted directly rather
 /// than argued, while the pixel-level claims stay on the shader itself (see
 /// `swarm.rs`'s seven-maxima capture, which renders the real pipeline).
-pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
+pub(super) fn mark_distance_arm_rough(
+    p: [f32; 2],
+    shape: f32,
+    points: f32,
+    star: [f32; 3],
+    rough: [f32; 3],
+) -> f32 {
     let len = (p[0] * p[0] + p[1] * p[1]).sqrt();
     if shape < 0.5 {
         return len;
@@ -58,8 +76,11 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
         let k = star[0];
         let curve = star[1];
         let jitter = star[2];
+        let seed = rough[0];
+        let wobble = rough[1];
+        let wobble_freq = rough[2];
 
-        if curve == 0.0 && jitter == 0.0 {
+        if curve == 0.0 && jitter == 0.0 && wobble == 0.0 {
             let b = (1.0 - k * h.cos()) / (k * h.sin());
             let d_line = len * f.cos() + len * f.sin() * (1.0 - k * h.cos()) / (k * h.sin());
             if d_line <= 1.0 {
@@ -81,7 +102,8 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
 
         let n = points.max(1.0);
         let index = (spike - (spike / n).floor() * n).max(0.0) as u32;
-        let rt = 1.0 + jitter * (spike_hash01(index) * 2.0 - 1.0);
+        let rt = 1.0 + jitter * (seeded_spike_hash01(index, seed, 0) * 2.0 - 1.0);
+        let wobble_phase = seeded_spike_hash01(index, seed, PHASE_SALT) * std::f32::consts::TAU;
         let tip = [rt, 0.0f32];
         let valley = [k * h.cos(), k * h.sin()];
         let ctrl = [
@@ -96,9 +118,10 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
         for i in 1..=STAR_SEGMENTS {
             let t = i as f32 / STAR_SEGMENTS as f32;
             let sm = 1.0 - t;
+            let swell = 1.0 + star_edge_wobble(t, wobble, wobble_freq, wobble_phase);
             let cur = [
-                sm * sm * tip[0] + 2.0 * sm * t * ctrl[0] + t * t * valley[0],
-                sm * sm * tip[1] + 2.0 * sm * t * ctrl[1] + t * t * valley[1],
+                (sm * sm * tip[0] + 2.0 * sm * t * ctrl[0] + t * t * valley[0]) * swell,
+                (sm * sm * tip[1] + 2.0 * sm * t * ctrl[1] + t * t * valley[1]) * swell,
             ];
             let e = [cur[0] - prev[0], cur[1] - prev[1]];
             let w = [q[0] - prev[0], q[1] - prev[1]];
@@ -125,7 +148,70 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
     1.0 + heart_sd(q) / HEART_INRADIUS
 }
 
-/// **The CPU mirror of `mark_boundary_radius`** (Plan 0098 Phase 2). Kept
+/// The CPU mirror of the edge's radial wander at edge parameter `t`, as a
+/// fraction of the local radius.
+///
+/// **Branchless, because the WGSL is.** The shader spells this inline in both
+/// sub-segment loops rather than calling a function — a call there stopped the
+/// DX12 backend producing a working `shape_field` pipeline — so there is no
+/// zero-amplitude early exit to mirror. `0 * sin * sin` is an exact zero
+/// anyway, which is what makes the default an identity.
+pub(super) fn star_edge_wobble(t: f32, amp: f32, freq: f32, phase: f32) -> f32 {
+    amp * STAR_WOBBLE_MAX
+        * (std::f32::consts::TAU * freq * t + phase).sin()
+        * (std::f32::consts::PI * t).sin()
+}
+
+/// One arm at the **neutral** hand-drawn configuration — what every caller
+/// written before the wobble existed means, spelled once rather than at each of
+/// them.
+pub(super) fn mark_distance_arm(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
+    mark_distance_arm_rough(p, shape, points, star, NEUTRAL_ROUGH)
+}
+
+/// **The CPU mirror of the WGSL `mark_distance`**: one arm at a whole index, a
+/// blend of the two neighbours between them (ADR-0226).
+pub(super) fn mark_distance_rough(
+    p: [f32; 2],
+    shape: f32,
+    points: f32,
+    star: [f32; 3],
+    rough: [f32; 3],
+) -> f32 {
+    let lo = shape.floor();
+    let t = shape - lo;
+    if t == 0.0 {
+        return mark_distance_arm_rough(p, lo, points, star, rough);
+    }
+    let a = mark_distance_arm_rough(p, lo, points, star, rough);
+    let b = mark_distance_arm_rough(p, lo + 1.0, points, star, rough);
+    a * (1.0 - t) + b * t
+}
+
+/// [`mark_distance_rough`] at the neutral hand-drawn configuration.
+pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
+    mark_distance_rough(p, shape, points, star, NEUTRAL_ROUGH)
+}
+
+/// The CPU mirror of the WGSL `mark_boundary_radius`, blending the same way.
+pub(crate) fn mark_boundary_radius_rough(
+    p: [f32; 2],
+    shape: f32,
+    points: f32,
+    star: [f32; 3],
+    rough: [f32; 3],
+) -> f32 {
+    let lo = shape.floor();
+    let t = shape - lo;
+    if t == 0.0 {
+        return mark_boundary_radius_arm_rough(p, lo, points, star, rough);
+    }
+    let a = mark_boundary_radius_arm_rough(p, lo, points, star, rough);
+    let b = mark_boundary_radius_arm_rough(p, lo + 1.0, points, star, rough);
+    a * (1.0 - t) + b * t
+}
+
+/// **The CPU mirror of `mark_boundary_radius_arm`** (Plan 0098 Phase 2). Kept
 /// identical by inspection, the same arrangement [`mark_distance`]'s own mirror
 /// uses and for the same reason.
 ///
@@ -138,7 +224,13 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
 /// figure's own centre, where the boundary radius is a ray's length from a point
 /// to itself and the coordinate it feeds is `0` either way — which is why the
 /// divergence is recorded rather than removed.
-pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
+pub(crate) fn mark_boundary_radius_arm_rough(
+    p: [f32; 2],
+    shape: f32,
+    points: f32,
+    star: [f32; 3],
+    rough: [f32; 3],
+) -> f32 {
     if shape < 0.5 {
         return 1.0;
     }
@@ -159,15 +251,17 @@ pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, star: [
         let spike = ((a + h) / seg).floor();
         let f = (a - seg * spike).abs().min(h);
         let (k, curve, jitter) = (star[0], star[1], star[2]);
+        let (seed, wobble, wobble_freq) = (rough[0], rough[1], rough[2]);
 
-        if curve == 0.0 && jitter == 0.0 {
+        if curve == 0.0 && jitter == 0.0 && wobble == 0.0 {
             let b = (1.0 - k * h.cos()) / (k * h.sin());
             return 1.0 / (f.cos() + b * f.sin());
         }
 
         let n = points.max(1.0);
         let index = (spike - (spike / n).floor() * n).max(0.0) as u32;
-        let rt = 1.0 + jitter * (spike_hash01(index) * 2.0 - 1.0);
+        let rt = 1.0 + jitter * (seeded_spike_hash01(index, seed, 0) * 2.0 - 1.0);
+        let wobble_phase = seeded_spike_hash01(index, seed, PHASE_SALT) * std::f32::consts::TAU;
         let tip = [rt, 0.0f32];
         let valley = [k * h.cos(), k * h.sin()];
         let ctrl = [
@@ -180,9 +274,10 @@ pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, star: [
         for i in 1..=STAR_SEGMENTS {
             let t = i as f32 / STAR_SEGMENTS as f32;
             let sm = 1.0 - t;
+            let swell = 1.0 + star_edge_wobble(t, wobble, wobble_freq, wobble_phase);
             let cur = [
-                sm * sm * tip[0] + 2.0 * sm * t * ctrl[0] + t * t * valley[0],
-                sm * sm * tip[1] + 2.0 * sm * t * ctrl[1] + t * t * valley[1],
+                (sm * sm * tip[0] + 2.0 * sm * t * ctrl[0] + t * t * valley[0]) * swell,
+                (sm * sm * tip[1] + 2.0 * sm * t * ctrl[1] + t * t * valley[1]) * swell,
             ];
             let e = [cur[0] - prev[0], cur[1] - prev[1]];
             let denom = u[0] * e[1] - u[1] * e[0];
@@ -214,6 +309,21 @@ pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, star: [
         return t_lobe / HEART_SCALE;
     }
     (HEART_CY / denom) / HEART_SCALE
+}
+
+/// One boundary-radius arm at the **neutral** hand-drawn configuration.
+pub(crate) fn mark_boundary_radius_arm(
+    p: [f32; 2],
+    shape: f32,
+    points: f32,
+    star: [f32; 3],
+) -> f32 {
+    mark_boundary_radius_arm_rough(p, shape, points, star, NEUTRAL_ROUGH)
+}
+
+/// [`mark_boundary_radius_rough`] at the neutral hand-drawn configuration.
+pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
+    mark_boundary_radius_rough(p, shape, points, star, NEUTRAL_ROUGH)
 }
 
 /// **The curved star arm's normalization reference**, mirroring the second
@@ -459,17 +569,133 @@ fn no_two_shapes_draw_the_same_figure() {
 /// The roster is closed at both ends and a broken binding lands on the
 /// default rather than on a bound (`kaleido_edge`'s rule: a selector has no
 /// "as far as you can go" reading).
+///
+/// **It does not round** (ADR-0226): a value between two arms is a position
+/// between them, so the conditioner's whole job is the clamp and the fallback.
+/// That an integer survives it unchanged is what makes the blend's identity
+/// branch exact rather than a hair off it.
 #[test]
-fn the_shape_selector_clamps_rounds_and_falls_back() {
+fn the_shape_selector_clamps_and_falls_back_without_rounding() {
     assert_eq!(mark_shape(-3.0), 0.0);
     assert_eq!(mark_shape(99.0), MAX_SHAPE);
-    assert_eq!(mark_shape(2.4), 2.0);
-    assert_eq!(mark_shape(2.6), 3.0);
+    assert_eq!(mark_shape(2.4), 2.4);
+    assert_eq!(mark_shape(2.6), 2.6);
     assert_eq!(mark_shape(f32::NAN), DEFAULT_SHAPE);
     assert_eq!(mark_shape(f32::INFINITY), DEFAULT_SHAPE);
-    // Every index the roster names survives the quantizer unchanged.
+    // Every index the roster names reaches the shader unchanged, which is what
+    // puts it on the identity branch rather than a hair off it.
     for (i, _) in SHAPES.iter().enumerate() {
         assert_eq!(mark_shape(i as f32), i as f32);
+    }
+
+    // The scaled-copy coordinate's refusal follows the arm rather than the
+    // index: a position that only touches the `ring` inherits its defect, and a
+    // whole index reads exactly as the equality it replaced.
+    for (i, _) in SHAPES.iter().enumerate() {
+        assert_eq!(
+            shape_touches_ring(i as f32),
+            i as f32 == RING_SHAPE,
+            "a whole index must read as the `== RING_SHAPE` test it replaced"
+        );
+    }
+    assert!(shape_touches_ring(0.5) && shape_touches_ring(1.5));
+    assert!(!shape_touches_ring(2.5) && !shape_touches_ring(3.5));
+}
+
+/// **The roster travels** (ADR-0226): a whole index is the arm it names, bit for
+/// bit, and a position between two arms is a figure that is neither.
+///
+/// The first half is the contract every shipped preset and every golden baseline
+/// rests on, so it is asserted as **bit equality** against the arm function
+/// directly — over the whole sprite quad, every arm, every point count the
+/// folds take, and the star's curved branch as well as its straight one.
+///
+/// The second half is the capability, and it is measured rather than asserted by
+/// construction: coverage (`max(0, 1 - d)^2`, what the shader emits) at the
+/// midpoint of each neighbouring pair, against both endpoints, in the same
+/// dimensionless units `no_two_shapes_draw_the_same_figure` uses. A blend that
+/// silently collapsed onto one neighbour — the failure a `select` or a
+/// mis-signed `t` would produce — reads 0 against that side.
+#[test]
+fn a_whole_index_is_an_identity_and_a_fractional_one_is_neither_neighbour() {
+    let stars = [NEUTRAL_STAR, [0.3, 0.5, 0.35]];
+    for (shape, name) in SHAPES.iter().enumerate() {
+        for points in [3.0f32, 5.0, 7.0, 12.0] {
+            for star in stars {
+                for i in 0..48 {
+                    for j in 0..48 {
+                        let p = [i as f32 / 23.5 - 1.0, j as f32 / 23.5 - 1.0];
+                        let got = mark_distance(p, shape as f32, points, star);
+                        let want = mark_distance_arm(p, shape as f32, points, star);
+                        assert_eq!(
+                            got.to_bits(),
+                            want.to_bits(),
+                            "{name} at {p:?} must be its own arm, bit for bit"
+                        );
+                        let got_b = mark_boundary_radius(p, shape as f32, points, star);
+                        let want_b = mark_boundary_radius_arm(p, shape as f32, points, star);
+                        assert_eq!(
+                            got_b.to_bits(),
+                            want_b.to_bits(),
+                            "{name}'s boundary radius at {p:?} must be its own arm, bit for bit"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    const N: usize = 96;
+    let n = 7.0;
+    let grid: Vec<[f32; 2]> = (0..N)
+        .flat_map(|i| {
+            (0..N).map(move |j| {
+                [
+                    i as f32 / (N as f32 - 1.0) * 2.0 - 1.0,
+                    j as f32 / (N as f32 - 1.0) * 2.0 - 1.0,
+                ]
+            })
+        })
+        .collect();
+    let coverage = |shape: f32| -> Vec<f32> {
+        grid.iter()
+            .map(|&p| {
+                (1.0 - mark_distance(p, shape, n, NEUTRAL_STAR))
+                    .max(0.0)
+                    .powi(2)
+            })
+            .collect()
+    };
+    let mean = |v: &[f32]| v.iter().sum::<f32>() / v.len() as f32;
+    let disc_mean = mean(&coverage(DISC));
+    let apart = |a: &[f32], b: &[f32]| -> f32 {
+        a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f32>() / a.len() as f32 / disc_mean
+    };
+
+    println!(
+        "{:<20} {:>14} {:>14}",
+        "travelling pair", "from lower", "from upper"
+    );
+    for lo in 0..SHAPES.len() - 1 {
+        let mid = lo as f32 + 0.5;
+        let (fa, fb, fm) = (
+            coverage(lo as f32),
+            coverage(lo as f32 + 1.0),
+            coverage(mid),
+        );
+        let (from_lo, from_hi) = (apart(&fm, &fa), apart(&fm, &fb));
+        println!(
+            "{:<20} {from_lo:>14.3} {from_hi:>14.3}",
+            format!("{} -> {}", SHAPES[lo], SHAPES[lo + 1])
+        );
+        assert!(
+            from_lo > 0.02 && from_hi > 0.02,
+            "{} -> {} at {mid} is not a third figure: {from_lo:.4} from the \
+             lower arm and {from_hi:.4} from the upper, of the disc's mean \
+             coverage",
+            SHAPES[lo],
+            SHAPES[lo + 1]
+        );
     }
 }
 
@@ -529,6 +755,89 @@ fn an_eased_points_sweep_visits_only_whole_counts() {
     assert_eq!(mark_points(f32::NAN), DEFAULT_POINTS);
 }
 
+/// **An eased `shape` travels: the sweep lands between the two arms rather than
+/// stepping onto one of them** (ADR-0226).
+///
+/// The twin of `an_eased_points_sweep_visits_only_whole_counts` above, for the
+/// opposite claim — and it is driven through the **whole route a preset binding
+/// takes**, not through the scene's conditioner alone. A bound value crosses two
+/// stages: `ParamKind::quantize`, which the binding pipeline applies after the
+/// hold and the smoother, and then `mark_shape`. Measuring `mark_shape` by
+/// itself passes while the declaration a layer above still rounds, which is the
+/// exact blind spot that leaves the blend reachable only from an unquantized
+/// live override.
+///
+/// `POINTS` is the control on the same route: a declaration that *does* round
+/// still steps through whole counts, so the fraction `shape` keeps is a property
+/// of its own declaration rather than of the stage being inert.
+#[test]
+fn an_eased_shape_sweep_lands_between_the_arms() {
+    const SAMPLES: usize = 400;
+    // The shape a `[smoothing]` ease produces: a one-pole, per frame.
+    let ease = |i: usize| 1.0 - (1.0 - 1.0 / 40.0f32).powi(i as i32);
+
+    let raw: Vec<f32> = (0..=SAMPLES)
+        .map(|i| POLYGON + (STAR - POLYGON) * ease(i))
+        .collect();
+    let mut distinct_raw: Vec<u32> = raw.iter().map(|v| v.to_bits()).collect();
+    distinct_raw.sort_unstable();
+    distinct_raw.dedup();
+    assert!(
+        distinct_raw.len() > 100,
+        "the raw sweep must genuinely be continuous, or this proves nothing: {} \
+         distinct values",
+        distinct_raw.len()
+    );
+
+    let seen: Vec<f32> = raw
+        .iter()
+        .map(|&v| mark_shape(SHAPE.kind.quantize(v)))
+        .collect();
+    let between = seen.iter().filter(|&&v| v > POLYGON && v < STAR).count();
+    assert!(
+        between > 100,
+        "an eased polygon -> star sweep must reach the scene at positions between \
+         the two arms; only {between} of {} samples did, which is what a \
+         `Structural` declaration produces by rounding every one of them onto an \
+         arm before the scene sees it",
+        seen.len()
+    );
+
+    let mut distinct_seen: Vec<u32> = seen.iter().map(|v| v.to_bits()).collect();
+    distinct_seen.sort_unstable();
+    distinct_seen.dedup();
+    assert_eq!(
+        distinct_seen.len(),
+        distinct_raw.len(),
+        "nothing on the route from a binding to the scene may collapse two \
+         positions on the roster into one"
+    );
+
+    // ...and the identity every shipped preset rests on survives the same route.
+    for (i, name) in SHAPES.iter().enumerate() {
+        assert_eq!(
+            mark_shape(SHAPE.kind.quantize(i as f32)),
+            i as f32,
+            "a preset binding {name} by its whole index must reach the scene as \
+             that index exactly"
+        );
+    }
+
+    // The control: the same ease, the same two stages, a rounding declaration.
+    let mut counts: Vec<f32> = (0..=SAMPLES)
+        .map(|i| mark_points(POINTS.kind.quantize(7.0 + 2.0 * ease(i))))
+        .collect();
+    counts.sort_by(f32::total_cmp);
+    counts.dedup();
+    assert_eq!(
+        counts,
+        vec![7.0, 8.0, 9.0],
+        "the same route on a `Structural` declaration must still step through \
+         whole counts, or the quantizer is inert and `shape`'s fraction says \
+         nothing"
+    );
+}
+
 /// The roster is one list in one place, and these are its values.
 ///
 /// Pinned so a silent reorder is a failing test rather than a shipped preset
@@ -553,7 +862,10 @@ fn the_shape_roster_is_pinned() {
             "points",
             "star_valley",
             "star_curve",
-            "star_jitter"
+            "star_jitter",
+            "star_seed",
+            "star_wobble",
+            "star_wobble_freq"
         ]
     );
     // Plan 0091 Phase 5 promoted a welded constant, and the default is the whole
@@ -561,6 +873,50 @@ fn the_shape_roster_is_pinned() {
     assert_eq!(DEFAULT_STAR_VALLEY, 0.45);
     assert_eq!(DEFAULT_STAR_CURVE, 0.0);
     assert_eq!(DEFAULT_STAR_JITTER, 0.0);
+    // The hand-drawn controls' identities: seed 0 is the unseeded hash and
+    // amplitude 0 keeps the straight-edge closed form selected, which together
+    // are why nothing shipped moved when they arrived.
+    assert_eq!(DEFAULT_STAR_SEED, 0.0);
+    assert_eq!(DEFAULT_STAR_WOBBLE, 0.0);
+}
+
+/// The three hand-drawn controls are conditioned CPU-side like the three beside
+/// them, and **the two that have an identity reach the shader as exactly that**.
+///
+/// `star_seed` rounds, because there is nothing between two arrangements;
+/// `star_wobble` is a one-sided amplitude; `star_wobble_freq` is held inside the
+/// band the edge's eight-sub-segment sampling can represent, so a preset cannot
+/// name a frequency the polyline would alias.
+#[test]
+fn the_hand_drawn_controls_are_clamped_and_their_identities_are_exact() {
+    assert_eq!(star_seed(0.0), 0.0);
+    assert_eq!(star_seed(-4.0), 0.0);
+    assert_eq!(star_seed(1e9), 255.0);
+    assert_eq!(star_seed(2.4), 2.0);
+    assert_eq!(star_seed(2.6), 3.0);
+    assert_eq!(star_seed(f32::NAN), DEFAULT_STAR_SEED);
+
+    assert_eq!(star_wobble(0.0), 0.0);
+    assert_eq!(star_wobble(-1.0), 0.0);
+    assert_eq!(star_wobble(4.0), 1.0);
+    assert_eq!(star_wobble(f32::INFINITY), DEFAULT_STAR_WOBBLE);
+
+    assert_eq!(star_wobble_freq(0.0), 0.5);
+    assert_eq!(star_wobble_freq(9.0), 2.5);
+    assert_eq!(star_wobble_freq(1.75), 1.75);
+    assert_eq!(star_wobble_freq(f32::NAN), DEFAULT_STAR_WOBBLE_FREQ);
+
+    // The identity that matters most: at zero amplitude the window function is
+    // not merely small, it is not evaluated, and the arm takes the closed form.
+    for t in [0.0f32, 0.1, 0.5, 0.9, 1.0] {
+        assert_eq!(star_edge_wobble(t, 0.0, 2.5, 1.3), 0.0);
+    }
+    // ...and at any amplitude the window is exactly 0 at both ends, which is
+    // what pins the tip and the valley.
+    for amp in [0.25f32, 1.0] {
+        assert_eq!(star_edge_wobble(0.0, amp, 1.0, 0.0), 0.0);
+        assert!(star_edge_wobble(1.0, amp, 1.0, 0.0).abs() < 1e-7);
+    }
 }
 
 /// The templated chunk carries no unsubstituted placeholder — a `%NAME%` that
@@ -574,7 +930,19 @@ fn the_shader_chunk_substitutes_every_placeholder() {
         "unsubstituted placeholder in the mark SDF chunk:\n{wgsl}"
     );
     assert!(wgsl.contains("fn mark_distance("));
+    assert!(wgsl.contains("fn mark_distance_arm("));
     assert!(wgsl.contains("fn mark_boundary_radius("));
+    assert!(wgsl.contains("fn mark_boundary_radius_arm("));
+    assert!(wgsl.contains("fn mark_seeded_hash01("));
+    // The wobble is spelled INLINE at both call sites rather than called, for
+    // the DX12 reason stated at its note — so what is pinned here is that both
+    // spellings are present, not that a function is.
+    assert_eq!(
+        wgsl.matches("wobble_amp * sin(").count(),
+        2,
+        "the edge wobble must be written out in BOTH the distance loop and the \
+         boundary-radius loop, or the two describe two outlines"
+    );
 }
 
 // --- The exterior contract (Plan 0091 Phase 2) ---------------------------------
@@ -609,6 +977,21 @@ pub(crate) fn boundary_loops(shape: f32, points: f32) -> Vec<Loop> {
 /// The star-aware form. Only the `star` arm reads the configuration; every other
 /// silhouette ignores it, which is the same inertness the shader has.
 pub(crate) fn boundary_loops_with(shape: f32, points: f32, star: [f32; 3]) -> Vec<Loop> {
+    boundary_loops_rough(shape, points, star, NEUTRAL_ROUGH)
+}
+
+/// The same outline with the hand-drawn controls applied.
+///
+/// The wobble is evaluated at the **dense** sample's own `t`, so this is the
+/// continuous wobbled edge rather than the shader's eight-segment reading of it
+/// — which is what keeps the sampling residual inside the measurement instead of
+/// cancelling out of it.
+pub(crate) fn boundary_loops_rough(
+    shape: f32,
+    points: f32,
+    star: [f32; 3],
+    rough: [f32; 3],
+) -> Vec<Loop> {
     let n = points as usize;
     let circle = |r: f32| -> Loop {
         (0..BOUNDARY_SAMPLES)
@@ -647,11 +1030,14 @@ pub(crate) fn boundary_loops_with(shape: f32, points: f32, star: [f32; 3]) -> Ve
         let seg = std::f32::consts::TAU / points;
         let h = 0.5 * seg;
         let (k, curve, jitter) = (star[0], star[1], star[2]);
+        let (seed, wobble, wobble_freq) = (rough[0], rough[1], rough[2]);
         const DENSE: usize = 128;
         let mut loop_pts: Loop = Vec::new();
         for spike in 0..n {
             let axis = seg * spike as f32;
-            let rt = 1.0 + jitter * (spike_hash01(spike as u32) * 2.0 - 1.0);
+            let rt = 1.0 + jitter * (seeded_spike_hash01(spike as u32, seed, 0) * 2.0 - 1.0);
+            let wobble_phase =
+                seeded_spike_hash01(spike as u32, seed, PHASE_SALT) * std::f32::consts::TAU;
             // Both half-edges of this spike, walked out from the valley before
             // it, through the tip, to the valley after it.
             for side in [-1.0f32, 1.0] {
@@ -669,10 +1055,13 @@ pub(crate) fn boundary_loops_with(shape: f32, points: f32, star: [f32; 3]) -> Ve
                 for i in steps {
                     let t = i as f32 / DENSE as f32;
                     let sm = 1.0 - t;
+                    let swell = 1.0 + star_edge_wobble(t, wobble, wobble_freq, wobble_phase);
                     // In the spike's own frame, then rotated onto its axis with
                     // the half-edge's side.
-                    let x = sm * sm * tip[0] + 2.0 * sm * t * ctrl[0] + t * t * valley[0];
-                    let y = (sm * sm * tip[1] + 2.0 * sm * t * ctrl[1] + t * t * valley[1]) * side;
+                    let x = (sm * sm * tip[0] + 2.0 * sm * t * ctrl[0] + t * t * valley[0]) * swell;
+                    let y = (sm * sm * tip[1] + 2.0 * sm * t * ctrl[1] + t * t * valley[1])
+                        * swell
+                        * side;
                     let (c, sn) = (axis.cos(), axis.sin());
                     loop_pts.push([x * c - y * sn, x * sn + y * c]);
                 }
@@ -762,6 +1151,22 @@ pub(crate) fn true_signed_distance(p: [f32; 2], loops: &[Loop]) -> f32 {
 /// the arm measures against, and the heart's is `HEART_INRADIUS` over the scale
 /// that maps heart space into the sprite.
 pub(crate) fn inradius_local(shape: f32, points: f32, star: [f32; 3]) -> f32 {
+    inradius_local_rough(shape, points, star, NEUTRAL_ROUGH)
+}
+
+/// The same, aware of the hand-drawn controls.
+///
+/// **`star_wobble` selects the curved branch and does not change its
+/// reference.** The arm's divisor is the **unwobbled, unjittered** spike's
+/// deepest-point distance, for the reason stated at that loop — a reference that
+/// followed the wobble would be a property of whichever spike the fragment
+/// folded onto rather than of the figure.
+pub(crate) fn inradius_local_rough(
+    shape: f32,
+    points: f32,
+    star: [f32; 3],
+    rough: [f32; 3],
+) -> f32 {
     if shape < 0.5 {
         return 1.0;
     }
@@ -779,7 +1184,7 @@ pub(crate) fn inradius_local(shape: f32, points: f32, star: [f32; 3]) -> f32 {
         // Phase 1). The curved one divides by the figure's own deepest-point
         // distance; the straight one still divides by the edge plane's
         // perpendicular.
-        if star[1] != 0.0 || star[2] != 0.0 {
+        if star[1] != 0.0 || star[2] != 0.0 || rough[1] != 0.0 {
             return curved_star_inradius(points, k, star[1]);
         }
         // d = x + B*y with B = (1 - k cos h) / (k sin h); the line d = 1 sits
@@ -811,8 +1216,17 @@ pub(super) fn measure_arm(shape: f32, points: f32) -> ArmError {
 }
 
 pub(super) fn measure_arm_with(shape: f32, points: f32, star: [f32; 3]) -> ArmError {
-    let loops = boundary_loops_with(shape, points, star);
-    let radius = inradius_local(shape, points, star);
+    measure_arm_rough(shape, points, star, NEUTRAL_ROUGH)
+}
+
+pub(super) fn measure_arm_rough(
+    shape: f32,
+    points: f32,
+    star: [f32; 3],
+    rough: [f32; 3],
+) -> ArmError {
+    let loops = boundary_loops_rough(shape, points, star, rough);
+    let radius = inradius_local_rough(shape, points, star, rough);
     let mut out = ArmError {
         exterior_worst: 0.0,
         exterior_at: [0.0, 0.0],
@@ -825,7 +1239,7 @@ pub(super) fn measure_arm_with(shape: f32, points: f32, star: [f32; 3]) -> ArmEr
                 -PROBE_HALF_SPAN + 2.0 * PROBE_HALF_SPAN * iy as f32 / PROBE_STEPS as f32,
             ];
             let truth = true_signed_distance(p, &loops);
-            let claimed = (mark_distance(p, shape, points, star) - 1.0) * radius;
+            let claimed = (mark_distance_rough(p, shape, points, star, rough) - 1.0) * radius;
             let err = (claimed - truth).abs();
             if truth > 0.0 {
                 if err > out.exterior_worst {
@@ -1268,6 +1682,462 @@ fn the_curved_star_exterior_is_re_measured() {
          the sampling changed, so re-read what STAR_SEGMENTS costs before \
          relaxing this"
     );
+}
+
+// --- The hand-drawn controls (ADR-0226's siblings) -----------------------------
+
+/// The measured tip radii of one figure, spike by spike — the quantity
+/// `star_jitter` moves and the quantity `star_wobble` must not.
+///
+/// Read off [`mark_boundary_radius_rough`] **on each spike's own axis**, where
+/// the folded edge parameter is 0 and the wobble's window is therefore exactly
+/// 0. So this is the arm's own outline radius at the tip, not a separate model
+/// of it.
+fn tip_radii(points: f32, star: [f32; 3], rough: [f32; 3]) -> Vec<f32> {
+    let seg = std::f32::consts::TAU / points;
+    (0..points as usize)
+        .map(|spike| {
+            let a = seg * spike as f32;
+            let p = [a.cos(), a.sin()];
+            mark_boundary_radius_rough(p, STAR, points, star, rough)
+        })
+        .collect()
+}
+
+/// The spread of a set of radii — max minus min, the "amount" of a jitter.
+fn spread(v: &[f32]) -> f32 {
+    v.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
+        - v.iter().cloned().fold(f32::INFINITY, f32::min)
+}
+
+/// **`star_seed` re-scatters without re-sizing.**
+///
+/// The done-when has two halves and they pull against each other: two seeds must
+/// give *different arrangements* and the *same amount* of jitter. So this
+/// measures the per-spike tip radii at sixteen seeds and asserts both.
+///
+/// **"The same amount" is a statement about the distribution, not about one
+/// figure.** Seven draws from one uniform band do not span the same range twice
+/// — for `n` uniform draws the expected range is `(n - 1) / (n + 1)` of the
+/// band, which is `0.75` here, with real variance about it. So the amount is
+/// held three ways: no seed may span **more** than the band (that would be a
+/// draw outside it, which is arithmetic rather than luck), no seed may collapse,
+/// and the **mean** range across the seeds must land on the uniform
+/// distribution's own expectation.
+///
+/// **The arrangement assertion is what the stride buys.** Adding the seed to the
+/// index instead of multiplying it would give seed 1 the sequence seed 0 had,
+/// shifted by one spike — the same star turned by one spike position, since the
+/// spikes sit at fixed angles. That is why the test compares against every
+/// rotation of the reference rather than against the reference alone.
+#[test]
+fn a_star_seed_re_scatters_the_jitter_without_changing_its_amount() {
+    let points = 7.0f32;
+    let star = [DEFAULT_STAR_VALLEY, 0.0, 0.5];
+    let band = 2.0 * star[2];
+    let seeds: Vec<f32> = (0..16).map(|i| (i * 17 % 256) as f32).collect();
+
+    println!("{:<6} {:>8} {:>8}  radii", "seed", "spread", "mean");
+    let mut all: Vec<Vec<f32>> = Vec::new();
+    for &seed in &seeds {
+        let r = tip_radii(points, star, [seed, 0.0, DEFAULT_STAR_WOBBLE_FREQ]);
+        let mean = r.iter().sum::<f32>() / r.len() as f32;
+        println!(
+            "{seed:<6} {:>8.4} {mean:>8.4}  {}",
+            spread(&r),
+            r.iter()
+                .map(|x| format!("{x:.3}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
+        all.push(r);
+    }
+
+    for (seed, r) in seeds.iter().zip(&all) {
+        let s = spread(r);
+        assert!(
+            s <= band + 1e-5,
+            "seed {seed} spans {s:.4}, past the {band:.4} `star_jitter` allows — \
+             the seed must move the arrangement and never the amount"
+        );
+        assert!(
+            s > 0.25 * band,
+            "seed {seed} spans only {s:.4} of the {band:.4} `star_jitter` opens \
+             — that is not seven draws from one band, it is a collapsed one"
+        );
+    }
+
+    // The distribution's own expectation for the range of `n` uniform draws.
+    let want = (points - 1.0) / (points + 1.0) * band;
+    let got = all.iter().map(|r| spread(r)).sum::<f32>() / all.len() as f32;
+    println!(
+        "mean range over {} seeds: {got:.4} (uniform expects {want:.4})",
+        seeds.len()
+    );
+    assert!(
+        (got - want).abs() < 0.12 * band,
+        "the mean range over the seeds is {got:.4} against the {want:.4} a \
+         uniform draw predicts — a seed that changed the AMOUNT rather than the \
+         arrangement moves this number, and one that changed only the \
+         arrangement cannot"
+    );
+
+    // The ARRANGEMENT: not equal to any other seed's, and not any ROTATION of
+    // one either — a rotated jitter pattern is the same star turned, which is
+    // what a seed that merely offset the hash's input would produce.
+    let n = points as usize;
+    for i in 0..all.len() {
+        for j in 0..all.len() {
+            if i == j {
+                continue;
+            }
+            for turn in 0..n {
+                let same = (0..n).all(|s| (all[i][s] - all[j][(s + turn) % n]).abs() < 1e-4);
+                assert!(
+                    !same,
+                    "seed {} is seed {}'s arrangement turned by {turn} spikes — \
+                     the seed must reach an unrelated region of the hash, not \
+                     slide along it",
+                    seeds[i], seeds[j]
+                );
+            }
+        }
+    }
+
+    // Seed 0 is the identity: the arrangement every jittered star has drawn.
+    for spike in 0..n as u32 {
+        assert_eq!(
+            seeded_spike_hash01(spike, 0.0, 0).to_bits(),
+            spike_hash01(spike).to_bits(),
+            "seed 0 must be the unseeded hash, bit for bit"
+        );
+    }
+}
+
+/// **The wobble moves the edge and leaves the tip where it is**, which is the
+/// difference between a hand-drawn figure and a damaged one — and the two are
+/// measured separately rather than inferred from one number.
+///
+/// - **The tip**, at each spike's own axis, must sit on the figure's own tip
+///   radius — `1` here, since `star_jitter` is 0 — and must stay there as the
+///   amplitude rises.
+/// - **The edge**, sampled between tip and valley, must move by an amount that
+///   tracks the amplitude.
+///
+/// Both probes read [`mark_boundary_radius_rough`], the arm's own outline, so
+/// this measures the shape the shader draws rather than a second model of it.
+///
+/// **Why the tip is a tolerance and not a bit-equality.** The window is exactly
+/// 0 at `t = 0`, so the tip is algebraically untouched — but the probe reaches
+/// the tip by naming the angle `seg * spike`, and the arm recovers the folded
+/// parameter through `atan2`, which does not round-trip that angle exactly.
+/// Spike 4 of 7 lands about `1e-7` off its own axis, where the first
+/// sub-segment *is* wobbled, so the reading carries a last-bit trace of the
+/// amplitude. The bar below is three orders below the edge's movement, which is
+/// the separation the done-when asks for; a wobble that actually moved the tip
+/// would move it by the amplitude, not by an ulp.
+#[test]
+fn the_wobble_changes_the_edge_and_not_the_tip() {
+    let points = 7.0f32;
+    let star = NEUTRAL_STAR;
+    let seg = std::f32::consts::TAU / points;
+    let h = 0.5 * seg;
+
+    let edge_radii = |rough: [f32; 3]| -> Vec<f32> {
+        // Strictly inside the half-wedge: at 0 the window pins the tip and at
+        // `h` it pins the valley, so the interesting region is between them.
+        (1..16)
+            .map(|i| {
+                let a = h * i as f32 / 16.0;
+                mark_boundary_radius_rough([a.cos(), a.sin()], STAR, points, star, rough)
+            })
+            .collect()
+    };
+
+    let flat = [0.0f32, 0.0, DEFAULT_STAR_WOBBLE_FREQ];
+    let base_edge = edge_radii(flat);
+    // Every spike's tip is the figure's own tip radius, which at `star_jitter`
+    // 0 is exactly 1 — asserted on the UNWOBBLED figure so the wobbled ones
+    // below have a radius to be held to rather than only each other.
+    for (spike, r) in tip_radii(points, star, flat).iter().enumerate() {
+        assert!(
+            (r - 1.0).abs() < 1e-5,
+            "spike {spike}'s unwobbled tip radius reads {r} rather than the \
+             figure's own 1 — the probe is wrong before the wobble is measured"
+        );
+    }
+    let base_tips = tip_radii(points, star, flat);
+    /// How far the tip may read from the unwobbled figure's. Three orders below
+    /// the edge's floor below, so the two quantities are separated rather than
+    /// merely both small.
+    const TIP_BAR: f32 = 1e-5;
+
+    println!(
+        "{:<22} {:>14} {:>14}",
+        "wobble", "tip moved by", "edge moved by"
+    );
+    let mut last_edge_move = 0.0f32;
+    for (amp, freq) in [
+        (0.25f32, 1.0f32),
+        (0.5, 1.0),
+        (1.0, 1.0),
+        (1.0, 0.5),
+        (1.0, 2.5),
+    ] {
+        let rough = [3.0, amp, freq];
+        let tips = tip_radii(points, star, rough);
+        let edge = edge_radii(rough);
+        let tip_move = tips
+            .iter()
+            .zip(&base_tips)
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0f32, f32::max);
+        let edge_move = edge
+            .iter()
+            .zip(&base_edge)
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0f32, f32::max);
+        println!("amp {amp} freq {freq:<12} {tip_move:>14.7} {edge_move:>14.5}");
+
+        for (spike, (got, want)) in tips.iter().zip(&base_tips).enumerate() {
+            assert!(
+                (got - want).abs() < TIP_BAR,
+                "spike {spike}'s tip radius moved {:.8} under wobble {amp} at \
+                 frequency {freq} — the window is 0 at the tip, so the only \
+                 movement allowed here is the probe's own `atan2` residual",
+                (got - want).abs()
+            );
+        }
+        assert!(
+            tip_move < TIP_BAR && edge_move > 1000.0 * TIP_BAR,
+            "wobble {amp} at frequency {freq} moved the tip {tip_move:.8} and \
+             the edge {edge_move:.5} — the point of this parameter is that \
+             those two numbers are orders apart"
+        );
+        assert!(
+            edge_move > 0.01,
+            "wobble {amp} at frequency {freq} moved the edge by only \
+             {edge_move:.5} — the parameter has to do something between the tip \
+             and the valley"
+        );
+        if freq == 1.0 {
+            // At a fixed frequency the displacement is linear in the amplitude,
+            // so a larger amplitude must move the edge further. This is what
+            // convicts an amplitude that saturated or was clamped away.
+            assert!(
+                edge_move > last_edge_move,
+                "wobble {amp} moved the edge {edge_move:.5}, no further than the \
+                 smaller amplitude's {last_edge_move:.5}"
+            );
+            last_edge_move = edge_move;
+        }
+    }
+}
+
+/// **The wobble's cost to the exterior field, measured against Plan 0091 Phase
+/// 5's 0.540** — the number the done-when names, and the one a worse field would
+/// have to be judged against.
+///
+/// The ground truth here is the **continuous** wobbled outline, sampled 16x
+/// finer than the shader's eight sub-segments, so what this reports is the
+/// approximation's error and not the harness's — the same arrangement
+/// [`the_curved_star_exterior_is_re_measured`] uses.
+///
+/// The table this produced, in sprite-local units where the whole sprite is 2
+/// wide:
+///
+/// | configuration | 5 points | 7 points |
+/// |---|---|---|
+/// | `star_wobble` 0.5, freq 1.0 | see the printed row | |
+/// | `star_wobble` 1.0, freq 1.0 | | |
+/// | `star_wobble` 1.0, freq 2.5 | | |
+/// | `star_wobble` 1.0 + `star_jitter` 0.4 | | |
+///
+/// The rows are printed rather than transcribed, because a number copied into a
+/// doc comment is a number that can drift from the one the test computes.
+#[test]
+fn the_wobbled_star_exterior_is_measured_against_the_jitters_own_cost() {
+    println!(
+        "{:<30} {:>6} {:>14} {:>14}",
+        "configuration", "points", "exterior worst", "interior worst"
+    );
+    let mut worst_wobble_only: f32 = 0.0;
+    let mut worst_with_jitter: f32 = 0.0;
+    for (label, star, rough) in [
+        ("wobble 0.5 freq 1.0", NEUTRAL_STAR, [0.0f32, 0.5, 1.0]),
+        ("wobble 1.0 freq 1.0", NEUTRAL_STAR, [0.0, 1.0, 1.0]),
+        ("wobble 1.0 freq 2.5", NEUTRAL_STAR, [0.0, 1.0, 2.5]),
+        ("wobble 1.0 freq 0.5", NEUTRAL_STAR, [0.0, 1.0, 0.5]),
+        ("wobble 1.0 seed 9", NEUTRAL_STAR, [9.0, 1.0, 1.0]),
+        (
+            "wobble 1.0 + jitter 0.4",
+            [DEFAULT_STAR_VALLEY, 0.0, 0.4],
+            [0.0, 1.0, 1.0],
+        ),
+    ] {
+        for points in [5.0f32, 7.0] {
+            let e = measure_arm_rough(STAR, points, star, rough);
+            println!(
+                "{label:<30} {points:>6} {:>14.5} {:>14.5}",
+                e.exterior_worst, e.interior_worst
+            );
+            if star[2] != 0.0 {
+                worst_with_jitter = worst_with_jitter.max(e.exterior_worst);
+            } else {
+                worst_wobble_only = worst_wobble_only.max(e.exterior_worst);
+            }
+        }
+    }
+
+    println!(
+        "worst exterior error: wobble-only {worst_wobble_only:.5}, \
+         with jitter {worst_with_jitter:.5} (against the jitter's own 0.540)"
+    );
+    // The bar is the number Plan 0091 Phase 5 measured for `star_jitter`. The
+    // done-when's instruction is that a materially worse field is a STOP rather
+    // than a tuning problem, so this bound is that phase's measurement and not a
+    // headroom chosen to fit whatever the wobble turned out to cost.
+    assert!(
+        worst_wobble_only < 0.540,
+        "`star_wobble` alone puts the exterior {worst_wobble_only:.5} out, past \
+         the 0.540 `star_jitter` already costs — a wobble that is worse than the \
+         jitter is a real cost to `shape_field`, which reads this region, and \
+         the answer is to report it rather than to raise this bound"
+    );
+    assert!(
+        worst_with_jitter < 1.2,
+        "the wobble and the jitter together put the exterior \
+         {worst_with_jitter:.5} out — two per-spike displacements compound, and \
+         this bound is where that stops being an addition and becomes a \
+         different failure"
+    );
+}
+
+/// **The rough figure is the same figure on every run and on every adapter**,
+/// which is the property the integer hash was chosen for and the one a
+/// `sin`-based hash would forfeit — its low bits differ between GPUs, so the
+/// same preset would draw a different star on another machine.
+///
+/// Rendered rather than argued, because the hash runs in WGSL and it is the
+/// compiled shader's arithmetic that is in question:
+///
+/// - **Two runs**, same adapter: the two captures must be **byte-identical**.
+///   Two fresh renderers, so nothing is being compared against a cached frame.
+/// - **Two adapters**: every adapter this machine enumerates, against the
+///   software one. A picture is not expected bit-for-bit across rasterizers, so
+///   the frame is held to the golden suite's own drift tolerance — and the
+///   **arrangement**, which is what the hash decides, is compared exactly by
+///   the per-spike brightness ordering.
+///
+/// Skips where no adapter exists at all (ADR-0016), and the cross-adapter half
+/// is a no-op on a machine with only one.
+#[test]
+fn a_seeded_wobbled_star_is_the_same_figure_on_two_runs_and_two_adapters() {
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::Preset;
+    use crate::render::{
+        AdapterChoice, CaptureImage, HeadlessOptions, RenderError, Renderer, list_adapters,
+        metrics::frame_diff,
+    };
+
+    const SIZE: u32 = 160;
+    const POINTS: usize = 7;
+    // The roughest figure the arm can draw, so every one of the three controls
+    // is exercised at once rather than one at a time.
+    const TOML: &str = "name = \"rough\"\nsystem = \"shape_field\"\n\
+         [palette]\nstops = [\n\
+         { at = 0.0, color = \"#000000\" },\n\
+         { at = 1.0, color = \"#ffffff\" },\n]\n\
+         [params]\nshape = \"3\"\npoints = \"7\"\nstar_jitter = \"0.5\"\n\
+         star_wobble = \"1.0\"\nstar_wobble_freq = \"1.5\"\nstar_seed = \"11\"\n\
+         scale = \"0.7\"\ncolor_span = \"0.9\"\n";
+
+    let shoot = |choice: &AdapterChoice| -> Option<CaptureImage> {
+        let opts = HeadlessOptions {
+            width: SIZE,
+            height: SIZE,
+            prefer_software: false,
+        };
+        let mut r = match Renderer::new_headless_on(opts, Default::default(), choice) {
+            Ok(r) => r,
+            Err(RenderError::RequestAdapter(_)) => return None,
+            Err(e) => panic!("headless renderer build failed: {e}"),
+        };
+        r.set_presets(vec![
+            Preset::from_toml_str(TOML).unwrap_or_else(|e| panic!("rough failed to load: {e}")),
+        ]);
+        Some(
+            r.capture_preset("rough", &AnalysisFrame::default(), 2)
+                .unwrap_or_else(|e| panic!("capture rough: {e}")),
+        )
+    };
+
+    let Some(soft_a) = shoot(&AdapterChoice::Software) else {
+        eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+        return;
+    };
+    let soft_b =
+        shoot(&AdapterChoice::Software).expect("the software adapter was there a moment ago");
+    assert_eq!(
+        soft_a.rgba, soft_b.rgba,
+        "two runs on one adapter drew different figures — the spike hash is \
+         supposed to be a pure function of the index and the seed"
+    );
+    println!("two runs on the software adapter: byte-identical");
+
+    // The arrangement the hash decides, read off the picture: how bright the
+    // frame is along each spike's own axis, at the radius where a tip reaches
+    // and a valley does not. A reordering here IS a different figure, whatever
+    // the mean says.
+    let arrangement = |img: &CaptureImage| -> Vec<u8> {
+        let c = (SIZE / 2) as f32;
+        let mut rank: Vec<(usize, f32)> = (0..POINTS)
+            .map(|s| {
+                let theta = std::f32::consts::TAU * s as f32 / POINTS as f32;
+                let sum: f32 = (1..=12)
+                    .map(|k| {
+                        let r = c * 0.5 * k as f32 / 12.0;
+                        let x = (c + theta.cos() * r).round().clamp(0.0, (SIZE - 1) as f32) as u32;
+                        let y = (c + theta.sin() * r).round().clamp(0.0, (SIZE - 1) as f32) as u32;
+                        let i = ((y * img.width + x) * 4) as usize;
+                        f32::from(img.rgba[i])
+                    })
+                    .sum();
+                (s, sum)
+            })
+            .collect();
+        rank.sort_by(|a, b| b.1.total_cmp(&a.1));
+        rank.iter().map(|(s, _)| *s as u8).collect()
+    };
+    let want = arrangement(&soft_a);
+    println!("spike order on the software adapter: {want:?}");
+
+    for (i, a) in list_adapters().iter().enumerate() {
+        let Some(img) = shoot(&AdapterChoice::Index(i)) else {
+            continue;
+        };
+        let diff = frame_diff(&soft_a, &img);
+        let got = arrangement(&img);
+        println!(
+            "adapter [{i}] {:<44} frame_diff {diff:.5} order {got:?}",
+            a.name
+        );
+        // The golden suite's own mean tolerance: the bar a picture has to clear
+        // to be the same picture on another rasterizer.
+        assert!(
+            diff < 0.02,
+            "adapter [{i}] ({}) drew a frame {diff:.5} from the software one — \
+             past the drift the golden suite tolerates between rasterizers",
+            a.name
+        );
+        assert_eq!(
+            got, want,
+            "adapter [{i}] ({}) put the spikes in a different order — that is \
+             the hash disagreeing between GPUs, which is the failure integer \
+             arithmetic was chosen to prevent",
+            a.name
+        );
+    }
 }
 
 // --- Phase 1: the star's interior stops lying (design-backlog 0097) ------------

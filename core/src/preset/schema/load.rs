@@ -184,12 +184,13 @@ impl Preset {
                      there crosses the outline more than once",
                 ),
                 Some(true) => None,
-                None => (resting("shape").map(crate::render::scenes::marks::mark_shape)
-                    == Some(crate::render::scenes::marks::RING_SHAPE))
-                .then_some(
-                    "a `ring`: an annulus's centre lies in its hole, so a ray from there crosses \
-                     the outline twice",
-                ),
+                None => resting("shape")
+                    .map(crate::render::scenes::marks::mark_shape)
+                    .is_some_and(crate::render::scenes::marks::shape_touches_ring)
+                    .then_some(
+                        "a `ring`: an annulus's centre lies in its hole, so a ray from there \
+                         crosses the outline twice",
+                    ),
             };
             if let Some(figure) = figure
                 && mode.is_some_and(|m| m.is_finite() && m.clamp(0.0, max_mode).round() >= 1.0)
