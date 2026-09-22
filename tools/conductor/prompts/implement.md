@@ -28,9 +28,9 @@ follow it; where it and the rest of the skill disagree, conductor mode wins.
   `RLX_UPDATE_PARAM_REFERENCE=1` ahead of `cargo` or `node`; `env`, `export` and `$env:` are refused
   (`$env:X = '1'; ...` is a second command). Read text with the Read and Grep tools or `git grep`,
   never `awk`, `sed` or a pipe into `grep`: a done-when written as a pipe runs as its parts, or as
-  the equivalent Grep call, and the log row's note says which. `git clean` and `git checkout` name
-  their path after `--`. Making and removing a scratch file or directory inside the lane is allowed; a path
-  that leaves the lane is refused, whatever it is for.
+  the equivalent Grep call, and the log's `### Notes` says which. `git clean` and `git checkout`
+  name their path after `--`. Making and removing a scratch file or directory inside the lane is
+  allowed; a path that leaves the lane is refused, whatever it is for.
 - If the last-run line says `yes`, finish with the close block of the `## Implementation log`,
   committed, and print the outcome instead of the pointer. Do not run the full workspace suite: the
   conductor's `pre-review` gate runs it next on the same tree, so the close block's `Full suite:`
