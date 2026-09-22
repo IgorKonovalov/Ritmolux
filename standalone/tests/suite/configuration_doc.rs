@@ -98,6 +98,7 @@ fn every_flag_the_help_roster_prints_is_documented() {
 fn every_key_populated() -> Config {
     let mut config = Config::default();
     config.output.display_name = Some("a monitor".to_owned());
+    config.output.gpu = Some("an adapter".to_owned());
     config.console.display_name = Some("another monitor".to_owned());
     config
 }
@@ -200,8 +201,9 @@ fn the_complete_example_parses_to_the_defaults() {
 
 #[test]
 fn the_complete_example_states_every_key_it_can() {
-    // The two `display_name` keys have no spelling at their default - the value
-    // is absent, and TOML has no null - so the example states every OTHER key.
+    // The `Option` keys - the two `display_name`s and `[output] gpu` - have no
+    // spelling at their default: the value is absent, and TOML has no null. So
+    // the example states every OTHER key.
     // Without this the example could quietly shrink to `[output]` alone and
     // still parse to the defaults, which is the one way the test above passes
     // while the document stops being complete.

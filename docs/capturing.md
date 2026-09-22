@@ -1786,6 +1786,18 @@ renderer : NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu), driver 32.0.1
 sender   : adapter [1] NVIDIA GeForce RTX 3080 Laptop GPU
 ```
 
+**Both are fixed for the life of the run.** The window's settings menu can move a
+running show onto another adapter ([Running the app](running.md#the-graphics-adapter)),
+but a `--stream` run has no window and no menu, and its renderer keeps the adapter
+it was built on; the sender, whose adapter is a correctness constraint rather than
+a frame-rate one, is never re-opened underneath a connected receiver. To publish
+from the other GPU, stop the run and start it again with `--gpu` — the receiver
+re-acquires the sender by name as it does after any restart. `[output] gpu` in
+`config.toml` is the **window's** stored choice and is not read here: this mode
+takes only the flag, so what a receiver connects to is always what the command
+line says. On Linux, `--sink stdout` writes pixels to a pipe and has no adapter
+tie at all.
+
 ### Presets, and stopping
 
 Presets rotate on the operator config's `[rotate]` dwell timer exactly as they

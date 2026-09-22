@@ -50,7 +50,7 @@ one, so you always land where you asked.
 | `Backspace` | Back to the preset you were on before — walks the presets actually shown, one step per press |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
 | `Tab`     | Open/close the preset browser — opens on the preset you're watching. Arrow keys walk the list and wrap at both ends, left/right step a column, holding an arrow scrolls, type to filter, `Enter` selects (also dissolves), `Esc` closes |
-| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, next-in countdown, console. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
+| `S`       | Open/close the settings menu — quality, adapter, auto-rotate, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, next-in countdown, console. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
 | `C`       | Open/close the **operator console** — a second window on another display carrying the browser, the settings menu, a transport strip and a live preview of the output |
 | `[` / `]` | Drop / raise the quality tier live — pins it for the session and persists the choice |
 | `F`       | Toggle fullscreen                                           |
@@ -219,6 +219,29 @@ resources, so changing it rebuilds them.
 A tier can also be pinned before launch, and what wins there is
 [the precedence in Configuration](configuration.md#quality). The measured budgets each tier is held
 to are in [Non-functional requirements](nfr.md).
+
+## The graphics adapter
+
+On a machine with one GPU there is nothing to choose. On a hybrid laptop there are two, and the gap
+between them is the largest single frame-cost fact about the show: the same preset at the same
+tier runs several times faster on the discrete part than on the integrated one. Unflagged, the
+window asks for the **high-performance** adapter, and the startup line in `diagnostics.log` names
+which one it got and why (`renderer adapter: … (default: high performance)`).
+
+The settings menu's **Adapter** row, beside **Quality**, lists every adapter the machine
+enumerates; left and right walk the list and the switch happens at once, without a restart. The
+window, the preset on screen, the engine clock, the audio and the diagnostics all stay. What does
+not is anything accumulated on the GPU — trails, feedback, a simulation's field — so a switch is
+visibly a fresh start of the picture rather than a seamless handover, the same re-accumulation a
+tier change costs. An open console follows onto the new adapter; a console the new adapter cannot
+drive closes with a line in `diagnostics.log`, and the show is untouched.
+
+The row writes the adapter's **name** to `config.toml` under `[output] gpu`, so the next launch
+comes up on it; `--gpu` overrides that for one run, and
+[Configuration](configuration.md#output) has the precedence and what happens when a stored adapter
+is no longer there. A switch the adapter refuses — it cannot drive this window, or its driver will
+not open a device — leaves the show exactly where it was, reports why on stderr, and writes
+nothing. With one adapter the row shows it and does nothing.
 
 ## Displays and fullscreen
 

@@ -40,7 +40,7 @@ telemetry.
 | `--fps` | `<n>` | Published frame rate; default `60` on `--sink spout`, `30` on `--sink stdout`. Needs `--stream` |
 | `--sender` | `<name>` | The published Spout sender name, default `ritmolux`. Needs `--stream` |
 | `--frames` | `<n>` | Stop after this many frames. Needs `--stream` |
-| `--gpu` | `<name\|index>` | Which graphics adapter to render on — the window and `--stream` both |
+| `--gpu` | `<name\|index>` | Which graphics adapter to render on — the window and `--stream` both. Overrides `[output] gpu` for one run |
 | `--preset` | `<name>` | Hold one scene and disable rotation |
 
 A flag marked *Needs `--stream`* passed without it is a startup error naming both flags, rather
@@ -179,7 +179,7 @@ is yours, differing from the shipped set is usually the point of it, and `--list
 reading of its drift.
 
 **`--gpu <name|index>`** works for both the window and `--stream`. **On a machine with one GPU you
-will never need it; on a hybrid laptop it is the difference between a picture and nothing.** A
+will never need it; on a hybrid laptop it is what decides which GPU the show runs on.** A
 Spout sender shares a D3D11 texture by handle and the receiver opens it on its own device, which
 works only when both are the same physical GPU — and Windows hands a plain console process the
 power-saving GPU while the receiving application runs on the discrete one. One flag moves both
@@ -187,12 +187,19 @@ halves: the renderer and the sender each resolve the name against their own rost
 `--stream`'s renderer asks for the high-performance adapter and the sender follows it by name,
 printing what both resolved to.
 
-**The window's unset behaviour is deliberately different**: it asks for whatever the graphics layer
-picks for the surface, which is what it has always asked for, so no published frame-time figure
-moves because this flag arrived. On a hybrid laptop that default is the power-saving GPU, and
-`--gpu <name|index>` is how you move the window onto the discrete one; the startup line in
-`diagnostics.log` names the adapter and says whether a flag pinned it. A named adapter that cannot
-drive the window is a startup error rather than a quiet fall-back to another GPU.
+**The window asks for the same thing unset: the high-performance adapter**, which on a hybrid
+laptop is the discrete GPU rather than the power-saving one the graphics layer would otherwise hand
+a window. The startup line in `diagnostics.log` names the adapter and which carrier chose it —
+`(default: high performance)`, `(pinned by --gpu)` or `(from config.toml [output] gpu)`. For the
+window the flag is the per-run override of a **stored** choice: `[output] gpu` holds the adapter by
+name in `config.toml`, the settings menu's **Adapter** row writes it, and `--gpu` wins over the key
+for one launch without writing it — the precedence `--tier` has over `[quality] tier`. The two
+carriers fail differently on purpose. A `--gpu` that names an adapter this machine does not have, or
+one that cannot drive the window, is a startup error rather than a quiet fall-back to another GPU.
+A stored `[output] gpu` that no longer resolves — a laptop undocked from its eGPU, a driver that
+renamed the card — starts anyway on the default preference, with one line on stderr and a startup
+note naming both what the file asked for and what was taken: a file outlives the machine state that
+made it valid, and a show that will not start is the wrong failure for a persisted preference.
 
 **`--preset <name>`** takes the preset's **display name** — `Clifford`, `Rose Window` — as the
 browse overlay and `--preset`'s own error listing spell it, not the `.toml` filename, so most of
@@ -282,16 +289,26 @@ the file to forget every mark.
 
 ### `[output]`
 
-Which display the show opens on, and whether it opens fullscreen.
+Which display the show opens on, whether it opens fullscreen, and which graphics adapter draws it.
 
 | Key | Default | What it means |
 |---|---|---|
 | `display` | `0` | Target monitor index — the fallback when no `display_name` matches |
 | `display_name` | unset | Preferred monitor identity, matched by name *before* the raw index. Unset means "use the index" |
 | `fullscreen` | `false` | Open borderless-fullscreen on the target display; windowed otherwise |
+| `gpu` | unset | The graphics adapter to render on, spelled as `--gpu` is: a name (`"NVIDIA"`, or the full name the settings menu writes) or a bare roster index. Unset means the high-performance adapter |
 
 The name is tried before the index because the window system's monitor ordering can shift across a
 boot or a hotplug, so a stored index alone may point at the wrong screen.
+
+`gpu` is stored by **name** for the same reason: the adapter roster orders differently per operating
+system and driver, so an index alone can name the wrong GPU after an update. `--gpu` overrides it
+for one run without writing it. A name that matches more than one adapter is ambiguous, and a stored
+adapter that is absent, ambiguous or cannot drive the window **falls back** to the high-performance
+default with a line saying so, where the flag would refuse to start — see
+[`--gpu`](#the-ones-that-need-a-paragraph) above. The settings menu's **Adapter** row moves the
+running show and writes this key; [Running the app](running.md#the-graphics-adapter) says what a
+switch costs.
 
 ### `[input]`
 
@@ -411,8 +428,8 @@ monitor there is, which is the correct degrade rather than a failure.
 
 ### A complete file
 
-Every key at its default. `display_name` in `[output]` and `[console]` is absent because "unset" is
-its default and the file format has no spelling for one.
+Every key at its default. `display_name` in `[output]` and `[console]`, and `gpu` in `[output]`,
+are absent because "unset" is their default and the file format has no spelling for one.
 
 <!-- The block below is round-tripped through the config type by
      `standalone/tests/suite/configuration_doc.rs`; a value edited here without the code
@@ -466,6 +483,7 @@ running app *for that session*.
 | Setting | Highest | | | Lowest |
 |---|---|---|---|---|
 | Quality tier | `--tier` | `RLX_TIER` | `[quality] tier` | auto |
+| Graphics adapter | `--gpu` | | `[output] gpu` | high performance |
 | Preset directory | `RLX_PRESET_DIR` | | | the seeded per-user directory |
 | Input mode | `--input` | | `[input] mode` | `loopback` |
 | Input device | `--device` | | `[input] device` | the mode's default endpoint |
@@ -475,9 +493,10 @@ running app *for that session*.
 | Control on/off | `--control` (on) | | `[control] enabled` | off |
 | Console on/off | `--console` (on) | | `[console] enabled` | off |
 
-`--input`, `--device`, `--osc`, `--control` and `--console` pin a **run** and never write themselves into
-`config.toml`; the file is the persistent form. There is no environment variable for the input
-selection, because an input is a property of a rig and already persists to the config.
+`--input`, `--device`, `--gpu`, `--osc`, `--control` and `--console` pin a **run** and never write
+themselves into `config.toml`; the file is the persistent form. There is no environment variable for
+the input selection or the adapter, because both are properties of a rig and already persist to the
+config.
 
 ## OSC addresses
 
