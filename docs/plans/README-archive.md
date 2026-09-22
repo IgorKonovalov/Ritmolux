@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0213 - The hook costs what the push is worth](#0213---the-hook-costs-what-the-push-is-worth)
   - [0203 - The figure gains the levers it was measured to lack](#0203---the-figure-gains-the-levers-it-was-measured-to-lack)
   - [0199 - The gate's cost is measured before it is cut](#0199---the-gates-cost-is-measured-before-it-is-cut)
   - [0201 - The warp surface stops lying](#0201---the-warp-surface-stops-lying)
@@ -242,6 +243,32 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0213 - The hook costs what the push is worth](done/0213-the-hook-costs-what-the-push-is-worth.md)
+
+- closed 2026-09-22, conductor-run lane `plan-0213-the-hook-costs-what-the-push-is-worth` in
+`WORK/rlx-plan-0213`. Four phases, `e3498a57`, `4e08e759`, `60f4c282` and `4ef1ffff`; the close
+block `d63d3ef8`; the close's prose repairs `d3aa28e4`. One review round: **no blockers, no majors,
+three minors, one nit**, two repaired. Version **0.141.0** (minor, as Plan 0196 took for the last
+change to the hook's shape). ADR-0237 accepted. Closed no backlog entry.
+- **What landed.** The pre-push hook's four cargo steps became conditional. `scripts/push-scope.mjs`
+compares the tree being pushed with the tree already on the remote against
+`scripts/push-scope.manifest.mjs`, a declared path set that is every file a build reads or a Rust test
+opens, and answers "no" by exit 3 alone, so a crash reads as "run everything". When the steps run,
+the test step is served by `tools/conductor/suite-record.mjs` when the suite ledger holds a green full
+`cargo nextest run --workspace` for the exact clean tree, through the same `greenRecord` the
+conductor's wrapper consults. The Node roster, the sd-filter suite and the studio's three still run on
+every push. A docs-only push measured 8.2 s against 557.2 s for an unrecorded Rust push on the
+reference machine.
+- **What the review checked that the log could not.** The served path against the real ledger rather
+than a scratch one, and under a relative `GIT_DIR` as git exports to a hook in a main checkout; and
+the manifest against every Rust source that opens a file outside its crate, which found nothing
+missing.
+- **What outlived the plan.** The self-test that is ADR-0237's mitigation for a wrong path list runs
+nowhere but by hand, because the plan forbade a roster change; adding it to
+`scripts/gates.manifest.mjs` is the owner's call. A new tag is read as an unknown range even when a
+branch in the same push carries its commit, so a tagged push always runs `fmt`, `clippy` and
+`rustdoc`.
 
 ### [0203 - The figure gains the levers it was measured to lack](done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md)
 

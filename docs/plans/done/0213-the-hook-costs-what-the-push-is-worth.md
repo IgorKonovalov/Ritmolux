@@ -1,14 +1,17 @@
 # 0213 — The hook costs what the push is worth
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-22. Phases `e3498a57`, `4e08e759`, `60f4c282`, `4ef1ffff`;
+> close repairs `d3aa28e4`. Mode 4 (conductor round 1): no blockers, no majors, three minors, one
+> nit (two repaired). Full suite served from the pre-review gate's ledger record; push-scope
+> self-test 36 of 36. Version 0.141.0.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-20 (user)
 > **Owner skill(s):** dev
-> **Related ADRs:** [0237](../adrs/0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md)
-> (proposed), [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
-> [0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md),
-> [0211](../adrs/0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md),
-> [0217](../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md)
+> **Related ADRs:** [0237](../../adrs/0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md)
+> (accepted), [0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
+> [0207](../../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md),
+> [0211](../../adrs/0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md),
+> [0217](../../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md)
 
 ## TL;DR
 
@@ -32,7 +35,7 @@ Three facts, all established rather than assumed:
 - **Most pushes move no Rust.** Plans, ADRs, roster rows, backlog bodies, queue edits and
   hand-resolved merges are the bulk of what lands here, and no cargo step can fail on any of them.
 
-[ADR-0237](../adrs/0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md)
+[ADR-0237](../../adrs/0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md)
 records the decision and what it rejects, including why the hook is not simply deleted.
 
 ## Decision
@@ -160,3 +163,55 @@ lookup on the suite step. The Node roster is untouched.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
 - **Outstanding `human` phases:** none
+
+## Close review
+
+Conductor round 1, 2026-09-22, a fresh session given the plan and the lane.
+
+**Verdict: Plan 0213 landed cleanly; no blockers, no majors, three minors and one nit (two minors
+repaired at the close, in `d3aa28e4`).**
+
+**Evidence.** Full suite: `with-lock: skipped cargo nextest run --workspace: tree f35a67a is green in
+the suite ledger, run by gate 0213-pre-review at 2026-09-22T05:16:12.320Z: 1774 tests run: 1774
+passed (40 slow), 7 skipped` (ADR-0207), cited in place of a run; the lane touched no Rust.
+`node scripts/push-scope.mjs --self-test`: 36 of 36, the four named ranges present by name.
+`push-scope.mjs` on the lane's own ranges exits 3, correctly. `tools/conductor/suite-record.mjs`
+against the real ledger, not a scratch one, served this tree from the pre-review record, and still
+did with a relative `GIT_DIR` in the environment, as git exports to a hook in a main checkout.
+
+**Lens 1.** Four phases, four commits, each one `**Owner skill:** dev`. The manifest was checked
+against every Rust source that opens a file outside its crate (`include_str!`, `repo_root().join`,
+`CARGO_MANIFEST_DIR/..`) and against both build scripts: every such file is listed. The hook's range
+logic is conservative in every branch it cannot decide, reads stdin before any step, and returns from
+a heredoc-fed loop rather than a pipe, so `scope_note` survives. `suite-record.mjs` reuses
+`greenRecord` and `suiteLedger`; `greenRecord` filters on the exact `SUITE_COMMAND`, so a `-P fast`
+record cannot serve. Phase 4's readings name the machine and say the served one used a seeded ledger.
+The log is shorter than the phases and discloses its deviations.
+
+**Lenses 2, 4, 5.** No Rust, C ABI or control protocol touched; `suite-record.mjs` is a read-only
+third ledger reader and `lib/ledger.mjs` says so. No DSP, geometry or numeric assertion.
+
+**Lens 3.** `docs/developing.md` states when each cargo step runs and what a skip or serve prints.
+Version bump: minor, as Plan 0196 took. ADR-0237 accepted; ADR-0033's row gains the inbound
+`superseded in part by 0237`.
+
+**Findings.**
+
+- **minor, repaired (`d3aa28e4`)** — `docs/developing.md` said only a new *branch* runs all four; any
+  ref with an all-zero remote sha does, including the release tag every `git push --follow-tags`
+  close push carries. The sentence now says "a ref" and names the tag case.
+- **minor, repaired (`d3aa28e4`)** — `CLAUDE.md`'s `scripts/` inventory named neither
+  `push-scope.mjs` nor its manifest; a fourth kind, "a hook helper", now names both.
+- **minor, open** — `scripts/push-scope.manifest.mjs:4` says the self-test "holds this list", and
+  nothing runs the self-test: it is on neither the gate manifest nor CI, so ADR-0237's mitigation is
+  unenforced. The plan forbade a roster change; adding it to `scripts/gates.manifest.mjs` is the
+  owner's call.
+- **nit, open** — `.githooks/pre-push:118` treats a new tag as an unknown range even when another ref
+  in the same push carries the tag's commit, so a tagged push always runs `fmt`, `clippy` and
+  `rustdoc` (the test step can still be served).
+
+**Close notes.** Presets untouched, so no curation owed; no backlog entry closed; backlog probes
+exit 0. Translation advisory: `docs/running.ru.md` and `packaging/foobar/READ-ME-FIRST.ru.md` trail
+their sources, neither moved by this plan.
+
+No earlier round.

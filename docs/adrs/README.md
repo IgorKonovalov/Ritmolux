@@ -53,7 +53,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0030](0030-scene-target-size-hot-path-hook.md) | Third `Scene` widening: a per-frame target-size hook; hot-path notifications are now in scope | accepted |
 | [0031](0031-post-stage-trait-instantiable-composite-chain.md) | Post-composite stages behind a `PostStage` trait; the composite becomes an instantiable ordered chain | accepted (membership revised by 0032) |
 | [0032](0032-ink-leaves-the-chain-blend-between-chain-and-ink.md) | Ink leaves the `PostChain`: a terminal engine post-pass, with the transition blend between chain and ink | accepted |
-| [0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) | Testing strategy: named tiers, a core-only coverage ratchet, and a local pre-push gate | accepted |
+| [0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) | Testing strategy: named tiers, a core-only coverage ratchet, and a local pre-push gate | accepted, superseded in part by 0237 |
 | [0034](0034-internal-resolution-follows-the-target.md) | Internal render resolutions follow the target (quantized and capped); the reaction-diffusion **simulation** grid does not | accepted (Plan 0033; Outcome) |
 | [0035](0035-asymmetric-attack-release-easing.md) | Asymmetric easing: `[smoothing]` accepts an `{ attack, release }` pair (supplements ADR-0019) | accepted |
 | [0037](0037-internal-grid-is-a-resolution-not-a-shape.md) | An internal grid is a **resolution**, not a **shape**: aspect comes from the render target | accepted (Plan 0035) |
@@ -258,7 +258,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0234](0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md) | An instrument's system roster is derived from the enum the engine reads | proposed |
 | [0235](0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md) | A gallery card's hop is chosen per family, and the signal outlasts it | proposed |
 | [0236](0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md) | A diffused render varies by prompt on bar boundaries, and the seed stays fixed | proposed |
-| [0237](0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md) | The hook runs cargo only when the push moved Rust, and serves the rest from the ledger | proposed, supersedes 0033 in part |
+| [0237](0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md) | The hook runs cargo only when the push moved Rust, and serves the rest from the ledger | accepted 2026-09-22 (Plan 0213), supersedes 0033 in part |
 | [0238](0238-a-scene-declares-a-capability-and-the-engine-stops-enumerating-kinds.md) | A scene declares a capability, and the engine stops enumerating kinds | proposed |
 | [0239](0239-rotation-carries-two-orders-and-the-shuffles-seed-varies-per-launch.md) | Rotation carries two orders, and the shuffle's seed varies per launch | proposed |
 | [0240](0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md) | A setting lives in a file, and the in-app menu edits that file | accepted 2026-09-20, Plan 0217 |
