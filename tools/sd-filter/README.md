@@ -27,7 +27,16 @@ python -m venv .venv
 
 On Linux the venv needs a CPython the pinned `torch` publishes wheels for, which
 means 3.13 or older. A rolling distribution's system `python` can be newer than
-that (Arch ships 3.14), in which case build the venv from an older interpreter.
+that (Arch ships 3.14). In that case, build the venv from an older interpreter
+through `uv`. `uv` fetches that interpreter itself and leaves the system `python`
+alone. `--seed` puts `pip` in the venv so the install line above works as written:
+
+```bash
+uv venv --seed --python 3.12 .venv
+.venv/bin/python -m pip install -r tools/sd-filter/requirements.txt
+```
+
+The venv is at the repository root, where both the Windows and the Linux lines above expect it.
 
 It needs a CUDA GPU and pulls several gigabytes of weights from Hugging Face on
 the first run. `requirements.txt` pins the `+cu124` `torch` build with its index

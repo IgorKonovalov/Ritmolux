@@ -378,8 +378,8 @@ conductor.** The conductor is not verified on Linux until Phase 5, and 0120 is c
 | 2 — The lane contracts stop assuming Windows | dev | done | `ae5b3724` |
 | 3 — The gate is green on this box | dev | done; hardware-adapter bullet not met, see Notes | `eb2c67c3` |
 | 4 — The studio drives a Linux player | studio-builder | done | `b8e9148e` |
-| 5 — The conductor's claims are checked on Linux | dev | done: probes, parity, tests, `VERIFIED_CLI` in `a42f7c38`; the real run with this row | committed with this row |
-| 6 — The diffusion sidecar runs on CUDA | dev | not started | |
+| 5 — The conductor's claims are checked on Linux | dev | done; the run parked on a conductor defect, see Notes | `a42f7c38`, `eab62d65` |
+| 6 — The diffusion sidecar runs on CUDA | dev | done | committed with this row |
 | 7 — A working day on the box | human | not started | |
 
 ### Phase 1 readings (2026-09-22)
@@ -550,6 +550,34 @@ not change docs/plans/done/0221-the-arch-block-names-the-studios-settings-file.m
 and `transcripts/0221-02-review.jsonl`. The lane still holds the worktree, pending the owner's
 `resume` or `adopt-close`.
 
+### Phase 6 readings (2026-09-22)
+
+**Environment.** `uv venv --seed --python 3.12 .venv`, then CPython 3.12.14 and
+`.venv/bin/python -m pip install -r tools/sd-filter/requirements.txt`: exit 0 in 270 s, with the pins
+unchanged. `import torch` prints `2.6.0+cu124 True`, `torch.cuda.get_device_name(0)` is
+`NVIDIA GeForce RTX 3080 Laptop GPU`, and `torch.version.cuda` is `12.4`, on driver 610.57.04
+(8192 MiB).
+
+**Check.** `python3 tools/sd-filter/test_sd_filter.py` (system 3.14.7) prints `all checks passed`.
+The colour-table group skips with `no numpy`. `.venv/bin/python tools/sd-filter/test_sd_filter.py`
+also prints `all checks passed`, with no group skipped, including the end-to-end subprocess group
+against `target/release/examples/shot`.
+
+**One real pass.** This is a reading from the Arch box, not a portable figure: RTX 3080 Laptop 8 GB,
+driver 610.57.04, torch 2.6.0+cu124, CPython 3.12.14, Arch Linux. It was the first run, so the
+Hugging Face cache started empty and holds 2.9 GB afterwards. The pipeline was the page's canonical
+one, `shot --preset "Leviathan" --render <4 s synthetic wav> --fps 30 --size 1920x1080 --tier rich`,
+into `sd_filter.py --profile fast --prompt "a vast canyon of luminous glowing rock strata"`, into the
+canonical `ffmpeg` line. `PIPESTATUS 0 0 0`, 289 s of wall time. The filter's own report:
+
+```
+sd-filter: 120 emitted in 286.0 s = 2.383 s per emitted frame, WALL CLOCK (model load 214.9 s of that)
+sd-filter: 40 diffused, mean 1.333 s in the diffusion CALL alone (stride 3), peak VRAM 3.81 GiB
+```
+
+`ffprobe` counts 120 frames at 1920x1080 in the output. `docs/diffusion-filter.md`'s figures are
+unchanged.
+
 ### Notes
 
 - **Phase 2, heredoc probe.** A throwaway repository in the session scratchpad took a commit through
@@ -635,6 +663,11 @@ and `transcripts/0221-02-review.jsonl`. The lane still holds the worktree, pendi
   The allowlist carries `RUSTDOCFLAGS=* cargo doc *` but not the `env` spelling, so the session
   passed the flags through `--config`. The first attempt exited 101, and the quoted form then ran.
   No rule was changed.
+- **Phase 6, the venv is seeded.** A bare `uv venv` has no `pip`, so the README's
+  `.venv/bin/python -m pip install` line would fail. The README now gives `uv venv --seed`.
+- **Phase 6, not edited.** `docs/diffusion-filter.md`'s "Setup" and its environment check show only
+  the Windows `.venv/Scripts/python` lines, and `tools/sd-filter/README.md` carries the Linux ones.
+  That page is outside Phase 6's file list. `docs/developing.md` cites no venv, so it is unchanged.
 
 ### Close triggers
 
