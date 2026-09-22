@@ -1,9 +1,9 @@
 # 0222 — A repaired finding follows its file into `done/`
 
-> **Status:** in-progress (2026-09-22; conductor lane)
+> **Status:** done (2026-09-22; conductor lane). Phases 1-2 `a90b3d3c`, `aeaf6b3e`. Mode 4 round 1: no blockers, no majors, one minor (open), one nit (repaired in `5a3e9b0e`). Full workspace suite, `cargo doc -D warnings` and the conductor tests verified green at the close. Version 0.143.1 (patch).
 > **Created:** 2026-09-22
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) (the `fixed_in` check; not amended), [ADR-0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md), [ADR-0233](../adrs/0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md)
+> **Related ADRs:** [ADR-0209](../../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) (the `fixed_in` check; not amended), [ADR-0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md), [ADR-0233](../../adrs/0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md)
 
 ## TL;DR
 
@@ -193,3 +193,102 @@ architect skill and is not a phase here.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0; 43 reductions hold across 20 live entries, 4 unprobeable
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207); `node --test tools/conductor/test/` ran green at Phase 2 (384 tests, 382 pass, 2 skipped)
 - **Outstanding `human` phases:** none
+
+## Close review
+
+### Plan 0222 close review, round 1
+
+**Verdict: Plan 0222 landed cleanly; no blockers, no majors, one minor and one nit (the nit repaired
+at the close).**
+
+Lane `/home/igor/Work/rlx-plan-0222` on `plan-0222-a-repaired-finding-follows-its-file-into-done`.
+Phase 1 `a90b3d3c`, Phase 2 `aeaf6b3e`, close block `e4cb4147`.
+
+#### Evidence
+
+- **Full suite:** `node with-lock.mjs suite -- cargo nextest run --workspace` ran in this session
+  (the wrapper ran it rather than skipping it): `Summary [ 459.102s] 1774 tests run: 1774 passed
+  (5 slow), 7 skipped`.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: clean.
+- `node --test tools/conductor/test/`: 384 tests, 382 pass, 0 fail, 2 skipped.
+- `node scripts/check-backlog-claims.mjs`: exit 0, 43 reductions across 20 live entries, 4
+  unprobeable.
+
+#### Lens 1 - alignment
+
+- Both phases carry one in-vocabulary `**Owner skill:** dev`. The log is present, shorter than the
+  phases section, and discloses its one deviation.
+- **Phase 1.** `earlierPaths` in `tools/conductor/lib/close.mjs` reads
+  `git diff --name-status -z -M <fixed_in> HEAD`, a tree-to-tree diff exactly as the Decision asks
+  (not `--follow`), keeps each `R` row whose new path is the finding's file, and adds the plan's
+  pre-move path by construction from `findPlan` when the file is the plan's `done/` path. The `-z`
+  parse steps three tokens for `R`/`C` rows and two otherwise, which is right for `--name-status -z`.
+  The disagreement message names the followed paths. The README's **The checks** paragraph carries
+  the rule in one clause. The five named cases are all in `close.test.mjs` against a real repository
+  built from the extracted `initRepo()`:
+  1. 0221 shape: the repair commit, a `main` commit merged `--no-ff`, the move with `Status: done` and
+     a `## Close review`, an annotated tag; the `done/` path verifies to `[]`. The test also asserts
+     git pairs the rename, so this case exercises the diff branch.
+  2. The pre-move path verifies.
+  3. A 200-line review: the test asserts **no** `R` row and a `D` row for the old path, so the
+     by-construction branch is proven to be the one that passes it.
+  4. `main` renames `docs/guide.md`, which the repair edited at its old path; the new path verifies,
+     and the test asserts the `R` row.
+  5. `fixed_in` is the README-only `main` commit: exactly one problem, matching `does not change`,
+     and naming the followed path. This is the case that bites a follower that accepts any rename.
+  The log records the pre-fix run: cases 1, 3, 4 failed with `does not change`, case 5 on the missing
+  second path, case 2 passed, which is what the unmodified check predicts.
+- **Phase 2.** The shell bullet in `implement.md` and `review.md` is reworded and `fix.md` gains it,
+  each saying the four things the plan lists. Every prefix form the prompts name is in
+  `settings.conductor.json` (`RUSTDOCFLAGS=* cargo doc *`, `RLX_UPDATE_PRESET_SCHEMA=1 cargo|node *`,
+  `RLX_UPDATE_PARAM_REFERENCE=1 cargo|node *`); the settings file is untouched. `settings.test.mjs`
+  reads the `RUSTDOCFLAGS=` literal out of `prompts/review.md` and holds it allowed (a missing
+  literal becomes a refused placeholder, so the case goes red), and holds the `env` form, both
+  `git -C` forms, the `awk` range and the pipe refused.
+
+#### Lens 2 - layering, coupling
+
+Conductor tooling only; no core, ABI, protocol or real-time path is touched. `repairProblems` now
+takes `plan`, passed from its one caller `verifyClose`. No widening of any seam.
+
+#### Lens 3 - docs and bookkeeping
+
+The conductor README is the only operator doc the change affects, and it was swept. No ADR is
+paired (the plan argues, correctly, that this is a defect against an unchanged ADR-0209). No
+`Closes:` line. Version owed: **patch** (fix-only conductor tooling).
+
+#### Lens 4 - correctness
+
+The only numeric literals added are fixture sizes (40 guide lines, 200 review lines), chosen so the
+similarity sits clearly on one side of git's 50 % line; case 3 asserts which side, so a change in
+git's default would turn it red rather than pass silently. No hot-path code.
+
+#### Lens 5 - design integrity
+
+The rename follower is a private helper beside the check it serves; `close.mjs`'s rule that the
+session's word is never the evidence is kept, since the paths come from git and from `findPlan`,
+never from the outcome.
+
+#### Findings
+
+**minor**
+
+1. `tools/conductor/test/settings.test.mjs:203` - the Phase 2 done-when says the refused cases *are*
+   the four commands `state/transcripts/0221-*.jsonl` records under `permission_denials` (ADR-0233's
+   shape), but the log says the transcript lies outside the lane and was not read, so the `awk` case
+   and the pipe are reconstructions from the plan's Context table. The property pinned (`awk`
+   refused, and a pipe refused at its `awk` part) holds for any spelling, so nothing is wrong today;
+   what is missing is the provenance. The owner, who can read `state/`, confirms the two `awk`
+   literals against the transcript or rewrites them to it. Left open: it is test content, which a
+   close does not repair.
+
+**nit**
+
+1. `tools/conductor/prompts/implement.md:31` - the reworded bullet sent the done-when note to "the
+   log row's note", but the log's rows have no note column (the `### Notes` list is where `dev`
+   writes it, as `fix.md` already says), and one line ran past the file's wrap width. Repaired at
+   the close in `5a3e9b0e`: "the log's `### Notes` says which", rewrapped.
+
+### Earlier rounds
+
+None: round 1 was the first round.

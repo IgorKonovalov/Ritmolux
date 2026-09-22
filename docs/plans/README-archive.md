@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0222 - A repaired finding follows its file into done/](#0222---a-repaired-finding-follows-its-file-into-done)
   - [0221 - The Arch block names the studio's settings file](#0221---the-arch-block-names-the-studios-settings-file)
   - [0120 - The standalone ships on Ubuntu](#0120---the-standalone-ships-on-ubuntu)
   - [0210 - The gallery card shows the world it names](#0210---the-gallery-card-shows-the-world-it-names)
@@ -246,6 +247,22 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0222 - A repaired finding follows its file into done/](done/0222-a-repaired-finding-follows-its-file-into-done.md)
+
+- closed 2026-09-22, conductor-run lane `plan-0222-a-repaired-finding-follows-its-file-into-done`.
+Phase 1 `a90b3d3c`, Phase 2 `aeaf6b3e`. Round 1: **no blockers, no majors, one minor, one nit**,
+the nit repaired at the close in `5a3e9b0e`. Version **0.143.1** (patch: fix-only conductor tooling).
+No ADR paired; a defect against an unchanged ADR-0209.
+- **What landed.** The conductor's `fixed_in` check accepts a finding named by its path at the tip or
+at the repair commit, following every rename a tree-to-tree `git diff -M` pairs and, by construction,
+the plan's own move to `done/` whatever the similarity. The three session prompts spell the shell
+forms the allowlist allows, and `settings.test.mjs` reads the `RUSTDOCFLAGS` form out of the review
+prompt.
+- **What outlived the plan.** The minor: the refused `awk` cases were written from the plan's Context
+table, not from `state/transcripts/0221-*.jsonl`, which the lane cannot read; the owner confirms them.
+Translation advisory at the close: `how-it-works.ru.md`, `running.ru.md` and the foobar
+`READ-ME-FIRST.ru.md` stale, none moved by this plan. No preset touched, so no curation verdict owed.
 
 ### [0221 - The Arch block names the studio's settings file](done/0221-the-arch-block-names-the-studios-settings-file.md)
 
