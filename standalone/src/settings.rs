@@ -103,6 +103,15 @@ pub struct SettingsView {
     /// window state, not the config key: the row reports what is on screen, so
     /// a console opened by `--console` or the `C` hotkey reads correctly here.
     pub console: bool,
+    /// Position of the running graphics adapter in the shell's cached roster,
+    /// and how big that roster is (ADR-0246). A count under two means there is
+    /// nowhere to move to — one adapter, or an enumeration that failed — and
+    /// the row then renders and goes inert rather than asking the shell to
+    /// switch onto a list that is not there.
+    pub adapter_index: usize,
+    pub adapter_count: usize,
+    /// The running adapter's own name, as the renderer describes it.
+    pub adapter_name: String,
     /// The resolved preset directory — shown, never edited.
     pub preset_dir: String,
 }
@@ -183,6 +192,12 @@ pub enum SettingsAction {
     /// Open or close the operator console (ADR-0143). The state machine says
     /// only that it changed; the shell owns the window.
     ToggleConsole,
+    /// Move the running show onto the adapter at this position in the shell's
+    /// cached roster, and persist it (ADR-0246). The position is already
+    /// stepped and wrapped here, so the shell switches without re-deciding
+    /// anything; `Left` walks down the roster and `Right` up it, wrapping at
+    /// both ends like the row highlight does.
+    SetAdapter(usize),
 }
 
 /// The rows, in display order. Exhaustive and ordered here so the labels, the
@@ -190,6 +205,7 @@ pub enum SettingsAction {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SettingsRow {
     Quality,
+    Adapter,
     AutoRotate,
     MinDwell,
     MaxDwell,
@@ -207,8 +223,12 @@ pub enum SettingsRow {
 
 impl SettingsRow {
     /// Every row, in display order. The one read-only row stays last.
-    pub const ALL: [SettingsRow; 14] = [
+    pub const ALL: [SettingsRow; 15] = [
         SettingsRow::Quality,
+        // Beside the tier: both decide what the machine spends on the picture,
+        // both rebuild the GPU state when moved, and an operator whose show is
+        // slow looks at the two together (ADR-0246).
+        SettingsRow::Adapter,
         SettingsRow::AutoRotate,
         SettingsRow::MinDwell,
         SettingsRow::MaxDwell,
@@ -237,6 +257,7 @@ impl SettingsRow {
     fn label(self) -> &'static str {
         match self {
             SettingsRow::Quality => "Quality",
+            SettingsRow::Adapter => "Adapter",
             SettingsRow::AutoRotate => "Auto-rotate",
             SettingsRow::MinDwell => "Min dwell",
             SettingsRow::MaxDwell => "Max dwell",
@@ -262,6 +283,21 @@ impl SettingsRow {
                 view.tier.as_str().to_uppercase(),
                 view.tier_state.suffix()
             ),
+            SettingsRow::Adapter => {
+                if view.adapter_count == 0 {
+                    // No roster to hold a position in, so the row names what
+                    // is running rather than inventing a `1 of 1`.
+                    view.adapter_name.clone()
+                } else {
+                    // 1-based for the operator, like the `Display` row.
+                    format!(
+                        "{} of {} - {}",
+                        view.adapter_index + 1,
+                        view.adapter_count,
+                        view.adapter_name
+                    )
+                }
+            }
             SettingsRow::AutoRotate => on_off(view.auto_rotate).to_owned(),
             SettingsRow::MinDwell => format!("{} s", view.min_dwell_secs),
             SettingsRow::MaxDwell => format!("{} s", view.max_dwell_secs),
@@ -318,6 +354,20 @@ impl SettingsRow {
             SettingsRow::Quality => {
                 SettingsAction::SetTier(if right { Tier::Rich } else { Tier::Floor })
             }
+            // A walk over the roster, wrapping, with the target decided here
+            // so the shell cannot land off the end of a list it did not size.
+            // Under two entries there is nowhere to go, and the key is inert
+            // rather than a switch onto the adapter already running.
+            SettingsRow::Adapter if view.adapter_count > 1 => {
+                let count = view.adapter_count;
+                let at = view.adapter_index.min(count - 1);
+                SettingsAction::SetAdapter(if right {
+                    (at + 1) % count
+                } else {
+                    (at + count - 1) % count
+                })
+            }
+            SettingsRow::Adapter => SettingsAction::None,
             SettingsRow::AutoRotate => SettingsAction::ToggleAuto,
             SettingsRow::MinDwell => {
                 let min = step(view.min_dwell_secs, right).clamp(DWELL_FLOOR, view.max_dwell_secs);

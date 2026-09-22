@@ -331,6 +331,9 @@ fn view() -> crate::settings::SettingsView {
         now_playing: true,
         next_rotation: true,
         console: false,
+        adapter_index: 0,
+        adapter_count: 1,
+        adapter_name: "adapter".to_owned(),
         preset_dir: String::new(),
     }
 }

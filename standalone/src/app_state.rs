@@ -257,6 +257,16 @@ pub(crate) struct Hud {
     /// [`Hud::frame_text`]. Retained for its capacity.
     pub(crate) modal_scratch: Vec<console::Line>,
 
+    /// The graphics adapters this machine enumerates, as the `Adapter` row
+    /// walks them (ADR-0246).
+    ///
+    /// **Cached, and refreshed only when the settings modal opens**, for the
+    /// reason the input roster is: enumerating adapters builds a graphics
+    /// instance and asks every backend, and the settings view runs every
+    /// frame the modal is up. The cost of caching is that an adapter appearing
+    /// or disappearing while the menu is open is not seen until it is reopened.
+    pub(crate) adapter_roster: Vec<rlx_core::render::AdapterDescription>,
+
     /// Retained scratch for [`AppState::queue_frame_text`], cleared at entry
     /// rather than reallocated (Plan 0061 Phase 5).
     ///
@@ -569,6 +579,10 @@ impl AppState {
                 console_request: None,
                 ab_side: None,
                 random_state: 0x9E37_79B9,
+                // Left empty until the settings modal is opened, like the input
+                // roster: a roster nothing is reading is an enumeration paid
+                // for nothing.
+                adapter_roster: Vec::new(),
                 frame_text: console::FrameText::default(),
                 modal_scratch: Vec::new(),
                 chrome_scratch: Vec::new(),
@@ -1337,6 +1351,79 @@ impl AppState {
         self.window.request_redraw();
     }
 
+    /// Move the running show onto the adapter at `index` in the cached roster
+    /// (the `Adapter` row, ADR-0246), and persist it.
+    ///
+    /// The switch goes first and the file follows it: `[output] gpu` is
+    /// written only from a renderer that is actually on the named adapter, so
+    /// a switch that was refused does not persist as a preference the next
+    /// launch would fall back from. Written by **name**, the roster's own,
+    /// which the engine resolves exactly ahead of any containing one; an
+    /// index would name a different GPU on another operating system's roster.
+    ///
+    /// A refused switch — the engine's transactional error — leaves the show
+    /// on the adapter it was on, and the row reads the same on the next frame
+    /// because the view is gathered from the renderer rather than from the
+    /// request. The reason goes where the tier's demotion notice does.
+    pub(crate) fn swap_adapter(&mut self, index: usize) {
+        let Some(entry) = self.hud.adapter_roster.get(index).cloned() else {
+            return;
+        };
+        let choice = AdapterChoice::Named(entry.name.clone());
+        match self.renderer.set_adapter(&choice, Arc::clone(&self.window)) {
+            Ok(()) => {
+                self.config.output.gpu = Some(entry.name);
+                self.save_config();
+                // The same event a tier change is to the soak log: a GPU
+                // resource rebuild, whose frames the steady-state statistic
+                // leaves out.
+                self.note_soak_switch();
+                let line = format!(
+                    "renderer adapter: {} (from the settings menu, written to config.toml \
+                     [output] gpu)",
+                    self.renderer.adapter_description()
+                );
+                eprintln!("{line}");
+                self.diagnostics.diag_log.note(&line);
+                self.update_title();
+            }
+            Err(err) => {
+                let line = format!(
+                    "adapter unchanged, still on {}: {err}",
+                    self.renderer.adapter_description()
+                );
+                eprintln!("{line}");
+                self.diagnostics.diag_log.note(&line);
+            }
+        }
+        self.window.request_redraw();
+    }
+
+    /// The machine's graphics adapters, re-enumerated into the cache.
+    ///
+    /// Builds a graphics instance, so this is a keypress-driven call and never
+    /// a per-frame one — the same rule the input roster follows.
+    pub(crate) fn refresh_adapter_roster(&mut self) {
+        self.hud.adapter_roster = rlx_core::render::list_adapters();
+    }
+
+    /// Where the running adapter sits in the cached roster, or `None` when the
+    /// roster does not hold it — an enumeration that failed, or one that
+    /// described the running adapter differently, and in either case a
+    /// position the row cannot walk from.
+    ///
+    /// Matched on the full description rather than the name: both strings are
+    /// produced by the engine's one describer, so equality is total here, and
+    /// two roster entries can share a name — one card seen through two
+    /// backends — while their descriptions differ.
+    pub(crate) fn adapter_index(&self) -> Option<usize> {
+        let running = self.renderer.adapter_description();
+        self.hud
+            .adapter_roster
+            .iter()
+            .position(|entry| entry.detail == running)
+    }
+
     /// The mode's active endpoints, re-enumerated into the cache.
     ///
     /// COM, so this is a keypress-driven call and never a per-frame one. A
@@ -1779,6 +1866,21 @@ impl AppState {
             preset_name: self.config.hud.preset_name,
             now_playing: self.config.hud.now_playing,
             next_rotation: self.config.hud.next_rotation,
+            // Read off the cache, like the input roster. A running adapter the
+            // roster does not hold reads as no roster at all: the row then
+            // names what is running and goes inert, rather than walking from
+            // a position that is a guess.
+            adapter_index: self.adapter_index().unwrap_or(0),
+            adapter_count: self
+                .adapter_index()
+                .map_or(0, |_| self.hud.adapter_roster.len()),
+            adapter_name: self
+                .adapter_index()
+                .and_then(|at| self.hud.adapter_roster.get(at))
+                .map_or_else(
+                    || self.renderer.adapter_description().to_owned(),
+                    |entry| entry.name.clone(),
+                ),
             preset_dir: self.show.preset_dir().display().to_string(),
         }
     }
@@ -1795,6 +1897,7 @@ impl AppState {
                 self.open_browse();
             }
             SettingsAction::SetTier(tier) => self.swap_tier(tier),
+            SettingsAction::SetAdapter(index) => self.swap_adapter(index),
             SettingsAction::ToggleAuto => self.toggle_auto_rotate(),
             SettingsAction::SetDwell { min_secs, max_secs } => {
                 self.config.rotate.min_dwell_secs = min_secs;

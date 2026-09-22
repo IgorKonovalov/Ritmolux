@@ -232,9 +232,12 @@ impl AppState {
             KeyCode::KeyS => {
                 // One of the two refresh points (the other is a mode change).
                 // Enumeration is COM, so it happens on the keypress that makes
-                // the roster visible, not on the frames that draw it.
+                // the roster visible, not on the frames that draw it. The
+                // adapter roster is refreshed on the same keypress for the
+                // same reason: it builds a graphics instance.
                 if !self.hud.settings.is_open() {
                     self.refresh_input_roster();
+                    self.refresh_adapter_roster();
                 }
                 let view = self.settings_view();
                 let action = self.hud.settings.handle_key(SettingsKey::Toggle, &view);

@@ -24,6 +24,9 @@ fn view() -> SettingsView {
         now_playing: true,
         next_rotation: true,
         console: false,
+        adapter_index: 1,
+        adapter_count: 2,
+        adapter_name: "NVIDIA GeForce RTX 3080 Laptop GPU".to_owned(),
         preset_dir: r"C:\Users\x\AppData\Roaming\Ritmolux\presets".to_owned(),
     }
 }
@@ -130,6 +133,97 @@ fn each_row_emits_the_action_its_table_row_names() {
     );
 }
 
+/// **The adapter row walks the roster and wraps at both ends**, with the
+/// target decided in the state machine so the shell never indexes off the end
+/// of a list it did not size. `Right` walks up, `Left` walks down — the
+/// orientation the row highlight and the `Display` row share.
+#[test]
+fn the_adapter_row_walks_the_roster_and_wraps() {
+    let mut v = view();
+    v.adapter_count = 3;
+
+    v.adapter_index = 1;
+    assert_eq!(
+        edit_at(SettingsRow::Adapter, true, &v),
+        SettingsAction::SetAdapter(2)
+    );
+    assert_eq!(
+        edit_at(SettingsRow::Adapter, false, &v),
+        SettingsAction::SetAdapter(0)
+    );
+
+    // Off the last entry `Right` wraps to the first, and off the first `Left`
+    // wraps to the last.
+    v.adapter_index = 2;
+    assert_eq!(
+        edit_at(SettingsRow::Adapter, true, &v),
+        SettingsAction::SetAdapter(0),
+        "Right off the last adapter did not wrap"
+    );
+    v.adapter_index = 0;
+    assert_eq!(
+        edit_at(SettingsRow::Adapter, false, &v),
+        SettingsAction::SetAdapter(2),
+        "Left off the first adapter did not wrap"
+    );
+
+    // A position past the roster — a cache that shrank under the row — is
+    // clamped rather than indexed.
+    v.adapter_index = 7;
+    assert_eq!(
+        edit_at(SettingsRow::Adapter, true, &v),
+        SettingsAction::SetAdapter(0)
+    );
+}
+
+/// **With fewer than two adapters the row renders and does not move.** One
+/// adapter and a failed enumeration reach the state machine identically, and
+/// neither may ask the shell to switch onto a roster it cannot walk — a switch
+/// onto the adapter already running would restart every accumulation for no
+/// change.
+#[test]
+fn the_adapter_row_is_inert_without_a_second_adapter() {
+    let s = opened();
+    let value = |v: &SettingsView| -> String {
+        s.lines(v)
+            .iter()
+            .find(|(l, _)| *l == "Adapter")
+            .map(|(_, val)| val.clone())
+            .expect("no Adapter row")
+    };
+
+    let mut v = view();
+    v.adapter_count = 1;
+    v.adapter_index = 0;
+    for right in [false, true] {
+        assert_eq!(
+            edit_at(SettingsRow::Adapter, right, &v),
+            SettingsAction::None,
+            "a one-adapter roster moved"
+        );
+    }
+    assert_eq!(value(&v), "1 of 1 - NVIDIA GeForce RTX 3080 Laptop GPU");
+
+    v.adapter_count = 0;
+    for right in [false, true] {
+        assert_eq!(
+            edit_at(SettingsRow::Adapter, right, &v),
+            SettingsAction::None,
+            "an empty roster moved"
+        );
+    }
+    // With no roster it names what is running rather than a `1 of 0`.
+    assert_eq!(value(&v), "NVIDIA GeForce RTX 3080 Laptop GPU");
+
+    // Non-vacuity: the same row with two adapters does move.
+    let v = view();
+    assert_eq!(
+        edit_at(SettingsRow::Adapter, true, &v),
+        SettingsAction::SetAdapter(0)
+    );
+    assert_eq!(value(&v), "2 of 2 - NVIDIA GeForce RTX 3080 Laptop GPU");
+}
+
 /// **The read-only row is read-only.** It shows where presets are resolved
 /// from, which is a launch-time decision a menu cannot move.
 #[test]
@@ -154,6 +248,7 @@ fn the_rows_are_the_ones_the_menu_promises_in_order() {
         SettingsRow::ALL,
         [
             SettingsRow::Quality,
+            SettingsRow::Adapter,
             SettingsRow::AutoRotate,
             SettingsRow::MinDwell,
             SettingsRow::MaxDwell,
