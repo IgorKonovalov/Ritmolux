@@ -448,7 +448,7 @@ wording.
 | 2 — The tree compiles, lints and tests on Ubuntu | dev | done | `120d9f5e` |
 | 3 — The PulseAudio capture backend | dev | done | `9346e3ae` |
 | 4 — The release tarball | dev | done | `ed74dad1` |
-| 5 — The docs say Linux | dev | done | committed with this row |
+| 5 — The docs say Linux | dev | done | `d3550166` |
 | 6 — Run it on the Ubuntu box | — | moved 2026-09-20 to Plan 0214 Phase 4 | |
 
 ### Notes
@@ -572,6 +572,31 @@ wording.
   `ritmolux` from `stage.sh` measures 12,711,688 B against 10,000,000 B.
 - **Advisory, unchanged by this plan's intent:** `check-translations.mjs` reports `docs/running.ru.md`
   behind `docs/running.md`, which this phase edited again; the Russian slice was not touched.
+- **The full suite is red on Linux, and the four failures are `core/` tests left alone** per
+  "No change to `core/`" and the Risks section's "report rather than absorb". Three are the Phase 2
+  `-P fast` failures above; the fourth is a deferred suite, `rlx-core::golden
+  scenes_match_golden_baselines`, on the software adapter (llvmpipe): `reaction_diffusion` mean
+  0.0110 / max outlier 190 and `attractor` mean 0.0018 / max outlier 114, against tolerances 0.02 /
+  48. The other 26 golden scenes are within tolerance. The owner chose to close with the red
+  recorded rather than hold the close for it.
+
+### Close triggers
+
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** none. The two backlog entries the 2026-09-14 amendment folded in, 0181
+  and 0208, are already in `docs/design-backlog-archive.md`.
+- **What shipped:** feature — a Linux standalone with PulseAudio-protocol capture, a CI arm and a
+  release tarball.
+- **Operator docs touched:** `README.md`, `CLAUDE.md`, `docs/nfr.md`, `docs/releasing.md`,
+  `docs/on-device-validation.md`, `docs/how-it-works.md`, `docs/running.md`,
+  `docs/configuration.md`, `docs/capturing.md`, `docs/presets.md`, `packaging/linux/READ-ME-FIRST.md`
+  (new), and on the site `site/src/plugins/rewrite-links.mjs`, `site/astro.config.mjs`,
+  `site/src/content/docs/start-here.mdx`. No generated file regenerated.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0.
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast` on the Arch box, exit 100 —
+  `1774 tests run: 1770 passed (3 slow), 4 failed, 7 skipped`. The four are named in the Notes.
+- **Outstanding `human` phases:** none in this plan. The on-box run and the CI and release
+  readings are [0214](0214-the-linux-arm-reports-back.md)'s.
 
 ## Risks & open questions
 
