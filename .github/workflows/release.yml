@@ -159,6 +159,37 @@ jobs:
           path: target/dist/*.zip
           if-no-files-found: error
 
+  # The Linux standalone (ADR-0131). A thin caller, like the macos job: the
+  # build, the staging, the archiving AND the verification all live in
+  # packaging/linux/stage.sh, so a developer running it on their own Linux box
+  # is held to this job's bar rather than to a looser one.
+  #
+  # The runner's glibc is the floor the tarball runs on, which is why it is
+  # built here rather than on anything newer.
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The same build packages ci.yml's check job installs, minus the Vulkan
+      # ICD, which nothing here runs. libpulse-dev is not on the runner image,
+      # and without it the build fails rather than degrading.
+      - name: Install the Linux build packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libpulse-dev libxkbcommon-dev libwayland-dev
+      - uses: Swatinem/rust-cache@v2
+      # Invoked through `bash` for the reason the macos job gives: this repo is
+      # developed on Windows with core.filemode=false, where the executable bit
+      # is easy to drop on a later edit.
+      - name: Build, stage, archive and verify
+        run: bash packaging/linux/stage.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: target/dist/*.tar.gz
+          if-no-files-found: error
+
   # The foobar2000 component (Plan 0102, ADR-0115). A thin caller, like the
   # macos job: fetch the SDK, run the recipe, upload - the build, the version
   # stamp, the packaging AND the seven fatal checks all live in
@@ -258,7 +289,7 @@ jobs:
           path: target/dist/*.zip
           if-no-files-found: error
 
-  # Publish. Gated on ALL FIVE builds by `needs:`, so a failure on any platform
+  # Publish. Gated on ALL SIX builds by `needs:`, so a failure on any platform
   # leaves no Release at all rather than a half-published one - the release job
   # is skipped, not merely red.
   #
@@ -267,11 +298,11 @@ jobs:
   # produces run artifacts and nothing else. The ref half alone left "dispatch
   # is a rehearsal" true only for the refs nobody rehearses on (backlog 0194).
   #
-  # Runs on ubuntu-latest: it only moves zips around, and `gh` is preinstalled
+  # Runs on ubuntu-latest: it only moves archives around, and `gh` is preinstalled
   # on every runner image, so no pinned third-party release action is needed
   # (NFR section 4 - every dependency is a cost to justify).
   release:
-    needs: [macos, windows, foobar, studio-macos, studio-windows]
+    needs: [macos, windows, linux, foobar, studio-macos, studio-windows]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -289,22 +320,27 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Five since Plan 0159: the two standalone zips, the foobar2000
-          # component, and the two studio zips. The recipe either produces all
-          # five or the tag is incomplete (ADR-0115, Negative), and an exact
-          # count is what makes a silently-skipped job fail here rather than
-          # ship a short release.
-          count=$(ls -1 assets/*.zip | wc -l)
-          if [ "$count" -ne 5 ]; then
-              echo "expected exactly 5 zips, found $count:" >&2
+          # Five zips - the Windows and macOS standalone, the foobar2000
+          # component, and the two studio zips - and one tarball, the Linux
+          # standalone. The recipe either produces all six or the tag is
+          # incomplete (ADR-0115, Negative), and an exact count PER KIND is what
+          # makes a silently-skipped job fail here rather than ship a short
+          # release: counting zips alone passes a release that carries nothing
+          # for Linux. `nullglob` so a missing kind counts as 0 rather than as
+          # its own unexpanded pattern.
+          shopt -s nullglob
+          zips=(assets/*.zip)
+          tarballs=(assets/*.tar.gz)
+          if [ "${#zips[@]}" -ne 5 ] || [ "${#tarballs[@]}" -ne 1 ]; then
+              echo "expected exactly 5 zips and 1 tarball, found ${#zips[@]} and ${#tarballs[@]}:" >&2
               ls -1 assets/ >&2
               exit 1
           fi
-          ls -1 assets/*.zip
+          ls -1 "${zips[@]}" "${tarballs[@]}"
 
-          notes="Builds of the ${TAG} tag: the standalone app for macOS and
-          Windows, the foobar2000 component, and the studio for macOS and
-          Windows.
+          notes="Builds of the ${TAG} tag: the standalone app for macOS,
+          Windows and Linux, the foobar2000 component, and the studio for macOS
+          and Windows.
 
           - **macOS** (universal, arm64 + Intel, requires macOS 13+): unsigned and
             ad-hoc signed only, so macOS quarantines it - right-click the app and
@@ -313,6 +349,9 @@ jobs:
             granting it.
           - **Windows** (x64): unsigned, so SmartScreen warns once - More info,
             then Run anyway.
+          - **Linux** (x86_64, Ubuntu 24.04 or newer): a .tar.gz - unpack it and
+            run ritmolux. It needs PipeWire or PulseAudio: the binary will not
+            start without libpulse.so.0, which every Ubuntu desktop carries.
           - **foobar2000 component** (x64 only, foobar2000 v2): unzip, then
             install foo_ritmolux.fb2k-component from File - Preferences - Components.
             It reads what foobar2000 is already decoding, so unlike the
@@ -322,19 +361,19 @@ jobs:
             need - take this INSTEAD of the standalone zip above, not beside it.
             Same signing story as the standalone app on each platform.
 
-          Each zip carries a READ-ME-FIRST.txt with the full steps. The two
-          standalone zips also carry a reference copy of the presets; the
-          component and the studio share the standalone app's preset folder if
-          both are installed. This is a prerelease while the app is 0.x."
+          Each archive carries a READ-ME-FIRST.txt with the full steps. The
+          three standalone archives also carry a reference copy of the presets;
+          the component and the studio share the standalone app's preset folder
+          if both are installed. This is a prerelease while the app is 0.x."
 
           # Re-running a workflow on an existing tag must not hard-fail:
           # `gh release create` errors when the release already exists, so
           # create it if absent and clobber the assets otherwise.
           if gh release view "$TAG" >/dev/null 2>&1; then
               echo "release $TAG exists; replacing its assets"
-              gh release upload "$TAG" assets/*.zip --clobber
+              gh release upload "$TAG" "${zips[@]}" "${tarballs[@]}" --clobber
           else
-              gh release create "$TAG" assets/*.zip \
+              gh release create "$TAG" "${zips[@]}" "${tarballs[@]}" \
                   --prerelease \
                   --title "$TAG" \
                   --notes "$notes"

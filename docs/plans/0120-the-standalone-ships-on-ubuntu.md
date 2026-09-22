@@ -446,8 +446,8 @@ wording.
 |---|---|---|---|
 | 1 — Probe the Ubuntu box before any code is written | human | done | — |
 | 2 — The tree compiles, lints and tests on Ubuntu | dev | done | `120d9f5e` |
-| 3 — The PulseAudio capture backend | dev | done | committed with this row |
-| 4 — The release tarball | dev | not started | |
+| 3 — The PulseAudio capture backend | dev | done | `9346e3ae` |
+| 4 — The release tarball | dev | done | committed with this row |
 | 5 — The docs say Linux | dev | not started | |
 | 6 — Run it on the Ubuntu box | — | moved 2026-09-20 to Plan 0214 Phase 4 | |
 
@@ -539,6 +539,21 @@ wording.
   `live PulseAudio 48000/2 @DEFAULT_MONITOR@` with bass/mid/treb moving (e.g. `0.4316 0.4397
   0.1463`), on `AMD Radeon Graphics (RADV RENOIR)` at 164.9 fps; the process was gone after SIGINT.
   `-P fast` after the phase: 1695 run, 1692 passed, the same 3 failed, 86 skipped.
+- **Phase 4 — `stage.sh` ran on the Arch box**, exit 0: `target/dist/ritmolux-v0.142.0-linux-x64.tar.gz`,
+  all five of its checks passing (top-level `ritmolux` and `READ-ME-FIRST.txt`, a single top-level
+  folder, `ritmolux` mode `-rwxr-xr-x` in the archive, 116 `.toml` matching the repo, no `.md`).
+  The unpacked binary links `libpulse.so.0` and `libpulse-simple.so.0` and needs `GLIBC_2.44` at
+  most — the Arch box's glibc, so a local tarball is not the portable one; only the runner's is.
+  It launched and wrote `live PulseAudio 48000/2 @DEFAULT_MONITOR@` rows with the sink SUSPENDED
+  (bands 0.0000) and exited on SIGINT.
+- **Phase 4 — the script checks two things beyond the Windows job's**: the single top-level
+  folder, and the binary's executable bit inside the archive.
+- **Phase 4 — the `release` job's guard was exercised locally** against dummy `assets/` trees: 5
+  zips + 1 tarball passes; 5+0, 6+0, 5+2 and 4+1 each exit 1. Both `gh release` commands now take
+  the two counted arrays rather than `assets/*.zip`.
+- **Followup, not acted on: `ubuntu-latest` is the glibc floor the release notes name as 24.04.**
+  The job follows the plan and ADR-0131 in naming `ubuntu-latest`; when GitHub moves that label to
+  a newer image the floor moves with it and the notes' "Ubuntu 24.04 or newer" goes false silently.
 
 ## Risks & open questions
 
