@@ -3,8 +3,8 @@
 //! The `start_capture` arms are the whole of the platform branch the shell
 //! carries: Windows opens WASAPI, macOS opens ScreenCaptureKit, Linux opens
 //! PulseAudio's default monitor, and every other target reports
-//! [`CaptureVerdict::Unsupported`] rather than failing to build. Each returns the same [`CaptureStart`], so the caller never asks which
-//! platform it is on.
+//! [`CaptureVerdict::Unsupported`] rather than failing to build. Each returns
+//! the same [`CaptureStart`], so the caller never asks which platform it is on.
 //!
 //! [`RecoveryPolicy`] is the other half: a stream that dies is reopened a
 //! bounded number of times and then let go, once, rather than retried forever.
