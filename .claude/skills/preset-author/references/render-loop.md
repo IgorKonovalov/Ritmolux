@@ -9,7 +9,8 @@
 
 A headless capture **example** in the `standalone` crate. It loads a preset library, renders
 without a window, and writes a PNG (or a metrics report). It is an example, not a shipped binary,
-so it never bloats `ritmolux.exe`.
+so it never bloats the shipped binary (`ritmolux.exe` on Windows, `target/release/ritmolux` on
+Linux).
 
 ```sh
 cargo run -p standalone --example shot -- <flags>
@@ -50,7 +51,8 @@ audio one of two ways:
 
 ## Pointing `shot` at your draft — just name the file
 
-There is no `%APPDATA%` copy-over dance (that was true before `RLX_PRESET_DIR` landed). Precedence,
+There is no copy-over dance into the per-user folder (`%APPDATA%\Ritmolux\` on Windows,
+`~/.local/share/Ritmolux/` on Linux, or `$XDG_DATA_HOME/Ritmolux/` when that is set). Precedence,
 highest first:
 
 1. `--preset-file <path>` — exactly one preset from that file. `--preset` is then unnecessary.
@@ -66,7 +68,13 @@ capture prints a `[source]` label naming the winner, so a PNG's provenance is ne
 The live-iteration loop is the same override in a shell:
 
 ```powershell
+# Windows (PowerShell)
 $env:RLX_PRESET_DIR = "./presets"; cargo run -p standalone --release   # app reloads an edit in ~150 ms
+```
+
+```sh
+# Linux and macOS (POSIX shell)
+RLX_PRESET_DIR=./presets cargo run -p standalone --release             # app reloads an edit in ~150 ms
 ```
 
 The app **never seeds** into an override folder — it is yours.

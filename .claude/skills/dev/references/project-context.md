@@ -27,6 +27,7 @@ core-cabi/       # package `rlx-core-cabi` — the C ABI and nothing else (ADR-0
                  #   OUTSIDE workspace `default-members` — see the commands table below
 rlx-ring/        # package `rlx-ring` — the lock-free SPSC ring, zero-dependency so Miri gates it
 standalone/      # package `standalone`, binary `ritmolux` — winit + wgpu + loopback capture
+                 #   (WASAPI on Windows, ScreenCaptureKit on macOS, PulseAudio simple API on Linux)
   examples/shot.rs #  the headless capture CLI (an example, not a bin — keeps `image` out of ritmolux.exe)
 plugin-foobar/   # C++ shim — foobar2000 SDK glue, links core's C ABI (Windows-first)
 milkconv/        # package `milkconv` — the MilkDrop `.milk` -> preset converter (ADR-0113).
@@ -58,8 +59,8 @@ and `nextest --workspace -P fast`. CI's `links` job runs the same Node gates. Tw
 
 ## The machine-local cargo config (opt-in)
 
-A machine-local `WORK/.cargo/config.toml` — one directory above every worktree, found by cargo's
-ancestor walk — points the MSVC target at the toolchain's bundled `rust-lld`:
+On Windows, a machine-local `WORK/.cargo/config.toml` points the MSVC target at the toolchain's
+bundled `rust-lld`. It sits one directory above every worktree, where cargo's ancestor walk finds it:
 
 ```toml
 [target.x86_64-pc-windows-msvc]
@@ -68,6 +69,7 @@ linker = "rust-lld.exe"
 
 That is the whole file. It is **never committed** and **inert when absent** — a machine without it
 builds correctly, just with the default linker — so every command below is unchanged either way.
+Linux has no counterpart: `x86_64-unknown-linux-gnu` already links with `rust-lld` by default.
 
 **Each worktree compiles into its own `target/`, and it must stay that way.**
 [ADR-0141](../../../../docs/adrs/0141-one-artifact-store-serves-every-lane.md) added a
@@ -172,8 +174,8 @@ local `build`, `clippy` and `nextest` is blind to it, and pre-push does not run 
 `spout` job does (ADR-0181). If a phase touches anything `standalone/src/stream.rs` reaches, compile
 it yourself (`docs/developing.md` has the one-time SDK fetch):
 
-```powershell
-cargo check -p standalone --features spout
+```sh
+cargo check -p standalone --features spout   # Windows only: Spout is a Windows SDK
 ```
 
 ## Ownership map
@@ -208,7 +210,9 @@ per "When the plan is wrong".
   thread; copy into the ring buffer and return.
 - **Source-agnostic core** — no WASAPI/ScreenCaptureKit/foobar/winit types in `core/`.
 - **wgpu-only rendering** — no raw Metal/DX/Vulkan outside the wgpu layer; scenes don't branch on
-  backend.
+  backend. The shipped backend per OS is Metal on macOS, DX12 on Windows and Vulkan on Linux
+  (`core/Cargo.toml`'s per-target `wgpu` features). *(2026-09-22: the Linux `vulkan` arm is not
+  declared yet, so a Linux build finds no adapter until Plan 0120 Phase 2 adds it.)*
 - **Deterministic DSP** — FFT/onset/beat are pure functions of the input window; seed any visual
   randomness.
 - **C ABI is a contract** — minimal, versioned, explicit ownership/lifetimes; don't let Rust

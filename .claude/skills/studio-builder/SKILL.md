@@ -356,9 +356,10 @@ The plan and the ADRs win on specifics. Defaults when they are silent:
 - **You don't relax a security default to make something work.**
 - **You don't ship placeholders.** A panel with mock data tells the user the wrong story.
 - **You don't push, open PRs or run `gh`.** Stage by explicit path and commit; never
-  `git add -A` / `.` / `--all` / `:/` (a hook denies it). On Windows, commit multi-line
-  messages through the PowerShell tool's single-quoted here-string, plain ASCII body. Never
-  rewrite history.
+  `git add -A` / `.` / `--all` / `:/` (a hook denies it). Commit multi-line messages with a
+  plain ASCII body, through the mechanism for your platform: the Bash tool's quoted heredoc
+  (`git commit -F - <<'EOF'`) on Linux and macOS, the PowerShell tool's single-quoted
+  here-string on Windows. Never rewrite history.
 - **You don't run `--no-verify`**, and you don't disable a failing check.
 
 ## References

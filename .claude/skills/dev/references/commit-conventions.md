@@ -17,9 +17,24 @@ hook in this repo yet; the convention is enforced by discipline and the architec
 - **scope**: the crate/area touched. Optional but encouraged — it scans the log far better.
 - **subject**: imperative, lowercase, no trailing period, ≤ ~72 chars.
 
-Commit the message via the **PowerShell tool's single-quoted here-string** (`@'...'@`, closing
-`'@` at column 0). Keep the body plain ASCII — straight hyphens, no em-dashes, no internal
-double-quotes — or git may misparse the here-string into stray pathspecs.
+Commit the message through the mechanism for your platform:
+
+- **Linux and macOS:** use the **Bash tool's quoted heredoc**. The quoted `'EOF'` stops every
+  expansion, so `$`, backticks and quotes in the body arrive verbatim:
+
+  ```bash
+  git commit -F - <<'EOF'
+  feat(core): subject line
+
+  Body line.
+  EOF
+  ```
+
+- **Windows:** use the **PowerShell tool's single-quoted here-string** (`@'...'@`, closing `'@` at
+  column 0). The Bash tool mangles here-strings there.
+
+On every platform, keep the body plain ASCII — straight hyphens, no em-dashes, no internal
+double-quotes — or git may misparse it into stray pathspecs.
 
 ## Types
 

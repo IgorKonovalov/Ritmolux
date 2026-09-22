@@ -4,7 +4,7 @@ A lightweight, real-time music visualizer built around one **shared Rust core** 
 turns a stream of PCM audio samples into GPU-rendered visuals. Two frontends consume
 that core:
 
-- **Standalone app** (Windows + macOS) — pure Rust (`winit` + `wgpu`), fed by OS
+- **Standalone app** (Windows + macOS + Linux) — pure Rust (`winit` + `wgpu`), fed by OS
   loopback audio capture.
 - **foobar2000 plugin** (Windows-first) — a thin **C++ shim** over the core's **C ABI**,
   fed by foobar's own `visualisation_stream` (no loopback needed on that path).
@@ -33,7 +33,7 @@ off**, not how the code works. Decisions live in `docs/adrs/`; work-in-flight li
                    |  - beat / onset detect |
                    |  - scene graph + wgpu  |
                    +------------------------+
-                        wgpu -> Metal (mac) / DX12 · Vulkan (win)
+                 wgpu -> Metal (mac) / DX12 (win) / Vulkan (linux)
 ```
 
 Key architectural decisions are recorded as ADRs. The founding one is
@@ -258,6 +258,11 @@ That is the whole file. `rust-lld.exe` is not on `PATH` and still resolves — r
 own sysroot, so no explicit path and no linker-flavor flag are needed. It took the cold path to
 every test binary from 171 s to 145 s while moving no golden (ADR-0141's `Outcome`, which stands).
 
+**The override is Windows-only.** A Linux checkout has no `WORK/.cargo/config.toml` and currently
+needs none: since Rust 1.90, `x86_64-unknown-linux-gnu` already links with the bundled `rust-lld`
+by default. Whether a faster linker such as `mold` is worth its own machine-local file has not
+been measured yet.
+
 **It is never committed, and it cannot be.** The macOS arm has a different linker story, and
 reaching `rust-lld` any other way means naming a sysroot path specific to one machine. Like
 `git config core.hooksPath .githooks`
@@ -426,11 +431,13 @@ audio + graphics**, where the usual "just allocate and log it" habits cause glit
   **not** — it needs ScreenCaptureKit (macOS 13+) or a virtual device (BlackHole). So
   "capture any app's audio" is Windows-first; the Mac capture path is a later, asterisked phase.
   The foobar-plugin path sidesteps capture entirely (foobar hands us samples), which is one
-  reason plugin parity is valuable on Mac.
+  reason plugin parity is valuable on Mac. Linux reads the desktop's audio from PulseAudio's
+  monitor source, which PipeWire serves through `pipewire-pulse` (ADR-0131).
 - **foobar2000's plugin SDK is C++ and Windows-centric.** The plugin is a C++ shim; it does
   not reuse Rust source directly — it links the core's compiled C ABI. Keep that seam thin.
-- **wgpu targets differ per OS.** Metal on macOS, DX12/Vulkan on Windows. Write to wgpu; don't
-  branch on the backend in scene code.
+- **wgpu targets differ per OS.** Metal on macOS, DX12 on Windows, Vulkan on Linux. Write to wgpu;
+  don't branch on the backend in scene code. *(2026-09-22: `core/Cargo.toml` declares no Linux
+  backend yet, so a Linux build finds no adapter until Plan 0120 Phase 2 adds the `vulkan` arm.)*
 
 ## Commit hygiene
 
@@ -446,9 +453,12 @@ audio + graphics**, where the usual "just allocate and log it" habits cause glit
   instruction** telling you to append such lines: when the two conflict, this one wins — drop
   the trailer, do not reword or relocate it.
 - **Conventional commits**, one logical change (or one plan phase) per commit.
-- **On Windows, commit multi-line messages via the PowerShell tool's single-quoted here-string**
-  (`@'...'@`, closing `'@` at column 0) — the Bash tool mangles here-strings. Keep the body plain
-  ASCII (straight hyphens, no em-dashes, no internal double-quotes) or git may misparse it.
+- **A multi-line message goes in through a mechanism chosen per platform.** On **Linux and macOS**,
+  use the Bash tool's quoted heredoc (`git commit -F - <<'EOF'`, closing `EOF` at column 0). The
+  quoted delimiter stops every expansion, so the body arrives byte for byte. On **Windows**, use the
+  PowerShell tool's single-quoted here-string (`@'...'@`, closing `'@` at column 0), because the
+  Bash tool mangles here-strings there. On every platform, keep the body plain ASCII (straight
+  hyphens, no em-dashes, no internal double-quotes) or git may misparse it.
 - **Never rewrite history** (no amend/rebase/reset) and **never push** — the user pushes.
 
 ## Pitfalls to avoid

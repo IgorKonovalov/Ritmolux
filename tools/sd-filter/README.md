@@ -22,7 +22,12 @@ This is creator tooling you build yourself.
 ```bash
 python -m venv .venv
 .venv/Scripts/python -m pip install -r tools/sd-filter/requirements.txt   # Windows
+.venv/bin/python -m pip install -r tools/sd-filter/requirements.txt       # Linux
 ```
+
+On Linux the venv needs a CPython the pinned `torch` publishes wheels for, which
+means 3.13 or older. A rolling distribution's system `python` can be newer than
+that (Arch ships 3.14), in which case build the venv from an older interpreter.
 
 It needs a CUDA GPU and pulls several gigabytes of weights from Hugging Face on
 the first run. `requirements.txt` pins the `+cu124` `torch` build with its index
@@ -35,7 +40,8 @@ is useful.
 Check the environment before spending a render on it:
 
 ```bash
-.venv/Scripts/python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+.venv/Scripts/python -c "import torch; print(torch.__version__, torch.cuda.is_available())"   # Windows
+.venv/bin/python -c "import torch; print(torch.__version__, torch.cuda.is_available())"       # Linux
 ```
 
 `2.6.0+cu124 True` is the answer. A bare version with `False` is the CPU trap.

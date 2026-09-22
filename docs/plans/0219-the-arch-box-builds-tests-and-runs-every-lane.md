@@ -374,8 +374,8 @@ conductor.** The conductor is not verified on Linux until Phase 5, and 0120 is c
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Provision the box, and read what it has | human | done; readings below | committed with this row |
-| 2 — The lane contracts stop assuming Windows | dev | not started | |
+| 1 — Provision the box, and read what it has | human | done; readings below | `1f4678f1` |
+| 2 — The lane contracts stop assuming Windows | dev | done | committed with this row |
 | 3 — The gate is green on this box | dev | not started | |
 | 4 — The studio drives a Linux player | studio-builder | not started | |
 | 5 — The conductor's claims are checked on Linux | dev | not started | |
@@ -424,6 +424,30 @@ tools: `ci.yml` takes `taiki-e/install-action@nextest` and `@cargo-deny` at thei
 and `origin/plan-0133-the-engine-drives-the-lights` are present after `git fetch`.
 
 ### Notes
+
+- **Phase 2, heredoc probe.** A throwaway repository in the session scratchpad took a commit through
+  the quoted heredoc with a multi-line body carrying `'quotes'`, `$DOLLAR` and backticks.
+  `git log -1 --format=%B` matched the input byte for byte (157 bytes), plus the one trailing
+  newline `%B` always appends. The same form with an agent co-author trailer in the body was
+  **denied** by `block-attribution-trailers.js` before it ran, so the hook was not changed and no
+  regression case was added. That hook has no test suite. `tools/conductor/test/hooks.test.mjs`
+  covers the conductor hooks and is 69/69 green. `1f4678f1` was the first repository commit made
+  with the heredoc.
+- **Phase 2, a side effect of the hook.** The hook scans the whole command line. So a Bash command
+  that both names the commit-with-file form and quotes the trailer text is denied, even when it
+  commits nothing, as a `python3` heredoc editing this log was. Such a note has to be written with
+  the Edit tool or without the literal.
+- **Phase 2, beyond the file list's letter.** CLAUDE.md's diagram line read
+  `DX12 · Vulkan (win)`, but `core/Cargo.toml` compiles DX12 alone on Windows. The Linux edit set it to
+  `DX12 (win) / Vulkan (linux)`. The spout `cargo check` blocks in `docs/developing.md` and
+  `dev/references/project-context.md` are now labelled Windows-only (`cfg(all(feature = "spout", windows))`).
+  `render-loop.md` lost its parenthetical history about `RLX_PRESET_DIR`.
+- **Phase 2, observed.** `cargo build` on this box, cold, took 62 s wall (11 min 11 s user). It is
+  green with three dead-code warnings in `standalone/src/capture_verdict.rs` (`live`, `failed`,
+  `sanitize`), which nothing reaches without a Linux capture arm.
+  `cargo clippy --workspace --all-targets -- -D warnings` exits 101 on exactly those three, plus
+  the `Live`/`Failed` variants, so the pre-push hook is red on this box until 0120 Phase 3 lands.
+  `docs/developing.md`'s Arch block says so.
 
 ### Close triggers
 

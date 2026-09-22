@@ -986,9 +986,11 @@ changing its finding's file, an annotated tag on the tip — and parks on any di
 
 Status flips, README refreshes, ADRs, moving plans to `done/` — all commit by **explicit path**.
 **Never `git add -A` / `.` / `--all` / `:/`** — a `PreToolUse` hook denies it. `git status`
-first; leave files that aren't yours. On Windows, commit multi-line messages via the **PowerShell
-tool's single-quoted here-string** (`@'...'@`, closing `'@` at column 0), plain ASCII body — the
-Bash tool mangles here-strings. Never rewrite history (no amend/rebase/reset). Never push.
+first; leave files that aren't yours. Commit multi-line messages with a plain ASCII body, through
+the mechanism for your platform. On Linux and macOS, use the **Bash tool's quoted heredoc**
+(`git commit -F - <<'EOF'`, closing `EOF` at column 0). On Windows, use the **PowerShell tool's
+single-quoted here-string** (`@'...'@`, closing `'@` at column 0), because the Bash tool mangles
+here-strings there. Never rewrite history (no amend/rebase/reset). Never push.
 
 **No agent attribution, ever** — no `Co-Authored-By:` trailer, no `Claude-Session:` line, no
 session URL, no "Generated with" footer, in a commit message, a tag message or a PR body. A second

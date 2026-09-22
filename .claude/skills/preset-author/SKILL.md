@@ -510,9 +510,11 @@ could not express (`references/api-feedback.md`).
 
 Preset `.toml` files you commit stage by **explicit path** — never `git add -A` / `.` / `--all` /
 `:/` (a `PreToolUse` hook denies broad staging); `git status` first, leave files that aren't yours.
-Conventional commits (`feat(preset): …` for a new look). On Windows, commit multi-line messages via
-the **PowerShell tool's single-quoted here-string** (`@'...'@`, closing `'@` at column 0, plain-ASCII
-body, no internal double-quotes). Never rewrite history, never push.
+Conventional commits (`feat(preset): …` for a new look). Commit multi-line messages with a
+plain-ASCII body and no internal double-quotes, through the mechanism for your platform. On Linux and
+macOS, use the **Bash tool's quoted heredoc** (`git commit -F - <<'EOF'`, closing `EOF` at column 0).
+On Windows, use the **PowerShell tool's single-quoted here-string** (`@'...'@`, closing `'@` at
+column 0). Never rewrite history, never push.
 
 **Writing `.toml` on Windows:** `Set-Content -Encoding utf8` prepends a UTF-8 BOM that the TOML
 parser rejects — use the `Write` tool, and check the diff.

@@ -25,6 +25,35 @@ nothing.
 The headless capture CLI and the visual-QA harness have their own page,
 [Headless capture and video](capturing.md).
 
+### A fresh Arch Linux checkout
+
+Everything below uses Arch package names. `libpulse`, `pkgconf`, `wayland`, `libxkbcommon`,
+`ffmpeg`, `nodejs` and `python` are usually present already on a desktop install:
+
+```sh
+sudo pacman -S --needed rustup vulkan-swrast vulkan-tools \
+  cargo-nextest cargo-release cargo-deny uv \
+  libpulse pkgconf wayland libxkbcommon ffmpeg nodejs npm python
+rustup show                          # inside the checkout: installs the toolchain rust-toolchain.toml pins
+git config core.hooksPath .githooks  # the pre-push gate, opt-in per clone
+npm --prefix studio ci               # the studio's dependencies, which the hook's studio step needs
+cargo build
+```
+
+`vulkan-swrast` is lavapipe, the software Vulkan rasterizer the adapter-agnostic tests run on
+([ADR-0242](adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)).
+`vulkaninfo --summary` should list it as `llvmpipe` beside the hardware GPUs. `uv` provides the older
+CPython that the diffusion sidecar's pinned torch needs. Desktop audio reaches the standalone through
+PulseAudio's monitor source, which PipeWire serves via `pipewire-pulse`
+([ADR-0131](adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md)).
+
+**As of 2026-09-22 the Linux build is not yet a working one.** `core/Cargo.toml` enables no `wgpu`
+backend on Linux, and the standalone has no Linux capture arm. So `cargo build` succeeds, but with
+dead-code warnings in `standalone/src/capture_verdict.rs` that `clippy -D warnings` rejects, wgpu has
+no backend to find an adapter with, and the app renders silence. That holds until
+[Plan 0120](plans/0120-the-standalone-ships-on-ubuntu.md) Phases 2 and 3 land. No green pre-push
+gate on Linux has been recorded yet.
+
 ## Editing presets in VS Code
 
 Install **Even Better TOML** (`tamasfe.even-better-toml`). That is the whole setup: a committed
@@ -308,6 +337,7 @@ construction. If you are refactoring anything `standalone/src/stream.rs` reaches
 yourself before pushing:
 
 ```powershell
+# Windows only: Spout is a Windows SDK, and the feature compiles nothing elsewhere
 powershell -File packaging/spout/fetch-sdk.ps1   # once per checkout
 cargo check -p standalone --features spout
 ```

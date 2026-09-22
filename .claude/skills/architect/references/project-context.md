@@ -8,8 +8,9 @@ The source of truth for concrete facts about this repo. Read it to ground a deci
 A lightweight, real-time music visualizer. One **shared Rust core** turns a stream of PCM
 samples into GPU-rendered visuals via **wgpu**. Two frontends consume the core:
 
-- **Standalone** (Windows + macOS): pure Rust, `winit` window + `wgpu` surface, fed by OS
-  loopback capture (WASAPI on Windows; ScreenCaptureKit / BlackHole on macOS).
+- **Standalone** (Windows + macOS + Linux): pure Rust, `winit` window + `wgpu` surface, fed by OS
+  loopback capture (WASAPI on Windows; ScreenCaptureKit / BlackHole on macOS; the PulseAudio
+  simple API's monitor source on Linux, ADR-0131).
 - **foobar2000 plugin** (Windows-first): a thin **C++ shim** over the core's **C ABI**, fed by
   foobar's `visualisation_stream`. No loopback needed on this path.
 
@@ -177,4 +178,10 @@ deciding what to design next.
   Mac capture as an asterisked, later phase — the plugin path sidesteps capture on Mac.
 - **foobar2000's SDK is C++ and Windows-centric.** The plugin does not reuse Rust source; it
   links the compiled C ABI. Keep that seam thin.
-- **wgpu backends differ per OS** (Metal / DX12 / Vulkan). Write to wgpu; don't branch on backend.
+- **Linux reaches the desktop's audio through PulseAudio's monitor source** (ADR-0131), which
+  PipeWire serves through `pipewire-pulse`. ADR-0241 makes Linux the lead platform, with Windows a
+  peer.
+- **wgpu backends differ per OS**: Metal on macOS, DX12 on Windows, Vulkan on Linux. Write to wgpu;
+  don't branch on backend. *(2026-09-22: `core/Cargo.toml` declares no Linux backend and
+  `standalone/` has no Linux capture arm yet. Plan 0120 Phases 2-3 add both, so until they land
+  a Linux build finds no adapter and renders silence.)*

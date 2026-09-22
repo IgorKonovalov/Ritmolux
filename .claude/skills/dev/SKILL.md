@@ -205,10 +205,12 @@ For **each phase in order**:
 5. **Commit the phase** — conventional commit per `references/commit-conventions.md`. **Stage only
    this phase's files plus the plan, by explicit path — never `git add -A` / `.` / `--all` / `:/`**
    (a `PreToolUse` hook denies broad staging). `git status` first; if you see files that aren't
-   yours, leave them and surface them. On Windows, commit the message via the **PowerShell tool's
-   single-quoted here-string** (`@'...'@`, closing `'@` at column 0, plain-ASCII body) — the Bash
-   tool mangles here-strings; if the body needs a double quote, write it to a file and use
-   `git commit -F`.
+   yours, leave them and surface them. Commit the message with a plain-ASCII body, through the
+   mechanism for your platform. On Linux and macOS, use the **Bash tool's quoted heredoc**
+   (`git commit -F - <<'EOF'`, closing `EOF` at column 0). On Windows, use the **PowerShell
+   tool's single-quoted here-string** (`@'...'@`, closing `'@` at column 0), because the Bash tool
+   mangles here-strings there. On Windows, if the body needs a double quote, write it to a file and
+   use `git commit -F`.
 6. **Move to the next phase.** Don't pause for review — the architect reviews after the last phase.
 
 Rules that compound across phases:
