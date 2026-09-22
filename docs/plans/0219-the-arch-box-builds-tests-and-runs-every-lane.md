@@ -126,14 +126,26 @@ conductor.** The conductor is not verified on Linux until Phase 5, and 0120 is c
   `git config core.hooksPath .githooks` and `npm --prefix studio ci`.
 - **Carry from the Windows box first** (recorded there 2026-09-22, the day development moved). None
   of this is in the repository, so a fresh clone on this box does not have it:
-  - **`WORK/milkdrop2-src`**, the MilkDrop reference (`xeiraex/milkdrop2` at `d4c843a`), and
-    **`WORK/milkdrop-corpus`**. Plan 0202 Phases 3-6 read both, and so does any MilkDrop look gate.
-  - **`tools/conductor/local.json`** (gitignored). The conductor refuses to start without it. Copy it,
-    or rebuild it from `local.example.json`.
-  - **The lane branches that were never pushed**: `plan-0202-the-three-mechanisms-get-their-gate`
-    (Phases 1-2 landed, Phase 3 re-scoped 2026-09-22, resumable) and
-    `plan-0133-the-engine-drives-the-lights` (postponed until the rig is back). Check
-    `git branch -r` for both after the Windows-side push.
+  - **Copy these three from the Windows disk.** `WORK` on Windows is `C:\Users\Igor Konovalov\WORK`,
+    and on this box it is `~/Work`, the sibling directory 0219 Phase 5's lanes live in:
+
+    | From (Windows) | To (this box) | Needed by |
+    |---|---|---|
+    | `WORK\milkdrop2-src` (a git clone of `xeiraex/milkdrop2`, HEAD `d4c843a`) | `~/Work/milkdrop2-src` | Plan 0202 Phase 3 and any MilkDrop reference reading |
+    | `WORK\milkdrop-corpus` (the `.milk` corpus) | `~/Work/milkdrop-corpus` | Plan 0202 Phases 3, 5 and 6, and `milkconv` census runs |
+    | `WORK\Ritmolux\tools\conductor\local.json` (gitignored) | `tools/conductor/local.json` in this checkout | the conductor, which refuses to start without it; `local.example.json` rebuilds it |
+
+    The reference can be re-cloned instead of copied:
+    `git clone https://github.com/xeiraex/milkdrop2 ~/Work/milkdrop2-src && git -C ~/Work/milkdrop2-src checkout d4c843a`.
+    The corpus cannot; it is only on the Windows disk. The log records
+    `git -C ~/Work/milkdrop2-src rev-parse HEAD` and
+    `find ~/Work/milkdrop-corpus -name '*.milk' | wc -l` once they are in place.
+  - **The two lane branches were pushed 2026-09-22**:
+    - `plan-0202-the-three-mechanisms-get-their-gate`, at `425decee`. Phases 1-2 landed, Phase 3 was
+      re-scoped 2026-09-22, and the plan is resumable.
+    - `plan-0133-the-engine-drives-the-lights`, at `e5081eec`, postponed until the rig is back.
+
+    `git fetch` brings both here as `origin/<branch>`.
   - **Plans left on Windows's queue, not started:** 0207 and 0206 (lane a). They stay in
     `queue.json` and wait for Phase 5 below, like everything else the conductor runs here.
   - **0202 Phase 5 and 0192 need the Windows boot**: the first is a live foobar2000 look gate, the
