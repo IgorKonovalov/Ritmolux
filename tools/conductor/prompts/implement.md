@@ -22,9 +22,14 @@ follow it; where it and the rest of the skill disagree, conductor mode wins.
   `Monitor`, and a background command left unfinished at the end parks the plan whatever you claim.
 - **Shell calls run one command per call**, because the allowlist reads each one on its own. No `cd`:
   run the tool from the lane root and give the path — `npm --prefix studio run typecheck`, not
-  `cd studio; npm run typecheck`. No environment set by an assignment statement ahead of a command
-  (`$env:X = '1'; ...` is a second command and is refused). `git clean` and `git checkout` name their
-  path after `--`. Making and removing a scratch file or directory inside the lane is allowed; a path
+  `cd studio; npm run typecheck`. Git runs in the lane this session was started in and never takes
+  `-C`. The only environment prefixes are the exact forms the allowlist names,
+  `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`, and `RLX_UPDATE_PRESET_SCHEMA=1` or
+  `RLX_UPDATE_PARAM_REFERENCE=1` ahead of `cargo` or `node`; `env`, `export` and `$env:` are refused
+  (`$env:X = '1'; ...` is a second command). Read text with the Read and Grep tools or `git grep`,
+  never `awk`, `sed` or a pipe into `grep`: a done-when written as a pipe runs as its parts, or as
+  the equivalent Grep call, and the log row's note says which. `git clean` and `git checkout` name
+  their path after `--`. Making and removing a scratch file or directory inside the lane is allowed; a path
   that leaves the lane is refused, whatever it is for.
 - If the last-run line says `yes`, finish with the close block of the `## Implementation log`,
   committed, and print the outcome instead of the pointer. Do not run the full workspace suite: the

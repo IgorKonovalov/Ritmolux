@@ -21,6 +21,10 @@ import { test } from "node:test";
 import { TOOL_DIR } from "./helpers.mjs";
 
 const settings = JSON.parse(readFileSync(join(TOOL_DIR, "settings.conductor.json"), "utf8"));
+
+// The rustdoc form the review prompt prints, read out of the prompt, so a prompt and an allowlist that
+// drift apart turn a case below red rather than send a session into a denial.
+const promptedRustdoc = readFileSync(join(TOOL_DIR, "prompts", "review.md"), "utf8").match(/`(RUSTDOCFLAGS=[^`]+)`/)?.[1];
 const allow = settings.permissions.allow;
 const deny = settings.permissions.deny;
 
@@ -188,6 +192,16 @@ const CASES = [
   { tool: "Bash", command: "cd studio && npm run typecheck", allowed: false, why: "same, in the other shell" },
   { tool: "PowerShell", command: "$env:ELECTRON_SKIP_BINARY_DOWNLOAD = '1'; npm --prefix studio ci", allowed: false, why: "an assignment is its own command" },
   { tool: "PowerShell", command: "$env:CARGO_TARGET_DIR = 'target/p9'; cargo nextest run", allowed: false, why: "same" },
+
+  // The four commands Plan 0221's run recorded under `permission_denials`. The prompts now spell the
+  // allowed form of each; the refused forms stay refused, since `env *`, `awk *` and
+  // `git -C * add *` would each reach any program, or any checkout on the machine.
+  { tool: "Bash", command: promptedRustdoc ?? "review.md prints no RUSTDOCFLAGS form", allowed: true, why: "the literal the review prompt prints" },
+  { tool: "Bash", command: 'env RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps', allowed: false, why: "`env` runs any program" },
+  { tool: "Bash", command: "git -C /elsewhere add x", allowed: false, why: "`-C` reaches a checkout outside the lane" },
+  { tool: "Bash", command: "git -C /elsewhere commit -m x", allowed: false },
+  { tool: "Bash", command: "awk '/a/,/b/' docs/developing.md", allowed: false, why: "`awk` writes files and runs commands" },
+  { tool: "Bash", command: "awk '/^## Disk/,/^## /' docs/developing.md | grep -c config.toml", allowed: false, why: "the done-when pipe: its `awk` part is refused" },
 
   // The lane is the bound. A deletion whose path leaves it is refused however it is spelled.
   { tool: "Bash", command: "rm -rf ../rlx-plan-0175", allowed: false, why: "escapes the worktree" },

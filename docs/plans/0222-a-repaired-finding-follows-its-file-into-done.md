@@ -172,11 +172,14 @@ architect skill and is not a phase here.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The `fixed_in` check follows the file across a rename | dev | committed with this row | |
-| 2 — The prompts spell what the allowlist allows | dev | not started | |
+| 1 — The `fixed_in` check follows the file across a rename | dev | done | `a90b3d3c` |
+| 2 — The prompts spell what the allowlist allows | dev | committed with this row | |
 
 ### Notes
 
 - Phase 1: the five `close.test.mjs` cases were run against the unmodified `close.mjs` first. Case 1
   failed with `finding 0 is fixed_in <sha>, which does not change docs/plans/done/0101-fixture.md`;
   cases 3 and 4 failed the same way, case 5 on the missing second path, case 2 passed.
+- Phase 2: `state/transcripts/0221-*.jsonl` lies outside the lane and was not read; the refused
+  cases take the commands as the plan's Context table records them, with the 0221 pipe written as
+  `awk '/^## Disk/,/^## /' docs/developing.md | grep -c config.toml`.
