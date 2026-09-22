@@ -127,8 +127,9 @@ impl Drop for CaptureHandle {
     /// within one read. If it has not finished inside [`STOP_POLLS`] the server
     /// has stopped delivering, and the thread is detached rather than joined: it
     /// owns the stream and the producer, drops both when its read returns, and
-    /// nothing reads its ring any more. The shell's next `start` builds a new
-    /// ring, so the single-producer invariant holds either way.
+    /// its ring has no reader: the shell drops the consumer with the handle. The
+    /// shell's next `start` builds a new ring, so the single-producer invariant
+    /// holds either way.
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Release);
         let Some(thread) = self.thread.take() else {
