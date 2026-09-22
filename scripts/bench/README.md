@@ -79,8 +79,10 @@ its adapter is not comparable (ADR-0071, ADR-0243).
    in place of `linux` and today's date (`windows-<date>-bench-nvidia.tsv`,
    `windows-<date>-live.tsv`), with the same `#` header lines: OS build, commit, adapter and driver,
    size, whether music played. Stage those files by explicit path and commit them; do not write the
-   reading into `docs/` on your own — hand the comparison back to the owner. **Neither `.ps1` had
-   been run when it was written**; if one misbehaves, fix it here and say what you changed.
+   reading into `docs/` on your own — hand the comparison back to the owner. **Both `.ps1` scripts
+   were first run on 2026-09-22** and worked as written but for the number format: a comma-decimal
+   locale printed `5,68` into the tab-separated output, so each now sets the invariant culture
+   before printing. If one misbehaves again, fix it here and say what you changed.
 
 ## Saved results
 
@@ -93,6 +95,8 @@ with `#` lines that name the machine, build, adapter, driver and conditions:
 | `linux-2026-09-22-live.tsv` | live fullscreen, the ten presets, both GPUs |
 | `linux-2026-09-22-sweep-nvidia.tsv` | headless, the whole shipped library, one run each, dGPU |
 | `linux-2026-09-22-sweep-amd.tsv` | the same on the iGPU — the sweep that picked the ten |
+| `windows-2026-09-22-bench-nvidia.tsv` | headless bench, the ten presets, 3 runs each, dGPU |
+| `windows-2026-09-22-live.tsv` | live fullscreen, the ten presets, both GPUs |
 
 A later reading is a new file with a new date, never an edit of an old one: a comparison needs both
 ends to stay put.
@@ -142,3 +146,69 @@ every row.
 
 The dGPU holds the 165 Hz cap on all ten, matching the Windows dGPU reference in `docs/nfr.md`
 (165.0 fps median, p99 6.3-8.9 ms). The iGPU misses 60 fps on the seven attractor-heavy presets.
+
+## Windows reading, 2026-09-22
+
+The same laptop, the same ten presets, build `ff474fee`: RTX 3080 Laptop GPU and AMD Radeon(TM)
+Graphics, both on DX12, drivers 32.0.15.8142 and 30.0.13002.1001; Windows 10 Home 22H2
+(10.0.19045.6466), the internal 2560x1440 165 Hz panel. Files:
+`windows-2026-09-22-bench-nvidia.tsv`, `windows-2026-09-22-live.tsv`.
+
+**Two things weaken the comparison, and neither is fixable after the fact.** The headless bench ran
+**with music playing** where the Linux one had none, so a preset whose point count follows the audio
+is not compared like for like there; the live test had music on both machines. And each Windows live
+row kept 22 one-second samples against Linux's 25 — startup takes longer here, so more of the fixed
+32 s was spent before the log steadied. Medians are unaffected by the sample count.
+
+### Headless bench, 1920x1080, dGPU, music playing
+
+No iGPU column: the sweep that picked the ten was not repeated here, only the ten-preset bench.
+
+| preset | Windows DX12 ms | Linux Vulkan ms | Win/Linux |
+|---|---|---|---|
+| Nebula | 5.68 | 4.12 | 1.38 |
+| Leviathan | 5.76 | 4.51 | 1.28 |
+| Clifford | 5.46 | 3.85 | 1.42 |
+| Volute | 5.10 | 3.91 | 1.30 |
+| Dragon | 5.11 | 3.90 | 1.31 |
+| Ink on Paper | 4.73 | 3.31 | 1.43 |
+| Barnsley Fern | 5.03 | 3.82 | 1.32 |
+| Braid | 7.40 | 5.80 | 1.28 |
+| Murmuration | 7.46 | 5.90 | 1.26 |
+| Shatter | 6.76 | 5.27 | 1.28 |
+
+Linux is ahead on every preset, and the gap is an **additive 1.2-1.6 ms per frame** rather than a
+ratio that tracks the preset's weight - Ink on Paper, the cheapest, pays the same absolute penalty
+as Murmuration, the dearest. That shape points at a fixed per-frame cost on this path (submission,
+the readback, the driver), not at one shader family DX12 compiles worse. The three runs per preset
+agreed within 0.1 ms.
+
+### Live fullscreen, 2560x1440, music playing
+
+22 one-second samples per row; capture `live WASAPI 48000/2` throughout; zero dropped frames in
+every row.
+
+| preset | NVIDIA fps med / min | NVIDIA p99 med / max | AMD fps med / min | AMD p99 med / max | AMD samples < 60 |
+|---|---|---|---|---|---|
+| Nebula | 165.0 / 164.9 | 7.54 / 7.89 | 26.4 / 26.2 | 49.83 / 53.01 | 22 |
+| Leviathan | 165.0 / 164.7 | 7.52 / 7.94 | 27.2 / 26.4 | 48.69 / 50.55 | 22 |
+| Clifford | 165.0 / 164.9 | 7.23 / 7.78 | 33.2 / 31.5 | 40.79 / 41.28 | 22 |
+| Volute | 165.0 / 164.9 | 7.09 / 7.29 | 60.7 / 40.3 | 32.40 / 37.64 | 11 |
+| Dragon | 165.0 / 164.9 | 7.11 / 7.43 | 47.0 / 44.7 | 30.96 / 33.13 | 22 |
+| Ink on Paper | 165.0 / 165.0 | 6.74 / 7.34 | 42.5 / 39.9 | 35.87 / 37.66 | 22 |
+| Barnsley Fern | 165.0 / 165.0 | 7.04 / 7.54 | 52.1 / 49.4 | 27.43 / 30.64 | 16 |
+| Braid | 165.0 / 165.0 | 6.91 / 7.29 | 86.1 / 81.4 | 14.71 / 15.29 | 0 |
+| Murmuration | 165.0 / 164.9 | 7.01 / 7.63 | 93.9 / 89.1 | 13.88 / 16.14 | 0 |
+| Shatter | 165.0 / 165.0 | 6.93 / 7.17 | 107.1 / 99.7 | 15.96 / 16.98 | 0 |
+
+**The dGPU result agrees with Linux and with `docs/nfr.md`**: the cap is held on all ten, nothing
+drops, and p99 stays under 8 ms. Windows sits 0.5-0.9 ms higher at p99 than Linux does, which is the
+same additive penalty the headless bench measures, spent inside a frame budget of 6.06 ms that has
+room for it.
+
+**The iGPU result reverses the headless verdict.** Windows is faster in every row - by 3-15%, and by
+32% on Volute, which is also the row that swings most (median 60.7 fps, minimum 40.3). Linux's worst
+frames are much worse: on the four heaviest presets its p99 max reaches 64-82 ms where Windows stays
+at 41-53 ms. So the OS that loses by a constant on the dGPU wins on the iGPU, which is where the
+laptop's panel is wired and where the lag that prompted this bench was seen. The same seven presets
+miss 60 fps on both.
