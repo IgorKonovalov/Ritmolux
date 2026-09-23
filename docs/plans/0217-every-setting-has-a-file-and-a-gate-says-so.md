@@ -1,6 +1,6 @@
 # 0217 — Every setting has a file, and a gate says so
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-20
 > **Owner skill(s):** dev, studio-builder
 > **Related ADRs:** [0240](../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md)
@@ -197,16 +197,23 @@ impl SettingsRow {
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by the implementer)_
+**Lane:** `plan-0217-every-setting-has-a-file-and-a-gate-says-so` in `/home/igor/Work/rlx-plan-0217`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The diagnostics overlay gets a key | dev | not started | |
+| 1 — The diagnostics overlay gets a key | dev | done | committed with this row |
 | 2 — Every settings row declares the key it edits | dev | not started | |
 | 3 — A gate for the two applications a Rust test cannot see | dev | not started | |
 | 4 — The studio's own third copy | studio-builder | not started | |
 
 ### Notes
+
+- **Phase 1's first done-when is asserted by construction rather than by a launched window.**
+  Nothing in the suite builds an `AppState` — it needs a winit window — so "a `config.toml`
+  carrying `diagnostics = true` starts with the overlay painted" is carried by
+  `AppState::new` calling the same `renderer.set_overlay` that `toggle_diagnostics` calls, seeded
+  from `config.hud.diagnostics`. The round trip through the file is asserted in
+  `config.rs`'s `the_diagnostics_overlay_defaults_off_and_round_trips`.
 
 ### Close triggers
 

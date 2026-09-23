@@ -61,7 +61,7 @@ one, so you always land where you asked.
 | `R`       | Switch the rotation **order** — shuffled (the default) or alphabetical by preset name. Persisted |
 | `L`       | Switch what rotation **draws from** — the whole library or your favourites. Persisted |
 | `Tab`     | Open/close the preset browser — opens on the preset you're watching. Arrow keys walk the list and wrap at both ends, left/right step a column, holding an arrow scrolls, type to filter, `Enter` selects (also dissolves), `Esc` closes |
-| `S`       | Open/close the settings menu — quality, adapter, auto-rotate, rotation order, what rotation draws from, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, next-in countdown, console. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
+| `S`       | Open/close the settings menu — quality, adapter, auto-rotate, rotation order, what rotation draws from, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, next-in countdown, console. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and is written to `config.toml` |
 | `C`       | Open/close the **operator console** — a second window on another display carrying the browser, the settings menu, a transport strip and a live preview of the output |
 | `[` / `]` | Drop / raise the quality tier live — pins it for the session and persists the choice |
 | `F`       | Toggle fullscreen                                           |
@@ -69,7 +69,7 @@ one, so you always land where you asked.
 | `D`       | Cycle to the next display/monitor                           |
 | `F1`      | Mark as a **favourite** (press again to unmark) — remembered across restarts |
 | `F2`      | **Hide** it: no more auto-rotate, and gone from the browser's default view |
-| `F3`      | Toggle the diagnostics overlay                              |
+| `F3`      | Toggle the diagnostics overlay — persisted, so it comes back up where you left it |
 | `F4`      | In the browser: show **favourites only**                    |
 | `F5`      | In the browser: narrow to **one family**, then the next, then all of them again |
 | `F6`      | In the browser: bring **hidden** presets back into the list |
@@ -129,7 +129,11 @@ and, while auto-rotate is on, a line under it counts down to the next change
 drawn. For a permanently clean canvas, turn the settings menu's **Preset name**
 row off — that is `[hud] preset_name` in `config.toml`, and it survives a
 restart; the **Next in** row (`[hud] next_rotation`) turns off just the
-countdown.
+countdown. Every settings row is an editor of a `config.toml` key like those
+two, the **Diagnostics** row (`[hud] diagnostics`) included, so anything you
+can change from the menu you can also set in the file before launching — and
+the **Presets** row, which only shows where presets are loaded from, is the one
+row that changes nothing.
 
 ## The operator console
 

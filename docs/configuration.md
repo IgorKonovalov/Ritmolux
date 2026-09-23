@@ -379,6 +379,7 @@ The furniture the shell paints over the show. Separate from `[output]` because i
 | `preset_name` | `true` | Draw the active preset's name in the top-left corner. Even when on, the name yields to a menu and to the `F3` panel — this is "never show it", not "show it always" |
 | `now_playing` | `true` | Announce the current track in the lower-left corner when it changes. Off means no track ever reaches the visualizer, not a banner drawn transparent |
 | `next_rotation` | `true` | Count down to the next auto-rotate, under the preset name. Nothing is drawn while auto-rotate is off, so this key only decides whether the line appears when there *is* a countdown |
+| `diagnostics` | `false` | Paint the diagnostics overlay — the panel `F3` and the settings menu's **Diagnostics** row toggle. Set it to `true` to come up with the panel already open on a machine you are measuring |
 
 ### `[osc]`
 
@@ -473,6 +474,7 @@ tier = "auto"
 preset_name = true
 now_playing = true
 next_rotation = true
+diagnostics = false
 
 [osc]
 enabled = false

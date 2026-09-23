@@ -166,8 +166,8 @@ impl Default for Osc {
 /// `[hud]` — the on-canvas furniture the shell draws over the show (Plan 0096).
 ///
 /// Separate from `[output]` because it is about what is *painted*, not about
-/// which screen the window opens on. Two keys: the corner preset name and the
-/// now-playing banner the second one took, as ADR-0110 expected.
+/// which screen the window opens on: the corner preset name, the now-playing
+/// banner, the auto-rotate countdown and the `F3` diagnostics overlay.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Hud {
@@ -187,6 +187,11 @@ pub struct Hud {
     /// countdown to report. `true` for the reason the banner is: the line only
     /// exists while rotation is running, so it cannot clutter a held show.
     pub next_rotation: bool,
+    /// Paint the diagnostics overlay — the panel `F3` and the `Diagnostics`
+    /// settings row toggle. `false` out of the box, so a fresh install comes up
+    /// with a clean canvas; the key is what lets a machine being measured start
+    /// with the panel already up without anyone pressing a key.
+    pub diagnostics: bool,
 }
 
 impl Default for Hud {
@@ -195,6 +200,7 @@ impl Default for Hud {
             preset_name: true,
             now_playing: true,
             next_rotation: true,
+            diagnostics: false,
         }
     }
 }
@@ -523,6 +529,31 @@ mod tests {
         assert!(
             config.hud.next_rotation,
             "the countdown key a later build added must default on too"
+        );
+    }
+
+    /// **The overlay is off out of the box and its "on" survives a restart.**
+    /// Both halves, because a key that defaulted on would paint a panel over
+    /// every fresh install, and a key that did not round-trip would be a menu
+    /// row with no file behind it — which is the shape ADR-0240 refuses.
+    #[test]
+    fn the_diagnostics_overlay_defaults_off_and_round_trips() {
+        assert!(
+            !Config::default().hud.diagnostics,
+            "a fresh install must come up with a clean canvas"
+        );
+
+        let config: Config = toml::from_str("[hud]\npreset_name = false\n")
+            .expect("a [hud] section predating `diagnostics` must still parse");
+        assert!(!config.hud.diagnostics, "an absent key painted the overlay");
+
+        let mut config = Config::default();
+        config.hud.diagnostics = true;
+        let text = toml::to_string_pretty(&config).expect("config serializes");
+        let back: Config = toml::from_str(&text).expect("its own output parses");
+        assert!(
+            back.hud.diagnostics,
+            "the on choice did not survive a save, so `F3` would not outlive a restart"
         );
     }
 
