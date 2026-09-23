@@ -322,6 +322,20 @@ jobs:
       # on the line is the escape, and a marker with no reason is itself a
       # finding.
       - run: node scripts/check-system-counts.mjs
+      # And the settings-file gate (ADR-0240): the two applications a Rust test
+      # cannot see keep every setting in a file. The standalone's half is carried
+      # by types - `SettingsRow::config_path` is an exhaustive match from a menu
+      # row to a `config.toml` key - and neither of the other two has anything
+      # like it: nothing here compiles `plugin-foobar/` at all. So this reads
+      # source text for two properties. No `localStorage`, `sessionStorage` or
+      # `indexedDB` under `studio/`, because all three keep a choice where no
+      # file can be edited and no other process can read it; and every `cfg_*`
+      # declaration under `plugin-foobar/` named in docs/configuration.md,
+      # because foobar's store is host-side and a document is the only thing
+      # that can tell resume state from an unclaimed setting. It greps rather
+      # than parses, so `settings-allow: <why>` on the line is the escape and a
+      # marker with no reason is itself a finding.
+      - run: node scripts/check-settings-have-files.mjs
       # And the roster's own gate (ADR-0217): every `node scripts/...` invocation
       # above is the projection of scripts/gates.manifest.mjs for this job, in that
       # order, and `.githooks/pre-push`'s are its projection for the hook. How many

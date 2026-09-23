@@ -202,8 +202,8 @@ impl SettingsRow {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The diagnostics overlay gets a key | dev | done | 14ae5f69 |
-| 2 — Every settings row declares the key it edits | dev | done | committed with this row |
-| 3 — A gate for the two applications a Rust test cannot see | dev | not started | |
+| 2 — Every settings row declares the key it edits | dev | done | 776b946f |
+| 3 — A gate for the two applications a Rust test cannot see | dev | done | committed with this row |
 | 4 — The studio's own third copy | studio-builder | not started | |
 
 ### Notes
@@ -227,6 +227,19 @@ impl SettingsRow {
 - `SettingsRow::edit` now returns `None` for any row whose `config_path` is empty, so "read-only"
   is the declaration rather than a second hand-written arm. The `Presets` arm stays for
   exhaustiveness.
+- **Phase 3's allowlist is the inline `settings-allow: <reason>` marker, not a list of paths in the
+  script.** The plan's Risks section points at `check-comment-hygiene.mjs`'s `hygiene-allow:` for
+  the shape, and that shape is a marker on the line; a path list would also have had nothing to
+  exclude today (`studio/` has zero browser-storage hits), so its reason-is-required half would
+  have been unexercised in both the repository and the fixture. A marker with no reason after the
+  colon is itself a finding, and the fixture seeds that.
+- Fixture counts: `node scripts/check-settings-have-files.mjs scripts/fixtures/settings-files`
+  exits 1 with five breaks across two files, and the real tree is green. The fixtures must stay
+  **tracked** — the gate enumerates from `git ls-files`, so an untracked copy of that tree reports
+  zero sources scanned and exits 0.
+- **Noticed and not acted on:** `README.md`'s `scripts/` block names a selection of the Node gates
+  in prose and does not name this one. It is outside Phase 3's `Files touched`, and the block is a
+  selection rather than a roster, so nothing was changed there.
 
 ### Close triggers
 

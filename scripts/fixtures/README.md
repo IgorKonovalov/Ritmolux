@@ -450,6 +450,41 @@ occurs in this repository:
   script's own header. It is seeded so that the hole is a decision anyone can re-run rather than a
   sentence in a comment.
 
+## `settings-files/` — for `check-settings-have-files.mjs`
+
+```
+node scripts/check-settings-have-files.mjs scripts/fixtures/settings-files
+```
+
+Expect **exit 1 and exactly five breaks, across two files**. Note the root: like the two gates
+above this checker is pointed at its own subdirectory rather than at `scripts/fixtures`, because
+it needs a `docs/configuration.md` at the root it is given — the document is what makes a plugin
+declaration a claim, and there can only be one of it per tree.
+
+| File | Line | Case | Expected |
+|------|-----:|------|----------|
+| `plugin-foobar/seeded.cpp` | 17 | a `cfg_int` no document names | reported — a declaration nobody has claimed is indistinguishable from a setting with no file |
+| `studio/renderer/seeded.ts` | 6 | `localStorage.setItem` | reported |
+| `studio/renderer/seeded.ts` | 10 | `window.sessionStorage` | reported — the second branch of the alternation |
+| `studio/renderer/seeded.ts` | 14 | `indexedDB.open` | reported — the third |
+| `studio/renderer/seeded.ts` | 22 | a `settings-allow:` marker with nothing after the colon | reported in the match's place, so the escape cannot become an off switch |
+
+**The silences are what decide whether the gate is usable**, because this one greps rather than
+parses and would otherwise convict its own documentation:
+
+| Case | Seeded in | Expected |
+|------|-----------|----------|
+| a `cfg_string` the document names in backticks | `plugin-foobar/seeded.cpp` — `g_cfg_documented` | not reported — naming it *is* the claim the gate asks for |
+| the store's own accessor | `plugin-foobar/seeded.cpp` — `g_cfg_seeded.get()` | not reported — the word boundary before `cfg_` fails inside an identifier, which is what separates a declaration from a use |
+| a `localStorage` line carrying `settings-allow:` **with** a reason | `studio/renderer/seeded.ts` | not reported |
+| an identifier that merely starts with one of the three names | `studio/renderer/seeded.ts` — `localStorageShim` | not reported — the match is whole-word |
+| the same three names in the document's own prose | `docs/configuration.md` | not scanned at all — the browser-storage half reads source under `studio/` and nothing else |
+
+**The file set comes from `git ls-files`**, like the two gates above, so these fixtures have to be
+**tracked** for the counts to hold. An untracked copy of this tree reports `0 studio source(s) and
+0 plugin source(s)` and exits 0, which reads exactly like a clean tree — that is the one way this
+root goes vacuously green, and staging the files is what stops it.
+
 ## `gate-carriers/` — for `check-gate-carriers.mjs`
 
 ```
