@@ -309,7 +309,7 @@ pub(crate) struct PreviewService {
 | 3 — Four capabilities become four traits | dev | done | 2a6bdbcf |
 | 4 — A new kind-branch has to declare itself | dev | done | 673fced7 |
 | 5 — The preview concern gets an owner | dev | done | fdac6e6e |
-| 6 — The preview concern stays owned | dev | done | committed with this row |
+| 6 — The preview concern stays owned | dev | done | a8eab67d |
 
 ### Notes
 
@@ -455,12 +455,23 @@ reads.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no file under `presets/` is in the range's diff.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
+- **What shipped:** no feature and no fix. Six commits of internal refactor and three new hygiene
+  guards, plus the repairs listed above. The range touches `core/src/render/`, `core/tests/suite/`
+  and `standalone/src/capture_*`; it changes no preset, no rendered frame, no C ABI symbol, no
+  control-protocol message and no flag, env var or `config.toml` key.
+- **Operator docs touched:** none. Nothing under `docs/` moved but this plan.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *46 stated reductions
+  still hold across all 21 live entries (4 unprobeable)*. Thirty advisory rows report probed paths
+  that have moved since their entry was stamped; three of those name paths this range touched
+  (`0154` on `standalone/src/capture_win.rs`, `0021` and `0092` on `core/src`).
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). The last run inside the range
+  was Phase 5's `cargo nextest run --workspace` — `1799 tests run: 1799 passed, 7 skipped`. Phase 6
+  ran `cargo nextest run --workspace -P fast` — exit 0, `1722 tests run: 1722 passed (1 slow),
+  86 skipped` — plus `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D
+  warnings`, `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`,
+  `node scripts/check-comment-hygiene.mjs` and `node scripts/check-system-counts.mjs`, all exit 0.
 - **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
