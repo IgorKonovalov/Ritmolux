@@ -204,7 +204,7 @@ impl SettingsRow {
 | 1 — The diagnostics overlay gets a key | dev | done | 14ae5f69 |
 | 2 — Every settings row declares the key it edits | dev | done | 776b946f |
 | 3 — A gate for the two applications a Rust test cannot see | dev | done | committed with this row |
-| 4 — The studio's own third copy | studio-builder | not started | |
+| 4 — The studio's own third copy | studio-builder | done | committed with this row |
 
 ### Notes
 
@@ -240,6 +240,33 @@ impl SettingsRow {
 - **Noticed and not acted on:** `README.md`'s `scripts/` block names a selection of the Node gates
   in prose and does not name this one. It is outside Phase 3's `Files touched`, and the block is a
   selection rather than a roster, so nothing was changed there.
+- **Phase 4's check is a sibling file, `studio/electron/settings.doc.test.ts`,** rather than an
+  addition to `settings.test.ts`. That file holds the *behaviour* of reading and writing the
+  settings file; this one holds a declaration to a document, reads no settings and asserts no
+  degradation path, and the plan's `Files touched` allows the sibling.
+- **It reads `StudioSettings` as source text, because a TypeScript interface is erased before
+  anything runs.** There is no `Config::default()` on this side to serialise and walk, so the
+  choices were a parse of the declaration or a hand-maintained runtime roster with a type-level
+  exhaustiveness guard. The parse was taken: it leaves nothing to keep in sync, so the declaration a
+  developer edits is the one the test reads. Both parsers throw on an empty read, and a third test
+  asserts a known key from each side, so the two diffs cannot pass by finding nothing.
+- **Both done-when mutations were run.** Adding `mutantKey?: string` to `StudioSettings` fails with
+  `expected [ 'mutantKey' ] to deeply equal []`; adding a `mutantRow` row to the README table fails
+  the reverse test the same way. Both were reverted.
+- **The new section names browser storage in `studio/README.md`, which the Phase 3 gate does not
+  read** — `.md` is outside its `STUDIO_EXTENSIONS`, so the prose needs no `settings-allow:` marker.
+  The new `.ts` file is in scope and deliberately names none of the three APIs.
+- **The phase's second done-when is NOT green on this machine, for a reason that predates the phase
+  and is outside it.** `npm --prefix studio test` reports `2 failed | 30 passed (32)` test files
+  with `280 passed (280)` tests: `electron/window.csp.test.ts` and
+  `electron/ipc/presetHandlers.test.ts` fail to **collect** at `import 'electron'` with *"Electron
+  failed to install correctly"*. `studio/node_modules/electron/` has no `path.txt` and an almost
+  empty `dist/`, because npm's `allowScripts` policy on this machine has never approved
+  `electron@32.1.2`'s `postinstall` (`npm --prefix studio install-scripts ls` lists it beside the
+  two `esbuild` builds). `npm rebuild electron` does not download it for the same reason. Approving
+  an install script and fetching the binary is a supply-chain decision and writes outside the
+  phase's `Files touched`, so this session did neither. Everything the phase owns is green:
+  typecheck (all four projects), lint, and every test that collects, including the three new ones.
 
 ### Close triggers
 

@@ -115,6 +115,32 @@ A player whose `hello` reports a version the studio does not know is **stopped**
 and the window says so, rather than driving it and showing a picture from an
 engine the panels were not generated from.
 
+## Every setting has a key in `settings.json`
+
+A choice the user expects to outlive the window is **defined by a key in that
+file** (ADR-0240). The settings panel is an editor of the file, never the only
+way to reach the value: a `settings.json` written by hand before the first
+launch is as good as one the panel wrote. Browser storage keeps a choice where
+no file can be edited and no other process can read it, so the studio persists
+nothing that way and `scripts/check-settings-have-files.mjs` refuses it.
+
+Momentary view state is not a setting and owes no key — a panel width, a scroll
+position, which view is open. Those stay in React state and are gone with the
+window, which is what they are for.
+
+| Key          | Shape                         | What it does                                                     |
+| ------------ | ----------------------------- | ---------------------------------------------------------------- |
+| `playerPath` | path                          | An explicit player binary, second in the resolution order above  |
+| `playerMode` | `windowed` or `windowless`    | Which sink the player is spawned with, read at spawn (ADR-0186)  |
+
+Both are optional, and a file that is missing, is not JSON, or carries a key of
+the wrong shape degrades to "no setting" rather than failing the launch — the
+resolution order has two other roots and the mode has a default.
+
+`electron/settings.doc.test.ts` holds that table and the `StudioSettings`
+interface to each other in both directions, so a new key with no row and a row
+with no key each fail before the panel can offer it.
+
 ## Seeing the picture without a person at the screen
 
 `--capture <file> [--capture-after <ms>]` saves one PNG of the window and quits.
