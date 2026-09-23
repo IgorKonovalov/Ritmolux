@@ -52,7 +52,6 @@ place. The plan file carries the real link.
 | [0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) | The diffused frame's resolution is measured before it is designed | approved | dev, human | No ADR yet: the quality profile has never run on a track, so Phase 1 renders the pair and Phase 2 may close the plan. Takes backlog 0125. |
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
 | [0215](0215-the-wide-seams-narrow-and-a-guard-holds-them.md) | The wide seams narrow, and a guard holds them | approved | dev | ADR-0238 (proposed): a scene declares a capability, not the engine enumerating kinds. Sweep 2026-09-20: capture pragma, Scene seam, preview owner - each gated. Lists are dated evidence. |
-| [0216](0216-the-operator-owns-the-order.md) | The operator owns the order | approved | dev | ADR-0239 (proposed): two rotation orders, each on a row and a hotkey, and `source` likewise. The shuffle seed stops being the embedded preset count - takes 0205 finding 5. |
 | [0217](0217-every-setting-has-a-file-and-a-gate-says-so.md) | Every setting has a file, and a gate says so | approved | dev, studio-builder | ADR-0240: a file defines every setting and the menu edits it. Repairs the one violation - the F3 overlay persists nowhere - then a Rust test and a Node gate hold all three. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | Unblocked 2026-09-22 (0219 closed); runs after 0214. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). Phase 3 can stop the plan. |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
@@ -297,13 +296,17 @@ each other; 0216 precedes 0217 so that 0217's gate is written against a settings
 carries the two rotation orders. [0215]'s work is the `Scene` capability seam in `core`, which is what
 makes it the safe parallel rather than a second editor of the same files.
 
+- **[0216] closed 2026-09-23**, first of the three and lane a's first link. The rest of the note
+  stands: [0217] is next on lane a, against the settings surface 0216 just widened, and [0215] runs
+  beside it.
+
 [0202]: 0202-the-three-mechanisms-get-their-gate.md
 [0206]: 0206-the-browser-shows-the-look.md
 [0207]: 0207-the-commitments-get-their-instruments.md
 [0211]: 0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md
 [0212]: 0212-the-diffused-render-gains-a-timeline.md
 [0215]: 0215-the-wide-seams-narrow-and-a-guard-holds-them.md
-[0216]: 0216-the-operator-owns-the-order.md
+[0216]: done/0216-the-operator-owns-the-order.md
 [0217]: 0217-every-setting-has-a-file-and-a-gate-says-so.md
 [0220]: 0220-the-dependencies-catch-up-and-npm-gets-its-gate.md
 [0224]: 0224-the-adapter-becomes-a-setting.md
@@ -1028,6 +1031,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0216 - The operator owns the order](done/0216-the-operator-owns-the-order.md) - closed 2026-09-23. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.144.0**. ADR-0239 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0219 - The Arch box builds, tests and runs every lane](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md) - closed 2026-09-22. Review: **one major (routed to 0218), six minors (four fixed).** Version: none (docs/tooling). ADR-0243 stays proposed. Closes nothing. [Write-up](README-archive.md).
 - [0222 - A repaired finding follows its file into done/](done/0222-a-repaired-finding-follows-its-file-into-done.md) - closed 2026-09-22. Review: **no blockers, no majors, one minor, one nit (fixed).** Version: **0.143.1** (patch). Closes nothing. [Write-up](README-archive.md).
 - [0221 - The Arch block names the studio's settings file](done/0221-the-arch-block-names-the-studios-settings-file.md) - closed 2026-09-22. Review: **no blockers, no majors, one nit (fixed).** Version: none (docs-only). Closes nothing. [Write-up](README-archive.md).
