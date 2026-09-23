@@ -308,8 +308,8 @@ pub(crate) struct PreviewService {
 | 2 — Two methods leave the `Scene` trait | dev | done | c330e18f |
 | 3 — Four capabilities become four traits | dev | done | 2a6bdbcf |
 | 4 — A new kind-branch has to declare itself | dev | done | 673fced7 |
-| 5 — The preview concern gets an owner | dev | done | committed with this row |
-| 6 — The preview concern stays owned | dev | not started | |
+| 5 — The preview concern gets an owner | dev | done | fdac6e6e |
+| 6 — The preview concern stays owned | dev | done | committed with this row |
 
 ### Notes
 
@@ -408,6 +408,50 @@ a_headless_run_emits_the_roster_the_preset_and_a_preset_error` failed once under
 workspace's parallelism, then passed alone and passed again on a second full-workspace run
 (`1799 tests run: 1799 passed, 7 skipped`). It spawns the player and reads its stdout; nothing in
 this phase is on that path.
+
+**Phase 6 — the guard reads struct bodies, and exempts the owner by name.**
+`the_preview_concern_is_named_in_one_module` walks every `.rs` file under
+`core/src/render/`, enters each `struct` body and collects the fields whose name contains
+`preview` or whose type names `Preview*` or `CaptureImage`. Fields in `render/preview.rs` need no
+row; every other one must be in `PREVIEW_FIELDS_ELSEWHERE`, and a row naming a field that is not
+there fails too. Struct bodies rather than lines is what separates a field from the function
+parameters and struct literals that spell `preview: &PreviewTarget` identically —
+`aux_target.rs` and `preview_readback.rs` both carry one.
+
+**Phase 6 — the roster as committed holds three rows**, re-derived on 2026-09-23: `mod.rs`'s
+`preview` (`Renderer`'s one door), `preview_readback.rs`'s `tap` (the readback's own sampling tap,
+ADR-0187), and `capture_api.rs`'s `images`. The third is not a preview field at all — it is the
+headless capture's result set, and it is in the roster because `CaptureImage` had to be a watched
+type for the guard to catch a frame slot named something generic. That is the price of covering
+the captured frame as well as the readback, and the row says so.
+
+**Phase 6 — both directions were established by trying them.** A temporary
+`probe_last_shot: Option<CaptureImage>` on `Renderer` failed the guard with the undeclared-field
+message; a temporary `mod.rs`/`probe_stale_row` row failed it with the stale-row message. Both
+probes were reverted before the commit. A third assertion, that the owner module still holds a
+`PreviewReadback` field and a `CaptureImage` field, is what stops the guard passing on a tree
+where the concern had been deleted outright.
+
+**Phase 6 — three files outside the phase's list, all repairing earlier phases of this plan.**
+Two gates were red at the Phase 5 commit and are green now:
+
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` failed on two intra-doc links to
+  `PreviewService`, which is `pub(super)` — one in `render/preview.rs`'s module header, one in
+  `render/preview_readback.rs`'s `impl Renderer` doc. Both are plain code spans now.
+- `node scripts/check-comment-hygiene.mjs` reported four plan-relative-narration findings: one in
+  `render/evaluate.rs` (Phase 3), one in `render/preview.rs` (Phase 5), one in
+  `tests/suite/hygiene.rs` (Phase 4) and one written in this phase. All four are restated as
+  properties of the code; none took an escape.
+
+Neither gate is in a phase's `Done when`, which is how both survived the commits that introduced
+them. Only `cargo fmt`, `cargo clippy` and the test suites were being run per phase.
+
+**Phase 6 — `PreviewService::target` is dead code in a `-p rlx-core` build.** Its only caller is
+`present_aux`, which is `#[cfg(feature = "text")]`, and the accessor is not. No workspace-wide
+build sees it — `standalone` enables `text`, so `cargo clippy --workspace --all-targets -- -D
+warnings` and `cargo nextest run --workspace` are both clean — but a narrow
+`cargo nextest run -p rlx-core` warns. Left alone: it is a Phase 5 file and a warning no gate
+reads.
 
 ### Close triggers
 

@@ -15,7 +15,7 @@
 //!
 //! ## One owner
 //!
-//! [`PreviewService`] holds every resource the concern has — the intermediate,
+//! `PreviewService` holds every resource the concern has — the intermediate,
 //! the readback and the frame the readback produced — and `Renderer` holds one
 //! of it. Three loose fields there could each be opened, closed, resized and
 //! drained separately, and an accessor that moved two of them and forgot the
@@ -37,12 +37,12 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Everything the program preview owns, as one thing.
 ///
-/// `Renderer` holds one of these where it held the intermediate, the readback
-/// and the produced frame side by side. The accessors that open, close, size and
-/// drain the concern delegate here rather than reaching three fields each, which
-/// is what stops an accessor from moving two of them and quietly leaving the
-/// third behind — closing the intermediate without closing the readback leaves a
-/// staging buffer copying out of a texture that no longer exists.
+/// `Renderer` reaches the concern through one field. The accessors that open,
+/// close, size and drain it delegate here rather than each touching the
+/// intermediate, the readback and the produced frame separately, which is what
+/// stops one of them from moving two and quietly leaving the third behind:
+/// closing the intermediate without closing the readback would leave a staging
+/// buffer copying out of a destroyed texture.
 ///
 /// **Off the frame path.** [`take_target`](Self::take_target) and
 /// [`restore_target`](Self::restore_target) bracket the draw from `render` and

@@ -181,7 +181,7 @@ impl PreviewReadback {
 /// The renderer-facing half: opening and closing the readback, and taking what
 /// it produced.
 ///
-/// Every one of these delegates to the [`PreviewService`](preview::PreviewService)
+/// Every one of these delegates to the `PreviewService` in `render::preview`
 /// the renderer holds — the readback and the intermediate it copies out of are
 /// one concern with one owner, and a `Renderer` accessor that reached past that
 /// owner could open half of it.

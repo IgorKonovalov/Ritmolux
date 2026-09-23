@@ -27,6 +27,10 @@
 //! (j) Every function under `core/src/render/` that matches exhaustively on
 //!     `SystemKind` is one this file declares, with the reason it is not a field
 //!     of the consolidated kind table (ADR-0238 part 3).
+//! (k) The program preview is owned by one module: every struct field under
+//!     `core/src/render/` that names a preview resource or a captured frame is
+//!     declared in `render/preview.rs`, or listed here with the reason it is
+//!     somewhere else.
 //!
 //! `rlx_core` is the crate under test rather than a dependency, so reaching for
 //! `SystemKind::ALL` in (j) leaves the header's claim standing.
@@ -312,8 +316,8 @@ fn hot_path_modules_carry_the_panic_pragma() {
 /// and `disallowed_methods` guards below. The point is not that there are few:
 /// it is that a fifteenth fourteen-arm match cannot appear without somebody
 /// writing down why the answer could not be a field on `SceneKindInfo`
-/// (ADR-0238 part 3). A row whose function no longer exists fails too, so the
-/// roster cannot outlive what it describes.
+/// (ADR-0238 part 3). A row naming a function that is not there fails too, so
+/// the roster cannot outlive what it describes.
 const EXHAUSTIVE_KIND_MATCHES: [(&str, &str); 3] = [
     (
         "kind_info",
@@ -2197,4 +2201,326 @@ fn the_target_literal_guard_reads_literals_not_prose() {
             "the guard missed the segment in: {path}"
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// (k) The preview concern stays owned (Plan 0215 Phase 6, ADR-0143)
+// ---------------------------------------------------------------------------
+
+/// The module that owns the program preview. A field naming a preview resource
+/// or a captured frame belongs here unless [`PREVIEW_FIELDS_ELSEWHERE`] says
+/// otherwise.
+const PREVIEW_OWNER: &str = "preview.rs";
+
+/// A struct field is a preview resource when its **type** names one of these.
+///
+/// `CaptureImage` is in the list because the captured frame is half of what the
+/// guard is about, and it is the only identifier that names it — a
+/// reintroduced frame slot on `Renderer` would be typed this way whatever it
+/// were called. A field whose **name** contains `preview` counts too, which is
+/// what catches a slot typed as something generic.
+const PREVIEW_RESOURCE_TYPES: [&str; 2] = ["Preview", "CaptureImage"];
+
+/// Every struct field under `core/src/render/` that names a preview resource
+/// and is **not** declared in [`PREVIEW_OWNER`], with the reason it is not.
+///
+/// **A declared roster, not a count**, the same shape as
+/// [`EXHAUSTIVE_KIND_MATCHES`]. Counting `Renderer`'s preview fields would fix
+/// the concern at the size it has today; naming where it is allowed to live
+/// lets `PreviewService` grow a fifth resource without touching this file,
+/// while a second preview slot on `Renderer` arrives as an undeclared row. That
+/// second slot is the shape the guard exists to refuse: two owners can be
+/// opened and closed independently, and closing the intermediate while the
+/// readback stands leaves a staging buffer copying out of a destroyed texture.
+const PREVIEW_FIELDS_ELSEWHERE: [(&str, &str, &str); 3] = [
+    (
+        "mod.rs",
+        "preview",
+        "the one field by which `Renderer` reaches the concern - the door, not a \
+         second owner",
+    ),
+    (
+        "preview_readback.rs",
+        "tap",
+        "the readback's own sampling tap, held beside the buffer it feeds so the \
+         geometry is fixed for the life of the run (ADR-0187); reached through \
+         the readback, which the owner holds",
+    ),
+    (
+        "capture_api.rs",
+        "images",
+        "the headless capture's result set, not a preview frame - `CaptureImage` \
+         is the shared image type and this is the other consumer of it",
+    ),
+];
+
+/// **The preview concern is named in one module** (Plan 0215 Phase 6).
+///
+/// Reads whole files and every struct body in them, for ADR-0202's reason: a
+/// guard that looked only at `Renderer` would be blind to a preview resource
+/// parked on a neighbouring struct, which is the same concern split by a
+/// different seam.
+///
+/// The owner module is exempt by name rather than by a cap, so growing the
+/// concern is free and moving a piece of it out is not.
+#[test]
+fn the_preview_concern_is_named_in_one_module() {
+    let render = core_src().join("render");
+    let mut files = Vec::new();
+    collect_every_rs_file(&render, &mut files);
+    assert!(!files.is_empty(), "found no render source files to scan");
+
+    let mut owner_fields: Vec<(String, String)> = Vec::new();
+    let mut elsewhere: Vec<(String, String)> = Vec::new();
+    for file in &files {
+        let rel = file
+            .strip_prefix(&render)
+            .unwrap_or(file)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let text = std::fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
+        for (name, ty) in preview_fields(&text) {
+            if rel == PREVIEW_OWNER {
+                owner_fields.push((name, ty));
+            } else {
+                elsewhere.push((rel.clone(), name));
+            }
+        }
+    }
+
+    // The owner still holds the two the done-when names. Without this the guard
+    // would pass on a tree where the concern had been deleted outright, which is
+    // the vacuous green every guard in this file is written against.
+    for wanted in ["PreviewReadback", "CaptureImage"] {
+        assert!(
+            owner_fields.iter().any(|(_, ty)| ty.contains(wanted)),
+            "no field in core/src/render/{PREVIEW_OWNER} is typed `{wanted}`. The \
+             preview owner holds the readback and the frame it produced; if the \
+             concern moved, move this guard's owner with it."
+        );
+    }
+
+    for (rel, name) in &elsewhere {
+        assert!(
+            PREVIEW_FIELDS_ELSEWHERE
+                .iter()
+                .any(|(f, n, _)| f == rel && n == name),
+            "`{name}` in core/src/render/{rel} holds a preview resource outside \
+             core/src/render/{PREVIEW_OWNER}, which owns the concern (ADR-0143). \
+             Put it on `PreviewService` and delegate, or add a row to \
+             PREVIEW_FIELDS_ELSEWHERE saying in one line why it cannot live there."
+        );
+    }
+    for (rel, name, _) in &PREVIEW_FIELDS_ELSEWHERE {
+        assert!(
+            elsewhere.iter().any(|(f, n)| f == rel && n == name),
+            "PREVIEW_FIELDS_ELSEWHERE declares `{name}` in core/src/render/{rel}, \
+             which is no longer a field there. Drop the row: a roster that \
+             outlives what it describes stops being read."
+        );
+    }
+}
+
+/// The `(name, type)` of every struct field in `text` that names a preview
+/// resource — by type, or by a name containing `preview`.
+///
+/// Struct **bodies** only, which is what separates a field from the function
+/// parameters and struct literals that spell `preview: &PreviewTarget` the same
+/// way. A body is entered at the first `{` after a `struct` header, so a
+/// generic bound or a `where` clause on its own line does not hide it, and left
+/// when the brace depth returns to zero; a field is read at depth 1, so a
+/// nested anonymous block cannot contribute one.
+fn preview_fields(text: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut depth = 0usize;
+    let mut in_body = false;
+    let mut pending_header = false;
+
+    for line in text.lines() {
+        let line = line.trim();
+        if !in_body {
+            if !pending_header && struct_header(line) {
+                pending_header = true;
+            }
+            if pending_header && line.contains('{') {
+                pending_header = false;
+                in_body = true;
+                depth = brace_depth(line);
+                if depth == 0 {
+                    in_body = false;
+                }
+            }
+            continue;
+        }
+        if depth == 1
+            && let Some((name, ty)) = field_decl(line)
+            && (name.to_ascii_lowercase().contains("preview")
+                || PREVIEW_RESOURCE_TYPES.iter().any(|t| ty.contains(t)))
+        {
+            out.push((name, ty));
+        }
+        let next = depth as i32 + bracket_delta_braces(line);
+        depth = next.max(0) as usize;
+        if depth == 0 {
+            in_body = false;
+        }
+    }
+    out
+}
+
+/// Does `line` declare a `struct`? Visibility and attributes may precede it on
+/// the line; a `//` before the keyword makes it prose.
+fn struct_header(line: &str) -> bool {
+    let rest = match line.strip_prefix("struct ") {
+        Some(rest) => Some(rest),
+        None => line
+            .split_once(" struct ")
+            .filter(|(before, _)| !before.contains("//"))
+            .map(|(_, after)| after),
+    };
+    rest.is_some_and(|r| r.starts_with(|c: char| c.is_ascii_uppercase()))
+}
+
+/// The `(name, type)` a struct-field line declares, or `None` for any other
+/// line. Doc comments, attributes and braces are not fields; neither is a path
+/// like `Self::X`, whose `::` the split steps over.
+fn field_decl(line: &str) -> Option<(String, String)> {
+    if line.starts_with("//") || line.starts_with('#') {
+        return None;
+    }
+    let bytes = line.as_bytes();
+    let mut cut = None;
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes.get(i) == Some(&b':') {
+            if bytes.get(i + 1) == Some(&b':') {
+                i += 2;
+                continue;
+            }
+            cut = Some(i);
+            break;
+        }
+        i += 1;
+    }
+    let cut = cut?;
+    let (head, tail) = line.split_at(cut);
+    let ty = tail.get(1..)?.trim().trim_end_matches(',').to_owned();
+    // Strip a visibility prefix; anything else before the name means this is not
+    // a field declaration.
+    let name = head.trim();
+    let name = name
+        .rsplit_once(' ')
+        .map_or(
+            name,
+            |(vis, last)| if vis.starts_with("pub") { last } else { name },
+        )
+        .trim();
+    let plain = !name.is_empty()
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && !name.starts_with(|c: char| c.is_ascii_digit());
+    (plain && !ty.is_empty()).then(|| (name.to_owned(), ty))
+}
+
+/// `line`'s net brace balance, counting only `{` and `}`.
+fn bracket_delta_braces(line: &str) -> i32 {
+    line.chars().fold(0, |acc, c| match c {
+        '{' => acc + 1,
+        '}' => acc - 1,
+        _ => acc,
+    })
+}
+
+/// How deep `line` leaves the scanner, starting from zero. Used for the header
+/// line itself, which opens the body.
+fn brace_depth(line: &str) -> usize {
+    bracket_delta_braces(line).max(0) as usize
+}
+
+/// The preview-ownership guard reads struct fields, and reads the shapes a
+/// second owner would actually arrive in.
+///
+/// This is the negative half of Phase 6's done-when kept permanently: the guard
+/// is demonstrated failing on the field it exists to refuse, rather than only
+/// observed green on a tree that happens not to have one.
+#[test]
+fn the_preview_ownership_guard_reads_fields_not_parameters() {
+    // The shape Phase 5 removed: the readback and the frame back beside the
+    // intermediate, under any name.
+    let regrown = "struct Renderer {\n\
+                   \x20   preview: preview::PreviewService,\n\
+                   \x20   preview_readback: Option<PreviewReadback>,\n\
+                   \x20   captured: Option<CaptureImage>,\n\
+                   }\n";
+    let found = preview_fields(regrown);
+    assert_eq!(
+        found,
+        vec![
+            ("preview".to_owned(), "preview::PreviewService".to_owned()),
+            (
+                "preview_readback".to_owned(),
+                "Option<PreviewReadback>".to_owned()
+            ),
+            ("captured".to_owned(), "Option<CaptureImage>".to_owned()),
+        ],
+        "the guard missed a preview field a second owner would carry"
+    );
+    for (name, _) in &found {
+        if name == "preview" {
+            continue;
+        }
+        assert!(
+            !PREVIEW_FIELDS_ELSEWHERE
+                .iter()
+                .any(|(f, n, _)| *f == "mod.rs" && n == name),
+            "`{name}` on `Renderer` is declared in PREVIEW_FIELDS_ELSEWHERE, so \
+             the guard above would accept the regrown shape"
+        );
+    }
+
+    // A visibility prefix does not hide a field, and a generic header with the
+    // brace on its own line still opens a body.
+    assert_eq!(
+        preview_fields(
+            "pub(super) struct Wrapper<T>\n\
+             where\n\
+             \x20   T: Copy,\n\
+             {\n\
+             \x20   pub(crate) preview_frame: Option<CaptureImage>,\n\
+             }\n"
+        ),
+        vec![(
+            "preview_frame".to_owned(),
+            "Option<CaptureImage>".to_owned()
+        )]
+    );
+
+    // Not fields: a parameter list, a struct literal, a doc comment, a match arm
+    // and a `let` binding all spell `name: Type` or name the types.
+    for prose in [
+        "fn bind(&mut self, preview: &PreviewTarget) -> Option<&wgpu::BindGroup> {\n}\n",
+        "let image = CaptureImage { rgba, width, height };\n",
+        "/// preview: Option<CaptureImage> in a doc comment is not a field\n",
+        "let mut captured: Vec<(u32, CaptureImage)> = Vec::new();\n",
+        "// struct Renderer { preview_readback: Option<PreviewReadback> }\n",
+    ] {
+        assert!(
+            preview_fields(prose).is_empty(),
+            "the guard read a field out of: {prose}"
+        );
+    }
+
+    // A field nested in an inner block is not read at depth 1, and the scanner
+    // leaves the body at the closing brace rather than running to end of file.
+    assert_eq!(
+        preview_fields(
+            "struct A {\n\
+             \x20   preview: preview::PreviewService,\n\
+             }\n\
+             fn after() {\n\
+             \x20   let preview: Option<CaptureImage> = None;\n\
+             }\n"
+        ),
+        vec![("preview".to_owned(), "preview::PreviewService".to_owned())]
+    );
 }

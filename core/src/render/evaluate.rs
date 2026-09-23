@@ -380,9 +380,9 @@ pub(super) fn apply_series(scene: &mut Box<dyn Scene>, name: &str, values: &[f32
 /// from [`apply_series`]'s: a per-vertex series varies over space and its first
 /// element is the top-left corner, which is not a sensible whole-scene reading
 /// of anything. So a scene without the capability ends the walk rather than
-/// degrading it — the evaluations are not run at all, where they used to be run
-/// into the scratch and dropped by a no-op default. The loader already warns
-/// that a `[per_vertex]` table on such a system is inert.
+/// degrading it — the expressions are not evaluated at all, rather than
+/// evaluated into the scratch and dropped. The loader already warns that a
+/// `[per_vertex]` table on such a system is inert.
 pub(super) fn apply_per_vertex(
     scene: &mut Box<dyn Scene>,
     bindings: &[crate::preset::Binding],
