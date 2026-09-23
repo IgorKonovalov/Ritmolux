@@ -50,7 +50,6 @@ place. The plan file carries the real link.
 | [0209](0209-a-system-joins-the-instruments-by-existing.md) | A system joins the instruments by existing | approved | dev, human | ADR-0234 (proposed): distinctness derives its roster from SystemKind; the catalogue declares an entry per system. Phases 4-5 edit .claude/, so NOT queued. Closes 0258, takes 0256's half. |
 | [0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) | The diffused frame's resolution is measured before it is designed | approved | dev, human | No ADR yet: the quality profile has never run on a track, so Phase 1 renders the pair and Phase 2 may close the plan. Takes backlog 0125. |
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
-| [0215](0215-the-wide-seams-narrow-and-a-guard-holds-them.md) | The wide seams narrow, and a guard holds them | approved | dev | ADR-0238 (proposed): a scene declares a capability, not the engine enumerating kinds. Sweep 2026-09-20: capture pragma, Scene seam, preview owner - each gated. Lists are dated evidence. |
 | [0217](0217-every-setting-has-a-file-and-a-gate-says-so.md) | Every setting has a file, and a gate says so | approved | dev, studio-builder | ADR-0240: a file defines every setting and the menu edits it. Repairs the one violation - the F3 overlay persists nowhere - then a Rust test and a Node gate hold all three. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | Unblocked 2026-09-22 (0219 closed); runs after 0214. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). Phase 3 can stop the plan. |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
@@ -301,13 +300,15 @@ makes it the safe parallel rather than a second editor of the same files.
   taken on the owner's box and the plan ran to a close, so it no longer holds a worktree and the
   third `max_open_worktrees` slot is free. The reason [0202], [0211], [0212] and [0220] stay off the
   queue is unchanged — each still parks at a human phase mid-plan.
+- **[0215] closed 2026-09-23**, second of the three and the whole of lane b's parallel. What is left
+  of the note is [0217] on lane a, and a free lane beside it.
 
 [0202]: 0202-the-three-mechanisms-get-their-gate.md
 [0206]: 0206-the-browser-shows-the-look.md
 [0207]: done/0207-the-commitments-get-their-instruments.md
 [0211]: 0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md
 [0212]: 0212-the-diffused-render-gains-a-timeline.md
-[0215]: 0215-the-wide-seams-narrow-and-a-guard-holds-them.md
+[0215]: done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md
 [0216]: done/0216-the-operator-owns-the-order.md
 [0217]: 0217-every-setting-has-a-file-and-a-gate-says-so.md
 [0220]: 0220-the-dependencies-catch-up-and-npm-gets-its-gate.md
@@ -334,19 +335,13 @@ its `after: ["0207"]` is now satisfied, so nothing holds it but the re-queue its
 [0221]: done/0221-the-arch-block-names-the-studios-settings-file.md
 [0206]: 0206-the-browser-shows-the-look.md
 
-**Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster above.**
-It carries the three structural findings of that day's architecture sweep, and its position is
-deliberate rather than incidental: [0206](0206-the-browser-shows-the-look.md) adds a consumer to the
-preview surface its Phase 5 extracts, [0209](0209-a-system-joins-the-instruments-by-existing.md)
-derives a roster from the `SystemKind` its Phase 4 gates, and [0203] touches scene params. Run
-earlier it would refactor code three approved plans are about to rewrite. **The [0203] third of that
-is spent 2026-09-20**, when it closed having added six scene params and changed a seventh's meaning;
-the other two stand. Every count and file list
-inside it is stamped with the date it was read, and `dev` re-derives each at the phase it needs it
-rather than restoring a shape this plan recorded - which is what lets it sit at the back of a
-sixteen-plan queue without going stale.
+~~**Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster
+above.**~~ — **spent 2026-09-23**, when it closed. Moved verbatim to
+[README-archive.md](README-archive.md)'s `## Prior sequencing notes (superseded)`, which also
+records what the ordering was and was not worth: 0215 ran ahead of [0206] and [0209] rather than
+behind them, and the dated-evidence rule inside it is why that cost nothing.
 
-[0215]: 0215-the-wide-seams-narrow-and-a-guard-holds-them.md
+[0215]: done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md
 
 
 **Added 2026-09-19 - [0204] is approved, it sits behind [0201], and it is not a conductor plan.**
@@ -1035,6 +1030,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0215 - The wide seams narrow, and a guard holds them](done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md) - closed 2026-09-23. Review: **no blockers, no majors, three minors, two nits (two fixed).** Version: **0.146.1**. ADR-0238 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0224 - The adapter becomes a setting](done/0224-the-adapter-becomes-a-setting.md) - closed 2026-09-23. Review: **no blockers, no majors, two minors, one nit (all three fixed).** Version: **0.146.0**. ADR-0246 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0207 - The commitments get their instruments](done/0207-the-commitments-get-their-instruments.md) - closed 2026-09-23. Review: **no blockers, no majors, six minors, two nits (five fixed).** Version: **0.145.0**. ADR-0231 + 0232 accepted, each with an Outcome. Closed 0257. [Write-up](README-archive.md).
 - [0216 - The operator owns the order](done/0216-the-operator-owns-the-order.md) - closed 2026-09-23. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.144.0**. ADR-0239 accepted. Closes nothing. [Write-up](README-archive.md).

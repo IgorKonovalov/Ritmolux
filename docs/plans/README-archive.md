@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0215 - The wide seams narrow, and a guard holds them](#0215---the-wide-seams-narrow-and-a-guard-holds-them)
   - [0224 - The adapter becomes a setting](#0224---the-adapter-becomes-a-setting)
   - [0207 - The commitments get their instruments](#0207---the-commitments-get-their-instruments)
   - [0216 - The operator owns the order](#0216---the-operator-owns-the-order)
@@ -221,6 +222,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-23 from `README.md` — the 0215-runs-last note, spent](#moved-2026-09-23-from-readmemd--the-0215-runs-last-note-spent)
   - [Moved 2026-09-23 from `README.md` — the 0224-before-0223 note, spent](#moved-2026-09-23-from-readmemd--the-0224-before-0223-note-spent)
   - [Moved 2026-09-18 from `README.md` — item 5 of the 2026-08-18 sequence, 0103 goes last, spent](#moved-2026-09-18-from-readmemd--item-5-of-the-2026-08-18-sequence-0103-goes-last-spent)
   - [Moved 2026-09-16 from `README.md` — the conductor stand-down that waited on 0180, spent](#moved-2026-09-16-from-readmemd--the-conductor-stand-down-that-waited-on-0180-spent)
@@ -252,6 +254,47 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0215 - The wide seams narrow, and a guard holds them](done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md)
+
+- closed 2026-09-23, conductor-run lane `plan-0215-the-wide-seams-narrow-and-a-guard-holds-them`.
+Phase 1 `2faed625`, Phase 2 `c330e18f`, Phase 3 `2a6bdbcf`, Phase 4 `673fced7`, Phase 5 `fdac6e6e`,
+Phase 6 `a8eab67d`, log `d83eb601`, the close's two prose repairs `9b469223`. Round 1: **no
+blockers, no majors, three minors and two nits**; the two repairable ones fixed at the close.
+Version **0.146.1** (patch: an internal refactor that changed shipped source but shipped neither a
+feature nor a fix). ADR-0238 accepted, with no `Outcome`. Closes no backlog entry. The full review
+is the plan's own `## Close review` section.
+- **What landed.** Three abstractions that had grown without a carrier were narrowed, and each
+narrowing got a guard in the phase after it. The shell's real-time capture loops became modules of
+their own carrying the panic-denial pragma, and the hygiene guard targets all three backend
+directories. `Scene` lost `sample_budget` and `active_sample_count` outright and turned four
+capabilities — per-vertex binding, series binding, feedback source, feedback sink — into narrow
+traits reached through `Option` accessors whose default is `None`; the render-side static kind facts
+consolidated into `SceneKindInfo`. `Renderer`'s three preview fields became one `PreviewService`.
+- **The accessor default is behaviour, not shape, and there is a test that says so.** A binding
+aimed at a scene that lacks the capability is answered at the call site and the two absences are
+answered *differently*: a series degrades to element 0 through `set_param`, a `[per_vertex]` table
+is not evaluated at all. `a_binding_at_a_scene_without_the_capability_is_answered_at_the_call_site`
+asserts both against pre-filled scratch, which is what stands between the design and a caller that
+writes `let _ = scene.as_feedback_sink()` and reproduces the old silent default with more words.
+- **Every one of the three guards is demonstrated failing as well as green**, which is the plan's
+answer to a guard that passes vacuously: the pragma set asserts each target exists before scanning,
+the kind-match roster fails in both directions, and the preview roster carries a permanent negative
+test plus an assertion that the owner still holds a readback and a frame — the shape that stops it
+passing on a tree where the concern was deleted outright.
+- **Three phases found the tree had moved, and each is a log entry rather than a stop.** There are
+three capture backends, not the two the plan named, and the Linux one is the arm that runs here;
+Plan 0206 has not landed, so the preview had three fields rather than four; and a preset-suite guard
+that located a param roster with `text.find("fn set_param")` turned out to be accidentally correct
+— it matched `fn set_param_series` the moment `impl SeriesBound` landed above `impl Scene`, and
+then parsed no arms at all.
+- **What outlived the plan.** `standalone/src/capture_frames.rs` is still outside the pragma set,
+and `drain_whole_frames` — which indexes and slices freely — runs on the Linux real-time thread once
+per read. The plan's file list did not reach it and the close left it open; the repair is code plus
+the guard set, so it wants a phase rather than a close. The Windows and macOS splits were compiled
+on no host. And `Observed<T>` in `render/tests.rs` stopped forwarding `set_feedback`, so an observer
+wrapped around the attractor would see its `[feedback]` table dropped with no diagnostic; neither
+scene it observes today has the capability.
 
 ### [0224 - The adapter becomes a setting](done/0224-the-adapter-becomes-a-setting.md)
 
@@ -10106,6 +10149,31 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Moved 2026-09-23 from `README.md` — the 0215-runs-last note, spent
+
+Spent when [Plan 0215](done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md) closed on
+2026-09-23. It ran behind [0203] as the note required, and ahead of [0206] and [0209] rather than
+behind them — which cost nothing, because every list inside it was dated evidence its phases
+re-derived. Phase 5 found three preview fields rather than the four 0206 would have added, and
+Phase 4's roster was re-derived on the day it was written. Kept verbatim, except that the moved
+plans' links are written for this file's depth:
+
+**Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster above.**
+It carries the three structural findings of that day's architecture sweep, and its position is
+deliberate rather than incidental: [0206](0206-the-browser-shows-the-look.md) adds a consumer to the
+preview surface its Phase 5 extracts, [0209](0209-a-system-joins-the-instruments-by-existing.md)
+derives a roster from the `SystemKind` its Phase 4 gates, and [0203] touches scene params. Run
+earlier it would refactor code three approved plans are about to rewrite. **The [0203] third of that
+is spent 2026-09-20**, when it closed having added six scene params and changed a seventh's meaning;
+the other two stand. Every count and file list
+inside it is stamped with the date it was read, and `dev` re-derives each at the phase it needs it
+rather than restoring a shape this plan recorded - which is what lets it sit at the back of a
+sixteen-plan queue without going stale.
+
+[0215]: done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md
+[0203]: done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md
+[0206]: 0206-the-browser-shows-the-look.md
 
 ### Moved 2026-09-23 from `README.md` — the 0224-before-0223 note, spent
 

@@ -1,9 +1,15 @@
 # 0215 — The wide seams narrow, and a guard holds them
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-23 under the conductor (ADR-0205). Six phase commits,
+> `2faed625` … `a8eab67d`, plus the close block `d83eb601` and the close's own prose repair
+> `9b469223`. Mode 4 round 1: **no blockers, no majors**, three minors and two nits — the two
+> repairable ones fixed in `9b469223`. Verified: all three parts of ADR-0238 implemented, the three
+> new guards each demonstrated failing as well as green, the full suite green on the reviewed tree
+> (ADR-0207 ledger, `1801 passed, 7 skipped`), and no preset, frame, C ABI symbol, protocol message
+> or config key in the range.
 > **Created:** 2026-09-20
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0238](../adrs/0238-a-scene-declares-a-capability-and-the-engine-stops-enumerating-kinds.md) (proposed)
+> **Related ADRs:** [ADR-0238](../../adrs/0238-a-scene-declares-a-capability-and-the-engine-stops-enumerating-kinds.md) (accepted)
 
 ## TL;DR
 
@@ -20,19 +26,19 @@ changes: the acceptance for the whole plan is that the golden suite does not mov
 A standing architectural review on 2026-09-20 swept the tree against layering, real-time safety,
 coupling, determinism and design integrity. The mechanical rules came back clean and, more to the
 point, **gated** — the core is free of platform and audio-source types, the C ABI's functions match
-[spec 0001](../specs/0001-c-abi.md) exactly, `Expr::eval` allocates nothing, there are no train-wreck
+[spec 0001](../../specs/0001-c-abi.md) exactly, `Expr::eval` allocates nothing, there are no train-wreck
 reaches across boundaries, and every direct dependency is exact-pinned with a written justification.
 What the sweep found was not rule-breaking. It was **three places where size accumulated without a
 carrier**, which is the same failure this repository has already documented at the documentation
-layer ([ADR-0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)) and at the
+layer ([ADR-0116](../../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)) and at the
 comment layer
-([ADR-0127](../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)).
+([ADR-0127](../../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)).
 
 **The `Scene` seam.** Eighteen methods, sixteen defaulted. Six have exactly one implementor across
 the fourteen systems; two of those six — `sample_budget`, `active_sample_count` — are reached only by
 test assertions. Because a default body cannot answer *whether* a scene has a capability, callers
 that need to know branch on `SystemKind` outside the trait instead.
-[ADR-0238](../adrs/0238-a-scene-declares-a-capability-and-the-engine-stops-enumerating-kinds.md)
+[ADR-0238](../../adrs/0238-a-scene-declares-a-capability-and-the-engine-stops-enumerating-kinds.md)
 carries the decision and the one constraint that shapes it: `shares_resources` is asked of a roster
 preset whose scene may never have been constructed, so it cannot become a trait method.
 
@@ -54,9 +60,9 @@ in the shell and it never did.
 ### Every measurement in this plan is dated evidence, not a contract
 
 Sixteen approved plans sit ahead of this one, and three land on exactly this code:
-**[0206](0206-the-browser-shows-the-look.md)** adds another consumer to the preview surface,
-**[0209](0209-a-system-joins-the-instruments-by-existing.md)** derives a roster from `SystemKind`,
-and **[0203](done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md)** touches scene params. Every
+**[0206](../0206-the-browser-shows-the-look.md)** adds another consumer to the preview surface,
+**[0209](../0209-a-system-joins-the-instruments-by-existing.md)** derives a roster from `SystemKind`,
+and **[0203](0203-the-figure-gains-the-levers-it-was-measured-to-lack.md)** touches scene params. Every
 count, file list and call-site table in this plan and in ADR-0238 was read on **2026-09-20** and will
 be wrong by the time the plan runs.
 
@@ -195,7 +201,7 @@ flowchart TB
   - The roster as committed names the sites that exist **on the tree at that moment**, each with the
     reason it is not the consolidated table. It is written from a re-derivation, not from this plan.
   - The guard reads whole files rather than two adjacent lines. The precedent is
-    [ADR-0202](../adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md), whose surviving
+    [ADR-0202](../../adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md), whose surviving
     instance was an assertion message.
 
 ### Phase 5 — The preview concern gets an owner
@@ -413,6 +419,225 @@ is not — so no workspace-wide build sees it and it is left alone as a Phase 5 
   `RUSTDOCFLAGS="-D warnings"`, `check-comment-hygiene.mjs` and `check-system-counts.mjs`, all
   exit 0.
 - **Outstanding `human` phases:** none
+
+## Close review
+
+> Mode 4 round 1, 2026-09-23, run as a separate headless session under the conductor (ADR-0205) with
+> the plan and the lane and nothing an implementer wrote. Reproduced in full from
+> `tools/conductor/state/reviews/0215-round-1.md`; a conductor-run close has no reader in the room,
+> so this section is the evidence of what was checked. No earlier round: nothing was raised before
+> this one.
+
+**Verdict: Plan 0215 landed cleanly — no blockers, no majors, three minors and two nits.** All six
+phases are present, each carries a single in-vocabulary `**Owner skill:** dev` tag, all three parts
+of ADR-0238 are implemented, and the three new guards are each demonstrated failing rather than only
+observed green. Nothing a user sees changed: no preset, no C ABI symbol, no control-protocol
+message, no flag or config key is in the diff, and the golden suite did not move.
+
+### Evidence run in the review sitting
+
+| check | result |
+|---|---|
+| `node .../with-lock.mjs suite -- cargo nextest run --workspace` | `with-lock: skipped cargo nextest run --workspace: tree 44ac80c is green in the suite ledger, run by gate 0215-pre-review at 2026-09-23T21:06:48.015Z: 1801 tests run: 1801 passed (5 slow), 7 skipped` (ADR-0207 ledger record — lens 1's full-suite evidence) |
+| `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` | exit 0 |
+| `cargo fmt --all --check` | exit 0 |
+| `cargo clippy --workspace --all-targets -- -D warnings` | exit 0 |
+| `node scripts/check-doc-links.mjs` | OK, 553 tracked files |
+| `node scripts/check-backlog-claims.mjs` | OK — 46 reductions across 21 live entries (4 unprobeable); 30 advisory moved-path rows |
+| `node scripts/check-index-rows.mjs` | OK, 0 over cap, 0 misshaped |
+| `node scripts/check-translations.mjs` | OK, 5 stamped; 3 advisory stale rows |
+| `node scripts/toc.mjs --check` | OK, 7 blocks, 646 rows |
+| `node scripts/check-comment-hygiene.mjs` | OK, 0 escapes |
+| `node scripts/check-system-counts.mjs` | OK |
+
+The log's `Full suite:` says it is owed to the conductor's `pre-review` gate. In conductor mode that
+is correct, and the ledger record above is the run.
+
+### Lens 1 — alignment with the plan and ADR-0238
+
+The `## Implementation log` maps all six phases to commits and is claims, not evidence; every
+paragraph below is read off the tree.
+
+- **Phase 1.** Three backends were split, not the two the plan named — `capture_linux/` as well,
+  which is the arm that actually runs on the reference machine. Each `rt.rs` carries the pragma
+  block verbatim and the guard's target list holds all three backend directories. The guard is
+  **not vacuous**: `hot_path_modules_carry_the_panic_pragma` asserts `target.exists()` for every
+  entry before scanning and `collect_rs_files` panics on a missing directory, and the sentinel test
+  is a plain `text.contains(PRAGMA_SENTINEL)` — deleting the block from any scanned file fails it.
+  The setup halves keep their `expect`, `eprintln!` and `format!` calls unchanged. The three
+  slicing rewrites (`push_silence`, `read_loop`, `interleave_planar` + `handle_audio`) are each
+  unreachable at the sizes their callers establish, so behaviour on every reachable input is
+  unchanged; see nit 1 for the one place where the new arm differs from its neighbour in what it
+  reports. The Windows and macOS arms were not compiled anywhere, which the log discloses; both
+  moves were read here and no leftover reference survives — `Duration`, `SampleProducer`,
+  `AUDCLNT_BUFFERFLAGS_SILENT`, `AUDCLNT_E_DEVICE_INVALIDATED`, `POLL_INTERVAL` and
+  `SILENCE_CHUNK_SAMPLES` are all absent from `capture_win.rs` and present in `capture_win/rt.rs`.
+  The fourth done-when — the `PRAGMA_SENTINEL` doc naming the same set the target list names — is
+  met for `core/src/milk/`, which it now carries, and was missed for the capture arms; that is
+  minor 1.
+- **Phase 2.** Neither `sample_budget` nor `active_sample_count` is a member of `Scene`. Both are
+  inherent `#[cfg(test)]` methods on `AttractorScene`. The two assertions
+  (`the_render_path_resolves_a_larger_budget_than_a_window_does`,
+  `a_trace_preset_draws_its_anchor_count_at_1080p`) make the same claims — a budget resolved larger
+  on the render path than in a window, and an active count that tracks it — through the concrete
+  scene, and they read it off a scene built by `create_attractor`, which is the factory's own arm
+  verbatim rather than a restatement of the ceiling law under test. `Observed<T>` lost the
+  forwarding method with it. No production caller existed, as the plan expected.
+- **Phase 3.** `PerVertexBound`, `SeriesBound`, `FeedbackSource` (`#[cfg(test)]`) and `FeedbackSink`
+  are four traits implemented only by `WarpMeshScene`, `SpectrumScene`, `WarpMeshScene` and
+  `AttractorScene` respectively; every other scene inherits the `None` accessor. The behavioural
+  done-when is met by a real test rather than a review note:
+  `a_binding_at_a_scene_without_the_capability_is_answered_at_the_call_site` drives `apply_series`
+  and `apply_per_vertex` at a stub declaring neither capability and asserts the two absences are
+  answered **differently** — the series lands as element 0 through `set_param`, the per-vertex table
+  is never evaluated, evidenced by pre-filled scratch that comes back untouched. That is the
+  assertion that would catch a `let _ = scene.as_feedback_sink()` caller, which is the risk the plan
+  named. `shares_resources` keeps its signature over two `SystemKind`s and now reads `kind_info`;
+  `transition.rs` is not in the diff at all, so `Transition::pair_shares_resources` is unchanged as
+  required. The non-scene `set_feedback` sinks are untouched — `live.chain.set_feedback(preset
+  .feedback)` in `roster.rs` is byte-identical. `SceneKindInfo` is one exhaustive table with no
+  wildcard arm, in `render/`, carrying `shares_line_renderer` as a field. The `preset.rs` repair
+  (`find("fn set_param(")`) is a real finding about a guard that was accidentally correct, correctly
+  fixed and correctly disclosed.
+- **Phase 4.** `every_exhaustive_system_kind_match_is_declared` reads whole files, derives its
+  variant roster from `SystemKind::ALL` through `Debug` rather than a hand-written list, and
+  attributes a match to the most recent `fn` line. Both directions are asserted: an undeclared site
+  fails, and a declared row that no longer matches fails. Arm-versus-array-element is told by the
+  `=>` the variant group ends in, which is what stops it convicting the test that enumerates
+  independent pairs. The roster's three rows (`kind_info`, `create`, `expected_scene_name`) match
+  what the tree holds under `core/src/render/`.
+- **Phase 5.** `Renderer` reaches the preview through exactly one field,
+  `preview: preview::PreviewService`. Every accessor delegates; none touches two resources directly.
+  The per-frame sequence in `render()` is unchanged in effect — take, draw, record the copy, restore,
+  `step_readback` before the submission, `arm_readback` after it — and `capture_at_clock` records
+  the same order. `draw_frame` is modified only in its exhaustive destructuring, where three
+  `preview*: _` bindings became one. `present_aux` takes the secondary present target's borrow
+  through `self.preview.target()` rather than a sibling field. `set_adapter`'s reconstruction is
+  equivalent: the old code kept a `preview_size` it never used except as an `is_some()`, and the new
+  code keeps the boolean.
+- **Phase 6.** `the_preview_concern_is_named_in_one_module` walks struct **bodies** at brace depth 1
+  under `core/src/render/`, so a parameter list, a struct literal, a `let` binding, a doc comment
+  and a commented-out struct are all excluded — each of those five shapes is asserted excluded in
+  `the_preview_ownership_guard_reads_fields_not_parameters`, which also asserts the regrown
+  three-field `Renderer` is caught. The guard additionally asserts the owner still holds a
+  `PreviewReadback` field and a `CaptureImage` field, which is what stops it passing on a tree where
+  the concern was deleted outright — the vacuous green the plan's risk section named. The roster's
+  three rows are each present in the tree.
+
+Phase tags: all six read `**Owner skill:** dev`, single and in-vocabulary. ADR-0238's three parts are
+all implemented, and its one shaping constraint is respected: the `shares_resources` question stays a
+kind fact because it is asked of a roster preset whose scene may never exist.
+
+### Lens 2 — layering, coupling, real-time safety
+
+- **Source-agnostic core.** Nothing platform-specific entered `core/`. The whole capture change is
+  in `standalone/`, and the new traits name only `wgpu` and crate-internal types.
+- **The audio callback.** The three `rt` modules allocate their buffers before the loop, take no
+  lock, log nothing and open no file. The pragma now denies `unwrap`/`expect`/indexing/`panic`/
+  `unreachable` in each of them, which is the plan's point. One gap survives and is disclosed —
+  minor 3.
+- **The C ABI.** `core-cabi/` is not in the diff; spec 0001's roster is untouched and
+  `RLX_ABI_VERSION` did not move.
+- **The control protocol.** `studio/` and `docs/specs/0003` are not in the diff.
+- **Seam widening.** `Scene` got narrower, not wider: two methods left outright and four became
+  accessors whose bodies live in four traits each implemented by one scene. `FeedbackSource` is
+  `#[cfg(test)]`, so the shipped extension seam is unchanged, and the doc says why.
+- **Law of Demeter.** Phase 5 removed a train-wreck: `renderer.preview_readback.tap.texture()
+  .format()` in `core/src/render/tests.rs` is now `renderer.preview.readback_tap_format()`.
+
+### Lens 3 — doc freshness and release bookkeeping
+
+The range touches no operator-visible surface: no hotkey, menu row, flag, environment variable,
+`config.toml` key, OSC address, preset, param, schema or rendered frame. The operator-doc sweep is
+therefore empty, and it was confirmed rather than assumed — `git grep` for
+`draws_through_shared_line_renderer`, `set_param_series`, `set_per_vertex`, `Scene::sample_budget`,
+`active_sample_count` and `feedback_field` across `docs/` and `.claude/` returns only dated records
+(ADRs, closed plans, the backlog archive) and this plan, all append-only and correctly left alone.
+No `.ru.md` source moved in this range.
+
+- **Preset curation (step 3b):** not triggered — no file under `presets/` is in the diff.
+- **Backlog archiving (step 3c):** not triggered — the plan header names no `Closes:`.
+- **Backlog probes (step 1c):** green. Three advisory moved-path rows name paths this range touched
+  (`0154` on `standalone/src/capture_win.rs`, `0021` and `0092` on `core/src`). Entry `0154`'s body
+  was read: its claim is about `CoCreateInstance` in the **setup** half, which this plan left in
+  `capture_win.rs` untouched, so the split does not falsify it.
+- **Translation advisory (step 1e):** three rows — `docs/how-it-works.ru.md`, `docs/running.ru.md`,
+  `packaging/foobar/READ-ME-FIRST.ru.md`. None of the three English sources moved in **this** range;
+  the drift predates the lane and is routed, not repaired here.
+- **Version bump owed:** yes. This plan is neither a feature nor a fix, and it is not
+  docs/chore-only either — it changed shipped `core/` and `standalone/` source. `patch` is the level
+  this close takes.
+
+### Lens 4 — correctness and determinism
+
+- **Boundary validation** is untouched: `intake` still validates format once where audio enters,
+  and the split moved no check.
+- **Determinism.** No wall-clock read and no unseeded randomness entered the diff. `SeededRng` is
+  unchanged.
+- **No panics in the hot path.** The three capture loops now deny them; `PreviewService`'s methods
+  index nothing; `render/preview.rs` already carried the pragma and still does.
+- **Aspect.** No `aspect` value in the diff is derived from a grid size; the only occurrence is the
+  stub scene's `_aspect: f32` parameter.
+- **Numeric assertions.** The range adds no numeric threshold. The moved budget assertions keep the
+  tier constants they already compared against, which are exact and dimensionless.
+- **One behavioural change, correctly disclosed.** `apply_per_vertex` stops the walk on `None`
+  instead of evaluating each binding into the scratch and discarding it, so a `[per_vertex]` table
+  on a scene without vertices no longer costs the evaluation. Nothing read those values; the full
+  suite and the goldens are the evidence, and the new call-site test asserts the scratch is left as
+  the caller handed it over.
+
+### Lens 5 — design integrity
+
+The three narrowings each have a carrier, which is the plan's whole thesis, and each carrier is a
+**declared roster rather than a cap** — the shape ADR-0116 argued for one layer up. Dependencies
+still point inward. No god module appeared: `PreviewService` took three fields and six accessors out
+of `Renderer` rather than adding a fifth job to it. OCP improved on both axes — a new static kind
+fact is a field on `SceneKindInfo`, and a fifteenth system is told by the guard which sites it owes.
+The one design question the plan left open for the close — whether `SceneKindInfo` should absorb the
+factory — is correctly out of scope and is already recorded as an ADR-0238 followup.
+
+### Findings
+
+**minor 1 — `core/tests/suite/hygiene.rs:45`. Fixed in `9b469223`.** The `PRAGMA_SENTINEL` doc named
+*"the `rt` module of any `standalone/src/capture_*` backend"*, but the guard's target list holds each
+backend's **whole directory** (`capture_rt()` returns `standalone/src/<backend>`, and the comment
+beside the list says so deliberately: *"Directories rather than files, so a loop that grows a second
+module joins the guard by being put there"*). So a second module placed beside `rt.rs` must carry the
+pragma while the instruction a developer reads said only `rt` needs it. Phase 1's fourth done-when is
+precisely that the doc *"names the same set the test's target list names"* — the same class of drift
+it was written to repair for `core/src/milk/`. The doc now says the directory.
+
+**minor 2 — this plan's `## Implementation log`. Fixed in `9b469223`.** The log ran 179 lines against
+the `## Implementation phases` section's 119. The report is not allowed to outweigh the contract, and
+nothing gates that property. Every one of the notes carried a real disclosure, so the repair is
+compression rather than deletion: the notes are grouped one paragraph per phase and tightened, and
+no disclosure was dropped.
+
+**minor 3 — `standalone/src/capture_frames.rs:32`. Left open.** `drain_whole_frames` runs on the
+Linux real-time thread — `capture_linux/rt.rs:64` calls it once per read, between stream start and
+stop — and indexes and slices freely (`out[..samples]`, `buf[..whole]`, `src[0]`…`src[3]`,
+`copy_within`). It sits outside the `capture_*/` directories the guard now targets, so the pragma
+does not cover it and nothing holds it where it is. The bounds are established by the caller and the
+helper is unit-tested, so this is a coverage gap rather than a live defect — but it is the same gap,
+one call deep, that Phase 1 exists to close, and the plan's own rule is that the real-time loop is
+*"the code that runs between stream start and stop"*. `dev` disclosed it as outside the phase's file
+list, which is the right call for the phase and leaves the decision here. The repair is code plus the
+guard set, so it is not one a close may make: rewrite the four bounds as `get`/`get_mut` and add the
+file to the pragma target list, or record why the helper stays exempt.
+
+**nit 1 — `standalone/src/capture_linux/rt.rs:53`. Left open.** The new
+`let Some(window) = bytes.get_mut(carry..filled) else { return; }` leaves `lost` unset, while the
+`stream.read` error path three lines below stores it before returning. Both end the capture thread;
+only one tells the shell. The bound is unreachable — `carry < FRAME_BYTES` and the buffer is
+`READ_BYTES + FRAME_BYTES` — so this is about which failure the code would report if the invariant
+ever broke, not about a reachable path.
+
+**nit 2 — `core/src/render/tests.rs:2986`. Left open.** `Observed<T>` stopped forwarding
+`set_feedback`: it now inherits `Scene`'s `None` for `as_feedback_sink`, so `hand_over_active_preset`
+would skip the sink entirely for an observed scene that has one. Neither scene observed today
+(emitter, shape collage) has the capability and the doc comment says so, but the previous version
+forwarded and this one silently will not — an observer wrapped around the attractor would see its
+`[feedback]` table dropped with no diagnostic.
 
 ## Followups (after this lands)
 
