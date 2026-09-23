@@ -548,9 +548,9 @@ fn a_sequential_walk_skips_a_preset_hidden_mid_walk_without_losing_its_place() {
     assert_eq!(traversal.draw(&eligible).as_deref(), Some("alpha"));
     assert_eq!(traversal.draw(&eligible).as_deref(), Some("bravo"));
 
-    // `charlie` is hidden between two draws, so the next eligible set no longer
-    // holds it: the walk continues at the name after it rather than restarting
-    // or stalling on a name that is gone.
+    // `charlie` is hidden between two draws, so the next eligible set omits it:
+    // the walk continues at the name after it rather than restarting or stalling
+    // on a name that is gone.
     let narrowed: Vec<&str> = eligible
         .iter()
         .copied()

@@ -315,14 +315,26 @@ The scene director's auto-rotate policy.
 | `max_dwell_secs` | `90` | Always rotate by this many seconds, even through a steady passage |
 | `track_change` | `true` | Let the track-change novelty signal nudge rotation in on the same dwell |
 | `source` | `"all"` | Which part of the library rotation draws from: `"all"`, or `"favourites"` for the presets you have marked |
+| `seed` | absent | Pins the shuffle's order. Absent, the shell picks a different number each launch; set, the walk repeats exactly. Ignored by `"sequential"` |
 
 **What rotation draws from, and in what order.** Hidden presets are excluded from both sources —
 that is what hiding one means. `"favourites"` is a hard filter with a fallback: it narrows to the
 marked presets, and while none are marked it draws from the whole eligible set rather than holding
-one scene forever. Within whichever set that leaves, rotation walks a **shuffled traversal**: it
-shows every eligible preset once before showing any of them twice, reshuffles when the cycle is
-exhausted, and never ends one cycle and begins the next on the same preset. `Backspace` steps back
-through what was actually shown.
+one scene forever. Within whichever set that leaves, `order` decides the walk. `"shuffled"`, the
+default, shows every eligible preset once before showing any of them twice, reshuffles when the
+cycle is exhausted, and never ends one cycle and begins the next on the same preset.
+`"sequential"` walks the eligible set in ascending preset-name order and wraps, recomputing the
+successor against the set each draw — so hiding a preset mid-show skips it without the walk losing
+its place. `Backspace` steps back through what was actually shown, under either order. Both keys are
+also the `R` and `L` hotkeys and two rows of the settings menu, and a change made there is written
+back here.
+
+**`seed` is how a run is reproduced.** With no `seed` key the shuffle starts from a number the shell
+varies per launch, so two runs of one build do not replay one order — which is what the shuffle has
+always claimed to do. That matters most on the `--stream` path, where rotation runs even with
+`auto = false` and nobody is at the keyboard to notice the order changed: a headless run someone
+wants to reproduce frame for frame needs `seed` set. Nothing enforces it. `"sequential"` ignores the
+key entirely, because its order is the library's.
 
 **Hold one scene by default.** Out of the box the app stays on a single scene until you opt in — the
 `A` hotkey, or `auto = true` here. Manual `Space` works either way. When auto is on the defaults
@@ -435,6 +447,7 @@ min_dwell_secs = 20
 max_dwell_secs = 90
 track_change = true
 source = "all"
+# seed = 7             # absent: the shuffle varies per launch. Set: it repeats exactly.
 
 [quality]
 tier = "auto"

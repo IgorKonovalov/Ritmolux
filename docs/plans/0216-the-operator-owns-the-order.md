@@ -255,8 +255,8 @@ track_change = true
 | 2 — the order becomes a config key | dev | done | `4c50cb3e` |
 | 3 — the seed varies per launch, and a key pins it | dev | done | `9a40ab42` |
 | 4 — two settings rows and two hotkeys | dev | done | `618acd5a` |
-| 5 — a favourite reads as a warm row | dev | done | committed with this row |
-| 6 — the docs say what the app now does | dev | not started | |
+| 5 — a favourite reads as a warm row | dev | done | `a849a8fe` |
+| 6 — the docs say what the app now does | dev | done | committed with this row |
 
 ### Notes
 
@@ -293,3 +293,13 @@ track_change = true
   what the tests read.
 - Phase 5 also corrects the row count in `hud.rs`'s settings-column comment, which Phase 4's two new
   rows made stale.
+- Phase 6 also edits `standalone/src/director.rs` and `standalone/src/director/tests.rs`, which its
+  file list does not name: `node scripts/check-comment-hygiene.mjs` found two `no longer` phrases in
+  comments Phases 1 and 2 added. Both were reworded to state the property; nothing else moved.
+- `docs/running.ru.md` is now staler than its stamp, as the plan's Phase 6 anticipated. Not
+  translated. `node scripts/check-translations.mjs` exits 0 and reports it as an advisory row
+  alongside `docs/how-it-works.ru.md` and `packaging/foobar/READ-ME-FIRST.ru.md`, both of which were
+  already listed before this plan.
+- `docs/running.md` also gained a sentence about the warm favourite row, which Phase 6's done-when
+  does not ask for; Phase 5 changed what the browser looks like and that page is where the browser
+  is described.

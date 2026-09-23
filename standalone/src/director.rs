@@ -364,8 +364,8 @@ impl Traversal {
     /// Keeps `trail` and `last`, so `Backspace` still walks what was shown and
     /// a sequential walk picked up mid-show continues from the preset on screen
     /// rather than from the top of the library. Drops the announced `upcoming`,
-    /// because the order that chose it is no longer the one drawing — the next
-    /// peek names what the new order will actually take. A call naming the order
+    /// which the departing order chose — the next peek names what the incoming
+    /// one will actually take. A call naming the order
     /// already running is a no-op, so a surface restating it cannot restart a
     /// shuffle's cycle.
     pub fn set_order(&mut self, order: RotateOrder, seed: u32) {
