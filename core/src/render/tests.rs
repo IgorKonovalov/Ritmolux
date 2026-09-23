@@ -367,6 +367,114 @@ fn headless_captures_a_non_black_frame() {
     assert!(non_black, "the active preset drew at least one lit pixel");
 }
 
+/// **The window path encodes no timestamp writes.** The frame tap is the only
+/// thing in the engine that builds a query set, so a frame drawn without one —
+/// which is every frame a window presents — takes the untimed branch of
+/// `gpu::color_pass` for every pass it encodes.
+///
+/// Asserted in **both** directions off the same counter: an ordinary capture
+/// leaves it where it was, and a tapped frame on an adapter that has the
+/// feature moves it. A one-sided version would pass equally well against a
+/// `claim` that never handed out a slot at all.
+#[test]
+fn only_a_tapped_frame_writes_timestamps() {
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 128,
+        height: 128,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    let frame = AnalysisFrame::default();
+
+    assert!(!super::gpu::timer_armed(), "nothing arms a timer at rest");
+    let before = super::gpu::timestamp_writes_issued();
+    let _ = renderer.capture_frame(&frame).expect("capture succeeds");
+    assert_eq!(
+        super::gpu::timestamp_writes_issued(),
+        before,
+        "an untapped frame attached timestamp writes to a pass"
+    );
+    assert!(!super::gpu::timer_armed(), "a capture left a timer armed");
+
+    let mut tap = renderer.open_tap();
+    if !tap.times_passes() {
+        // The software rasterizers have no `TIMESTAMP_QUERY`, which is the
+        // condition the stream mode prints its one notice for; there is
+        // nothing further to assert here.
+        eprintln!("skipped: this adapter has no timestamp queries (ADR-0016)");
+        return;
+    }
+    renderer
+        .render_tapped(&mut tap, &frame, crate::render::scenes::FALLBACK_DT)
+        .expect("a tapped frame renders");
+    assert!(
+        super::gpu::timestamp_writes_issued() > before,
+        "a tapped frame attached no timestamp writes"
+    );
+    assert!(
+        !super::gpu::timer_armed(),
+        "the timer outlived the frame it was armed for"
+    );
+    assert_eq!(tap.pass_costs().frames(), 1);
+    assert!(
+        !tap.pass_costs().rows().is_empty(),
+        "a tapped frame reported no pass rows"
+    );
+}
+
+/// A composite stage's row is in the table exactly while the stage runs.
+///
+/// The table's whole use is deciding what to move, so a row that is present
+/// whatever a preset binds would be reporting on the instrument rather than on
+/// the frame. Driven through `set_param_override` on the shipped Leviathan,
+/// because that is the preset ADR-0245's readings were taken on.
+#[test]
+fn a_stages_row_appears_and_disappears_with_its_param() {
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 128,
+        height: 128,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    if !renderer.select_preset_by_name("Leviathan") {
+        panic!("the shipped set has no `Leviathan`");
+    }
+    let mut tap = renderer.open_tap();
+    if !tap.times_passes() {
+        eprintln!("skipped: this adapter has no timestamp queries (ADR-0016)");
+        return;
+    }
+    let frame = AnalysisFrame::default();
+
+    // Each of the three named passes, against the param that switches its
+    // stage on. `kaleido_order` needs at least two wedges to be a fold at all.
+    for (param, on, pass) in [
+        ("trails", 0.6, "trails-pass"),
+        ("kaleido_order", 6.0, "kaleido-pass"),
+        ("bloom_amount", 0.8, "bloom-bright-pass"),
+    ] {
+        for (value, expected) in [(0.0, false), (on, true)] {
+            renderer
+                .set_param_override(param, value)
+                .expect("the stage params are in the vocabulary");
+            tap.reset_pass_costs();
+            renderer
+                .render_tapped(&mut tap, &frame, crate::render::scenes::FALLBACK_DT)
+                .expect("a tapped frame renders");
+            let present = tap.pass_costs().rows().iter().any(|(row, _)| *row == pass);
+            assert_eq!(
+                present,
+                expected,
+                "`{pass}` at {param} = {value}: the table {} it",
+                if present { "lists" } else { "omits" }
+            );
+            renderer.clear_param_override(param);
+        }
+    }
+}
+
 /// Plan 0049 Phase 2: the analysis snapshot survives the trip from the frame
 /// the render seam is handed to the accessor the overlay and the 1 Hz logger
 /// read. The `diag` unit tests cover the conversion; this covers the plumbing,

@@ -204,7 +204,8 @@ pub(crate) fn uniform_buffer(device: &wgpu::Device, label: &str, size: usize) ->
 // ---------------------------------------------------------------------------
 
 /// Begin a render pass over one colour attachment: no resolve target, no depth,
-/// no timestamp or occlusion queries, `store: Store`.
+/// no occlusion query, `store: Store`, and a timestamp-write pair taken from
+/// whichever [`PassTimer`] is armed on this thread.
 ///
 /// That is the shape of every pass this crate encodes, and `label`, `view` and
 /// `load` are the only things any of them vary. The value is not the saved
@@ -218,6 +219,10 @@ pub(crate) fn uniform_buffer(device: &wgpu::Device, label: &str, size: usize) ->
 /// depth attachment, or `StoreOp::Discard` spells its own descriptor — this
 /// helper is not the place to grow a flag for it.
 ///
+/// **`label` is the row a timing table reports under**, so it doubles as the
+/// pass's identity: two passes sharing a label are summed, and a label built
+/// per frame would be a new row per frame.
+///
 /// The returned pass borrows `encoder` and nothing else: wgpu 30 holds the
 /// attachment by `Arc` internally, so `view` need only outlive the call.
 pub(crate) fn color_pass<'encoder>(
@@ -226,6 +231,10 @@ pub(crate) fn color_pass<'encoder>(
     view: &wgpu::TextureView,
     load: wgpu::LoadOp<wgpu::Color>,
 ) -> wgpu::RenderPass<'encoder> {
+    // Claimed before the descriptor is spelled, so the `&QuerySet` the
+    // descriptor borrows is a handle on this stack frame rather than a borrow
+    // out of the thread-local — which cannot outlive `with_borrow_mut`.
+    let slot = claim_timestamp_slot(label);
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some(label),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -238,10 +247,284 @@ pub(crate) fn color_pass<'encoder>(
             },
         })],
         depth_stencil_attachment: None,
-        timestamp_writes: None,
+        timestamp_writes: slot.as_ref().map(|slot| wgpu::RenderPassTimestampWrites {
+            query_set: &slot.query_set,
+            beginning_of_pass_write_index: Some(slot.begin),
+            end_of_pass_write_index: Some(slot.end),
+        }),
         occlusion_query_set: None,
         multiview_mask: None,
     })
+}
+
+/// Begin a compute pass, timed the same way [`color_pass`] is.
+///
+/// The two compute dispatches in the engine — the attractor's step and its
+/// decay seed — would otherwise be the only passes a timing table could not
+/// see, and they are the heaviest ones on the scene that motivates measuring
+/// at all.
+pub(crate) fn compute_pass<'encoder>(
+    encoder: &'encoder mut wgpu::CommandEncoder,
+    label: &str,
+) -> wgpu::ComputePass<'encoder> {
+    let slot = claim_timestamp_slot(label);
+    encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+        label: Some(label),
+        timestamp_writes: slot.as_ref().map(|slot| wgpu::ComputePassTimestampWrites {
+            query_set: &slot.query_set,
+            beginning_of_pass_write_index: Some(slot.begin),
+            end_of_pass_write_index: Some(slot.end),
+        }),
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Per-pass GPU timing (ADR-0245's instrument)
+// ---------------------------------------------------------------------------
+
+/// How many passes one frame may time.
+///
+/// A rich-tier dissolve with both chains carrying all three stages and a
+/// six-level bloom encodes well under half of this; past it a pass is simply
+/// untimed rather than the frame being refused, because an instrument that can
+/// stop a show is worse than one with a blind spot. Two queries a pass, so the
+/// query set holds `2 * this` — inside wgpu's own 4096 ceiling with room.
+const MAX_TIMED_PASSES: usize = 256;
+
+/// Bytes one resolved timestamp query occupies. wgpu resolves each query as a
+/// `u64` tick count.
+const QUERY_BYTES: u64 = 8;
+
+/// The query set and the index pair one pass writes into it.
+///
+/// Carries an **owned** query-set handle rather than a borrow, because the
+/// timer it came from lives in a thread-local and `with_borrow_mut`'s closure
+/// is the whole of that borrow's life — see [`claim_timestamp_slot`]. The
+/// handle is refcounted, so the clone is an atomic increment.
+struct TimestampSlot {
+    query_set: wgpu::QuerySet,
+    begin: u32,
+    end: u32,
+}
+
+thread_local! {
+    /// The timer this thread's next encoded pass writes into, if any.
+    ///
+    /// **Ambient rather than threaded through every call site**, and that is
+    /// the design rather than an accident: a pass is opened from forty places,
+    /// including three [`PostStage`](super::post::PostStage) implementations
+    /// whose `resolve` signature is the composite's contract, so an explicit
+    /// parameter would mean widening that contract to carry an instrument. The
+    /// arm/disarm pair is owned by exactly one caller — the frame tap — and a
+    /// timer is *moved* in and back out, so there is no path on which a frame
+    /// writes into a query set another frame is resolving.
+    static ARMED: std::cell::RefCell<Option<PassTimer>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Take the next slot for `label` out of the armed timer, or `None` when no
+/// timer is armed — which is every frame the window draws.
+fn claim_timestamp_slot(label: &str) -> Option<TimestampSlot> {
+    ARMED.with_borrow_mut(|armed| armed.as_mut().and_then(|timer| timer.claim(label)))
+}
+
+/// Whether a timer is armed on this thread. Read by the test that holds the
+/// window path to encoding no timestamp writes at all.
+#[cfg(test)]
+pub(crate) fn timer_armed() -> bool {
+    ARMED.with_borrow(Option::is_some)
+}
+
+#[cfg(test)]
+thread_local! {
+    /// How many passes this thread has attached timestamp writes to.
+    ///
+    /// Per-thread like [`ARMED`], so two tests running as threads of one
+    /// process cannot read each other's count. Incremented only inside
+    /// [`PassTimer::claim`], which only runs while a timer is armed — so "an
+    /// untapped frame did not move it" is a claim about the descriptor every
+    /// pass was actually given.
+    static TIMESTAMP_WRITES: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Passes this thread has attached timestamp writes to since it started.
+#[cfg(test)]
+pub(crate) fn timestamp_writes_issued() -> u64 {
+    TIMESTAMP_WRITES.get()
+}
+
+/// One frame's GPU timestamp query set, its resolve and readback buffers, and
+/// the labels of the passes written into it.
+///
+/// Built once per [`FrameTap`](super::capture::FrameTap) and reused for every
+/// frame of a tapped run, so a long run allocates nothing here.
+pub(crate) struct PassTimer {
+    query_set: wgpu::QuerySet,
+    /// `QUERY_RESOLVE | COPY_SRC` — `resolve_query_set`'s destination, which
+    /// cannot also be `MAP_READ`.
+    resolve: wgpu::Buffer,
+    /// `COPY_DST | MAP_READ`, the CPU-visible copy of the above.
+    readback: wgpu::Buffer,
+    /// Nanoseconds one timestamp tick represents, read off the queue once.
+    period_ns: f32,
+    /// One label per timed pass, in write order. Reused between frames rather
+    /// than rebuilt, so the steady state allocates no strings.
+    labels: Vec<String>,
+    /// Passes the frame being encoded has claimed a slot for.
+    claimed: usize,
+    /// Whether a map is outstanding on [`readback`](Self::readback), so a
+    /// collection that finds no map does not unmap a buffer that was never
+    /// mapped.
+    mapped: bool,
+}
+
+impl PassTimer {
+    /// Build a timer, or `None` when the device has no timestamp queries — the
+    /// software rasterizers, and any driver that does not offer the feature.
+    pub(crate) fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Option<Self> {
+        if !device.features().contains(wgpu::Features::TIMESTAMP_QUERY) {
+            return None;
+        }
+        let queries = MAX_TIMED_PASSES as u32 * 2;
+        let bytes = u64::from(queries) * QUERY_BYTES;
+        Some(Self {
+            query_set: device.create_query_set(&wgpu::QuerySetDescriptor {
+                label: Some("rlx-pass-timestamps"),
+                ty: wgpu::QueryType::Timestamp,
+                count: queries,
+            }),
+            resolve: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("rlx-pass-timestamps-resolve"),
+                size: bytes,
+                usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
+                mapped_at_creation: false,
+            }),
+            readback: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("rlx-pass-timestamps-readback"),
+                size: bytes,
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+                mapped_at_creation: false,
+            }),
+            period_ns: queue.get_timestamp_period(),
+            labels: Vec::with_capacity(MAX_TIMED_PASSES),
+            claimed: 0,
+            mapped: false,
+        })
+    }
+
+    /// Hand out the next index pair, recording `label` against it. `None` once
+    /// the frame has spent [`MAX_TIMED_PASSES`].
+    fn claim(&mut self, label: &str) -> Option<TimestampSlot> {
+        if self.claimed >= MAX_TIMED_PASSES {
+            return None;
+        }
+        let at = self.claimed;
+        self.claimed += 1;
+        // Overwrite in place where a previous frame already put a label at this
+        // position: the pass order is stable frame to frame for a given preset,
+        // so the common case copies bytes into an existing `String` rather than
+        // allocating one.
+        match self.labels.get_mut(at) {
+            Some(existing) if existing == label => {}
+            Some(existing) => {
+                existing.clear();
+                existing.push_str(label);
+            }
+            None => self.labels.push(label.to_owned()),
+        }
+        #[cfg(test)]
+        TIMESTAMP_WRITES.set(TIMESTAMP_WRITES.get() + 1);
+        let begin = at as u32 * 2;
+        Some(TimestampSlot {
+            query_set: self.query_set.clone(),
+            begin,
+            end: begin + 1,
+        })
+    }
+
+    /// Record the resolve and the copy to the readback buffer into `encoder`,
+    /// after the frame's passes have been encoded into the same one.
+    fn resolve_into(&self, encoder: &mut wgpu::CommandEncoder) {
+        let queries = self.claimed as u32 * 2;
+        if queries == 0 {
+            return;
+        }
+        encoder.resolve_query_set(&self.query_set, 0..queries, &self.resolve, 0);
+        encoder.copy_buffer_to_buffer(
+            &self.resolve,
+            0,
+            &self.readback,
+            0,
+            u64::from(queries) * QUERY_BYTES,
+        );
+    }
+}
+
+/// Arm `timer` for the passes encoded next on this thread. Returns the timer
+/// that was armed before, which is `None` in every use this engine makes.
+pub(crate) fn arm_pass_timer(timer: Option<PassTimer>) -> Option<PassTimer> {
+    ARMED.with_borrow_mut(|armed| std::mem::replace(armed, timer.map(PassTimer::rearmed)))
+}
+
+/// Take the armed timer back and record its resolve into `encoder` — the other
+/// half of [`arm_pass_timer`], and the one that must run before the frame is
+/// submitted.
+pub(crate) fn disarm_pass_timer(encoder: &mut wgpu::CommandEncoder) -> Option<PassTimer> {
+    let timer = ARMED.with_borrow_mut(Option::take);
+    if let Some(timer) = timer.as_ref() {
+        timer.resolve_into(encoder);
+    }
+    timer
+}
+
+impl PassTimer {
+    /// The timer with its per-frame claim count reset — what arming means.
+    fn rearmed(mut self) -> Self {
+        self.claimed = 0;
+        self
+    }
+
+    /// Ask for the resolved timestamps, without waiting. The caller's own frame
+    /// readback supplies the `poll` that completes this.
+    pub(crate) fn map(&mut self) {
+        if self.claimed == 0 {
+            return;
+        }
+        let bytes = self.claimed as u64 * 2 * QUERY_BYTES;
+        self.readback
+            .slice(..bytes)
+            .map_async(wgpu::MapMode::Read, |_| {});
+        self.mapped = true;
+    }
+
+    /// Fold the mapped timestamps into `costs`, a no-op when the map did not
+    /// land. A pass whose two ticks are out of order — which some drivers
+    /// produce across a frame boundary — contributes zero rather than a
+    /// nonsense figure.
+    pub(crate) fn collect(&mut self, costs: &mut super::capture::PassCosts) {
+        if !self.mapped {
+            return;
+        }
+        let bytes = self.claimed as u64 * 2 * QUERY_BYTES;
+        let slice = self.readback.slice(..bytes);
+        if let Ok(mapped) = slice.get_mapped_range() {
+            for (at, pair) in mapped.chunks_exact(QUERY_BYTES as usize * 2).enumerate() {
+                let Some(label) = self.labels.get(at) else {
+                    break;
+                };
+                let (Some(begin), Some(end)) = (pair.get(..8), pair.get(8..16)) else {
+                    break;
+                };
+                let begin = u64::from_le_bytes(begin.try_into().unwrap_or([0; 8]));
+                let end = u64::from_le_bytes(end.try_into().unwrap_or([0; 8]));
+                let ticks = end.saturating_sub(begin);
+                costs.add(label, ticks as f64 * f64::from(self.period_ns) / 1.0e6);
+            }
+            drop(mapped);
+        }
+        self.readback.unmap();
+        self.mapped = false;
+        costs.close_frame();
+    }
 }
 
 // ---------------------------------------------------------------------------

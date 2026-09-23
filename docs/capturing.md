@@ -1902,6 +1902,40 @@ growing **2.0 MB across the whole run**. That is a reading from one box and one
 driver, not a specification — a machine that cannot hold the rate reports it the
 way the next paragraph describes.
 
+**A third reading sits under those two: what each GPU pass cost.** Where the
+adapter offers timestamp queries, the same 30 s report and the exit print one row
+per labelled render or compute pass, in mean GPU milliseconds per frame,
+costliest first:
+
+```
+stream: pass costs, mean per frame over 1800 frames
+  attractor-draw-pass    19.840 ms
+  bloom-blur-h            4.220 ms
+  trails-pass             4.125 ms
+  kaleido-pass            2.980 ms
+  (7 more)                1.640 ms
+```
+
+The label is the pass's own, so a row names something you can find in the
+engine, and a pass encoded several times a frame — the bloom pyramid's blur runs
+once per level — is **summed into one row** rather than split across them. The
+rows follow the preset: turn `trails`, `kaleido_order` or `bloom_amount` off and
+those rows leave the table, because an inactive stage encodes nothing.
+
+These are **GPU** times taken at each pass's own boundaries, so they do not add
+up to `render+readback` above — that one is a CPU-side wall clock around the
+whole encode, submit and map, and the GPU runs passes concurrently with it.
+
+**An adapter without timestamp queries — the software rasterizers — prints one
+line instead**, at startup, and no table afterwards:
+
+```
+skipped  : per-pass GPU timings - this adapter offers no timestamp queries, so no pass cost table is reported
+```
+
+Nothing else changes on that adapter: the query set is the only thing this adds,
+it is built by the frame tap and by nothing else, and a window has no tap.
+
 **Wall clock against scene clock is the honest frame-rate reading.** They track
 each other because `dt` is measured per frame rather than assumed, so a run that
 cannot hold the requested rate renders in correct real time and simply delivers

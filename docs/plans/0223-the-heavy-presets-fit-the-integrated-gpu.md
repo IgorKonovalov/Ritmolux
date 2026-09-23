@@ -1,6 +1,6 @@
 # 0223 — The heavy presets fit the integrated GPU
 
-> **Status:** approved 2026-09-22
+> **Status:** in-progress 2026-09-22
 > **Created:** 2026-09-22
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0245](../adrs/0245-an-internal-grid-is-a-fraction-of-the-target-resolved-per-tier-and-adapter-class.md)
@@ -245,11 +245,11 @@ grid_scale = "auto"   # or 0.25..1.0
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(not started)_
+**Lane:** `plan-0223-the-heavy-presets-fit-the-integrated-gpu` in `/home/igor/Work/rlx-plan-0223`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Every pass reports what it cost | dev | not started | |
+| 1 — Every pass reports what it cost | dev | done | committed with this row |
 | 2 — The stream readback stops waiting | dev | not started | |
 | 3 — The grid rounds to nearest | dev | not started | |
 | 4 — The post chain stops copying and clearing | dev | not started | |
@@ -258,6 +258,30 @@ grid_scale = "auto"   # or 0.25..1.0
 | 7 — The table takes the measured rows | dev | not started | |
 
 ### Notes
+
+- **Phase 1, the timer is ambient rather than a parameter.** `gpu::color_pass` and the new
+  `gpu::compute_pass` read the armed timer out of a thread-local instead of taking it as an
+  argument. The phase's `Files touched` excludes `trails.rs`, `kaleidoscope.rs` and `bloom.rs`
+  while its `Done when` asks for their rows, and those passes are opened from inside
+  `PostStage::resolve`, whose signature is the composite's contract — so an explicit slot would
+  have had to widen that contract. `render_tapped` owns the one arm/disarm pair and the timer is
+  *moved* in and back out. Recorded here because it is a global-mutable-state choice, not because
+  the plan is ambiguous about the outcome.
+- **Phase 1, a second test beyond the done-when.** The done-when names the trails/kaleido/bloom
+  rows as something to observe on a running `--stream`; this session cannot start the app on this
+  box (no audio device reachable from it), so the claim is asserted instead, in
+  `core/src/render/tests.rs::a_stages_row_appears_and_disappears_with_its_param`, driving the
+  shipped Leviathan through `set_param_override`. The `--stream` table itself is covered by pure
+  tests over `stream::pass_table`; the live invocation is unrun.
+- **The suite is red on one pre-existing test, on this lane's filesystem.**
+  `rlx-core render::tonemap::tests::the_scan_reads_the_visibility_the_helpers_actually_set` fails
+  at `core/src/render/tonemap/tests.rs:1431` with `left: ""`, `right: "FRAGMENT"` on the
+  `pub(crate) fn sampler(` needle. It is the failure Plan 0214's `## Implementation log` records
+  and Plan 0214 Phase 2 owns: `rs_files` concatenates `core/src` in unsorted `read_dir` order and
+  the needle also matches the test's own literal. No phase of this plan adds or removes a file
+  under `core/src`, so the walk order it depends on is untouched here. It makes Phase 3's and
+  Phase 4's *"the whole suite is green"* unsatisfiable as stated for as long as it stands; every
+  other test in `-P fast` passes.
 
 ### Close triggers
 

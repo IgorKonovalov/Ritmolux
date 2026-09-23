@@ -189,6 +189,25 @@ fn describe_adapter(info: &wgpu::AdapterInfo) -> String {
     out
 }
 
+/// The device features to ask `adapter` for: the ones the engine can **use**
+/// where it offers them, and nothing it cannot run without.
+///
+/// wgpu grants a device exactly the requested set, so a feature not named here
+/// is unavailable even on hardware that has it — and a feature named here that
+/// the adapter lacks makes `request_device` fail outright. Intersecting with
+/// the adapter's own set is what makes this a capability query rather than a
+/// requirement.
+///
+/// **`TIMESTAMP_QUERY` is the whole list**, and it buys per-pass GPU timings
+/// for a tapped run ([`PassTimer`](super::gpu::PassTimer)). Pass-boundary
+/// writes only, so `TIMESTAMP_QUERY_INSIDE_PASSES` — which tile-based GPUs
+/// generally do not have — is deliberately not asked for. An adapter without
+/// even this one (the software rasterizers) renders exactly as before and
+/// reports no table.
+fn optional_features(adapter: &wgpu::Adapter) -> wgpu::Features {
+    adapter.features() & wgpu::Features::TIMESTAMP_QUERY
+}
+
 /// Which graphics adapter a headless context should render on.
 ///
 /// Stated in wgpu's own vocabulary and nothing else: no platform type, no
@@ -467,6 +486,7 @@ impl RenderContext {
         let adapter = resolve_adapter(instance, choice, Some(&surface))?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("rlx-device"),
+            required_features: optional_features(&adapter),
             ..Default::default()
         }))
         .map_err(RenderError::RequestDevice)?;
@@ -543,6 +563,7 @@ impl RenderContext {
         let adapter = resolve_adapter(&instance, choice, None)?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("rlx-headless-device"),
+            required_features: optional_features(&adapter),
             ..Default::default()
         }))
         .map_err(RenderError::RequestDevice)?;
@@ -665,6 +686,7 @@ impl RenderContext {
         }
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("rlx-device"),
+            required_features: optional_features(&adapter),
             ..Default::default()
         }))
         .map_err(RenderError::RequestDevice)?;

@@ -327,14 +327,25 @@ pub struct FrameTap {
     pub(crate) width: u32,
     /// Pixel height the three resources above are sized against.
     pub(crate) height: u32,
+    /// The per-pass GPU timer, `None` on an adapter with no timestamp queries.
+    ///
+    /// **This is the only thing in the engine that builds a query set**, which
+    /// is what makes "the window path encodes no timestamp writes" structural:
+    /// a window has no tap.
+    pub(crate) timer: Option<gpu::PassTimer>,
+    /// What the timer has measured since the last [`reset_pass_costs`].
+    ///
+    /// [`reset_pass_costs`]: FrameTap::reset_pass_costs
+    pub(crate) costs: PassCosts,
 }
 
 impl FrameTap {
-    /// Build the target, its view and the readback buffer in one step — the
-    /// whole of the tap's GPU allocation, paid here so the per-frame path pays
-    /// none.
+    /// Build the target, its view, the readback buffer and — where the device
+    /// offers timestamp queries — the pass timer, in one step: the whole of the
+    /// tap's GPU allocation, paid here so the per-frame path pays none.
     pub(crate) fn new(
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         format: wgpu::TextureFormat,
         width: u32,
         height: u32,
@@ -348,11 +359,103 @@ impl FrameTap {
             padded_bpr,
             width,
             height,
+            timer: gpu::PassTimer::new(device, queue),
+            costs: PassCosts::default(),
         }
     }
 
     /// The pixel size every frame this tap yields will carry.
     pub fn size(&self) -> (u32, u32) {
         (self.width, self.height)
+    }
+
+    /// Whether this tap can report per-pass GPU costs at all. `false` on an
+    /// adapter without `TIMESTAMP_QUERY` — the software rasterizers — where a
+    /// caller says so once rather than printing an empty table every window.
+    pub fn times_passes(&self) -> bool {
+        self.timer.is_some()
+    }
+
+    /// What every labelled pass has cost since the last reset.
+    pub fn pass_costs(&self) -> &PassCosts {
+        &self.costs
+    }
+
+    /// Start a fresh measurement window, so each report covers the interval
+    /// since the last one rather than the whole run to date.
+    pub fn reset_pass_costs(&mut self) {
+        self.costs.reset();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// What the passes cost
+// ---------------------------------------------------------------------------
+
+/// GPU time per labelled render/compute pass, accumulated over a window of
+/// frames (ADR-0245).
+///
+/// **Summed per label, not per pass instance.** A frame encodes `bloom-blur-h`
+/// once per pyramid level, and what a reader wants to know is what the blur
+/// costs the frame — so the rows are what each *label* costs per frame, and a
+/// label that appears `N` times carries all `N`.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PassCosts {
+    /// `(label, total milliseconds)`, in first-seen order. A `Vec` rather than
+    /// a map because the roster is a few dozen entries walked once a frame: a
+    /// linear scan over that is cheaper than hashing, and it allocates nothing
+    /// once the labels have all been seen.
+    rows: Vec<(String, f64)>,
+    /// Frames these totals cover, so a row can be reported as a mean.
+    frames: u64,
+}
+
+impl PassCosts {
+    /// Add one pass's milliseconds to its label's running total.
+    pub(crate) fn add(&mut self, label: &str, ms: f64) {
+        if !ms.is_finite() {
+            return;
+        }
+        if let Some(row) = self.rows.iter_mut().find(|(name, _)| name == label) {
+            row.1 += ms;
+            return;
+        }
+        self.rows.push((label.to_owned(), ms));
+    }
+
+    /// Note that a frame's worth of passes has been added.
+    pub(crate) fn close_frame(&mut self) {
+        self.frames += 1;
+    }
+
+    /// Frames the accumulated totals cover.
+    pub fn frames(&self) -> u64 {
+        self.frames
+    }
+
+    /// Every label's **mean milliseconds per frame**, costliest first. Empty
+    /// while no frame has been measured.
+    ///
+    /// Sorted here rather than by the caller so every report orders the rows
+    /// the same way; ties keep first-seen order, which is roughly composite
+    /// order and reads as the frame's own sequence.
+    pub fn rows(&self) -> Vec<(&str, f64)> {
+        if self.frames == 0 {
+            return Vec::new();
+        }
+        let frames = self.frames as f64;
+        let mut rows: Vec<(&str, f64)> = self
+            .rows
+            .iter()
+            .map(|(label, total)| (label.as_str(), total / frames))
+            .collect();
+        rows.sort_by(|a, b| b.1.total_cmp(&a.1));
+        rows
+    }
+
+    /// Drop the accumulated totals and the frame count.
+    pub fn reset(&mut self) {
+        self.rows.clear();
+        self.frames = 0;
     }
 }

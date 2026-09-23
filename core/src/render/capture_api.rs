@@ -669,6 +669,7 @@ impl Renderer {
     pub fn open_tap(&self) -> FrameTap {
         FrameTap::new(
             &self.ctx.device,
+            &self.ctx.queue,
             self.ctx.surface_format(),
             self.ctx.config.width,
             self.ctx.config.height,
@@ -706,6 +707,11 @@ impl Renderer {
     /// [`metrics`](Self::metrics) is what that run reports. The rate it yields is
     /// the tap's throughput, not a display refresh. No capture entry point feeds
     /// it: their frames are drawn offline and would make a rate of nothing.
+    ///
+    /// **Times every pass it encodes**, where the tap has a timer — the query
+    /// set is armed around the draw, resolved into the same submission, and
+    /// read back on the poll the frame readback already pays for, so a tapped
+    /// run costs one extra buffer copy and no extra wait (ADR-0245).
     pub fn render_tapped(
         &mut self,
         tap: &mut FrameTap,
@@ -721,6 +727,9 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("rlx-frame-tap"),
             });
+        // Armed for the whole encode and taken back before the submit, so no
+        // pass encoded outside this window can write into the query set.
+        gpu::arm_pass_timer(tap.timer.take());
         capture::record_clear(&mut encoder, &tap.view);
         let draw_calls = self.draw_frame(
             frame,
@@ -738,13 +747,22 @@ impl Renderer {
             width,
             height,
         );
+        tap.timer = gpu::disarm_pass_timer(&mut encoder);
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
+        // Asked for before the frame readback below, so the one `poll(Wait)`
+        // that blocks on the image completes this map too.
+        if let Some(timer) = tap.timer.as_mut() {
+            timer.map();
+        }
 
         #[cfg(feature = "text")]
         self.text_layer.end_frame();
 
         let image =
             capture::read_back(&self.ctx.device, &tap.buffer, width, height, tap.padded_bpr)?;
+        if let Some(timer) = tap.timer.as_mut() {
+            timer.collect(&mut tap.costs);
+        }
         // After the readback, so a frame that failed to come back is not counted
         // as delivered, and the clock spans the whole draw-to-bytes cost.
         self.diag.set_draw_calls(draw_calls);

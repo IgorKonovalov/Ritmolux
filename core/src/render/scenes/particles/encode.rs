@@ -382,10 +382,7 @@ pub(super) fn encode_jitter(
         )),
     );
 
-    let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-        label: Some("attractor-jitter-pass"),
-        timestamp_writes: None,
-    });
+    let mut pass = gpu::compute_pass(encoder, "attractor-jitter-pass");
     pass.set_pipeline(&pipelines.compute_pipeline);
     pass.set_bind_group(0, &pipelines.compute_bg, &[jitter_offset]);
     pass.dispatch_workgroups(active.div_ceil(WORKGROUP), 1, 1);
@@ -404,10 +401,7 @@ pub(super) fn encode_steps(
     // `FixedStep` already clamps to `MAX_SUBSTEPS`; clamped again because a
     // dispatch past the slots written above would read an undefined slot.
     for slot in 0..pending_steps.min(MAX_SUBSTEPS) {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("attractor-step-pass"),
-            timestamp_writes: None,
-        });
+        let mut pass = gpu::compute_pass(encoder, "attractor-step-pass");
         pass.set_pipeline(&pipelines.compute_pipeline);
         pass.set_bind_group(0, &pipelines.compute_bg, &[pipelines.step_stride * slot]);
         pass.dispatch_workgroups(groups, 1, 1);

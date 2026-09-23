@@ -85,7 +85,7 @@ use aux_target::AuxTarget;
 #[cfg(feature = "text")]
 pub use aux_target::{AuxCounts, AuxPresentMode};
 use background::Background;
-pub use capture::{CaptureImage, FrameTap};
+pub use capture::{CaptureImage, FrameTap, PassCosts};
 pub use capture_api::AudioCapture;
 pub use context::{
     AdapterChoice, AdapterDescription, RenderContext, RenderError, adapter_change_permitted,

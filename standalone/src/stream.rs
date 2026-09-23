@@ -357,6 +357,55 @@ impl StageCosts {
     }
 }
 
+/// How many pass rows a report prints. The tail below this is individually
+/// negligible and collectively noise; a reader chasing a frame time wants the
+/// handful of passes that could pay for moving.
+const PASS_ROWS: usize = 12;
+
+/// The per-pass GPU cost table, one row per labelled pass, costliest first.
+///
+/// `rows` is [`FrameTap::pass_costs`]'s own ordering and unit — **mean GPU
+/// milliseconds per frame** over `frames` frames — so this formats and does not
+/// compute. Pure, so the shape a reader copies out of a log is asserted rather
+/// than eyeballed.
+///
+/// [`FrameTap::pass_costs`]: rlx_core::render::FrameTap::pass_costs
+pub fn pass_table(rows: &[(&str, f64)], frames: u64) -> String {
+    if frames == 0 || rows.is_empty() {
+        return "stream: no pass timings to report".to_owned();
+    }
+    let mut out = format!("stream: pass costs, mean per frame over {frames} frames");
+    // The widest label printed, so the millisecond column lines up without a
+    // fixed width that a longer label would blow past.
+    let width = rows
+        .iter()
+        .take(PASS_ROWS)
+        .map(|(label, _)| label.len())
+        .max()
+        .unwrap_or(0);
+    for (label, ms) in rows.iter().take(PASS_ROWS) {
+        out.push_str(&format!("\n  {label:<width$}  {ms:>7.3} ms"));
+    }
+    if let Some(rest) = rows.len().checked_sub(PASS_ROWS).filter(|n| *n > 0) {
+        let tail: f64 = rows.iter().skip(PASS_ROWS).map(|(_, ms)| *ms).sum();
+        out.push_str(&format!(
+            "\n  {:<width$}  {tail:>7.3} ms",
+            format!("({rest} more)")
+        ));
+    }
+    out
+}
+
+/// The one line a run prints when its adapter cannot time a pass at all.
+///
+/// ADR-0016's shape: a visible one-line notice saying what was skipped and why,
+/// rather than a failure or an empty table every thirty seconds.
+pub fn no_pass_timings_notice() -> String {
+    "skipped  : per-pass GPU timings - this adapter offers no timestamp queries, \
+     so no pass cost table is reported"
+        .to_owned()
+}
+
 /// Whether frame `frames` closes a reporting interval.
 pub fn should_report(frames: u64, every: u64) -> bool {
     every != 0 && frames != 0 && frames.is_multiple_of(every)
@@ -756,6 +805,9 @@ pub fn run(
     let mut diag_log = crate::diaglog::DiagLog::new(crate::cli::resolve_log_path());
 
     let mut tap = renderer.open_tap();
+    if !tap.times_passes() {
+        eprintln!("{}", no_pass_timings_notice());
+    }
     eprintln!("{}", sink.opened());
 
     install_stop_handler();
@@ -922,6 +974,11 @@ pub fn run(
         if should_report(frames, REPORT_EVERY) {
             resident.sample();
             eprintln!("{}", costs.line(request.sink));
+            if tap.times_passes() {
+                let pass_costs = tap.pass_costs();
+                eprintln!("{}", pass_table(&pass_costs.rows(), pass_costs.frames()));
+                tap.reset_pass_costs();
+            }
             eprintln!(
                 "{}",
                 resident.summary(frames.min(u64::from(u32::MAX)) as u32)
@@ -947,6 +1004,10 @@ pub fn run(
     resident.sample();
     if costs.frames > 0 {
         eprintln!("{}", costs.line(request.sink));
+    }
+    if tap.times_passes() && tap.pass_costs().frames() > 0 {
+        let pass_costs = tap.pass_costs();
+        eprintln!("{}", pass_table(&pass_costs.rows(), pass_costs.frames()));
     }
     eprintln!(
         "{}",
@@ -1263,6 +1324,52 @@ mod tests {
         costs.reset();
         assert_eq!(costs, StageCosts::default());
         assert_eq!(costs.frames, 0);
+    }
+
+    /// One row per labelled pass, costliest first, in mean milliseconds per
+    /// frame — the shape a reader copies out of a log to decide what to move.
+    #[test]
+    fn the_pass_table_ranks_the_passes_by_cost() {
+        let rows: [(&str, f64); 3] = [
+            ("trails-pass", 4.125),
+            ("attractor-draw-pass", 19.84),
+            ("bloom-blur-h", 1.5),
+        ];
+        // Pre-sorted by the producer; this asserts the table prints that order
+        // rather than re-deriving it.
+        let mut sorted = rows;
+        sorted.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let table = pass_table(&sorted, 1800);
+        assert!(table.contains("over 1800 frames"), "{table}");
+        let draw = table
+            .find("attractor-draw-pass")
+            .expect("the costliest row");
+        let trails = table.find("trails-pass").expect("the second row");
+        let bloom = table.find("bloom-blur-h").expect("the third row");
+        assert!(
+            draw < trails && trails < bloom,
+            "not cost-ordered:\n{table}"
+        );
+        assert!(table.contains("19.840 ms"), "{table}");
+        assert!(table.contains("4.125 ms"), "{table}");
+    }
+
+    /// An empty window says so rather than printing a headed table with no
+    /// rows under it.
+    #[test]
+    fn an_unmeasured_window_reports_no_pass_timings() {
+        assert!(pass_table(&[], 0).contains("no pass timings"));
+        assert!(pass_table(&[("trails-pass", 1.0)], 0).contains("no pass timings"));
+    }
+
+    /// The adapters with no timestamp queries get one visible line, not a
+    /// failure and not an empty table every thirty seconds (ADR-0016's shape).
+    #[test]
+    fn an_adapter_without_timestamps_gets_one_notice() {
+        let notice = no_pass_timings_notice();
+        assert!(notice.starts_with("skipped"), "{notice}");
+        assert!(notice.contains("timestamp queries"), "{notice}");
+        assert_eq!(notice.lines().count(), 1, "{notice}");
     }
 
     #[test]
