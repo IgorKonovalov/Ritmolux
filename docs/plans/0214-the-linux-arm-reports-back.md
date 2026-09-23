@@ -296,7 +296,7 @@ sessions, so the flip would sit desynced from that index indefinitely.
 
 ### Phase 2, second pass (2026-09-23)
 
-**Lane:** `main` directly. **Commit:** filled in by the row below.
+**Lane:** `main` directly. **Commit:** `f6bd0bf5`.
 
 **The first pass worked, read from run
 [35916291035](https://github.com/IgorKonovalov/Ritmolux/actions/runs/35916291035) on `6ae4af8c`.**
