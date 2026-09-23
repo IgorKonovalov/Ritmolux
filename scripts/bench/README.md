@@ -37,7 +37,9 @@ samples_under_60`, and each run's `# renderer adapter` line on stderr.
 
 ```
 ./scripts/bench/live-presets.sh [NVIDIA AMD]                # Linux, Hyprland
+./scripts/bench/live-presets.sh default                     # Linux, unflagged - whatever the app picks
 .\scripts\bench\live-presets.ps1 [-Gpus NVIDIA,AMD]          # Windows
+.\scripts\bench\live-presets.ps1 -Gpus default              # Windows, unflagged
 ```
 
 - **Linux** opens each window on Hyprland workspace 9, focuses it, fullscreens it with the Lua
@@ -54,9 +56,11 @@ samples_under_60`, and each run's `# renderer adapter` line on stderr.
 (or nothing on both), or the two readings differ by what the music drove rather than by the OS.
 
 `--gpu NVIDIA` selects by name, not index, because the adapter roster orders differently per OS.
-**Without `--gpu` the window takes the surface's default adapter, which on this laptop is the AMD
-iGPU** — every unflagged Linux run in the log resolved `RADV RENOIR`. A reading that does not name
-its adapter is not comparable (ADR-0071, ADR-0243).
+**Without `--gpu` the window takes the high-performance adapter, which on this laptop is the NVIDIA
+dGPU** (ADR-0246). Readings taken before that flip resolved `RADV RENOIR` instead, so which adapter
+an unflagged row ran on is readable only from that run's own `# renderer adapter` line — and a
+reading that does not name its adapter is not comparable (ADR-0071, ADR-0243). The pseudo-name
+`default` in place of a GPU name is how an unflagged run is read.
 
 ## Memo for an agent running this on Windows
 
@@ -67,6 +71,8 @@ its adapter is not comparable (ADR-0071, ADR-0243).
    `renderer` / `# renderer adapter` line:
    - `.\scripts\bench\bench-presets.ps1 -Gpu NVIDIA`
    - `.\scripts\bench\live-presets.ps1` (tell the owner first: it takes the screen for ~11 minutes)
+   - `.\scripts\bench\live-presets.ps1 -Gpus default` — the unflagged reading Plan 0224 Phase 7 asks
+     for, beside `results/linux-2026-09-23-live-default.tsv`
 4. Report each table beside the Linux reference below — per preset, Windows vs Linux, and the ratio
    for the headless bench. Say which OS is faster per preset and whether the gap is uniform (a
    backend or driver constant) or concentrated in one family (a shader or pipeline path one backend
@@ -93,6 +99,7 @@ with `#` lines that name the machine, build, adapter, driver and conditions:
 |---|---|
 | `linux-2026-09-22-bench-nvidia.tsv` | headless bench, the ten presets, 3 runs each, dGPU |
 | `linux-2026-09-22-live.tsv` | live fullscreen, the ten presets, both GPUs |
+| `linux-2026-09-23-live-default.tsv` | live fullscreen, the ten presets, unflagged — the adapter the app itself picks |
 | `linux-2026-09-22-sweep-nvidia.tsv` | headless, the whole shipped library, one run each, dGPU |
 | `linux-2026-09-22-sweep-amd.tsv` | the same on the iGPU — the sweep that picked the ten |
 | `windows-2026-09-22-bench-nvidia.tsv` | headless bench, the ten presets, 3 runs each, dGPU |

@@ -1,5 +1,6 @@
 # Live per-preset reading: each preset borderless-fullscreen, 30 s, with music.
 # Usage: .\scripts\bench\live-presets.ps1 [-Gpus NVIDIA,AMD]
+# The pseudo-name `default` runs unflagged, so the row reads whatever adapter the app itself picks.
 # Fullscreen comes from [output] fullscreen in config.toml, which this script sets to true for
 # the run and restores afterwards. Keep the window in front: an occluded window throttles.
 param([string[]]$Gpus = @("NVIDIA", "AMD"))
@@ -19,7 +20,8 @@ try {
   foreach ($gpu in $Gpus) {
     foreach ($p in $Presets) {
       $before = (Get-Content $Log).Count
-      $proc = Start-Process -FilePath $Bin -ArgumentList "--gpu", "`"$gpu`"", "--preset", "`"$p`"" -PassThru
+      $pin = if ($gpu -eq "default") { @() } else { @("--gpu", "`"$gpu`"") }
+      $proc = Start-Process -FilePath $Bin -ArgumentList ($pin + @("--preset", "`"$p`"")) -PassThru
       Start-Sleep -Seconds 32
       Stop-Process -Id $proc.Id -Force; $proc.WaitForExit(); Start-Sleep -Seconds 1
       $new = Get-Content $Log | Select-Object -Skip $before

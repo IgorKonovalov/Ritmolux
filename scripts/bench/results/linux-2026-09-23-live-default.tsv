@@ -1,0 +1,15 @@
+# linux 2026-09-23, Arch kernel 7.2.5, Hyprland 0.56.2, build 226a71a0 (lane plan-0224), tier rich pinned by [quality] tier
+# live fullscreen 2560x1440 (hyprland logical 2048x1152 at scale 1.25), 32 s per preset, first 6 samples dropped, music playing
+# default = unflagged: no --gpu and no [output] gpu. Resolved to NVIDIA GeForce RTX 3080 Laptop GPU (Vulkan, DiscreteGpu), driver NVIDIA 610.57.04, logged as "default: high performance"
+# the panel is wired to the iGPU, so every frame crosses PRIME; an unflagged non-fullscreen window of the same build read 164.9 fps, 6.06 avg_ms, 6.6-7.0 p99_ms
+gpu	preset	window	samples	fps_med	fps_min	avg_ms_med	p99_ms_med	p99_ms_max	dropped	samples_under_60
+default	Nebula	2048x1152 fs2	24	164.9	164.8	6.06	6.46	7.03	0	0
+default	Leviathan	2048x1152 fs2	25	164.9	164.9	6.07	6.45	6.63	0	0
+default	Clifford	2048x1152 fs2	25	164.9	164.9	6.06	6.45	6.77	0	0
+default	Volute	2048x1152 fs2	25	164.9	164.7	6.06	6.41	6.80	0	0
+default	Dragon	2048x1152 fs2	25	164.9	164.9	6.06	6.47	6.63	0	0
+default	Ink on Paper	2048x1152 fs2	25	164.9	164.8	6.06	6.28	6.42	0	0
+default	Barnsley Fern	2048x1152 fs2	25	164.9	164.9	6.07	6.44	6.82	0	0
+default	Braid	2048x1152 fs2	25	164.9	164.8	6.07	6.67	6.91	0	0
+default	Murmuration	2048x1152 fs2	25	164.9	164.8	6.06	6.69	7.00	0	0
+default	Shatter	2048x1152 fs2	25	164.9	164.8	6.06	6.55	6.82	0	0

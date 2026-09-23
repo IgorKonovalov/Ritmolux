@@ -1,6 +1,7 @@
 #!/bin/bash
 # Live per-preset reading: each preset fullscreen on its own Hyprland workspace, 30 s, with music.
 # Usage: live-presets.sh [gpu-name ...]   (default: NVIDIA AMD)
+# The pseudo-name `default` runs unflagged, so the row reads whatever adapter the app itself picks.
 # Needs Hyprland 0.56+ (Lua dispatch), jq, a release build, and audio playing.
 # The workspace is FOCUSED, not silent: a hidden workspace gets no frame callbacks, so the
 # present would stall and the reading would measure the compositor, not the preset.
@@ -19,7 +20,8 @@ for gpu in "${GPUS[@]}"; do
   for p in "${PRESETS[@]}"; do
     before=$(wc -l < "$LOG")
     hyprctl dispatch "hl.dsp.focus({workspace = $WS})" >/dev/null
-    "$BIN" --gpu "$gpu" --preset "$p" >/dev/null 2>&1 &
+    if [ "$gpu" = default ]; then pin=(); else pin=(--gpu "$gpu"); fi
+    "$BIN" "${pin[@]}" --preset "$p" >/dev/null 2>&1 &
     pid=$!
     sleep 3; hyprctl dispatch 'hl.dsp.window.fullscreen()' >/dev/null
     sleep 9

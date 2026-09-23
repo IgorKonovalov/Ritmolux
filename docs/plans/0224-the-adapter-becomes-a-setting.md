@@ -312,7 +312,7 @@ renderer adapter: AMD Radeon Graphics (RADV RENOIR) ... (default: high performan
 | 4 — the menu row moves the running show | dev | done | c95ad331 |
 | 5 — the console and the sender follow the switch | dev | done | 854ae8d8 |
 | 6 — the operator documentation catches up | dev | done | 596f3f8a |
-| 7 — the machine says whether the default was right | human | not started | |
+| 7 — the machine says whether the default was right | human | Linux half taken, Windows owed | |
 
 ### Notes
 
@@ -325,6 +325,11 @@ renderer adapter: AMD Radeon Graphics (RADV RENOIR) ... (default: high performan
 - Phase 5, backlog 0165's console degrade branch: did not execute here — the session opened no window.
 - Phase 6: `standalone/tests/suite/configuration_doc.rs` populates the new key so the page is held to name it (596f3f8a). `README.md` needed no edit; `docs/nfr.md`'s note landed in Phase 2 (421bd32e).
 - Followup: a switch whose new adapter negotiates a different surface format changes the preview pipe's pixel order after the `stream` event announced it once (ADR-0187); `set_adapter` re-opens the readback and announces nothing.
+- Phase 7, Linux half, 2026-09-23 on the Arch box, lane build 226a71a0, tier `rich` pinned by the file: the unflagged window resolves **NVIDIA GeForce RTX 3080 Laptop GPU (Vulkan, DiscreteGpu), driver NVIDIA 610.57.04**, logged `default: high performance`. Ten-preset fullscreen reading in `scripts/bench/results/linux-2026-09-23-live-default.tsv`: fps median 164.9 on every preset, `frame_ms_avg` 6.06-6.07, `frame_ms_p99` median 6.28-6.69 with a worst sample of 7.03, zero dropped, zero samples under 60.
+- Phase 7, the PRIME answer: the cross-GPU copy is affordable on this box. The unflagged rows sit within noise of 2026-09-22's `--gpu NVIDIA` rows (p99 median 6.30-6.75) and beat the old unflagged iGPU default by six times (25.3-102 fps, most presets under 60 in every sample). Linux does not lose under the new default, so nothing is reverted and ADR-0246 takes no `Outcome` on this half.
+- Phase 7, the fall-back on real hardware: `[output] gpu = "Intel Arc A770"` in the box's own `config.toml` started and said so twice — on stderr, naming the three adapters present and `starting on the default adapter instead`, and in the log as `# renderer adapter: NVIDIA ... (default: high performance; "Intel Arc A770" from config.toml [output] gpu did not resolve)`.
+- Phase 7 made the reading repeatable rather than a one-off: `scripts/bench/live-presets.sh` and `.ps1` take the pseudo-name `default` for an unflagged run, and `scripts/bench/README.md`'s "Common to both" claim that an unflagged window takes the AMD iGPU — falsified by Phase 2, missed by Phase 6 — is corrected there.
+- Phase 7, still owed: the Windows box's own `live-presets.ps1 -Gpus default` reading, and with it the second half of the done-when. Only the owner can boot that side.
 - Followup: two of backlog 0165's probes are broken by Phase 2 — `present: None => AdapterChoice::Default` and `present: fn the_window_and_the_stream_disagree_when_unflagged`, both in `standalone/src/gpu.rs`.
 
 ### Close triggers
@@ -335,7 +340,7 @@ renderer adapter: AMD Radeon Graphics (RADV RENOIR) ... (default: high performan
 - **Operator docs touched:** `docs/configuration.md`, `docs/running.md` (`docs/running.ru.md`'s source moved; `check-translations.mjs` lists it as an advisory), `docs/capturing.md`, `docs/nfr.md`.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit non-zero — 2 broken, both entry 0165, named in the Notes above.
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Narrowed runs per phase, all green: `standalone --lib gpu:: config::`; `standalone --bin ritmolux settings:: console:: input:: app_state:: hud::`; `rlx-core --test suite adapter_switch:: tier_switch::`; `rlx-core --lib render::` (683 passed); `standalone --test suite configuration_doc::`.
-- **Outstanding `human` phases:** 7.
+- **Outstanding `human` phases:** 7 — its Linux half was taken on 2026-09-23 and its Windows reading is owed.
 
 ## Followups (after this lands)
 
