@@ -87,9 +87,10 @@ pub(crate) struct Show {
     /// Which part of the library rotation draws from (`[rotate] source`).
     source: config::RotateSource,
 
-    /// The number the traversal's shuffle is seeded from, held so switching the
-    /// order away from the shuffle and back re-seeds from the same value rather
-    /// than from whatever the mixer had reached.
+    /// The number the traversal's shuffle is seeded from — `[rotate] seed`, or
+    /// this launch's own varying value. Held so switching the order away from
+    /// the shuffle and back re-seeds from the same number rather than from
+    /// whatever the mixer had reached.
     rotate_seed: u32,
 
     /// The family of each preset in the roster, positionally — the filename
@@ -142,6 +143,35 @@ pub(crate) struct Show {
     next_health: Instant,
 }
 
+/// The number this run's traversal is seeded from: `[rotate] seed` when the
+/// operator pinned one, and `launch` — a number the shell varies per run —
+/// otherwise.
+///
+/// Split from the clock read below so the rule is a value rather than a
+/// side effect: the traversal stays a pure function of the number it is handed,
+/// and the choice of which number that is stays here, in the shell.
+fn traversal_seed(pinned: Option<u32>, launch: u32) -> u32 {
+    pinned.unwrap_or(launch)
+}
+
+/// A number that differs between launches of one build.
+///
+/// The wall clock is the only source of one available without a dependency, and
+/// this is the single read on the rotation path — the traversal itself is
+/// clock-free, which is what keeps a walk reproducible from its seed. Falls back
+/// to zero on a clock before the epoch, which is a pinned order rather than a
+/// failure.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "the one launch-varying number the shell picks; the traversal it seeds reads no clock"
+)]
+fn launch_seed() -> u32 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.subsec_nanos() ^ (since.as_secs() as u32))
+        .unwrap_or(0)
+}
+
 impl Show {
     /// Resolve the preset directory, seed the curated set into it on first run,
     /// load it over the renderer's embedded defaults, and record the signature
@@ -164,11 +194,7 @@ impl Show {
         marks_path: Option<PathBuf>,
     ) -> Self {
         let now = Instant::now();
-        // Seeded from the count of the set the binary carries — read before the
-        // reload below installs the per-user or `RLX_PRESET_DIR` library, so it
-        // is the *embedded* count and not this run's roster. It is therefore one
-        // number per build: every launch of a given build walks one order.
-        let rotate_seed = renderer.preset_names().count() as u32;
+        let rotate_seed = traversal_seed(rotate.seed, launch_seed());
         let mut show = Self {
             dir: startup_preset_dir(),
             sig: None,
@@ -692,6 +718,55 @@ mod tests {
             marks_path: None,
             next_health: now + HEALTH_INTERVAL,
         }
+    }
+
+    /// **With no `[rotate] seed`, the walk is a function of a number that moves
+    /// between launches; with one, it is pinned.**
+    ///
+    /// Stated over `traversal_seed` and the traversal it feeds rather than over
+    /// `launch_seed` itself: a test that called the clock twice and demanded two
+    /// answers would be asserting the host's clock granularity, which is ~15 ms
+    /// on one of the three platforms this ships to and would make the test a
+    /// coin-flip there. What is assertable — and what was wrong — is that the
+    /// number reaching the traversal moves at all, and that a pinned key stops
+    /// it moving.
+    #[test]
+    fn an_absent_rotate_seed_varies_the_walk_and_a_pinned_one_repeats_it() {
+        let eligible = ["alpha", "bravo", "charlie", "delta", "echo"];
+
+        let walk = |pinned: Option<u32>, launch: u32, order, steps| {
+            let mut traversal = Traversal::for_order(order, traversal_seed(pinned, launch));
+            (0..steps)
+                .map(|_| traversal.draw(&eligible).expect("a non-empty set"))
+                .collect::<Vec<String>>()
+        };
+
+        // Absent: the launch value reaches the mixer, so the first draw is not
+        // one name for the whole build. Some pairs of launch values do collide
+        // on a five-preset library — the claim is that the walk moves, not that
+        // every pair of launches differs.
+        let firsts: std::collections::BTreeSet<Vec<String>> = (0..64)
+            .map(|launch| walk(None, launch, config::RotateOrder::Shuffled, 1))
+            .collect();
+        assert!(
+            firsts.len() > 1,
+            "every launch drew the same preset first, so the seed is not reaching \
+             the traversal and the shuffle replays one order per build"
+        );
+
+        // Pinned: the launch value is ignored and two runs walk identically.
+        assert_eq!(
+            walk(Some(7), 11, config::RotateOrder::Shuffled, 12),
+            walk(Some(7), 4_000_000_001, config::RotateOrder::Shuffled, 12),
+            "`seed = 7` did not pin the walk"
+        );
+
+        // And the sequential order ignores the seed entirely.
+        assert_eq!(
+            walk(None, 1, config::RotateOrder::Sequential, 7),
+            walk(None, 2, config::RotateOrder::Sequential, 7),
+            "a varying seed moved a walk that is supposed to be alphabetical"
+        );
     }
 
     /// **A reload that rewrites the on-screen preset's family re-reports it**

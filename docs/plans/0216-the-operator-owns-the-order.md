@@ -252,8 +252,8 @@ track_change = true
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `Order` splits out of `Traversal` | dev | done | `14d24213` |
-| 2 — the order becomes a config key | dev | done | committed with this row |
-| 3 — the seed varies per launch, and a key pins it | dev | not started | |
+| 2 — the order becomes a config key | dev | done | `4c50cb3e` |
+| 3 — the seed varies per launch, and a key pins it | dev | done | committed with this row |
 | 4 — two settings rows and two hotkeys | dev | not started | |
 | 5 — a favourite reads as a warm row | dev | not started | |
 | 6 — the docs say what the app now does | dev | not started | |
@@ -272,3 +272,8 @@ track_change = true
   `Show::set_rotate_source`) carry an `#[allow(dead_code)]` for the same clippy reason as Phase 1 —
   their only callers are Phase 4's rows and hotkeys. `Show::set_rotate_source` is in this phase
   rather than Phase 4 because Phase 4's file list does not name `standalone/src/show.rs`.
+- Phase 3's done-when *"two launches of one build produce different first draws"* is asserted over
+  `traversal_seed` and the traversal it feeds, not over `launch_seed`: two clock reads in one test
+  are not guaranteed to differ where the wall clock is coarse, so the test states that the number
+  reaching the traversal moves and that `seed = 7` stops it moving. Nothing asserts that
+  `launch_seed` reads the clock.

@@ -336,6 +336,11 @@ pub struct Rotate {
     /// Which part of the library rotation draws from (ADR-0228). Hidden presets
     /// are excluded from every value.
     pub source: RotateSource,
+    /// What the shuffle is seeded from (ADR-0239). **Absent by default, and then
+    /// the shell varies it per launch**, so two runs of one build do not replay
+    /// one order; set it and the walk repeats exactly, which is how a `--stream`
+    /// run or a two-night show is reproduced. `"sequential"` ignores it.
+    pub seed: Option<u32>,
 }
 
 impl Default for Rotate {
@@ -347,6 +352,7 @@ impl Default for Rotate {
             max_dwell_secs: 90,
             track_change: true,
             source: RotateSource::All,
+            seed: None,
         }
     }
 }
