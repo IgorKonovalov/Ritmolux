@@ -44,7 +44,7 @@ place. The plan file carries the real link.
 | [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | approved | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four are `human`. Unblocked: 0120 closed 2026-09-22. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | approved | dev, human | ADR-0113's third Outcome is the brief: the rate candidate, the echo, the per-mode wave scale, then a fourth look gate. Phases 5-6 need the rig and the corpus, so the conductor parks. |
-| [0207](0207-the-commitments-get-their-instruments.md) | The commitments get their instruments | approved | dev, human | ADR-0231 + 0232 (proposed): the exe cap re-derived and a build that prints it; an ADVISORY frame-cost column; the Floor read on a named machine. Phase 1 sets the constant. Closes backlog 0257. |
+| [0207](0207-the-commitments-get-their-instruments.md) | The commitments get their instruments | approved | dev | ADR-0231 + 0232 (proposed): the exe cap re-derived and a build that prints it; an ADVISORY frame-cost column. Phases 1-2 landed; Phase 3's Floor reading deferred 2026-09-23. |
 | [0206](0206-the-browser-shows-the-look.md) | The browser shows the look | approved | dev | ADR-0230 (proposed): a low-priority subprocess of the player renders each still, cached by name + file stamp; a pane beside the list, never a grid. 0205 closed - shares the overlay. Exe is already over cap, backlog 0257. |
 | [0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md) | The library learns from the corpus it will not ship | approved | human | ADR-0227 (proposed): a borrowed look is authored natively and the reference stays outside. A judged 4-6 cohort of 21 picks, routed by look. After 0201's `zoom` fix. |
 | [0208](0208-the-conductors-safety-claims-get-their-evidence.md) | The conductor's safety claims get their evidence | approved | dev | ADR-0233 (proposed): the deny half is asserted against a probe transcript, not a model; Phase 1 can supersede it. Edits settings.conductor.json, so NOT queued. Closes 0236-0241. |
@@ -57,7 +57,7 @@ place. The plan file carries the real link.
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | Unblocked 2026-09-22 (0219 closed); runs after 0214. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). Phase 3 can stop the plan. |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 | [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
-| [0224](0224-the-adapter-becomes-a-setting.md) | The adapter becomes a setting | approved | dev, human | ADR-0246 (proposed): a `[output] gpu` key, the unflagged window prefers the fast adapter, and set_adapter rebuilds on the live context. Runs BEFORE 0223, which is then tuned against what an operator gets. |
+| [0224](0224-the-adapter-becomes-a-setting.md) | The adapter becomes a setting | approved | dev, human | ADR-0246 (proposed): a `[output] gpu` key, the unflagged window prefers the fast adapter, set_adapter rebuilds live. Runs BEFORE 0223. Parked: Phase 7's Windows reading owed; Arch half read 2026-09-23. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -280,6 +280,33 @@ sized in samples, so 21 of 64 bands are bin-starved at 96 kHz — pinned by a te
 waiting on someone reporting a mushy low end on a 96 kHz interface).
 
 ## Recommended execution sequence
+
+**Added 2026-09-23 — the queue holds three plans chosen for needing no hardware, and one arithmetic
+governs the choice.** Both lanes were stalled on `human` phases — [0207]'s Floor reading (since
+deferred) and [0224]'s Windows reading (still owed) — and nothing else was queued. [0215], [0216] and
+[0217] are the only approved plans whose every phase belongs to an implementer, so each runs to a
+close instead of parking. **A parked plan keeps its worktree**: 0224 holds one, `max_open_worktrees`
+is 3, and two live lanes take the rest, so a plan that parks partway costs the third slot and stops
+the next lane. That is why [0202], [0211], [0212] and [0220] stay off the queue despite being ready —
+each parks at a human phase mid-plan — and they are the first to add once a park settles.
+
+**Lane a serialises the operator surface, lane b stays out of it.** [0206]'s browser pane, [0216]'s
+rotation rows and hotkeys and [0217]'s settings-file gate all edit the standalone's menu, its
+`config.toml` keys and the same two operator pages, so they run one after another rather than beside
+each other; 0216 precedes 0217 so that 0217's gate is written against a settings surface that already
+carries the two rotation orders. [0215]'s work is the `Scene` capability seam in `core`, which is what
+makes it the safe parallel rather than a second editor of the same files.
+
+[0202]: 0202-the-three-mechanisms-get-their-gate.md
+[0206]: 0206-the-browser-shows-the-look.md
+[0207]: 0207-the-commitments-get-their-instruments.md
+[0211]: 0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md
+[0212]: 0212-the-diffused-render-gains-a-timeline.md
+[0215]: 0215-the-wide-seams-narrow-and-a-guard-holds-them.md
+[0216]: 0216-the-operator-owns-the-order.md
+[0217]: 0217-every-setting-has-a-file-and-a-gate-says-so.md
+[0220]: 0220-the-dependencies-catch-up-and-npm-gets-its-gate.md
+[0224]: 0224-the-adapter-becomes-a-setting.md
 
 **Spent 2026-09-22, when [0222] closed behind [0221].** The note as written:
 **Added 2026-09-22, later - [0222] is approved and queued in lane `a` behind [0221], with `after: ["0221"]`.**
