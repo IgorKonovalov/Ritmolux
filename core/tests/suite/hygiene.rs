@@ -42,8 +42,10 @@ use std::path::{Path, PathBuf};
 /// `core/src/diag/`, `core/src/audio.rs`, `core/src/preset/expr.rs`,
 /// `core/src/milk/` (the EEL2 machine), the `core-cabi` crate's `src/` (the C
 /// ABI, moved out of `core/src/ffi.rs` by ADR-0072), the `rlx-ring` crate's
-/// `src/` (the extracted SPSC ring, Plan 0005), or the `rt` module of any
-/// `standalone/src/capture_*` backend (the shell's real-time capture loops):
+/// `src/` (the extracted SPSC ring, Plan 0005), or a `standalone/src/capture_*`
+/// backend's own directory — the whole directory, not only the `rt` module in
+/// it today, so a loop that grows a second module joins the guard by being put
+/// there (the shell's real-time capture loops):
 ///
 /// ```ignore
 /// #![deny(

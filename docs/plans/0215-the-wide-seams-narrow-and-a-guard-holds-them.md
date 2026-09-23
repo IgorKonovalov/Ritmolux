@@ -297,8 +297,7 @@ pub(crate) struct PreviewService {
 
 ## Implementation log
 
-> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
-> last one. **The phases above are the contract; everything here is what happened.**
+> Written by `dev` as the phases land. **The phases above are the contract; this is what happened.**
 
 **Lane:** `plan-0215-the-wide-seams-narrow-and-a-guard-holds-them` in `/home/igor/Work/rlx-plan-0215`
 
@@ -313,165 +312,106 @@ pub(crate) struct PreviewService {
 
 ### Notes
 
-**Phase 1 — three capture arms, not two.** The plan and ADR name `capture_win.rs` and
-`capture_mac.rs`; the tree also carries `standalone/src/capture_linux.rs` (ADR-0131), whose
-`read_loop` is the real-time thread on the reference machine. All three were split, and the guard
-targets all three `capture_*/` directories. Covering only the two named arms would have left the
-only arm that builds here outside the guard.
+**Phase 1 — three arms, and two of them unbuilt.** The tree also carries
+`standalone/src/capture_linux.rs` (ADR-0131), whose `read_loop` is the real-time thread on the
+reference machine, so all three backends were split and the guard targets all three `capture_*/`
+directories. Only the Linux arm was built, linted and tested; the Windows and macOS splits are
+mechanical moves reviewed by reading and compiled on no host, and the macOS one moved the whole
+`define_class!` block, so the ObjC thunk sits inside the guarded module.
+**Three slicing sites were rewritten to satisfy the pragma** — `push_silence`'s `&silence[..n]`;
+`read_loop`'s `&mut bytes[carry..filled]` and `&samples[..drained.samples]`; `interleave_planar`'s
+two indexes plus `handle_audio`'s `&buffers[0]`, `&planes[..plane_count]` and
+`&state.scratch[..written]` — each now `get`/`get_mut` with an early return. Every bound is
+unreachable at the sizes the callers establish, so behaviour is unchanged on every reachable input,
+but this is a code change inside the moved loops rather than a pure move.
+`standalone/src/capture_frames.rs` stays out of the guard set: `drain_whole_frames` is called from
+the Linux loop and indexes freely, but is a pure helper outside `capture_*/` and the file list.
 
-**Phase 1 — neither Windows nor macOS was compiled.** The reference machine is Linux, so only the
-Linux arm was built, linted and tested. The Windows and macOS splits are mechanical moves,
-reviewed by reading; they were not compile-checked on any host. The macOS split moved the whole
-`define_class!` block, so the ObjC callback thunk is inside the guarded module rather than calling
-into it.
+**Phase 2 — no production caller, and a named factory arm.** The re-derivation found only the two
+assertions in `render/scenes/mod.rs`'s test module and a forwarding method on the test-only
+`Observed<T>`, gone with the trait method. The tests read the budget off a scene the factory built,
+so reaching the concrete type meant the attractor arm of `create` had to be callable alone:
+`create_attractor` is that arm verbatim, live/offline ceiling choice included, and the factory calls
+it too. ADR-0195 still names `Scene::sample_budget` in prose (line 145) — a dated record, left be.
 
-**Phase 1 — three slicing sites were rewritten to satisfy the pragma.** `push_silence`'s
-`&silence[..n]` (Windows), `read_loop`'s `&mut bytes[carry..filled]` and `&samples[..drained.samples]`
-(Linux), and `interleave_planar`'s two indexes plus `handle_audio`'s `&buffers[0]`,
-`&planes[..plane_count]` and `&state.scratch[..written]` (macOS) became `get`/`get_mut` with an
-early return. Every bound is unreachable at the sizes the callers establish, so the behaviour on
-every reachable input is unchanged — but this is a code change inside the moved loops, not a pure
-move, and the plan's "no behaviour moves in this phase" is met in effect rather than by the diff
-being empty.
+**Phase 3 — one behavioural change and one accidental guard.** The per-vertex `None` arm changes
+what runs, not what is drawn: the old default was a no-op, so a `[per_vertex]` table on a scene
+without vertices was evaluated into the renderer's scratch and discarded, and the caller now ends
+the walk instead. No frame moves — nothing read those values — and the full suite is the evidence.
+One file outside the list, `core/tests/suite/preset.rs`: `declared_params_match_set_param` located a
+scene's param roster with `text.find("fn set_param")`, which matched `fn set_param_series` once the
+spectrum scene's `impl SeriesBound` landed above its `impl Scene`, and then parsed no arms; it now
+searches `fn set_param(`, and that guard was accidentally correct. `Observed<T>` lost three
+forwarding methods: it hands out borrows from behind a `RefCell`, which an `as_*` accessor cannot
+do, so it takes the `None` default for all four capabilities — its doc's reason for
+`mirror_overflow` — and neither scene it observes has any. The ceiling exception was not needed:
+`set_per_vertex` goes through an accessor like the rest, and no golden moved.
 
-**Phase 1 — `standalone/src/capture_frames.rs` is not in the guard set.** `drain_whole_frames` is
-called from the Linux loop and indexes and slices freely. It is a pure, shared helper outside the
-`capture_*/` directories the guard now targets, and pulling it in was outside the phase's file
-list.
+**Phase 4 — three rows, both directions, and one non-`std` name.** The roster holds `kind_info`,
+`create` and the test module's `expected_scene_name`, re-derived on 2026-09-23; nothing else under
+`core/src/render/` matches exhaustively on `SystemKind` (`bare_system_extras` has a wildcard arm,
+`shares_resources` reads the table). Both directions were established by trying them: a temporary
+fourteen-arm `probe_kind_fact` and a temporary stale `probe_row`, both reverted. The guard reaches
+for `rlx_core::preset::SystemKind::ALL`, the first non-`std` name in `hygiene.rs`, whose header now
+says why the crate under test is not the dependency its std-only claim was about; the alternative,
+a hand-written variant list inside the guard, is the staleness ADR-0202 is about.
 
-**Phase 2 — the re-derivation found no production caller**, as the plan expected: the only callers
-were the two assertions in `render/scenes/mod.rs`'s test module and a forwarding method on
-`render/tests.rs`'s `Observed<T>` wrapper, which is itself test-only and never observed an
-attractor. That forwarding method is gone with the trait method.
-
-**Phase 2 — the factory arm gained a named helper.** The tests read the budget off a scene the
-factory built, which is the wiring they assert about; reaching the concrete type meant the
-attractor arm of `create` had to be callable on its own. `create_attractor` is that arm, verbatim,
-including the live/offline ceiling choice — the factory arm now calls it and so do the tests.
-
-**Phase 2 — ADR-0195 still names `Scene::sample_budget` in prose** (its line 145). Not touched: it
-is a dated record and outside the phase's file list.
-
-**Phase 3 — the per-vertex `None` arm changes what runs, not what is drawn.** The old default was a
-no-op, so a `[per_vertex]` table on a scene without vertices was evaluated into the renderer's
-scratch and discarded. The caller now ends the walk on `None` and the evaluations do not happen.
-No frame moves — nothing read those values — and the full suite is the evidence.
-
-**Phase 3 — one file outside the phase's list: `core/tests/suite/preset.rs`.**
-`declared_params_match_set_param` locates a scene's parameter roster with `text.find("fn
-set_param")`, which matched `fn set_param_series` once the spectrum scene's `impl SeriesBound`
-landed above its `impl Scene`, and then parsed no arms. The search is now for `fn set_param(`. The
-guard was accidentally correct rather than correct, and reordering the two impl blocks would have
-left that in place.
-
-**Phase 3 — `Observed<T>` in `render/tests.rs` lost three forwarding methods.** It hands out
-borrows from behind a `RefCell`, which an `as_*` accessor cannot do, so it takes the `None`
-default for all four capabilities — the same reason its doc already gave for `mirror_overflow`.
-Neither scene it observes (emitter, shape collage) has any of the four.
-
-**Phase 3 — the ceiling exception was not needed.** `set_per_vertex` is reached through an
-accessor like the other three; no frame-cost reading was taken, and no golden moved.
-
-**Phase 4 — the roster as committed holds three rows**, re-derived on 2026-09-23: `kind_info`,
-`create` and the test module's `expected_scene_name`. Nothing else under `core/src/render/` matches
-exhaustively on `SystemKind`; `bare_system_extras` in `render/tests.rs` has a wildcard arm and
-`shares_resources` now reads the table.
-
-**Phase 4 — both directions were established by trying them.** A temporary fourteen-arm
-`probe_kind_fact` in `render/scenes/mod.rs` failed the guard with the undeclared message; a
-temporary `probe_row` in the roster failed it with the stale-row message. Both probes were reverted
-before the commit.
-
-**Phase 4 — the guard reaches for `rlx_core::preset::SystemKind::ALL`**, which is the first
-non-`std` name in `hygiene.rs`. Its header called the file std-only; the header now says why the
-crate under test is not the dependency that claim is about. The alternative was a hand-written
-variant list inside the guard, which is the staleness ADR-0202 is about.
-
-**Phase 5 — Plan 0206 has not landed, so there were three preview fields, not four.** `Renderer`
-carried `preview`, `preview_readback` and `preview_frame` exactly as the plan's evidence described;
-the risk section's thumbnail consumer does not exist on this tree. `PreviewService` lives in
-`render/preview.rs`, beside `PreviewTarget` and `PreviewTap`.
-
-**Phase 5 — `draw_frame`'s destructuring changed, which is the one line of it that had to.** It
-names `Renderer`'s fields exhaustively, so three `preview*: _` bindings became one. Nothing else in
-`draw_frame` moved and the frame path is unchanged; the goldens did not move.
-
-**Phase 5 — one test reached into the readback's tap and now asks the owner.**
+**Phase 5 — three preview fields, not four.** Plan 0206 has not landed, so `Renderer` carried
+`preview`, `preview_readback` and `preview_frame` exactly as the plan's evidence described and the
+risk section's thumbnail consumer does not exist; `PreviewService` lives in `render/preview.rs`.
+`draw_frame`'s destructuring changed, which is the one line of it that had to: it names `Renderer`'s
+fields exhaustively, so three `preview*: _` bindings became one. Nothing else in it moved and the
+goldens did not. One test reached into the readback's tap:
 `the_declared_pixel_order_is_the_one_the_frames_carry` read
-`renderer.preview_readback.tap.texture().format()`; `PreviewService::readback_tap_format` is a
-`#[cfg(test)]` accessor for it. The public API — `open_preview_readback`, `preview_readback_size`,
-`take_preview_frame`, `open_preview`, `close_preview`, `preview_state` — is unchanged in name and
-signature.
+`renderer.preview_readback.tap.texture().format()` and now asks the owner through a `#[cfg(test)]`
+`readback_tap_format`; every public preview entry point on `Renderer` keeps its name and signature.
+One full-suite run was red on a flake — `standalone::stream_show
+a_headless_run_emits_the_roster_the_preset_and_a_preset_error`, which spawns the player and reads
+its stdout — then passed alone and on a second full run (`1799 passed, 7 skipped`).
 
-**Phase 5 — one full-suite run was red on a flake.** `standalone::stream_show
-a_headless_run_emits_the_roster_the_preset_and_a_preset_error` failed once under the full
-workspace's parallelism, then passed alone and passed again on a second full-workspace run
-(`1799 tests run: 1799 passed, 7 skipped`). It spawns the player and reads its stdout; nothing in
-this phase is on that path.
-
-**Phase 6 — the guard reads struct bodies, and exempts the owner by name.**
-`the_preview_concern_is_named_in_one_module` walks every `.rs` file under
-`core/src/render/`, enters each `struct` body and collects the fields whose name contains
-`preview` or whose type names `Preview*` or `CaptureImage`. Fields in `render/preview.rs` need no
-row; every other one must be in `PREVIEW_FIELDS_ELSEWHERE`, and a row naming a field that is not
-there fails too. Struct bodies rather than lines is what separates a field from the function
-parameters and struct literals that spell `preview: &PreviewTarget` identically —
-`aux_target.rs` and `preview_readback.rs` both carry one.
-
-**Phase 6 — the roster as committed holds three rows**, re-derived on 2026-09-23: `mod.rs`'s
-`preview` (`Renderer`'s one door), `preview_readback.rs`'s `tap` (the readback's own sampling tap,
-ADR-0187), and `capture_api.rs`'s `images`. The third is not a preview field at all — it is the
-headless capture's result set, and it is in the roster because `CaptureImage` had to be a watched
-type for the guard to catch a frame slot named something generic. That is the price of covering
-the captured frame as well as the readback, and the row says so.
-
-**Phase 6 — both directions were established by trying them.** A temporary
-`probe_last_shot: Option<CaptureImage>` on `Renderer` failed the guard with the undeclared-field
-message; a temporary `mod.rs`/`probe_stale_row` row failed it with the stale-row message. Both
-probes were reverted before the commit. A third assertion, that the owner module still holds a
-`PreviewReadback` field and a `CaptureImage` field, is what stops the guard passing on a tree
-where the concern had been deleted outright.
-
-**Phase 6 — three files outside the phase's list, all repairing earlier phases of this plan.**
-Two gates were red at the Phase 5 commit and are green now:
-
-- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` failed on two intra-doc links to
-  `PreviewService`, which is `pub(super)` — one in `render/preview.rs`'s module header, one in
-  `render/preview_readback.rs`'s `impl Renderer` doc. Both are plain code spans now.
-- `node scripts/check-comment-hygiene.mjs` reported four plan-relative-narration findings: one in
-  `render/evaluate.rs` (Phase 3), one in `render/preview.rs` (Phase 5), one in
-  `tests/suite/hygiene.rs` (Phase 4) and one written in this phase. All four are restated as
-  properties of the code; none took an escape.
-
-Neither gate is in a phase's `Done when`, which is how both survived the commits that introduced
-them. Only `cargo fmt`, `cargo clippy` and the test suites were being run per phase.
-
-**Phase 6 — `PreviewService::target` is dead code in a `-p rlx-core` build.** Its only caller is
-`present_aux`, which is `#[cfg(feature = "text")]`, and the accessor is not. No workspace-wide
-build sees it — `standalone` enables `text`, so `cargo clippy --workspace --all-targets -- -D
-warnings` and `cargo nextest run --workspace` are both clean — but a narrow
-`cargo nextest run -p rlx-core` warns. Left alone: it is a Phase 5 file and a warning no gate
-reads.
+**Phase 6 — struct bodies, a named exemption, and two gates nobody was running.**
+`the_preview_concern_is_named_in_one_module` walks every `.rs` file under `core/src/render/`, enters
+each `struct` body and collects the fields whose name contains `preview` or whose type names
+`Preview*` or `CaptureImage`. Fields in `render/preview.rs` need no row; every other one must be in
+`PREVIEW_FIELDS_ELSEWHERE`, and a row naming a field that is not there fails too. Bodies rather than
+lines is what separates a field from the parameters and struct literals that spell
+`preview: &PreviewTarget` identically — `aux_target.rs` and `preview_readback.rs` both carry one.
+The roster, re-derived on 2026-09-23, holds `mod.rs`'s `preview` (`Renderer`'s one door),
+`preview_readback.rs`'s `tap` (ADR-0187) and `capture_api.rs`'s `images` — the last being the
+headless capture's result set, in the roster because `CaptureImage` had to be a watched type for the
+guard to catch a frame slot named something generic. Both directions were established by trying them
+(a temporary `probe_last_shot: Option<CaptureImage>` and a temporary stale row, both reverted), and
+a third assertion — that the owner still holds a `PreviewReadback` and a `CaptureImage` field —
+stops the guard passing on a tree where the concern had been deleted outright. Three files outside
+the list repair earlier phases: `cargo doc -D warnings` failed
+on two intra-doc links to the `pub(super)` `PreviewService` (`render/preview.rs`'s header,
+`preview_readback.rs`'s `impl Renderer` doc), now plain code spans; and `check-comment-hygiene.mjs`
+reported four plan-relative narrations — in `render/evaluate.rs`, `render/preview.rs`,
+`tests/suite/hygiene.rs` and this phase — all restated as properties, none escaped. Neither gate is
+in a phase's `Done when`, which is how both survived the commits that introduced them; only `fmt`,
+`clippy` and the test suites ran per phase. Finally, `PreviewService::target` is dead code in a
+`-p rlx-core` build — its only caller, `present_aux`, is `#[cfg(feature = "text")]` and the accessor
+is not — so no workspace-wide build sees it and it is left alone as a Phase 5 file.
 
 ### Close triggers
 
 - **`presets/` touched:** no file under `presets/` is in the range's diff.
 - **Plan header `Closes:`** none
-- **What shipped:** no feature and no fix. Six commits of internal refactor and three new hygiene
-  guards, plus the repairs listed above. The range touches `core/src/render/`, `core/tests/suite/`
-  and `standalone/src/capture_*`; it changes no preset, no rendered frame, no C ABI symbol, no
-  control-protocol message and no flag, env var or `config.toml` key.
+- **What shipped:** no feature and no fix — six commits of internal refactor and three new hygiene
+  guards, plus the repairs above. The range touches `core/src/render/`, `core/tests/suite/` and
+  `standalone/src/capture_*`, and changes no preset, rendered frame, C ABI symbol, control-protocol
+  message, flag, env var or `config.toml` key.
 - **Operator docs touched:** none. Nothing under `docs/` moved but this plan.
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *46 stated reductions
-  still hold across all 21 live entries (4 unprobeable)*. Thirty advisory rows report probed paths
-  that have moved since their entry was stamped; three of those name paths this range touched
-  (`0154` on `standalone/src/capture_win.rs`, `0021` and `0092` on `core/src`).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *46 stated reductions still
+  hold across all 21 live entries (4 unprobeable)*. Thirty advisory rows report probed paths that
+  moved since their entry was stamped; three name paths this range touched (`0154` on
+  `standalone/src/capture_win.rs`, `0021` and `0092` on `core/src`).
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207). The last run inside the range
-  was Phase 5's `cargo nextest run --workspace` — `1799 tests run: 1799 passed, 7 skipped`. Phase 6
-  ran `cargo nextest run --workspace -P fast` — exit 0, `1722 tests run: 1722 passed (1 slow),
-  86 skipped` — plus `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D
-  warnings`, `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`,
-  `node scripts/check-comment-hygiene.mjs` and `node scripts/check-system-counts.mjs`, all exit 0.
+  was Phase 5's `cargo nextest run --workspace` — `1799 passed, 7 skipped`. Phase 6 ran the `-P fast`
+  tier (`1722 passed (1 slow), 86 skipped`) plus `cargo fmt --all --check`, `cargo clippy
+  --workspace --all-targets -- -D warnings`, `cargo doc --workspace --no-deps` under
+  `RUSTDOCFLAGS="-D warnings"`, `check-comment-hygiene.mjs` and `check-system-counts.mjs`, all
+  exit 0.
 - **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
