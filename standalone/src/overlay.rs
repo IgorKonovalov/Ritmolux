@@ -85,6 +85,11 @@ pub const CAPTURE_COLOR: [f32; 4] = [0.72, 0.80, 0.90, 0.95];
 /// arithmetic tested cannot drift apart.
 pub const ROW_COLOR: [f32; 4] = [0.72, 0.78, 0.88, 0.95];
 pub const ROW_HL_COLOR: [f32; 4] = [1.0, 0.88, 0.35, 1.0];
+/// A favourite's row. Warm against `ROW_COLOR`'s cool grey and darker than the
+/// cursor's yellow, so a column of forty reads as marked-or-not at a glance
+/// while the highlight still wins on the row it is on — the one-character `*`
+/// does not survive that scan, which is what this colour is for.
+pub const FAV_COLOR: [f32; 4] = [0.95, 0.80, 0.60, 0.95];
 /// The filter-echo header sits above the list; dimmer than the rows.
 pub const HEADER_COLOR: [f32; 4] = [0.6, 0.66, 0.76, 0.9];
 

@@ -254,8 +254,8 @@ track_change = true
 | 1 — `Order` splits out of `Traversal` | dev | done | `14d24213` |
 | 2 — the order becomes a config key | dev | done | `4c50cb3e` |
 | 3 — the seed varies per launch, and a key pins it | dev | done | `9a40ab42` |
-| 4 — two settings rows and two hotkeys | dev | done | committed with this row |
-| 5 — a favourite reads as a warm row | dev | not started | |
+| 4 — two settings rows and two hotkeys | dev | done | `618acd5a` |
+| 5 — a favourite reads as a warm row | dev | done | committed with this row |
 | 6 — the docs say what the app now does | dev | not started | |
 
 ### Notes
@@ -286,3 +286,10 @@ track_change = true
 - Phase 4 adds no control to `standalone/src/console.rs`, which its file list names: the transport
   strip is unchanged and the two rows reach the console through the routing that already moves
   every settings line there.
+- Phase 5 puts `FAV_COLOR` in `standalone/src/overlay.rs`, which its file list does not name, rather
+  than in `standalone/src/hud.rs`: `overlay` is where `ROW_COLOR` and `ROW_HL_COLOR` live, and
+  `hud`'s own module doc states that the browse list's colours live there beside the layout that
+  reasons about them. The `(marker, color)` decision moved into `hud::browse_row_style`, which is
+  what the tests read.
+- Phase 5 also corrects the row count in `hud.rs`'s settings-column comment, which Phase 4's two new
+  rows made stale.
