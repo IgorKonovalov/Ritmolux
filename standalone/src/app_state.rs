@@ -1401,13 +1401,13 @@ impl AppState {
                 // resource rebuild, whose frames the steady-state statistic
                 // leaves out.
                 self.note_soak_switch();
-                let line = format!(
+                let msg = format!(
                     "renderer adapter: {} (from the settings menu, written to config.toml \
                      [output] gpu)",
                     self.renderer.adapter_description()
                 );
-                eprintln!("{line}");
-                self.diagnostics.diag_log.note(&line);
+                eprintln!("{msg}");
+                self.diagnostics.diag_log.note(&msg);
                 // The console follows: the switch released its surface with
                 // the old device, so its window is re-attached through the
                 // one attach path, with a new surface on the new device. A
@@ -1419,12 +1419,12 @@ impl AppState {
                 self.update_title();
             }
             Err(err) => {
-                let line = format!(
+                let msg = format!(
                     "adapter unchanged, still on {}: {err}",
                     self.renderer.adapter_description()
                 );
-                eprintln!("{line}");
-                self.diagnostics.diag_log.note(&line);
+                eprintln!("{msg}");
+                self.diagnostics.diag_log.note(&msg);
             }
         }
         self.window.request_redraw();
