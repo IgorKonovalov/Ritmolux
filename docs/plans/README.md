@@ -55,7 +55,6 @@ place. The plan file carries the real link.
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | Unblocked 2026-09-22 (0219 closed); runs after 0214. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). Phase 3 can stop the plan. |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 | [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
-| [0224](0224-the-adapter-becomes-a-setting.md) | The adapter becomes a setting | approved | dev, human | ADR-0246 (proposed): a `[output] gpu` key, the unflagged window prefers the fast adapter, set_adapter rebuilds live. Runs BEFORE 0223. Parked: Phase 7's Windows reading owed; Arch half read 2026-09-23. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -298,6 +297,10 @@ makes it the safe parallel rather than a second editor of the same files.
 - **[0216] closed 2026-09-23**, first of the three and lane a's first link. The rest of the note
   stands: [0217] is next on lane a, against the settings surface 0216 just widened, and [0215] runs
   beside it.
+- **[0224] closed 2026-09-23**, and with it the arithmetic above loosens: its Windows reading was
+  taken on the owner's box and the plan ran to a close, so it no longer holds a worktree and the
+  third `max_open_worktrees` slot is free. The reason [0202], [0211], [0212] and [0220] stay off the
+  queue is unchanged — each still parks at a human phase mid-plan.
 
 [0202]: 0202-the-three-mechanisms-get-their-gate.md
 [0206]: 0206-the-browser-shows-the-look.md
@@ -308,7 +311,7 @@ makes it the safe parallel rather than a second editor of the same files.
 [0216]: done/0216-the-operator-owns-the-order.md
 [0217]: 0217-every-setting-has-a-file-and-a-gate-says-so.md
 [0220]: 0220-the-dependencies-catch-up-and-npm-gets-its-gate.md
-[0224]: 0224-the-adapter-becomes-a-setting.md
+[0224]: done/0224-the-adapter-becomes-a-setting.md
 
 **Spent 2026-09-22, when [0222] closed behind [0221].** The note as written:
 **Added 2026-09-22, later - [0222] is approved and queued in lane `a` behind [0221], with `after: ["0221"]`.**
@@ -703,14 +706,13 @@ the per-pass table rather than grow its own instrument. **Overtaken 2026-09-23**
 first and Phase 2 shipped a whole-frame reading of its own — the per-pass table did not exist to be
 read. The live question 0223 inherits is whether that table replaces this column or feeds it.
 
-**Added 2026-09-22: [0224](0224-the-adapter-becomes-a-setting.md) runs before
-[0223](0223-the-heavy-presets-fit-the-integrated-gpu.md).** 0224 flips what an unflagged window asks
-for, from the power-saving adapter to the high-performance one (ADR-0246), so it changes the machine
-0223 is tuning against. Measured on the Arch box on 2026-09-22, one preset and one tier: 25 fps with
-a 79 ms p99 on the integrated part against 164.9 fps and 6.5 ms on the discrete one. Running 0223
-first would tune the presets for an adapter most operators would stop landing on one plan later;
-0223 is still worth doing after, because the integrated part stays the default on any machine whose
-config names it and on every single-adapter box.
+~~**Added 2026-09-22: 0224 runs before [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md).**~~
+— **spent 2026-09-23**, when [0224](done/0224-the-adapter-becomes-a-setting.md) closed. The flip is
+on `main`, so 0223 measures against the adapter an operator actually gets, which is all the note
+asked for. What it leaves 0223 is one live fact rather than an ordering: the integrated part stays
+the default on any machine whose `[output] gpu` names it and on every single-adapter box, so the
+tuning is still worth doing. The note is
+[in the archive](README-archive.md#prior-sequencing-notes-superseded).
 
 ### What this sequence assumes
 
@@ -1033,6 +1035,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0224 - The adapter becomes a setting](done/0224-the-adapter-becomes-a-setting.md) - closed 2026-09-23. Review: **no blockers, no majors, two minors, one nit (all three fixed).** Version: **0.146.0**. ADR-0246 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0207 - The commitments get their instruments](done/0207-the-commitments-get-their-instruments.md) - closed 2026-09-23. Review: **no blockers, no majors, six minors, two nits (five fixed).** Version: **0.145.0**. ADR-0231 + 0232 accepted, each with an Outcome. Closed 0257. [Write-up](README-archive.md).
 - [0216 - The operator owns the order](done/0216-the-operator-owns-the-order.md) - closed 2026-09-23. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.144.0**. ADR-0239 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0219 - The Arch box builds, tests and runs every lane](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md) - closed 2026-09-22. Review: **one major (routed to 0218), six minors (four fixed).** Version: none (docs/tooling). ADR-0243 stays proposed. Closes nothing. [Write-up](README-archive.md).

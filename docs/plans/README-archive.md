@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0224 - The adapter becomes a setting](#0224---the-adapter-becomes-a-setting)
   - [0207 - The commitments get their instruments](#0207---the-commitments-get-their-instruments)
   - [0216 - The operator owns the order](#0216---the-operator-owns-the-order)
   - [0219 - The Arch box builds, tests and runs every lane](#0219---the-arch-box-builds-tests-and-runs-every-lane)
@@ -220,6 +221,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-23 from `README.md` — the 0224-before-0223 note, spent](#moved-2026-09-23-from-readmemd--the-0224-before-0223-note-spent)
   - [Moved 2026-09-18 from `README.md` — item 5 of the 2026-08-18 sequence, 0103 goes last, spent](#moved-2026-09-18-from-readmemd--item-5-of-the-2026-08-18-sequence-0103-goes-last-spent)
   - [Moved 2026-09-16 from `README.md` — the conductor stand-down that waited on 0180, spent](#moved-2026-09-16-from-readmemd--the-conductor-stand-down-that-waited-on-0180-spent)
   - [Moved 2026-09-15 from `README.md` — the engine-lane opening that resumed 0175 first, spent](#moved-2026-09-15-from-readmemd--the-engine-lane-opening-that-resumed-0175-first-spent)
@@ -250,6 +252,53 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0224 - The adapter becomes a setting](done/0224-the-adapter-becomes-a-setting.md)
+
+- closed 2026-09-23, conductor-run lane `plan-0224-the-adapter-becomes-a-setting`. Phase 1
+`82b134fa`, Phase 2 `421bd32e`, Phase 3 `1009340c`, Phase 4 `c95ad331`, Phase 5 `854ae8d8`,
+Phase 6 `596f3f8a`, log `226a71a0`; Phase 7's two hardware halves `1a8b2258` (Arch) and `95f5bf0f`
+(Windows), with `5a81d80a` and `126a9427` carrying the sequence and the row. Round 1: **no blockers,
+no majors, two minors and one nit**, all three repaired at the close in `2649a32c`; an earlier
+attempt at the same round repaired three more in `a8f64d36` and parked on `merge_conflict`, which
+the owner resolved as `285ee8af`. Version **0.146.0** (minor: a feature plan). ADR-0246 accepted,
+with no `Outcome`. Closes no backlog entry. The full review is the plan's own `## Close review`
+section.
+- **What landed.** The graphics adapter stopped being a launch constant. `[output] gpu` holds it in
+`config.toml` by name, resolved by the same name-or-index rule `--gpu` uses, with the flag
+overriding the key for one run and the startup line naming which of the three carriers chose the
+adapter. The **unflagged window now prefers the high-performance adapter** rather than whatever the
+graphics layer hands a window, which on this project's hybrid reference boxes is a factor of six in
+frame rate; `RendererOptions::default()` is unchanged, so the foobar shim's window asks for exactly
+what it always did. `Renderer::set_adapter` rebuilds every GPU-owning member on a second adapter's
+device — transactionally, with every fallible step staged before the old device is released — and
+the settings menu's **Adapter** row walks the roster, applies at once, writes the key and re-attaches
+an open console on the new device.
+- **The two carriers fail differently, on purpose, and that is the plan's one real design decision.**
+A stored adapter that is absent, ambiguous or unable to present falls back to the default preference
+with a line naming both what was asked for and what was taken; `--gpu` keeps ADR-0155's hard refusal.
+One test asserts both against the same three errors so the difference reads as a rule rather than an
+inconsistency.
+- **Three of the plan's own done-whens described states that do not exist**, and the implementation
+was right to leave them: `--gpu`'s refusal exits 1 rather than the plan's 2 (deliberately — the flag
+was recognized and its effect failed); there is no windowed `--render` take to refuse a switch during;
+and a `--stream` run is surface-less, so no switch can ever reach the Spout sender. `docs/capturing.md`
+records both adapters as fixed for the life of such a run instead of promising a receiver drop.
+- **What outlived the plan.** The headline path has still never executed anywhere. A `Renderer` with
+a real surface needs a window, CI has none, and no session in this plan opened one, so the suite pins
+the refusal, both directions of the guard and the exact-name rule and structurally cannot reach the
+rebuild; Phase 7 measured the *default* on both operating systems rather than a switch.
+`docs/on-device-validation.md` carries a five-item `Runnable now` walk for it — the row, what
+survives, the file write by name, a refused switch, and what an open console does across it, which is
+also the newest chance at backlog 0165's never-fired degrade branch. Beside it, a switch whose new
+adapter negotiates a different surface format moves the preview pipe's pixel order after the `stream`
+event announced it once (ADR-0187), and `set_adapter` re-opens the readback and announces nothing.
+- **The `human` phase is genuinely discharged, with numbers.** Unflagged fullscreen readings on both
+boxes — `linux-2026-09-23-live-default.tsv` (164.9 fps median, p99 median 6.28-6.69) and
+`windows-2026-09-23-live-default.tsv` (165.0 fps median, p99 median 6.48-6.88) — sit within noise of
+the same boxes' `--gpu NVIDIA` rows and six times above their old unflagged iGPU rows. The Linux PRIME
+copy the plan singled out as the revert risk is affordable, so the flip stands on both platforms and
+ADR-0246 owes no `Outcome`.
 
 ### [0207 - The commitments get their instruments](done/0207-the-commitments-get-their-instruments.md)
 
@@ -10057,6 +10106,22 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Moved 2026-09-23 from `README.md` — the 0224-before-0223 note, spent
+
+Spent when [Plan 0224](done/0224-the-adapter-becomes-a-setting.md) closed on 2026-09-23: the flip it
+sequenced is on `main`, so 0223 now measures against the adapter an operator actually gets, which is
+exactly what the note asked for. Kept verbatim, except that the moved plan's link is written for this
+file's depth:
+
+**Added 2026-09-22: [0224](done/0224-the-adapter-becomes-a-setting.md) runs before
+[0223](0223-the-heavy-presets-fit-the-integrated-gpu.md).** 0224 flips what an unflagged window asks
+for, from the power-saving adapter to the high-performance one (ADR-0246), so it changes the machine
+0223 is tuning against. Measured on the Arch box on 2026-09-22, one preset and one tier: 25 fps with
+a 79 ms p99 on the integrated part against 164.9 fps and 6.5 ms on the discrete one. Running 0223
+first would tune the presets for an adapter most operators would stop landing on one plan later;
+0223 is still worth doing after, because the integrated part stays the default on any machine whose
+config names it and on every single-adapter box.
 
 ### Moved 2026-09-18 from `README.md` — item 5 of the 2026-08-18 sequence, 0103 goes last, spent
 

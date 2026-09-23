@@ -1330,9 +1330,9 @@ the running adapter has already landed and is what makes any of this attributabl
 > that branch needs a genuinely multi-adapter display topology; the last probe below therefore still
 > holds, and the entry keeps this half.
 
-- **Verified 2026-08-31** - re-written: the constructor now takes the choice, so the old reduction is dead; what stands is that the window still *asks* for the default when unflagged: `present: None => AdapterChoice::Default in: standalone/src/gpu.rs`
+- **Verified 2026-09-23** - re-written a second time: [Plan 0224](plans/done/0224-the-adapter-becomes-a-setting.md) Phase 2 ended the unflagged default this bullet tracked, so the reduction is now the opposite value, asserted where the old one was: `present: assert_eq!\(window_choice\(None\), AdapterChoice::HighPerformance\) in: standalone/src/gpu.rs`
 - **Verified 2026-08-30** - and the code's own doc says what the default yields on a hybrid box: `present: the power-saving GPU for a console process in: core/src/render/context.rs`
-- **Verified 2026-08-31** - the two unflagged arms are held apart, which is what keeps the published figures comparable: `present: fn the_window_and_the_stream_disagree_when_unflagged in: standalone/src/gpu.rs`
+- **Verified 2026-09-23** - the relation between the two unflagged arms is still pinned by a test, but as agreement rather than as difference: `present: fn the_window_and_the_stream_agree_when_unflagged in: standalone/src/gpu.rs`
 - **Verified 2026-08-30** - the startup note that makes a figure attributable exists: `present: renderer adapter in: standalone/src/app_state.rs`
 - **Verified 2026-08-30** - the console's degrade branch is still built and still unreachable here: `present: console surface unavailable on this adapter in: standalone/src/app_state.rs`
 - **PARTLY PROMOTED 2026-09-01 -> [Plan 0147](plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 6**, which takes the measurement half: a new windowed
@@ -1342,6 +1342,16 @@ the running adapter has already landed and is what makes any of this attributabl
 - **Updated 2026-09-15** - it stayed unexercised. The title ask is discharged (`--gpu` reaches the
   window, and `docs/nfr.md` carries a discrete-adapter windowed row); the live half is the console's
   dual-GPU degrade path in `standalone/src/app_state.rs`, which needs a multi-adapter display setup.
+- **Updated 2026-09-23, at [Plan 0224](plans/done/0224-the-adapter-becomes-a-setting.md)'s close.**
+  That plan flipped the unflagged window onto the high-performance adapter
+  ([ADR-0246](adrs/0246-the-adapter-is-a-setting-and-the-window-prefers-high-performance.md)),
+  which falsified the reductions of the two bullets above — both of them bookkeeping for halves
+  already discharged, neither the entry's live claim — so both are rewritten against the tree as it
+  is. **The live half is unchanged and still has not fired:** the plan added a runtime adapter
+  switch, and a switch onto the adapter that does not drive the console's display is the newest
+  configuration in which the degrade branch could execute, but no session opened a window, so it
+  remains a reading the on-device checklist asks for
+  ([on-device validation](on-device-validation.md)) rather than one anything has taken.
 
 ## 0187 — two measurements of the same console on the same adapter class disagree by 2x, and nothing explains which one the machine actually does
 

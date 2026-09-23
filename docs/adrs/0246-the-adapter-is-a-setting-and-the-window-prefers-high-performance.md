@@ -1,8 +1,8 @@
 # ADR-0246 — The adapter is a setting, not a launch constant: the window prefers high performance, a file key holds the choice, and it moves without a restart
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-09-22
-> **Related plan(s):** [0224](../plans/0224-the-adapter-becomes-a-setting.md)
+> **Related plan(s):** [0224](../plans/done/0224-the-adapter-becomes-a-setting.md)
 > **Amends:** [ADR-0155](0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) (the
 > windowed default, which that ADR declined to change)
 > **Supplements:** [ADR-0146](0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md)
