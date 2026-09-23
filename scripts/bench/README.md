@@ -105,6 +105,7 @@ with `#` lines that name the machine, build, adapter, driver and conditions:
 | `linux-2026-09-22-sweep-amd.tsv` | the same on the iGPU — the sweep that picked the ten |
 | `windows-2026-09-22-bench-nvidia.tsv` | headless bench, the ten presets, 3 runs each, dGPU |
 | `windows-2026-09-22-live.tsv` | live fullscreen, the ten presets, both GPUs |
+| `windows-2026-09-23-live-default.tsv` | live fullscreen, the ten presets, unflagged — the adapter the app itself picks |
 
 A later reading is a new file with a new date, never an edit of an old one: a comparison needs both
 ends to stay put.

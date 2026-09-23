@@ -823,6 +823,7 @@ other, which surfaces at runtime as a device-lost or a stale handle rather than 
       0165 and has still never fired** — a switch onto the adapter that does not drive the console's
       display is the newest configuration in which it could. Either outcome is the reading; say
       which.
+
 ## iGPU-gated — the Floor reading NFR §1 asserts (Plan 0207 Phase 3)
 
 **This is question 1 above, finally with an instrument.** Extracted from Plan 0207 at that plan's
