@@ -81,7 +81,7 @@ use crate::render::tier::attractor_budget;
 use ifs::{FitLut, IfsFigure, IfsPacked, IfsTable, Levers};
 
 use super::common;
-use super::{Phase, Scene, SeededRng};
+use super::{FeedbackSink, Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::{self, FeedbackConfig, PingPongField};
 use crate::render::palette::{self, Palette};
@@ -1617,9 +1617,21 @@ pub const PARAMS: &[ParamSpec] = &[
     },
 ];
 
+impl FeedbackSink for AttractorScene {
+    /// The scene's own internal trail field is the second sink of the preset's
+    /// `[feedback]` table; the engine trails stage is the first.
+    fn set_feedback(&mut self, cfg: FeedbackConfig) {
+        self.feedback = cfg;
+    }
+}
+
 impl Scene for AttractorScene {
     fn name(&self) -> &'static str {
         "attractor"
+    }
+
+    fn as_feedback_sink(&mut self) -> Option<&mut dyn FeedbackSink> {
+        Some(self)
     }
 
     fn set_occlude(&mut self, occlude: f32) {
@@ -1749,13 +1761,6 @@ impl Scene for AttractorScene {
                 self.feedback_transform.set_param(name, value);
             }
         }
-    }
-
-    /// Take the active preset's `[feedback]` table (ADR-0048). **Once at preset
-    /// load, off the hot path**, exactly like [`configure`](Scene::configure) —
-    /// a warp kind is a shader path, not a scalar.
-    fn set_feedback(&mut self, cfg: FeedbackConfig) {
-        self.feedback = cfg;
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {

@@ -237,7 +237,9 @@ fn read_linear(renderer: &Renderer, seam: Seam) -> Option<f32> {
     let texture = match seam {
         Seam::Field => {
             let system = renderer.roster.active_preset()?.system;
-            scene_for(&renderer.scenes, system)?.feedback_field()?
+            scene_for(&renderer.scenes, system)?
+                .as_feedback_source()?
+                .feedback_field()?
         }
         Seam::Present => renderer.tonemap.src_texture()?,
     };

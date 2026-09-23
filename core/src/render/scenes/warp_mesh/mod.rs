@@ -66,7 +66,7 @@ use crate::render::gpu;
 use crate::render::palette::{self, Palette};
 
 use super::common;
-use super::{Phase, Scene, lines};
+use super::{PerVertexBound, Phase, Scene, lines};
 
 // The five concerns of this scene, taking the shape `particles/` already has.
 // `shaders` is the WGSL and the POD blocks,
@@ -863,14 +863,47 @@ impl WarpMeshScene {
     }
 }
 
+impl PerVertexBound for WarpMeshScene {
+    fn set_per_vertex(&mut self, name: &str, values: &[f32]) {
+        let Some(index) = PER_VERTEX_PARAMS.iter().position(|spec| spec.name == name) else {
+            return;
+        };
+        let Some(slot) = self.state.values.get_mut(index) else {
+            return;
+        };
+        // A series of the wrong length means the renderer and this scene clamped
+        // the grid differently, which `clamp_grid` exists to prevent. Copy what
+        // fits and leave the rest at the scalar rather than panicking on the hot
+        // path.
+        let n = slot.len().min(values.len());
+        if let (Some(dst), Some(src)) = (slot.get_mut(..n), values.get(..n)) {
+            dst.copy_from_slice(src);
+        }
+        if let Some(flag) = self.state.bound.get_mut(index) {
+            *flag = n > 0;
+        }
+    }
+}
+
+#[cfg(test)]
+impl super::FeedbackSource for WarpMeshScene {
+    fn feedback_field(&self) -> Option<&wgpu::Texture> {
+        self.field_texture()
+    }
+}
+
 impl Scene for WarpMeshScene {
     fn name(&self) -> &'static str {
         "warp mesh"
     }
 
+    fn as_per_vertex_bound(&mut self) -> Option<&mut dyn PerVertexBound> {
+        Some(self)
+    }
+
     #[cfg(test)]
-    fn feedback_field(&self) -> Option<&wgpu::Texture> {
-        self.field_texture()
+    fn as_feedback_source(&self) -> Option<&dyn super::FeedbackSource> {
+        Some(self)
     }
 
     fn set_time(&mut self, time: f32) {
@@ -1012,26 +1045,6 @@ impl Scene for WarpMeshScene {
             "color_source" => self.color_source = value,
             "coverage_threshold" => self.coverage_threshold = value,
             _ => {}
-        }
-    }
-
-    fn set_per_vertex(&mut self, name: &str, values: &[f32]) {
-        let Some(index) = PER_VERTEX_PARAMS.iter().position(|spec| spec.name == name) else {
-            return;
-        };
-        let Some(slot) = self.state.values.get_mut(index) else {
-            return;
-        };
-        // A series of the wrong length means the renderer and this scene clamped
-        // the grid differently, which `clamp_grid` exists to prevent. Copy what
-        // fits and leave the rest at the scalar rather than panicking on the hot
-        // path.
-        let n = slot.len().min(values.len());
-        if let (Some(dst), Some(src)) = (slot.get_mut(..n), values.get(..n)) {
-            dst.copy_from_slice(src);
-        }
-        if let Some(flag) = self.state.bound.get_mut(index) {
-            *flag = n > 0;
         }
     }
 

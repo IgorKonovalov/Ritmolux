@@ -305,8 +305,8 @@ pub(crate) struct PreviewService {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The real-time capture loop joins the pragma guard | dev | done | 2faed625 |
-| 2 — Two methods leave the `Scene` trait | dev | done | committed with this row |
-| 3 — Four capabilities become four traits | dev | not started | |
+| 2 — Two methods leave the `Scene` trait | dev | done | c330e18f |
+| 3 — Four capabilities become four traits | dev | done | committed with this row |
 | 4 — A new kind-branch has to declare itself | dev | not started | |
 | 5 — The preview concern gets an owner | dev | not started | |
 | 6 — The preview concern stays owned | dev | not started | |
@@ -351,6 +351,26 @@ including the live/offline ceiling choice — the factory arm now calls it and s
 
 **Phase 2 — ADR-0195 still names `Scene::sample_budget` in prose** (its line 145). Not touched: it
 is a dated record and outside the phase's file list.
+
+**Phase 3 — the per-vertex `None` arm changes what runs, not what is drawn.** The old default was a
+no-op, so a `[per_vertex]` table on a scene without vertices was evaluated into the renderer's
+scratch and discarded. The caller now ends the walk on `None` and the evaluations do not happen.
+No frame moves — nothing read those values — and the full suite is the evidence.
+
+**Phase 3 — one file outside the phase's list: `core/tests/suite/preset.rs`.**
+`declared_params_match_set_param` locates a scene's parameter roster with `text.find("fn
+set_param")`, which matched `fn set_param_series` once the spectrum scene's `impl SeriesBound`
+landed above its `impl Scene`, and then parsed no arms. The search is now for `fn set_param(`. The
+guard was accidentally correct rather than correct, and reordering the two impl blocks would have
+left that in place.
+
+**Phase 3 — `Observed<T>` in `render/tests.rs` lost three forwarding methods.** It hands out
+borrows from behind a `RefCell`, which an `as_*` accessor cannot do, so it takes the `None`
+default for all four capabilities — the same reason its doc already gave for `mirror_overflow`.
+Neither scene it observes (emitter, shape collage) has any of the four.
+
+**Phase 3 — the ceiling exception was not needed.** `set_per_vertex` is reached through an
+accessor like the other three; no frame-cost reading was taken, and no golden moved.
 
 ### Close triggers
 

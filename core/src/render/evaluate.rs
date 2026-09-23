@@ -356,6 +356,48 @@ fn apply_route(
     }
 }
 
+/// Apply one per-element series to `scene`.
+///
+/// **The `None` arm is the point** (ADR-0238). A scene with no per-element
+/// surface answers `None`, and the caller — here — decides what that means: the
+/// binding's element-0 value through [`Scene::set_param`], which is the
+/// `index = 0` reading it would have got outside a per-element evaluation. The
+/// series is degraded rather than dropped, and the decision is visible at the
+/// call site instead of living in a default body on the seam.
+pub(super) fn apply_series(scene: &mut Box<dyn Scene>, name: &str, values: &[f32]) {
+    if let Some(bound) = scene.as_series_bound() {
+        bound.set_param_series(name, values);
+        return;
+    }
+    if let Some(&first) = values.first() {
+        scene.set_param(name, first);
+    }
+}
+
+/// Evaluate a preset's or a layer's `[per_vertex]` table into `scene`.
+///
+/// **The `None` arm is the point here too**, and it says something different
+/// from [`apply_series`]'s: a per-vertex series varies over space and its first
+/// element is the top-left corner, which is not a sensible whole-scene reading
+/// of anything. So a scene without the capability ends the walk rather than
+/// degrading it — the evaluations are not run at all, where they used to be run
+/// into the scratch and dropped by a no-op default. The loader already warns
+/// that a `[per_vertex]` table on such a system is inert.
+pub(super) fn apply_per_vertex(
+    scene: &mut Box<dyn Scene>,
+    bindings: &[crate::preset::Binding],
+    vars: &Variables<'_>,
+    surface: &mut VertexSurface<'_>,
+) {
+    for binding in bindings {
+        let Some(bound) = scene.as_per_vertex_bound() else {
+            return;
+        };
+        evaluate_vertex_series(&binding.expr, vars, surface);
+        bound.set_per_vertex(&binding.name, surface.buf);
+    }
+}
+
 /// Evaluate one preset's bindings into a composite side, an optional ink pass,
 /// and its scene. **Routing only** — nothing is encoded here, because the frame's
 /// destination is not known until ink's activity is (ADR-0032).
@@ -419,11 +461,11 @@ pub(super) fn evaluate_preset(
             // `[spectrum] smoothing`; a series has no single value for the
             // per-binding smoother to hold.
             evaluate_series(&binding.expr, vars, series);
-            scene.set_param_series(&binding.name, series);
+            apply_series(scene, &binding.name, series);
             // One backdrop has no elements to vary across, so it takes element
-            // 0 — the same fallback `set_param_series` already gives a
-            // whole-figure param, which is what `saturation` and `palette_mix`
-            // are on every scene that has a per-element surface.
+            // 0 — the same fallback a whole-figure param gets, which is what
+            // `saturation` and `palette_mix` are on every scene that has a
+            // per-element surface.
             if matches!(*route, ParamRoute::SceneAndBackdrop)
                 && let Some(&first) = series.first()
             {
@@ -477,10 +519,7 @@ pub(super) fn evaluate_preset(
     // and `per_vertex` is empty for every preset that declares no table, so
     // every other system takes exactly the path it took before this existed.
     if let Some(mut surface) = vertex {
-        for binding in &preset.per_vertex {
-            evaluate_vertex_series(&binding.expr, vars, &mut surface);
-            scene.set_per_vertex(&binding.name, surface.buf);
-        }
+        apply_per_vertex(scene, &preset.per_vertex, vars, &mut surface);
     }
     // The scene advances **after** every value this frame binds has landed, so
     // whatever `advance` integrates is this frame's parameter rather than the
@@ -527,7 +566,7 @@ pub(super) fn evaluate_layer(
     for (index, binding) in layer.params.iter().enumerate() {
         if !series.is_empty() && binding.expr.uses_index() {
             evaluate_series(&binding.expr, vars, series);
-            scene.set_param_series(&binding.name, series);
+            apply_series(scene, &binding.name, series);
             continue;
         }
         let raw = binding.expr.eval(vars);
@@ -538,10 +577,7 @@ pub(super) fn evaluate_layer(
         scene.set_param(&binding.name, value);
     }
     if let Some(mut surface) = vertex {
-        for binding in &layer.per_vertex {
-            evaluate_vertex_series(&binding.expr, vars, &mut surface);
-            scene.set_per_vertex(&binding.name, surface.buf);
-        }
+        apply_per_vertex(scene, &layer.per_vertex, vars, &mut surface);
     }
     if let Some(mix) = layer.mix.as_ref() {
         let raw = mix.expr.eval(vars);

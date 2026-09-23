@@ -651,6 +651,100 @@ impl std::fmt::Display for Recovered<'_> {
     }
 }
 
+/// A scene that binds a parameter **per mesh vertex** (Plan 0100 Phase 1,
+/// ADR-0113).
+///
+/// Reached through [`Scene::as_per_vertex_bound`], whose default is `None`
+/// (ADR-0238): a `[per_vertex]` table aimed at a scene that has no vertices is
+/// an absence the caller can act on, rather than a no-op body that returns and
+/// leaves no trace. The loader already warns that such a table is inert.
+pub(crate) trait PerVertexBound {
+    /// Apply one named parameter as a per-vertex series: `values` holds one
+    /// evaluation of the binding per mesh vertex, in row-major order from the
+    /// top-left, `(meshx + 1) * (meshy + 1)` long.
+    ///
+    /// The per-element channel one axis up, and deliberately just as narrow: it
+    /// carries `(name, &[f32])` in one direction and returns nothing.
+    ///
+    /// The slice borrows the renderer's scratch, sized at preset load from the
+    /// same [`clamp_grid`](warp_mesh::clamp_grid) the scene uses, so nothing
+    /// here allocates.
+    fn set_per_vertex(&mut self, name: &str, values: &[f32]);
+}
+
+/// A scene that binds a parameter **per element** (Plan 0034 Phase 4,
+/// ADR-0036).
+///
+/// Reached through [`Scene::as_series_bound`], whose default is `None`
+/// (ADR-0238). A scene without a per-element surface does not silently swallow
+/// the series: the caller takes element 0 through
+/// [`Scene::set_param`](Scene::set_param) instead, which is the `index = 0`
+/// reading the binding would have got outside a per-element evaluation.
+pub(crate) trait SeriesBound {
+    /// Apply one named parameter as a per-element series, in element order.
+    /// Reached only for a binding whose expression names `index`.
+    ///
+    /// **This is the whole channel, and it is deliberately this narrow.** It
+    /// carries `(name, &[f32])` in one direction and returns nothing. A scene
+    /// cannot ask the preset layer for anything, cannot see the expression, and
+    /// cannot learn which preset is loaded — so this is `set_param` with a
+    /// slice, not an inversion in which scenes read presets. The slice borrows
+    /// the renderer's scratch, which is sized at preset load, so nothing here
+    /// allocates.
+    ///
+    /// A name this scene has no per-element row for is the implementor's own
+    /// fallback, not the caller's: only the scene knows which of its parameters
+    /// vary across elements.
+    fn set_param_series(&mut self, name: &str, values: &[f32]);
+}
+
+/// A scene keeping a feedback field a probe can read **before** that scene's
+/// present pass.
+///
+/// **`#[cfg(test)]`, and that gate is the whole justification.** ADR-0002 keeps
+/// the scene seam thin and a real widening of it is ADR-worthy; this does not
+/// exist in a shipped build, so the extension seam is unchanged. It exists
+/// because Plan 0111 Phase 2's bisect requires its five seams to be read from
+/// **one run** — same signal, same hop, same size, same adapter — and a
+/// `Box<dyn Scene>` cannot otherwise be asked for the one quantity that sits
+/// upstream of everything the bisect covers. Measuring seam A on a
+/// separately-driven scene would satisfy the arithmetic and quietly break that
+/// requirement.
+#[cfg(test)]
+pub(crate) trait FeedbackSource {
+    /// The field, or `None` when this scene's GPU resources have not been built
+    /// yet — so the outer [`Option`] says "no such capability" and the inner one
+    /// says "not yet".
+    fn feedback_field(&self) -> Option<&wgpu::Texture>;
+}
+
+/// A scene with a feedback accumulation of **its own**, which takes a preset's
+/// `[feedback]` table (ADR-0048).
+///
+/// # One vocabulary, two buffers
+///
+/// **This is the routing contract, and it is worth stating plainly because it
+/// will surprise someone.** The `fb_*` params and that table are consumed by
+/// *two* sinks: the engine [`Trails`](crate::render::trails::Trails) stage,
+/// which transforms the accumulation every scene composites through, and the
+/// attractor scene's own internal trail field, which is what reaches here. A
+/// preset may have **both** active at once — an attractor with `trails` on —
+/// and then a single `fb_rotate` turns *both* accumulations, each about its own
+/// buffer. Neither transforms the other's, and neither transforms the present
+/// deposit: the transform applies to the past.
+///
+/// That is a deliberate design (ADR-0048's Alternative D was to give the engine
+/// stage the vocabulary and leave the attractor out), and the reason it is safe
+/// is that the two answer the same param names with the same arithmetic —
+/// [`feedback::Transform`](crate::render::feedback::Transform) and one shared
+/// WGSL snippet, not two implementations that must agree.
+pub(crate) trait FeedbackSink {
+    /// Take the active preset's `[feedback]` table. Invoked **once at preset
+    /// load, off the hot path**, like [`Scene::configure`] and
+    /// [`Scene::set_palette`]: a warp kind is a shader path, not a scalar.
+    fn set_feedback(&mut self, cfg: crate::render::feedback::FeedbackConfig);
+}
+
 /// One visual. `update` advances state from the analysis frame; `render` draws
 /// with the state it has.
 ///
@@ -658,6 +752,14 @@ impl std::fmt::Display for Recovered<'_> {
 /// implement the named-parameter surface — `set_time`, `reset_params`,
 /// `set_param` — that the preset layer evaluates into per frame (ADR-0002). The
 /// trait carries no-op defaults so a future non-parametric scene need not.
+///
+/// # Capabilities are declared, not defaulted
+///
+/// A surface only some scenes have is a narrow trait of its own, reached
+/// through an `as_*` accessor here whose default is `None` (ADR-0238). The
+/// difference from a defaulted method is what the seam can *say*: a caller
+/// asking a scene for a capability it lacks gets an absence it can act on
+/// rather than a body that returns having done nothing.
 pub(crate) trait Scene {
     fn name(&self) -> &'static str;
     fn update(&mut self, frame: &AnalysisFrame);
@@ -718,21 +820,10 @@ pub(crate) trait Scene {
     /// occlusion at that seam for this to scale. Default no-op.
     fn set_occlude(&mut self, _occlude: f32) {}
 
-    /// The scene's feedback field, for a probe that needs the value **before**
-    /// this scene's present pass. `None` for every scene without one, which is
-    /// every scene but the warp mesh.
-    ///
-    /// **`#[cfg(test)]`, and that gate is the whole justification.** ADR-0002
-    /// keeps this trait thin and a real widening of it is ADR-worthy; this method
-    /// does not exist in a shipped build, so the extension seam is unchanged. It
-    /// exists because Plan 0111 Phase 2's bisect requires its five seams to be
-    /// read from **one run** — same signal, same hop, same size, same adapter —
-    /// and a `Box<dyn Scene>` cannot otherwise be asked for the one quantity that
-    /// sits upstream of everything the bisect covers. Measuring seam A on a
-    /// separately-driven scene would satisfy the arithmetic and quietly break
-    /// that requirement.
+    /// This scene as a [`FeedbackSource`], or `None` — which is every scene but
+    /// the warp mesh.
     #[cfg(test)]
-    fn feedback_field(&self) -> Option<&wgpu::Texture> {
+    fn as_feedback_source(&self) -> Option<&dyn FeedbackSource> {
         None
     }
 
@@ -768,49 +859,26 @@ pub(crate) trait Scene {
     /// Apply one named parameter; unknown names are ignored.
     fn set_param(&mut self, _name: &str, _value: f32) {}
 
-    /// Apply one named parameter as a **per-element series** (Plan 0034 Phase 4,
-    /// ADR-0036): `values` holds one evaluation of the binding per element, in
-    /// element order. Reached only for a binding whose expression names `index`.
+    /// This scene as a [`SeriesBound`], or `None` — which is every scene but the
+    /// spectrum readout.
     ///
-    /// **This is the whole channel, and it is deliberately this narrow.** It
-    /// carries `(name, &[f32])` in one direction and returns nothing. A scene
-    /// cannot ask the preset layer for anything, cannot see the expression, and
-    /// cannot learn which preset is loaded — so this is `set_param` with a slice,
-    /// not an inversion in which scenes read presets. The slice borrows the
-    /// renderer's scratch, which is sized at preset load, so nothing here
-    /// allocates.
-    ///
-    /// The default takes the **first** value and routes it through
-    /// [`set_param`](Self::set_param) — exactly the `index = 0` reading a binding
-    /// gets outside a per-element evaluation. So a scene with no per-element
-    /// surface degrades a series to a scalar instead of dropping it, and a scene
-    /// that never opts in behaves byte-for-byte as before. Only the spectrum
-    /// readout overrides this.
-    fn set_param_series(&mut self, name: &str, values: &[f32]) {
-        if let Some(&first) = values.first() {
-            self.set_param(name, first);
-        }
+    /// The caller degrades a series to element 0 on `None`, so a scene that
+    /// never opts in behaves byte-for-byte as it did when that fallback was a
+    /// default body here.
+    fn as_series_bound(&mut self) -> Option<&mut dyn SeriesBound> {
+        None
     }
 
-    /// Apply one named parameter as a **per-vertex series** (Plan 0100 Phase 1,
-    /// ADR-0113): `values` holds one evaluation of the binding per mesh vertex,
-    /// in row-major order from the top-left, `(meshx + 1) * (meshy + 1) ` long.
+    /// This scene as a [`PerVertexBound`], or `None` — which is every scene but
+    /// the warp mesh.
     ///
-    /// The per-element channel one axis up, and deliberately just as narrow: it
-    /// carries `(name, &[f32])` in one direction and returns nothing. Reached
-    /// only for a binding in a `[per_vertex]` table, so a scene that never opts
-    /// in is never called.
-    ///
-    /// Unlike [`set_param_series`](Self::set_param_series) the default does
-    /// **nothing** rather than degrading to the first value. A per-vertex series
-    /// varies over space and its first element is the top-left corner, which is
-    /// not a sensible whole-scene reading of anything; the loader already warns
-    /// that a `[per_vertex]` table on another system is inert.
-    ///
-    /// The slice borrows the renderer's scratch, sized at preset load from the
-    /// same [`clamp_grid`](warp_mesh::clamp_grid) the scene uses, so nothing here
-    /// allocates.
-    fn set_per_vertex(&mut self, _name: &str, _values: &[f32]) {}
+    /// Unlike [`as_series_bound`](Self::as_series_bound) there is no degrading
+    /// on `None`: a per-vertex series varies over space and its first element is
+    /// the top-left corner, which is not a sensible whole-scene reading of
+    /// anything. The caller stops evaluating the table instead.
+    fn as_per_vertex_bound(&mut self) -> Option<&mut dyn PerVertexBound> {
+        None
+    }
 
     /// Consume a preset's declarative structural config (ADR-0007). Invoked
     /// **once at preset load, off the hot path** — a generator builds and caches
@@ -833,31 +901,11 @@ pub(crate) trait Scene {
     /// ADR-0007's [`configure`](Scene::configure).
     fn set_palette(&mut self, _palette: &Palette) {}
 
-    /// Consume a preset's `[feedback]` structural table (ADR-0048). Invoked
-    /// **once at preset load, off the hot path**, like
-    /// [`configure`](Scene::configure) and [`set_palette`](Scene::set_palette),
-    /// and load-time for `configure`'s reason: a warp kind is a shader path, not
-    /// a scalar. Default no-op — the third and last thin off-hot-path widening of
-    /// this trait.
-    ///
-    /// # One vocabulary, two buffers
-    ///
-    /// **This is the routing contract, and it is worth stating plainly because it
-    /// will surprise someone.** The `fb_*` params and this table are consumed by
-    /// *two* sinks: the engine [`Trails`](crate::render::trails::Trails) stage,
-    /// which transforms the accumulation every scene composites through, and the
-    /// attractor scene's own internal trail field, which is what reaches here.
-    /// A preset may have **both** active at once — an attractor with `trails` on —
-    /// and then a single `fb_rotate` turns *both* accumulations, each about its
-    /// own buffer. Neither transforms the other's, and neither transforms the
-    /// present deposit: the transform applies to the past.
-    ///
-    /// That is a deliberate design (ADR-0048's Alternative D was to give the
-    /// engine stage the vocabulary and leave the attractor out), and the reason it
-    /// is safe is that the two answer the same param names with the same
-    /// arithmetic — [`feedback::Transform`](crate::render::feedback::Transform)
-    /// and one shared WGSL snippet, not two implementations that must agree.
-    fn set_feedback(&mut self, _cfg: crate::render::feedback::FeedbackConfig) {}
+    /// This scene as a [`FeedbackSink`], or `None` — which is every scene but
+    /// the attractor.
+    fn as_feedback_sink(&mut self) -> Option<&mut dyn FeedbackSink> {
+        None
+    }
 
     /// The per-frame cap overflow, if this frame hit one: the line scenes'
     /// geometry mirror (Plan 0018 Phase 4) when its N-fold replication exceeded
@@ -999,14 +1047,35 @@ pub(crate) fn create_layer_scene(
 /// construction — so a preset's own main-plus-layer pair never consults this,
 /// whatever the two systems are.
 pub(crate) fn shares_resources(a: SystemKind, b: SystemKind) -> bool {
-    a == b || (draws_through_shared_line_renderer(a) && draws_through_shared_line_renderer(b))
+    a == b || (kind_info(a).shares_line_renderer && kind_info(b).shares_line_renderer)
 }
 
-/// Whether a system draws through the shared `LineRenderer`. **Exhaustive** with
-/// no wildcard arm, like [`create`] itself: a new scene fails to compile here
-/// until someone says which side of the sharing it is on.
-fn draws_through_shared_line_renderer(kind: SystemKind) -> bool {
-    match kind {
+/// The render-side static facts about a [`SystemKind`] — what is true of the
+/// *kind*, as opposed to what a built scene can be asked (ADR-0238 part 3).
+///
+/// These stay kind facts because they are asked where no scene exists:
+/// [`shares_resources`] is consulted about a **roster preset** whose scene may
+/// never have been constructed, which is why no accessor on `Scene` can replace
+/// it. They stay in `render/` because each is a render implementation detail
+/// and none belongs in the preset schema.
+pub(crate) struct SceneKindInfo {
+    /// Whether this kind draws through the roster's one shared
+    /// [`LineRenderer`](lines::LineRenderer) — "borrowed by whichever line scene
+    /// is active, only one draws per frame" (see [`create_all`]). So two
+    /// *different* line kinds are as unrenderable in one frame as one kind
+    /// twice.
+    pub(crate) shares_line_renderer: bool,
+}
+
+/// The static facts about `kind`, in **one exhaustive table** with no wildcard
+/// arm, like [`create`] itself: a new system fails to compile here until
+/// someone says which side of every fact it is on.
+///
+/// The next such fact is a **field on [`SceneKindInfo`]**, not a fifteenth
+/// fourteen-arm match of its own — that accumulation is what ADR-0238 part 3
+/// ended.
+pub(crate) fn kind_info(kind: SystemKind) -> SceneKindInfo {
+    let shares_line_renderer = match kind {
         SystemKind::ParametricCurve
         | SystemKind::LSystem
         | SystemKind::StarPattern
@@ -1021,6 +1090,9 @@ fn draws_through_shared_line_renderer(kind: SystemKind) -> bool {
         | SystemKind::ShapeCollage
         | SystemKind::AnalyticField
         | SystemKind::Cellular => false,
+    };
+    SceneKindInfo {
+        shares_line_renderer,
     }
 }
 
