@@ -10,26 +10,30 @@
 //! and sleeps. Endpoint enumeration and friendly-name strings are built once at
 //! setup, *before* the real-time loop, so they never violate that discipline.
 //!
+//! That split is a module boundary: this file is the setup half, and the loop
+//! lives in [`rt`], which carries the panic-denial pragma the hygiene guard
+//! checks for.
+//!
 //! The loop **reports and never decides** (ADR-0142). When the stream dies it
 //! stores one `AtomicBool` and returns; it does not re-enumerate, does not
 //! reopen anything, and does not say so on stderr — all three would allocate or
 //! block. Choosing what to run next belongs to the shell, which is the only
 //! place that can rebuild the analyzer anyway.
 
+mod rt;
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::thread::JoinHandle;
-use std::time::Duration;
 
-use rlx_core::audio::{AudioFormat, SampleConsumer, SampleProducer, intake};
+use rlx_core::audio::{AudioFormat, SampleConsumer, intake};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
 use windows::Win32::Foundation::RPC_E_CHANGED_MODE;
 use windows::Win32::Media::Audio::{
-    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_E_DEVICE_INVALIDATED, AUDCLNT_SHAREMODE_SHARED,
-    AUDCLNT_STREAMFLAGS_LOOPBACK, DEVICE_STATE_ACTIVE, EDataFlow, IAudioCaptureClient,
-    IAudioClient, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEX,
-    WAVEFORMATEXTENSIBLE, eCapture, eConsole, eRender,
+    AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK, DEVICE_STATE_ACTIVE, EDataFlow,
+    IAudioCaptureClient, IAudioClient, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator,
+    WAVEFORMATEX, WAVEFORMATEXTENSIBLE, eCapture, eConsole, eRender,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
@@ -39,6 +43,8 @@ use windows::Win32::System::Com::{
     CoUninitialize, STGM_READ,
 };
 use windows::Win32::System::Variant::VT_LPWSTR;
+
+use rt::Stream;
 
 /// Which audio path to capture. `Loopback` taps a render device (what the
 /// system plays); `LineIn` captures an input device directly (no loopback flag).
@@ -62,17 +68,9 @@ pub struct CaptureSelector {
 /// the consumer does by draining every frame, not by keeping the ring small.
 const RING_CAPACITY_FRAMES: usize = 16_384;
 
-/// WASAPI shared-mode periods are 10 ms; polling faster than the period keeps
-/// delivery latency well under the 15 ms capture allocation in NFR section 3.
-const POLL_INTERVAL: Duration = Duration::from_millis(4);
-
 /// Requested WASAPI buffer duration (100 ms, in 100 ns units) — device-side
 /// headroom so a late poll drops nothing.
 const BUFFER_DURATION_HNS: i64 = 1_000_000;
-
-/// Scratch zeros pushed when a packet carries the SILENT flag (its data
-/// pointer is not required to be valid then). Preallocated before the loop.
-const SILENCE_CHUNK_SAMPLES: usize = 4096;
 
 pub struct CaptureHandle {
     stop: Arc<AtomicBool>,
@@ -376,16 +374,6 @@ pub fn list_devices() -> Result<(), CaptureError> {
     Ok(())
 }
 
-struct Stream {
-    audio_client: IAudioClient,
-    capture_client: IAudioCaptureClient,
-    producer: SampleProducer,
-    // Interleaving width of the captured stream. The ring producer does
-    // not expose the format (Plan 0005), so carry the channel count
-    // here.
-    channels: usize,
-}
-
 fn capture_thread(
     selector: &CaptureSelector,
     stop: &AtomicBool,
@@ -402,7 +390,7 @@ fn capture_thread(
     match setup_stream(selector) {
         Ok((mut stream, format, device, consumer)) => {
             let _ = setup_tx.send(Ok((format, device, consumer)));
-            run_capture_loop(&mut stream, stop, lost);
+            rt::run_capture_loop(&mut stream, stop, lost);
             unsafe {
                 let _ = stream.audio_client.Stop();
             }
@@ -476,103 +464,6 @@ fn setup_stream(
             friendly,
             consumer,
         ))
-    }
-}
-
-/// Whether a packet-call error means the stream is *gone* rather than merely
-/// unhappy.
-///
-/// `AUDCLNT_E_DEVICE_INVALIDATED` is what WASAPI reports when the endpoint is
-/// removed, disabled, or has its format changed underneath the client. Every
-/// other code stays transient: the loop cannot tell a hiccup from a teardown,
-/// and promoting both would tear capture down on noise.
-fn is_device_lost(err: &windows::core::Error) -> bool {
-    err.code() == AUDCLNT_E_DEVICE_INVALIDATED
-}
-
-/// The real-time loop. From here until `stop` flips: no allocation, no locks,
-/// no logging, no I/O — copy packets into the ring, release, sleep.
-///
-/// A dead stream ends the loop rather than sleeping back into it: `lost` is
-/// stored and the function returns, leaving the shell to decide what runs next.
-/// Spinning on an invalidated device delivers nothing and says nothing, which is
-/// the failure this exit exists to end.
-fn run_capture_loop(stream: &mut Stream, stop: &AtomicBool, lost: &AtomicBool) {
-    // Preallocated so silent packets cost no heap work inside the loop.
-    let silence = [0.0f32; SILENCE_CHUNK_SAMPLES];
-    let channels = stream.channels;
-    let Stream {
-        capture_client,
-        producer,
-        ..
-    } = stream;
-
-    while !stop.load(Ordering::Acquire) {
-        loop {
-            let packet_frames = match unsafe { capture_client.GetNextPacketSize() } {
-                Ok(n) => n,
-                Err(e) => {
-                    if is_device_lost(&e) {
-                        lost.store(true, Ordering::Relaxed);
-                        return;
-                    }
-                    break;
-                }
-            };
-            if packet_frames == 0 {
-                break;
-            }
-            let mut data: *mut u8 = std::ptr::null_mut();
-            let mut frames_read: u32 = 0;
-            let mut flags: u32 = 0;
-            let got = unsafe {
-                capture_client.GetBuffer(&mut data, &mut frames_read, &mut flags, None, None)
-            };
-            if let Err(e) = got {
-                if is_device_lost(&e) {
-                    lost.store(true, Ordering::Relaxed);
-                    return;
-                }
-                break;
-            }
-            let sample_count = frames_read as usize * channels;
-            if flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32 != 0 {
-                push_silence(producer, &silence, sample_count, channels);
-            } else if !data.is_null() && sample_count > 0 {
-                // Safety: WASAPI hands us frames_read frames of the mix
-                // format we validated as f32 at setup.
-                let samples =
-                    unsafe { std::slice::from_raw_parts(data as *const f32, sample_count) };
-                // Drop-on-full is the ring's policy; nothing to retry
-                // without blocking.
-                let _ = producer.push_samples(samples);
-            }
-            if let Err(e) = unsafe { capture_client.ReleaseBuffer(frames_read) } {
-                if is_device_lost(&e) {
-                    lost.store(true, Ordering::Relaxed);
-                    return;
-                }
-                break;
-            }
-        }
-        std::thread::sleep(POLL_INTERVAL);
-    }
-}
-
-fn push_silence(
-    producer: &mut SampleProducer,
-    silence: &[f32],
-    mut remaining: usize,
-    channels: usize,
-) {
-    let chunk_max = silence.len() / channels * channels;
-    while remaining > 0 && chunk_max > 0 {
-        let n = remaining.min(chunk_max);
-        let written = producer.push_samples(&silence[..n]);
-        if written < n {
-            break;
-        }
-        remaining -= n;
     }
 }
 

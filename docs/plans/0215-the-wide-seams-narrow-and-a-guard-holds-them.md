@@ -1,6 +1,6 @@
 # 0215 — The wide seams narrow, and a guard holds them
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-20
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0238](../adrs/0238-a-scene-declares-a-capability-and-the-engine-stops-enumerating-kinds.md) (proposed)
@@ -300,11 +300,11 @@ pub(crate) struct PreviewService {
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(not started)_
+**Lane:** `plan-0215-the-wide-seams-narrow-and-a-guard-holds-them` in `/home/igor/Work/rlx-plan-0215`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The real-time capture loop joins the pragma guard | dev | not started | |
+| 1 — The real-time capture loop joins the pragma guard | dev | done | committed with this row |
 | 2 — Two methods leave the `Scene` trait | dev | not started | |
 | 3 — Four capabilities become four traits | dev | not started | |
 | 4 — A new kind-branch has to declare itself | dev | not started | |
@@ -312,6 +312,32 @@ pub(crate) struct PreviewService {
 | 6 — The preview concern stays owned | dev | not started | |
 
 ### Notes
+
+**Phase 1 — three capture arms, not two.** The plan and ADR name `capture_win.rs` and
+`capture_mac.rs`; the tree also carries `standalone/src/capture_linux.rs` (ADR-0131), whose
+`read_loop` is the real-time thread on the reference machine. All three were split, and the guard
+targets all three `capture_*/` directories. Covering only the two named arms would have left the
+only arm that builds here outside the guard.
+
+**Phase 1 — neither Windows nor macOS was compiled.** The reference machine is Linux, so only the
+Linux arm was built, linted and tested. The Windows and macOS splits are mechanical moves,
+reviewed by reading; they were not compile-checked on any host. The macOS split moved the whole
+`define_class!` block, so the ObjC callback thunk is inside the guarded module rather than calling
+into it.
+
+**Phase 1 — three slicing sites were rewritten to satisfy the pragma.** `push_silence`'s
+`&silence[..n]` (Windows), `read_loop`'s `&mut bytes[carry..filled]` and `&samples[..drained.samples]`
+(Linux), and `interleave_planar`'s two indexes plus `handle_audio`'s `&buffers[0]`,
+`&planes[..plane_count]` and `&state.scratch[..written]` (macOS) became `get`/`get_mut` with an
+early return. Every bound is unreachable at the sizes the callers establish, so the behaviour on
+every reachable input is unchanged — but this is a code change inside the moved loops, not a pure
+move, and the plan's "no behaviour moves in this phase" is met in effect rather than by the diff
+being empty.
+
+**Phase 1 — `standalone/src/capture_frames.rs` is not in the guard set.** `drain_whole_frames` is
+called from the Linux loop and indexes and slices freely. It is a pure, shared helper outside the
+`capture_*/` directories the guard now targets, and pulling it in was outside the phase's file
+list.
 
 ### Close triggers
 

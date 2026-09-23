@@ -29,10 +29,11 @@ use std::path::{Path, PathBuf};
 
 /// The panic-denial header every hot-path module must carry. Copy it verbatim
 /// to the top of any new file under `core/src/dsp/`, `core/src/render/`,
-/// `core/src/diag/`, `core/src/audio.rs`, `core/src/preset/expr.rs`, the
-/// `core-cabi` crate's `src/` (the C ABI, moved out of `core/src/ffi.rs` by
-/// ADR-0072), or the `rlx-ring` crate's `src/` (the extracted SPSC ring,
-/// Plan 0005):
+/// `core/src/diag/`, `core/src/audio.rs`, `core/src/preset/expr.rs`,
+/// `core/src/milk/` (the EEL2 machine), the `core-cabi` crate's `src/` (the C
+/// ABI, moved out of `core/src/ffi.rs` by ADR-0072), the `rlx-ring` crate's
+/// `src/` (the extracted SPSC ring, Plan 0005), or the `rt` module of any
+/// `standalone/src/capture_*` backend (the shell's real-time capture loops):
 ///
 /// ```ignore
 /// #![deny(
@@ -220,6 +221,17 @@ fn the_guard_resolves_a_path_declared_test_module() {
     );
 }
 
+/// The real-time half of one `standalone/src/capture_*` backend: the child
+/// directory beside the backend's setup file, holding the code that runs
+/// between stream start and stop.
+///
+/// Only one of the three compiles on any given host, but all three are source
+/// files on every host, and a guard that covered only the arm it was run on
+/// would leave the other two free to drift.
+fn capture_rt(root: &Path, backend: &str) -> PathBuf {
+    root.join("standalone").join("src").join(backend)
+}
+
 /// The hot-path set the pragma guards. Directories are scanned recursively;
 /// a new hot-path directory added by a later plan must be listed here,
 /// which is a Mode 4 review item.
@@ -250,6 +262,16 @@ fn hot_path_modules_carry_the_panic_pragma() {
         // load-time, and is scanned anyway because the split between "decodes" and
         // "executes" is not one a future edit should have to remember.
         src.join("milk"),
+        // The shell's real-time capture loops. Each backend is split so that the
+        // code running between stream start and stop is a module of its own, and
+        // the setup half beside it — endpoint enumeration, format negotiation,
+        // the friendly-name read — is outside this set, because it legitimately
+        // allocates, formats and writes to stderr. Directories rather than
+        // files, so a loop that grows a second module joins the guard by being
+        // put there.
+        capture_rt(&workspace_root(), "capture_win"),
+        capture_rt(&workspace_root(), "capture_mac"),
+        capture_rt(&workspace_root(), "capture_linux"),
     ];
 
     let mut files = Vec::new();
