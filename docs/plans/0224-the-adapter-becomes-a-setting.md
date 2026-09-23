@@ -332,6 +332,44 @@ renderer adapter: AMD Radeon Graphics (RADV RENOIR) ... (default: high performan
 - Phase 7, still owed: the Windows box's own `live-presets.ps1 -Gpus default` reading, and with it the second half of the done-when. Only the owner can boot that side.
 - Followup: two of backlog 0165's probes are broken by Phase 2 — `present: None => AdapterChoice::Default` and `present: fn the_window_and_the_stream_disagree_when_unflagged`, both in `standalone/src/gpu.rs`.
 
+### The Windows half of Phase 7 — the sequence to run there
+
+> Written on the Arch box after its half landed, for whoever runs the other one. **The branch is
+> `plan-0224-the-adapter-becomes-a-setting`, not `main`:** the default flip is Phase 2's commit on
+> this branch, so a `main` checkout measures the old default and answers nothing.
+
+1. `git fetch origin && git switch plan-0224-the-adapter-becomes-a-setting`, or
+   `git worktree add ..\rlx-plan-0224 plan-0224-the-adapter-becomes-a-setting`.
+2. `cargo build -p standalone --release --bin ritmolux`.
+3. `.\target\release\ritmolux.exe --list-adapters` — confirm an NVIDIA `DiscreteGpu` row and an AMD
+   `IntegratedGpu` row, and keep the exact names and drivers for the header.
+4. Read `%APPDATA%\Ritmolux\config.toml`: note what `[quality] tier` pins, and confirm `[output]`
+   carries **no** `gpu` key — a stored one makes the run flagged in all but name. The Arch reading was
+   `rich`; whatever this box pins goes in the header, because that is the column the done-when adds.
+5. Start music and leave it playing (the Arch half played one track on loop through the loopback
+   capture; a silent run is not comparable).
+6. `.\scripts\bench\live-presets.ps1 -Gpus default` — about 6 minutes, it takes the screen, do not
+   touch the machine. Keep every `# renderer adapter` line it echoes: each must name the adapter and
+   read `(default: high performance)`.
+7. Save the table as `scripts\bench\results\windows-<date>-live-default.tsv`, with the same four
+   `#` header lines as `results/linux-2026-09-23-live-default.tsv` — OS build, commit, conditions,
+   and the adapter, driver and tier the run resolved.
+8. Confirm `config.toml` reads `fullscreen = false` again; the script restores it in a `finally`, and
+   a killed shell skips that.
+9. The fall-back, on real hardware rather than in a test: put `gpu = "Intel Arc A770"` under
+   `[output]`, start the app, confirm it **starts** on the default adapter and says so twice — the
+   stderr line naming the adapters present and `starting on the default adapter instead`, and the
+   log's `# renderer adapter: ... (default: high performance; "Intel Arc A770" from config.toml
+   [output] gpu did not resolve)`. Restore the file.
+10. The verdict, against this same box's `--gpu NVIDIA` rows in
+    `results/windows-2026-09-22-live.tsv`: **if Windows loses under the new default**, the flip is
+    reverted for Windows and ADR-0246 takes a dated `Outcome` — that is engine work and an ADR edit,
+    so park it and hand both to `architect`/`dev` rather than doing it from this lane.
+11. Otherwise: add a Notes row above with the numbers, mark the Phase 7 row `done` with the commit,
+    stage by explicit path, commit, and push the branch.
+12. Back on the Arch box: `git -C <lane> pull --ff-only`, then
+    `node tools/conductor/conductor.mjs resume 0224`, which reads the row and reopens the close.
+
 ### Close triggers
 
 - **`presets/` touched:** none.

@@ -72,7 +72,8 @@ reading that does not name its adapter is not comparable (ADR-0071, ADR-0243). T
    - `.\scripts\bench\bench-presets.ps1 -Gpu NVIDIA`
    - `.\scripts\bench\live-presets.ps1` (tell the owner first: it takes the screen for ~11 minutes)
    - `.\scripts\bench\live-presets.ps1 -Gpus default` — the unflagged reading Plan 0224 Phase 7 asks
-     for, beside `results/linux-2026-09-23-live-default.tsv`
+     for, beside `results/linux-2026-09-23-live-default.tsv`. That plan's `## Implementation log`
+     carries the whole sequence for the Windows side, branch included; this list is the rig only.
 4. Report each table beside the Linux reference below — per preset, Windows vs Linux, and the ratio
    for the headless bench. Say which OS is faster per preset and whether the gap is uniform (a
    backend or driver constant) or concentrated in one family (a shader or pipeline path one backend
