@@ -248,6 +248,20 @@ show. Sends are **non-blocking and dropped on failure**: a broken link costs the
 frame, and the app prints one line when it starts failing and one when it recovers rather than a
 line per frame.
 
+### The one flag `--help` does not print
+
+**`--thumb <name>`** renders one preset's browser thumbnail into the cache and exits. It is
+deliberately absent from the roster, because the process that passes it is **the player itself**: the
+app re-invokes its own executable one preset at a time to fill the thumbnail cache below
+([ADR-0230](adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md)). Like
+`--schema` and `--check` it opens no window, binds no socket and starts no capture client.
+
+It is documented here rather than hidden outright so that a `ritmolux` seen in a process list with an
+argument nothing explains is not a mystery. Running it by hand is harmless — it renders the still for
+one preset of whatever library this launch resolves, writes the cache entry, and says on standard
+error either what it wrote or that the preset has not changed since last time. A name no library
+holds is refused and nothing is written.
+
 ## Environment variables
 
 | Variable | Value | What it is for |
@@ -286,6 +300,20 @@ hidden = ["Multibrot"]
 Both keys are optional and both are lists of preset **names**. A missing, empty or malformed file
 means "no marks" and never stops the app starting; a malformed one says so on the console. Delete
 the file to forget every mark.
+
+### The third thing in that directory: `thumbnails/`
+
+Beside the two files sits a directory the app fills by itself: `thumbnails/`, one cache entry per
+preset, each a 160x90 still of what that preset looks like. Nothing ships in it — the pictures are
+rendered on this machine, because the binary has room for neither the images nor an image codec
+([ADR-0230](adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md)).
+
+An entry is named for its preset and carries the **modification time and length** of the `.toml` it
+was rendered from, which is what makes it stale: edit a preset in an `RLX_PRESET_DIR` library and its
+picture is rendered again. It is cache rather than state — **delete the directory and it refills**,
+and a directory that cannot be created turns the feature off with one line in `diagnostics.log`
+rather than stopping the app. Nothing prunes it, so an entry for a preset you no longer have stays
+until you delete it, the same standing cost `marks.toml` accepts.
 
 ### `[output]`
 

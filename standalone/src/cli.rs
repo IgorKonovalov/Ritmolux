@@ -226,6 +226,34 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
     },
 ];
 
+/// Flags the binary accepts and `--help` does not print: modes that exist for a
+/// **parent process** rather than for a person.
+///
+/// A second roster rather than a `hidden` field, because the two are read in
+/// different places and only one of them is a surface: [`rostered`] joins both,
+/// so an internal mode is recognized, is claimed by its scanner and is held to
+/// the drift gate exactly like every other flag — while [`help_text`] and
+/// [`nearest_flag`] read [`FLAGS`] alone, so the mode is neither advertised nor
+/// suggested as the correction for a typo.
+pub(crate) const INTERNAL_FLAGS: &[FlagSpec] = &[FlagSpec {
+    name: "--thumb",
+    takes_value: true,
+    requires: None,
+    help: "<name> render one preset's browser thumbnail into the cache and exit",
+}];
+
+/// The roster entry `name` refers to, from either roster.
+///
+/// The single lookup the scanners share, so an internal mode is recognized
+/// wherever an advertised flag is — a mode reachable only because nothing
+/// refused it is the silence ADR-0148 exists to end.
+pub(crate) fn rostered(name: &str) -> Option<&'static FlagSpec> {
+    FLAGS
+        .iter()
+        .chain(INTERNAL_FLAGS)
+        .find(|spec| spec.name == name)
+}
+
 /// Print the flag roster to stdout.
 ///
 /// Called as the **first** statement in `main`, before the event loop, the
@@ -301,6 +329,10 @@ pub(crate) fn edit_distance(a: &str, b: &str) -> usize {
 /// Two edits is the bar because that is what a transposition costs — `--ocs` for
 /// `--osc` is the typo this exists for — and a looser bar starts naming a flag
 /// that merely shares three letters with a word.
+///
+/// [`FLAGS`] only: a correction that named an [`INTERNAL_FLAGS`] mode would
+/// point an operator at a flag `--help` does not print and no page tells them
+/// how to use.
 pub(crate) fn nearest_flag(name: &str) -> Option<&'static FlagSpec> {
     FLAGS
         .iter()
@@ -343,7 +375,7 @@ pub(crate) fn walk_flags(args: impl Iterator<Item = String>) -> Vec<Claimed> {
         let Some(name) = flag_name(&arg) else {
             continue;
         };
-        let Some(spec) = FLAGS.iter().find(|spec| spec.name == name) else {
+        let Some(spec) = rostered(name) else {
             seen.push(Claimed::Unknown(arg.clone()));
             continue;
         };
@@ -501,6 +533,29 @@ pub(crate) fn parse_check_arg() -> Result<Option<PathBuf>, String> {
     while let Some(arg) = args.next() {
         if let Some(value) = flag_value(&arg, "--check", &mut args) {
             return value.map(|path| Some(PathBuf::from(path)));
+        }
+    }
+    Ok(None)
+}
+
+/// The preset name `--thumb <name>` / `--thumb=<name>` asks for a browser
+/// thumbnail of, or `None` when the flag is absent (ADR-0230).
+///
+/// `Err` on the flag with nothing after it, for `--check`'s reason: there is no
+/// sensible default preset to render, and an empty value names none.
+///
+/// The one scanner here whose caller is a **program**: the thumbnail pass
+/// re-invokes this executable through `current_exe()` one preset at a time, so
+/// the flag is in [`INTERNAL_FLAGS`] and `--help` does not print it.
+pub(crate) fn parse_thumb_arg() -> Result<Option<String>, String> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if let Some(value) = flag_value(&arg, "--thumb", &mut args) {
+            let value = value?;
+            if value.trim().is_empty() {
+                return Err("--thumb: expected a preset name".to_owned());
+            }
+            return Ok(Some(value));
         }
     }
     Ok(None)
@@ -852,9 +907,9 @@ pub(crate) fn default_downbeat_log_path() -> PathBuf {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::{
-        FLAGS, InputSource, config, help_text, missing_companion, parse_control_arg_from,
-        parse_input_args_from, parse_osc_arg_from, resolve_control, resolve_input, resolve_osc,
-        unrecognized_flag, valued_valueless_flag,
+        FLAGS, INTERNAL_FLAGS, InputSource, config, help_text, missing_companion, nearest_flag,
+        parse_control_arg_from, parse_input_args_from, parse_osc_arg_from, resolve_control,
+        resolve_input, resolve_osc, rostered, unrecognized_flag, valued_valueless_flag,
     };
 
     /// `--osc` in both spellings, and the empty value refused for the same
@@ -1262,13 +1317,13 @@ pub(crate) mod tests {
     /// silence it replaces. Nothing else checks it.
     #[test]
     fn every_requires_names_a_real_flag() {
-        for spec in FLAGS {
+        for spec in FLAGS.iter().chain(INTERNAL_FLAGS) {
             let Some(companion) = spec.requires else {
                 continue;
             };
             assert!(
-                FLAGS.iter().any(|other| other.name == companion),
-                "`{}` requires `{companion}`, which is not itself in FLAGS",
+                rostered(companion).is_some(),
+                "`{}` requires `{companion}`, which is in neither roster",
                 spec.name
             );
             assert_ne!(
@@ -1284,7 +1339,7 @@ pub(crate) mod tests {
     /// invocation, which is a worse failure than the silence it replaces.
     #[test]
     fn every_rostered_flag_is_claimed_in_both_spellings() {
-        for spec in FLAGS {
+        for spec in FLAGS.iter().chain(INTERNAL_FLAGS) {
             let spaced: Vec<String> = if spec.takes_value {
                 vec![spec.name.to_owned(), "value".to_owned()]
             } else {
@@ -1418,9 +1473,9 @@ pub(crate) mod tests {
             for literal in literals {
                 let name = literal.trim_end_matches('=');
                 assert!(
-                    FLAGS.iter().any(|spec| spec.name == name),
-                    "`{name}` is compared against an argument in {file} and is not in FLAGS, \
-                     so the binary accepts a flag --help does not mention"
+                    rostered(name).is_some(),
+                    "`{name}` is compared against an argument in {file} and is in neither \
+                     roster, so the binary accepts a flag nothing declares"
                 );
             }
         }
@@ -1460,6 +1515,38 @@ pub(crate) mod tests {
             );
         }
         assert!(text.contains("-h"), "--help does not name its own synonym");
+    }
+
+    /// **An internal mode is recognized and unadvertised, and both halves
+    /// matter.** Recognized, or the roster gate refuses the very invocation the
+    /// thumbnail pass makes; unadvertised, or `--help` offers an operator a mode
+    /// whose caller is a program — and `nearest_flag` starts correcting typos to
+    /// it, which is worse than refusing them.
+    #[test]
+    fn an_internal_mode_is_claimed_and_never_advertised() {
+        let text = help_text();
+        for spec in INTERNAL_FLAGS {
+            assert_eq!(
+                refused(&[spec.name, "value"]),
+                None,
+                "the roster refused its own `{}`",
+                spec.name
+            );
+            assert!(
+                !text.contains(spec.name),
+                "--help advertises the internal mode `{}`",
+                spec.name
+            );
+            // A one-edit typo of the mode is the sharpest case: it is exactly
+            // where a joined lookup would name it.
+            let typo = format!("{}x", spec.name);
+            assert_ne!(
+                nearest_flag(&typo).map(|near| near.name),
+                Some(spec.name),
+                "`{typo}` is corrected to the internal mode `{}`",
+                spec.name
+            );
+        }
     }
 
     /// **`--help` renders each dependency once, from the field that enforces

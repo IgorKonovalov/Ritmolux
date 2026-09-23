@@ -1,6 +1,6 @@
 # 0206 — The browser shows the look
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev
@@ -211,16 +211,40 @@ struct ThumbKey {
 > Written by the lane — one row per phase as that phase's commit lands, and the close block after
 > the last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled)_
+**Lane:** `plan-0206-the-browser-shows-the-look` in `/home/igor/Work/rlx-plan-0206`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — One thumbnail, on demand, in a cache | dev | not started | |
+| 1 — One thumbnail, on demand, in a cache | dev | done | committed with this row |
 | 2 — The pane shows what is cached | dev | not started | |
 | 3 — The pass fills the cache by itself | dev | not started | |
 | 4 — A changed preset gets a new picture | dev | not started | |
 
 ### Notes
+
+**Phase 1 — two files beyond the phase's list, and one done-when clause not met as stated.**
+
+- The mode's own contract — one invocation writes one image, a second for the same unchanged preset
+  writes nothing — is observable only from outside the process, so it is asserted by a new
+  `standalone/tests/suite/thumb_cli.rs` (wired into `standalone/tests/suite/main.rs`). Neither file
+  is in the phase's `Files touched`. The render it costs measured 1.7 s on this Linux box, and it
+  skips with a printed reason where there is no adapter, the rule `shot_cli` follows.
+- The clause *"a cache directory that cannot be created disables the feature and says so once in
+  `diagnostics.log`"* is **not met in this phase**, because in this phase nothing in the app reads
+  the cache and so there is no feature to disable. What landed is the sentence and the check:
+  `thumbs::ensure_cache_dir` returns the reason, and `thumbs::unavailable_note` is the one line both
+  the child and the pass write, so the two cannot describe the condition two ways. The `--thumb`
+  child prints that line on standard error and exits 1. The app-side half — write it once to
+  `diagnostics.log` and stop trying — belongs to Phase 3's pass, whose `Files touched` names
+  `diaglog.rs`.
+- A cache entry is a fixed header plus raw RGBA8 rows, not a PNG: ADR-0011 keeps `image` a
+  dev-dependency, so the shipped binary has no codec to encode or decode one with. ADR-0230 states
+  the same constraint when it rules out embedding.
+- `--thumb` is rostered in a second roster, `cli::INTERNAL_FLAGS`, rather than in `FLAGS`. Both are
+  needed: the roster gate refuses any flag-shaped argument no roster names, so an unrostered
+  `--thumb` would be refused on the very invocation the pass makes, while `FLAGS` is what `--help`
+  prints and what `nearest_flag` corrects typos to. Three existing roster tests now read both
+  rosters.
 
 ### Close triggers
 
