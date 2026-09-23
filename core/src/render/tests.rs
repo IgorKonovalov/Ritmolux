@@ -2896,9 +2896,6 @@ impl<T: super::scenes::Scene> super::scenes::Scene for Observed<T> {
     fn set_feedback(&mut self, cfg: super::feedback::FeedbackConfig) {
         self.0.borrow_mut().set_feedback(cfg);
     }
-    fn sample_budget(&self) -> Option<u32> {
-        self.0.borrow().sample_budget()
-    }
 }
 
 /// Put `scene` in the roster slot for `kind`, on a renderer whose preset 0 is

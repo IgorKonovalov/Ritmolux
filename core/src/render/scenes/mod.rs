@@ -869,47 +869,6 @@ pub(crate) trait Scene {
     fn mirror_overflow(&self) -> Option<&lines::CapOverflow> {
         None
     }
-
-    /// The scene's **resolved sample budget** for the target it was last given,
-    /// where it has one (ADR-0140) — the attractor, and nothing else today.
-    ///
-    /// A hook rather than a field on the roster because it is a scene's own
-    /// arithmetic: only a scene knows what its budget resolved to. `None` is the
-    /// honest answer for every scene whose count is a flat capacity, and for the
-    /// attractor before a target size has reached it.
-    ///
-    /// **The seam exists so the factory's choice of ceiling is readable off the
-    /// built scene**, which is what makes that wiring testable at all — a test
-    /// that recomputed the law would pass with both modes handed the same
-    /// number. It is not the reporting path: `shot --render` prints its budget
-    /// from [`TierConfig::attractor_budget_offline`] instead, because the header
-    /// is written before the renderer is constructed and this would answer
-    /// `None` there.
-    ///
-    /// `#[cfg(test)]` because that leaves nothing but the test: no shipped path
-    /// asks a scene what its budget resolved to, and a trait method the engine
-    /// never calls is a widened seam pretending to be an API.
-    #[cfg(test)]
-    fn sample_budget(&self) -> Option<u32> {
-        None
-    }
-
-    /// The count the scene actually **draws** out of that budget, where it has
-    /// one — `[particles] density` resolved against the effective budget
-    /// ADR-0195 defines, which is the anchor for a trace and the target-scaled
-    /// budget for a cloud.
-    ///
-    /// Distinct from [`sample_budget`](Self::sample_budget) for the reason that
-    /// hook's own doc gives: the budget is a property of the target, and this
-    /// is the look choice taken out of it. Both are needed to state that a
-    /// density change moved the drawn count and left the allocation alone.
-    ///
-    /// `#[cfg(test)]` for `sample_budget`'s reason — no shipped path asks a
-    /// scene how many instances it is about to draw.
-    #[cfg(test)]
-    fn active_sample_count(&self) -> Option<u32> {
-        None
-    }
 }
 
 /// The registry: every built-in scene, **keyed by the [`SystemKind`] it drives**,
@@ -1108,16 +1067,7 @@ fn create(
             device,
             surface_format,
         )),
-        SystemKind::Attractor => Box::new(particles::AttractorScene::new(
-            device,
-            surface_format,
-            tier.attractor_particles,
-            match budget {
-                crate::render::SampleBudget::Live => tier.attractor_particles_live_ceiling,
-                crate::render::SampleBudget::Offline => tier.attractor_particles_offline_ceiling,
-            },
-            tier.attractor_trail_cap,
-        )),
+        SystemKind::Attractor => Box::new(create_attractor(device, surface_format, tier, budget)),
         SystemKind::Spectrum => Box::new(lines::SpectrumScene::new(
             line_renderer(),
             tier.max_segments,
@@ -1155,6 +1105,31 @@ fn create(
     }
 }
 
+/// The attractor scene [`create`] builds, as its concrete type.
+///
+/// **The ceiling choice lives here and nowhere else** (ADR-0140): a window gets
+/// the tier's live cap, a headless render its offline one. Named rather than
+/// inlined into the factory arm so a test can build exactly what the factory
+/// builds and read the resolved budget off it, without restating the choice it
+/// is asserting about.
+fn create_attractor(
+    device: &wgpu::Device,
+    surface_format: wgpu::TextureFormat,
+    tier: &crate::render::TierConfig,
+    budget: crate::render::SampleBudget,
+) -> particles::AttractorScene {
+    particles::AttractorScene::new(
+        device,
+        surface_format,
+        tier.attractor_particles,
+        match budget {
+            crate::render::SampleBudget::Live => tier.attractor_particles_live_ceiling,
+            crate::render::SampleBudget::Offline => tier.attractor_particles_offline_ceiling,
+        },
+        tier.attractor_trail_cap,
+    )
+}
+
 /// Tiny deterministic RNG (splitmix64) so visual randomness is explicitly
 /// seeded (NFR 6) without pulling a rand crate.
 pub(crate) struct SeededRng(u64);
@@ -1190,7 +1165,7 @@ mod tests {
     //! render path.
     #![allow(clippy::panic)]
 
-    use super::{CapOverflow, OverflowContext, ParamKind, create_all};
+    use super::{CapOverflow, OverflowContext, ParamKind, Scene, create_all, create_attractor};
     use crate::preset::SystemKind;
     use crate::render::context::{RenderContext, RenderError};
 
@@ -1329,9 +1304,12 @@ mod tests {
     ///
     /// Read off the scene rather than recomputed: this is the wiring under test,
     /// so a recomputation of the law here would pass with the factory handing
-    /// both modes the same number. 1920x1080 is the size the whole plan is
-    /// about — nine times the reference — and it is past the live ceiling and
-    /// under the offline one, which is what makes the two answers differ.
+    /// both modes the same number. [`create_attractor`] is the factory's own
+    /// ceiling choice, reached for its concrete type because the budget is a
+    /// property of this scene and not of the `Scene` seam (ADR-0238).
+    /// 1920x1080 is the size the whole plan is about — nine times the
+    /// reference — and it is past the live ceiling and under the offline one,
+    /// which is what makes the two answers differ.
     ///
     /// No frame is rendered: `set_target_size` is CPU arithmetic, so this costs
     /// one scene build on WARP and nothing else.
@@ -1349,12 +1327,9 @@ mod tests {
         };
 
         let resolved = |budget: SampleBudget, tier: &TierConfig, w: u32, h: u32| -> Option<u32> {
-            let mut scenes = create_all(&ctx.device, ctx.surface_format(), tier, budget);
-            let (_, scene) = scenes
-                .iter_mut()
-                .find(|(kind, _)| *kind == SystemKind::Attractor)?;
+            let mut scene = create_attractor(&ctx.device, ctx.surface_format(), tier, budget);
             // Before a target size reaches it, a scene has no resolved budget to
-            // report - which is the distinction the hook's `None` carries.
+            // report - which is the distinction the `None` carries.
             assert_eq!(scene.sample_budget(), None);
             scene.set_target_size(w, h);
             scene.sample_budget()
@@ -1409,7 +1384,7 @@ mod tests {
     /// `configure` never reaching `active_count` at all, which is one of the two
     /// call sites that has to pass the anchor.
     ///
-    /// No frame is rendered: both hooks are CPU arithmetic.
+    /// No frame is rendered: both accessors are CPU arithmetic.
     #[test]
     fn a_trace_preset_draws_its_anchor_count_at_1080p() {
         use crate::render::{SampleBudget, TierConfig};
@@ -1432,13 +1407,7 @@ mod tests {
             (SampleBudget::Live, rich.attractor_particles_live_ceiling),
             (SampleBudget::Offline, 1_350_000),
         ] {
-            let mut scenes = create_all(&ctx.device, ctx.surface_format(), &rich, budget);
-            let Some((_, scene)) = scenes
-                .iter_mut()
-                .find(|(kind, _)| *kind == SystemKind::Attractor)
-            else {
-                panic!("the roster has no attractor");
-            };
+            let mut scene = create_attractor(&ctx.device, ctx.surface_format(), &rich, budget);
             // The preset switch order: `configure` carries the density, and the
             // first frame's `set_target_size` carries the target.
             scene.configure(&super::lines::GeneratorConfig::Particles {

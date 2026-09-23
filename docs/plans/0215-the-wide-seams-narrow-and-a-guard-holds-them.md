@@ -304,8 +304,8 @@ pub(crate) struct PreviewService {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The real-time capture loop joins the pragma guard | dev | done | committed with this row |
-| 2 — Two methods leave the `Scene` trait | dev | not started | |
+| 1 — The real-time capture loop joins the pragma guard | dev | done | 2faed625 |
+| 2 — Two methods leave the `Scene` trait | dev | done | committed with this row |
 | 3 — Four capabilities become four traits | dev | not started | |
 | 4 — A new kind-branch has to declare itself | dev | not started | |
 | 5 — The preview concern gets an owner | dev | not started | |
@@ -338,6 +338,19 @@ being empty.
 called from the Linux loop and indexes and slices freely. It is a pure, shared helper outside the
 `capture_*/` directories the guard now targets, and pulling it in was outside the phase's file
 list.
+
+**Phase 2 — the re-derivation found no production caller**, as the plan expected: the only callers
+were the two assertions in `render/scenes/mod.rs`'s test module and a forwarding method on
+`render/tests.rs`'s `Observed<T>` wrapper, which is itself test-only and never observed an
+attractor. That forwarding method is gone with the trait method.
+
+**Phase 2 — the factory arm gained a named helper.** The tests read the budget off a scene the
+factory built, which is the wiring they assert about; reaching the concrete type meant the
+attractor arm of `create` had to be callable on its own. `create_attractor` is that arm, verbatim,
+including the live/offline ceiling choice — the factory arm now calls it and so do the tests.
+
+**Phase 2 — ADR-0195 still names `Scene::sample_budget` in prose** (its line 145). Not touched: it
+is a dated record and outside the phase's file list.
 
 ### Close triggers
 
