@@ -251,25 +251,79 @@ pub fn eligible_names<'a>(
     }
 }
 
-/// The order rotation walks the eligible set in, and the trail of what it
-/// actually showed.
+/// Which order rotation walks the eligible set in.
 ///
-/// **A shuffled traversal, not a remembered-history window.** Every draw is
-/// taken uniformly from the eligible presets this cycle has not yet shown; when
-/// none are left the cycle restarts, excluding whatever was shown last so a
-/// preset never ends one cycle and begins the next. The property — *no repeat
-/// while an unseen preset remains* — needs no window length to defend, and it
-/// holds while the eligible set grows and shrinks between draws: a preset that
-/// becomes eligible mid-cycle is unseen and joins the pool immediately, and one
-/// that stops being eligible simply stops being drawn.
+/// An enum rather than a flag on [`Traversal`]: the cycle state and the mixer
+/// below belong to the shuffle alone, and a flag would leave both unread under a
+/// sequential walk while the type's documented no-repeat invariant held in only
+/// one of its two modes.
+#[derive(Debug, Clone)]
+#[allow(
+    dead_code,
+    reason = "the sequential arm has no caller outside this module's tests"
+)]
+pub enum Order {
+    /// **A shuffled traversal, not a remembered-history window.** Every draw is
+    /// taken uniformly from the eligible presets this cycle has not yet shown;
+    /// when none are left the cycle restarts, excluding whatever was shown last
+    /// so a preset never ends one cycle and begins the next. The property — *no
+    /// repeat while an unseen preset remains* — needs no window length to
+    /// defend, and it holds while the eligible set grows and shrinks between
+    /// draws: a preset that becomes eligible mid-cycle is unseen and joins the
+    /// pool immediately, and one that stops being eligible simply stops being
+    /// drawn.
+    ///
+    /// Deterministic from its seed: no clock, no dependency, the same bit mixer
+    /// the console's `random` control uses.
+    Shuffled {
+        /// Eligible names already drawn this cycle.
+        seen: Vec<String>,
+        /// lowbias32 counter state.
+        rng: u32,
+    },
+    /// The eligible set walked in ascending name order, wrapping at the end.
+    ///
+    /// Carries no state of its own: the successor is computed against the set
+    /// handed to *that* draw, so a mark toggled mid-walk changes what comes next
+    /// without the walk losing its place — the preset after the last one drawn
+    /// is still the answer whether or not that one is still eligible.
+    Sequential,
+}
+
+impl Order {
+    /// A shuffle with an empty cycle, seeded from `seed`.
+    pub fn shuffled(seed: u32) -> Self {
+        Order::Shuffled {
+            seen: Vec::new(),
+            rng: seed,
+        }
+    }
+}
+
+/// One step of the bit mixer — lowbias32, one round, so consecutive counter
+/// values do not produce neighbouring positions the way a bare increment would.
+fn next_rand(rng: &mut u32) -> u32 {
+    let mut x = rng.wrapping_add(0x9E37_79B9);
+    *rng = x;
+    x ^= x >> 16;
+    x = x.wrapping_mul(0x21F0_AAAD);
+    x ^= x >> 15;
+    x = x.wrapping_mul(0x735A_2D97);
+    x ^= x >> 15;
+    x
+}
+
+/// What rotation draws, and the trail of what it actually showed.
 ///
-/// Deterministic from its seed: no clock, no dependency, the same bit mixer the
-/// console's `random` control uses.
+/// The draw itself belongs to the [`Order`]; everything here is shared between
+/// the two, which is what keeps `Backspace` and the console's staging line with
+/// one maintainer rather than one per order.
 #[derive(Debug, Clone)]
 pub struct Traversal {
-    /// Eligible names already drawn this cycle.
-    seen: Vec<String>,
-    /// The name the last draw handed out, excluded when a cycle restarts.
+    /// Which order the next draw comes from.
+    order: Order,
+    /// The name the last draw handed out — excluded when a shuffle's cycle
+    /// restarts, and the anchor a sequential walk takes the successor of.
     last: Option<String>,
     /// The next draw, and whether taking it restarts the cycle. Held so the
     /// console can name what a rotation will take without the answer changing
@@ -279,41 +333,37 @@ pub struct Traversal {
     /// current at the end. Every switch pushes here, whatever asked for it, so
     /// "previous" means the preset that was on screen rather than an index one
     /// lower — the two stopped being the same thing when rotation stopped being
-    /// sequential.
+    /// the roster's successor.
     trail: Vec<String>,
-    /// lowbias32 counter state.
-    rng: u32,
 }
 
 impl Traversal {
-    /// A fresh traversal seeded from `seed`.
+    /// A fresh shuffled traversal seeded from `seed`.
     ///
     /// Injected rather than read from a clock, so a test can state an exact
     /// sequence and a run is reproducible from its seed alone. One seed is one
     /// order: a caller that passes the same number every launch gets the same
-    /// walk every launch, which is what the shell does.
+    /// walk every launch.
     pub fn new(seed: u32) -> Self {
+        Self::with_order(Order::shuffled(seed))
+    }
+
+    /// A fresh traversal walking the eligible set in ascending name order.
+    #[allow(
+        dead_code,
+        reason = "the sequential order has no caller outside this module's tests"
+    )]
+    pub fn new_sequential() -> Self {
+        Self::with_order(Order::Sequential)
+    }
+
+    fn with_order(order: Order) -> Self {
         Self {
-            seen: Vec::new(),
+            order,
             last: None,
             upcoming: None,
             trail: Vec::new(),
-            rng: seed,
         }
-    }
-
-    /// One step of the bit mixer — lowbias32, one round, so consecutive counter
-    /// values do not produce neighbouring positions the way a bare increment
-    /// would.
-    fn next_rand(&mut self) -> u32 {
-        let mut x = self.rng.wrapping_add(0x9E37_79B9);
-        self.rng = x;
-        x ^= x >> 16;
-        x = x.wrapping_mul(0x21F0_AAAD);
-        x ^= x >> 15;
-        x = x.wrapping_mul(0x735A_2D97);
-        x ^= x >> 15;
-        x
     }
 
     /// The preset the next rotation will take, computing it if there is none
@@ -345,48 +395,69 @@ impl Traversal {
     pub fn draw(&mut self, eligible: &[&str]) -> Option<String> {
         let pick = self.peek(eligible)?.to_owned();
         let (_, restarts) = self.upcoming.take()?;
-        if restarts {
-            self.seen.clear();
+        if let Order::Shuffled { seen, .. } = &mut self.order {
+            if restarts {
+                seen.clear();
+            }
+            seen.push(pick.clone());
+            // Drop names that have left the library, so the cycle's memory
+            // cannot outlive the set it is about.
+            seen.retain(|name| eligible.contains(&name.as_str()));
         }
-        self.seen.push(pick.clone());
         self.last = Some(pick.clone());
-        // Drop names that have left the library, so the cycle's memory cannot
-        // outlive the set it is about.
-        self.seen.retain(|name| eligible.contains(&name.as_str()));
         Some(pick)
     }
 
-    /// Choose the next preset without recording it: an unseen eligible preset
-    /// if this cycle has one, otherwise a fresh cycle excluding the preset
-    /// drawn last.
+    /// Choose the next preset without recording it, in whichever order is
+    /// running.
     ///
-    /// The `bool` is whether taking this pick restarts the cycle, carried out
-    /// rather than applied here so that peeking — which a console does once a
-    /// frame — never advances the traversal's own state.
+    /// The `bool` is whether taking this pick restarts a shuffle's cycle,
+    /// carried out rather than applied here so that peeking — which a console
+    /// does once a frame — never advances the traversal's own state. A
+    /// sequential walk has no cycle to restart and always answers `false`.
     fn pick(&mut self, eligible: &[&str]) -> Option<(String, bool)> {
-        let unseen: Vec<&str> = eligible
-            .iter()
-            .copied()
-            .filter(|name| !self.seen.iter().any(|held| held == name))
-            .collect();
-        let (pool, restarts) = if unseen.is_empty() {
-            let fresh: Vec<&str> = eligible
-                .iter()
-                .copied()
-                .filter(|name| self.last.as_deref() != Some(*name))
-                .collect();
-            // A one-preset eligible set has nothing but the preset it just
-            // showed, and holding it is the honest answer there.
-            if fresh.is_empty() {
-                (eligible.to_vec(), true)
-            } else {
-                (fresh, true)
+        let Self { order, last, .. } = self;
+        let last = last.as_deref();
+        match order {
+            Order::Shuffled { seen, rng } => {
+                let unseen: Vec<&str> = eligible
+                    .iter()
+                    .copied()
+                    .filter(|name| !seen.iter().any(|held| held == name))
+                    .collect();
+                let (pool, restarts) = if unseen.is_empty() {
+                    let fresh: Vec<&str> = eligible
+                        .iter()
+                        .copied()
+                        .filter(|name| last != Some(*name))
+                        .collect();
+                    // A one-preset eligible set has nothing but the preset it
+                    // just showed, and holding it is the honest answer there.
+                    if fresh.is_empty() {
+                        (eligible.to_vec(), true)
+                    } else {
+                        (fresh, true)
+                    }
+                } else {
+                    (unseen, false)
+                };
+                let index = (next_rand(rng) as usize) % pool.len().max(1);
+                pool.get(index).map(|name| ((*name).to_owned(), restarts))
             }
-        } else {
-            (unseen, false)
-        };
-        let index = (self.next_rand() as usize) % pool.len().max(1);
-        pool.get(index).map(|name| ((*name).to_owned(), restarts))
+            Order::Sequential => {
+                // Sorted here, against the set this draw was handed, rather
+                // than cached: a mark toggled mid-walk moves the successor and
+                // must not leave the walk pointing at a name that is gone.
+                let mut sorted: Vec<&str> = eligible.to_vec();
+                sorted.sort_unstable();
+                // Strictly greater, so the anchor need not still be eligible:
+                // the first name past it is the successor either way. Wrapping
+                // to the first is what closes the lap.
+                last.and_then(|last| sorted.iter().copied().find(|name| *name > last))
+                    .or_else(|| sorted.first().copied())
+                    .map(|name| (name.to_owned(), false))
+            }
+        }
     }
 
     /// Record `name` as having been on screen, so a step backwards can return

@@ -1,6 +1,6 @@
 # 0216 — The operator owns the order
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-20
 > **Owner skill(s):** dev
 > **Related ADRs:** [0239](../adrs/0239-rotation-carries-two-orders-and-the-shuffles-seed-varies-per-launch.md) (proposed), [0228](../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md), [0027](../adrs/0027-scene-rotation-constant-default-calmer-cadence.md)
@@ -243,3 +243,24 @@ track_change = true
   the core source-agnostic.
 
 ## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `/home/igor/Work/rlx-plan-0216` on `plan-0216-the-operator-owns-the-order`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — `Order` splits out of `Traversal` | dev | done | committed with this row |
+| 2 — the order becomes a config key | dev | not started | |
+| 3 — the seed varies per launch, and a key pins it | dev | not started | |
+| 4 — two settings rows and two hotkeys | dev | not started | |
+| 5 — a favourite reads as a warm row | dev | not started | |
+| 6 — the docs say what the app now does | dev | not started | |
+
+### Notes
+
+- Phase 1: `Order::Sequential` and `Traversal::new_sequential` carry an `#[allow(dead_code)]` while
+  nothing but the module's own tests constructs them — `cargo clippy --all-targets` builds the bin
+  without `cfg(test)` and rejects both otherwise. Removed in Phase 2, where the config key
+  constructs them.

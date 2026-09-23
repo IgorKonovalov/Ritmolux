@@ -350,8 +350,12 @@ fn favourites_only_narrows_and_falls_back_when_nothing_is_marked() {
     );
 }
 
-/// **Auto-rotate does not repeat while unseen presets remain**, and a preset
-/// never ends one cycle and begins the next.
+/// **Under `Shuffled`, auto-rotate does not repeat while unseen presets
+/// remain**, and a preset never ends one cycle and begins the next.
+///
+/// A property of that one order, not of [`Traversal`]: the sequential walk
+/// below makes its own, weaker promise, and a test that read as though this
+/// held for the type would be silently asserting one branch.
 ///
 /// Stated as a property over many cycles rather than as a fixed sequence: the
 /// order is seeded and a different seed is a different order, but neither claim
@@ -509,8 +513,117 @@ fn stepping_back_walks_what_was_shown_rather_than_an_index() {
     assert_eq!(traversal.trail_len(), 0);
 }
 
+/// **`Sequential` visits every eligible name in ascending name order and wraps
+/// to the first**, whatever order the roster hands them over in.
+///
+/// The eligible set below is deliberately not sorted: a walk that followed the
+/// roster would pass this test's length and fail its sequence.
+#[test]
+fn sequential_walks_the_names_in_ascending_order_and_wraps() {
+    let mut traversal = Traversal::new_sequential();
+    let eligible = vec!["echo", "alpha", "delta", "bravo", "charlie"];
+
+    let drawn: Vec<String> = (0..12)
+        .map(|_| traversal.draw(&eligible).expect("a non-empty set"))
+        .collect();
+    let expected: Vec<String> = LIBRARY
+        .iter()
+        .cycle()
+        .take(12)
+        .map(|name| (*name).to_owned())
+        .collect();
+    assert_eq!(
+        drawn, expected,
+        "a sequential walk must read alphabetically and wrap, not follow the roster"
+    );
+}
+
+/// **The successor is computed against the set handed to that draw**, not a
+/// list cached when the traversal was built: hiding a preset mid-walk skips it
+/// without the walk losing its place.
+#[test]
+fn a_sequential_walk_skips_a_preset_hidden_mid_walk_without_losing_its_place() {
+    let mut traversal = Traversal::new_sequential();
+    let eligible = library();
+    assert_eq!(traversal.draw(&eligible).as_deref(), Some("alpha"));
+    assert_eq!(traversal.draw(&eligible).as_deref(), Some("bravo"));
+
+    // `charlie` is hidden between two draws, so the next eligible set no longer
+    // holds it: the walk continues at the name after it rather than restarting
+    // or stalling on a name that is gone.
+    let narrowed: Vec<&str> = eligible
+        .iter()
+        .copied()
+        .filter(|name| *name != "charlie")
+        .collect();
+    assert_eq!(traversal.draw(&narrowed).as_deref(), Some("delta"));
+
+    // Un-hidden again, it rejoins the next lap in its own place.
+    assert_eq!(traversal.draw(&eligible).as_deref(), Some("echo"));
+    assert_eq!(traversal.draw(&eligible).as_deref(), Some("alpha"));
+    assert_eq!(traversal.draw(&eligible).as_deref(), Some("bravo"));
+    assert_eq!(traversal.draw(&eligible).as_deref(), Some("charlie"));
+}
+
+/// **`trail` and `upcoming` are the shared half**, so they behave identically
+/// whichever order is drawing — the same sequence of calls run through each.
+///
+/// That is the whole reason the sequential walk goes *through* the traversal
+/// rather than around it: `Backspace` and the console's staging line would
+/// otherwise have one maintainer per order.
+#[test]
+fn the_trail_and_the_announcement_behave_the_same_under_both_orders() {
+    let eligible = library();
+    let run = |mut traversal: Traversal| {
+        let mut announced = Vec::new();
+        let mut drawn = Vec::new();
+        for _ in 0..7 {
+            let next = traversal.peek(&eligible).expect("a next").to_owned();
+            assert_eq!(
+                traversal.peek(&eligible),
+                Some(next.as_str()),
+                "peeking twice named two different presets"
+            );
+            announced.push(next.clone());
+            let pick = traversal.draw(&eligible).expect("a non-empty set");
+            assert_eq!(
+                pick, next,
+                "the draw took a preset other than the announced one"
+            );
+            traversal.note_shown(&pick);
+            drawn.push(pick);
+        }
+        assert_eq!(traversal.trail_len(), 7);
+        let mut back = Vec::new();
+        while let Some(name) = traversal.step_back() {
+            back.push(name);
+        }
+        assert_eq!(traversal.trail_len(), 0, "the trail is spent");
+        (announced, drawn, back)
+    };
+
+    let (shuffled_announced, shuffled_drawn, shuffled_back) = run(Traversal::new(7));
+    let (seq_announced, seq_drawn, seq_back) = run(Traversal::new_sequential());
+
+    assert_eq!(shuffled_announced, shuffled_drawn);
+    assert_eq!(seq_announced, seq_drawn);
+
+    let reversed = |drawn: &[String]| {
+        let mut back: Vec<String> = drawn.to_vec();
+        back.reverse();
+        back
+    };
+    assert_eq!(shuffled_back, reversed(&shuffled_drawn));
+    assert_eq!(seq_back, reversed(&seq_drawn));
+
+    // Non-vacuity: the two orders really did hand out different walks, so the
+    // agreement above is about the shared half rather than about one order run
+    // twice.
+    assert_ne!(shuffled_drawn, seq_drawn);
+}
+
 /// The same seed walks the same order, and a different one does not: the
-/// traversal reads no clock, so a run is reproducible from its seed alone.
+/// shuffle reads no clock, so a run is reproducible from its seed alone.
 #[test]
 fn the_order_is_a_pure_function_of_the_seed() {
     let walk = |seed| {
