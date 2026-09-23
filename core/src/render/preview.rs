@@ -12,6 +12,14 @@
 //! and the property that matters about it — that a frame routed through it is
 //! byte-identical to one drawn straight at the target — is asserted on the
 //! headless capture path, which compiles with glyphon out.
+//!
+//! ## One owner
+//!
+//! [`PreviewService`] holds every resource the concern has — the intermediate,
+//! the readback and the frame the readback produced — and `Renderer` holds one
+//! of it. Three loose fields there could each be opened, closed, resized and
+//! drained separately, and an accessor that moved two of them and forgot the
+//! third looked exactly like one that moved all three.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; `render/` scan set). The
 // copy runs once per displayed frame while a preview is open.
@@ -23,8 +31,193 @@
     clippy::unreachable
 )]
 
-use super::gpu;
+use super::preview_readback::PreviewReadback;
+use super::{CaptureImage, PixelOrder, RenderError, gpu};
 use std::sync::atomic::{AtomicU64, Ordering};
+
+/// Everything the program preview owns, as one thing.
+///
+/// `Renderer` holds one of these where it held the intermediate, the readback
+/// and the produced frame side by side. The accessors that open, close, size and
+/// drain the concern delegate here rather than reaching three fields each, which
+/// is what stops an accessor from moving two of them and quietly leaving the
+/// third behind — closing the intermediate without closing the readback leaves a
+/// staging buffer copying out of a texture that no longer exists.
+///
+/// **Off the frame path.** [`take_target`](Self::take_target) and
+/// [`restore_target`](Self::restore_target) bracket the draw from `render` and
+/// from the headless capture; `draw_frame` itself never sees this — from in
+/// there the intermediate is just the view it was handed.
+pub(super) struct PreviewService {
+    /// The intermediate (ADR-0143), `None` unless a shell has opened one. While
+    /// it is `Some` the frame is drawn into it and reaches the real destination
+    /// by an exact copy; while it is `None` nothing is allocated, no copy is
+    /// encoded and the frame path is what it was — which is what makes the
+    /// console free when it is closed.
+    target: Option<PreviewTarget>,
+    /// The non-blocking readback (Plan 0158 Phase 6), `None` unless a shell
+    /// opened one. While it is `Some` each frame drawn through the intermediate
+    /// records one `copy_texture_to_buffer` and polls the previous frame's map;
+    /// while it is `None` nothing is allocated and the frame path costs one
+    /// `Option` test.
+    readback: Option<PreviewReadback>,
+    /// The most recent frame the readback produced and nothing has taken.
+    ///
+    /// One slot rather than a queue: a preview wants the newest picture, and a
+    /// consumer that fell behind is better served by the current frame than by
+    /// the backlog it missed.
+    frame: Option<CaptureImage>,
+}
+
+impl PreviewService {
+    /// A closed preview: no intermediate, no readback, nothing produced.
+    pub(super) const fn closed() -> Self {
+        Self {
+            target: None,
+            readback: None,
+            frame: None,
+        }
+    }
+
+    /// Build the intermediate at `format` and `width`x`height`, discarding any
+    /// standing one. An already-open preview is rebuilt, which is how a caller
+    /// follows a resize.
+    pub(super) fn open_target(
+        &mut self,
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        width: u32,
+        height: u32,
+    ) {
+        self.target = Some(PreviewTarget::new(device, format, width, height));
+    }
+
+    /// The open intermediate, or `None`.
+    pub(super) fn target(&self) -> Option<&PreviewTarget> {
+        self.target.as_ref()
+    }
+
+    /// The intermediate's size and identity, or `None` when closed.
+    pub(super) fn state(&self) -> Option<((u32, u32), u64)> {
+        self.target.as_ref().map(|t| (t.size(), t.generation()))
+    }
+
+    /// Whether an intermediate is open.
+    pub(super) fn is_open(&self) -> bool {
+        self.target.is_some()
+    }
+
+    /// Move the intermediate out for the draw, which takes `&mut Renderer`.
+    /// Paired with [`restore_target`](Self::restore_target) in the same frame.
+    pub(super) fn take_target(&mut self) -> Option<PreviewTarget> {
+        self.target.take()
+    }
+
+    /// Put back what [`take_target`](Self::take_target) handed out.
+    pub(super) fn restore_target(&mut self, target: Option<PreviewTarget>) {
+        self.target = target;
+    }
+
+    /// Release the intermediate, the readback and anything the readback had
+    /// produced.
+    ///
+    /// All three together, always: the readback copies out of the intermediate,
+    /// so one left behind would hold a staging buffer for a texture that no
+    /// longer exists and never yield another frame.
+    pub(super) fn close(&mut self) {
+        self.target = None;
+        self.readback = None;
+        self.frame = None;
+    }
+
+    /// Open a readback yielding `width`x`height` frames at the intermediate's
+    /// format, replacing any standing one.
+    ///
+    /// Requires an open intermediate — the blit that fills the readback's tap
+    /// samples it and has nothing to read without one. Refused when the frames
+    /// would come out at a format no consumer can be told the order of, so the
+    /// announcement that follows can always be true (ADR-0187).
+    pub(super) fn open_readback(
+        &mut self,
+        device: &wgpu::Device,
+        width: u32,
+        height: u32,
+    ) -> Result<(), RenderError> {
+        let Some(target) = self.target.as_ref() else {
+            return Err(RenderError::CaptureReadback);
+        };
+        let format = target.format();
+        if PixelOrder::of(format).is_none() {
+            return Err(RenderError::UnnameablePixelOrder(format));
+        }
+        self.readback = Some(PreviewReadback::new(device, format, width, height));
+        Ok(())
+    }
+
+    /// Close the readback and free its staging buffer, leaving the intermediate
+    /// open.
+    pub(super) fn close_readback(&mut self) {
+        self.readback = None;
+    }
+
+    /// The size of the frames the readback yields, or `None` when closed.
+    pub(super) fn readback_size(&self) -> Option<(u32, u32)> {
+        self.readback.as_ref().map(PreviewReadback::size)
+    }
+
+    /// Take the frame the readback produced, if one has landed.
+    pub(super) fn take_frame(&mut self) -> Option<CaptureImage> {
+        self.frame.take()
+    }
+
+    /// The format the readback's fixed-size mirror was built at, or `None` when
+    /// no readback is open.
+    ///
+    /// `#[cfg(test)]`, and the tap is an internal of the readback: the one
+    /// reader is the assertion that every path this renderer announces a pixel
+    /// order for really produces that order.
+    #[cfg(test)]
+    pub(super) fn readback_tap_format(&self) -> Option<wgpu::TextureFormat> {
+        self.readback
+            .as_ref()
+            .map(|readback| readback.tap.texture().format())
+    }
+
+    /// The consume-then-record half, before the frame's submission.
+    ///
+    /// Consumed first: the buffer cannot be recorded into while it is mapped, so
+    /// this frame's copy is only possible once the previous one has been taken. A
+    /// frame the caller never collected is replaced rather than queued — the
+    /// newest picture is the one a preview wants.
+    ///
+    /// Returns whether a copy was recorded, which decides whether
+    /// [`arm_readback`](Self::arm_readback) runs after the submission.
+    pub(super) fn step_readback(
+        &mut self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+    ) -> bool {
+        let Self {
+            target,
+            readback,
+            frame,
+        } = self;
+        let (Some(readback), Some(target)) = (readback.as_mut(), target.as_ref()) else {
+            return false;
+        };
+        if let Some(image) = readback.consume(device) {
+            *frame = Some(image);
+        }
+        readback.record(device, encoder, target)
+    }
+
+    /// Ask for the mapping, after the submission that carried the copy.
+    pub(super) fn arm_readback(&mut self) {
+        if let Some(readback) = self.readback.as_mut() {
+            readback.arm();
+        }
+    }
+}
 
 /// Hands out an identity for each intermediate ever built, so a consumer that
 /// caches GPU state against one can tell it has been handed a different

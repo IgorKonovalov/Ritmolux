@@ -178,8 +178,13 @@ impl PreviewReadback {
     }
 }
 
-/// The renderer-facing half: opening and closing the readback, and the two steps
-/// a frame drawn through the intermediate performs.
+/// The renderer-facing half: opening and closing the readback, and taking what
+/// it produced.
+///
+/// Every one of these delegates to the [`PreviewService`](preview::PreviewService)
+/// the renderer holds — the readback and the intermediate it copies out of are
+/// one concern with one owner, and a `Renderer` accessor that reached past that
+/// owner could open half of it.
 impl Renderer {
     /// Open a non-blocking readback of the preview, yielding `width`x`height`
     /// frames.
@@ -197,26 +202,13 @@ impl Renderer {
     /// told the order of, so the announcement that follows can always be true
     /// (ADR-0187).
     pub fn open_preview_readback(&mut self, width: u32, height: u32) -> Result<(), RenderError> {
-        let Some(preview) = self.preview.as_ref() else {
-            return Err(RenderError::CaptureReadback);
-        };
-        let format = preview.format();
-        if PixelOrder::of(format).is_none() {
-            return Err(RenderError::UnnameablePixelOrder(format));
-        }
-        self.preview_readback = Some(PreviewReadback::new(
-            &self.ctx.device,
-            format,
-            width,
-            height,
-        ));
-        Ok(())
+        self.preview.open_readback(&self.ctx.device, width, height)
     }
 
     /// Close the readback and free its staging buffer. A closed readback yields
     /// nothing and costs the frame one `Option` test.
     pub fn close_preview_readback(&mut self) {
-        self.preview_readback = None;
+        self.preview.close_readback();
     }
 
     /// The size of the frames the readback yields, or `None` when it is closed.
@@ -227,7 +219,7 @@ impl Renderer {
     /// across every resize, and a consumer told it once never has to be told
     /// again.
     pub fn preview_readback_size(&self) -> Option<(u32, u32)> {
-        self.preview_readback.as_ref().map(PreviewReadback::size)
+        self.preview.readback_size()
     }
 
     /// Take the frame the readback produced, if one has landed.
@@ -236,38 +228,6 @@ impl Renderer {
     /// `None` means "not yet" rather than "never": the caller sends what it gets
     /// and does not wait.
     pub fn take_preview_frame(&mut self) -> Option<CaptureImage> {
-        self.preview_frame.take()
-    }
-
-    /// The consume-then-record half, before the frame's submission.
-    ///
-    /// Returns whether a copy was recorded, which decides whether
-    /// [`arm_preview_readback`](Self::arm_preview_readback) runs after it.
-    pub(super) fn step_preview_readback(&mut self, encoder: &mut wgpu::CommandEncoder) -> bool {
-        let Self {
-            ctx,
-            preview,
-            preview_readback,
-            preview_frame,
-            ..
-        } = self;
-        let (Some(readback), Some(preview)) = (preview_readback.as_mut(), preview.as_ref()) else {
-            return false;
-        };
-        // Consumed first: the buffer cannot be recorded into while it is mapped,
-        // so this frame's copy is only possible once the previous one has been
-        // taken. A frame the caller never collected is replaced rather than
-        // queued — the newest picture is the one a preview wants.
-        if let Some(image) = readback.consume(&ctx.device) {
-            *preview_frame = Some(image);
-        }
-        readback.record(&ctx.device, encoder, preview)
-    }
-
-    /// Ask for the mapping, after the submission that carried the copy.
-    pub(super) fn arm_preview_readback(&mut self) {
-        if let Some(readback) = self.preview_readback.as_mut() {
-            readback.arm();
-        }
+        self.preview.take_frame()
     }
 }

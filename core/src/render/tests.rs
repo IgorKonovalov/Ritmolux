@@ -2915,12 +2915,9 @@ fn the_declared_pixel_order_is_the_one_the_frames_carry() {
             .open_preview_readback(32, 18)
             .expect("a readback opens at a nameable format");
         let mirror = renderer
-            .preview_readback
-            .as_ref()
-            .expect("the readback is open")
-            .tap
-            .texture()
-            .format();
+            .preview
+            .readback_tap_format()
+            .expect("the readback is open");
         assert_eq!(
             PixelOrder::of(mirror),
             Some(declared),

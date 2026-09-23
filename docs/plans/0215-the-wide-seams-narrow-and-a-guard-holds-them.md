@@ -307,8 +307,8 @@ pub(crate) struct PreviewService {
 | 1 — The real-time capture loop joins the pragma guard | dev | done | 2faed625 |
 | 2 — Two methods leave the `Scene` trait | dev | done | c330e18f |
 | 3 — Four capabilities become four traits | dev | done | 2a6bdbcf |
-| 4 — A new kind-branch has to declare itself | dev | done | committed with this row |
-| 5 — The preview concern gets an owner | dev | not started | |
+| 4 — A new kind-branch has to declare itself | dev | done | 673fced7 |
+| 5 — The preview concern gets an owner | dev | done | committed with this row |
 | 6 — The preview concern stays owned | dev | not started | |
 
 ### Notes
@@ -386,6 +386,28 @@ before the commit.
 non-`std` name in `hygiene.rs`. Its header called the file std-only; the header now says why the
 crate under test is not the dependency that claim is about. The alternative was a hand-written
 variant list inside the guard, which is the staleness ADR-0202 is about.
+
+**Phase 5 — Plan 0206 has not landed, so there were three preview fields, not four.** `Renderer`
+carried `preview`, `preview_readback` and `preview_frame` exactly as the plan's evidence described;
+the risk section's thumbnail consumer does not exist on this tree. `PreviewService` lives in
+`render/preview.rs`, beside `PreviewTarget` and `PreviewTap`.
+
+**Phase 5 — `draw_frame`'s destructuring changed, which is the one line of it that had to.** It
+names `Renderer`'s fields exhaustively, so three `preview*: _` bindings became one. Nothing else in
+`draw_frame` moved and the frame path is unchanged; the goldens did not move.
+
+**Phase 5 — one test reached into the readback's tap and now asks the owner.**
+`the_declared_pixel_order_is_the_one_the_frames_carry` read
+`renderer.preview_readback.tap.texture().format()`; `PreviewService::readback_tap_format` is a
+`#[cfg(test)]` accessor for it. The public API — `open_preview_readback`, `preview_readback_size`,
+`take_preview_frame`, `open_preview`, `close_preview`, `preview_state` — is unchanged in name and
+signature.
+
+**Phase 5 — one full-suite run was red on a flake.** `standalone::stream_show
+a_headless_run_emits_the_roster_the_preset_and_a_preset_error` failed once under the full
+workspace's parallelism, then passed alone and passed again on a second full-workspace run
+(`1799 tests run: 1799 passed, 7 skipped`). It spawns the player and reads its stdout; nothing in
+this phase is on that path.
 
 ### Close triggers
 
