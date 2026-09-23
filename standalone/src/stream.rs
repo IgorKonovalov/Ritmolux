@@ -311,17 +311,17 @@ pub const REPORT_EVERY: u64 = 1800;
 /// report.
 ///
 /// **Two stages, because the engine/sink boundary is the only one a caller-side
-/// clock can see.** `render_tapped` encodes the draw, submits it and then blocks
-/// mapping the readback, so there is no CPU-visible instant between "drew" and
-/// "read back": the block absorbs the GPU execution and the transfer together,
-/// and a timer around the encode alone would measure the encode. Splitting those
-/// two needs GPU timestamp queries — a device feature and a `core` seam, not a
+/// clock can see.** `render_tapped` encodes the draw, submits it and takes the
+/// *previous* frame's map on the way past without waiting, so what this measures
+/// is the CPU cost of producing a frame and not the GPU's cost of drawing it —
+/// that one is the per-pass table, which needs timestamp queries rather than a
 /// clock out here. The split that *is* available is the one that says whether
 /// the sink limits the rate, which is the question the readback-versus-zero-copy
 /// decision turns on (ADR-0125).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct StageCosts {
-    /// Time inside `render_tapped`: draw, submit and the blocking readback.
+    /// Time inside `render_tapped`: the non-blocking consume of the previous
+    /// frame, this frame's encode, and the submit.
     pub render: Duration,
     /// Time inside the sink's send: the upload into a Spout sender's own
     /// device, or the blocking write into the pipe.
@@ -342,7 +342,7 @@ impl StageCosts {
         }
         let per = |total: Duration| total.as_secs_f64() * 1000.0 / self.frames as f64;
         format!(
-            "stream: render+readback {:.2} ms, {} {:.2} ms, mean over {} frames",
+            "stream: draw+submit {:.2} ms, {} {:.2} ms, mean over {} frames",
             per(self.render),
             sink.send_label(),
             per(self.send),
@@ -856,7 +856,15 @@ pub fn run(
 
     let period = request.period();
     let mut scratch = vec![0.0_f32; 32_768];
+    // Frames put on the sink. `--frames` bounds this and the summary reports
+    // it, so a bounded run puts exactly that many frames' bytes on the pipe.
     let mut frames: u64 = 0;
+    // Frames *drawn*, which is one ahead of `frames` once the pipeline has
+    // filled: the tap hands back frame `N` while frame `N+1` is being drawn.
+    // Pacing and the report interval run off this one, because they are about
+    // the loop's own cadence; `--frames` and the summary run off `frames`,
+    // because they are about what a reader received.
+    let mut drawn: u64 = 0;
     let mut scene = 0.0_f64;
     let mut costs = StageCosts::default();
     let mut resident = ResidentSet::default();
@@ -935,16 +943,22 @@ pub fn run(
             reason = "stage costing reads the wall clock; core analysis stays clock-free"
         )]
         let drew = Instant::now();
+        // One frame in flight: this call draws frame `drawn` and hands back
+        // frame `drawn - 1`, so the first one yields nothing and every later
+        // one publishes a frame that is one behind the scene clock.
         let image = renderer
             .render_tapped(&mut tap, &frame, dt)
-            .map_err(|err| format!("--stream: frame {frames}: {err}"))?;
+            .map_err(|err| format!("--stream: frame {drawn}: {err}"))?;
         #[allow(
             clippy::disallowed_methods,
             reason = "stage costing reads the wall clock; core analysis stays clock-free"
         )]
         let sent = Instant::now();
-        sink.send(&image.rgba, image.width, image.height)
-            .map_err(|err| format!("--stream: frame {frames}: {err}"))?;
+        if let Some(image) = image {
+            sink.send(&image.rgba, image.width, image.height)
+                .map_err(|err| format!("--stream: frame {frames}: {err}"))?;
+            frames += 1;
+        }
         #[allow(
             clippy::disallowed_methods,
             reason = "stage costing reads the wall clock; core analysis stays clock-free"
@@ -953,7 +967,7 @@ pub fn run(
         costs.render += sent.duration_since(drew);
         costs.send += done.duration_since(sent);
         costs.frames += 1;
-        frames += 1;
+        drawn += 1;
 
         // The structured stream, after the frame that produced the figures it
         // reports (ADR-0176). Both are no-ops without `--events`.
@@ -971,7 +985,7 @@ pub fn run(
             &capture_token,
         );
 
-        if should_report(frames, REPORT_EVERY) {
+        if should_report(drawn, REPORT_EVERY) {
             resident.sample();
             eprintln!("{}", costs.line(request.sink));
             if tap.times_passes() {
@@ -991,7 +1005,7 @@ pub fn run(
             reason = "stream pacing reads the wall clock; core analysis stays clock-free"
         )]
         let elapsed = started.elapsed();
-        if let Some(rest) = rest_before(frames, period, elapsed) {
+        if let Some(rest) = rest_before(drawn, period, elapsed) {
             std::thread::sleep(rest);
         }
     }
@@ -1298,7 +1312,7 @@ mod tests {
             frames: 100,
         };
         let line = costs.line(Sink::Spout);
-        assert!(line.contains("render+readback 8.00 ms"), "{line}");
+        assert!(line.contains("draw+submit 8.00 ms"), "{line}");
         assert!(line.contains("spout send 1.00 ms"), "{line}");
         assert!(line.contains("over 100 frames"), "{line}");
     }
@@ -1506,7 +1520,7 @@ mod sink_tests {
         assert!(pipe.contains("pipe write"), "{pipe}");
         // Both report the stage that is the same either way, at the same figure.
         for line in [&spout, &pipe] {
-            assert!(line.contains("render+readback 2.00 ms"), "{line}");
+            assert!(line.contains("draw+submit 2.00 ms"), "{line}");
         }
     }
 

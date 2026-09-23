@@ -105,9 +105,17 @@ fn one_tap_renders_three_hundred_consecutive_frames_without_growing() {
     let mut drawn = 0u32;
     let mut any_content = false;
     for index in 0..FRAMES {
-        let img = renderer
+        // Draw, then drain: the tap keeps one frame in flight, and taking it
+        // back on the same iteration is what makes "frame `index` came back"
+        // below a statement about frame `index`. The allocation this test is
+        // about is the same either way — the tap's buffers are built once in
+        // `open_tap` and the loop reuses them.
+        let _ = renderer
             .render_tapped(&mut tap, &frame, DT)
             .unwrap_or_else(|e| panic!("frame {index} of {FRAMES} through the tap: {e}"));
+        let img = renderer
+            .drain_tap(&mut tap)
+            .unwrap_or_else(|| panic!("frame {index} of {FRAMES} was not in flight"));
         assert_eq!(
             (img.width, img.height),
             (WIDTH, HEIGHT),

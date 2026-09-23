@@ -1880,27 +1880,42 @@ the three numbers a measurement needs — frames emitted, wall clock, scene cloc
 Every 30 s and at exit, the mode reports its per-stage cost and its resident set:
 
 ```
-stream: render+readback 7.79 ms, spout send 0.79 ms, mean over 1800 frames
+stream: draw+submit 7.79 ms, spout send 0.79 ms, mean over 1800 frames
 render: resident set 277 MB, growth +0.2 MB across 5400 frames ...
 stream: 36000 frames, 600.00 s wall, 599.99 s scene clock, on NVIDIA GeForce RTX 3080 ...
 ```
 
-**Two stages, not three.** `render+readback` is the engine drawing the frame
-*and* pulling it back to the CPU: the readback blocks, so no CPU-visible instant
-separates them and splitting them would need GPU timestamp queries. The second
-stage is the sink's own, and it is **named for the sink** — `spout send` is the
-upload into the sender's device, `pipe write` is the blocking write to standard
-output — so a figure copied out of a log says which one produced it. The split
-answers the question that matters, whether the sink is what limits the rate, and
-on the development machine it is not, by an order of magnitude.
+**Two stages, not three.** `draw+submit` is the CPU cost of producing a frame:
+encoding the passes, submitting them, and taking the *previous* frame's readback
+on the way past. **Nothing on this path waits for the GPU** — the tap keeps one
+frame in flight and polls without blocking, so a frame is published while the
+next one is being drawn. What the GPU itself spent is the per-pass table below,
+which needs timestamp queries rather than a clock on this side. The second stage
+is the sink's own, and it is **named for the sink** — `spout send` is the upload
+into the sender's device, `pipe write` is the blocking write to standard output —
+so a figure copied out of a log says which one produced it. The split answers the
+question that matters, whether the sink is what limits the rate, and on the
+development machine it is not, by an order of magnitude.
 
-**Measured, on one machine, once** (RTX 3080 Laptop, 1280x720 at 60 fps, one
-preset held, nothing else on the GPU): a **30-minute run emitted 108,000 frames
-in 1800.00 s wall against 1799.99 s scene**, at 3.67-7.82 ms of render+readback
-and 0.27-0.58 ms of Spout send per frame, with the resident set at a 280 MB peak
-growing **2.0 MB across the whole run**. That is a reading from one box and one
-driver, not a specification — a machine that cannot hold the rate reports it the
-way the next paragraph describes.
+**One frame of latency, and it is the whole price.** The first call publishes
+nothing, so a run emits one fewer frame than it draws, and every published frame
+is one frame behind the scene clock. `--frames N` still puts exactly `N` frames
+on the sink.
+
+**A figure taken before this is not comparable to one taken after it.** The
+readback used to block, so the first stage carried the GPU's execution time as
+well as the CPU's. The reading in the next paragraph is one of those, kept as the
+record of what the old figure was rather than as something to compare against a
+new run.
+
+**Measured, on one machine, once, against the blocking readback** (RTX 3080
+Laptop, 1280x720 at 60 fps, one preset held, nothing else on the GPU): a
+**30-minute run emitted 108,000 frames in 1800.00 s wall against 1799.99 s
+scene**, at 3.67-7.82 ms of the first stage and 0.27-0.58 ms of Spout send per
+frame, with the resident set at a 280 MB peak growing **2.0 MB across the whole
+run**. That is a reading from one box and one driver, not a specification — a
+machine that cannot hold the rate reports it the way the next paragraph
+describes.
 
 **A third reading sits under those two: what each GPU pass cost.** Where the
 adapter offers timestamp queries, the same 30 s report and the exit print one row
@@ -1923,8 +1938,10 @@ rows follow the preset: turn `trails`, `kaleido_order` or `bloom_amount` off and
 those rows leave the table, because an inactive stage encodes nothing.
 
 These are **GPU** times taken at each pass's own boundaries, so they do not add
-up to `render+readback` above — that one is a CPU-side wall clock around the
-whole encode, submit and map, and the GPU runs passes concurrently with it.
+up to `draw+submit` above — that one is a CPU-side wall clock around the encode
+and the submit, and the GPU runs the passes it was handed concurrently with it.
+On a run that is holding its rate the pass table is the larger of the two, and
+it is the one to read when a preset will not fit the frame.
 
 **An adapter without timestamp queries — the software rasterizers — prints one
 line instead**, at startup, and no table afterwards:

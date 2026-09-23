@@ -405,7 +405,7 @@ fn only_a_tapped_frame_writes_timestamps() {
         eprintln!("skipped: this adapter has no timestamp queries (ADR-0016)");
         return;
     }
-    renderer
+    let _ = renderer
         .render_tapped(&mut tap, &frame, crate::render::scenes::FALLBACK_DT)
         .expect("a tapped frame renders");
     assert!(
@@ -415,6 +415,12 @@ fn only_a_tapped_frame_writes_timestamps() {
     assert!(
         !super::gpu::timer_armed(),
         "the timer outlived the frame it was armed for"
+    );
+    // The timings land with the pixels, one frame later: draining is what takes
+    // both off the frame just drawn.
+    assert!(
+        renderer.drain_tap(&mut tap).is_some(),
+        "the frame just drawn is in flight"
     );
     assert_eq!(tap.pass_costs().frames(), 1);
     assert!(
@@ -459,10 +465,16 @@ fn a_stages_row_appears_and_disappears_with_its_param() {
             renderer
                 .set_param_override(param, value)
                 .expect("the stage params are in the vocabulary");
-            tap.reset_pass_costs();
-            renderer
+            let _ = renderer
                 .render_tapped(&mut tap, &frame, crate::render::scenes::FALLBACK_DT)
                 .expect("a tapped frame renders");
+            // Reset between the draw and the drain: the draw collects the
+            // *previous* frame's timings, and the drain collects this one's.
+            tap.reset_pass_costs();
+            assert!(
+                renderer.drain_tap(&mut tap).is_some(),
+                "the frame just drawn is in flight"
+            );
             let present = tap.pass_costs().rows().iter().any(|(row, _)| *row == pass);
             assert_eq!(
                 present,

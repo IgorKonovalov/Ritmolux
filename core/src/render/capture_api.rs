@@ -678,7 +678,7 @@ impl Renderer {
 
     /// Advance the scene clock by `dt` real seconds, draw the active preset for
     /// `frame` through the same `draw_frame` the window presents through, and
-    /// read the result back out of `tap`.
+    /// hand back the **previous** call's frame out of `tap`.
     ///
     /// `dt` is **per call**, which is the difference between this and
     /// [`capture_stream`](Self::capture_stream)'s one fixed step: a caller that
@@ -692,35 +692,53 @@ impl Renderer {
     /// a [`capture_frame`](Self::capture_frame) of the same preset at the same
     /// clock are still byte-identical (`core/tests/suite/frame_tap.rs`).
     ///
-    /// **Blocks on the readback**, as every path through
-    /// `capture::read_back` does. That is what bounds a
-    /// long run's memory — the poll retires each frame's submission before the
-    /// next is encoded (the retention Plan 0099 measured) — and it is why this is
-    /// a *source* entry point and not a display one: there is no present deadline
-    /// here, only throughput.
+    /// # One frame in flight, and `Ok(None)` is the ordinary first answer
+    ///
+    /// **Nothing here waits.** This frame's submission carries the copy out of
+    /// the tap's texture, the *previous* frame's map is taken on the way past
+    /// with a non-blocking poll, and the caller sees frame `N` while frame
+    /// `N+1` is being drawn. So the first call after
+    /// [`open_tap`](Self::open_tap) yields `Ok(None)`, and a call whose
+    /// predecessor's map has not landed yet yields `Ok(None)` too — the frame
+    /// was still drawn and the clock still moved, it simply produced no bytes.
+    /// [`FrameTap`] carries the cycle.
+    ///
+    /// **A long run's memory is bounded by the map rather than by a wait**: the
+    /// tap's one buffer cannot be recorded into again until its map has landed
+    /// and been taken, so at most one frame is ever outstanding and the
+    /// retention Plan 0099 measured stays per-frame (Plan 0223 Phase 2).
     ///
     /// A `dt` that is not finite and positive is replaced by one nominal step
     /// before the clock sees it (`sanitize_frame_dt`, ADR-0191).
     ///
     /// **Feeds the diagnostics frame clock**, as [`render`](Self::render) does,
     /// because a tap is the whole of a windowless run's live output and
-    /// [`metrics`](Self::metrics) is what that run reports. The rate it yields is
-    /// the tap's throughput, not a display refresh. No capture entry point feeds
-    /// it: their frames are drawn offline and would make a rate of nothing.
+    /// [`metrics`](Self::metrics) is what that run reports. Counted per frame
+    /// **drawn** rather than per frame handed back, so the rate is the tap's
+    /// own throughput and does not read as halved on the pipeline's first
+    /// call. No capture entry point feeds it: their frames are drawn offline
+    /// and would make a rate of nothing.
     ///
     /// **Times every pass it encodes**, where the tap has a timer — the query
     /// set is armed around the draw, resolved into the same submission, and
-    /// read back on the poll the frame readback already pays for, so a tapped
-    /// run costs one extra buffer copy and no extra wait (ADR-0245).
+    /// read back on the same poll that takes the pixels, so a tapped run costs
+    /// one extra buffer copy and no extra wait (ADR-0245).
     pub fn render_tapped(
         &mut self,
         tap: &mut FrameTap,
         frame: &AnalysisFrame,
         dt: f32,
-    ) -> Result<CaptureImage, RenderError> {
+    ) -> Result<Option<CaptureImage>, RenderError> {
         let dt = super::sanitize_frame_dt(dt);
         let (width, height) = (tap.width, tap.height);
         self.time += dt;
+        // Consumed first: the buffer cannot be recorded into while it is
+        // mapped, so this frame's copy is only possible once the previous one
+        // has been taken. This also collects the previous frame's pass timings,
+        // while the timer still holds that frame's labels.
+        let image = tap.consume(&self.ctx.device);
+        let recording = tap.ready_to_record();
+
         let mut encoder = self
             .ctx
             .device
@@ -728,8 +746,12 @@ impl Renderer {
                 label: Some("rlx-frame-tap"),
             });
         // Armed for the whole encode and taken back before the submit, so no
-        // pass encoded outside this window can write into the query set.
-        gpu::arm_pass_timer(tap.timer.take());
+        // pass encoded outside this window can write into the query set. Left
+        // unarmed on a frame that cannot record, because its resolve would
+        // write into a readback buffer that is still mapped.
+        if recording {
+            gpu::arm_pass_timer(tap.timer.take());
+        }
         capture::record_clear(&mut encoder, &tap.view);
         let draw_calls = self.draw_frame(
             frame,
@@ -739,34 +761,47 @@ impl Renderer {
             dt,
             SaltMode::Live,
         );
-        capture::record_copy(
-            &mut encoder,
-            &tap.texture,
-            &tap.buffer,
-            tap.padded_bpr,
-            width,
-            height,
-        );
-        tap.timer = gpu::disarm_pass_timer(&mut encoder);
+        if recording {
+            capture::record_copy(
+                &mut encoder,
+                &tap.texture,
+                &tap.buffer,
+                tap.padded_bpr,
+                width,
+                height,
+            );
+            tap.timer = gpu::disarm_pass_timer(&mut encoder);
+        }
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
-        // Asked for before the frame readback below, so the one `poll(Wait)`
-        // that blocks on the image completes this map too.
-        if let Some(timer) = tap.timer.as_mut() {
-            timer.map();
+        if recording {
+            tap.arm();
+            if let Some(timer) = tap.timer.as_mut() {
+                timer.map();
+            }
         }
 
         #[cfg(feature = "text")]
         self.text_layer.end_frame();
 
-        let image =
-            capture::read_back(&self.ctx.device, &tap.buffer, width, height, tap.padded_bpr)?;
-        if let Some(timer) = tap.timer.as_mut() {
-            timer.collect(&mut tap.costs);
-        }
-        // After the readback, so a frame that failed to come back is not counted
-        // as delivered, and the clock spans the whole draw-to-bytes cost.
         self.diag.set_draw_calls(draw_calls);
         self.diag.record_frame();
         Ok(image)
+    }
+
+    /// **Wait** for the frame `tap` still holds and hand it back, drawing
+    /// nothing.
+    ///
+    /// [`render_tapped`](Self::render_tapped) keeps one frame in flight, so a
+    /// run that stops asking for frames leaves one behind. This is how a
+    /// **bounded** run collects it, and how a test takes exactly one frame per
+    /// call: `render_tapped` then this, and the pipeline is empty again.
+    ///
+    /// `None` when nothing is in flight — an unused tap, or one already
+    /// drained.
+    ///
+    /// **A live loop must not call this.** It is the wait `render_tapped` no
+    /// longer pays, and paying it per frame puts the stall back.
+    pub fn drain_tap(&mut self, tap: &mut FrameTap) -> Option<CaptureImage> {
+        tap.drain(&self.ctx.device)
     }
 }

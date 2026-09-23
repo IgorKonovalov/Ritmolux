@@ -483,8 +483,11 @@ impl PassTimer {
         self
     }
 
-    /// Ask for the resolved timestamps, without waiting. The caller's own frame
-    /// readback supplies the `poll` that completes this.
+    /// Ask for the resolved timestamps, without waiting.
+    ///
+    /// Asked for on the same submission as the frame's own readback and taken
+    /// on the same poll, so the timings and the pixels they describe arrive
+    /// together and neither costs a wait of its own.
     pub(crate) fn map(&mut self) {
         if self.claimed == 0 {
             return;
@@ -496,10 +499,23 @@ impl PassTimer {
         self.mapped = true;
     }
 
+    /// Release a map that will never be read — the frame whose readback failed.
+    /// Leaving it mapped would make the buffer unrecordable for the rest of the
+    /// run.
+    pub(crate) fn discard(&mut self) {
+        if self.mapped {
+            self.readback.unmap();
+            self.mapped = false;
+        }
+    }
+
     /// Fold the mapped timestamps into `costs`, a no-op when the map did not
-    /// land. A pass whose two ticks are out of order — which some drivers
-    /// produce across a frame boundary — contributes zero rather than a
-    /// nonsense figure.
+    /// land. A pass whose two ticks are out of order — which the timestamp
+    /// counter's own wrap can produce — contributes zero rather than a nonsense
+    /// figure.
+    ///
+    /// **Called before the timer is re-armed**, so `labels` and `claimed` still
+    /// describe the frame these timestamps came from.
     pub(crate) fn collect(&mut self, costs: &mut super::capture::PassCosts) {
         if !self.mapped {
             return;

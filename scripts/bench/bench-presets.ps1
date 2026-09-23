@@ -14,7 +14,7 @@ Run-One "Nebula" 1 | Select-String '^renderer'
 "preset`trun1`trun2`trun3`tmedian_ms`tfps_equiv"
 foreach ($p in $Presets) {
   $r = 1..3 | ForEach-Object {
-    $line = Run-One $p 1440 | Select-String 'render\+readback ([0-9.]+) ms' | Select-Object -Last 1
+    $line = Run-One $p 1440 | Select-String 'draw\+submit ([0-9.]+) ms' | Select-Object -Last 1
     [double]$line.Matches[0].Groups[1].Value
   }
   $m = ($r | Sort-Object)[1]

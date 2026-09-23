@@ -102,9 +102,18 @@ fn a_tapped_frame_is_byte_identical_to_the_capture_at_the_same_clock() {
             (SIZE, SIZE),
             "the tap sizes itself to the renderer's configured target"
         );
+        // Draw the frame, then drain the pipeline for it: the tap keeps one
+        // frame in flight, so the call that draws frame 0 hands back nothing.
+        assert!(
+            renderer
+                .render_tapped(&mut tap, &frame, CAPTURE_FRAME_DT)
+                .expect("render_tapped on a fresh headless renderer")
+                .is_none(),
+            "the first tapped frame is one frame late"
+        );
         renderer
-            .render_tapped(&mut tap, &frame, CAPTURE_FRAME_DT)
-            .expect("render_tapped on a fresh headless renderer")
+            .drain_tap(&mut tap)
+            .expect("the frame just drawn is in flight")
     };
 
     assert_eq!(
@@ -132,6 +141,97 @@ fn a_tapped_frame_is_byte_identical_to_the_capture_at_the_same_clock() {
              the clock by {CAPTURE_FRAME_DT} (render::scenes::FALLBACK_DT)"
         );
     }
+}
+
+/// **The tap publishes frame `N` while frame `N+1` is being drawn**, and the
+/// first call publishes nothing at all.
+///
+/// Asserted on the pixels rather than on a counter: each frame is given its own
+/// backdrop colour through a `bg_hue` override, so "the frame that came out is
+/// the one before the frame that went in" is a fact about the bytes. A
+/// counter-only version would pass against a tap that returned the *current*
+/// frame and simply skipped one.
+#[test]
+fn the_tap_hands_back_the_previous_frame() {
+    /// The two backdrops, as `bg_hue` in turns. Far apart so the two frames
+    /// cannot be confused for one another at any rounding.
+    const HUES: [f32; 2] = [0.0, 0.5];
+    /// Bright enough that the backdrop is the dominant thing in the frame.
+    const BRIGHT: f32 = 0.9;
+
+    let frame = AnalysisFrame::default();
+
+    // The reference: what each of the two frames looks like on its own, taken
+    // through `capture_frame`, whose clock steps the same `FALLBACK_DT`.
+    let references: Vec<CaptureImage> = {
+        let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+            return;
+        };
+        HUES.iter()
+            .map(|hue| {
+                set_backdrop(&mut renderer, *hue, BRIGHT);
+                renderer
+                    .capture_frame(&frame)
+                    .expect("capture_frame on a headless renderer")
+            })
+            .collect()
+    };
+    assert!(
+        first_difference(
+            references.first().expect("two references"),
+            references.get(1).expect("two references"),
+        )
+        .is_some(),
+        "the two backdrops rendered the same frame, so the order below could \
+         not be read off the pixels"
+    );
+
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let mut tap = renderer.open_tap();
+
+    // Frame 0 goes in and nothing comes out.
+    set_backdrop(&mut renderer, HUES[0], BRIGHT);
+    assert!(
+        renderer
+            .render_tapped(&mut tap, &frame, CAPTURE_FRAME_DT)
+            .expect("render_tapped on a headless renderer")
+            .is_none(),
+        "the first tapped frame was published immediately; the tap is not \
+         keeping a frame in flight"
+    );
+
+    // Frame 1 goes in and frame 0 comes out. The map is given the wait it
+    // needs through `drain_tap`, so this is an order assertion and not a race.
+    set_backdrop(&mut renderer, HUES[1], BRIGHT);
+    let published = renderer
+        .drain_tap(&mut tap)
+        .expect("frame 0 is the frame in flight");
+    if let Some(diff) = first_difference(references.first().expect("two references"), &published) {
+        panic!(
+            "the frame the tap published is not frame 0: {diff}. It matches \
+             frame 1 instead, which means the tap is publishing the frame just \
+             drawn rather than the one before it"
+        );
+    }
+    // And it is genuinely frame 0 rather than a frame that happens to match:
+    // frame 1's reference differs from what came out.
+    assert!(
+        first_difference(references.get(1).expect("two references"), &published).is_some(),
+        "the published frame matches BOTH references, so the backdrop override \
+         did not reach the tapped path and this asserts nothing"
+    );
+}
+
+/// Hold a backdrop colour on the active preset, whatever it binds.
+fn set_backdrop(renderer: &mut rlx_core::render::Renderer, hue: f32, bright: f32) {
+    renderer
+        .set_param_override("bg_hue", hue)
+        .expect("`bg_hue` is in every system's vocabulary");
+    renderer
+        .set_param_override("bg_bright", bright)
+        .expect("`bg_bright` is in every system's vocabulary");
 }
 
 /// A windowless run's frames reach the diagnostics clock, so the rate it reports
@@ -162,7 +262,7 @@ fn tapped_frames_feed_the_frame_clock_and_captures_do_not() {
 
     let mut tap = renderer.open_tap();
     for _ in 0..FRAMES {
-        renderer
+        let _ = renderer
             .render_tapped(&mut tap, &frame, CAPTURE_FRAME_DT)
             .expect("render_tapped on a fresh headless renderer");
     }

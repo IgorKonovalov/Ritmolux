@@ -13,12 +13,19 @@ measure different things:
 ## The headless bench
 
 Each script runs `ritmolux --stream --sink stdout` once per preset, three times, at 1920x1080 for
-1440 frames, and reads the `render+readback N ms` line the stream mode prints at exit
+1440 frames, and reads the `draw+submit N ms` line the stream mode prints at exit
 ([capturing.md, "What it costs"](../../docs/capturing.md#what-it-costs-and-what-those-numbers-mean)).
 That path has **no window, no swapchain and no vsync**, so the number is not capped at the panel's
-refresh rate the way the window's `F3` fps is. It includes the GPU-to-CPU readback of every frame (a
-roughly constant cost on both OSes) and excludes presenting to a display. **This is the test that
-can say which OS is faster**, since the live test saturates at the refresh rate on a fast GPU.
+refresh rate the way the window's `F3` fps is. It is the **CPU** cost of producing a frame —
+encoding it, submitting it, and taking the previous frame's readback on the way past without
+waiting — and it excludes presenting to a display. **This is the test that can say which OS is
+faster**, since the live test saturates at the refresh rate on a fast GPU.
+
+**Every `results/` file older than this line was taken against a different figure.** The stream's
+readback used to block, so the number then carried the GPU's own execution time as well as the
+CPU's, and the two are not comparable. A reading taken now is a new dated file, never a row added
+to an old one. The per-pass table the same run prints — `stream: pass costs, …` — is where the GPU
+side of a frame is now read, and it is a *GPU* figure with no CPU-side wait in it at all.
 
 ```
 ./scripts/bench/bench-presets.sh NVIDIA            # Linux (Vulkan)

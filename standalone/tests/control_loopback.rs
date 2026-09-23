@@ -246,11 +246,12 @@ fn frame_of(presets: Vec<Preset>, drive: impl FnOnce(&mut Renderer)) -> Option<C
     renderer.set_presets(presets);
     let mut tap = renderer.open_tap();
     drive(&mut renderer);
-    Some(
-        renderer
-            .render_tapped(&mut tap, &AnalysisFrame::default(), DT)
-            .expect("render_tapped on a headless renderer"),
-    )
+    // Draw, then drain: the tap keeps one frame in flight, so the call that
+    // draws this frame hands back the one before it — here, nothing.
+    let _ = renderer
+        .render_tapped(&mut tap, &AnalysisFrame::default(), DT)
+        .expect("render_tapped on a headless renderer");
+    renderer.drain_tap(&mut tap)
 }
 
 /// A `ctl/param` datagram sent to the loopback port changes the routed value on

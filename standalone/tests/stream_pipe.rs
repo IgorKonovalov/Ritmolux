@@ -192,8 +192,8 @@ fn whole_frames_reach_the_pipe_at_the_announced_geometry() {
         preview.stderr
     );
     assert!(
-        preview.stderr.contains("render+readback"),
-        "the cost line does not report the render stage:\n{}",
+        preview.stderr.contains("draw+submit"),
+        "the cost line does not report the engine stage:\n{}",
         preview.stderr
     );
 

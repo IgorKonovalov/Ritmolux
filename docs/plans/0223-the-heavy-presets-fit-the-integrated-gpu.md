@@ -249,8 +249,8 @@ grid_scale = "auto"   # or 0.25..1.0
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Every pass reports what it cost | dev | done | committed with this row |
-| 2 — The stream readback stops waiting | dev | not started | |
+| 1 — Every pass reports what it cost | dev | done | 29e1b900 |
+| 2 — The stream readback stops waiting | dev | done | committed with this row |
 | 3 — The grid rounds to nearest | dev | not started | |
 | 4 — The post chain stops copying and clearing | dev | not started | |
 | 5 — The grid scale exists, at 1.0 everywhere | dev | not started | |
@@ -273,6 +273,32 @@ grid_scale = "auto"   # or 0.25..1.0
   `core/src/render/tests.rs::a_stages_row_appears_and_disappears_with_its_param`, driving the
   shipped Leviathan through `set_param_override`. The `--stream` table itself is covered by pure
   tests over `stream::pass_table`; the live invocation is unrun.
+- **Phase 2, `render_tapped`'s return type moved.** It is
+  `Result<Option<CaptureImage>, RenderError>` now, because the done-when's *"the first published
+  frame is one frame late"* has no other shape. That is a signature change to a public method, so
+  it reaches six files the phase's `Files touched` does not list — `core/tests/suite/frame_tap.rs`,
+  `core/tests/suite/override.rs`, `core/src/render/tests.rs`,
+  `standalone/tests/frame_tap_memory.rs`, `standalone/tests/control_loopback.rs` and
+  `standalone/tests/stream_pipe.rs` — all mechanically.
+- **Phase 2 adds `Renderer::drain_tap`, which the plan does not name.** A bounded run and every
+  test that wants one frame per call need the frame the pipeline is still holding, and a
+  non-blocking consume cannot promise one: which frame comes out would depend on the GPU's
+  schedule, so the override and frame-tap suites would have become racy rather than merely
+  pipelined. `drain_tap` waits and draws nothing; the `--stream` loop never calls it, and the
+  indefinite wait lives in `capture.rs`, which `no_indefinite_wait_lives_outside_the_places_that_may_hold_one`
+  already allowlists.
+- **Phase 2 renames the cost line's first stage and the two bench scripts follow.** The done-when
+  asks that the exit line stop saying `render+readback`; it now says `draw+submit`. Both
+  `scripts/bench/bench-presets.sh` and `.ps1` parse that literal and would have silently returned
+  empty figures, so both were edited alongside the README the phase does list.
+- **Phase 2's Meter Mono reading is owed and not taken.** The done-when asks for that preset's
+  figure on the discrete adapter before and after. This session cannot start the application —
+  the conductor's allowlist has no `cargo run` — so no before/after pair exists. What *was*
+  observed, incidentally, through `standalone::stream_pipe`'s own subprocess on the discrete
+  adapter (RTX 3080 Laptop, Vulkan, 640x360, `Echo Plate`, 30 published frames): `stream:
+  draw+submit 1.03 ms, pipe write 0.65 ms`, with the per-pass table printing thirteen rows
+  underneath it. That is a different preset at a different size and is **not** the reading the
+  done-when asks for.
 - **The suite is red on one pre-existing test, on this lane's filesystem.**
   `rlx-core render::tonemap::tests::the_scan_reads_the_visibility_the_helpers_actually_set` fails
   at `core/src/render/tonemap/tests.rs:1431` with `left: ""`, `right: "FRAGMENT"` on the

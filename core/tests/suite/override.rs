@@ -66,13 +66,26 @@ fn run(
     let mut last = None;
     for index in 0..frames {
         drive(&mut renderer, index);
-        last = Some(
-            renderer
-                .render_tapped(&mut tap, &frame, DT)
-                .expect("render_tapped on a headless renderer"),
-        );
+        last = tapped_frame(&mut renderer, &mut tap, &frame);
     }
     last
+}
+
+/// Draw one frame through the tap and take it — `render_tapped` keeps a frame
+/// in flight, so a test that wants one frame per call drains after each.
+///
+/// The wait is what makes a bounded run deterministic: without it the frame
+/// that comes out depends on whether the previous map had landed, which is a
+/// property of the GPU's schedule rather than of the code under test.
+fn tapped_frame(
+    renderer: &mut Renderer,
+    tap: &mut rlx_core::render::FrameTap,
+    frame: &AnalysisFrame,
+) -> Option<CaptureImage> {
+    let _ = renderer
+        .render_tapped(tap, frame, DT)
+        .expect("render_tapped on a headless renderer");
+    renderer.drain_tap(tap)
 }
 
 /// The index of the first differing byte, and what the two frames hold there.
@@ -342,16 +355,14 @@ fn a_rebind_keeps_the_eased_values_and_a_replacement_snaps_them() {
         let frame = AnalysisFrame::default();
         let mut settled = Vec::new();
         for _ in 0..100 {
-            let img = renderer
-                .render_tapped(&mut tap, &frame, DT)
-                .expect("render_tapped on a headless renderer");
+            let img = tapped_frame(&mut renderer, &mut tap, &frame)
+                .expect("the frame just drawn is in flight");
             settled.push(mean_luma(&img));
         }
         renderer.set_presets(reload);
         let after = mean_luma(
-            &renderer
-                .render_tapped(&mut tap, &frame, DT)
-                .expect("render_tapped on a headless renderer"),
+            &tapped_frame(&mut renderer, &mut tap, &frame)
+                .expect("the frame just drawn is in flight"),
         );
         let last = *settled.last()?;
         // The step the run was already taking, measured over the frames just

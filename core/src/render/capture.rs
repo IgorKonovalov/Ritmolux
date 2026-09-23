@@ -308,6 +308,20 @@ pub(super) fn unpad_rows(padded: &[u8], width: u32, height: u32, padded_bpr: u32
 /// of one fixed-`dt`, one-preset run it drives itself; this type hands that
 /// reuse to a caller who owns the loop.
 ///
+/// # One frame in flight, and nothing waits
+///
+/// The cycle is the preview readback's, three steps across two frames:
+/// **consume** the previous submission's map with a non-blocking poll,
+/// **record** this frame's copy into the freed buffer, and **arm** the map
+/// after the submission. So a caller sees frame *N* while frame *N+1* is being
+/// drawn, and the very first call yields nothing at all.
+///
+/// **The buffer cannot be re-recorded while it is mapped**, which is why the
+/// consume step comes first and why a map that has not landed skips the record:
+/// a second copy into a mapped buffer is a validation error, not a dropped
+/// frame. A frame whose copy was skipped is still *drawn* — the scene advances
+/// and the clock moves — it simply produces no bytes.
+///
 /// **Sized at construction and never resized.** `record_copy`'s extent, the
 /// buffer's length and `padded_bpr` are all fixed against `width`×`height`, so a
 /// renderer that resizes underneath a live tap needs a new one — [`open_tap`]
@@ -337,6 +351,9 @@ pub struct FrameTap {
     ///
     /// [`reset_pass_costs`]: FrameTap::reset_pass_costs
     pub(crate) costs: PassCosts,
+    /// The armed map's result channel, `None` when [`buffer`](Self::buffer) is
+    /// free to record into.
+    armed: Option<std::sync::mpsc::Receiver<Result<(), wgpu::BufferAsyncError>>>,
 }
 
 impl FrameTap {
@@ -361,12 +378,100 @@ impl FrameTap {
             height,
             timer: gpu::PassTimer::new(device, queue),
             costs: PassCosts::default(),
+            armed: None,
         }
     }
 
     /// The pixel size every frame this tap yields will carry.
     pub fn size(&self) -> (u32, u32) {
         (self.width, self.height)
+    }
+
+    /// Take the frame the **previous** submission's map produced, if it has
+    /// landed, and fold that frame's pass timings in with it.
+    ///
+    /// Polls without waiting. A map still in flight yields `None` and leaves the
+    /// buffer armed; the next call asks again. Call this before
+    /// [`record`](Self::record) within a frame — the buffer cannot be copied
+    /// into while it is mapped.
+    ///
+    /// The timings are collected **here**, before the timer is re-armed for the
+    /// frame about to be encoded, because the labels and the claim count it
+    /// still holds are the ones the landed timestamps belong to.
+    pub(crate) fn consume(&mut self, device: &wgpu::Device) -> Option<CaptureImage> {
+        use std::sync::mpsc::TryRecvError;
+
+        let armed = self.armed.as_ref()?;
+        // The one poll on this path, and it is the non-blocking kind: an
+        // indefinite wait here would put the GPU's whole execution time inside
+        // the caller's own frame cost (Plan 0223 Phase 2).
+        let _ = device.poll(wgpu::PollType::Poll);
+        match armed.try_recv() {
+            Ok(Ok(())) => {}
+            // Still in flight: not an error and not a dropped frame. The buffer
+            // stays armed and the next call asks again.
+            Err(TryRecvError::Empty) => return None,
+            // Mapping failed, or the callback was dropped without firing. Either
+            // way this cycle is over: disarm so the next frame records afresh.
+            Ok(Err(_)) | Err(TryRecvError::Disconnected) => {
+                self.armed = None;
+                if let Some(timer) = self.timer.as_mut() {
+                    timer.discard();
+                }
+                return None;
+            }
+        }
+        self.armed = None;
+        if let Some(timer) = self.timer.as_mut() {
+            timer.collect(&mut self.costs);
+        }
+        let slice = self.buffer.slice(..);
+        let image = slice.get_mapped_range().ok().map(|mapped| CaptureImage {
+            width: self.width,
+            height: self.height,
+            rgba: unpad_rows(&mapped, self.width, self.height, self.padded_bpr),
+        });
+        // Unmapped whether or not the range was readable: a buffer left mapped
+        // is one this tap can never record into again.
+        self.buffer.unmap();
+        image
+    }
+
+    /// Whether the buffer is free to be copied into this frame.
+    pub(crate) fn ready_to_record(&self) -> bool {
+        self.armed.is_none()
+    }
+
+    /// **Wait** for the frame still in flight and take it, drawing nothing.
+    ///
+    /// The blocking counterpart of [`consume`](Self::consume), for a caller
+    /// that has stopped asking for frames and wants the one the pipeline is
+    /// still holding — a bounded run's last frame, and the way a test takes one
+    /// frame per call deterministically. `None` when nothing is in flight.
+    ///
+    /// **A live loop must not call this.** It is exactly the wait the pipeline
+    /// exists to remove, and this file is one of the two the indefinite-wait
+    /// allowlist admits for that reason.
+    pub(crate) fn drain(&mut self, device: &wgpu::Device) -> Option<CaptureImage> {
+        self.armed.as_ref()?;
+        // The map was asked for on a submission that has already been made, so
+        // this returns as soon as the GPU retires it.
+        let _ = device.poll(wgpu::PollType::wait_indefinitely());
+        self.consume(device)
+    }
+
+    /// Ask for the mapping, after the submission that carried the copy.
+    ///
+    /// The callback only sends; every decision is taken on the caller's thread
+    /// when it next polls, so nothing wgpu calls back into does work.
+    pub(crate) fn arm(&mut self) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.buffer
+            .slice(..)
+            .map_async(wgpu::MapMode::Read, move |res| {
+                let _ = tx.send(res);
+            });
+        self.armed = Some(rx);
     }
 
     /// Whether this tap can report per-pass GPU costs at all. `false` on an

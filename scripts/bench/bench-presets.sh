@@ -8,7 +8,7 @@ for p in "${PRESETS[@]}"; do
   r=()
   for i in 1 2 3; do
     r+=("$("$BIN" --stream --sink stdout --gpu "$GPU" --size "$SIZE" --fps 240 --frames 1440 --preset "$p" 2>&1 >/dev/null \
-          | sed -nE 's/.*render\+readback ([0-9.]+) ms.*/\1/p' | tail -1)")
+          | sed -nE 's/.*draw\+submit ([0-9.]+) ms.*/\1/p' | tail -1)")
   done
   m=$(printf '%s\n' "${r[@]}" | sort -g | sed -n 2p)
   printf '%s\t%s\t%s\t%s\t%s\t%.0f\n' "$p" "${r[@]}" "$m" "$(awk -v m="$m" 'BEGIN{print 1000/m}')"
