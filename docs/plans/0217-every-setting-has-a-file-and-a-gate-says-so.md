@@ -201,8 +201,8 @@ impl SettingsRow {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The diagnostics overlay gets a key | dev | done | committed with this row |
-| 2 — Every settings row declares the key it edits | dev | not started | |
+| 1 — The diagnostics overlay gets a key | dev | done | 14ae5f69 |
+| 2 — Every settings row declares the key it edits | dev | done | committed with this row |
 | 3 — A gate for the two applications a Rust test cannot see | dev | not started | |
 | 4 — The studio's own third copy | studio-builder | not started | |
 
@@ -214,6 +214,19 @@ impl SettingsRow {
   `AppState::new` calling the same `renderer.set_overlay` that `toggle_diagnostics` calls, seeded
   from `config.hud.diagnostics`. The round trip through the file is asserted in
   `config.rs`'s `the_diagnostics_overlay_defaults_off_and_round_trips`.
+- **Phase 2's two menu-side tests are unit tests in `standalone/src/settings/tests.rs`, not in
+  `standalone/tests/suite/configuration_doc.rs`.** `SettingsRow` lives in the `ritmolux` binary
+  rather than in the `standalone` library, so an integration test cannot reach it — the same wall
+  that makes `configuration_doc.rs` shell out to `--help` for the flag roster. The listed file gets
+  a paragraph in its module doc naming where the fourth property lives and why.
+- **Phase 2's first done-when was verified by mutating the declared path, not by removing the
+  `Config` field.** Removing `hud.diagnostics` from `Config` is a compile error at the two
+  production reads in `app_state.rs` before any test runs. Spelling the path
+  `hud.diagnostics_MUTANT` instead fails both new tests with
+  `["Diagnostics -> hud.diagnostics_MUTANT"]`, which is the message the criterion asks for.
+- `SettingsRow::edit` now returns `None` for any row whose `config_path` is empty, so "read-only"
+  is the declaration rather than a second hand-written arm. The `Presets` arm stays for
+  exhaustiveness.
 
 ### Close triggers
 

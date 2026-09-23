@@ -3,6 +3,10 @@ use super::{
     SettingsKey, SettingsRow, SettingsState, SettingsView, Tier, TierState,
 };
 
+use std::path::Path;
+
+use standalone::config::Config;
+
 fn view() -> SettingsView {
     SettingsView {
         tier: Tier::Rich,
@@ -289,6 +293,114 @@ fn the_rows_are_the_ones_the_menu_promises_in_order() {
     // The read-only row stays last, which is what keeps a menu lap from ending
     // on a key that does nothing.
     assert_eq!(SettingsRow::ALL.last(), Some(&SettingsRow::Presets));
+}
+
+/// A serialised config with every `Option` key set.
+///
+/// ADR-0240's Negative section: an optional key is absent from a default
+/// serialisation, so walking `Config::default()` would report `[output] gpu` —
+/// the key the `Adapter` row edits — as unresolved. The same workaround
+/// `standalone/tests/suite/configuration_doc.rs` uses on the schema side.
+fn populated_config() -> toml::Value {
+    let mut config = Config::default();
+    config.output.display_name = Some("a monitor".to_owned());
+    config.output.gpu = Some("an adapter".to_owned());
+    config.console.display_name = Some("another monitor".to_owned());
+    config.rotate.seed = Some(7);
+    let text = toml::to_string(&config).expect("the config type must serialise");
+    toml::from_str(&text).expect("its own output must parse as a value tree")
+}
+
+/// Whether `section.key` names something in the tree.
+fn resolves(root: &toml::Value, path: &str) -> bool {
+    let mut cursor = root;
+    for segment in path.split('.') {
+        match cursor.get(segment) {
+            Some(next) => cursor = next,
+            None => return false,
+        }
+    }
+    true
+}
+
+/// `docs/configuration.md`, resolved from the manifest rather than the cwd — a
+/// test's working directory is not a contract.
+fn configuration_doc() -> String {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/configuration.md");
+    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()))
+}
+
+/// **Every row edits a key that exists** (ADR-0240). This is the menu-side half
+/// of the property `configuration_doc.rs` asserts from the schema side: that
+/// one walks the keys and finds the document, this one walks the rows and finds
+/// the keys, so a row whose value lives nowhere is a failure rather than a
+/// habit nobody wrote down.
+#[test]
+fn every_row_edits_a_key_the_config_holds() {
+    let config = populated_config();
+    let unresolved: Vec<String> = SettingsRow::ALL
+        .iter()
+        .filter_map(|row| {
+            let path = row.config_path()?;
+            (!resolves(&config, path)).then(|| format!("{row:?} -> {path}"))
+        })
+        .collect();
+    assert!(
+        unresolved.is_empty(),
+        "these settings rows declare a config.toml path that does not resolve: {unresolved:?}\n\
+         A row is an editor of a key; a row whose key is gone is a choice reachable only from \
+         inside the running window, which is what ADR-0240 refuses."
+    );
+}
+
+/// **The one read-only row is the `Presets` path display, and `edit` agrees.**
+/// Asserted as a list rather than a count, for the reason the roster above is:
+/// a row that quietly stopped declaring a key would otherwise read as the same
+/// answer.
+#[test]
+fn the_presets_row_is_the_only_row_that_edits_nothing() {
+    let read_only: Vec<SettingsRow> = SettingsRow::ALL
+        .iter()
+        .copied()
+        .filter(|row| row.config_path().is_none())
+        .collect();
+    assert_eq!(
+        read_only,
+        vec![SettingsRow::Presets],
+        "a row declaring no config.toml path is a setting with no file behind it"
+    );
+
+    // And the declaration is what makes the row inert, in both directions.
+    let v = view();
+    for right in [false, true] {
+        assert_eq!(
+            edit_at(SettingsRow::Presets, right, &v),
+            SettingsAction::None
+        );
+    }
+}
+
+/// **Every key a row edits is named in `docs/configuration.md`, in backticks.**
+/// Reached from the menu side: `configuration_doc.rs` holds the document to the
+/// schema, and a key the schema holds but no row reaches is a different
+/// property from a row whose key a reader cannot look up.
+#[test]
+fn every_key_a_row_edits_is_documented() {
+    let doc = configuration_doc();
+    let missing: Vec<String> = SettingsRow::ALL
+        .iter()
+        .filter_map(|row| {
+            let path = row.config_path()?;
+            let (section, key) = path.split_once('.').expect("a path is `section.key`");
+            let section_named = doc.contains(&format!("`[{section}]`"));
+            let key_named = doc.contains(&format!("`{key}`"));
+            (!section_named || !key_named).then(|| format!("{row:?} -> {path}"))
+        })
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "docs/configuration.md does not name the key these rows edit, in backticks: {missing:?}"
+    );
 }
 
 /// **The input rows are read-only where capture takes no selection.** They

@@ -276,6 +276,47 @@ impl SettingsRow {
         SettingsRow::Presets,
     ];
 
+    /// The `config.toml` path this row edits, as `section.key`, or `None` for a
+    /// row that edits nothing.
+    ///
+    /// **Exhaustive on purpose** (ADR-0240): a setting is defined by a key in a
+    /// user-editable file and the menu is an editor of that file, so a new row
+    /// cannot be added without answering which key holds its value. The tests
+    /// beside this module assert that every declared path resolves in a
+    /// serialised config and that its leaf key is named in
+    /// `docs/configuration.md`, which is the same property
+    /// `standalone/tests/suite/configuration_doc.rs` asserts for the schema,
+    /// reached from the menu side instead.
+    ///
+    /// A row whose change reaches the file through more than one key names the
+    /// one its **value** is — `Display` names `output.display`, and the
+    /// `display_name` the same write keeps in step is the index's identity
+    /// rather than a second choice.
+    pub(crate) fn config_path(self) -> Option<&'static str> {
+        match self {
+            SettingsRow::Quality => Some("quality.tier"),
+            SettingsRow::Adapter => Some("output.gpu"),
+            SettingsRow::AutoRotate => Some("rotate.auto"),
+            SettingsRow::Order => Some("rotate.order"),
+            SettingsRow::Source => Some("rotate.source"),
+            SettingsRow::MinDwell => Some("rotate.min_dwell_secs"),
+            SettingsRow::MaxDwell => Some("rotate.max_dwell_secs"),
+            SettingsRow::Fullscreen => Some("output.fullscreen"),
+            SettingsRow::Display => Some("output.display"),
+            SettingsRow::Diagnostics => Some("hud.diagnostics"),
+            SettingsRow::InputMode => Some("input.mode"),
+            SettingsRow::InputDevice => Some("input.device"),
+            SettingsRow::PresetName => Some("hud.preset_name"),
+            SettingsRow::NowPlaying => Some("hud.now_playing"),
+            SettingsRow::NextRotation => Some("hud.next_rotation"),
+            SettingsRow::Console => Some("console.enabled"),
+            // The path display: it names where presets are loaded from, which
+            // is a launch-time resolution (`RLX_PRESET_DIR`, then the per-user
+            // dir) rather than a value the file holds.
+            SettingsRow::Presets => None,
+        }
+    }
+
     fn label(self) -> &'static str {
         match self {
             SettingsRow::Quality => "Quality",
@@ -385,6 +426,12 @@ impl SettingsRow {
     /// offering the same control must produce the same action value, and the
     /// only way to guarantee that is one function.
     pub(crate) fn edit(self, right: bool, view: &SettingsView) -> SettingsAction {
+        // A row that edits no key edits nothing. Read-only is then a property of
+        // the declaration above rather than of a hand-written arm, so the two
+        // cannot disagree about which row is the read-only one.
+        if self.config_path().is_none() {
+            return SettingsAction::None;
+        }
         match self {
             // A switch, not a cycle: `[`/`]`'s orientation, floor on the left.
             SettingsRow::Quality => {
@@ -454,9 +501,9 @@ impl SettingsRow {
             SettingsRow::NowPlaying => SettingsAction::ToggleNowPlaying,
             SettingsRow::NextRotation => SettingsAction::ToggleNextRotation,
             SettingsRow::Console => SettingsAction::ToggleConsole,
-            // Read-only: it tells you where presets are loaded from, which is a
-            // launch-time resolution (`RLX_PRESET_DIR`, then the per-user dir),
-            // not a thing a menu can move.
+            // Read-only, and already returned above on the strength of its
+            // empty `config_path`. The arm stays because the match is
+            // exhaustive, and it agrees with the guard by construction.
             SettingsRow::Presets => SettingsAction::None,
         }
     }
