@@ -306,8 +306,8 @@ pub(crate) struct PreviewService {
 |---|---|---|---|
 | 1 — The real-time capture loop joins the pragma guard | dev | done | 2faed625 |
 | 2 — Two methods leave the `Scene` trait | dev | done | c330e18f |
-| 3 — Four capabilities become four traits | dev | done | committed with this row |
-| 4 — A new kind-branch has to declare itself | dev | not started | |
+| 3 — Four capabilities become four traits | dev | done | 2a6bdbcf |
+| 4 — A new kind-branch has to declare itself | dev | done | committed with this row |
 | 5 — The preview concern gets an owner | dev | not started | |
 | 6 — The preview concern stays owned | dev | not started | |
 
@@ -371,6 +371,21 @@ Neither scene it observes (emitter, shape collage) has any of the four.
 
 **Phase 3 — the ceiling exception was not needed.** `set_per_vertex` is reached through an
 accessor like the other three; no frame-cost reading was taken, and no golden moved.
+
+**Phase 4 — the roster as committed holds three rows**, re-derived on 2026-09-23: `kind_info`,
+`create` and the test module's `expected_scene_name`. Nothing else under `core/src/render/` matches
+exhaustively on `SystemKind`; `bare_system_extras` in `render/tests.rs` has a wildcard arm and
+`shares_resources` now reads the table.
+
+**Phase 4 — both directions were established by trying them.** A temporary fourteen-arm
+`probe_kind_fact` in `render/scenes/mod.rs` failed the guard with the undeclared message; a
+temporary `probe_row` in the roster failed it with the stale-row message. Both probes were reverted
+before the commit.
+
+**Phase 4 — the guard reaches for `rlx_core::preset::SystemKind::ALL`**, which is the first
+non-`std` name in `hygiene.rs`. Its header called the file std-only; the header now says why the
+crate under test is not the dependency that claim is about. The alternative was a hand-written
+variant list inside the guard, which is the staleness ADR-0202 is about.
 
 ### Close triggers
 

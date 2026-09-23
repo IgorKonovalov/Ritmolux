@@ -24,6 +24,12 @@
 //! (i) No string literal in a workspace member's `tests/` names `target` as a
 //!     path segment: a test asks cargo where the target directory is
 //!     (`CARGO_TARGET_TMPDIR`) rather than building the path from the source tree.
+//! (j) Every function under `core/src/render/` that matches exhaustively on
+//!     `SystemKind` is one this file declares, with the reason it is not a field
+//!     of the consolidated kind table (ADR-0238 part 3).
+//!
+//! `rlx_core` is the crate under test rather than a dependency, so reaching for
+//! `SystemKind::ALL` in (j) leaves the header's claim standing.
 
 use std::path::{Path, PathBuf};
 
@@ -296,6 +302,179 @@ fn hot_path_modules_carry_the_panic_pragma() {
             file.display(),
         );
     }
+}
+
+/// Every function under `core/src/render/` that matches **exhaustively** on
+/// `SystemKind`, paired with the reason it is not a field of the consolidated
+/// kind table.
+///
+/// **A declared roster, not a cap** — the same shape as the `sanitize_frame_dt`
+/// and `disallowed_methods` guards below. The point is not that there are few:
+/// it is that a fifteenth fourteen-arm match cannot appear without somebody
+/// writing down why the answer could not be a field on `SceneKindInfo`
+/// (ADR-0238 part 3). A row whose function no longer exists fails too, so the
+/// roster cannot outlive what it describes.
+const EXHAUSTIVE_KIND_MATCHES: [(&str, &str); 3] = [
+    (
+        "kind_info",
+        "the consolidated table itself - the site every new static kind fact is \
+         meant to join instead of starting a match of its own",
+    ),
+    (
+        "create",
+        "the factory: a kind resolves to a different concrete scene type, which \
+         is a constructor call rather than a fact a struct field could carry",
+    ),
+    (
+        "expected_scene_name",
+        "a test's independent copy of the kind-to-scene mapping, written so the \
+         two can disagree - folding it into the table would make the assertion \
+         compare the table with itself",
+    ),
+];
+
+/// **A new `SystemKind` branch under `core/src/render/` has to declare itself**
+/// (Plan 0215 Phase 4, ADR-0238 part 3).
+///
+/// Reads whole files rather than two adjacent lines, for ADR-0202's reason: the
+/// instance that survived two closes there was in a place nobody thought to
+/// look. A match arm is told from an array element by the `=>` its
+/// variant group ends in — `[SystemKind::Swarm, SystemKind::Emitter, ...]` names
+/// variants too, and a guard that counted mentions would convict the test that
+/// enumerates the independent pairs.
+///
+/// The variant roster comes from `SystemKind::ALL` through `Debug`, so it grows
+/// with the enum and this guard cannot be exhaustive about a stale list.
+#[test]
+fn every_exhaustive_system_kind_match_is_declared() {
+    let variants: Vec<String> = rlx_core::preset::SystemKind::ALL
+        .iter()
+        .map(|kind| format!("{kind:?}"))
+        .collect();
+
+    let mut files = Vec::new();
+    collect_every_rs_file(&core_src().join("render"), &mut files);
+    assert!(!files.is_empty(), "found no render source files to scan");
+
+    let mut found: Vec<(String, PathBuf)> = Vec::new();
+    for file in &files {
+        let text = std::fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
+        for name in exhaustive_match_fns(&text, &variants) {
+            found.push((name, file.clone()));
+        }
+    }
+
+    for (name, file) in &found {
+        assert!(
+            EXHAUSTIVE_KIND_MATCHES
+                .iter()
+                .any(|(declared, _)| declared == name),
+            "`{name}` in {} matches exhaustively on every SystemKind and is not \
+             declared in EXHAUSTIVE_KIND_MATCHES. Either make the answer a field \
+             on SceneKindInfo (ADR-0238 part 3), or add a row here saying in one \
+             line why it cannot be.",
+            file.display(),
+        );
+    }
+    for (declared, _) in &EXHAUSTIVE_KIND_MATCHES {
+        assert!(
+            found.iter().any(|(name, _)| name == declared),
+            "EXHAUSTIVE_KIND_MATCHES declares `{declared}`, which no longer \
+             matches exhaustively on SystemKind under core/src/render/. Drop the \
+             row: a roster that outlives what it describes stops being read."
+        );
+    }
+}
+
+/// Every `.rs` file under `dir`, including out-of-line `#[cfg(test)]` modules.
+///
+/// Distinct from [`collect_rs_files`], which skips those: the pragma guard is
+/// about shipped code, and this one is about a branch appearing anywhere — a
+/// fourteen-arm match written inside a test module is exactly as much of a
+/// fifteenth site as one written beside the factory.
+fn collect_every_rs_file(dir: &Path, out: &mut Vec<PathBuf>) {
+    if dir.is_file() {
+        if dir.extension().is_some_and(|ext| ext == "rs") {
+            out.push(dir.to_path_buf());
+        }
+        return;
+    }
+    let mut entries: Vec<PathBuf> = std::fs::read_dir(dir)
+        .unwrap_or_else(|e| panic!("read_dir {}: {e}", dir.display()))
+        .map(|entry| entry.expect("dir entry").path())
+        .collect();
+    entries.sort();
+    for entry in &entries {
+        collect_every_rs_file(entry, out);
+    }
+}
+
+/// The functions in `text` whose match arms between them name every variant in
+/// `variants`.
+///
+/// Attribution is by the most recent `fn <name>` line, so a `match` inside a
+/// closure is credited to the function holding it — which is the unit the
+/// roster names. A variant is counted only where its group ends in `=>`: that
+/// is what separates an arm from an array element, and the arm groups
+/// `rustfmt` produces span several lines, each continuation beginning with `|`.
+fn exhaustive_match_fns(text: &str, variants: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut current: Option<String> = None;
+    let mut seen: Vec<String> = Vec::new();
+    let mut pending: Vec<String> = Vec::new();
+
+    let flush = |current: &Option<String>, seen: &mut Vec<String>, out: &mut Vec<String>| {
+        if let Some(name) = current
+            && variants.iter().all(|v| seen.iter().any(|s| s == v))
+        {
+            out.push(name.clone());
+        }
+        seen.clear();
+    };
+
+    for line in text.lines() {
+        let line = line.trim();
+        if let Some(name) = fn_name(line) {
+            flush(&current, &mut seen, &mut out);
+            pending.clear();
+            current = Some(name);
+        }
+        let named: Vec<String> = variants
+            .iter()
+            .filter(|v| line.contains(&format!("SystemKind::{v}")))
+            .cloned()
+            .collect();
+        if named.is_empty() {
+            // Not a continuation of an arm group, so whatever was pending was
+            // never an arm.
+            pending.clear();
+            continue;
+        }
+        pending.extend(named);
+        if line.contains("=>") {
+            seen.append(&mut pending);
+        } else if line.ends_with(',') || line.ends_with(']') {
+            // An array element or a call argument, not an arm head.
+            pending.clear();
+        }
+    }
+    flush(&current, &mut seen, &mut out);
+    out
+}
+
+/// The name a `fn` declaration line declares, or `None` for any other line.
+fn fn_name(line: &str) -> Option<String> {
+    let rest = line.strip_prefix("fn ").or_else(|| {
+        line.split_once(" fn ")
+            .filter(|(before, _)| !before.contains("//"))
+            .map(|(_, after)| after)
+    })?;
+    let name: String = rest
+        .chars()
+        .take_while(|c| c.is_alphanumeric() || *c == '_')
+        .collect();
+    (!name.is_empty()).then_some(name)
 }
 
 #[test]
