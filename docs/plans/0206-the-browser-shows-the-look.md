@@ -246,6 +246,28 @@ struct ThumbKey {
   prints and what `nearest_flag` corrects typos to. Three existing roster tests now read both
   rosters.
 
+**Phase 2 — parked, not started: there is no seam to draw an image through.**
+
+The engine's only public drawing surface for the shell is `Renderer::queue_text`, which takes
+`TextRun { text, x, y, size, color }` — one line of text, one colour. `core/src/render/mod.rs`
+exposes no function that accepts pixels: nothing named `rgba`, `image`, `pixels` or `texture`, and no
+`pub fn` in the crate takes a `&[u8]`. The console's second surface is the same primitive
+(`present_aux(&[TextRun])`), and `Renderer` keeps its device, queue and surface private and owns the
+acquire/present inside `render`, so the shell has nowhere to insert a pass of its own even though
+`rlx_core` re-exports `wgpu`.
+
+So *"highlighting a preset in the browser shows its cached still beside the list"* needs a new
+image-blit entry point on the renderer plus a draw site in `hud.rs`. Both are outside Phase 2's
+`Files touched` (`overlay.rs`, `overlay/tests.rs`, `docs/running.md` — `overlay.rs` is pure, window-
+free and draws nothing), and the first is ruled out by this plan's own *"It does not touch `core`"*.
+Phases 3 and 4 are not blocked by the same wall — the pass and the staleness rule need no pixels on
+screen — but Phase 4's *"the pane shows the old one rather than a placeholder"* is a claim about
+Phase 2's pane, so the run stops here rather than skipping past it.
+
+Two ways out, and the choice is the architect's: widen the plan with a core image-overlay phase (and
+say whether the "does not touch `core`" line meant the C ABI and the protocol rather than the crate),
+or re-specify the pane in terms of what the text layer can actually draw.
+
 ### Close triggers
 
 - **`presets/` touched:**
