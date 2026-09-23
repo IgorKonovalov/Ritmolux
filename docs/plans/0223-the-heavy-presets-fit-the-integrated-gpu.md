@@ -250,8 +250,8 @@ grid_scale = "auto"   # or 0.25..1.0
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Every pass reports what it cost | dev | done | 29e1b900 |
-| 2 — The stream readback stops waiting | dev | done | committed with this row |
-| 3 — The grid rounds to nearest | dev | not started | |
+| 2 — The stream readback stops waiting | dev | done | 045025be |
+| 3 — The grid rounds to nearest | dev | done | committed with this row |
 | 4 — The post chain stops copying and clearing | dev | not started | |
 | 5 — The grid scale exists, at 1.0 everywhere | dev | not started | |
 | 6 — The two integrated rows are measured | human | not started | |
@@ -299,6 +299,32 @@ grid_scale = "auto"   # or 0.25..1.0
   draw+submit 1.03 ms, pipe write 0.65 ms`, with the per-pass table printing thirteen rows
   underneath it. That is a different preset at a different size and is **not** the reading the
   done-when asks for.
+- **Phase 3, the step moved as well as the rounding.** `POST_GRID_STEP` and `TRAIL_GRID_STEP` are
+  both 128 now, and `grid::MIN_AXIS` (256) is the floor that used to be implied by one step. The
+  done-when's four values follow from that pair and are asserted directly in
+  `grid.rs::an_axis_rounds_to_the_nearest_step_above_the_floor`.
+- **Phase 3 moved 1920x1080 out of the rich tier's "cap binds" set.** At 1080p the post grid is now
+  1920x1024, inside the floor cap on both axes, so the two tiers resolve the same grid there and a
+  1080p window no longer supersamples its post stages by ~1.07x. That is a behaviour change the
+  plan does not call out;
+  `post/tests.rs::the_rich_tier_raises_the_grid_only_where_the_floor_cap_binds` now lists it in
+  the agreeing set and says why.
+- **Phase 3 re-chose three probe sizes in the post tests, and the reason is worth reading.** The
+  fold-symmetry and picture-shape tests need a target whose grid *shape* differs from its own, and
+  finer quantization makes that disagreement smaller everywhere: the widest separation the policy
+  can still produce comes from `MIN_AXIS`, an axis under 256 landing on the floor. So `(320, 256)`
+  became `(512, 160)` and `(1280, 800)` became `(640, 200)`, and the 1280x800 control moved to
+  1280x768. Same properties, probes that can still see them.
+- **Phase 3's done-when on the documentation cards names a size the manifest does not have.** The
+  640x360 entries are the **per-preset gallery cards** (`CARD_SIZE` in `scripts/docs-shots.mjs`);
+  every other entry is 1280x720, and a 1280x720 target's grid is 1280x768 under both the old rule
+  and the new one — unchanged. All 116 card names were re-rendered, which also re-renders the
+  fifteen 1280x720 system images that share a `presetFile` stem with a card (the script's name
+  matching cannot separate them). 113 of the 133 images written differ; the other 20 came back
+  byte-identical.
+- **Phase 3's grep for committed renders outside `docs/images/` found only `core/tests/golden/`**,
+  and every one of those is at or under 256 a side, which is why `cargo nextest run --workspace`
+  is green with nothing blessed.
 - **The suite is red on one pre-existing test, on this lane's filesystem.**
   `rlx-core render::tonemap::tests::the_scan_reads_the_visibility_the_helpers_actually_set` fails
   at `core/src/render/tonemap/tests.rs:1431` with `left: ""`, `right: "FRAGMENT"` on the

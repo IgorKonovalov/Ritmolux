@@ -82,23 +82,30 @@ fn the_over_junction_splits_the_walk_at_bloom() {
 /// line geometry composited through trails or the fold was rasterized at full
 /// resolution and then thrown away through a 720p grid, which on the 2048x1152
 /// display the preset lane worked at was a 1.6x upscale of the entire frame.
+///
+/// "Follows" means **within half a step of the target**, in either direction:
+/// the policy rounds each axis to the *nearest* step (ADR-0245), so an axis can
+/// land a little under the target as well as a little over it. What it may
+/// never be is a constant, which the second half pins.
 #[test]
 fn the_internal_grid_follows_the_target_instead_of_a_fixed_720p() {
-    // Common desktop sizes, all under the cap: the grid is the target rounded
-    // up to the step, never the old constant.
+    // Common desktop sizes, all under the cap.
     for target in [(1280, 720), (1600, 900), (1920, 1080)] {
         let grid = floor_grid(target);
-        assert!(
-            grid.0 >= target.0 && grid.1 >= target.1,
-            "{target:?} must not be downsampled below the target: got {grid:?}"
-        );
+        for (axis, want) in [(grid.0, target.0), (grid.1, target.1)] {
+            assert!(
+                axis.abs_diff(want) <= POST_GRID_STEP / 2,
+                "{target:?} -> {grid:?}: axis {axis} is more than half a step \
+                 ({}) from the target's {want}",
+                POST_GRID_STEP / 2
+            );
+        }
         assert!(grid.0 <= POST_MAX_W && grid.1 <= POST_MAX_H, "{grid:?}");
     }
-    // The display ADR-0034 was raised on. 2048x1152 is 16:9 and above the
-    // width cap, so it comes back capped *with its aspect exactly
-    // preserved* — a 1.07x downscale, and emphatically not 1280x720
-    // (ADR-0034).
-    assert_eq!(floor_grid((2048, 1152)), (1920, 1080));
+    // The display ADR-0034 was raised on. 2048x1152 is above the width cap, so
+    // it comes back capped by a single scale on both axes — and emphatically
+    // not 1280x720 (ADR-0034).
+    assert_eq!(floor_grid((2048, 1152)), (1920, 1024));
     assert_ne!(floor_grid((2048, 1152)), (1280, 720));
 }
 
@@ -138,9 +145,9 @@ fn every_grid_axis_is_quantized_and_non_degenerate() {
 /// ultrawide into a 16:9 grid, which the aspect-ignoring present then stretched
 /// back — so the picture changed shape as the window crossed the cap.
 ///
-/// Note what "aspect intact" can and cannot mean under a 256 px step: the
-/// derived axis is rounded up to the step, so an ultrawide's grid aspect is
-/// coarser than its target's (3440x1440 is 2.39; the grid is 1920x1024 = 1.88).
+/// Note what "aspect intact" can and cannot mean under a 128 px step: the
+/// derived axis is rounded to the nearest step, so an ultrawide's grid aspect is
+/// coarser than its target's (3440x1440 is 2.39; the grid is 1920x768 = 2.50).
 /// What the single factor buys is that it is **not** squashed to the cap's own
 /// 16:9, which is the regression.
 #[test]
@@ -193,16 +200,16 @@ fn the_grid_policy_is_a_pure_function_of_the_target() {
 /// squarely in the agreeing set, and `new_headless` pins the floor
 /// regardless).
 ///
-/// **1920x1080 belongs in the *binding* set, not the agreeing one**, and that
-/// is worth stating because it is the display size the floor was written for.
-/// The policy quantizes *then* clamps, so a 1080p target rounds up to
-/// 2048x1280 and the floor cap cuts it back to exactly 1920x1080 — meaning on
-/// the rich tier a 1080p window supersamples its post stages by ~1.07x rather
-/// than matching them to the surface.
+/// **1920x1080 belongs in the *agreeing* set**, and that is worth stating
+/// because it is the display size the floor was written for. Rounding to the
+/// nearest step (ADR-0245) puts a 1080p target's grid at 1920x1024, inside the
+/// floor cap on both axes — so the floor cap does not bind there and the two
+/// tiers resolve the same grid. A 1080p window at either tier now matches its
+/// post stages to the surface instead of supersampling them.
 #[test]
 fn the_rich_tier_raises_the_grid_only_where_the_floor_cap_binds() {
     let rich = TierConfig::RICH;
-    for target in [(1920, 1080), (2560, 1440), (3440, 1440), (3840, 2160)] {
+    for target in [(2560, 1440), (3440, 1440), (3840, 2160)] {
         let (fw, fh) = floor_grid(target);
         let (rw, rh) = internal_grid_size(target, rich.post_cap);
         assert!(
@@ -213,7 +220,7 @@ fn the_rich_tier_raises_the_grid_only_where_the_floor_cap_binds() {
     }
     // Targets whose *quantized* grid still fits under the floor cap, so
     // neither cap binds and the tier cannot change the answer.
-    for target in [(640, 480), (1280, 720), (1600, 900)] {
+    for target in [(640, 480), (1280, 720), (1600, 900), (1920, 1080)] {
         assert_eq!(
             floor_grid(target),
             internal_grid_size(target, rich.post_cap),
@@ -561,7 +568,7 @@ fn stages_rebuild_on_a_size_change_and_only_on_a_size_change() {
     assert!(stages.bloom.set_param("bloom_amount", 0.8));
 
     // Two sizes that the policy maps to *different* grids, so the compare has
-    // something to see. (Sizes inside one 256 px step deliberately do not
+    // something to see. (Sizes inside one 128 px step deliberately do not
     // rebuild — that is the point of quantizing.)
     let small = (512, 512);
     let large = (1024, 768);
@@ -625,10 +632,10 @@ fn stages_rebuild_on_a_size_change_and_only_on_a_size_change() {
         "returning to a size rebuilds"
     );
 
-    // A size within the same 256 px step is free — the quantization is what
-    // makes a live window drag survivable. (512 sits exactly *on* a step, so
-    // 513 is already the next grid up; the probe has to be inside the step.)
-    let same_grid = (400, 400);
+    // A size within the same 128 px step is free — the quantization is what
+    // makes a live window drag survivable. Rounding is to the *nearest* step,
+    // so 512's step spans [448, 576) and the probe has to sit inside it.
+    let same_grid = (500, 500);
     assert_eq!(floor_grid(small), floor_grid(same_grid));
     pump(&ctx, &mut stages.trails, same_grid);
     assert_eq!(
@@ -645,9 +652,14 @@ fn stages_rebuild_on_a_size_change_and_only_on_a_size_change() {
 /// reports an internal size of 2048x1152". That is not reachable alongside the
 /// same plan's 1920x1080 cap, which 2048x1152 exceeds on width; ADR-0034 says
 /// as much when it calls the cap "a 1.07x downscale at the display in
-/// question". So the assertion is the capped grid — with the aspect exactly
-/// preserved, 2048x1152 and 1920x1080 both being 16:9 — and, per the done-when's
+/// question". So the assertion is the capped grid and, per the done-when's
 /// actual point, emphatically not 1280x720.
+///
+/// The **aspect** assertion below is the load-bearing half and is on the
+/// target's, not the grid's: the height lands on 1024 rather than 1080 because
+/// each axis rounds to the nearest step (ADR-0245), and a grid is a resolution
+/// rather than a shape (ADR-0037), so what must not move is what the scene is
+/// told to project at.
 #[test]
 fn the_chain_reports_the_targets_grid_not_a_fixed_720p() {
     let Some(ctx) = headless_context_or_skip() else {
@@ -670,7 +682,7 @@ fn the_chain_reports_the_targets_grid_not_a_fixed_720p() {
 
     assert_eq!(
         target.size,
-        (1920, 1080),
+        (1920, 1024),
         "the composite must follow the render target under the cap, not sit at 1280x720"
     );
     assert_ne!(target.size, (1280, 720), "the fixed 720p grid is retired");
@@ -742,9 +754,12 @@ fn fold_error_at(ctx: &RenderContext, surface: (u32, u32)) -> f32 {
 ///   was the whole test through Plan 0033, and it *cannot* distinguish grid
 ///   aspect from surface aspect, which is why it passed for the entire life of
 ///   the defect.
-/// - **(320, 256)** — grid (512, 256). The target is 1.25:1 and the grid is
+/// - **(512, 160)** — grid (512, 256). The target is 3.2:1 and the grid is
 ///   2:1, so folding about the grid is a 1.6x wrong axis and only the target's
-///   aspect scores clean.
+///   aspect scores clean. The disagreement comes from the grid's **floor**: an
+///   axis under `grid::MIN_AXIS` lands on it, which is the largest separation
+///   the policy can produce now that each axis rounds to the nearest 128
+///   (ADR-0245).
 #[test]
 fn the_fold_stays_symmetric_on_a_non_16_9_target() {
     let Some(ctx) = headless_context_or_skip() else {
@@ -767,7 +782,7 @@ fn the_fold_stays_symmetric_on_a_non_16_9_target() {
 
     // The discriminating probe: the grid's shape is not the target's here, so
     // only one of the two can be the axis the fold uses.
-    let disagreeing = (320, 256);
+    let disagreeing = (512, 160);
     let grid = floor_grid(disagreeing);
     assert_eq!(grid, (512, 256), "the probe's grid must not be its surface");
     assert!(
@@ -987,24 +1002,26 @@ fn disc_extent_ratio(ctx: &RenderContext, surface: (u32, u32), through_a_stage: 
 /// internal grid, so the scene drew correct-for-the-grid and the stage's
 /// aspect-ignoring present stretched it by grid-aspect-over-target-aspect.
 ///
-/// The sizes are chosen, not incidental. **1280x800** takes a 1280x1024 grid:
-/// 1.25 against the target's 1.6, a 1.28x stretch and the worst ordinary case.
-/// **1920x1080** is the control the policy returns unchanged — it is what the
-/// project develops at, it is why this shipped, and it must move under neither
-/// the defect nor the fix.
+/// The sizes are chosen, not incidental. **640x200** takes a 640x256 grid: 2.5
+/// against the target's 3.2, a 1.28x stretch and the widest separation the
+/// policy can still produce — the height is under `grid::MIN_AXIS` and lands on
+/// the floor, which is where a grid's shape and a target's now disagree most
+/// (each axis rounds to the nearest 128, ADR-0245). **1280x768** is the control
+/// the policy returns unchanged, and it must move under neither the defect nor
+/// the fix.
 #[test]
 fn composing_a_stage_does_not_change_the_pictures_shape() {
     let Some(ctx) = headless_context_or_skip() else {
         return;
     };
 
-    let skewing = (1280, 800);
+    let skewing = (640, 200);
     assert_eq!(
         floor_grid(skewing),
-        (1280, 1024),
+        (640, 256),
         "the probe size must be one where the grid's shape is not the target's"
     );
-    let control = (1920, 1080);
+    let control = (1280, 768);
     assert_eq!(
         floor_grid(control),
         control,

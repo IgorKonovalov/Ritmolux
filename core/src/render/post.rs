@@ -107,14 +107,18 @@ pub(crate) const STAGE_COUNT: usize = 3;
 
 /// Quantization step for each axis of a post stage's internal grid.
 ///
-/// Same 256 px as the attractor's trail grid, for the same reason: a grid change
+/// Same 128 px as the attractor's trail grid, for the same reason: a grid change
 /// costs texture reallocation, bind-group rebuilds and — for trails — a cleared
 /// accumulation, and the standalone forwards **every** `WindowEvent::Resized`. At
 /// pixel granularity a live window drag would pay that hundreds of times and blink
-/// the afterglow away continuously; at 256 px it crosses a handful of grids.
+/// the afterglow away continuously; at 128 px it crosses a dozen or so grids
+/// across a screen-width drag, which is the same order as a coarser step with
+/// half the rounding error (ADR-0245). The grid never falls below
+/// `grid::MIN_AXIS` whatever the step, so a small target still pays one rebuild
+/// rather than many.
 /// Purely a constant — no wall clock, so a fixed-size headless capture stays
 /// byte-reproducible (NFR §6).
-const POST_GRID_STEP: u32 = 256;
+const POST_GRID_STEP: u32 = 128;
 
 /// The grid both post stages run at for a given render target (ADR-0034) — this
 /// call site's **cap and step** over the one shared policy

@@ -49,6 +49,13 @@
     clippy::unreachable
 )]
 
+/// The smallest a quantized axis may be, whatever the step.
+///
+/// A grid under this is not worth the rebuild it costs, and both call sites
+/// carry per-frame state whose restart a small grid would make frequent. It is
+/// a **floor**, not a round-up: an axis at 300 texels lands on the nearest step
+/// above the floor rather than being pushed to a multiple of it.
+const MIN_AXIS: u32 = 256;
 /// The internal grid to rasterize into for a render target of `surface`, capped
 /// at `cap` and quantized to `step` on each axis.
 ///
@@ -82,12 +89,33 @@ pub(crate) fn grid_size(surface: (u32, u32), cap: (u32, u32), step: u32) -> (u32
     )
 }
 
-/// Round one axis up to the next `step` multiple, floored at one step (never 0)
-/// and clamped back under `cap` — the round-up overshoots on an axis already
-/// sitting at the cap.
+/// Round one axis to the **nearest** `step` multiple, floored at [`MIN_AXIS`]
+/// (never 0) and clamped back under `cap`.
+///
+/// Nearest rather than up, because a round-up is a cost the target never asked
+/// for: at a 256-texel step a 1080-tall target took a 1280-tall grid, 18.5 %
+/// more texels than the display has, and every term of a post stage's and the
+/// attractor's frame cost scales with that area (ADR-0245). Nearest at half the
+/// step is at most 6.25 % either way at the same granularity, and the direction
+/// it errs in is the target's own.
+///
+/// **Rounding down is not a loss of sharpness the way it reads.** A grid is a
+/// resolution and the present out of it is a normalized stretch (ADR-0037), so
+/// an axis 1/16 under the target's is 1/16 softer on that axis and nothing
+/// else; an axis 1/8 *over* it was 1/8 of a frame's fill thrown away.
+///
+/// The cap clamp comes last, so an axis already sitting on the cap stays there
+/// rather than rounding past it.
 fn quantize_axis(px: u32, cap: u32, step: u32) -> u32 {
     let step = step.max(1);
-    px.div_ceil(step).max(1).saturating_mul(step).min(cap)
+    // `+ step / 2` before the divide is round-half-up. Saturating because `px`
+    // can be `u32::MAX` on a degenerate input and the sum would wrap.
+    let steps = px.saturating_add(step / 2) / step;
+    steps
+        .max(1)
+        .saturating_mul(step)
+        .max(MIN_AXIS)
+        .min(cap.max(1))
 }
 
 #[cfg(test)]
@@ -186,7 +214,43 @@ mod tests {
     #[test]
     fn a_zero_step_is_total() {
         assert_eq!(grid_size((640, 480), (1920, 1080), 0), (640, 480));
-        assert_eq!(grid_size((0, 0), (1920, 1080), 0), (1, 1));
+        // A step of one quantizes nothing, so the floor is the only thing left
+        // to answer with.
+        assert_eq!(grid_size((0, 0), (1920, 1080), 0), (256, 256));
+        // …and the cap still wins over the floor, so the result is never
+        // larger than the caller allowed.
+        assert_eq!(grid_size((0, 0), (64, 64), 0), (64, 64));
+    }
+
+    /// **The rounding is to the nearest step, and the floor is a floor.**
+    ///
+    /// The four cases are the ones ADR-0245's arithmetic turns on: a 1080-tall
+    /// target keeps its width and rounds its height *down* instead of up, a
+    /// target already on the step is untouched, and anything under the floor
+    /// lands exactly on it rather than on a multiple of the step.
+    #[test]
+    fn an_axis_rounds_to_the_nearest_step_above_the_floor() {
+        const CAP: (u32, u32) = (2560, 1440);
+        assert_eq!(
+            grid_size((1920, 1080), CAP, 128),
+            (1920, 1024),
+            "1080 is 8.44 steps of 128: nearest is 8, not 9"
+        );
+        assert_eq!(
+            grid_size((2048, 1152), CAP, 128),
+            (2048, 1152),
+            "both axes are exact multiples of the step and must not move"
+        );
+        for small in [(128, 128), (96, 96), (1, 1)] {
+            assert_eq!(
+                grid_size(small, CAP, 128),
+                (256, 256),
+                "{small:?} is under the floor on both axes"
+            );
+        }
+        // The 640x360 card the documentation renders: the width is exact, the
+        // height rounds up because 2.81 steps is nearer 3 than 2.
+        assert_eq!(grid_size((640, 360), CAP, 128), (640, 384));
     }
 
     /// Pure: the same inputs always yield the same grid, with no wall clock

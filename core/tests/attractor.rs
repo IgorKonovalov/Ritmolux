@@ -785,7 +785,7 @@ fn mean_chroma_over(img: &CaptureImage, mask: &[bool]) -> (f32, f32) {
 const CAP: (u32, u32) = rlx_core::render::TierConfig::FLOOR.attractor_trail_cap;
 const CAP_W: u32 = CAP.0;
 const CAP_H: u32 = CAP.1;
-const STEP: u32 = 256;
+const STEP: u32 = 128;
 
 /// Above the cap the grid must keep the *target's* proportions. The previous
 /// per-axis clamp squashed a 3440x1440 ultrawide target to 2560x1440 — a 16:9
@@ -800,8 +800,8 @@ fn trail_grid_preserves_aspect_above_the_cap() {
         "3440x1440 was squashed back to 16:9 ({w}x{h}) — the per-axis clamp is back"
     );
     // The aspect-exact height for this width, before quantization. Rounding each
-    // axis up to STEP is what collapses nearby sizes onto one grid, so the aspect
-    // it can hold is exact to within that step - but no worse.
+    // axis to the nearest STEP is what collapses nearby sizes onto one grid, so
+    // the aspect it can hold is exact to within that step - but no worse.
     let exact_h = w as f32 * 1440.0 / 3440.0;
     assert!(
         (h as f32 - exact_h).abs() < STEP as f32,
@@ -810,7 +810,10 @@ fn trail_grid_preserves_aspect_above_the_cap() {
 
     // The same property on the other binding axis (a portrait/ultra-tall target).
     let (tw, th) = trail_grid_size(1080, 3440, CAP);
-    assert_eq!(th, CAP_H, "the binding axis should sit at its cap");
+    assert!(
+        CAP_H - th < STEP,
+        "the binding axis should sit within one {STEP} px step of its cap, got {th}"
+    );
     let exact_w = th as f32 * 1080.0 / 3440.0;
     assert!(
         (tw as f32 - exact_w).abs() < STEP as f32,
@@ -874,11 +877,11 @@ fn trail_grid_never_exceeds_the_cap_or_collapses() {
 /// Targets sharing one aspect but landing on different grids, so the *only* thing
 /// that differs between the two captures is the grid the scene chose. The first is
 /// aspect-exact (both axes are already `STEP` multiples, so the grid equals the
-/// target); the second quantizes up on both axes to a square grid under a 4:3
-/// target. Point size is in world units, so the cloud's extent as a *fraction* of
+/// target); the second has both axes inside one step of the grid's floor, so it
+/// lands on a square grid under a 4:3 target. Point size is in world units, so the cloud's extent as a *fraction* of
 /// the frame is resolution-independent and the two are directly comparable.
 const EXACT_TARGET: (u32, u32) = (1024, 768);
-const QUANTIZED_TARGET: (u32, u32) = (512, 384);
+const QUANTIZED_TARGET: (u32, u32) = (288, 216);
 /// Enough frames for the trail field to saturate (`fade = 0.94` fades over ~1 s),
 /// so the cloud's outline is at its full extent in both captures.
 const ASPECT_FRAMES: u32 = 90;
@@ -931,7 +934,7 @@ fn lit_bbox_ratio(img: &CaptureImage) -> f32 {
 /// or the shape is scaled by `target_aspect / grid_aspect`.
 ///
 /// Both targets below are 4:3. One is aspect-exact (grid 1024x768); the other
-/// quantizes to a 512x512 grid, aspect 1.0. Projecting at the grid ratio therefore
+/// quantizes to a 256x256 grid, aspect 1.0. Projecting at the grid ratio therefore
 /// drew the second **33% too wide** — the size-dependent shape error Phase 2's
 /// quantization introduced, and the reason this is the first non-square assertion
 /// in the suite: every other capture here is square, so grid aspect always equalled
@@ -948,7 +951,7 @@ fn attractor_projects_at_the_target_aspect() {
     );
     assert_ne!(
         quantized_grid, QUANTIZED_TARGET,
-        "{QUANTIZED_TARGET:?} is no longer quantized up — the premise is gone"
+        "{QUANTIZED_TARGET:?}'s grid is now its own size — the premise is gone"
     );
     let grid_ratio_gap = (quantized_grid.0 as f32 / quantized_grid.1 as f32)
         / (QUANTIZED_TARGET.0 as f32 / QUANTIZED_TARGET.1 as f32);

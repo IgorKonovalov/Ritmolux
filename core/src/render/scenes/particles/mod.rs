@@ -101,11 +101,13 @@ const TRAIL_FALLBACK_H: u32 = 720;
 /// A grid change costs a texture-pair reallocation, four bind groups, and a trail
 /// restart, and the standalone forwards **every** `WindowEvent::Resized` — so at
 /// pixel granularity a live drag pays that hundreds of times across a screen. At
-/// 256 px per axis a full-screen-width drag crosses a handful of grids and every
-/// other frame of it costs a compare. Coarser wastes fill (a 1920-wide window
-/// already takes a 2048-wide grid); finer defeats the point. Purely a constant —
+/// 128 px per axis a full-screen-width drag crosses a dozen or so grids and most
+/// frames of it cost only a compare. Coarser wastes fill — at 256 a 1080-tall
+/// window took a 1280-tall grid, 18.5 % of the axis for nothing, and this grid's
+/// whole frame cost is its area (ADR-0245); finer defeats the point. The axis
+/// never falls below `grid::MIN_AXIS` whatever the step. Purely a constant —
 /// no wall clock, so a fixed-size headless capture stays byte-reproducible.
-const TRAIL_GRID_STEP: u32 = 256;
+const TRAIL_GRID_STEP: u32 = 128;
 
 /// The trail accumulation grid for a render target of `width` x `height` — this
 /// scene's **cap and step** over the one shared policy
