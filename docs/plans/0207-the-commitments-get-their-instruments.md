@@ -199,7 +199,7 @@ correct one level up.
 |---|---|---|---|
 | 1 — The exe is measured, capped and reported | dev | done | 0b018885 |
 | 2 — The report says what a preset costs | dev | done | add3d174 |
-| 3 — The floor is measured where it is claimed | human | deferred 2026-09-23 — see `## Deferred` | |
+| 3 — The floor is measured where it is claimed | human | done — deferred 2026-09-23, the walk moved to on-device validation; see `## Deferred` | no commit |
 
 ### Notes
 
