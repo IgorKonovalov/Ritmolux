@@ -371,6 +371,15 @@ footprint so the vendor spread is on record.
       > the windowed frame-time figures on the discrete adapter and compare them against the iGPU
       > ones already recorded.** Unflagged behaviour is unchanged by design, so the existing numbers
       > remain valid for the default and the comparison is a new row rather than a correction.
+      >
+      > **Void from 2026-09-23: the last sentence above is no longer true.** An unflagged window now
+      > prefers the **high-performance** adapter
+      > ([ADR-0246](adrs/0246-the-adapter-is-a-setting-and-the-window-prefers-high-performance.md)),
+      > so a fresh unflagged run on this box resolves the RTX 3080 rather than the Radeon. The
+      > figures in this block are not edited and stay readable as history — each names its adapter —
+      > but none of them describes what a default launch produces now. `docs/nfr.md` carries the same
+      > note over its own rows. What has **not** changed is the dual-GPU degrade finding above: one
+      > display still puts both windows on one adapter, so that branch stays unexercised.
 
 ## Runnable now — the `Rich` tier calibration (Plan 0044 Phase 4)
 
@@ -775,6 +784,43 @@ with music playing at a normal volume.
       recovery reopens `@DEFAULT_MONITOR@`, and closing the window afterwards exits at once.
 
 Anything that fails becomes a backlog entry, not a silent fix.
+
+## Runnable now — the adapter switch on a two-adapter box (Plan 0224 Phases 3-5)
+
+**Not hardware-gated in the usual sense: this needs only a machine with two adapters, which the
+reference boxes already are.** It is here because the path it names **has never executed anywhere**.
+`Renderer::set_adapter` rebuilds every GPU-owning member on a second adapter's device, and a
+`Renderer` holding a real surface needs a window — so `core/tests/suite/adapter_switch.rs` can pin
+the refusal, the guard and the exact-name rule but structurally cannot reach the successful rebuild,
+and the sessions that built it opened no window. Plan 0224 Phase 7 measured the **default** on both
+operating systems and did not take a switch. What is unverified is not the flip an operator gets at
+launch; it is the menu row that moves a running show.
+
+The failure mode if something is wrong is a member rebuilt on one teardown path and forgotten on the
+other, which surfaces at runtime as a device-lost or a stale handle rather than at compile time.
+
+- [ ] **The row walks, and the picture comes back on the named adapter.** With music playing, press
+      `S`, move to the **Adapter** row beside **Quality**, and press right. Record what
+      `diagnostics.log`'s `renderer adapter:` line says afterwards, and that it names the adapter the
+      row named. Walk back with left and record the return trip too — a switch *to* the weaker
+      adapter is the likelier one to fail, because two devices are briefly alive at the commit and
+      the new one may not fit.
+- [ ] **The show survives it.** The preset on screen and the engine clock are the ones that were
+      there; the window, the audio and the diagnostics are untouched. Accumulated GPU state —
+      trails, feedback, a simulation field — is expected to restart visibly, which is the documented
+      cost and not a fault. A preset with a long trail is the one to watch it on.
+- [ ] **The file is written, by name.** `config.toml` reads `[output] gpu = "<the roster's own
+      name>"` — not an index — and the next unflagged launch comes up on it with the startup line
+      reading `(from config.toml [output] gpu)`.
+- [ ] **A refused switch changes nothing.** If any switch is refused, record the stderr line: it must
+      read `adapter unchanged, still on …`, the show must keep running, and `config.toml` must
+      **not** have been written.
+- [ ] **What an open console does across it.** Open the console with `C` first, then switch. Record
+      whether it re-attached on the new device (`console re-attached after the adapter switch: …` in
+      `diagnostics.log`) or fell to the degrade path. **The degrade path is the live half of backlog
+      0165 and has still never fired** — a switch onto the adapter that does not drive the console's
+      display is the newest configuration in which it could. Either outcome is the reading; say
+      which.
 
 ## How to run
 

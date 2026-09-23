@@ -389,3 +389,7 @@ renderer adapter: AMD Radeon Graphics (RADV RENOIR) ... (default: high performan
   event nothing currently emits.
 - Unifying `set_tier` and `set_adapter` into one rebuild path if the two drift (ADR-0246
   Alternative D).
+- **The preview pipe's pixel order after a switch that changes the surface format.** A new adapter
+  can negotiate a different format, which moves the readback's pixel order after the `stream` event
+  announced it once (ADR-0187); `set_adapter` re-opens the readback and announces nothing. Raised in
+  the Notes above at Phase 5 and carried here so it is not lost with the log.
