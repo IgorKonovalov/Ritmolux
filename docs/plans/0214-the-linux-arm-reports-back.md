@@ -251,7 +251,7 @@ Both failed in the same place. Every other job was green, including the `windows
 
 ### Phase 2, first pass (2026-09-23)
 
-**Lane:** `main` directly.
+**Lane:** `main` directly. **Commit:** `b47dc0f1`.
 
 The one failure Phase 1 recorded is repaired in `core/src/render/tonemap/tests.rs`. The walk is
 sorted through a new `sorted_rs_files`, which both scans in that file now call; the needle scan
