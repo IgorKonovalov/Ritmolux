@@ -44,7 +44,6 @@ place. The plan file carries the real link.
 | [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | approved | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four are `human`. Unblocked: 0120 closed 2026-09-22. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | approved | dev, human | ADR-0113's third Outcome is the brief: the rate candidate, the echo, the per-mode wave scale, then a fourth look gate. Phases 5-6 need the rig and the corpus, so the conductor parks. |
-| [0207](0207-the-commitments-get-their-instruments.md) | The commitments get their instruments | approved | dev | ADR-0231 + 0232 (proposed): the exe cap re-derived and a build that prints it; an ADVISORY frame-cost column. Phases 1-2 landed; Phase 3's Floor reading deferred 2026-09-23. |
 | [0206](0206-the-browser-shows-the-look.md) | The browser shows the look | approved | dev | ADR-0230 (proposed): a low-priority subprocess of the player renders each still, cached by name + file stamp; a pane beside the list, never a grid. 0205 closed - shares the overlay. Exe is already over cap, backlog 0257. |
 | [0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md) | The library learns from the corpus it will not ship | approved | human | ADR-0227 (proposed): a borrowed look is authored natively and the reference stays outside. A judged 4-6 cohort of 21 picks, routed by look. After 0201's `zoom` fix. |
 | [0208](0208-the-conductors-safety-claims-get-their-evidence.md) | The conductor's safety claims get their evidence | approved | dev | ADR-0233 (proposed): the deny half is asserted against a probe transcript, not a model; Phase 1 can supersede it. Edits settings.conductor.json, so NOT queued. Closes 0236-0241. |
@@ -302,7 +301,7 @@ makes it the safe parallel rather than a second editor of the same files.
 
 [0202]: 0202-the-three-mechanisms-get-their-gate.md
 [0206]: 0206-the-browser-shows-the-look.md
-[0207]: 0207-the-commitments-get-their-instruments.md
+[0207]: done/0207-the-commitments-get-their-instruments.md
 [0211]: 0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md
 [0212]: 0212-the-diffused-render-gains-a-timeline.md
 [0215]: 0215-the-wide-seams-narrow-and-a-guard-holds-them.md
@@ -326,9 +325,10 @@ close. The queue dropped the rest on purpose. [0120] is done. [0202] is mid-flig
 so that `run` picks up the fixture alone. 0206's `after: ["0207"]` stays in `plans`, where an
 unlisted plan's entry is inert. Re-queue 0207 and 0206 once 0219 Phase 5 closes.
 **Due 2026-09-22:** 0219 closed; the re-queue of 0207 and 0206 is the owner's to make before the next `run`.
+**Half spent 2026-09-23**, when 0207 was re-queued, ran and closed. What is left of the note is 0206:
+its `after: ["0207"]` is now satisfied, so nothing holds it but the re-queue itself.
 
 [0221]: done/0221-the-arch-block-names-the-studios-settings-file.md
-[0207]: 0207-the-commitments-get-their-instruments.md
 [0206]: 0206-the-browser-shows-the-look.md
 
 **Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster above.**
@@ -698,7 +698,7 @@ not before them.** Its Phase 6 is a reading on the laptop's integrated adapter a
 what moves the hardware tests onto the discrete one, so the two readings should name their adapters
 in the same vocabulary. Phases 1-2 (per-pass timings, the pipelined stream readback) change what
 `scripts/bench/` measures: every reading after them is a new dated file, and
-[0207](0207-the-commitments-get-their-instruments.md) Phase 2's frame-cost column should read
+[0207](done/0207-the-commitments-get-their-instruments.md) Phase 2's frame-cost column should read
 the per-pass table rather than grow its own instrument. **Overtaken 2026-09-23**, when 0207 closed
 first and Phase 2 shipped a whole-frame reading of its own — the per-pass table did not exist to be
 read. The live question 0223 inherits is whether that table replaces this column or feeds it.
@@ -1033,6 +1033,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0207 - The commitments get their instruments](done/0207-the-commitments-get-their-instruments.md) - closed 2026-09-23. Review: **no blockers, no majors, six minors, two nits (five fixed).** Version: **0.145.0**. ADR-0231 + 0232 accepted, each with an Outcome. Closed 0257. [Write-up](README-archive.md).
 - [0216 - The operator owns the order](done/0216-the-operator-owns-the-order.md) - closed 2026-09-23. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.144.0**. ADR-0239 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0219 - The Arch box builds, tests and runs every lane](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md) - closed 2026-09-22. Review: **one major (routed to 0218), six minors (four fixed).** Version: none (docs/tooling). ADR-0243 stays proposed. Closes nothing. [Write-up](README-archive.md).
 - [0222 - A repaired finding follows its file into done/](done/0222-a-repaired-finding-follows-its-file-into-done.md) - closed 2026-09-22. Review: **no blockers, no majors, one minor, one nit (fixed).** Version: **0.143.1** (patch). Closes nothing. [Write-up](README-archive.md).

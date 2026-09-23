@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0207 - The commitments get their instruments](#0207---the-commitments-get-their-instruments)
   - [0216 - The operator owns the order](#0216---the-operator-owns-the-order)
   - [0219 - The Arch box builds, tests and runs every lane](#0219---the-arch-box-builds-tests-and-runs-every-lane)
   - [0222 - A repaired finding follows its file into done/](#0222---a-repaired-finding-follows-its-file-into-done)
@@ -249,6 +250,46 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0207 - The commitments get their instruments](done/0207-the-commitments-get-their-instruments.md)
+
+- closed 2026-09-23, conductor-run lane `plan-0207-the-commitments-get-their-instruments`. Phase 1
+`0b018885`, Phase 2 `add3d174`, log `94f97add`, the deferral `11742290` + `01125466`. Round 1: **no
+blockers, no majors, six minors and two nits**, five repaired at the close in `a8f09acb`. Version
+**0.145.0** (minor: a feature plan). ADR-0231 + 0232 accepted, each with a dated `Outcome`. Closed
+backlog 0257. The full review is the plan's own `## Close review` section.
+- **What landed.** Two commitments that were numbers in a document now have instruments. The
+standalone's size cap is re-derived from what the exe carries — 10,971,648 B measured, plus
+ADR-0159's measured `text` step of 2,104,320 B, to 13,075,968 B, rounded to the **16,777,216 B**
+boundary above it — and NFR §4 records the derivation, the whole-MiB reading it declined (13,631,488
+B would put the one admitted step at 95.9 % of the cap, past the warning line), and a by-section and
+by-crate composition of the binary taken on the Linux build. `packaging/windows/stage.ps1` is new and
+the release workflow's windows job became a thin caller of it, the shape the linux, macos and foobar
+jobs already had; it and `packaging/macos/bundle.sh` print the artifact's length beside the build
+that produced it and warn above 15,099,494 B, fatally never. And `shot --report` gained an **advisory
+per-preset frame cost** in ms/frame at 1920x1080, the slope between a 48- and an 8-frame capture,
+best of two, presets interleaved so none inherits a warmed clock — printed with the adapter and the
+build profile in the header, marked past 16.67 ms, asserted nowhere.
+- **What the plan deliberately did not do.** No hard frame-cost gate: ADR-0232 keeps the reading
+advisory until there is evidence to design a gate against, which is the same order backlog 0256
+argued one level up. Nothing was optimised — no binary shrunk, no preset made faster.
+- **The `human` phase, deferred rather than run.** Phase 3 asked for NFR §1's Floor reading on §9's
+*"Older Windows PC (iGPU)"*. That box is not in hand and both machines that are are faster than the
+baseline by construction, so the walk moved verbatim into `docs/on-device-validation.md` as a dated
+`iGPU-gated` section — the move Plans 0152 and 0158 each made — and the half needing no hardware
+landed: NFR §1's Floor bullet now says in its own text, dated, that the number has never been read on
+the hardware it names, and §9's row says the machine is still a class rather than a configuration.
+- **What outlived the plan.** Two gaps the close left open. The exe's cap and warning threshold now
+live in three places — `packaging/windows/stage.ps1`, `packaging/macos/bundle.sh` and NFR §4 — with
+no guard holding them equal, where the component's pair has held guard (e) in
+`core/tests/suite/hygiene.rs` since ADR-0159 precisely because that ADR named the drift as its own
+negative. And `packaging/linux/stage.sh` still does not measure, though two of NFR §4's three series
+rows are Linux readings taken by hand. Both are a few lines of work and neither is a close-time edit.
+- **One process note, ratified rather than repaired.** The plan's `## Implementation phases` section
+— the contract — was rewritten in a lane commit to record the deferral, where a lane writes only the
+`Status:` line and the `## Implementation log`. The substance is right and the review ratifies it in
+full; what is worth keeping is that the scope decision reached a reader one round later than it
+should have.
 
 ### [0216 - The operator owns the order](done/0216-the-operator-owns-the-order.md)
 

@@ -1,8 +1,10 @@
 # ADR-0232 — A preset's frame cost is measured and reported, never asserted
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-23, implemented by
+> [Plan 0207](../plans/done/0207-the-commitments-get-their-instruments.md) Phase 2 — carries an
+> `Outcome`
 > **Date:** 2026-09-19
-> **Related plan(s):** [0207](../plans/0207-the-commitments-get-their-instruments.md)
+> **Related plan(s):** [0207](../plans/done/0207-the-commitments-get-their-instruments.md)
 > **Relates to:** [ADR-0045](0045-quality-tiers-floor-and-rich.md) (the tiers and the governor),
 > [ADR-0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) (a measurement
 > names its machine), [ADR-0016](0016-gpu-tests-opt-in-ci-scope.md) (CI has no GPU contract),
@@ -95,6 +97,32 @@ report shows real offenders, the gate that follows is argued from them and gets 
 - Nothing about the tiers or the governor changes. ADR-0045 stands in full.
 - The size cap is a separate question, decided in
   [ADR-0231](0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md).
+
+## Outcome (2026-09-23)
+
+**The advisory half shipped; the named-machine half did not, and moved.**
+[Plan 0207](../plans/done/0207-the-commitments-get-their-instruments.md) Phase 2 gave
+`shot --presets … --report` a per-preset frame cost in ms/frame at 1920x1080 — the size NFR §1
+states its budget at — taken fully driven on the report's tier, as the slope between a 48- and an
+8-frame capture, best of two repeats, with the presets interleaved inside the repeat loop so none of
+them inherits a GPU that had finished ramping its clocks. The text report's header names the adapter
+and the build profile, the JSON carries the same as a top-level `machine` object, and a `!` marks a
+reading past 16.67 ms and does nothing else. On a software adapter **no reading is taken at all**:
+the cells print `-`, the JSON omits the key, and the header says why — a frame time on a CPU
+rasterizer is a fact about the rasterizer, and CI has no GPU contract to take one on (ADR-0016).
+
+**This Decision's second paragraph said NFR §9's machine class *"is named in this ADR's plan"*. It
+was not.** The box is not in hand, and both machines that are are faster than the baseline by
+construction, so Plan 0207's Phase 3 was deferred at its close and the walk extracted verbatim into
+`docs/on-device-validation.md` as a dated `iGPU-gated` section. What landed instead is the honest
+statement: NFR §1's Floor bullet now says in its own text, dated, that the number has never been read
+on the hardware it names, and §9's row says the machine is still a class. **So the Floor claim is not
+yet a measurement with a configuration attached** — it is an assertion that admits it is one, which
+is the nearest true thing, and the instrument for the reading now exists.
+
+**The negative this ADR knowingly accepted is unchanged**: an advisory nobody reads is worth
+nothing, and the one occasion that guarantees this column gets read at least once is the deferred
+walk.
 
 ## Alternatives considered
 

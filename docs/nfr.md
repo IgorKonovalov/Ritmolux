@@ -188,7 +188,7 @@ the decision that moved it is linked.
   the component, applied to this artifact by
   [ADR-0231](adrs/0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md),
   replacing an inherited 10,000,000 B that had never been measured against the exe. The
-  derivation ([Plan 0207](plans/0207-the-commitments-get-their-instruments.md) Phase 1):
+  derivation ([Plan 0207](plans/done/0207-the-commitments-get-their-instruments.md) Phase 1):
   **10,971,648 B** measured for `target\release\ritmolux.exe` (Windows 10, `cargo build
   --release`, default features, 2026-09-19), plus one more step the size of the largest feature
   class this project has shipped — the `text` step, **+2,104,320 B** as
