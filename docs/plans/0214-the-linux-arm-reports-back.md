@@ -248,3 +248,48 @@ Both failed in the same place. Every other job was green, including the `windows
   make the file order deterministic, **and** make each needle identify its one definition (for
   example `pub(crate) fn texture(binding`), since sorting alone keeps a match that depends on
   filenames sorting in a particular order.
+
+### Phase 2, first pass (2026-09-23)
+
+**Lane:** `main` directly.
+
+The one failure Phase 1 recorded is repaired in `core/src/render/tonemap/tests.rs`. The walk is
+sorted through a new `sorted_rs_files`, which both scans in that file now call; the needle scan
+leaves its own file out of the concatenation; three needles are narrowed to `...(binding`; and each
+needle is asserted to match exactly one place in `core/src`.
+
+**Two readings that correct the cause recorded above**, both taken here rather than read from
+source:
+
+- **The wrong hit is the test's own literal, not `preview.rs:245`.** When a needle matches itself,
+  the next `ShaderStages::` is the one in its own assertion message, `ShaderStages::{found}`, where
+  `::` is followed by `{`; the visibility parser reads an empty alphanumeric run and returns `""`.
+  That is the `left: ""` both runs reported. `preview.rs:245` is a second match and a real hazard,
+  but it is not what fired.
+- **All four needles fail under the runner's order, not one.** Running the scan's logic over the
+  real tree in both directions: the old logic in sorted order reads all four correctly; the old
+  logic in reversed order reads `""` for all four; the new logic reads all four correctly in both
+  orders, each with exactly one match. nextest reported the first assertion to fire, so the arm was
+  never one match away from green.
+
+**The failure was reproduced on this machine, not only on the runners.** Under the conductor on
+2026-09-23, Plan 0223's lane failed this test at 18:31 on the `pub(crate) fn sampler(` needle
+(`left: ""`, `right: "FRAGMENT"`), while Plan 0215's lane ran `-P fast` green at 18:45. One box, one
+filesystem, two worktrees, opposite results.
+
+**No test's platform gate was widened or loosened**, and none was touched: the repair is confined to
+how one scan enumerates and searches `core/src`, and the assertion it now makes is strictly stronger
+than the one it replaces.
+
+**Checks:** `cargo fmt --all --check` clean; `cargo clippy --workspace --all-targets -- -D warnings`
+clean; `cargo nextest run --workspace -P fast` 1718 passed, 0 failed, 86 skipped.
+
+**Still owed on this phase, and only the owner can take it.** nextest cancelled on this failure, so
+the 810 tests behind it and the job's later steps - doctests, clippy, fmt, doc - plus the adapter
+line and the GPU-test list Phase 1's done-when names, have still never run. They arrive on the next
+push, and this phase stays open until that reading is green or hands back a shorter list.
+
+**One deviation, flagged rather than taken:** `Status:` is left at `approved` rather than flipped to
+`in-progress`. No plan on `main` carries `in-progress`, the roster row in `docs/plans/README.md`
+states `approved`, and this plan alternates between `human` pushes and `dev` repairs across many
+sessions, so the flip would sit desynced from that index indefinitely.
