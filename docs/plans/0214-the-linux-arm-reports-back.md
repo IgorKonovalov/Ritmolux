@@ -293,3 +293,57 @@ push, and this phase stays open until that reading is green or hands back a shor
 `in-progress`. No plan on `main` carries `in-progress`, the roster row in `docs/plans/README.md`
 states `approved`, and this plan alternates between `human` pushes and `dev` repairs across many
 sessions, so the flip would sit desynced from that index indefinitely.
+
+### Phase 2, second pass (2026-09-23)
+
+**Lane:** `main` directly. **Commit:** filled in by the row below.
+
+**The first pass worked, read from run
+[35916291035](https://github.com/IgorKonovalov/Ritmolux/actions/runs/35916291035) on `6ae4af8c`.**
+The arm went from `885/1695 tests run` to `1441/1718`, so 556 tests that had never executed on Linux
+now do, and every other job on that run is green - `check (windows-latest)`, `check (macos-latest)`,
+`coverage`, `spout`, `miri`, `deny`, `studio`, `links`. nextest still cancelled, on a different and
+genuinely Linux-only failure, which is this pass.
+
+**The second failure:** `standalone::help_cli
+an_unhonourable_command_line_is_refused_before_anything_is_built` at `standalone/tests/help_cli.rs:218`.
+`--preset a-name-no-preset-has` exited 101, not 2, because the process panicked at
+`standalone/src/run.rs:670`: *"failed to create event loop: neither WAYLAND_DISPLAY nor
+WAYLAND_SOCKET nor DISPLAY is set."*
+
+**Cause, and it is narrower than it first looks.** The six comments in `run.rs` that say a flag is
+judged *before the window exists* are all accurate: the window is created later, in `resumed`. What
+was wrong is that `EventLoop::new()` itself needs a display server on Linux, and it was constructed
+177 lines before the validation it is supposed to follow. On Windows and macOS that call cannot
+fail, so the ordering was invisible there and the guarantee appeared to hold. The local binding it
+produced was read in exactly one place, `run_app`, so the repair is to construct it there.
+
+**Reproduced here before it was repaired, and the other cases it was hiding.** With `DISPLAY`,
+`WAYLAND_DISPLAY` and `WAYLAND_SOCKET` all unset on the Arch box:
+
+| headless command line | before | after | expected |
+|---|---|---|---|
+| `--preset a-name-no-preset-has` | 101 | 2 | 2 |
+| `--preview syphon` | 101 | 2 | 2 |
+| `--tier nonsense` | 101 | 1 | 1 |
+| `--definitely-not-a-flag` | 2 | 2 | 2 |
+
+The last row is the control: it is parsed in `stream::parse`, which already ran before the event
+loop, and it was correct throughout. The second row is the case the same test asserts a few lines
+below the one that fired, so the arm had at least one more failure queued behind it.
+
+**No test's platform gate was widened or loosened**, and none was touched. No test changed at all:
+the repair is one statement moved inside `run`.
+
+**Checks, every one with no display server set:** `standalone::help_cli` 3 passed, 0 failed;
+`cargo nextest run --workspace -P fast` 1722 passed, 0 failed, 86 skipped; `cargo fmt --all --check`
+clean; `cargo clippy --workspace --all-targets -- -D warnings` clean.
+
+**A finding for `architect`, not acted on.** This class is invisible on Windows and macOS by
+construction - `EventLoop::new()` cannot fail there - so the ubuntu arm is the only thing that can
+catch it, and it catches it as a panic in an unrelated assertion rather than as itself. Whether the
+ordering deserves a guard of its own is a design question this pass did not answer.
+
+**Still owed on this phase.** The arm cancelled before its later steps again, so `cargo test --doc`,
+`clippy`, `fmt` and `doc` on Linux, the adapter Phase 1's done-when names, and the list of
+GPU-touching tests that ran rather than skipped are all still unread. They arrive on the next push.
