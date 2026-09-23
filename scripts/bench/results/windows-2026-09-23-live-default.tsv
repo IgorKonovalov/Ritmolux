@@ -1,0 +1,15 @@
+# windows 2026-09-23, Windows 10 Home 22H2 (Version 10.0.19045.6466), build 5a81d80a (lane plan-0224), tier rich pinned by [quality] tier
+# live fullscreen ([output] fullscreen = true, DISPLAY1 internal 2560x1440 165 Hz), 32 s per preset, first 6 samples dropped, music playing, capture live WASAPI, no background scan
+# default = unflagged: no --gpu and no [output] gpu. Resolved to NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu), driver 32.0.15.8142, logged as "default: high performance" for all ten presets
+# compare: the --gpu NVIDIA rows of results/windows-2026-09-22-live.tsv (same box, same driver)
+gpu	preset	samples	fps_med	fps_min	avg_ms_med	p99_ms_med	p99_ms_max	dropped	samples_under_60
+default	Nebula	21	165.0	165.0	6.06	6.82	7.49	0	0
+default	Leviathan	24	165.0	164.9	6.06	6.82	7.04	0	0
+default	Clifford	24	165.0	165.0	6.06	6.88	7.08	0	0
+default	Volute	24	165.0	164.9	6.06	6.71	7.00	0	0
+default	Dragon	24	165.0	165.0	6.06	6.67	6.83	0	0
+default	Ink on Paper	24	165.0	164.9	6.06	6.48	6.89	0	0
+default	Barnsley Fern	24	165.0	164.9	6.06	6.66	7.01	0	0
+default	Braid	24	165.0	165.0	6.06	6.70	6.90	0	0
+default	Murmuration	24	165.0	164.9	6.06	6.76	6.93	0	0
+default	Shatter	24	165.0	164.9	6.06	6.65	6.90	0	0
