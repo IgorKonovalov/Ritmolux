@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0225** (ADRs are a separate sequence — next free there is **0247**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0226** (ADRs are a separate sequence — next free there is **0247**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -40,7 +40,7 @@ place. The plan file carries the real link.
 <!-- roster:begin cap=320 -->
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | approved | human | 0103's Phases 5-6 plus the release they stand on. Push ONE tag: the pipeline has published nothing since v0.126.0, two runs red on the foobar job and three tags with no run. |
+| [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | approved | human | 0103's Phases 5-6 plus the release they stand on. The pipeline publishes again - v0.143.0 through v0.146.1 each shipped six artifacts with `foobar` green - so what is left is the submission itself. |
 | [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | approved | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four are `human`. Unblocked: 0120 closed 2026-09-22. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | approved | dev, human | ADR-0113's third Outcome is the brief: the rate candidate, the echo, the per-mode wave scale, then a fourth look gate. Phases 5-6 need the rig and the corpus, so the conductor parks. |
@@ -54,6 +54,7 @@ place. The plan file carries the real link.
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | Unblocked 2026-09-22 (0219 closed); runs after 0214. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). Phase 3 can stop the plan. |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 | [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
+| [0225](0225-the-split-goes-one-level-deeper.md) | The split goes one level deeper | draft | dev | ADR-0247 (proposed): the split recurses instead of stopping at `###`. Unblocks `Pages`, red since 2026-09-23 on a 32,711 B route. Four functions assume two levels. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
