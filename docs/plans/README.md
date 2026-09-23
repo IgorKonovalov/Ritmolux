@@ -668,8 +668,10 @@ not before them.** Its Phase 6 is a reading on the laptop's integrated adapter a
 what moves the hardware tests onto the discrete one, so the two readings should name their adapters
 in the same vocabulary. Phases 1-2 (per-pass timings, the pipelined stream readback) change what
 `scripts/bench/` measures: every reading after them is a new dated file, and
-[0207](0207-the-commitments-get-their-instruments.md) Phase 2's frame-cost column should read the
-per-pass table rather than grow its own instrument.
+[0207](0207-the-commitments-get-their-instruments.md) Phase 2's frame-cost column should read
+the per-pass table rather than grow its own instrument. **Overtaken 2026-09-23**, when 0207 closed
+first and Phase 2 shipped a whole-frame reading of its own — the per-pass table did not exist to be
+read. The live question 0223 inherits is whether that table replaces this column or feeds it.
 
 **Added 2026-09-22: [0224](0224-the-adapter-becomes-a-setting.md) runs before
 [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md).** 0224 flips what an unflagged window asks

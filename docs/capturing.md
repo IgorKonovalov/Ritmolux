@@ -829,7 +829,7 @@ The name column is fourteen characters wide, and a longer name is **elided in
 the middle**, not at the tail: `Tiled Rosette Mono` prints as `Tiled R~e Mono`.
 The tail is what distinguishes a name in this library — `Mono`, `Gallery`,
 `Bordered`, `Walk` — and a tail truncation threw it away, which is how two
-presets came to print as one row label in all three tables (design-backlog 0131).
+presets came to print as one row label in every table (design-backlog 0131).
 A `~` in a label means characters were dropped there.
 
 A family whose scenes draw through the line renderer first gets a one-column
@@ -848,8 +848,9 @@ under 100 characters. A preset in such a family that drew no line prints `-`, an
   Curve Mono     0.9602
 ```
 
-Two more labeled blocks print under the table (new readings go beside the table
-rather than into it, so every historical number keeps its place): the **realistic-levels** reading
+Three more labeled blocks print under the table (new readings go beside the table
+rather than into it, so every historical number keeps its place): the
+**[frame cost](#the-frame-cost-block)** described above, the **realistic-levels** reading
 (`reactivity_low` — the same bands at the levels real music reaches, [ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md)) and,
 since [Plan 0077](plans/done/0077-the-quiet-sky.md), the **footprint** reading (`reactivity_footprint`) — the same
 differentials divided by the **union of lit pixels** instead of the whole frame

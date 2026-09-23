@@ -1,9 +1,9 @@
 # The component's version, read from the one place that defines it (ADR-0025).
 #
-# Dot-sourced by fetch-sdk.ps1's siblings rather than copied a fourth time: the
-# same section-anchored regex already lives in plugin-foobar/build.ps1 and in
-# .github/workflows/release.yml's windows job, and a version that disagrees with
-# itself across three copies is exactly what ADR-0025 exists to prevent.
+# Dot-sourced by its callers rather than copied again: the same section-anchored
+# regex also lives in plugin-foobar/build.ps1, and a version that disagrees with
+# itself across copies is exactly what ADR-0025 exists to prevent.
+# packaging/windows/stage.ps1 dot-sources this file rather than carrying a copy.
 #
 # Anchored to [workspace.package]: a naive first-`version =` match would happily
 # read a member crate's inherited line or a [profile] key, and nothing
