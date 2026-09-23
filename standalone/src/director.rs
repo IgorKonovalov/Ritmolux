@@ -11,7 +11,7 @@
 
 use rlx_core::dsp::AnalysisFrame;
 
-use standalone::config::{self, RotateSource};
+use standalone::config::{self, RotateOrder, RotateSource};
 use standalone::marks::{Mark, Marks};
 
 /// Time constant (seconds) for the smoothed energy baseline. ~1.5 s means the
@@ -258,10 +258,6 @@ pub fn eligible_names<'a>(
 /// sequential walk while the type's documented no-repeat invariant held in only
 /// one of its two modes.
 #[derive(Debug, Clone)]
-#[allow(
-    dead_code,
-    reason = "the sequential arm has no caller outside this module's tests"
-)]
 pub enum Order {
     /// **A shuffled traversal, not a remembered-history window.** Every draw is
     /// taken uniformly from the eligible presets this cycle has not yet shown;
@@ -349,12 +345,47 @@ impl Traversal {
     }
 
     /// A fresh traversal walking the eligible set in ascending name order.
-    #[allow(
-        dead_code,
-        reason = "the sequential order has no caller outside this module's tests"
-    )]
     pub fn new_sequential() -> Self {
         Self::with_order(Order::Sequential)
+    }
+
+    /// A fresh traversal in the order `[rotate] order` names, seeded from
+    /// `seed`. `seed` is ignored by [`Order::Sequential`], which needs none.
+    pub fn for_order(order: RotateOrder, seed: u32) -> Self {
+        match order {
+            RotateOrder::Shuffled => Self::new(seed),
+            RotateOrder::Sequential => Self::new_sequential(),
+        }
+    }
+
+    /// Switch the order a **running** traversal draws in, the way
+    /// [`Director::set_dwell_bounds`] switches a running dwell.
+    ///
+    /// Keeps `trail` and `last`, so `Backspace` still walks what was shown and
+    /// a sequential walk picked up mid-show continues from the preset on screen
+    /// rather than from the top of the library. Drops the announced `upcoming`,
+    /// because the order that chose it is no longer the one drawing — the next
+    /// peek names what the new order will actually take. A call naming the order
+    /// already running is a no-op, so a surface restating it cannot restart a
+    /// shuffle's cycle.
+    #[allow(
+        dead_code,
+        reason = "the live order switch is the settings row's and the hotkey's seam"
+    )]
+    pub fn set_order(&mut self, order: RotateOrder, seed: u32) {
+        let unchanged = matches!(
+            (&self.order, order),
+            (Order::Shuffled { .. }, RotateOrder::Shuffled)
+                | (Order::Sequential, RotateOrder::Sequential)
+        );
+        if unchanged {
+            return;
+        }
+        self.order = match order {
+            RotateOrder::Shuffled => Order::shuffled(seed),
+            RotateOrder::Sequential => Order::Sequential,
+        };
+        self.upcoming = None;
     }
 
     fn with_order(order: Order) -> Self {

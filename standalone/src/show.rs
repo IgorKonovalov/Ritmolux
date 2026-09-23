@@ -87,6 +87,11 @@ pub(crate) struct Show {
     /// Which part of the library rotation draws from (`[rotate] source`).
     source: config::RotateSource,
 
+    /// The number the traversal's shuffle is seeded from, held so switching the
+    /// order away from the shuffle and back re-seeds from the same value rather
+    /// than from whatever the mixer had reached.
+    rotate_seed: u32,
+
     /// The family of each preset in the roster, positionally — the filename
     /// prefix its system is named for, which is what the browser narrows by and
     /// labels each row with.
@@ -159,19 +164,19 @@ impl Show {
         marks_path: Option<PathBuf>,
     ) -> Self {
         let now = Instant::now();
+        // Seeded from the count of the set the binary carries — read before the
+        // reload below installs the per-user or `RLX_PRESET_DIR` library, so it
+        // is the *embedded* count and not this run's roster. It is therefore one
+        // number per build: every launch of a given build walks one order.
+        let rotate_seed = renderer.preset_names().count() as u32;
         let mut show = Self {
             dir: startup_preset_dir(),
             sig: None,
             last_poll: now,
             director: Director::from_config(rotate),
-            // Seeded from the count of the set the binary carries — read before
-            // the reload below installs the per-user or `RLX_PRESET_DIR`
-            // library, so it is the *embedded* count and not this run's roster.
-            // It is therefore one number per build: every launch of a given
-            // build walks one order, which is what makes a run reproducible and
-            // is the property the traversal's tests state.
-            traversal: Traversal::new(renderer.preset_names().count() as u32),
+            traversal: Traversal::for_order(rotate.order, rotate_seed),
             source: rotate.source,
+            rotate_seed,
             families: Vec::new(),
             events,
             control,
@@ -228,6 +233,30 @@ impl Show {
     /// The preset the next rotation will take, or `None` on an empty roster.
     pub(crate) fn next_up(&self) -> Option<&str> {
         self.traversal.upcoming()
+    }
+
+    /// Switch the order rotation draws in, on a **running** show.
+    ///
+    /// The refresh rides along so no caller can leave the console naming a
+    /// preset the order that just left would have taken.
+    #[allow(
+        dead_code,
+        reason = "the live rotation controls are the settings rows' and the hotkeys' seam"
+    )]
+    pub(crate) fn set_rotate_order(&mut self, order: config::RotateOrder, renderer: &Renderer) {
+        self.traversal.set_order(order, self.rotate_seed);
+        self.refresh_upcoming(renderer);
+    }
+
+    /// Switch which part of the library rotation draws from, on a **running**
+    /// show — the live half of `[rotate] source`.
+    #[allow(
+        dead_code,
+        reason = "the live rotation controls are the settings rows' and the hotkeys' seam"
+    )]
+    pub(crate) fn set_rotate_source(&mut self, source: config::RotateSource, renderer: &Renderer) {
+        self.source = source;
+        self.refresh_upcoming(renderer);
     }
 
     /// Rotate: draw the next preset out of the eligible set and dissolve to it,
@@ -654,6 +683,7 @@ mod tests {
             director: Director::from_config(&config::Rotate::default()),
             traversal: Traversal::new(0),
             source: config::RotateSource::All,
+            rotate_seed: 0,
             families: Vec::new(),
             events: None,
             control: None,

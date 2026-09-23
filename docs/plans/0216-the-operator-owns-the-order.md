@@ -251,8 +251,8 @@ track_change = true
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `Order` splits out of `Traversal` | dev | done | committed with this row |
-| 2 — the order becomes a config key | dev | not started | |
+| 1 — `Order` splits out of `Traversal` | dev | done | `14d24213` |
+| 2 — the order becomes a config key | dev | done | committed with this row |
 | 3 — the seed varies per launch, and a key pins it | dev | not started | |
 | 4 — two settings rows and two hotkeys | dev | not started | |
 | 5 — a favourite reads as a warm row | dev | not started | |
@@ -264,3 +264,11 @@ track_change = true
   nothing but the module's own tests constructs them — `cargo clippy --all-targets` builds the bin
   without `cfg(test)` and rejects both otherwise. Removed in Phase 2, where the config key
   constructs them.
+- Phase 2 also edits `docs/configuration.md`, which its file list does not name:
+  `standalone/tests/suite/configuration_doc.rs` fails the moment a config key exists that the
+  `[rotate]` table and the complete example do not state. Only the table row and the example line
+  landed there; the prose is Phase 6's.
+- Phase 2: the live setters (`Traversal::set_order`, `Show::set_rotate_order`,
+  `Show::set_rotate_source`) carry an `#[allow(dead_code)]` for the same clippy reason as Phase 1 —
+  their only callers are Phase 4's rows and hotkeys. `Show::set_rotate_source` is in this phase
+  rather than Phase 4 because Phase 4's file list does not name `standalone/src/show.rs`.

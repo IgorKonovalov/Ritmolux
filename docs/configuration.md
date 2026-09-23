@@ -310,6 +310,7 @@ The scene director's auto-rotate policy.
 | Key | Default | What it means |
 |---|---|---|
 | `auto` | `false` | Auto-rotate on the dwell timer; manual-only (`Space`) when off |
+| `order` | `"shuffled"` | The order rotation walks the eligible set in: `"shuffled"`, or `"sequential"` for ascending preset-name order, wrapping |
 | `min_dwell_secs` | `20` | Never rotate sooner than this many seconds after the last change |
 | `max_dwell_secs` | `90` | Always rotate by this many seconds, even through a steady passage |
 | `track_change` | `true` | Let the track-change novelty signal nudge rotation in on the same dwell |
@@ -429,6 +430,7 @@ device = "default"
 
 [rotate]
 auto = false
+order = "shuffled"
 min_dwell_secs = 20
 max_dwell_secs = 90
 track_change = true
