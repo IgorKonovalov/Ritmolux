@@ -211,6 +211,8 @@ visuals react. A Linux build needs pkg-config and libpulse's headers.
 |-----------|-------------------------------------------------------------|
 | `Space`   | Next preset — dissolves (and restarts the auto-rotate timer) |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
+| `R`       | Switch the rotation order — shuffled (default) or alphabetical |
+| `L`       | Switch what rotation draws from — the whole library or your favourites |
 | `Tab`     | Open/close the preset browser                               |
 | `S`       | Open/close the settings menu                                |
 | `C`       | Open/close the operator console on a second display         |

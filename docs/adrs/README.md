@@ -260,7 +260,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0236](0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md) | A diffused render varies by prompt on bar boundaries, and the seed stays fixed | proposed |
 | [0237](0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md) | The hook runs cargo only when the push moved Rust, and serves the rest from the ledger | accepted 2026-09-22 (Plan 0213), supersedes 0033 in part |
 | [0238](0238-a-scene-declares-a-capability-and-the-engine-stops-enumerating-kinds.md) | A scene declares a capability, and the engine stops enumerating kinds | proposed |
-| [0239](0239-rotation-carries-two-orders-and-the-shuffles-seed-varies-per-launch.md) | Rotation carries two orders, and the shuffle's seed varies per launch | proposed |
+| [0239](0239-rotation-carries-two-orders-and-the-shuffles-seed-varies-per-launch.md) | Rotation carries two orders, and the shuffle's seed varies per launch | accepted 2026-09-23 (Plan 0216) |
 | [0240](0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md) | A setting lives in a file, and the in-app menu edits that file | accepted 2026-09-20, Plan 0217 |
 | [0241](0241-linux-leads-and-windows-is-a-peer.md) | Linux leads, and Windows stays a peer | accepted 2026-09-20, Plan 0218 |
 | [0242](0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md) | The software reference rasterizer is lavapipe, and a WARP claim is re-measured rather than renamed | accepted 2026-09-20, Plan 0218; extends 0023, 0071 |

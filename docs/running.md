@@ -31,12 +31,21 @@ By default the app **holds one scene** — pick a look and it stays. Press `A` t
 opt into auto-rotate (or set `auto = true` under `[rotate]` in `config.toml`);
 when it's on, a scene holds ~20–90 s and an energy drop can nudge a change early.
 
-**Rotation does not repeat itself.** `Space` and auto-rotate both draw from a shuffled traversal of
-your library: every preset is shown once before any of them is shown twice, and a new shuffle
-starts when the round is exhausted. Presets you have hidden are never drawn; setting
-`source = "favourites"` under `[rotate]` narrows the draw to the ones you have marked. `Backspace`
-steps back through the presets you actually saw — under a shuffle that is not the same thing as the
-preset one place lower in the list, and it is what "previous" means everywhere in the app.
+**Rotation comes in two orders, and the shuffle is the default.** `Space` and auto-rotate both draw
+from a **shuffled** traversal of your library: every preset is shown once before any of them is
+shown twice, and a new shuffle starts when the round is exhausted. Press `R` for the other order —
+**sequential**, which walks your library alphabetically by preset name and wraps at the end, so
+`Space` means "the next one" again. The switch is live, it survives a restart, and `order` under
+`[rotate]` is the same choice made in the file. Under the shuffle the walk also differs from launch
+to launch; `seed` under `[rotate]` pins it when you want the same evening twice.
+
+**What rotation draws from is the second switch.** Presets you have hidden are never drawn, in
+either order. `L` moves between the whole library and your favourites, and `source = "favourites"`
+under `[rotate]` is the same choice in the file; with nothing marked yet, favourites falls back to
+the whole library rather than holding one scene, and the settings menu says so on the row.
+`Backspace` steps back through the presets you actually saw — under a shuffle that is not the same
+thing as the preset one place lower in the list, and it is what "previous" means everywhere in the
+app.
 
 Every preset change — `Space`, a pick from the browser, or an auto-rotate — **dissolves**
 over about a second rather than cutting, so the show reads as continuous. The engine
@@ -49,8 +58,10 @@ one, so you always land where you asked.
 | `Space`   | Next preset — dissolves (and restarts the auto-rotate timer) |
 | `Backspace` | Back to the preset you were on before — walks the presets actually shown, one step per press |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
+| `R`       | Switch the rotation **order** — shuffled (the default) or alphabetical by preset name. Persisted |
+| `L`       | Switch what rotation **draws from** — the whole library or your favourites. Persisted |
 | `Tab`     | Open/close the preset browser — opens on the preset you're watching. Arrow keys walk the list and wrap at both ends, left/right step a column, holding an arrow scrolls, type to filter, `Enter` selects (also dissolves), `Esc` closes |
-| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, next-in countdown, console. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
+| `S`       | Open/close the settings menu — quality, auto-rotate, rotation order, what rotation draws from, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, next-in countdown, console. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
 | `C`       | Open/close the **operator console** — a second window on another display carrying the browser, the settings menu, a transport strip and a live preview of the output |
 | `[` / `]` | Drop / raise the quality tier live — pins it for the session and persists the choice |
 | `F`       | Toggle fullscreen                                           |
@@ -98,7 +109,9 @@ even the columns can't hold it, the list scrolls by whole columns and keeps the
 highlighted preset on screen.
 
 Every row reads `* Name              family` — the mark glyph (`*` favourite, `-` hidden), the name,
-and the **family** its system is named for, which is also the filename prefix. Three keys narrow
+and the **family** its system is named for, which is also the filename prefix. A favourite's whole
+row is drawn **warm**, because one character does not read down a column of forty; the row under
+the cursor keeps the cursor's own colour whether or not it is marked. Three keys narrow
 the list, and they **combine**: `F4` favourites only, `F5` one family at a time, `F6` hidden
 presets back in. Each is independent of what you have typed, and the header above the list names
 every one that is on — so a short list is never a mystery. The typed query resets each time you

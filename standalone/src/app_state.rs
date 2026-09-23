@@ -1595,6 +1595,52 @@ impl AppState {
         self.window.request_redraw();
     }
 
+    /// Set the order rotation draws in and **persist it** — the one path for
+    /// both the `R` hotkey and the settings row, exactly as
+    /// [`toggle_auto_rotate`](Self::toggle_auto_rotate) is for `A`.
+    ///
+    /// Asking for the order already running is a no-op, so a held key or a
+    /// surface restating the value neither rewrites the file nor restarts a
+    /// shuffle's cycle.
+    pub(crate) fn set_rotate_order(&mut self, order: config::RotateOrder) {
+        if self.config.rotate.order == order {
+            return;
+        }
+        self.config.rotate.order = order;
+        self.show.set_rotate_order(order, &self.renderer);
+        self.save_config();
+        eprintln!("rotation order: {}", order.as_str());
+        self.window.request_redraw();
+    }
+
+    /// Flip the order between its two values — the `R` key.
+    pub(crate) fn toggle_rotate_order(&mut self) {
+        let next = self.config.rotate.order.toggled();
+        self.set_rotate_order(next);
+    }
+
+    /// Set which part of the library rotation draws from and **persist it** —
+    /// the one path for both the `L` hotkey and the settings row.
+    pub(crate) fn set_rotate_source(&mut self, source: config::RotateSource) {
+        if self.config.rotate.source == source {
+            return;
+        }
+        self.config.rotate.source = source;
+        self.show.set_rotate_source(source, &self.renderer);
+        self.save_config();
+        eprintln!("rotation draws from: {}", source.as_str());
+        self.window.request_redraw();
+    }
+
+    /// Step to the next source — the `L` key.
+    pub(crate) fn cycle_rotate_source(&mut self) {
+        let next = match self.config.rotate.source {
+            config::RotateSource::All => config::RotateSource::Favourites,
+            config::RotateSource::Favourites => config::RotateSource::All,
+        };
+        self.set_rotate_source(next);
+    }
+
     /// Hold the preset on screen as the **B** side, or swap the two when one is
     /// already held (the `B` key).
     ///
@@ -1770,6 +1816,17 @@ impl AppState {
                 TierState::Auto
             },
             auto_rotate: self.show.director.auto_enabled(),
+            rotate_order: self.config.rotate.order,
+            rotate_source: self.config.rotate.source,
+            // Whether a favourite is *drawable*, not merely marked: a hidden
+            // favourite cannot be rotated to, so a library whose only marks are
+            // hidden is in the fallback exactly as an unmarked one is.
+            favourites_marked: {
+                let marks = self.show.marks();
+                self.renderer
+                    .preset_names()
+                    .any(|name| marks.is(Mark::Favourite, name) && !marks.is(Mark::Hidden, name))
+            },
             min_dwell_secs: self.config.rotate.min_dwell_secs,
             max_dwell_secs: self.config.rotate.max_dwell_secs,
             fullscreen: self.window.fullscreen().is_some(),
@@ -1811,6 +1868,8 @@ impl AppState {
             }
             SettingsAction::SetTier(tier) => self.swap_tier(tier),
             SettingsAction::ToggleAuto => self.toggle_auto_rotate(),
+            SettingsAction::SetOrder(order) => self.set_rotate_order(order),
+            SettingsAction::SetSource(source) => self.set_rotate_source(source),
             SettingsAction::SetDwell { min_secs, max_secs } => {
                 self.config.rotate.min_dwell_secs = min_secs;
                 self.config.rotate.max_dwell_secs = max_secs;

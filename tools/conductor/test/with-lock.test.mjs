@@ -3,14 +3,14 @@
 
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { readLedger } from "../lib/ledger.mjs";
 import { acquire, holder, isTestListing, pidAlive, runWrapped, suiteLedger } from "../with-lock.mjs";
+import { tmp } from "./helpers.mjs";
 
 const WITH_LOCK = resolve(dirname(fileURLToPath(import.meta.url)), "..", "with-lock.mjs");
 
@@ -27,7 +27,7 @@ function run(args, env) {
 }
 
 function freshDir() {
-  return mkdtempSync(join(tmpdir(), "rlx-lock-test-"));
+  return tmp("rlx-lock-test-");
 }
 
 test("two concurrent invocations hold the lock one at a time", async () => {
@@ -117,7 +117,7 @@ test("a wrapped list whose lock is held by another process starts at once, and l
 
 /** A clean scratch repository and a stand-in for spawning the command, counting its calls. */
 function wrapperScratch() {
-  const repo = mkdtempSync(join(tmpdir(), "rlx-wrap-repo-"));
+  const repo = tmp("rlx-wrap-repo-");
   const sh = (...a) => assert.equal(spawnSync("git", a, { cwd: repo, encoding: "utf8" }).status, 0, a.join(" "));
   sh("init", "-q", "-b", "main");
   sh("config", "user.email", "t@example.invalid");
@@ -317,7 +317,7 @@ test("a hand run through a lane's own copy of the wrapper records into the main 
 
 // ADR-0016's shape: what cannot be derived is said in one line, and the old behaviour carries on.
 test("a common directory with no checkout beside it falls back to this script's own state, with a notice", async () => {
-  const repo = mkdtempSync(join(tmpdir(), "rlx-wrap-sep-"));
+  const repo = tmp("rlx-wrap-sep-");
   const gitDir = join(freshDir(), "relocated.git");
   const sh = (...a) => assert.equal(spawnSync("git", a, { cwd: repo, encoding: "utf8" }).status, 0, a.join(" "));
   sh("init", "-q", "-b", "main", `--separate-git-dir=${gitDir}`);

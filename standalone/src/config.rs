@@ -321,6 +321,9 @@ pub struct Rotate {
     /// Defaults to `false` (ADR-0027): a fresh install holds one scene until the
     /// operator opts into rotation via the `toggle_auto` hotkey or `auto = true`.
     pub auto: bool,
+    /// The order rotation walks the eligible set in (ADR-0239). Defaults to
+    /// `"shuffled"`, which is what rotation has always done.
+    pub order: RotateOrder,
     /// Never rotate sooner than this many seconds after the last change.
     /// Defaults to 20 s (was 8; ADR-0027).
     pub min_dwell_secs: u32,
@@ -333,16 +336,60 @@ pub struct Rotate {
     /// Which part of the library rotation draws from (ADR-0228). Hidden presets
     /// are excluded from every value.
     pub source: RotateSource,
+    /// What the shuffle is seeded from (ADR-0239). **Absent by default, and then
+    /// the shell varies it per launch**, so two runs of one build do not replay
+    /// one order; set it and the walk repeats exactly, which is how a `--stream`
+    /// run or a two-night show is reproduced. `"sequential"` ignores it.
+    pub seed: Option<u32>,
 }
 
 impl Default for Rotate {
     fn default() -> Self {
         Self {
             auto: false,
+            order: RotateOrder::Shuffled,
             min_dwell_secs: 20,
             max_dwell_secs: 90,
             track_change: true,
             source: RotateSource::All,
+            seed: None,
+        }
+    }
+}
+
+/// The order rotation walks the eligible set in. Serializes as the kebab-case
+/// strings the config uses (`"shuffled"` / `"sequential"`), the shape
+/// [`RotateSource`] already has.
+///
+/// **Two orders, one default.** `Shuffled` shows every eligible preset once
+/// before showing any of them twice, which is what an unattended show wants;
+/// `Sequential` walks the eligible set in ascending preset-name order and wraps,
+/// which is what an operator stepping through a library with `Space` expects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RotateOrder {
+    /// Uniformly from the presets this cycle has not shown yet.
+    #[default]
+    Shuffled,
+    /// The successor of the last drawn preset, by name, wrapping at the end.
+    Sequential,
+}
+
+impl RotateOrder {
+    /// The kebab-case word this order serializes as — one string for the config
+    /// file and any line that reports it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RotateOrder::Shuffled => "shuffled",
+            RotateOrder::Sequential => "sequential",
+        }
+    }
+
+    /// The other order — what a toggle lands on.
+    pub fn toggled(self) -> Self {
+        match self {
+            RotateOrder::Shuffled => RotateOrder::Sequential,
+            RotateOrder::Sequential => RotateOrder::Shuffled,
         }
     }
 }
@@ -666,6 +713,67 @@ min_dwell_secs = 30
         assert!(
             text.contains("favourites"),
             "the source must be written as the word the document names: {text}"
+        );
+    }
+
+    /// **An existing `config.toml` predates `[rotate] order`**, so the key
+    /// missing has to mean the shuffle every such file already walked — and the
+    /// chosen value has to survive the write a settings change performs.
+    #[test]
+    fn the_rotation_order_defaults_to_the_shuffle_and_round_trips() {
+        use super::RotateOrder;
+
+        let config: Config = toml::from_str(
+            "[rotate]
+auto = true
+source = \"favourites\"
+",
+        )
+        .expect("a [rotate] section predating `order` must still parse");
+        assert_eq!(
+            config.rotate.order,
+            RotateOrder::Shuffled,
+            "an absent order changed how rotation walks the library"
+        );
+
+        let mut config = Config::default();
+        config.rotate.order = RotateOrder::Sequential;
+        let text = toml::to_string_pretty(&config).expect("config serializes");
+        let back: Config = toml::from_str(&text).expect("its own output parses");
+        assert_eq!(back.rotate.order, RotateOrder::Sequential);
+        assert!(
+            text.contains("sequential"),
+            "the order must be written as the word the document names: {text}"
+        );
+    }
+
+    /// **A misspelled order is refused, not silently defaulted**, the way every
+    /// other closed-set key here is: the file then fails to parse and
+    /// [`Config::load`] says so and uses the defaults, so an operator who typed
+    /// `"sequencial"` learns it instead of quietly getting a shuffle.
+    #[test]
+    fn an_unknown_rotation_order_is_refused() {
+        let err = toml::from_str::<Config>(
+            "[rotate]
+order = \"sequencial\"
+",
+        )
+        .expect_err("an unknown order must not deserialize");
+        assert!(
+            err.to_string().contains("sequencial"),
+            "the error must name the value that was refused: {err}"
+        );
+
+        // The same treatment the neighbouring closed-set key gets, asserted
+        // beside it so the two cannot drift into two behaviours.
+        assert!(
+            toml::from_str::<Config>(
+                "[rotate]
+source = \"favorites\"
+"
+            )
+            .is_err(),
+            "an unknown source must be refused the same way"
         );
     }
 
