@@ -5,11 +5,12 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+
+import { tmp } from "./helpers.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const PUSH_HOOK = join(REPO, ".claude", "hooks", "block-push-and-history-rewrite.js");
@@ -168,7 +169,7 @@ test("the background hook's denial says why, so the session runs it in the foreg
 });
 
 test("the suite hook logs every call to RLX_HOOK_LOG under the conductor, whatever it decides, and nothing outside it", () => {
-  const dir = mkdtempSync(join(tmpdir(), "rlx-hooklog-"));
+  const dir = tmp("rlx-hooklog-");
   const log = join(dir, "0101-01-implement.log");
   assert.equal(decision(SUITE_HOOK, "git status", { ...CONDUCTOR, RLX_HOOK_LOG: log }), "allow");
   assert.equal(decision(SUITE_HOOK, "cargo test -p rlx-core", { ...CONDUCTOR, RLX_HOOK_LOG: log }), "deny");
