@@ -1,8 +1,10 @@
 # ADR-0231 — The standalone's size cap is re-derived from what it carries, and the build reports it
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-23, implemented by
+> [Plan 0207](../plans/done/0207-the-commitments-get-their-instruments.md) Phase 1 — carries an
+> `Outcome`
 > **Date:** 2026-09-19
-> **Related plan(s):** [0207](../plans/0207-the-commitments-get-their-instruments.md)
+> **Related plan(s):** [0207](../plans/done/0207-the-commitments-get-their-instruments.md)
 > **Amends:** [NFR §4](../nfr.md#4-size-and-dependencies)'s standalone figure
 > **Relates to:** [ADR-0159](0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md)
 > (the precedent, one artifact over), [ADR-0038](0038-tag-driven-release-unsigned-universal-mac-app.md)
@@ -54,7 +56,7 @@ does not have: what a feature of the largest shipped class actually costs *in th
 candidate boundaries differ by a factor that matters — 12,582,912 B leaves 14.7 % headroom over
 today's measurement, 16,777,216 B leaves 53 % — and choosing between them without the step size
 would be inventing a number, which is the failure this whole ADR exists to correct rather than
-repeat. [Plan 0207](../plans/0207-the-commitments-get-their-instruments.md) Phase 1 takes that
+repeat. [Plan 0207](../plans/done/0207-the-commitments-get-their-instruments.md) Phase 1 takes that
 measurement and **its stop condition sets the constant**; this ADR gains a dated `Outcome` at the
 plan's close recording what it came out as.
 
@@ -93,6 +95,30 @@ that is not narrowed here: the carrier warns, and a release is never blocked by 
 
 - Nothing about the runtime commitment changes here. NFR §1's Floor tier, §2's baseline and the
   frame-time governor are untouched by this ADR.
+
+## Outcome (2026-09-23)
+
+**The constant this ADR deferred came out as 16,777,216 B (16 MiB)**, set by
+[Plan 0207](../plans/done/0207-the-commitments-get-their-instruments.md) Phase 1's stop condition as
+this Decision said it would be. The step the rule lacked is ADR-0159's measured `text` diff on the
+component, **2,104,320 B** — no feature-sized diff of the exe itself was available, because the
+standalone does not compile without the `text` feature, and the font stack attributes to 1,584,263 B
+of named symbols on the Linux build, a floor consistent with it. 10,971,648 + 2,104,320 =
+13,075,968 B, which is above the 12,582,912 B boundary and below the 16,777,216 B one, so the rule
+takes the larger of this ADR's two candidates. The whole-MiB reading of *"round"* (13,631,488 B) was
+considered and declined in NFR §4's own text: under it the one step the rule means to admit lands at
+95.9 % of the cap, past the warning line, so the cap would admit nothing quietly.
+
+**The carrier landed on both standalone recipes rather than one.** `packaging/windows/stage.ps1` is
+new — the release workflow's windows job had staged inline and became a thin caller of it — and
+`packaging/macos/bundle.sh` measures **each Apple slice on its own**, since a universal binary is two
+executables in one file and this cap is a figure for one. Both print the length beside the build that
+produced it and warn above 15,099,494 B; neither fails anything, as this ADR required.
+
+**Two things this ADR's negatives predicted are live and unaddressed.** The cap now sits in three
+places with no guard holding them equal, where the component's pair is held by guard (e) in
+`core/tests/suite/hygiene.rs`; and the Windows release exe carries `--features spout` and has never
+been measured with it, so the first tag build prints a figure this derivation did not use.
 
 ## Alternatives considered
 

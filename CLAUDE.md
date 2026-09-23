@@ -111,8 +111,9 @@ packaging/           # What a `v*` tag ships (ADR-0038) — zips, plus the Linux
                      #   not CI-only magic; linux/stage.sh does the same for the tarball. studio/
                      #   holds the same recipe for the studio, once per platform, each carrying a
                      #   player into resources/player/. foobar/ and spout/ stage their pinned SDKs
-                     #   before the build that needs them; windows/ carries no recipe of its own,
-                     #   only its reader. Plus the READ-ME-FIRST.md a tester finds in each archive;
+                     #   before the build that needs them; windows/stage.ps1 is the exe's recipe and
+                     #   measures it against NFR section 4's cap (ADR-0231), the same way the
+                     #   component's does. Plus the READ-ME-FIRST.md a tester finds in each archive;
                      #   the site publishes every one but the studio's as its install pages
                      #   (ADR-0167), and a new one does not join the PUBLISHED map by existing.
 docs/                # Full one-line-per-doc map: README.md "Repository layout". Five *.ru.md carry a

@@ -1,6 +1,6 @@
 use super::{
-    DWELL_CEILING, DWELL_FLOOR, DWELL_STEP, InputMode, SettingsAction, SettingsKey, SettingsRow,
-    SettingsState, SettingsView, Tier, TierState,
+    DWELL_CEILING, DWELL_FLOOR, DWELL_STEP, InputMode, RotateOrder, RotateSource, SettingsAction,
+    SettingsKey, SettingsRow, SettingsState, SettingsView, Tier, TierState,
 };
 
 fn view() -> SettingsView {
@@ -8,6 +8,9 @@ fn view() -> SettingsView {
         tier: Tier::Rich,
         tier_state: TierState::Auto,
         auto_rotate: false,
+        rotate_order: RotateOrder::Shuffled,
+        rotate_source: RotateSource::All,
+        favourites_marked: true,
         min_dwell_secs: 20,
         max_dwell_secs: 90,
         fullscreen: false,
@@ -107,6 +110,23 @@ fn each_row_emits_the_action_its_table_row_names() {
             SettingsAction::CycleInputDevice
         );
     }
+    // The two rotation rows are switches for the same reason the mode row is.
+    assert_eq!(
+        edit_at(SettingsRow::Order, false, &v),
+        SettingsAction::SetOrder(RotateOrder::Shuffled)
+    );
+    assert_eq!(
+        edit_at(SettingsRow::Order, true, &v),
+        SettingsAction::SetOrder(RotateOrder::Sequential)
+    );
+    assert_eq!(
+        edit_at(SettingsRow::Source, false, &v),
+        SettingsAction::SetSource(RotateSource::All)
+    );
+    assert_eq!(
+        edit_at(SettingsRow::Source, true, &v),
+        SettingsAction::SetSource(RotateSource::Favourites)
+    );
     // The mode row is a switch, not a toggle: each direction names one value,
     // so a held key settles rather than oscillating.
     assert_eq!(
@@ -250,6 +270,8 @@ fn the_rows_are_the_ones_the_menu_promises_in_order() {
             SettingsRow::Quality,
             SettingsRow::Adapter,
             SettingsRow::AutoRotate,
+            SettingsRow::Order,
+            SettingsRow::Source,
             SettingsRow::MinDwell,
             SettingsRow::MaxDwell,
             SettingsRow::Fullscreen,
@@ -597,6 +619,60 @@ fn closing_the_console_from_its_own_menu_leaves_the_menu_open() {
         "the menu closed itself when the console was toggled, so an operator \
          closing the console from the console loses the menu entirely"
     );
+}
+
+/// **Every row says something.** `label`, `value` and `edit` are exhaustive over
+/// `ALL` by construction — the compiler refuses a missing arm — so the part a
+/// compiler cannot check is that a row's value is not the empty string, which is
+/// what a row added with a `String::new()` placeholder would draw.
+#[test]
+fn every_row_shows_a_value_for_a_default_view() {
+    let v = view();
+    let lines = opened().lines(&v);
+    assert_eq!(lines.len(), SettingsRow::ALL.len());
+    for (label, value) in &lines {
+        assert!(!label.is_empty(), "a row drew no label");
+        assert!(!value.is_empty(), "the `{label}` row drew no value");
+    }
+}
+
+/// **The two rotation rows show the words `config.toml` holds**, and the source
+/// row names the fallback when the show is in it.
+///
+/// `favourites` with nothing marked already draws from the whole eligible set,
+/// so a row printing `favourites` over a library that is all showing would
+/// describe a filter nobody applied.
+#[test]
+fn the_rotation_rows_show_the_config_words_and_the_source_names_its_fallback() {
+    let mut v = view();
+    let s = opened();
+    let value = |row: SettingsRow, v: &SettingsView| -> String {
+        s.lines(v)
+            .iter()
+            .find(|(l, _)| *l == row.label())
+            .map(|(_, val)| val.clone())
+            .unwrap_or_else(|| panic!("no {:?} row", row))
+    };
+
+    assert_eq!(value(SettingsRow::Order, &v), "shuffled");
+    v.rotate_order = RotateOrder::Sequential;
+    assert_eq!(value(SettingsRow::Order, &v), "sequential");
+
+    assert_eq!(value(SettingsRow::Source, &v), "all");
+    v.rotate_source = RotateSource::Favourites;
+    assert_eq!(value(SettingsRow::Source, &v), "favourites");
+
+    v.favourites_marked = false;
+    let fallback = value(SettingsRow::Source, &v);
+    assert!(
+        fallback.contains("none marked") && fallback.contains("all"),
+        "with nothing marked the source row must say the show is drawing from \
+         the whole library, not print `favourites`: {fallback}"
+    );
+
+    // With `all` selected the flag is irrelevant — there is no fallback to be in.
+    v.rotate_source = RotateSource::All;
+    assert_eq!(value(SettingsRow::Source, &v), "all");
 }
 
 /// The console row reports the live window, not the stored preference: a

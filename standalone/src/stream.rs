@@ -979,11 +979,16 @@ fn apply_transport(
     use crate::settings::SettingsAction;
 
     let auto = show.director.auto_enabled();
+    let favourites_marked = renderer.preset_names().any(|name| {
+        show.marks().is(standalone::marks::Mark::Favourite, name)
+            && !show.marks().is(standalone::marks::Mark::Hidden, name)
+    });
     let view = headless_view(
         auto,
         renderer.tier(),
         config,
         &show.preset_dir().display().to_string(),
+        favourites_marked,
     );
     let Some(action) = crate::console::action_for_transport(verb, auto, &view) else {
         return;
@@ -1025,13 +1030,14 @@ fn apply_transport(
 /// against the live values the settings menu displays, and that function is the
 /// one mapping both run modes go through.
 ///
-/// Takes the four live values rather than the run's objects, so the mapping can
-/// be walked in a test without a GPU.
+/// Takes the live values rather than the run's objects, so the mapping can be
+/// walked in a test without a GPU.
 fn headless_view(
     auto_rotate: bool,
     tier: rlx_core::render::Tier,
     config: &standalone::config::Config,
     preset_dir: &str,
+    favourites_marked: bool,
 ) -> crate::settings::SettingsView {
     crate::settings::SettingsView {
         tier,
@@ -1039,6 +1045,9 @@ fn headless_view(
         // there is no frame-time governor here to demote it.
         tier_state: crate::settings::TierState::Pinned,
         auto_rotate,
+        rotate_order: config.rotate.order,
+        rotate_source: config.rotate.source,
+        favourites_marked,
         min_dwell_secs: config.rotate.min_dwell_secs,
         max_dwell_secs: config.rotate.max_dwell_secs,
         fullscreen: false,
@@ -1434,7 +1443,7 @@ mod sink_tests {
             for auto in [true, false] {
                 // The view the applier itself builds, so the test walks the
                 // mapping through the same values the run gives it.
-                let view = headless_view(auto, rlx_core::render::Tier::Rich, &config, "");
+                let view = headless_view(auto, rlx_core::render::Tier::Rich, &config, "", false);
                 let Some(action) = crate::console::action_for_transport(verb, auto, &view) else {
                     continue;
                 };

@@ -328,7 +328,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0257 | The standalone exe is 9.7 % over NFR §4's cap, and only the component would have noticed | [Plan 0207](plans/0207-the-commitments-get-their-instruments.md). **Promoted** |
 | 0126 | A render is one prompt, one seed and one preset from first frame to last | [Plan 0212](plans/0212-the-diffused-render-gains-a-timeline.md). **Promoted** |
 | 0236 | The `.claude/` park reads a phase's declared `Files touched`, and prose escapes it | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
 | 0237 | The allowlist bounds a deletion by literal path shapes, so an expansion escapes the lane | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
@@ -632,6 +631,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0095 | The backdrop ramp makes parallel stripes only, and a converging fan cannot be lit *and* darkened | [Plan 0203](plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) Phases 3-4 + ADR-0225. Judged by rendering; neither route buys the collage. **Closed 2026-09-20** |
 | 0255 | `docs-shots.mjs` renders all or nothing, so adding one card is done by hand | [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phase 1. A name filter, exact match, unknown name exits 1. **Closed 2026-09-22** |
 | 0254 | Every gallery card is captured at hop 300, before an accumulating world exists | [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phases 2-4 + ADR-0235. Six families at hop 2754/2828 over a 30 s clip. **Closed 2026-09-22** |
+| 0257 | The standalone exe is 9.7 % over NFR §4's cap, and only the component would have noticed | [Plan 0207](plans/done/0207-the-commitments-get-their-instruments.md) Phase 1 + ADR-0231. Re-derived to 16,777,216 B; both recipes measure and warn. **Closed 2026-09-23** |
 <!-- roster:end -->
 
 ---
@@ -15770,9 +15770,20 @@ fail a release over a size"* — so no gate is red and no user is affected. What
 future argument about whether a feature fits, because the number those arguments start from is
 wrong in an unknown direction and there is no instrument to correct it.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0207](plans/0207-the-commitments-get-their-instruments.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0207](plans/done/0207-the-commitments-get-their-instruments.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+- **CLOSED 2026-09-23** by [Plan 0207](plans/done/0207-the-commitments-get-their-instruments.md)
+  Phase 1 ([ADR-0231](adrs/0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md),
+  accepted with an `Outcome`). **Both halves discharged.** *Is the cap right?* — no: it was inherited,
+  and it is now **16,777,216 B**, derived from the 10,971,648 B the exe measures plus ADR-0159's
+  measured `text` step of 2,104,320 B, with the derivation, the composition it rests on and the
+  whole-MiB reading it declined all written into NFR §4. *Should anything report it?* — it does now:
+  `packaging/windows/stage.ps1` (new, and the release job is a thin caller of it) and
+  `packaging/macos/bundle.sh` print the length beside the build that produced it and warn above
+  15,099,494 B, fatally never. What this entry asked for and did **not** get is a guard holding the
+  two constants equal across the two recipes and NFR §4, the way guard (e) holds the component's —
+  named in the close review and left for a later plan.
 
 ---
 

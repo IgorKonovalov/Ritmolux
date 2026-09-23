@@ -13,13 +13,19 @@
 # this, upload the zip.
 #
 # The verification the plan requires lives HERE rather than in the workflow, so
-# a local run is held to the same bar as CI. Every check is fatal.
+# a local run is held to the same bar as CI. Every check is fatal except the
+# size measurement, which prints and at most warns (ADR-0231, on ADR-0159's
+# terms).
 #
-#   Usage:  packaging/macos/bundle.sh [--skip-build]
+#   Usage:  packaging/macos/bundle.sh [--skip-build] [--warn-bytes=<n>]
 #
 #   --skip-build   Reuse the two <target-dir>/<triple>/release/ritmolux binaries on
 #                  disk. For iterating on the bundle layout without paying for
 #                  a `lto = "fat"` rebuild twice; never used by CI.
+#   --warn-bytes   Lower the size warning's threshold. Its default sits well
+#                  above what either slice measures today, so this is how that
+#                  branch is exercised without waiting for the binary to grow
+#                  into it.
 #
 # macOS ships bash 3.2, so nothing here uses bash 4 syntax.
 
@@ -31,20 +37,34 @@ BIN_NAME="ritmolux"
 ARM_TARGET="aarch64-apple-darwin"
 INTEL_TARGET="x86_64-apple-darwin"
 
+# NFR section 4: the exe's soft cap, and 90% of it. A size is a MEASUREMENT
+# (ADR-0071): printed on every build, warned on above the threshold, and NEVER
+# fatal - every other check here is a property of a correct artifact, and a
+# release must not fail on a byte count. The same two figures sit in
+# packaging/windows/stage.ps1, which measures the same executable's other build.
+EXE_CAP_BYTES=16777216
+EXE_WARN_BYTES=15099494
+
 script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 
 skip_build=0
+warn_bytes="$EXE_WARN_BYTES"
 for arg in "$@"; do
     case "$arg" in
         --skip-build) skip_build=1 ;;
+        --warn-bytes=*) warn_bytes="${arg#--warn-bytes=}" ;;
         *) echo "bundle.sh: unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
+case "$warn_bytes" in
+    ''|*[!0-9]*) echo "bundle.sh: --warn-bytes takes a whole number of bytes, got '$warn_bytes'" >&2; exit 2 ;;
+esac
 
 die() { echo "bundle.sh: FAILED: $*" >&2; exit 1; }
 step() { echo ""; echo "==> $*"; }
 check() { echo "    ok: $*"; }
+warn() { echo "    WARNING: $*" >&2; }
 
 # --- Where cargo writes, which is not necessarily "${repo_root}/target" -------
 #
@@ -121,6 +141,48 @@ intel_bin="${target_dir}/${INTEL_TARGET}/release/${BIN_NAME}"
 [ -f "$arm_bin" ] || die "missing $arm_bin (drop --skip-build?)"
 [ -f "$intel_bin" ] || die "missing $intel_bin (drop --skip-build?)"
 
+# --- Measure: each slice's length against NFR section 4's cap (ADR-0231) ------
+#
+# The cap is a figure for one executable, and the universal file lipo fuses
+# below is two of them end to end, so each thin slice is measured on its own
+# and the fused file's length is printed afterwards as a record, not against
+# the cap. Printed in bytes, the unit NFR section 4 writes its series in, and
+# beside the build that produced it, because a size is a property of a build
+# rather than of the tree (ADR-0071).
+#
+# `wc -c` rather than `stat`: BSD and GNU stat spell the size flag
+# differently, and this script's checks run on both.
+file_bytes() { wc -c < "$1" | tr -d ' '; }
+percent_of_cap() {
+    awk -v n="$1" -v c="$EXE_CAP_BYTES" 'BEGIN { printf "%.1f", 100 * n / c }'
+}
+measure_slice() {
+    target="$1"
+    bin="$2"
+    bytes="$(file_bytes "$bin")"
+    echo "    ${BIN_NAME} (${target}) is ${bytes} B ($(percent_of_cap "$bytes") % of the ${EXE_CAP_BYTES} B cap)"
+    echo "    build: cargo build --release -p standalone --target ${target}, v${version}, $(rustc --version)"
+    if [ "$bytes" -gt "$warn_bytes" ]; then
+        # A warning, never a die. The cap is soft, and a release blocked on a
+        # byte count is one where someone edits the constant under time
+        # pressure at a tag - which is worse than no gate, because it also
+        # destroys the record.
+        #
+        # The cap is named, the threshold is not described as a fraction of it:
+        # with --warn-bytes the two are unrelated, and a message asserting 90%
+        # would be false in exactly the run that exercises this branch.
+        warn "${BIN_NAME} (${target}) is ${bytes} B, past the ${warn_bytes} B warning threshold." \
+             "NFR section 4's cap is ${EXE_CAP_BYTES} B. This is not a release blocker." \
+             "Record the figure in the exe's size series in docs/nfr.md section 4 and say what moved it."
+    else
+        check "under the ${warn_bytes} B warning threshold"
+    fi
+}
+
+step "measure ${BIN_NAME} against NFR section 4"
+measure_slice "$ARM_TARGET" "$arm_bin"
+measure_slice "$INTEL_TARGET" "$intel_bin"
+
 # --- Stage the bundle --------------------------------------------------------
 
 step "staging ${stage_name}"
@@ -129,6 +191,9 @@ mkdir -p "${bundle}/Contents/MacOS"
 
 step "lipo -create -> universal ${BIN_NAME}"
 lipo -create -output "${bundle}/Contents/MacOS/${BIN_NAME}" "$arm_bin" "$intel_bin"
+# Recorded, not capped: this file is both slices measured above, so the cap
+# does not apply to it and no threshold is compared here.
+echo "    universal ${BIN_NAME} is $(file_bytes "${bundle}/Contents/MacOS/${BIN_NAME}") B (both slices; recorded, not capped)"
 
 step "Info.plist (version substituted from [workspace.package])"
 # The version is a dotted numeric string from Cargo.toml, so it carries no sed

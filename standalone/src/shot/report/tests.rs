@@ -29,6 +29,15 @@ fn gate(param: &str, source: &str, kind: GateKind) -> GateReport {
     }
 }
 
+/// A hardware machine, named the way `describe_adapter` names one.
+fn machine() -> Machine {
+    Machine {
+        adapter: "Test GPU (Vulkan, DiscreteGpu), driver test 1.0".to_string(),
+        profile: "debug",
+        software: false,
+    }
+}
+
 fn preset_report(name: &str, gates: Vec<GateReport>) -> PresetReport {
     PresetReport {
         name: name.to_string(),
@@ -42,6 +51,7 @@ fn preset_report(name: &str, gates: Vec<GateReport>) -> PresetReport {
         coverage: 0.5,
         level: 0.1234,
         geometry: None,
+        cost: Some(4.567),
         transient: Transient {
             response: StepResponse {
                 rise_frames: 7,
@@ -216,13 +226,15 @@ fn the_realistic_levels_sit_under_full_scale_on_every_band() {
 /// capacity budgets (ADR-0045).
 #[test]
 fn the_text_report_header_names_its_source_and_its_tier() {
-    let out = text_report("--presets fixtures", &[], Tier::Floor);
+    let out = text_report("--presets fixtures", &[], Tier::Floor, &machine());
     assert_eq!(
-        out, "visual-QA report [--presets fixtures] tier floor\n",
-        "an empty roster still emits exactly the header line"
+        out,
+        "visual-QA report [--presets fixtures] tier floor\n  frame cost on Test GPU (Vulkan, \
+         DiscreteGpu), driver test 1.0, debug profile\n",
+        "an empty roster still emits exactly the header lines"
     );
 
-    let rich = text_report("embedded defaults", &[], Tier::Rich);
+    let rich = text_report("embedded defaults", &[], Tier::Rich, &machine());
     assert!(rich.contains("tier rich"), "got {rich}");
 }
 
@@ -240,7 +252,7 @@ fn the_text_report_emits_a_row_per_preset_with_its_transient_marks() {
         shape: vec![vec![0.0, 1.0], vec![1.0, 0.0]],
         near_dups: Vec::new(),
     };
-    let out = text_report("src", &[fam], Tier::Floor);
+    let out = text_report("src", &[fam], Tier::Floor, &machine());
 
     assert!(out.contains("=== swarm (2 presets) ==="), "got:\n{out}");
     for name in ["alpha", "beta"] {
@@ -273,7 +285,7 @@ fn the_footprint_reading_prints_beside_the_mean_columns_not_instead_of_them() {
         shape: vec![vec![0.0]],
         near_dups: Vec::new(),
     };
-    let out = text_report("src", &[fam], Tier::Floor);
+    let out = text_report("src", &[fam], Tier::Floor, &machine());
 
     // The mean value and the footprint value are both present — the fixture's
     // two arrays are distinct on every band, so each number is attributable.
@@ -301,6 +313,7 @@ fn the_footprint_reading_prints_beside_the_mean_columns_not_instead_of_them() {
             near_dups: Vec::new(),
         }],
         Tier::Floor,
+        &machine(),
     );
     assert!(
         json.contains("\"reactivity_footprint\":{\"bass\":0.9375"),
@@ -332,7 +345,7 @@ fn the_geometry_column_appears_only_for_families_with_a_line_seam() {
     let mut line_preset = preset_report("rosette", vec![]);
     line_preset.geometry = Some(0.3492);
     let line_fam = fam(SystemKind::StarPattern, vec![line_preset]);
-    let out = text_report("src", &[line_fam], Tier::Floor);
+    let out = text_report("src", &[line_fam], Tier::Floor, &machine());
     // The header token, not the bare substring: "geometry" also appears in the
     // near-duplicate summary line every family prints.
     assert!(
@@ -379,7 +392,7 @@ fn the_geometry_column_appears_only_for_families_with_a_line_seam() {
         SystemKind::StarPattern,
         vec![measured, preset_report("undrawn", vec![])],
     );
-    let out = text_report("src", &[mixed], Tier::Floor);
+    let out = text_report("src", &[mixed], Tier::Floor, &machine());
     let placeholder = format!("  {:<w$}      -\n", "undrawn", w = NAME_WIDTH);
     assert!(
         out.contains(&placeholder),
@@ -388,7 +401,7 @@ fn the_geometry_column_appears_only_for_families_with_a_line_seam() {
 
     // A family with no line seam: no header, no placeholder, no explainer.
     let swarm_fam = fam(SystemKind::Swarm, vec![preset_report("drift", vec![])]);
-    let out = text_report("src", &[swarm_fam], Tier::Floor);
+    let out = text_report("src", &[swarm_fam], Tier::Floor, &machine());
     assert!(
         !out.contains("geom\n") && !out.contains("in-frame geometry fraction"),
         "a family with no line seam must omit the column entirely:\n{out}"
@@ -401,12 +414,14 @@ fn the_geometry_column_appears_only_for_families_with_a_line_seam() {
         "src",
         &[fam(SystemKind::StarPattern, vec![measured])],
         Tier::Floor,
+        &machine(),
     );
     assert!(with.contains("\"in_frame_geometry\":0.5"), "{with}");
     let without = render_json(
         "src",
         &[fam(SystemKind::Swarm, vec![preset_report("drift", vec![])])],
         Tier::Floor,
+        &machine(),
     );
     assert!(!without.contains("in_frame_geometry"), "{without}");
     assert_eq!(
@@ -421,7 +436,7 @@ fn the_geometry_column_appears_only_for_families_with_a_line_seam() {
 /// where it costs milliseconds instead of sweeping a preset library.
 #[test]
 fn the_json_report_carries_its_top_level_keys_and_escapes_its_source() {
-    let out = render_json("a \"quoted\" source", &[], Tier::Floor);
+    let out = render_json("a \"quoted\" source", &[], Tier::Floor, &machine());
     assert!(
         out.starts_with('{') && out.trim_end().ends_with('}'),
         "{out}"
@@ -453,6 +468,7 @@ fn the_json_report_emits_one_family_object_per_system() {
         "src",
         &[fam(SystemKind::Swarm, "a"), fam(SystemKind::Emitter, "b")],
         Tier::Floor,
+        &machine(),
     );
     assert!(out.contains(SystemKind::Swarm.as_str()), "{out}");
     assert!(out.contains(SystemKind::Emitter.as_str()), "{out}");
@@ -636,7 +652,7 @@ fn the_motion_columns_print_in_the_table_and_carry_their_size_in_the_json() {
         shape: vec![vec![0.0]],
         near_dups: Vec::new(),
     };
-    let out = text_report("src", &[fam()], Tier::Floor);
+    let out = text_report("src", &[fam()], Tier::Floor, &machine());
     assert!(out.contains("drive"), "the drive header prints:\n{out}");
     assert!(out.contains("rate"), "the rate header prints:\n{out}");
     assert!(out.contains("0.625"), "the drive value prints:\n{out}");
@@ -651,7 +667,7 @@ fn the_motion_columns_print_in_the_table_and_carry_their_size_in_the_json() {
         "the anchoring caveat rides beside the columns, not in a footnote:\n{out}"
     );
 
-    let json = render_json("src", &[fam()], Tier::Floor);
+    let json = render_json("src", &[fam()], Tier::Floor, &machine());
     assert!(json.contains("\"drive\":0.625"), "{json}");
     assert!(
         json.contains(&format!(
@@ -664,6 +680,140 @@ fn the_motion_columns_print_in_the_table_and_carry_their_size_in_the_json() {
         json.matches('}').count(),
         "braces balance with the new keys: {json}"
     );
+}
+
+/// The per-frame cost is the long leg less the short leg over the frames
+/// between them, and nothing else: no clamp, no rounding toward zero. A reading
+/// at or below zero is printed as measured, because it says the two legs were
+/// within noise of each other, which the reader needs to know.
+#[test]
+fn the_cost_slope_is_the_difference_between_the_two_legs_per_frame() {
+    let gap = f64::from(COST_FRAMES_LONG - COST_FRAMES_SHORT);
+    assert!((slope_ms(10.0, 10.0 + gap) - 1.0).abs() < 1e-6);
+    assert!((slope_ms(100.0, 100.0 + 2.5 * gap) - 2.5).abs() < 1e-6);
+    assert!(slope_ms(12.0, 11.0) < 0.0, "noise is printed, not hidden");
+}
+
+/// A `!` marks a reading past the budget and nothing else; no reading prints
+/// `-`. The mark is the whole of what the column asserts (ADR-0232).
+#[test]
+fn a_cost_cell_marks_exactly_past_the_budget() {
+    let budget = COST_BUDGET_MS as f32;
+    assert_eq!(cost_cell(Some(4.567)), "4.567");
+    assert_eq!(
+        cost_cell(Some(budget - 0.01)),
+        format!("{:.3}", budget - 0.01)
+    );
+    assert_eq!(
+        cost_cell(Some(budget + 0.01)),
+        format!("{:.3} !", budget + 0.01)
+    );
+    assert_eq!(cost_cell(None), "-");
+}
+
+/// The frame cost prints per preset in its own block, the block names the size,
+/// the tier and the headless caveat, the header names the machine and the
+/// profile, and the JSON carries the same reading with its size and budget
+/// beside it plus the machine at the top level (ADR-0232, ADR-0071).
+#[test]
+fn the_frame_cost_prints_per_preset_and_names_its_machine_and_size() {
+    let fam = || {
+        let mut dear = preset_report("dear", vec![]);
+        dear.cost = Some(21.905);
+        FamilyReport {
+            system: SystemKind::Swarm,
+            presets: vec![preset_report("drifter", vec![]), dear],
+            pixel: vec![vec![0.0, 1.0], vec![1.0, 0.0]],
+            shape: vec![vec![0.0, 1.0], vec![1.0, 0.0]],
+            near_dups: Vec::new(),
+        }
+    };
+    let out = text_report("src", &[fam()], Tier::Rich, &machine());
+    assert!(
+        out.contains(
+            "frame cost on Test GPU (Vulkan, DiscreteGpu), driver test 1.0, debug profile"
+        ),
+        "the header names the machine and the profile:\n{out}"
+    );
+    assert!(
+        out.contains(&format!("{COST_WIDTH}x{COST_HEIGHT} on tier rich")),
+        "the block names the size and the tier it was taken at:\n{out}"
+    );
+    assert!(
+        out.contains("HEADLESS") && out.contains("predicts nothing about the app"),
+        "the caveat rides beside the cells:\n{out}"
+    );
+    assert!(out.contains("ms/frame"), "the block has its header:\n{out}");
+    assert!(
+        out.contains("4.567"),
+        "the under-budget cell prints bare:\n{out}"
+    );
+    assert!(
+        out.contains("21.905 !"),
+        "the over-budget cell is marked:\n{out}"
+    );
+
+    let json = render_json("src", &[fam()], Tier::Rich, &machine());
+    assert!(
+        json.contains(
+            "\"machine\":{\"adapter\":\"Test GPU (Vulkan, DiscreteGpu), driver test 1.0\",\
+             \"profile\":\"debug\",\"software\":false}"
+        ),
+        "the machine is at the top level: {json}"
+    );
+    assert!(
+        json.contains(&format!(
+            "\"frame_cost\":{{\"ms_per_frame\":4.5670,\"width\":{COST_WIDTH},\
+             \"height\":{COST_HEIGHT},\"budget_ms\":16.6667,\"over_budget\":false}}"
+        )),
+        "the cost carries its size and budget: {json}"
+    );
+    assert!(
+        json.contains("\"ms_per_frame\":21.9050") && json.contains("\"over_budget\":true"),
+        "the over-budget reading flags in the json too: {json}"
+    );
+    assert_eq!(
+        json.matches('{').count(),
+        json.matches('}').count(),
+        "braces balance with the new keys: {json}"
+    );
+}
+
+/// On a software adapter no reading is taken: the header says so and why, the
+/// cells print `-`, and the JSON omits the key rather than inventing a number
+/// (ADR-0232, ADR-0016).
+#[test]
+fn a_software_adapter_takes_no_frame_cost_and_says_so() {
+    let software = Machine {
+        adapter: "llvmpipe (Vulkan, Cpu)".to_string(),
+        profile: "debug",
+        software: true,
+    };
+    let fam = || {
+        let mut untimed = preset_report("drifter", vec![]);
+        untimed.cost = None;
+        FamilyReport {
+            system: SystemKind::Swarm,
+            presets: vec![untimed],
+            pixel: vec![vec![0.0]],
+            shape: vec![vec![0.0]],
+            near_dups: Vec::new(),
+        }
+    };
+    let out = text_report("src", &[fam()], Tier::Floor, &software);
+    assert!(
+        out.contains("frame cost not taken: llvmpipe (Vulkan, Cpu) is a software rasterizer"),
+        "the header says why there is no reading:\n{out}"
+    );
+    let rows: Vec<&str> = out.lines().filter(|l| l.contains("drifter")).collect();
+    assert!(
+        rows.iter().any(|l| l.trim_end().ends_with(" -")),
+        "the cost cell prints `-`:\n{out}"
+    );
+
+    let json = render_json("src", &[fam()], Tier::Floor, &software);
+    assert!(json.contains("\"software\":true"), "{json}");
+    assert!(!json.contains("frame_cost"), "no reading, no key: {json}");
 }
 
 /// The level column reaches both outputs, one cell per preset (ADR-0150).
@@ -684,7 +834,7 @@ fn the_level_column_prints_per_preset_and_reaches_the_json() {
         shape: vec![vec![0.0, 1.0], vec![1.0, 0.0]],
         near_dups: Vec::new(),
     };
-    let out = text_report("src", &[fam()], Tier::Floor);
+    let out = text_report("src", &[fam()], Tier::Floor, &machine());
     assert!(out.contains("level"), "the level header prints:\n{out}");
     assert_eq!(
         out.matches("0.1234").count(),
@@ -692,7 +842,7 @@ fn the_level_column_prints_per_preset_and_reaches_the_json() {
         "one level cell per preset, at four decimals:\n{out}"
     );
 
-    let json = render_json("src", &[fam()], Tier::Floor);
+    let json = render_json("src", &[fam()], Tier::Floor, &machine());
     assert_eq!(
         json.matches("\"level\":0.1234").count(),
         2,
@@ -715,7 +865,7 @@ fn no_report_table_line_wraps_at_a_hundred_columns() {
         shape: vec![vec![0.0]],
         near_dups: Vec::new(),
     };
-    let out = text_report("src", &[fam], Tier::Floor);
+    let out = text_report("src", &[fam], Tier::Floor, &machine());
     // The explanatory prose blocks wrap on their own and have no columns to
     // line up; the claim is about the header and the rows under it. Both are
     // found by content rather than by position, so a block inserted between
@@ -728,8 +878,8 @@ fn no_report_table_line_wraps_at_a_hundred_columns() {
         .collect();
     assert_eq!(
         table.len(),
-        8,
-        "all four tables carry a header and this preset's row:\n{out}"
+        10,
+        "all five tables carry a header and this preset's row:\n{out}"
     );
     assert!(
         table.iter().any(|l| l.contains("count")),
@@ -745,8 +895,8 @@ fn no_report_table_line_wraps_at_a_hundred_columns() {
 }
 
 /// design-backlog 0131: two presets whose display names share their first
-/// [`NAME_WIDTH`] characters must print as **distinguishable** rows in all three
-/// tables. Constructed as an explicit pair rather than leaned on the shipped
+/// [`NAME_WIDTH`] characters must print as **distinguishable** rows in every
+/// table. Constructed as an explicit pair rather than leaned on the shipped
 /// library, so curating the colliding preset away cannot silently retire this.
 #[test]
 fn two_names_sharing_their_first_fourteen_characters_print_as_distinct_rows() {
@@ -763,7 +913,7 @@ fn two_names_sharing_their_first_fourteen_characters_print_as_distinct_rows() {
         shape: vec![vec![0.0, 1.0], vec![1.0, 0.0]],
         near_dups: Vec::new(),
     };
-    let out = text_report("src", &[fam], Tier::Floor);
+    let out = text_report("src", &[fam], Tier::Floor, &machine());
 
     // Every table prints two rows, and in each table the two labels differ.
     let labels: Vec<&str> = out
@@ -771,7 +921,7 @@ fn two_names_sharing_their_first_fourteen_characters_print_as_distinct_rows() {
         .filter(|l| l.starts_with("  Tiled"))
         .map(|l| l.get(2..2 + NAME_WIDTH).unwrap_or(l))
         .collect();
-    assert_eq!(labels.len(), 6, "three tables, two rows each:\n{out}");
+    assert_eq!(labels.len(), 8, "four tables, two rows each:\n{out}");
     for pair in labels.chunks(2) {
         assert_ne!(
             pair.first(),
@@ -983,7 +1133,7 @@ fn the_count_column_follows_onset_and_carries_its_schedule_in_the_json() {
         shape: vec![vec![0.0]],
         near_dups: Vec::new(),
     };
-    let out = text_report("src", &[fam()], Tier::Floor);
+    let out = text_report("src", &[fam()], Tier::Floor, &machine());
     let header: Vec<&str> = out
         .lines()
         .find(|l| l.trim_start().starts_with("preset ") && l.contains("drive"))
@@ -1014,7 +1164,7 @@ fn the_count_column_follows_onset_and_carries_its_schedule_in_the_json() {
         "the column explains itself beside drive:\n{out}"
     );
 
-    let json = render_json("src", &[fam()], Tier::Floor);
+    let json = render_json("src", &[fam()], Tier::Floor, &machine());
     assert!(
         json.contains(
             "\"drive\":0.6250,\"count\":{\"mean\":0.0417,\"frames\":48,\"frames_per_beat\":5},"
@@ -1046,6 +1196,7 @@ fn the_count_column_follows_onset_and_carries_its_schedule_in_the_json() {
             near_dups: Vec::new(),
         }],
         Tier::Floor,
+        &machine(),
     );
     assert!(json.contains("\"count\":{\"mean\":0,"), "{json}");
 }

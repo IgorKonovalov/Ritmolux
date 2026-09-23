@@ -25,6 +25,18 @@ nothing.
 The headless capture CLI and the visual-QA harness have their own page,
 [Headless capture and video](capturing.md).
 
+### The exe's size is read by the build that makes it
+
+[NFR §4](nfr.md#4-size-and-dependencies) caps the release exe softly, and the figure is a property
+of a build rather than of the tree: it moves with the toolchain, the profile and the feature set.
+So nothing in the everyday loop or in `ci.yml` measures it. The two standalone packaging recipes do —
+`packaging/windows/stage.ps1` and `packaging/macos/bundle.sh` — on every run, printing the length
+beside the build that produced it and warning past 90 % of the cap, never failing
+([ADR-0231](adrs/0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md)).
+To read it on a box that runs neither, build the release binary and read its length; the
+composition behind the cap, and how it was taken, is written down in NFR §4 so the next reading can
+be compared with the last.
+
 ### A fresh Arch Linux checkout
 
 Everything below uses Arch package names. `libpulse`, `pkgconf`, `wayland`, `libxkbcommon`,

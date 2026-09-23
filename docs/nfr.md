@@ -47,7 +47,14 @@ the decision that moved it is linked.
   precedence above is unchanged.
 - **Floor:** ≥ 60 fps at 1080p on the baseline hardware (below) at the `Floor` tier, whose values
   are exactly the pre-tier engine's. The floor commitment is unchanged by tiering: the governor
-  means a mispredicted rich budget degrades to a known-good state instead of stuttering.
+  means a mispredicted rich budget degrades to a known-good state instead of stuttering. **As of
+  2026-09-23 this number has never been read on the hardware it names**, which is the honest status
+  of the oldest commitment on this page. The instrument exists now — an advisory per-preset frame cost
+  in `shot --report`
+  ([ADR-0232](adrs/0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md)) — and the
+  walk that would produce the reading is specified in
+  [On-device validation](on-device-validation.md), gated on §9's iGPU box being in hand. Read the
+  bullet as a commitment this project holds itself to, not as a measurement it has taken.
 - **Rich:** calibrated against a midrange discrete GPU (RTX 3060 / RX 6600 class) **on device**,
   not asserted from a multiplier — [Plan 0044](plans/done/0044-quality-tiers.md) Phase 4.
 - **Background cost:** when the window is minimized or fully occluded, rendering throttles to
@@ -185,14 +192,58 @@ the decision that moved it is linked.
 
 ## 4. Size and dependencies
 
-- **Soft cap 10,000,000 B** for the standalone release exe. The unit is in the number because
-  "~10 MB" reads two ways 4.9 % apart and nothing here said which; the *value* is the inherited
-  one, and it has never been measured against what the exe actually contains.
-  **The Linux binary is over it: 12,711,688 B** for `ritmolux` from `packaging/linux/stage.sh`,
-  v0.142.0, built on the Arch box (measured 2026-09-22,
-  [Plan 0120](plans/done/0120-the-standalone-ships-on-ubuntu.md)). The cap is soft, so nothing
-  fails. What the extra 2.7 MB is, and whether the cap should name each platform's binary, has
-  not been measured or decided.
+- **Soft cap 16,777,216 B (16 MiB)** for the standalone release exe, `ritmolux.exe` — derived
+  from what the artifact carries by the rule
+  [ADR-0159](adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) set for
+  the component, applied to this artifact by
+  [ADR-0231](adrs/0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md),
+  replacing an inherited 10,000,000 B that had never been measured against the exe. The
+  derivation ([Plan 0207](plans/done/0207-the-commitments-get-their-instruments.md) Phase 1):
+  **10,971,648 B** measured for `target\release\ritmolux.exe` (Windows 10, `cargo build
+  --release`, default features, 2026-09-19), plus one more step the size of the largest feature
+  class this project has shipped — the `text` step, **+2,104,320 B** as
+  [ADR-0159](adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) measured
+  it on the component, the one *measured* feature-sized diff on this code — is **13,075,968 B**,
+  and 16 MiB is the next round binary boundary above it
+  ([ADR-0231](adrs/0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md)
+  names the two boundaries the rule steps by, 12 MiB and 16 MiB; 12,582,912 B is below the sum).
+  The reading of "round" as any whole MiB would give 13,631,488 B and was not taken: under it the
+  one step the rule means to admit would land at 95.9 % of the cap, past the warning line, so the
+  cap would admit nothing quietly. At 16 MiB that step lands at 77.9 % and a second one at 90.5 %,
+  which is the shape
+  [ADR-0159](adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) asks for
+  exactly — one more feature of the largest class is admitted and the second has to be argued
+  for. The cap names the Windows exe; whether each platform's binary owes a figure of its
+  own is still not decided, and both recipes below measure per executable.
+  `packaging/windows/stage.ps1` and `packaging/macos/bundle.sh` print the length on every build,
+  beside the build that produced it, and **warn** above 15,099,494 B (90 % of the cap) — each
+  Apple slice on its own, since a universal binary is two executables in one file. Neither fails
+  a release over a size: these caps are soft. **The Windows release exe carries `--features
+  spout` and has not been measured with it**; the first tag build prints that figure.
+
+  What the exe carries, measured 2026-09-22 on the Linux build of the same tree — `ritmolux` from
+  `cargo build --release -p standalone`, v0.143.1, rustc 1.97.1, Arch, **12,711,784 B** stripped
+  (75.8 % of the cap; 96 B over the 12,711,688 B recorded for v0.142.0), then rebuilt with
+  `--config profile.release.strip=false` so the symbol table could be read. By section, from the
+  stripped file: `.text` 9,247,623 B, `.rodata` 1,771,688 B, `.eh_frame` 637,668 B, `.rela.dyn`
+  400,992 B, `.data.rel.ro` 327,352 B, `.gcc_except_table` 225,904 B, everything else under
+  100 KB together. By crate, from the 9,325,300 B of function and object symbols the unstripped
+  file names (fat LTO inlines the rest into callers, so every figure is a floor): `naga`
+  1,177,352 B; Rust's `core` 1,105,465 B; `rustfft` 799,921 B; `rlx_core` 655,958 B; `wgpu_core`
+  580,588 B; `winit` 509,326 B; `wgpu_hal` + `wgpu` 425,719 B; the standalone shell (`ritmolux`
+  + `standalone`) 344,921 B; `wayland_client` 275,803 B. **The font stack behind the `text`
+  feature** — `harfrust`, `skrifa`, `zeno`, `read_fonts`, `cosmic_text`, `swash`, `fontdb`,
+  `fontconfig_parser`, `roxmltree`, `yazi`, the `unicode_*` tables and `glyphon` itself — sums to
+  **1,584,263 B** of named symbols, a floor consistent with the 2,104,320 B the same feature
+  measured as a whole-artifact diff. The embedded preset library is 116 files, **641,455 B**
+  verbatim in `.rodata` ([ADR-0022](adrs/0022-build-time-preset-embedding.md)). The series, one
+  row per reading:
+
+  | Measured at | binary | build | bytes |
+  |---|---|---|---|
+  | 2026-09-19 | `ritmolux.exe` | Windows 10, `cargo build --release`, default features | 10,971,648 B |
+  | 2026-09-22 | `ritmolux` (Linux) | v0.142.0, `packaging/linux/stage.sh`, Arch | 12,711,688 B |
+  | 2026-09-22 | `ritmolux` (Linux) | v0.143.1, `cargo build --release -p standalone`, rustc 1.97.1, Arch | 12,711,784 B |
 - **Soft cap 12,582,912 B (12 MiB)** for the foobar2000 component, `foo_ritmolux.dll` — its own figure
   rather than "the same ballpark", because the two artifacts do not carry the same things. The
   component carries the whole core, the embedded preset library and the SDK shim, and carries
@@ -366,7 +417,7 @@ later plan + human task.
 | Machine | Validates |
 |---------|-----------|
 | Primary Windows dev box | Standalone Windows path, plugin, day-to-day dev |
-| Older Windows PC (iGPU) | The performance floor (§1) on baseline hardware (§2) |
+| Older Windows PC (iGPU) | The performance floor (§1) on baseline hardware (§2) — **still a class rather than a configuration, and the reading is owed** ([On-device validation](on-device-validation.md)) |
 | Arch Linux laptop (AMD iGPU + NVIDIA dGPU, PipeWire) | The Linux standalone path, live monitor capture, Vulkan on hardware and llvmpipe |
 | foobar2000 (installed) | Plugin loading + `visualisation_stream` behavior |
 

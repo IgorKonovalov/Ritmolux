@@ -1,8 +1,8 @@
 # ADR-0239 — Rotation carries two orders, and the shuffle's seed varies per launch
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-23
 > **Date:** 2026-09-20
-> **Related plan(s):** [0216](../plans/0216-the-operator-owns-the-order.md)
+> **Related plan(s):** [0216](../plans/done/0216-the-operator-owns-the-order.md)
 
 ## Context
 

@@ -225,6 +225,11 @@ impl AppState {
                 self.rotate_to_next();
             }
             KeyCode::KeyA => self.toggle_auto_rotate(),
+            // The two rotation switches, out here only like `A`: with the
+            // browser open both letters are filter characters and the branch
+            // above has already returned.
+            KeyCode::KeyR => self.toggle_rotate_order(),
+            KeyCode::KeyL => self.cycle_rotate_source(),
             KeyCode::F3 => self.toggle_diagnostics(),
             // `S` opens settings only out here — while the browser is open it is
             // a filter character, and the branch above returns before reaching
@@ -465,6 +470,10 @@ mod tests {
             KeyCode::KeyH,
             KeyCode::KeyS,
             KeyCode::KeyB,
+            // The two rotation switches: inert while the browser is open, for
+            // the same reason every other letter is.
+            KeyCode::KeyR,
+            KeyCode::KeyL,
             KeyCode::Digit1,
         ] {
             assert_eq!(

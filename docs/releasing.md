@@ -170,11 +170,12 @@ box this project is developed on:
 .\packaging\foobar\build-component.ps1    # same script, same checks, as CI runs
 ```
 
-So can the Windows studio, which needs the same Spout SDK because the player it carries is built
-with the feature:
+So can the Windows standalone, which needs the Spout SDK because the shipped exe is built with the
+feature, and the Windows studio, which carries a player built the same way:
 
 ```powershell
 .\packaging\spout\fetch-sdk.ps1           # once; idempotent
+.\packaging\windows\stage.ps1             # same script, same checks, as CI runs
 .\packaging\studio\build-studio.ps1       # same script, same checks, as CI runs
 ```
 
@@ -216,27 +217,49 @@ One tag per push publishes one release. Several in one push can fire nothing at 
 one tag" above), so if a whole backlog of them should reach `origin` *without* releases, disable
 `release.yml` and `ci.yml` for that one push rather than rely on that suppression.
 
-### While you are here: read the component's size
+### While you are here: read the two sizes
 
-`foo_ritmolux.dll` carries a soft cap of its own — **12,582,912 B (12 MiB)**
-([`docs/nfr.md`](nfr.md) §4, ADR-0159) — and it grew +910,848 B between Plan 0097 and Plan 0141
-without anyone watching, none of it attributed as it landed. **You no longer have to measure it.**
-The recipe above reads its own output's length and prints it beside the cap:
+Two of the artifacts carry a soft cap, and **you no longer have to measure either.** Each recipe
+reads its own output's length and prints it beside the cap:
 
-```
-    foo_ritmolux.dll is 9789952 B (77.8 % of the 12582912 B cap)
-```
+- `foo_ritmolux.dll` — **12,582,912 B (12 MiB)** ([`docs/nfr.md`](nfr.md) §4,
+  [ADR-0159](adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md)). It grew
+  +910,848 B between Plan 0097 and Plan 0141 without anyone watching, none of it attributed as it
+  landed, which is why the recipe now reads it:
 
-Past **11,324,620 B** — 90 % of the cap — that step emits a warning instead of a check mark. It
-warns and never dies: a release blocked on a byte count is one where someone edits the constant
-under time pressure at a tag, which is worse than no gate because it also destroys the record.
+  ```
+      foo_ritmolux.dll is 9789952 B (77.8 % of the 12582912 B cap)
+  ```
 
-**What is still yours is the row.** If the printed figure has moved more than **~100 KB** since the
-last one, add a dated row to the size series in
-[`docs/specs/0001-c-abi.md`](specs/0001-c-abi.md) and say what moved it — that table is the only
-record of the trend, and a trend is what the cap is actually about. The reminder sits here rather
-than only in that spec because the trigger it replaces — "re-measure when a dependency is added" —
-was conditioned on an event that never happened, and the growth arrived anyway.
+  Past **11,324,620 B** — 90 % of the cap — that step emits a warning instead of a check mark.
+
+- `ritmolux.exe` — **16,777,216 B (16 MiB)** (`docs/nfr.md` §4,
+  [ADR-0231](adrs/0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md)).
+  It sat 9.7 % over the inherited cap for an unknown time because nothing read it. Both standalone
+  recipes now do — `packaging/windows/stage.ps1` for the exe, `packaging/macos/bundle.sh` for each
+  Apple slice on its own, since the universal file is two executables — and each prints the build
+  beside the number, because a size is a property of a build rather than of the tree:
+
+  ```
+      ritmolux.exe is <bytes> B (<share> % of the 16777216 B cap)
+      build: cargo build --release -p standalone --features spout, v<version>, rustc <toolchain>, x86_64-pc-windows-msvc
+  ```
+
+  Past **15,099,494 B** — 90 % of the cap — it warns. The figure the cap was derived from,
+  10,971,648 B, is a default-features build; the recipe builds with `spout` and the first tag
+  build is what prints that reading.
+
+Every one of those warns and never dies: a release blocked on a byte count is one where someone
+edits the constant under time pressure at a tag, which is worse than no gate because it also
+destroys the record.
+
+**What is still yours is the row.** If a printed figure has moved more than **~100 KB** since the
+last one, add a dated row to its series and say what moved it — the component's in
+[`docs/specs/0001-c-abi.md`](specs/0001-c-abi.md), the exe's in [`docs/nfr.md`](nfr.md) §4. Those
+tables are the only record of the trend, and a trend is what a cap is actually about. The reminder
+sits here rather than only beside each table because the trigger it replaces — "re-measure when a
+dependency is added" — was conditioned on an event that never happened, and the growth arrived
+anyway.
 
 ## What this does NOT touch
 

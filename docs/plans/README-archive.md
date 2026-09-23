@@ -18,6 +18,8 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0207 - The commitments get their instruments](#0207---the-commitments-get-their-instruments)
+  - [0216 - The operator owns the order](#0216---the-operator-owns-the-order)
   - [0219 - The Arch box builds, tests and runs every lane](#0219---the-arch-box-builds-tests-and-runs-every-lane)
   - [0222 - A repaired finding follows its file into done/](#0222---a-repaired-finding-follows-its-file-into-done)
   - [0221 - The Arch block names the studio's settings file](#0221---the-arch-block-names-the-studios-settings-file)
@@ -248,6 +250,89 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0207 - The commitments get their instruments](done/0207-the-commitments-get-their-instruments.md)
+
+- closed 2026-09-23, conductor-run lane `plan-0207-the-commitments-get-their-instruments`. Phase 1
+`0b018885`, Phase 2 `add3d174`, log `94f97add`, the deferral `11742290` + `01125466`. Round 1: **no
+blockers, no majors, six minors and two nits**, five repaired at the close in `a8f09acb`. Version
+**0.145.0** (minor: a feature plan). ADR-0231 + 0232 accepted, each with a dated `Outcome`. Closed
+backlog 0257. The full review is the plan's own `## Close review` section.
+- **What landed.** Two commitments that were numbers in a document now have instruments. The
+standalone's size cap is re-derived from what the exe carries — 10,971,648 B measured, plus
+ADR-0159's measured `text` step of 2,104,320 B, to 13,075,968 B, rounded to the **16,777,216 B**
+boundary above it — and NFR §4 records the derivation, the whole-MiB reading it declined (13,631,488
+B would put the one admitted step at 95.9 % of the cap, past the warning line), and a by-section and
+by-crate composition of the binary taken on the Linux build. `packaging/windows/stage.ps1` is new and
+the release workflow's windows job became a thin caller of it, the shape the linux, macos and foobar
+jobs already had; it and `packaging/macos/bundle.sh` print the artifact's length beside the build
+that produced it and warn above 15,099,494 B, fatally never. And `shot --report` gained an **advisory
+per-preset frame cost** in ms/frame at 1920x1080, the slope between a 48- and an 8-frame capture,
+best of two, presets interleaved so none inherits a warmed clock — printed with the adapter and the
+build profile in the header, marked past 16.67 ms, asserted nowhere.
+- **What the plan deliberately did not do.** No hard frame-cost gate: ADR-0232 keeps the reading
+advisory until there is evidence to design a gate against, which is the same order backlog 0256
+argued one level up. Nothing was optimised — no binary shrunk, no preset made faster.
+- **The `human` phase, deferred rather than run.** Phase 3 asked for NFR §1's Floor reading on §9's
+*"Older Windows PC (iGPU)"*. That box is not in hand and both machines that are are faster than the
+baseline by construction, so the walk moved verbatim into `docs/on-device-validation.md` as a dated
+`iGPU-gated` section — the move Plans 0152 and 0158 each made — and the half needing no hardware
+landed: NFR §1's Floor bullet now says in its own text, dated, that the number has never been read on
+the hardware it names, and §9's row says the machine is still a class rather than a configuration.
+- **What outlived the plan.** Two gaps the close left open. The exe's cap and warning threshold now
+live in three places — `packaging/windows/stage.ps1`, `packaging/macos/bundle.sh` and NFR §4 — with
+no guard holding them equal, where the component's pair has held guard (e) in
+`core/tests/suite/hygiene.rs` since ADR-0159 precisely because that ADR named the drift as its own
+negative. And `packaging/linux/stage.sh` still does not measure, though two of NFR §4's three series
+rows are Linux readings taken by hand. Both are a few lines of work and neither is a close-time edit.
+- **One process note, ratified rather than repaired.** The plan's `## Implementation phases` section
+— the contract — was rewritten in a lane commit to record the deferral, where a lane writes only the
+`Status:` line and the `## Implementation log`. The substance is right and the review ratifies it in
+full; what is worth keeping is that the scope decision reached a reader one round later than it
+should have.
+
+### [0216 - The operator owns the order](done/0216-the-operator-owns-the-order.md)
+
+- closed 2026-09-23, conductor-run lane `plan-0216-the-operator-owns-the-order`. Phase 1
+`14d24213`, Phase 2 `4c50cb3e`, Phase 3 `9a40ab42`, Phase 4 `618acd5a`, Phase 5 `a849a8fe`,
+Phase 6 `fcd7f25c`, log `8e7fa1ca`. Round 1: **no blockers, no majors, two minors**, one repaired at
+the close in `b3c84fd9`. Version **0.144.0** (minor: a feature plan). ADR-0239 accepted. The full
+review is the plan's own `## Close review` section.
+- **What landed.** Rotation carries two orders. `Traversal` keeps the shared `trail` and the
+announced `upcoming` and delegates the draw to an `Order` whose `Shuffled` variant owns `seen` and
+the lowbias32 counter, so Plan 0205's no-repeat property is stated where it is implemented and no
+field sits dead in the other mode; `Order::Sequential` is stateless and takes the successor of the
+last drawn name in the eligible set sorted by name, recomputed against the set handed to *that*
+draw, so a mark toggled mid-walk moves the successor without the walk losing its place. `[rotate]
+order` and `[rotate] seed` join the config; `order`, `source` and `auto` now each have a settings
+row and a hotkey (`R`, `L`, `A`), all persisting through the one path that writes `config.toml`.
+The `Source` row reports the **state** rather than the key: with `favourites` selected and nothing
+drawable marked it reads `favourites - none marked, drawing from all`, which is the fallback
+`eligible_names` has always had and never said out loud. A favourite's whole browse row draws in a
+new `FAV_COLOR`, and the cursor still wins on the row it is on.
+- **What the seed change closes.** Plan 0205's close-review finding 5. The traversal was seeded from
+`renderer.preset_names().count()` read *before* the reload installed the real library — the embedded
+count, one number per build — so every launch replayed one order. The shell now picks the number:
+`[rotate] seed` when pinned, a launch-varying value otherwise. The seam stays injected and the
+director still reads no clock; the single `SystemTime::now()` sits in `launch_seed()` in the shell
+under a scoped allow.
+- **The two minors, one root.** `Order::Sequential` anchors on `last`, which moves only inside
+`draw`. Fixed at the close: `set_order`'s doc comment claimed a sequential walk picked up mid-show
+continues from the preset on screen, which it does not. Left open, as a design call rather than an
+edit: under `sequential`, `Space` after a browser pick continues from the last preset *rotation
+drew*, not from the one on screen — `alpha`, `bravo`, pick `echo`, `Space` gives `charlie`. The
+shuffle has the same shape (a browser pick never enters `seen`), inherited from Plan 0205;
+sequential order is what makes it visible, and it leaves ADR-0239's *"`Space` means the next preset
+again"* only partly delivered, since the pre-0205 rule took the successor of the **active index**.
+Whether a manual selection should re-anchor the traversal is the question worth deciding.
+- **What outlived the plan, not yet routed.** `[rotate] order` and `[rotate] source` are reachable
+from the menu and the hotkeys but not from the control protocol, whose `ctl/transport` vocabulary
+carries `next`, `prev`, `auto` and `hold` only — so the studio cannot set either. Widening spec 0003
+is ADR-worthy and was correctly left alone. Translation advisory: `docs/running.ru.md` is now stale
+against its stamp, this plan's doing and its first close stale; `docs/how-it-works.ru.md` and the
+foobar `READ-ME-FIRST.ru.md` were already listed. No preset touched; no curation owed. The plan's
+own out-of-scope list still stands, including Plan 0205's open finding 1 (`NAME_CHARS` is 21-vs-18
+and `star_mandala_bordered` truncates).
 
 ### [0219 - The Arch box builds, tests and runs every lane](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)
 

@@ -128,7 +128,7 @@ Flags:
 | `--size <WxH>` | render size (default 1280x720) |
 | `--out <path>` | output PNG (single shot) or dir/file (`--all`) |
 | `--all` | contact sheet of every preset, labeled (needs `--out`) |
-| `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage and the [transient probe](#the-transient-columns); `family=` takes any `system` name — every one the scene registry carries: `analytic_field`, `attractor`, `cellular`, `emitter`, `fragment_field`, `lsystem`, `parametric_curve`, `reaction_diffusion`, `shape_collage`, `shape_field`, `spectrum`, `star_pattern`, `swarm`, `warp_mesh` |
+| `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage, the [transient probe](#the-transient-columns) and an advisory [frame cost](#the-frame-cost-block); `family=` takes any `system` name — every one the scene registry carries: `analytic_field`, `attractor`, `cellular`, `emitter`, `fragment_field`, `lsystem`, `parametric_curve`, `reaction_diffusion`, `shape_collage`, `shape_field`, `spectrum`, `star_pattern`, `swarm`, `warp_mesh` |
 | `--json` | emit the report as JSON instead of a text table |
 | `--signal <kind:param>` | synth-audio filmstrip (see below) |
 | `--signal-secs <s>` | how long to synthesize that signal for (default `4`). The clip's length is what decides **which hops exist**, so a late `--frame-at` needs a longer one — [photographing a world that is still assembling](#a-late-hop-photographs-a-world-that-is-still-assembling). Needs `--signal`: `--audio` and `--render` take their length from the file |
@@ -829,7 +829,7 @@ The name column is fourteen characters wide, and a longer name is **elided in
 the middle**, not at the tail: `Tiled Rosette Mono` prints as `Tiled R~e Mono`.
 The tail is what distinguishes a name in this library — `Mono`, `Gallery`,
 `Bordered`, `Walk` — and a tail truncation threw it away, which is how two
-presets came to print as one row label in all three tables (design-backlog 0131).
+presets came to print as one row label in every table (design-backlog 0131).
 A `~` in a label means characters were dropped there.
 
 A family whose scenes draw through the line renderer first gets a one-column
@@ -848,8 +848,9 @@ under 100 characters. A preset in such a family that drew no line prints `-`, an
   Curve Mono     0.9602
 ```
 
-Two more labeled blocks print under the table (new readings go beside the table
-rather than into it, so every historical number keeps its place): the **realistic-levels** reading
+Three more labeled blocks print under the table (new readings go beside the table
+rather than into it, so every historical number keeps its place): the
+**[frame cost](#the-frame-cost-block)** described above, the **realistic-levels** reading
 (`reactivity_low` — the same bands at the levels real music reaches, [ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md)) and,
 since [Plan 0077](plans/done/0077-the-quiet-sky.md), the **footprint** reading (`reactivity_footprint`) — the same
 differentials divided by the **union of lit pixels** instead of the whole frame
@@ -866,6 +867,58 @@ holds one stimulus for every frame it renders, so each smoother has converged
 long before the pixels are read. That is the right question for "does it
 respond", and it is exactly why those columns are **identical for any
 `[smoothing]` constant**.
+
+#### The frame-cost block
+
+One more block prints under `geom`, and it is the one number on this page that
+is **not a property of the frame**: what a preset costs to draw, in
+milliseconds per frame, taken at **1920x1080** on the report's tier, fully
+driven ([ADR-0232](adrs/0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md)).
+The report's second header line names the machine it was taken on — the adapter
+as wgpu names it, and the build profile — because a frame time is a fact about
+a GPU, a driver and a profile rather than about the code
+([ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)),
+and `cargo run --example shot` is a **debug** build unless told otherwise, which
+moves the CPU side of every reading by an order of magnitude.
+
+```
+  frame cost on AMD Radeon Graphics (RADV RENOIR) (Vulkan, IntegratedGpu), driver radv Mesa 26.2.2-arch1.1, debug profile
+  ...
+  preset           ms/frame
+  Meter Mono          0.542
+  Ridge               3.589
+  Whorl              21.905 !
+```
+
+The method is the one the cost tests under `core/tests/` use: each preset is
+captured for 8 frames and for 48, the smaller of two readings of each leg is
+kept, and the cost is the difference over the 40 frames between them — so the
+scene rebuild, first-frame allocation and the single readback both legs pay are
+subtracted out. The presets of a family are interleaved inside the repeat loop
+rather than timed one after another, so none of them inherits a GPU that had
+finished ramping its clocks. A reading at or below zero is printed as measured:
+it means the two legs were within noise of each other.
+
+**It is not a frame rate, and it predicts nothing about the app.** The headless
+path has no window, no present, no compositor and no audio thread competing
+with it, so a preset well under the budget here can still miss it on a screen,
+and a number in milliseconds per frame will be read as an fps unless something
+says otherwise — which is why the caveat prints beside the cells rather than
+here alone. What the column *is* good for is **comparing presets on one
+machine**: which of a family's looks is the expensive one, and whether a retune
+moved the cost. A `!` marks a reading past **16.67 ms**, the budget
+[NFR §1](nfr.md#1-performance--adaptive-quality) states at 60 fps at this size
+on the floor tier, and it marks only — the report never fails a run over it,
+exactly as `distinctness` never fails one over a near-duplicate. On a software
+rasterizer no reading is taken and the cells print `-`: a frame time on
+lavapipe or WARP is a fact about the rasterizer, and CI has no GPU contract to
+take one on ([ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)).
+
+This pass is the report's most expensive: 120 frames at 1080p per preset, on
+top of the few hundred small frames every other column shares. On the
+development box's integrated GPU a debug-profile family of five costs a few
+seconds; a full-library report on a machine near the baseline should be run
+with that in mind, and `family=` narrows it.
 
 #### The two motion readings
 
@@ -1541,9 +1594,17 @@ figures; whether it needs a re-gain pass is
 
 The `--report --json` schema is a nested object of numbers keyed by
 family/preset: per-band `reactivity`, `reactivity_low` and `reactivity_footprint`,
-`animation`, `drive`, `count`, `rate`, `coverage`, `level`, `transient` (`rise_frames` /
+`animation`, `drive`, `count`, `rate`, `coverage`, `level`, `frame_cost`, `transient` (`rise_frames` /
 `fall_frames` as integers plus their `ratio`), `reachability`, the pairwise
-`pixel`/`shape` distinctness matrices, and `near_duplicates`.
+`pixel`/`shape` distinctness matrices, and `near_duplicates`. Beside `source`
+and `tier` at the top level sits `machine` — `adapter`, `profile` and
+`software` — which every `frame_cost` below it was taken on.
+
+`frame_cost` is an object: `ms_per_frame`, the `width` and `height` it was
+taken at, the `budget_ms` it is compared against and `over_budget`, the text
+block's `!` as a boolean ([the frame-cost block](#the-frame-cost-block)). It is
+**omitted** on a software adapter rather than written as a fake number, the
+way `in_frame_geometry` is omitted where no line seam measured.
 
 `rate` is an **object**, not a bare number: `mean`, `settled`, and
 `measured_at_px` — the size it was captured at, which is not the one the columns
