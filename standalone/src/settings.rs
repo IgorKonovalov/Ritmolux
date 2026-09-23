@@ -27,7 +27,7 @@
 
 use rlx_core::render::Tier;
 
-use standalone::config::InputMode;
+use standalone::config::{InputMode, RotateOrder, RotateSource};
 
 /// Dwell edit step, in seconds. Coarse on purpose: this is a live-show control
 /// operated by eye, not a scheduler.
@@ -70,6 +70,15 @@ pub struct SettingsView {
     pub tier: Tier,
     pub tier_state: TierState,
     pub auto_rotate: bool,
+    /// The order rotation walks the library in (`[rotate] order`).
+    pub rotate_order: RotateOrder,
+    /// Which part of the library rotation draws from (`[rotate] source`).
+    pub rotate_source: RotateSource,
+    /// Whether any preset the show could draw is marked a favourite. Read by the
+    /// source row alone: `Favourites` falls back to the whole eligible set while
+    /// nothing is marked, so the row has to report the state the show is in
+    /// rather than the word the config holds.
+    pub favourites_marked: bool,
     pub min_dwell_secs: u32,
     pub max_dwell_secs: u32,
     pub fullscreen: bool,
@@ -158,6 +167,12 @@ pub enum SettingsAction {
     OpenBrowse,
     SetTier(Tier),
     ToggleAuto,
+    /// Switch the order rotation draws in. A switch rather than a toggle, for
+    /// the reason the tier row is one: the value a key produces does not depend
+    /// on the value it is on, so key repeat cannot walk it back and forth.
+    SetOrder(RotateOrder),
+    /// Switch which part of the library rotation draws from, on the same rule.
+    SetSource(RotateSource),
     /// Both bounds, already clamped against each other and the floor/ceiling, so
     /// the shell writes them without re-deciding anything.
     SetDwell {
@@ -191,6 +206,8 @@ pub enum SettingsAction {
 pub enum SettingsRow {
     Quality,
     AutoRotate,
+    Order,
+    Source,
     MinDwell,
     MaxDwell,
     Fullscreen,
@@ -207,9 +224,14 @@ pub enum SettingsRow {
 
 impl SettingsRow {
     /// Every row, in display order. The one read-only row stays last.
-    pub const ALL: [SettingsRow; 14] = [
+    pub const ALL: [SettingsRow; 16] = [
         SettingsRow::Quality,
         SettingsRow::AutoRotate,
+        // Immediately after the switch that turns rotation on and before the
+        // dwell pair, so the four rotation rows read together: whether it
+        // rotates, in what order, out of what, and how often.
+        SettingsRow::Order,
+        SettingsRow::Source,
         SettingsRow::MinDwell,
         SettingsRow::MaxDwell,
         SettingsRow::Fullscreen,
@@ -238,6 +260,8 @@ impl SettingsRow {
         match self {
             SettingsRow::Quality => "Quality",
             SettingsRow::AutoRotate => "Auto-rotate",
+            SettingsRow::Order => "Order",
+            SettingsRow::Source => "Draw from",
             SettingsRow::MinDwell => "Min dwell",
             SettingsRow::MaxDwell => "Max dwell",
             SettingsRow::Fullscreen => "Fullscreen",
@@ -263,6 +287,18 @@ impl SettingsRow {
                 view.tier_state.suffix()
             ),
             SettingsRow::AutoRotate => on_off(view.auto_rotate).to_owned(),
+            // The kebab word `config.toml` holds, like the input-mode row.
+            SettingsRow::Order => view.rotate_order.as_str().to_owned(),
+            // **The state, not the key.** `favourites` with nothing marked
+            // already draws from the whole eligible set, and a row printing
+            // `favourites` over a library that is all showing describes a filter
+            // nobody applied.
+            SettingsRow::Source => match (view.rotate_source, view.favourites_marked) {
+                (RotateSource::Favourites, false) => {
+                    "favourites - none marked, drawing from all".to_owned()
+                }
+                (source, _) => source.as_str().to_owned(),
+            },
             SettingsRow::MinDwell => format!("{} s", view.min_dwell_secs),
             SettingsRow::MaxDwell => format!("{} s", view.max_dwell_secs),
             SettingsRow::Fullscreen => on_off(view.fullscreen).to_owned(),
@@ -319,6 +355,18 @@ impl SettingsRow {
                 SettingsAction::SetTier(if right { Tier::Rich } else { Tier::Floor })
             }
             SettingsRow::AutoRotate => SettingsAction::ToggleAuto,
+            // Switches, not toggles: the shuffle is on the left because it is
+            // the default, and `all` is on the left because it is the wider set.
+            SettingsRow::Order => SettingsAction::SetOrder(if right {
+                RotateOrder::Sequential
+            } else {
+                RotateOrder::Shuffled
+            }),
+            SettingsRow::Source => SettingsAction::SetSource(if right {
+                RotateSource::Favourites
+            } else {
+                RotateSource::All
+            }),
             SettingsRow::MinDwell => {
                 let min = step(view.min_dwell_secs, right).clamp(DWELL_FLOOR, view.max_dwell_secs);
                 SettingsAction::SetDwell {

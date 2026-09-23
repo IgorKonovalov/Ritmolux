@@ -368,10 +368,6 @@ impl Traversal {
     /// peek names what the new order will actually take. A call naming the order
     /// already running is a no-op, so a surface restating it cannot restart a
     /// shuffle's cycle.
-    #[allow(
-        dead_code,
-        reason = "the live order switch is the settings row's and the hotkey's seam"
-    )]
     pub fn set_order(&mut self, order: RotateOrder, seed: u32) {
         let unchanged = matches!(
             (&self.order, order),

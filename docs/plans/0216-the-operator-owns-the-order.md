@@ -253,8 +253,8 @@ track_change = true
 |---|---|---|---|
 | 1 — `Order` splits out of `Traversal` | dev | done | `14d24213` |
 | 2 — the order becomes a config key | dev | done | `4c50cb3e` |
-| 3 — the seed varies per launch, and a key pins it | dev | done | committed with this row |
-| 4 — two settings rows and two hotkeys | dev | not started | |
+| 3 — the seed varies per launch, and a key pins it | dev | done | `9a40ab42` |
+| 4 — two settings rows and two hotkeys | dev | done | committed with this row |
 | 5 — a favourite reads as a warm row | dev | not started | |
 | 6 — the docs say what the app now does | dev | not started | |
 
@@ -277,3 +277,12 @@ track_change = true
   are not guaranteed to differ where the wall clock is coarse, so the test states that the number
   reaching the traversal moves and that `seed = 7` stops it moving. Nothing asserts that
   `launch_seed` reads the clock.
+- Phase 4 also edits `standalone/src/stream.rs`, `standalone/src/console/tests.rs`,
+  `standalone/src/show.rs` and `standalone/src/director.rs`, none of which its file list names: the
+  first two build a `SettingsView` by literal and stop compiling the moment it gains a field
+  (`headless_view` gains a `favourites_marked` argument, computed from the run's marks), and the
+  last two lose the `#[allow(dead_code)]` the Phase 2 rows describe now that the hotkeys call them.
+  Nothing else in those four files moved.
+- Phase 4 adds no control to `standalone/src/console.rs`, which its file list names: the transport
+  strip is unchanged and the two rows reach the console through the routing that already moves
+  every settings line there.

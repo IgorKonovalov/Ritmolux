@@ -265,10 +265,6 @@ impl Show {
     ///
     /// The refresh rides along so no caller can leave the console naming a
     /// preset the order that just left would have taken.
-    #[allow(
-        dead_code,
-        reason = "the live rotation controls are the settings rows' and the hotkeys' seam"
-    )]
     pub(crate) fn set_rotate_order(&mut self, order: config::RotateOrder, renderer: &Renderer) {
         self.traversal.set_order(order, self.rotate_seed);
         self.refresh_upcoming(renderer);
@@ -276,10 +272,6 @@ impl Show {
 
     /// Switch which part of the library rotation draws from, on a **running**
     /// show — the live half of `[rotate] source`.
-    #[allow(
-        dead_code,
-        reason = "the live rotation controls are the settings rows' and the hotkeys' seam"
-    )]
     pub(crate) fn set_rotate_source(&mut self, source: config::RotateSource, renderer: &Renderer) {
         self.source = source;
         self.refresh_upcoming(renderer);
