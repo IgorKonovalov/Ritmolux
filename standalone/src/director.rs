@@ -362,8 +362,10 @@ impl Traversal {
     /// [`Director::set_dwell_bounds`] switches a running dwell.
     ///
     /// Keeps `trail` and `last`, so `Backspace` still walks what was shown and
-    /// a sequential walk picked up mid-show continues from the preset on screen
-    /// rather than from the top of the library. Drops the announced `upcoming`,
+    /// a sequential walk picked up mid-show continues from the last preset
+    /// *rotation drew* — or from the first name in the library when it has drawn
+    /// none, `last` being the anchor a draw sets and a manual selection does
+    /// not. Drops the announced `upcoming`,
     /// which the departing order chose — the next peek names what the incoming
     /// one will actually take. A call naming the order
     /// already running is a no-op, so a surface restating it cannot restart a
