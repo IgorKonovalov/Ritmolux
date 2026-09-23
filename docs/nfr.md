@@ -47,7 +47,14 @@ the decision that moved it is linked.
   precedence above is unchanged.
 - **Floor:** ≥ 60 fps at 1080p on the baseline hardware (below) at the `Floor` tier, whose values
   are exactly the pre-tier engine's. The floor commitment is unchanged by tiering: the governor
-  means a mispredicted rich budget degrades to a known-good state instead of stuttering.
+  means a mispredicted rich budget degrades to a known-good state instead of stuttering. **As of
+  2026-09-23 this number has never been read on the hardware it names**, which is the honest status
+  of the oldest commitment on this page. The instrument exists now — an advisory per-preset frame cost
+  in `shot --report`
+  ([ADR-0232](adrs/0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md)) — and the
+  walk that would produce the reading is specified in
+  [On-device validation](on-device-validation.md), gated on §9's iGPU box being in hand. Read the
+  bullet as a commitment this project holds itself to, not as a measurement it has taken.
 - **Rich:** calibrated against a midrange discrete GPU (RTX 3060 / RX 6600 class) **on device**,
   not asserted from a multiplier — [Plan 0044](plans/done/0044-quality-tiers.md) Phase 4.
 - **Background cost:** when the window is minimized or fully occluded, rendering throttles to
@@ -400,7 +407,7 @@ later plan + human task.
 | Machine | Validates |
 |---------|-----------|
 | Primary Windows dev box | Standalone Windows path, plugin, day-to-day dev |
-| Older Windows PC (iGPU) | The performance floor (§1) on baseline hardware (§2) |
+| Older Windows PC (iGPU) | The performance floor (§1) on baseline hardware (§2) — **still a class rather than a configuration, and the reading is owed** ([On-device validation](on-device-validation.md)) |
 | Arch Linux laptop (AMD iGPU + NVIDIA dGPU, PipeWire) | The Linux standalone path, live monitor capture, Vulkan on hardware and llvmpipe |
 | foobar2000 (installed) | Plugin loading + `visualisation_stream` behavior |
 

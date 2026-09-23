@@ -3,7 +3,7 @@
 > **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
-> **Owner skill(s):** dev, human
+> **Owner skill(s):** dev (the `human` phase was deferred 2026-09-23 — see `## Deferred`)
 > **Related ADRs:** [0231](../adrs/0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md)
 > (proposed), [0232](../adrs/0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md)
 > (proposed), [0159](../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md),
@@ -69,8 +69,9 @@ weakens a promise in order to pass it).
 
 ## Implementation phases
 
-Phases 1 and 2 are `dev` and contiguous; Phase 3 is `human` and needs hardware only the owner has,
-so a conductor run parks in front of it.
+Phases 1 and 2 are `dev` and contiguous. A third phase — the Floor reading on baseline hardware —
+**was deferred on 2026-09-23 and left this contract**; `## Deferred` below is the record, and the walk
+itself now lives in [On-device validation](../on-device-validation.md).
 
 ### Phase 1 — The exe is measured, capped and reported
 
@@ -110,7 +111,35 @@ so a conductor run parks in front of it.
   `docs/testing.md`'s gate table gains the row, marked ADVISORY, so the roster stays honest about
   what is and is not enforced.
 
-### Phase 3 — The floor is measured where it is claimed
+## Deferred (2026-09-23) — the Floor reading, formerly Phase 3
+
+**The machine is not available, and the reading cannot honestly be taken anywhere else.** The phase
+asked for NFR §1's floor to be read at 1080p at `Floor` on §9's *"Older Windows PC (iGPU)"*. That box
+is not in hand; the two machines that are — the dev box and the Arch laptop — are both faster than the
+baseline by construction, so a reading from either would answer a different question while looking
+like an answer to this one. Deferring is therefore the correct outcome rather than a concession.
+
+**The walk was extracted instead of dropped.** [On-device validation](../on-device-validation.md)
+gains a dated `iGPU-gated` section carrying the whole walk: name the machine in §9, run the shipped
+set at `Floor` with Phase 2's frame-cost block as the instrument, cross-check the flagged presets
+against the window's `F3` overlay, and write the result into §1's Floor line. That file is this
+project's standing carrier for a check no machine here can run, and extracting a hardware-gated phase
+into it at the close is the move [Plan 0152](done/0152-the-osc-root-becomes-rlx.md) Phase 5 and
+[Plan 0158](done/0158-the-player-grows-a-studio-facing-surface.md) Phase 7 both made before this one.
+
+**The gap is now visible on the page that makes the claim.** NFR §1's Floor bullet says in its own
+text that the number has never been read on the hardware it names, dated, and §9's matrix row says the
+machine is still a class rather than a configuration. That is the half of this phase that needed no
+hardware, and it landed: an unmeasured commitment that says so is a different object from one that
+reads as a measurement.
+
+**What this does not change.** The plan's `**Closes:**` claim is untouched — [backlog
+0257](../design-backlog-archive.md) was the standalone's size cap, both halves of it, and Phase 1
+discharged them. No hard frame-cost gate is written; ADR-0232 keeps the advisory shape deliberately,
+and designing a gate before the evidence it would be tuned against is the error this plan exists to
+correct one level up.
+
+#### What it asked for, verbatim
 
 - **Owner skill:** human
 - **What:** Name the machine and take the reading NFR §1 has always asserted.
@@ -170,7 +199,7 @@ so a conductor run parks in front of it.
 |---|---|---|---|
 | 1 — The exe is measured, capped and reported | dev | done | 0b018885 |
 | 2 — The report says what a preset costs | dev | done | add3d174 |
-| 3 — The floor is measured where it is claimed | human | not started | |
+| 3 — The floor is measured where it is claimed | human | deferred 2026-09-23 — see `## Deferred` | |
 
 ### Notes
 
@@ -215,10 +244,12 @@ so a conductor run parks in front of it.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 46 stated reductions hold
   across 21 live entries, 4 unprobeable
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
-- **Outstanding `human` phases:** Phase 3 — the floor is measured where it is claimed
+- **Outstanding `human` phases:** none — Phase 3 was deferred on 2026-09-23 (see `## Deferred`)
+  and its walk now lives in `docs/on-device-validation.md`
 
 ## Followups (after this lands)
 
-- Whatever Phase 3's reading turns up, as its own backlog entry — including the case where
-  everything passes, which is worth recording so the question is not re-opened from scratch.
+- Whatever the deferred Floor reading turns up, as its own backlog entry — including the case where
+  everything passes, which is worth recording so the question is not re-opened from scratch. The walk
+  waits in [On-device validation](../on-device-validation.md) until §9's iGPU box is in hand.
 - A hard frame-cost gate, if and only if the advisory finds shipped offenders.

@@ -28,6 +28,8 @@ far is one machine, one GPU vendor (AMD). Two questions can only be answered on 
 hardware, and the user won't have access to it until later:
 
 1. Does the **NFR §1 perf floor** (≥ 60 fps @ 1080p at the `Floor` tier) hold on the weakest box?
+   Since Plan 0207 this one has a specified walk and an instrument of its own — see the Floor-reading
+   section below.
    Since Plan 0044 the engine ships two tiers ([ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md)),
    and `Floor` is byte-for-byte the constants that were measured here before — so every item below
    is a **`Floor`-tier** measurement unless it says otherwise. **Pin it: `ritmolux.exe --tier floor`.**
@@ -775,6 +777,40 @@ with music playing at a normal volume.
       recovery reopens `@DEFAULT_MONITOR@`, and closing the window afterwards exits at once.
 
 Anything that fails becomes a backlog entry, not a silent fix.
+
+## iGPU-gated — the Floor reading NFR §1 asserts (Plan 0207 Phase 3)
+
+**This is question 1 above, finally with an instrument.** Extracted from Plan 0207 at that plan's
+close (2026-09-23) so the plan could close on its two completed `dev` phases without waiting on a box
+that is not in hand, exactly as every item above was. The machine it needs is §9's *"Older Windows PC
+(iGPU)"*, which is not the dev box and not the Arch laptop.
+
+**What Plan 0207 changed is that the walk now has a number rather than an impression.** Phase 2 gave
+`shot --report` an advisory per-preset frame cost in ms/frame at 1920x1080, taken fully driven, with a
+header naming the adapter and the build profile and a `!` on any reading past the 60 fps budget
+(ADR-0232, [Capturing](capturing.md#the-frame-cost-block)). It is **headless** — no window, no
+present, no compositor, no audio thread — so it ranks presets and predicts nothing about the app,
+which is exactly why the window's `F3` overlay is the cross-check here and not an afterthought.
+
+- [ ] **Name the machine in NFR §9.** Make, GPU and OS build, replacing the class *"Older Windows PC
+      (iGPU)"*. Until a row names a configuration, no reading taken on it can be compared with a later
+      one (ADR-0071). This half needs the box only for its identity, not for a measurement.
+- [ ] **Walk the shipped set at `Floor`, 1080p, with the report as the instrument.** A release build,
+      because a debug profile moves the CPU side of every reading by an order of magnitude:
+      `cargo run -p standalone --release --example shot -- --presets presets --report`. Record the
+      machine header and every preset the block marks `!`. A clean run with no `!` is a result worth
+      recording too.
+- [ ] **Cross-check the flagged presets in the window.** `ritmolux.exe --tier floor` at 1080p with
+      audio playing, `F3` on, and read `fps` and `frame_ms` p99 for each preset the report flagged,
+      plus two it did not. Record both numbers side by side — the headless cost and what the screen
+      actually did. Divergence between them is itself the finding, because it is the gap the report's
+      own caveat predicts and nothing in this repository has ever measured.
+- [ ] **Write the reading into NFR §1's Floor line**, dated and naming the machine, replacing the
+      undated assertion. **A miss is a result, not a failure**: if a shipped preset cannot hold
+      ≥ 60 fps at `Floor` on baseline hardware, that is the first real evidence this project has had
+      on the question. It belongs here and in a backlog entry — never in a silent retune, and never in
+      a hard gate written before the evidence it would be designed against.
+      _(Plan 0207 Phase 3, extracted at that plan's close 2026-09-23.)_
 
 ## How to run
 
