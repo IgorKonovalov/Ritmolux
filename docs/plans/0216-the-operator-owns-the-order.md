@@ -256,7 +256,7 @@ track_change = true
 | 3 — the seed varies per launch, and a key pins it | dev | done | `9a40ab42` |
 | 4 — two settings rows and two hotkeys | dev | done | `618acd5a` |
 | 5 — a favourite reads as a warm row | dev | done | `a849a8fe` |
-| 6 — the docs say what the app now does | dev | done | committed with this row |
+| 6 — the docs say what the app now does | dev | done | `fcd7f25c` |
 
 ### Notes
 
@@ -303,3 +303,21 @@ track_change = true
 - `docs/running.md` also gained a sentence about the warm favourite row, which Phase 6's done-when
   does not ask for; Phase 5 changed what the browser looks like and that page is where the browser
   is described.
+- Followup noticed and not acted on: `[rotate] order` and `[rotate] source` are reachable from the
+  settings menu and the hotkeys but not from the control protocol, whose `ctl/transport` vocabulary
+  carries `next`, `prev`, `auto` and `hold` only. The studio therefore cannot set either.
+
+### Close triggers
+
+- **`presets/` touched:** no
+- **Plan header `Closes:`** none — the header carries no `Closes:` line
+- **What shipped:** feature
+- **Operator docs touched:** `README.md`, `docs/running.md`, `docs/configuration.md`. No generated
+  file was regenerated: `presets/README.md`'s params block, `presets/schema/` and `.taplo.toml` are
+  untouched, and no preset, param or schema moved.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *46 stated reductions still
+  hold across all 21 live entries (4 unprobeable)*. No entry named by this plan.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Per-phase, `cargo nextest run
+  --workspace -P fast` was run at Phases 2, 3, 4, 5 and 6 and was green each time — 1705 tests run,
+  1705 passed, 86 skipped at the tip. No deferred GPU suite was run under an upward override.
+- **Outstanding `human` phases:** none — every phase is `dev`
