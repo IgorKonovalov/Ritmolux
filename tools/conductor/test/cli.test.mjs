@@ -338,6 +338,78 @@ test("pause asked mid-run lets the plan in flight merge, starts no other, and cl
   assert.match(r.out.join("\n"), /run ended - 1 merged, 0 parked/);
 });
 
+/** Gives the scratch tool directory a module set of its own, as the real one has. */
+function seedSources(p) {
+  mkdirSync(join(p.toolDir, "lib"), { recursive: true });
+  writeFileSync(join(p.toolDir, "conductor.mjs"), "// the entry point\n");
+  writeFileSync(join(p.toolDir, "lib", "lane.mjs"), "export const guard = 'old';\n");
+}
+
+test("a source changed mid-run pauses the run: the plan in flight merges, no other starts, and nothing restarts", async () => {
+  const { p, cli } = setup(
+    [
+      { number: "0101", phases: [dev("1")] },
+      { number: "0102", phases: [dev("1")] },
+    ],
+    { a: ["0101", "0102"] },
+    {
+      // The gate runs inside the lane while 0101 is in flight, as a merge to main would land.
+      gate: (p) => [{ name: "edit-source", cmd: [process.execPath, "-e", `require("fs").writeFileSync(${JSON.stringify(join(p.toolDir, "lib", "lane.mjs"))}, "export const guard = 'new';\\n")`] }],
+    },
+  );
+  seedSources(p);
+  // Resident, with nothing else to end it: the stale sources are what end the run.
+  const r = await cli("run", "--lane", "a");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  const state = loadState(p.stateDir);
+  assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+  assert.equal(state.plans["0102"], undefined, "the second plan never started");
+  assert.equal(state.runs.at(-1).paused.reason, "stale_sources");
+  assert.deepEqual(state.runs.at(-1).notStarted, [{ plan: "0102", lane: "a", reason: "paused" }]);
+  const out = r.out.join("\n");
+  assert.equal(
+    (out.match(/^conductor: tools\/conductor\/ changed on disk since this run started \(lib\/lane\.mjs\); pausing - the plans in flight finish and no other starts$/gm) ?? []).length,
+    1,
+    out,
+  );
+  assert.match(out, /^conductor: paused - tools\/conductor\/ changed on disk under the run; /m);
+  assert.equal(existsSync(join(p.stateDir, "conductor.sources.json")), false, "the record does not outlive the run");
+});
+
+test("status, resume and park name a live run whose sources changed, and identical bytes are not a change", async () => {
+  const { sourceDigest, recordSources } = await import("../lib/sources.mjs");
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1"), human("2")] }], { a: ["0101"] });
+  await cli("run", "--once");
+  seedSources(p);
+  // This test process stands in for the live conductor, which recorded what it loaded.
+  writeFileSync(join(p.stateDir, "conductor.pid"), String(process.pid));
+  recordSources(p.stateDir, process.pid, sourceDigest(p.toolDir));
+  const lane = join(p.toolDir, "lib", "lane.mjs");
+  const original = readFileSync(lane);
+  const notice = new RegExp(
+    `^conductor: notice: the running conductor \\(pid ${process.pid}\\) loaded tools/conductor/ sources that have changed on disk since it started \\(lib/lane\\.mjs\\); it decides with the old code`,
+  );
+  try {
+    for (const argv of [["status"], ["resume", "0101"], ["park", "0101"]]) {
+      const r = await cli(...argv);
+      assert.ok(!r.err.some((l) => notice.test(l)), `${argv[0]} on unchanged sources: ${r.err.join("\n")}`);
+    }
+    writeFileSync(lane, "export const guard = 'new';\n");
+    for (const argv of [["status"], ["resume", "0101"], ["park", "0101"]]) {
+      const r = await cli(...argv);
+      assert.match(r.err[0] ?? "", notice, `${argv[0]}: ${r.err.join("\n")}`);
+    }
+    // A checkout that puts back the same bytes is not stale, whatever it did to the timestamp.
+    writeFileSync(lane, original);
+    for (const argv of [["status"], ["resume", "0101"], ["park", "0101"]]) {
+      const r = await cli(...argv);
+      assert.ok(!r.err.some((l) => notice.test(l)), `${argv[0]} after the bytes came back: ${r.err.join("\n")}`);
+    }
+  } finally {
+    rmSync(join(p.stateDir, "conductor.pid"), { force: true });
+  }
+});
+
 test("an ask cancelled before the lane looks again lets the next plan start", async () => {
   // The second gate step is `afterClose`, so it runs only on the close tip — after the ask above and
   // before the lane's next look. It removes the same file `pause --off` removes.

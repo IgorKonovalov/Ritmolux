@@ -91,6 +91,16 @@ a run. **A pause is also how a resident run ordinarily ends**, and a spent `run_
 refused CLI version pauses it the same way; the run record names which. A paused lane records `paused` against every plan it did not start, which the history page's
 **Not started** section reads apart from `--once` and from a queue that ran out.
 
+**A run whose own code changed on disk pauses too.** `run` is one Node process that loads its modules
+once — `conductor.mjs`, `with-lock.mjs` and every `lib/*.mjs` — so a conductor change merged while it
+is up does not reach it. At start it records a content hash of those files in
+`state/conductor.sources.json`, compares on every look, and when they differ prints one line naming
+the changed files and pauses the same way: the plans in flight finish and no other starts. **It never
+restarts itself and never stops a session**; start `run` again once it ends. `status`, `resume` and
+`park` read the same record and print a `notice:` line when the live run is stale, because a live run
+is what takes a resume ask, and a refusal from old code otherwise reads as a real one. The comparison
+is by content, not timestamp, so a checkout that puts back identical bytes is not a change.
+
 `run` prints one line per milestone as it happens, each one `HH:MM NNNN <what>`. A line indented
 under a plan number happened inside a step or a gate:
 

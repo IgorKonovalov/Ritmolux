@@ -34,6 +34,7 @@ import { appendPark, dirtyWorktree } from "./lib/inbox.mjs";
 import { parkStillTrue, runLanes } from "./lib/lane.mjs";
 import { ascii } from "./lib/live.mjs";
 import { loadLocal, loadQueue, pruneQueue, readQueue, startedPlans } from "./lib/queue.mjs";
+import { changedSources, clearSources, recordSources, sourceDigest, staleLine, staleSince } from "./lib/sources.mjs";
 import {
   FINDING_VERBS,
   adoptClose,
@@ -139,6 +140,16 @@ function runningPid(p) {
   return pidAlive(pid) ? pid : null;
 }
 
+/**
+ * Prints the stale-run notice when a live run's loaded sources no longer match the disk, so an
+ * answer the live run gives — a refused resume, above all — is not read as the current code's.
+ */
+function noticeStaleRun(p, o) {
+  const pid = runningPid(p);
+  const changed = pid ? staleSince(p.stateDir, p.toolDir, pid) : null;
+  if (changed?.length) o.err(`conductor: notice: ${staleLine(pid, changed)}`);
+}
+
 function regenerate(p, state) {
   writeDigest(p.digest, state, { repo: p.repo, stateDir: p.stateDir });
 }
@@ -164,6 +175,8 @@ export function eventLine(name, d) {
       return `conductor: ${d.plan} closed${d.tag ? `, tag ${d.tag}` : ""}`;
     case "ff":
       return `conductor: ${d.plan} fast-forwarded main to ${d.head.slice(0, 7)}`;
+    case "stale-sources":
+      return `conductor: tools/conductor/ changed on disk since this run started (${d.changed.join(", ")}); pausing - the plans in flight finish and no other starts`;
     default:
       return null;
   }
@@ -204,6 +217,9 @@ async function cmdRun(args, o) {
     o.log("conductor: a pause left behind by an earlier run was cleared; a pause does not outlive its run");
   }
   writeFileSync(pidFile(p), String(process.pid));
+  // What this process loaded, so it and the other commands can tell when the disk has moved on.
+  const loaded = sourceDigest(p.toolDir);
+  recordSources(p.stateDir, process.pid, loaded);
 
   // Every line `run` prints while lanes run also goes to state/live.log, under one header per run.
   const liveLog = join(p.stateDir, "live.log");
@@ -248,6 +264,10 @@ async function cmdRun(args, o) {
       return v.error ? { error: v.error } : { version: v.version, ...cliVerdict(v.version) };
     },
     paused: () => Boolean(pauseAsk(p.stateDir)),
+    staleSources: () => {
+      const now = sourceDigest(p.toolDir);
+      return now.hash === loaded.hash ? null : changedSources(loaded, now);
+    },
     lanes: lane ? [lane] : undefined,
     commitPollMs: o.commitPollMs,
     onChange: () => regenerate(p, state),
@@ -263,6 +283,7 @@ async function cmdRun(args, o) {
     recoverInterrupted(p.stateDir, state);
     regenerate(p, state);
     clearPause(p.stateDir);
+    clearSources(p.stateDir);
     rmSync(pidFile(p), { force: true });
     o.err("conductor: interrupted; in-flight steps will run again on the next `run`");
     process.exit(130);
@@ -280,11 +301,14 @@ async function cmdRun(args, o) {
     }
     regenerate(p, state);
     clearPause(p.stateDir);
+    clearSources(p.stateDir);
     rmSync(pidFile(p), { force: true });
   }
   const recs = Object.values(state.plans);
   const paused = ctx.run?.paused;
-  if (paused?.reason === "run_budget") {
+  if (paused?.reason === "stale_sources") {
+    o.log("conductor: paused - tools/conductor/ changed on disk under the run; the plans in flight finished and no other was started. Start `run` again to run the code on disk.");
+  } else if (paused?.reason === "run_budget") {
     o.log(`conductor: paused - the run spent its run_budget_usd (${pf.local.run_budget_usd}); the plan in flight finished and no further plan was started.`);
   } else if (paused?.reason === "cli_version") {
     o.log(`conductor: paused - the CLI changed under the run and is refused: ${ctx.cliRefused}`);
@@ -304,6 +328,7 @@ function cmdStatus(args, o) {
   const state = loadState(p.stateDir);
   const pid = runningPid(p);
   o.log(pid ? `conductor: running (pid ${pid})` : "conductor: not running");
+  noticeStaleRun(p, o);
   const { lanes } = loadQueue(p.queue, p.repo, startedPlans(state));
   const laneNames = [...new Set([...Object.keys(lanes ?? {}), ...Object.keys(state.lanes)])].sort();
   for (const lane of laneNames) {
@@ -358,6 +383,7 @@ function cmdResume(args, o) {
     o.err("usage: conductor.mjs resume NNNN");
     return 2;
   }
+  noticeStaleRun(p, o);
   const state = loadState(p.stateDir);
   const rec = state.plans[plan];
   if (!rec || rec.status !== "parked") {
@@ -390,6 +416,7 @@ function cmdPark(args, o) {
     o.err("usage: conductor.mjs park NNNN");
     return 2;
   }
+  noticeStaleRun(p, o);
   if (runningPid(p)) {
     o.err("conductor: a run is in progress; park after it ends, or `abort` it first");
     return 1;
@@ -599,6 +626,7 @@ function cmdAbort(args, o) {
   }
   const state = loadState(p.stateDir);
   const n = recoverInterrupted(p.stateDir, state);
+  clearSources(p.stateDir);
   rmSync(pidFile(p), { force: true });
   regenerate(p, state);
   o.log(pid ? `conductor: stopped pid ${pid}; ${n} in-flight step(s) will run again on the next \`run\`` : "conductor: not running");

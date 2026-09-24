@@ -395,7 +395,8 @@ function recordNotStarted(ctx, lane, stopped) {
  * Records that `lane` stopped because the run was paused (ADR-0219), so the run's own record tells a
  * pause apart from `--once` and from a queue that simply ran out. `reason` is what paused it: `asked`
  * for the owner's `pause`, `run_budget` for a spent `run_budget_usd`, `cli_version` for a CLI the run
- * refused between sessions (ADR-0250).
+ * refused between sessions (ADR-0250), `stale_sources` for conductor sources changed on disk since the
+ * run loaded them (lib/sources.mjs).
  */
 function recordPaused(ctx, lane, reason = "asked") {
   ctx.run.paused ??= { at: now(), lanes: [], reason };
@@ -487,6 +488,13 @@ async function laneLoop(ctx, lane) {
     if (ctx.paused?.()) return recordPaused(ctx, lane, "asked");
     if (ctx.cliRefused) return recordPaused(ctx, lane, "cli_version");
     if (runBudgetSpent(ctx)) return recordPaused(ctx, lane, "run_budget");
+    // Sources changed on disk under this process: it would go on deciding with the code it loaded.
+    const stale = ctx.staleSources?.();
+    if (stale?.length) {
+      if (!ctx.staleSaid) event(ctx, "stale-sources", { changed: stale });
+      ctx.staleSaid = true;
+      return recordPaused(ctx, lane, "stale_sources");
+    }
     takeAsks(ctx);
     selfResume(ctx, lane);
     const pick = pickNext(ctx, lane);

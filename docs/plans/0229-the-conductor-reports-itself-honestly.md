@@ -157,8 +157,8 @@ ADR-0205 already forbids for backgrounded work — the same loss, differently ca
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The ledger names what failed | dev | done | `0b08037a` |
-| 2 — One reader decides a settled phase | dev | done | committed with this row |
-| 3 — A run refuses to start stale | dev | not started | |
+| 2 — One reader decides a settled phase | dev | done | `8bf46530` |
+| 3 — A run refuses to start stale | dev | done | committed with this row |
 | 4 — The allowlist admits what the tools already grant | dev | not started | |
 
 ### Notes
@@ -173,6 +173,11 @@ ADR-0205 already forbids for backgrounded work — the same loss, differently ca
   `plan.mjs:3`. The `close.mjs` caller checks that an implement step marked its own phases done and
   the `lane.mjs` one prints phases as their rows turn done; neither decides whether a park settled.
   `plan.mjs` holds `donePhases` itself, `nextStep` and `settledPhase`.
+- Phase 3: the module set hashed is `conductor.mjs`, `with-lock.mjs` and every `lib/*.mjs` under the
+  tool directory; `scripts/gates.manifest.mjs`, which `lib/gate.mjs` also imports, is outside
+  `tools/conductor/` and is not in it. The record is `state/conductor.sources.json`, written at start
+  and removed at the run's end, on interrupt and by `abort`. The notice goes to stderr. The new module
+  is `lib/sources.mjs`.
 
 ### Close triggers
 
