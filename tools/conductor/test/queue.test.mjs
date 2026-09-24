@@ -97,18 +97,18 @@ test("local.json is required, and every step budget must be set by the owner", (
   const dir = tmp();
   assert.match(loadLocal(join(dir, "local.json")).errors[0], /local\.json not found/);
 
-  writeFileSync(join(dir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, review: 2, merge: 2 }, run_budget_usd: 60, max_open_worktrees: 2 }));
+  writeFileSync(join(dir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, review: 2, merge: 2, repair: 3 }, run_budget_usd: 60, max_open_worktrees: 2 }));
   assert.deepEqual(loadLocal(join(dir, "local.json")).errors, ["local.json: budget_usd.fix must be a positive number"]);
 
   // The committed example carries zeros on purpose, so copying it without editing is refused.
   writeFileSync(join(dir, "local.json"), readFileSync(join(TOOL_DIR, "local.example.json"), "utf8"));
-  assert.equal(loadLocal(join(dir, "local.json")).errors.length, 5);
+  assert.equal(loadLocal(join(dir, "local.json")).errors.length, 6);
 
   // A resident run spends while nobody is looking, so its ceiling is required too (ADR-0250).
-  writeFileSync(join(dir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4, merge: 2 }, max_open_worktrees: 3 }));
+  writeFileSync(join(dir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4, merge: 2, repair: 3 }, max_open_worktrees: 3 }));
   assert.deepEqual(loadLocal(join(dir, "local.json")).errors, ["local.json: run_budget_usd must be a positive number"]);
 
-  writeFileSync(join(dir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4, merge: 2 }, run_budget_usd: 60, max_open_worktrees: 3 }));
+  writeFileSync(join(dir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4, merge: 2, repair: 3 }, run_budget_usd: 60, max_open_worktrees: 3 }));
   assert.deepEqual(loadLocal(join(dir, "local.json")).errors, []);
 });
 
@@ -122,7 +122,7 @@ function scratchTool({ local, version }) {
   return paths({ repo, toolDir });
 }
 
-const LOCAL = { budget_usd: { implement: 5, fix: 3, review: 4, merge: 2 }, run_budget_usd: 60, max_open_worktrees: 3 };
+const LOCAL = { budget_usd: { implement: 5, fix: 3, review: 4, merge: 2, repair: 3 }, run_budget_usd: 60, max_open_worktrees: 3 };
 
 test("preflight refuses to start without local.json", () => {
   const p = scratchTool({ version: "2.1.270 (Claude Code)" });

@@ -22,7 +22,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { tagObjectType } from "./git.mjs";
+import { isAncestor, resolveCommit, tagObjectType } from "./git.mjs";
 import { dirtyText, resumeCommand } from "./inbox.mjs";
 import { laneOpen } from "./lane.mjs";
 import { readLedger } from "./ledger.mjs";
@@ -222,6 +222,19 @@ export function owedPhasesInDone(repo) {
 }
 
 /**
+ * The repair commits a merged plan's closed tip carries that no review read (ADR-0248): a repair at
+ * `post-close` or `remerge`. Each stays on the page until `origin/main` holds it, since the owner's
+ * reading before the push is the whole of what checks it; with no `origin/main` it stays.
+ */
+function unreviewedRepairs(rec, repo) {
+  const pushed = repo && resolveCommit("refs/remotes/origin/main", repo);
+  return (rec.repairs ?? [])
+    .filter((r) => r.unreviewed)
+    .flatMap((r) => r.commits.map((sha) => ({ sha, stage: r.stage })))
+    .filter(({ sha }) => !(pushed && isAncestor(sha, "refs/remotes/origin/main", repo)));
+}
+
+/**
  * The one traversal of `state`, `state/` and git both pages render from. `now` is an option so a
  * test can pin the clock the current page's ages read.
  */
@@ -283,7 +296,7 @@ function standingParkLines(view, rec) {
 /** The current page's first section: everything waiting on the owner, and nothing else. */
 function needsYou(view) {
   const lines = [];
-  const counts = { parked: 0, stops: 0, findings: 0, lanes: 0, owed: 0 };
+  const counts = { parked: 0, stops: 0, findings: 0, lanes: 0, owed: 0, repairs: 0 };
   // The run carries its own CLI reading, so the line stops appearing on the first run whose version is listed.
   if (view.cli?.warning) {
     lines.push(`- **claude ${view.cli.version} is not a verified CLI version** - the last run went ahead with a warning (ADR-0208): ${view.cli.warning}.`);
@@ -312,6 +325,10 @@ function needsYou(view) {
     if (rec.cleanup && !rec.cleanup.ok && laneOpen(rec)) {
       counts.lanes += 1;
       lines.push(`- **${rec.plan} merged, lane not removed**: ${rec.cleanup.detail}. Holds \`${rec.worktree}\`.`);
+    }
+    for (const r of unreviewedRepairs(rec, view.repo)) {
+      counts.repairs += 1;
+      lines.push(`- **${rec.plan} reached main with an unreviewed repair**: \`${short(r.sha)}\` at ${r.stage}. Read it before you push.`);
     }
     closed += closedCount(rec);
     const open = openFindings(rec);
@@ -344,6 +361,7 @@ function needsYou(view) {
   if (counts.parked) parts.push(plural(counts.parked, "park"));
   if (view.settled.length) parts.push(`${view.settled.length} already settled`);
   if (counts.owed) parts.push(`${plural(counts.owed, "owed phase")}`);
+  if (counts.repairs) parts.push(`${plural(counts.repairs, "unreviewed repair")}`);
   if (counts.stops) parts.push(`${plural(counts.stops, "lane")} stopped at the worktree cap`);
   if (counts.findings) parts.push(`${plural(counts.findings, "merge")} with open findings`);
   if (counts.lanes) parts.push(`${plural(counts.lanes, "lane")} still on disk after a merge`);

@@ -7,6 +7,7 @@
 //      `owed` and the plan runs on without it (ADR-0249)
 //   -> merge main into the lane, a conflict handed to one merge session (ADR-0248)
 //   -> conductor gate -> take the close lock -> review session
+//      (every gate red gets one repair session and one re-run before it parks `gate_red`, ADR-0248)
 //   -> blockers/majors: release the lock, fix session, verify, gate, re-review (two fix rounds max)
 //   -> closed: verify the close -> gate the close tip -> fast-forward main (one automatic re-merge)
 //   -> release the lock
@@ -25,9 +26,9 @@ import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { adoptedClose, verifyClose, verifyFix, verifyImplement, verifyMerge } from "./close.mjs";
+import { adoptedClose, verifyClose, verifyFix, verifyImplement, verifyMerge, verifyRepair } from "./close.mjs";
 import { removeLane, laneNames, openLane } from "./cleanup.mjs";
-import { defaultGate, gateForStage, runGate } from "./gate.mjs";
+import { AFTER_CLOSE_STAGES, defaultGate, gateForStage, runGate } from "./gate.mjs";
 import { currentBranch, git, head, isClean, resolveCommit } from "./git.mjs";
 import { appendCleanupFailure, appendPark, appendSelfResume, dirtyText, dirtyWorktree } from "./inbox.mjs";
 import { servedNotice } from "./ledger.mjs";
@@ -48,6 +49,9 @@ import { clearPark, endStep, planRecord, saveState, spendSince, startStep, state
 import { USAGE_LIMIT, renderPromptFile, runStep } from "./step.mjs";
 
 export const MAX_FIX_ROUNDS = 2;
+
+/** Repair sessions one plan may run in all; a red after that parks with no session (ADR-0248). */
+export const MAX_REPAIRS = 3;
 
 // A session the usage limit ends is continued once the window reopens, rather than parked. A reset
 // further off than MAX_USAGE_WAIT_MS (the seven-day window's) parks `usage_limit` instead, as does a
@@ -730,7 +734,11 @@ export function usageWaitRefusal(result, resumes, nowMs) {
   return null;
 }
 
-async function gate(ctx, rec, label) {
+/**
+ * One conductor gate run at stage `label`. `logSuffix` keeps a re-run's logs beside the first run's
+ * rather than over them: the repair session was handed the first, and the park names the second.
+ */
+async function gate(ctx, rec, label, { logSuffix = "" } = {}) {
   const lines = gateReader({ stage: label });
   const show = (bodies) => bodies.forEach((b) => live(ctx, rec.plan, b));
   const t0 = Date.now();
@@ -738,7 +746,7 @@ async function gate(ctx, rec, label) {
     cwd: rec.worktree,
     commands: gateForStage(label, ctx.gate ?? defaultGate()),
     logDir: join(ctx.stateDir, "gates"),
-    label: `${rec.plan}-${label}`,
+    label: `${rec.plan}-${label}${logSuffix}`,
     lockDir: ctx.lockDir,
     lockPollMs: ctx.lockPollMs,
     onLockWait: (name, ms) => recordWait(rec, name, ms),
@@ -758,6 +766,52 @@ async function gate(ctx, rec, label) {
   if (g.ok) rec.gatedHead = head(rec.worktree);
   save(ctx);
   return g;
+}
+
+/**
+ * The gate at `stage`, with one repair session for a red (ADR-0248): `studio-builder` when the failing
+ * command is one of the studio's checks, `dev` otherwise. The stage's gate runs again after it, and a
+ * second red parks. Returns { g } for green, or { g, park } — `g` the last gate run. A plan that has
+ * already run MAX_REPAIRS repairs parks on its next red with no session.
+ */
+async function gateOrRepair(ctx, rec, stage) {
+  const g = await gate(ctx, rec, stage);
+  if (g.ok) return { g };
+  const repairs = rec.repairs ?? [];
+  if (repairs.length >= MAX_REPAIRS) {
+    return { g, park: { reason: "gate_red", detail: `${gateDetail(g)}; no repair session, the plan has run ${MAX_REPAIRS} already`, read: g.failed.log } };
+  }
+  const failed = gateForStage(stage, ctx.gate ?? defaultGate()).find((c) => c.name === g.failed.name);
+  const owner = /^studio /.test(g.failed.name) ? "studio-builder" : "dev";
+  const wt = rec.worktree;
+  const before = head(wt);
+  const file = planFileIn(wt, rec.plan);
+  const r = await session(ctx, rec, "repair", {
+    owner,
+    prompt: `/${owner} conductor repair plan ${rec.plan} at ${stage}`,
+    vars: {
+      plan: rec.plan,
+      lane: wt,
+      branch: rec.branch,
+      with_lock: ctx.withLockPath,
+      plan_file: file?.rel ?? "(missing)",
+      stage,
+      failing: `${g.failed.name} (${(failed?.cmd ?? []).join(" ")}) exited ${g.failed.code}${g.failed.tests?.length ? `, failing ${g.failed.tests.join(", ")}` : ""}`,
+      gate_log: g.failed.log,
+    },
+    budget: ctx.local.budget_usd.repair,
+    info: { stage },
+  });
+  if (r.status === "parked") return { g, park: { reason: r.reason, detail: r.detail, read: r.transcript, resetsAt: r.resetsAt } };
+  const problems = verifyRepair({ cwd: wt, before, outcome: r.outcome });
+  if (problems.length) return { g, park: { reason: "disagreement", detail: `repair at ${stage}: ${problems.join("; ")}`, read: r.transcript } };
+  // A repair on a tip a close produced reaches main without a review; the digest names it by SHA.
+  repairs.push({ stage, commits: r.outcome.commits.map((c) => resolveCommit(c, wt)), unreviewed: AFTER_CLOSE_STAGES.has(stage), at: now() });
+  rec.repairs = repairs;
+  save(ctx);
+  const g2 = await gate(ctx, rec, stage, { logSuffix: `-after-repair-${repairs.length}` });
+  if (g2.ok) return { g: g2 };
+  return { g: g2, park: { reason: "gate_red", detail: `${gateDetail(g2)}; still red after one repair session at ${stage}`, read: g2.failed.log } };
 }
 
 function gateDetail(g) {
@@ -890,8 +944,8 @@ export async function runPlan(ctx, lane, plan) {
     const early = await mergeMain(ctx, rec, "pre-review");
     if (early) return park(ctx, rec, early);
 
-    const g = await gate(ctx, rec, "pre-review");
-    if (!g.ok) return park(ctx, rec, { reason: "gate_red", detail: gateDetail(g), read: g.failed.log });
+    const pre = await gateOrRepair(ctx, rec, "pre-review");
+    if (pre.park) return park(ctx, rec, pre.park);
 
     for (;;) {
       const lock = await take(CLOSE, {
@@ -954,8 +1008,8 @@ export async function runPlan(ctx, lane, plan) {
           resolved: f.outcome.resolved.map((x) => ({ finding: x.finding, commit: resolveCommit(x.commit, wt) })),
         });
         save(ctx);
-        const g2 = await gate(ctx, rec, `fix-${round}`);
-        if (!g2.ok) return park(ctx, rec, { reason: "gate_red", detail: gateDetail(g2), read: g2.failed.log });
+        const fixGate = await gateOrRepair(ctx, rec, `fix-${round}`);
+        if (fixGate.park) return park(ctx, rec, fixGate.park);
         continue;
       }
       if (o.kind === "closed") {
@@ -987,7 +1041,10 @@ export async function runPlan(ctx, lane, plan) {
       branch: rec.branch,
       tag: rec.closed.tag,
       gatedHead: rec.gatedHead ?? null,
-      runGate: (label) => gate(ctx, rec, label),
+      runGate: async (label) => {
+        const r = await gateOrRepair(ctx, rec, label);
+        return r.park ? { ...r.g, ok: false, park: r.park } : r.g;
+      },
       onGated: (sha) => {
         rec.gatedHead = sha;
         save(ctx);

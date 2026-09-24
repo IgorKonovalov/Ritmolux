@@ -215,6 +215,9 @@ function validate(o) {
       }
       if (typeof o.detail !== "string" || !o.detail) return "parked.detail missing";
       return null;
+    case "repaired":
+      if (!isShaList(o.commits) || o.commits.length === 0) return "repaired.commits is not a list of SHAs";
+      return null;
     case "merged":
       if (!isShaList([o.commit])) return "merged.commit is not a SHA";
       return null;

@@ -42,6 +42,11 @@
 // "resolved by the merge session", commits and prints `merged`. `mergeParks` makes it park
 // `merge_conflict` instead; `mergeMarker` makes it commit the conflicted files with their markers in.
 //
+// `gateRed` makes the first implemented phase commit GATE_RED, which turns the scratch gate's
+// `marker` step red; `closeRed` makes the close commit it instead. A `repair` session removes it and
+// commits, or, with `repairFails` or no GATE_RED to remove, commits `repair-<n>.txt` and leaves the
+// red where it is. `repairParks` makes it park `plan_wrong` without a commit.
+//
 // Every session appends `<mode>-start` and `<mode>-end` to FAKE_EVENTS with a timestamp.
 
 import { execFileSync } from "node:child_process";
@@ -121,6 +126,10 @@ export default async ({ args, cwd, vars, env }) => {
           git("add", "PROBE_RED");
         }
         if (existsSync(join(cwd, "LIMIT_WIP"))) git("add", "LIMIT_WIP");
+        if (ps.gateRed && commits.length === 0 && !existsSync(join(cwd, "GATE_RED"))) {
+          writeFileSync(join(cwd, "GATE_RED"), "a defect the gate finds\n");
+          git("add", "GATE_RED");
+        }
         // A real commit subject is where the non-ASCII actually comes from: this repository's own log
         // carries em dashes, and a preset name can carry a curly quote. The run terminal is a Windows
         // console, so `ascii()` has to transform this before it is printed (backlog 0235).
@@ -137,6 +146,20 @@ export default async ({ args, cwd, vars, env }) => {
       const claimed = ps.bogusCommit ? [...commits, "deadbee"] : commits;
       const through = ps.numericThrough ? Number(ids.at(-1)) : ids.at(-1);
       return { text: block({ kind: "phases_done", plan, through, commits: claimed }), costUsd: ps.implementCost ?? 1, numTurns: ps.numTurns, stream: ps.stream };
+    }
+
+    if (mode === "repair") {
+      if (ps.repairParks) return { text: block({ kind: "parked", plan, reason: "plan_wrong", detail: "the test asserts the old behaviour" }), costUsd: 0.5 };
+      if (existsSync(join(cwd, "GATE_RED")) && !ps.repairFails) {
+        git("rm", "-q", "GATE_RED");
+        git("commit", "-q", "-m", `fix: plan ${plan} repairs the red at ${vars.stage}`);
+      } else {
+        const n = readdirSync(cwd).filter((f) => f.startsWith("repair-")).length + 1;
+        writeFileSync(join(cwd, `repair-${n}.txt`), `repair ${n} at ${vars.stage}\n`);
+        git("add", `repair-${n}.txt`);
+        git("commit", "-q", "-m", `fix: plan ${plan} tries a repair at ${vars.stage}`);
+      }
+      return { text: block({ kind: "repaired", plan, commits: [git("rev-parse", "--short", "HEAD")] }), costUsd: 0.5 };
     }
 
     if (mode === "merge") {
@@ -224,6 +247,10 @@ export default async ({ args, cwd, vars, env }) => {
         git("add", "VERSION", `docs/plans/done/${planName}`);
       }
       if (existsSync(join(cwd, "PROBE_RED")) && !ps.probeStaysRed) git("rm", "-q", "PROBE_RED");
+      if (ps.closeRed) {
+        writeFileSync(join(cwd, "GATE_RED"), "a defect the close brought in\n");
+        git("add", "GATE_RED");
+      }
       git("commit", "-q", "-m", `chore: Release ${version}`);
       if (ps.ledgerFlow) await suite();
       if (ps.lightweightTag) git("tag", `v${version}`);

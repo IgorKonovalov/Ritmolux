@@ -337,8 +337,8 @@ behaviour, never at the end.
 |---|---|---|---|
 | 1 — The run stays up, waits at the cap, and resumes what the tree settled | dev | done | `affd4859` |
 | 2 — A human phase can be owed after the merge | dev | done | `6e0b3d2c` |
-| 3 — The lane merges main early, and a conflict gets a merge session | dev | committed with this row | |
-| 4 — A red gate gets one repair session | dev | not started | |
+| 3 — The lane merges main early, and a conflict gets a merge session | dev | done | `56061b8b` |
+| 4 — A red gate gets one repair session | dev | committed with this row | |
 | 5 — The close is its own session, holds the lock alone, and keeps a clean verdict | dev | not started | |
 | 6 — A readiness check reads the plan before any spend | dev | not started | |
 | 7 — The pilot: one resident run over the real queue | human | not started | |
@@ -366,6 +366,11 @@ behaviour, never at the end.
   test keeps its park through a fake merge session that parks (`mergeParks`). `test/cli.test.mjs`,
   `test/live.test.mjs` and `test/queue.test.mjs` are outside the phase's files, and their `local.json`
   fixtures gained `budget_usd.merge`. `test/fake-claude.mjs` needed no change.
+- Phase 4: an unreviewed repair stays on the digest until `refs/remotes/origin/main` contains it, and
+  for good when there is no such ref. A re-run gate writes its logs under
+  `<plan>-<stage>-after-repair-<n>`, so the log the repair session was handed survives. The pre-existing
+  post-close red tests now expect a repair session before their park. `lib/merge.mjs` takes a
+  `runGate` result carrying `park`. The same fixtures as Phase 3 gained `budget_usd.repair`.
 
 ### Close triggers
 

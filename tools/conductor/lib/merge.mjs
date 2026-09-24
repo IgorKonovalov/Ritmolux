@@ -15,6 +15,8 @@
 //     way): nothing a re-merge can fix, so it parks at once rather than paying for a gate.
 //
 // `onGated(sha)` reports each tip the gate passed on, so a resumed plan does not gate it twice.
+// `runGate` may repair before it answers (ADR-0248): a result carrying `park` is the park to take, and
+// a green one after a repair names a tip the tag then moves onto, as for any other moved tip.
 
 import { currentBranch, git, head, isAncestor, isClean, resolveCommit, tagMessage, tagObjectType } from "./git.mjs";
 
@@ -66,7 +68,7 @@ export async function fastForwardMain({ repo, worktree, branch, tag, gatedHead, 
       return { ok: false, reason: "disagreement", detail: `${branch} has uncommitted changes since the close` };
     }
     const gate = await runGate("post-close");
-    if (!gate.ok) return { ok: false, reason: "gate_red", detail: `gate red on the branch as it stands after the close: ${gate.failed.name}`, gate };
+    if (!gate.ok) return gate.park ? { ok: false, ...gate.park, gate } : { ok: false, reason: "gate_red", detail: `gate red on the branch as it stands after the close: ${gate.failed.name}`, gate };
     onGated?.(head(worktree));
     const park = moveTag(tag, worktree);
     if (park) return park;
@@ -88,7 +90,7 @@ export async function fastForwardMain({ repo, worktree, branch, tag, gatedHead, 
   remerged = true;
   const gate = await runGate("remerge");
   if (!gate.ok) {
-    return { ok: false, reason: "gate_red", detail: `gate red after re-merging main: ${gate.failed.name}`, gate };
+    return gate.park ? { ok: false, ...gate.park, gate } : { ok: false, reason: "gate_red", detail: `gate red after re-merging main: ${gate.failed.name}`, gate };
   }
   onGated?.(head(worktree));
   const park = moveTag(tag, worktree);

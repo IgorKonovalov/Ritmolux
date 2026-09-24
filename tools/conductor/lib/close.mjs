@@ -87,6 +87,17 @@ export function verifyImplement({ cwd, plan, phases, before, outcome }) {
   return problems;
 }
 
+/** A repair step (ADR-0248): its commits exist and were made here, and the tree is clean. */
+export function verifyRepair({ cwd, before, outcome }) {
+  if (outcome.kind !== "repaired") return [`expected a repaired outcome, got ${outcome.kind}`];
+  const problems = [];
+  const made = commitsBetween(before, head(cwd), cwd);
+  if (made.length === 0) problems.push("the repair step made no commit");
+  claimedCommits(outcome.commits, made, cwd, problems);
+  if (!isClean(cwd)) problems.push("the worktree is not clean");
+  return problems;
+}
+
 /** A fix step: its commits exist and were made here, each resolution names one of them, clean tree. */
 export function verifyFix({ cwd, before, outcome, findingCount }) {
   const problems = [];

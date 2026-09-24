@@ -9,7 +9,8 @@ the plan on the branch, fast-forwards `main`, and removes the lane.
 **It never pushes.** Everything it does stays on this machine until you read what happened and push.
 
 **Anything it cannot decide parks the plan**, and the lane moves on to the next plan. That covers a
-`human` phase, a plan's own stop condition, a red gate, a review still failing after two fix rounds,
+`human` phase, a plan's own stop condition, a gate still red after its one repair session, a review
+still failing after two fix rounds,
 a spend cap, a usage limit too far off to wait for, or a session whose claim `git` does not bear out.
 
 **`run` stays up until you pause it** (ADR-0250). A lane with nothing to start looks again every
@@ -26,7 +27,7 @@ The decision and its rejected alternatives are ADR-0205. The plan that built it 
    spend.
 
    ```json
-   { "budget_usd": { "implement": 8, "fix": 4, "review": 6, "merge": 3 }, "run_budget_usd": 150, "max_open_worktrees": 3 }
+   { "budget_usd": { "implement": 8, "fix": 4, "review": 6, "merge": 3, "repair": 4 }, "run_budget_usd": 150, "max_open_worktrees": 3 }
    ```
 
    `run_budget_usd` is the ceiling on one run's total spend. A resident run spends while nobody is
@@ -219,7 +220,7 @@ entry. Every other reason is yours: `resume` it once you have acted.
 | `claude_dir` | The same, and for the same reason: the phase declares a file under `.claude/`, which the CLI will not let a session write (ADR-0210). **Nothing was run** — the park comes before the phase. The detail names the paths. Do the phase in the lane, mark its row `done`, commit; `resume` checks the row. |
 | `studio_install` | The plan declares files under `studio/` and `npm --prefix studio ci` failed, so the gate's three studio checks could not run (ADR-0218). The detail carries the install's tail; the usual cause is no network. **Nothing was run** — the park comes before the first session. Install by hand in the lane, or wait and `resume`, which installs again: the trigger is a missing `studio/node_modules`, so the open lane the park left behind is installed into rather than skipped. |
 | `stop_condition`, `plan_wrong`, `question` | Read the transcript the inbox names. Settle it in a human-started `/architect` session. |
-| `gate_red` | Read the gate log. Fix the defect in the lane. The conductor never retries a red. |
+| `gate_red` | The gate was red, a repair session ran, and the re-run was red too; or the plan had already run its three repairs. The park reads the second run's log. Fix the defect in the lane. |
 | `review_failed` | Read the last review under `state/reviews/`. Resuming grants two fresh fix rounds. |
 | `disagreement` | A session's claim and `git` differ. Read the detail and the transcript before trusting the lane. |
 | `cli_contract` | The CLI ran a session without the project hooks, or without loading the skill it invoked. Read the detail and the transcript, then verify the CLI version before resuming (`## When the CLI updates`). |
@@ -228,6 +229,17 @@ entry. Every other reason is yours: `resume` it once you have acted.
 | `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or read the transcript. Resuming re-runs the step from what the plan log and `git` show. |
 | `merge_conflict` | A merge session could not resolve a conflict and parked it, or the close hit one in code. Resolve it in the lane and commit the merge; a resumed plan goes straight back to where it stopped. |
 | `merge_failed`, `main_dirty` | Clean the main checkout, or clear what refused the fast-forward. `main_dirty` resumes itself once the main checkout is on `main` and clean. |
+
+**A red gate gets one repair session, not a park** (ADR-0248). At any stage, a red starts a fresh
+`dev` session, or a `studio-builder` one when the failing command is a studio check, handed the
+failing command and its gate log. It commits a fix, and the stage's gate runs again; a second red at
+that stage parks `gate_red`, reading the second run's log. A plan runs three repairs at most, and a
+red after that parks with no session. The repair prompt forbids changing an assertion, a golden or a
+test's inputs to make it pass: a test the session thinks is wrong parks `plan_wrong`. **A repair at
+`post-close` or `remerge` reaches `main` without a review**, since the close already graded the plan:
+the conductor moves the annotated tag onto the repaired tip, and the digest's **Needs you** names each
+such commit by SHA until `origin/main` holds it. Read those before you push. The budget is
+`budget_usd.repair`, required.
 
 **A merge that conflicts gets one merge session, not a park** (ADR-0248). The lane merges `main` itself
 before the `pre-review` gate, so the gate and the review see the tree that will reach `main`, and it

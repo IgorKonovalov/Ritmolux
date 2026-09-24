@@ -6,7 +6,7 @@
 //   { "lanes": { "a": ["0175", "0185"], "b": [] },
 //     "plans": { "0181": { "after": ["0185"] }, "0180": { "add_dirs": ["../milkdrop-corpus"] } } }
 // local.json (never committed, no defaults):
-//   { "budget_usd": { "implement": 5, "fix": 3, "review": 4, "merge": 2 }, "run_budget_usd": 60, "max_open_worktrees": 3 }
+//   { "budget_usd": { "implement": 5, "fix": 3, "review": 4, "merge": 2, "repair": 3 }, "run_budget_usd": 60, "max_open_worktrees": 3 }
 //   optional: "model": { "implement": "opus", ... }, "claude": ["claude"]
 
 import { existsSync, readFileSync } from "node:fs";
@@ -14,7 +14,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { findPlan, readPlanFile } from "./plan.mjs";
 
 const PLAN = /^[0-9]{4}$/;
-const STEP_KINDS = ["implement", "fix", "review", "merge"];
+const STEP_KINDS = ["implement", "fix", "review", "merge", "repair"];
 
 function readJson(path, what) {
   if (!existsSync(path)) return { error: `${what} not found at ${path}` };
