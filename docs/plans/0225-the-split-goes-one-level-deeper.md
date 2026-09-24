@@ -141,7 +141,8 @@ single `node` command against the module, and Phase 2's is the real gate.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The split recurses | dev | done | committed with this row |
+| 1 — The split recurses | dev | done | `b4e63064` |
+| 2 — The built site passes both gates | dev | done | committed with this row |
 
 ### Notes
 
@@ -152,3 +153,7 @@ single `node` command against the module, and Phase 2's is the real gate.
   (5 children) and `.../tuple-picks-a-whole-figure-framing-included` (4 children).
 - The recursion searches only `depth + 1` for children; a section over 20 KB with no heading one
   level down stays whole even if it has deeper headings.
+- Phase 2 needed no repair; its commit carries only this log. Routes gate: `216 built routes,
+  214 from the published set, every one in the menu; largest split route 29528 B`. Links gate ran
+  without a `dist/api/` tree, so `/api/` hrefs were not checked locally. Starlight rendered the
+  three-deep collapsed groups; the flatten fallback in Risks was not needed.
