@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
   - [0225 - The split goes one level deeper](#0225---the-split-goes-one-level-deeper)
+  - [0226 - The conductor stops waiting for the owner](#0226---the-conductor-stops-waiting-for-the-owner)
   - [0217 - Every setting has a file, and a gate says so](#0217---every-setting-has-a-file-and-a-gate-says-so)
   - [0215 - The wide seams narrow, and a guard holds them](#0215---the-wide-seams-narrow-and-a-guard-holds-them)
   - [0224 - The adapter becomes a setting](#0224---the-adapter-becomes-a-setting)
@@ -271,6 +272,33 @@ Closes no backlog entry. The full review is the plan's own `## Close review` sec
   `docs/on-device-validation.md` at 29,528 B.
 - **Left open.** That checklist has no internal headings, so the next edit to it can turn `Pages`
   red with no splitter repair available; ADR-0247 records it as editorial debt.
+
+### [0226 - The conductor stops waiting for the owner](done/0226-the-conductor-stops-waiting-for-the-owner.md)
+
+- closed 2026-09-24, human-started lane `plan-0226-the-conductor-stops-waiting-for-the-owner`.
+Phase 1 `affd4859`, Phase 2 `6e0b3d2c`, Phase 3 `56061b8b`, Phase 4 `8f363852`, Phase 5 `362d0f02`,
+Phase 6 `0bec06ee`. **Phase 7, the pilot, is owed** (`Blocks merge: no`, added at the close): it is a
+run of the merged conductor, so it cannot come before the merge. Mode 4 found **one major and three
+minors, no blockers**. Version: none, because the plan changes the conductor, the skills and docs and
+nothing a release ships. ADR-0248, 0249 and 0250 accepted with no `Outcome`. Closes no backlog entry.
+- **What landed.** `run` is resident (`--until-idle` keeps the old shape). The worktree cap is a
+  wait, `run_budget_usd` pauses the run, and a closed list of parks clears itself once the tree shows
+  it settled. A `human` phase marked `Blocks merge: no` is committed `owed` and listed in the digest.
+  `main` merges into the lane before pre-review, and a conflict gets one `merge` session. A red gate
+  gets one `repair` session, at most three per plan, and a repair on a closed tip is listed unreviewed
+  by SHA. The review ends on its verdict, the close is its own session under the lock, and a clean
+  verdict is reused over merge, close and repair commits. A read-only `readiness` session runs before
+  the first implement session.
+- **The major.** Phase 4's files left out the implementer skills, so `dev` and `studio-builder`
+  admitted only `implement`, `fix` and `merge` in conductor mode, and a live repair session would have
+  been told to restate and wait. The fake-claude scenarios cannot see a skill. The close fixed it in
+  `ee17e357`.
+- **Left open (minors).** (1) `park` and `finding --verb` are still refused while a run is live, and a
+  resident run almost always is, so those two commands are effectively unavailable until the run is
+  paused. Only `resume` got an ask file (the log's own followup). (2) `reusableVerdict` accepts any
+  two-parent commit whose second parent is on `main`. An owner's hand-resolved merge can therefore
+  carry code no review read. (3) This machine's `local.json` lacks `run_budget_usd` and the four new
+  budgets, so `check` and `run` refuse it until Phase 7's first step.
 
 ### [0217 - Every setting has a file, and a gate says so](done/0217-every-setting-has-a-file-and-a-gate-says-so.md)
 

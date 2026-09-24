@@ -41,8 +41,13 @@ do). The tag is machine-readable — each implementing lane reads it at the star
 hands a sibling-owned phase to the other implementer (ADR-0188), and stops/surfaces on a `human`
 phase. Order phases so each lane's run is contiguous. Missing tags fail Mode 4 review.
 
+A `human` phase whose output no later phase reads may add `- **Blocks merge:** no` under its owner
+tag (ADR-0249): the conductor merges without it and owes it afterwards. Omit the line on every other
+phase; it is invalid on `dev` and `studio-builder`.
+
 ### Phase 1 — <name>
 - **Owner skill:** <dev | studio-builder | human>
+- **Blocks merge:** no  _(human phases only, and only when nothing after it reads its output; otherwise omit)_
 - **What:** One sentence on what this phase produces.
 - **Files touched:** Rough list — `core/src/dsp/fft.rs`, `standalone/src/main.rs`, etc.
 - **Done when:** Concrete acceptance — "`cargo run -p standalone` shows spectrum bars reacting
@@ -89,7 +94,7 @@ by name if you can.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — <name> | <dev \| studio-builder \| human> | <done \| not started \| abandoned> | `<sha>` |
+| 1 — <name> | <dev \| studio-builder \| human> | <done \| not started \| abandoned \| owed> | `<sha>` |
 | 2 — <name> | … | … | … |
 
 ### Notes

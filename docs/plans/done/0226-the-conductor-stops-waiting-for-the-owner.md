@@ -1,16 +1,16 @@
 # 0226 — The conductor stops waiting for the owner
 
-> **Status:** approved
+> **Status:** done - Phase 7 owed, ADR-0249. Closed 2026-09-24 (human-started lane). Phases 1-6 `affd4859`, `6e0b3d2c`, `56061b8b`, `8f363852`, `362d0f02`, `0bec06ee`. Mode 4: one major (the implementer skills' conductor mode did not admit `repair`), fixed at the close in `ee17e357`; three minors open. Full workspace suite (1805 passed, 7 skipped), `cargo doc -D warnings` and the conductor tests (423 pass) verified green at the close. Version: none (conductor tooling, nothing a release ships).
 > **Created:** 2026-09-24
 > **Approved:** 2026-09-24 (user). Human-started, not queued; settle 0217 before starting.
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0248](../adrs/0248-the-pipeline-repairs-before-it-parks.md) (proposed),
-> [0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md) (proposed),
-> [0250](../adrs/0250-the-conductor-stays-up-and-resumes-what-the-repository-shows-settled.md) (proposed),
-> [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
-> [0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md),
-> [0214](../adrs/0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md),
-> [0219](../adrs/0219-the-conductor-can-be-asked-to-finish-and-stop-and-the-ask-does-not-outlive-the-run.md)
+> **Related ADRs:** [0248](../../adrs/0248-the-pipeline-repairs-before-it-parks.md) (proposed),
+> [0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md) (proposed),
+> [0250](../../adrs/0250-the-conductor-stays-up-and-resumes-what-the-repository-shows-settled.md) (proposed),
+> [0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
+> [0209](../../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md),
+> [0214](../../adrs/0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md),
+> [0219](../../adrs/0219-the-conductor-can-be-asked-to-finish-and-stop-and-the-ask-does-not-outlive-the-run.md)
 > **Closes:** none
 > **Runs human-started, NOT queued.** It rewrites the pipeline the conductor would run it with, and
 > Phases 2, 3, 5 and 6 edit `.claude/skills/`, which a headless session cannot write (ADR-0210).
@@ -263,6 +263,7 @@ behaviour, never at the end.
 ### Phase 7 — The pilot: one resident run over the real queue
 
 - **Owner skill:** human
+- **Blocks merge:** no
 - **What:** Write the four new budget keys and `run_budget_usd` into `local.json`, then start one
   `run` over the queue as it stands and leave it up through at least one night. Afterwards, read the
   digest and `digest --history`. Record the following in this plan's `### Notes`:
@@ -331,28 +332,83 @@ behaviour, never at the end.
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(not started)_
+**Lane:** `plan-0226-the-conductor-stops-waiting-for-the-owner` in `WORK/rlx-plan-0226`, human-started
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The run stays up, waits at the cap, and resumes what the tree settled | dev | not started | |
-| 2 — A human phase can be owed after the merge | dev | not started | |
-| 3 — The lane merges main early, and a conflict gets a merge session | dev | not started | |
-| 4 — A red gate gets one repair session | dev | not started | |
-| 5 — The close is its own session, holds the lock alone, and keeps a clean verdict | dev | not started | |
-| 6 — A readiness check reads the plan before any spend | dev | not started | |
-| 7 — The pilot: one resident run over the real queue | human | not started | |
+| 1 — The run stays up, waits at the cap, and resumes what the tree settled | dev | done | `affd4859` |
+| 2 — A human phase can be owed after the merge | dev | done | `6e0b3d2c` |
+| 3 — The lane merges main early, and a conflict gets a merge session | dev | done | `56061b8b` |
+| 4 — A red gate gets one repair session | dev | done | `8f363852` |
+| 5 — The close is its own session, holds the lock alone, and keeps a clean verdict | dev | done | `362d0f02` |
+| 6 — A readiness check reads the plan before any spend | dev | done | `0bec06ee` |
+| 7 — The pilot: one resident run over the real queue | human | owed | |
 
 ### Notes
 
+- Phase 1: "re-reads the state" is carried by `resume` itself. While a run is live, `resume` checks the
+  park and appends to `state/resume-asks.jsonl`, and the lane takes it on its next look
+  (`lib/state.mjs` `askResume`/`takeResumeAsks`). The run still owns `conductor.json`. `park` and
+  `finding --verb` are still refused during a live run.
+- Phase 1: a CLI version refused between sessions parks the plan about to start `cli_contract`, with
+  no session. It also pauses the run (`run.paused.reason: cli_version`).
+- Phase 1: under `--until-idle` the cap waits only while a holder is in flight in the run. With every
+  holder parked it still stops, which is why the existing cap tests are unchanged.
+- Phase 1: `test/live.test.mjs` is outside the phase's files. Its `local.json` fixture gained
+  `run_budget_usd`, and nothing else changed.
+- Phase 2: `verifyClose` checks only that an `owed` row sits on a `Blocks merge: no` human phase. It
+  does not require every other row to read done, because the close fixtures in `test/close.test.mjs`
+  carry rows that do not.
+- Phase 2: `test/helpers.mjs` is outside the phase's files. `planText` gained a `blocksMerge` phase
+  field. The conductor commits the `owed` row itself, as `docs(plans): NNNN Phase N is owed after the
+  merge`.
+- Phase 3: the review's `-p` prompt names the tip it reviews (`... round N at <sha>`), which leaves
+  `prompts/review.md` to Phase 5. The re-merge test now expects a merge session. The owner-resolves
+  test keeps its park through a fake merge session that parks (`mergeParks`). `test/cli.test.mjs`,
+  `test/live.test.mjs` and `test/queue.test.mjs` are outside the phase's files, and their `local.json`
+  fixtures gained `budget_usd.merge`. `test/fake-claude.mjs` needed no change.
+- Phase 4: an unreviewed repair stays on the digest until `refs/remotes/origin/main` contains it, and
+  for good when there is no such ref. A re-run gate writes its logs under
+  `<plan>-<stage>-after-repair-<n>`, so the log the repair session was handed survives. The pre-existing
+  post-close red tests now expect a repair session before their park. `lib/merge.mjs` takes a
+  `runGate` result carrying `park`. The same fixtures as Phase 3 gained `budget_usd.repair`.
+- Phase 5: the adopted-close scenarios moved their lost outcome from the review to the close
+  (`loseOutcome: "close"`), and their step lists gained `close:architect`. What they assert about
+  adoption is unchanged. Every scenario that closes gained `close:architect` in its step list, and the
+  ledger scenario's close is now step `03-close`. A review that moves the tip or dirties the tree
+  parks `disagreement`. A close-time `merge_conflict` restarts the close at most twice per run of the
+  plan (`MAX_CLOSE_MERGES`). `conductor.mjs` (`adopt-close` now calls `adoptClose`, which keeps a
+  recorded clean verdict) and the comment in `lib/locks.mjs` are outside the phase's files, as are the
+  fixtures that gained `budget_usd.close`.
+- Phase 6: readiness is keyed on a sha1 of the plan's text above `## Implementation log`
+  (`planContractHash`), not the file's blob hash. The file's blob changes with every phase's log row,
+  so hashing it would re-run readiness on every resume. The check runs lazily, just before the first
+  implement session, so a plan that parks at a `human` or `.claude/` Phase 1 runs none. A plan with
+  implement steps and no readiness record predates the check and is not stopped for one. Existing
+  scenarios gained `readiness:architect` first, which shifted their step indexes and labels
+  (`0101-02-implement`, `0101-04-close`) and the budget scenario's lane spend ($7.50 to $7.80).
+  `test/live.test.mjs`, outside the phase's files, got the same label shift.
+- Followup: `local.json` on this machine lacks `run_budget_usd` and the four new `budget_usd` keys, so
+  `check` and `run` refuse it after the merge until Phase 7's first step is done.
+- Followup: a resident run is live almost always, and `park NNNN` and `finding NNNN <ref> --verb`
+  are still refused while a run is live. Only `resume` got an ask file.
+
+- Close (architect, 2026-09-24): Phase 7 is the pilot of the merged conductor and cannot run before the
+  merge, so the close gave it `Blocks merge: no` and left its row `owed` (ADR-0249). The review's one
+  major, a repair session its own skill would not admit, is fixed in `ee17e357`.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no
+- **Plan header `Closes:`** none
+- **What shipped:** feature (conductor tooling; no Rust, C++ or studio code)
+- **Operator docs touched:** `tools/conductor/README.md`; skill material `.claude/skills/architect/SKILL.md`,
+  `.claude/skills/architect/references/templates/plan.md`, `.claude/skills/dev/SKILL.md`,
+  `.claude/skills/studio-builder/SKILL.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0
+- **Full suite:** `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace` in the
+  lane at `0bec06ee`, exit 0: 1805 run, 1805 passed, 7 skipped. Conductor suite
+  `node --test "tools/conductor/test/*.test.mjs"`: 423 pass, 0 fail, 2 skipped.
+- **Outstanding `human` phases:** Phase 7 (the pilot)
 
 ## Followups (after this lands)

@@ -596,3 +596,44 @@ test("durations", () => {
   assert.equal(duration(6 * 60000), "6 min");
   assert.equal(duration(112 * 60000), "1 h 52 min");
 });
+
+// ADR-0249: an owed phase is read from the closed plan on main, never from state/.
+test("a closed plan's owed row is one Needs you line, read from the tree with an empty state, and gone once the row reads done", () => {
+  const repo = tmp("rlx-owed-repo-");
+  const phases = [{ id: "1", owner: "dev" }, { id: "2", owner: "human", title: "Bench it on the device", blocksMerge: "no" }, { id: "3", owner: "dev" }];
+  const path = writePlan(repo, { number: "0301", status: "done - Phase 2 owed", phases, rows: { 1: { state: "done" }, 2: { state: "owed" }, 3: { state: "done" } } }, { done: true });
+  const empty = { version: 1, runs: [], lanes: {}, plans: {} };
+  const lines = renderDigest(empty, { repo, stateDir: tmp(), now: NOW }).split("\n");
+  assert.equal(lines[lines.indexOf("## Needs you") + 2], "1 owed phase.");
+  const owed = lines.filter((l) => l.includes(" owes Phase "));
+  assert.deepEqual(owed, [
+    "- **0301 owes Phase 2** (Bench it on the device): merged without it (`Blocks merge: no`). " +
+      "Do it, then mark its row `done` in `docs/plans/done/0301-fixture.md` on main and commit; the line leaves with the commit.",
+  ]);
+
+  writeFileSync(path, readFileSync(path, "utf8").replace("| human | owed |", "| human | done |"));
+  const after = renderDigest(empty, { repo, stateDir: tmp(), now: NOW });
+  assert.ok(!after.includes("owes Phase"), after);
+  assert.match(after, /^Nothing: no park, no lane stopped at the worktree cap, no open finding\.$/m);
+});
+
+// ADR-0248: a repair on a closed tip reaches main unreviewed, and the page names it until it is pushed.
+test("an unreviewed repair is listed by SHA until origin/main holds it; a reviewed one never is", () => {
+  const { repo, head } = repoWithTag();
+  const rec = {
+    plan: "0175", status: "merged", lane: "a", worktree: null, branch: "plan-0175-x", steps: [], park: null, parks: [], fixRounds: 0,
+    verdicts: [], fixes: [], gates: [], lockWaits: [], closed: { version: "0.124.0", tag: "v0.124.0", head }, merge: { head, remerged: false, at: "2026-09-15T11:00:00.000Z" },
+    repairs: [
+      { stage: "pre-review", commits: ["1111111111111111111111111111111111111111"], unreviewed: false, at: "2026-09-15T10:00:00.000Z" },
+      { stage: "post-close", commits: [head], unreviewed: true, at: "2026-09-15T10:50:00.000Z" },
+    ],
+  };
+  const state = { version: 1, runs: [{ started: "2026-09-15T10:00:00.000Z", ended: "2026-09-15T11:30:00.000Z", lanes: ["a"] }], lanes: {}, plans: { "0175": rec } };
+  const needs = (text) => text.split("\n").filter((l) => l.includes("unreviewed repair"));
+  assert.deepEqual(needs(renderDigest(state, { repo, stateDir: tmp(), now: NOW })), [
+    "1 unreviewed repair.",
+    `- **0175 reached main with an unreviewed repair**: \`${head.slice(0, 7)}\` at post-close. Read it before you push.`,
+  ]);
+  spawnSync("git", ["update-ref", "refs/remotes/origin/main", head], { cwd: repo });
+  assert.deepEqual(needs(renderDigest(state, { repo, stateDir: tmp(), now: NOW })), []);
+});

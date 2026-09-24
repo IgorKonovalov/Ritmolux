@@ -164,6 +164,18 @@ phases so each lane's run is contiguous** — an alternation that could have bee
 buys nothing. What is still worth avoiding is a crossing that is really a *protocol* question:
 that is an ADR before the plan, not a phase boundary.
 
+**A `human` phase may carry `- **Blocks merge:** no` beside its owner tag, and no other phase may**
+([ADR-0249](../../../docs/adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)). The conductor then
+merges what the machine built and owes the phase afterwards, instead of parking the plan in front of
+it; the phase's log row reads `owed` and the digest carries it until the owner marks it `done` on
+`main`. Write it only on a phase **whose output no later phase reads and whose absence leaves every
+claim of the plan true, if unverified**: an on-device check, a rig session, a judgement of what
+shipped. Never on an input — a signing certificate, a corpus someone has to fetch, a measurement a
+later phase uses as its threshold — because building past one produces work that silently used a
+default in its place. Without the field a human phase blocks, as it always has; its position in the
+plan means nothing. The readiness check (ADR-0248) rejects a plan in which a later phase depends on a
+phase marked `no`, and the plan reader rejects the field on a `dev` or `studio-builder` phase.
+
 **Do the arithmetic on every numeric done-when before the plan ships.** A done-when is the contract
 `dev` is held to, so an unchecked number costs either a mid-phase stop to litigate it or — worse — an
 implementation tuned until the wrong number is satisfied. Plan 0033 shipped three in one plan: "90 %
@@ -897,14 +909,43 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
 One standing hazard is left, from ADR-0053's Negative section: the **stash stack is shared across every
 worktree**, so a bare `git stash` / `git stash pop` can take another lane's entry — prefer a WIP commit.
 
-### Conductor mode — a close review nobody is watching
+### Conductor mode — a review and a close nobody is watching
 
-**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: review`.** That line is written by
-`tools/conductor/` (ADR-0205), which starts this session headless, as a separate process, in the plan's
-worktree, handing it the plan, the lane, a round number and a review path — and nothing an implementer
-wrote. That separation is what "fresh session" means for a conductor-run plan: this is not an
-auto-invocation of you from a lane, which stays forbidden. Nothing a user types enters this mode; where
-it and the rest of this skill disagree, it wins for that session only.
+**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: readiness`, `review` or
+`close`.** That line is written by `tools/conductor/` (ADR-0205), which starts this
+session headless, as a separate process, in the plan's worktree, handing it the plan, the lane, a round
+number and a review path — and nothing an implementer wrote. That separation is what "fresh session"
+means for a conductor-run plan: this is not an auto-invocation of you from a lane, which stays
+forbidden. Nothing a user types enters this mode; where it and the rest of this skill disagree, it wins
+for that session only.
+
+**The review and the close are two sessions** ([ADR-0248](../../../docs/adrs/0248-the-pipeline-repairs-before-it-parks.md)).
+A `review` session grades the plan and ends on its verdict, with no lock held, committing nothing. A
+clean verdict is recorded with the tip it graded, and the conductor takes the close lock and starts a
+`close` session, handed that review's path, which does the bookkeeping and the bump. A close that parks
+keeps the verdict: resuming starts a close again, not a review, unless the lane gained a commit nothing
+has reviewed.
+
+**`readiness`** — before the plan's first implement session, a read that spends nothing on code
+(ADR-0248). **Change nothing**: no edit, no commit, no merge. The conductor checks `HEAD` and the tree
+and parks a session that moved either. Grade **consistency, not the design** — the plan is approved,
+and whether it is a good idea is not the question. Check each phase:
+
+- its *What*, *Files touched* and *Done when* agree with each other (a done-when names no stage, file
+  or behaviour the *What* does not produce, and the *What* needs no file the list omits);
+- every path it names exists in the tree, or the plan says the phase creates it;
+- every seam it relies on (a function, module, type or config key it calls or extends) is inside some
+  phase's *Files touched*, its own or an earlier one's;
+- every done-when is runnable under `settings.conductor.json`'s allowlist, one command per call;
+- no phase reads the output of a `human` phase marked `**Blocks merge:** no`
+  ([ADR-0249](../../../docs/adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)), which is owed
+  after the merge.
+
+End `ready`, or park `plan_wrong` naming the phase and quoting both sides of the contradiction. Park
+only on a contradiction an implementer cannot work around; a matter of taste, or a gap an implementer
+closes in a minute, is `ready`. Your verdict is the owner's to overrule: they edit the plan or resume.
+
+**`review`** — steps 1 to 3, then the outcome.
 
 1. **Run Mode 4** against the plan and the lane, all five lenses, exactly as a human-started close —
    including running the full `nextest` and `cargo doc` yourself. Every `cargo nextest` runs as
@@ -916,23 +957,35 @@ it and the rest of this skill disagree, it wins for that session only.
    it in the review in place of a run. It is written by the process that saw the exit code, not by a
    session. `dev`'s close block will say its `Full suite:` is owed to the conductor's `pre-review`
    gate. In conductor mode that is correct, not a missing run.
+   The lane already carries `main`: the conductor merged it before its `pre-review` gate.
 2. **Write the review to the review path**, in the output shape Mode 4 describes. There is no
-   conversation to deliver it into.
-3. **Any `blocker` or `major`: stop there.** No bookkeeping, no merge, no bump. End with a `verdict`
-   outcome. The conductor sends the findings to a fresh `dev` fix session and starts a fresh review
-   after it; you will see this round's review path under the next round's prior rounds.
-4. **No blocker and no major: close on the branch, in this order.** It differs from the human-started
-   worktree close sequence, which gates straight after the merge. Here the gate runs **last, on the
-   tip you will tag**, because a tag does not change the tree, so the conductor's `post-close` gate
-   finds your run in the suite ledger and does not repeat it (ADR-0207):
+   conversation to deliver it into. A finding under `.claude/` names its replacement text (below).
+3. **End with a `verdict` outcome, whatever it carries.** No bookkeeping, no merge, no bump, no
+   commit: the conductor checks that the tip did not move and parks a review that moved it. Blockers
+   and majors go to a fresh `dev` fix session and a fresh review after it; you will see this round's
+   review path under the next round's prior rounds. A clean verdict goes to the close.
+
+**`close`** — the prompt names the plan, the round, the clean review's path and the tip it graded.
+Read the review and the plan; do not grade the plan again. The conductor holds the close lock.
+
+4. **Close on the branch, in this order.** It differs from the human-started worktree close sequence,
+   which gates straight after the merge. Here the gate runs **last, on the tip you will tag**, because a
+   tag does not change the tree, so the conductor's `post-close` gate finds your run in the suite ledger
+   and does not repeat it (ADR-0207):
    1. **Repair** every `minor` or `nit` finding ADR-0209 lets a close repair (below), and commit.
-   2. **`git merge main`**, and resolve there.
+   2. **`git merge main`.** Resolve a conflict **only in Markdown under `docs/`** — the plans index,
+      a README. **Any other conflicted path is code, and the architect writes no code**: run
+      `git merge --abort` and park `merge_conflict` naming the paths. The conductor runs a `dev` merge
+      session and starts a close again (ADR-0248).
    3. **The bookkeeping, committed**: steps 1–4 of the bookkeeping including the version bump, and
       the studio's two copies. The close commit also adds a **`## Close review`** section to the plan,
       after `## Implementation log`: this round's review in full, then one line for every finding an
       earlier round raised and a fix round resolved, naming the fix commit. A conductor-run close has
       no reader in the room; that section is the evidence of what was checked, and it moves into
-      `done/` beside the log it graded.
+      `done/` beside the log it graded. **A row reading `owed`** is a `Blocks merge: no` human phase the
+      conductor merged without (ADR-0249): leave it `owed`, never `done`. The `Status:` line reads
+      `done` and names it (`done - Phase 7 owed, ADR-0249`), the `## Close review` states what the
+      owed phase has not yet checked, and the plans index's recently-closed bullet names it too.
    4. **The whole gate on that tip**: `fmt`, `clippy`, `nextest` as exactly
       `... suite -- cargo nextest run --workspace` through the wrapper, and `cargo doc`, with nothing
       left uncommitted. **A red here parks `check_red`.** Do not tag, and do not work around it.
@@ -968,8 +1021,8 @@ it and the rest of this skill disagree, it wins for that session only.
    warnings` red; step 4 is what catches it.
 5. **Never fast-forward `main`, never remove the worktree or delete the branch, never push.** Steps 4,
    6 and 7 of the sequence are the conductor's; step 5 is the owner's.
-6. **Park rather than improvise** when the merge conflicts, the gate goes red, or the plan turns out
-   wrong — a `parked` outcome with reason `merge_conflict`, `check_red` or `plan_wrong`.
+6. **Park rather than improvise** when the merge conflicts in code, the gate goes red, or the plan turns
+   out wrong — a `parked` outcome with reason `merge_conflict`, `check_red` or `plan_wrong`.
 7. **Never start a command in the background, and never arm a `Monitor`.** Nothing re-invokes a
    headless session: backgrounding the full suite and ending the turn kills it and loses its result —
    and by then the close has already committed its repairs, its `done/` move and its version bump, so
@@ -979,10 +1032,10 @@ it and the rest of this skill disagree, it wins for that session only.
    unfinished when the session ends parks the plan `lost_background` whatever the outcome claims.
 
 **The last thing you print is one fenced `rlx-outcome` block** holding one JSON object, in the shapes
-the prompt shows: `verdict` (the counts, the review path, and `findings` — **every** finding of the
-round, each `{severity, file, line, what}`), `closed` (the version and tag, or `null` for a
-docs/chore-only close, carrying the same verdict, with `fixed_in` on each finding the close repaired),
-or `parked`. The finding lines are what the owner reads in the morning, verbatim; write each so it
+the prompt shows: from a readiness check, `ready` or `parked`; from a review, `verdict` (the counts, the review path, and `findings` — **every**
+finding of the round, each `{severity, file, line, what}`) or `parked`; from a close, `closed` (the
+version and tag, or `null` for a docs/chore-only close, carrying the review's verdict, with `fixed_in`
+on each finding the close repaired) or `parked`. The finding lines are what the owner reads in the morning, verbatim; write each so it
 stands on its own. The conductor verifies a `closed` against `git` — plan under `done/` with
 `Status: done`, a `## Close review` section, a clean tree, every `fixed_in` commit on the branch and
 changing its finding's file, an annotated tag on the tip — and parks on any disagreement.
