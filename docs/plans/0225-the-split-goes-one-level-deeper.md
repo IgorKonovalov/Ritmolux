@@ -1,6 +1,6 @@
 # 0225 — The split goes one level deeper
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-23
 > **Approved:** 2026-09-24 (user) — queued first in lane b. The `Pages` workflow is red and
 > the site has not deployed since 2026-09-23, so this one is ahead of the rest of the queue.
@@ -136,3 +136,19 @@ single `node` command against the module, and Phase 2's is the real gate.
 
 > Written as the phases land. **The phases above are the contract; everything here is what
 > happened.**
+
+**Lane:** `/home/igor/Work/rlx-plan-0225` on `plan-0225-the-split-goes-one-level-deeper`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The split recurses | dev | done | committed with this row |
+
+### Notes
+
+- Phase 1 measurement: before `{"routes":173,"duplicates":0,"largest":32711}`, after
+  `{"routes":191,"duplicates":0,"largest":29528}`. 18 new routes, not 9: two more `###` sections
+  in `presets/README.md` were over 20 KB with `####` children and split too -
+  `guide/parameter-roster/systems-and-their-named-parameters/shape_field--the-same-roster-at-frame-scale`
+  (5 children) and `.../tuple-picks-a-whole-figure-framing-included` (4 children).
+- The recursion searches only `depth + 1` for children; a section over 20 KB with no heading one
+  level down stays whole even if it has deeper headings.
