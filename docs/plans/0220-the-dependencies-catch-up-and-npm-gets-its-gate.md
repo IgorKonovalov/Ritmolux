@@ -107,7 +107,12 @@ flowchart LR
   - `window.csp.test.ts` and `presetHandlers.test.ts` pass. The two tests that need a built Linux
     player (`windowless.test.ts`, `templates.test.ts`) are recorded with their state and are not
     this phase's bar. They depend on 0120.
-  - The field lists named packages. `approve --all` is not used, and the log records the list.
+  - The field lists named packages, **pinned** as `pkg@version` — npm's default, per
+    [ADR-0244](../adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md).
+    `approve --all` and `--no-allow-scripts-pin` are both unused, and the log records the list.
+    Measured on the box 2026-09-24, that list is **three** entries, not two: `electron@32.1.2`,
+    `esbuild@0.24.0` and `esbuild@0.21.5`, because two `esbuild` versions are in the graph. Confirm
+    against `install-scripts ls` rather than against this line.
 
 ### Phase 2 — The lint set moves together
 - **Owner skill:** `studio-builder`
@@ -145,6 +150,10 @@ flowchart LR
     says whether vite 8 changed the dev server's injected headers.
   - `npm audit` in `studio/` no longer lists `vite`, `vitest`, `@vitest/mocker`, `vite-node`,
     `esbuild` or `@vitejs/plugin-react`. The log carries the audit's summary line.
+  - **Both `esbuild` `allowScripts` entries follow their versions.** They are pinned, so the bump
+    strands them and `npm ci` then leaves no platform binary while still exiting 0. Re-approve by
+    name after the bump and confirm with `npm --prefix studio install-scripts ls`, which must report
+    no unreviewed package.
 
 ### Phase 4 — Electron 44 and electron-builder 26
 - **Owner skill:** `studio-builder`
@@ -165,6 +174,10 @@ flowchart LR
   - `npm audit --omit=dev` in `studio/` reports no `high` or `critical`, and `npm audit` over the
     full graph reports no `critical`. Anything left is listed in the log with its GHSA id, as input
     to Phase 6's allow file.
+  - **`electron`'s `allowScripts` entry follows it to 44.4.3.** It is pinned, so the bump strands
+    `electron@32.1.2` and a fresh `npm ci` leaves no Electron binary — the exact failure this plan's
+    Phase 1 removed. Re-approve by name, and `node_modules/electron/dist/electron --version` prints
+    44.4.3.
   - The studio's `EXPECTED_PLAYER_VERSION` and `version` are untouched. This is not a release.
 
 ### Phase 5 — The Rust pins that trail
