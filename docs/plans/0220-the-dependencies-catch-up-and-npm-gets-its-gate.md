@@ -102,11 +102,17 @@ flowchart LR
   per ADR-0244).
 - **Done when:**
   - After `rm -rf studio/node_modules && npm --prefix studio ci` on the Arch box (npm 11.19.1),
-    `npm --prefix studio install-scripts ls` reports no unreviewed package, and
-    `node_modules/electron/dist/electron --version` prints the pinned version.
-  - `window.csp.test.ts` and `presetHandlers.test.ts` pass. The two tests that need a built Linux
-    player (`windowless.test.ts`, `templates.test.ts`) are recorded with their state and are not
-    this phase's bar. They depend on 0120.
+    `npm --prefix studio install-scripts ls` reports no unreviewed package.
+  - **The Electron binary is NOT this phase's bar, and neither are the two tests that need it.**
+    Amended 2026-09-24 after this phase landed as `f6852988` and parked: the field is necessary and
+    not sufficient. The postinstall now runs, and Electron 32's `install.js` extracts with
+    `extract-zip` 2.0.1 (yauzl 2.10.0), which on Node 26 writes one entry and exits 0 with its
+    promise neither resolved nor rejected — reproduced directly against the cached
+    `electron-v32.1.2-linux-x64.zip`. No version of this phase can produce a binary, because the
+    version that can extract on this Node is the one **Phase 4** installs. So
+    `window.csp.test.ts` and `presetHandlers.test.ts` are expected to fail to collect here, and
+    both they and the binary check move to Phase 4. `windowless.test.ts` and `templates.test.ts`
+    are recorded with their state and are not this phase's bar either; they depend on 0120.
   - The field lists named packages, **pinned** as `pkg@version` — npm's default, per
     [ADR-0244](../adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md).
     `approve --all` and `--no-allow-scripts-pin` are both unused, and the log records the list.
@@ -175,9 +181,15 @@ flowchart LR
     full graph reports no `critical`. Anything left is listed in the log with its GHSA id, as input
     to Phase 6's allow file.
   - **`electron`'s `allowScripts` entry follows it to 44.4.3.** It is pinned, so the bump strands
-    `electron@32.1.2` and a fresh `npm ci` leaves no Electron binary — the exact failure this plan's
-    Phase 1 removed. Re-approve by name, and `node_modules/electron/dist/electron --version` prints
-    44.4.3.
+    `electron@32.1.2` and a fresh `npm ci` would leave no binary. Re-approve by name.
+  - **The binary lands here, which Phase 1 could not make it do.** After
+    `rm -rf studio/node_modules && npm --prefix studio ci`,
+    `npx --prefix studio electron --version` prints 44.4.3 — spelled through `npx` because the
+    conductor's allowlist has `Bash(npx *)` and refuses a bare binary path, which it denied on
+    2026-09-24. Electron 44 depends on `@electron-internal/extract-zip` rather than the
+    `extract-zip` 2.0.1 that silently truncates on Node 26, so this is where that is proved.
+  - **`window.csp.test.ts` and `presetHandlers.test.ts` collect and pass**, carried here from
+    Phase 1 for the same reason.
   - The studio's `EXPECTED_PLAYER_VERSION` and `version` are untouched. This is not a release.
 
 ### Phase 5 — The Rust pins that trail
