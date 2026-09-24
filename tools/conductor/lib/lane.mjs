@@ -934,8 +934,10 @@ function readUpstreamBeforeClose(ctx, rec) {
   live(ctx, rec.plan, `  lane   ${line}`);
 }
 
-function gateDetail(g) {
-  const tests = g.failed.tests.length ? ` - failing: ${g.failed.tests.join(", ")}` : "";
+/** A red gate's park detail: the step, its exit, and the first failing test with how many follow it. */
+export function gateDetail(g) {
+  const [first, ...rest] = g.failed.tests ?? [];
+  const tests = first ? ` - failing: ${first}${rest.length ? ` and ${rest.length} more` : ""}` : "";
   return `${g.failed.name} exited ${g.failed.code}${tests}`;
 }
 

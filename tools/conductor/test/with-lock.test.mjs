@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import { readLedger } from "../lib/ledger.mjs";
 import { acquire, holder, isTestListing, pidAlive, runWrapped, suiteLedger } from "../with-lock.mjs";
-import { tmp } from "./helpers.mjs";
+import { RED_NEXTEST_OUTPUT, tmp } from "./helpers.mjs";
 
 const WITH_LOCK = resolve(dirname(fileURLToPath(import.meta.url)), "..", "with-lock.mjs");
 
@@ -174,6 +174,17 @@ test("a wrapped full suite with RLX_SUITE_LEDGER records its run, and skips the 
   const lines = readLedger(s.ledger);
   assert.equal(lines.length, 2);
   assert.deepEqual({ ...lines[1], at: null }, { tree: rec.tree, cmd: "cargo nextest run --workspace", skip: true, by: "0101-04-review", at: null, green: { by: rec.by, at: rec.at } });
+});
+
+test("a wrapped full suite that fails records both failing tests' names from nextest's output", async () => {
+  const s = wrapperScratch();
+  const red = async () => ({ code: 100, output: RED_NEXTEST_OUTPUT });
+  const r = await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: s.repo, run: red }));
+  assert.equal(r.value, 100);
+  const [rec] = readLedger(s.ledger);
+  assert.equal(rec.exit, 100);
+  assert.equal(rec.summary, "1805 tests run: 1803 passed (11 slow), 2 failed, 11 skipped");
+  assert.deepEqual(rec.failed, ["rlx-core::golden golden_rose_star", "standalone::shot_cli the_count_column"]);
 });
 
 test("any other argument vector neither skips nor records", async () => {

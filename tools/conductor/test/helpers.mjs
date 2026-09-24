@@ -119,6 +119,28 @@ export function writePlan(repo, spec, { done = false } = {}) {
   return path;
 }
 
+/**
+ * nextest's output for a red full suite, in its own shape: each failure printed as it happens, its
+ * captured output, and every failure printed again under the closing `Summary`.
+ */
+export const RED_NEXTEST_OUTPUT = [
+  "    Starting 1805 tests across 42 binaries (11 tests skipped)",
+  "        PASS [   0.012s] rlx-core dsp::fft::tests::sine_lands_in_one_bin",
+  "        FAIL [   1.234s] rlx-core::golden golden_rose_star",
+  "--- STDOUT:              rlx-core::golden golden_rose_star ---",
+  "running 1 test",
+  "thread 'golden_rose_star' panicked at core/tests/golden.rs:88:5:",
+  "        PASS [   0.020s] rlx-core dsp::onset::tests::silence_has_no_onset",
+  "        FAIL [   0.310s] standalone::shot_cli the_count_column",
+  "        PASS [   0.004s] rlx-ring tests::wraps",
+  "------------",
+  "     Summary [ 652.000s] 1805 tests run: 1803 passed (11 slow), 2 failed, 11 skipped",
+  "        FAIL [   1.234s] rlx-core::golden golden_rose_star",
+  "        FAIL [   0.310s] standalone::shot_cli the_count_column",
+  "error: test run failed",
+  "",
+].join("\n");
+
 export function outcomeBlock(obj) {
   return "Done.\n\n```rlx-outcome\n" + JSON.stringify(obj) + "\n```\n";
 }

@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { gatesFor } from "../../../scripts/gates.manifest.mjs";
-import { appendRecord, appendServed, appendSkip, cleanTree, greenRecord, SERVED_SUITE_ARGS, servingRecord, summaryLine } from "./ledger.mjs";
+import { appendRecord, appendServed, appendSkip, cleanTree, failingTests, greenRecord, SERVED_SUITE_ARGS, servingRecord, summaryLine } from "./ledger.mjs";
 import { SUITE, withLock } from "./locks.mjs";
 
 /**
@@ -111,11 +111,6 @@ function runCommand(cmd, cwd, env) {
     };
     start(false);
   });
-}
-
-/** nextest's per-test failure lines, e.g. `        FAIL [   1.234s] rlx-core::golden name`. */
-export function failingTests(output) {
-  return [...output.matchAll(/^\s*(?:FAIL|TIMEOUT|SIGSEGV|SIGABRT) \[[^\]]*\]\s+(.+?)\s*$/gm)].map((m) => m[1]);
 }
 
 /**
@@ -211,8 +206,9 @@ export async function runGate({
     writeFileSync(log, r.output);
     ran.push(c.name);
     timed.push({ name: c.name, code: r.code, ms, ...(suite ? { suite: true } : {}), ...(serving ? { served: true, by: serving.record.by } : {}) });
+    const tests = failingTests(r.output);
     if (suite && startTree && cleanTree(cwd) === startTree) {
-      const record = { tree: startTree, exit: r.code, summary: summaryLine(r.output), by: `gate ${label}`, ms };
+      const record = { tree: startTree, exit: r.code, summary: summaryLine(r.output), failed: tests, by: `gate ${label}`, ms };
       if (serving) appendServed(ledger, { ...record, green: serving.record, paths: serving.paths });
       else appendRecord(ledger, record);
     }
@@ -222,7 +218,7 @@ export async function runGate({
         ok: false,
         ran,
         commands: timed,
-        failed: { name: c.name, code: r.code, log, tail: r.output.trim().split("\n").slice(-15).join("\n"), tests: failingTests(r.output) },
+        failed: { name: c.name, code: r.code, log, tail: r.output.trim().split("\n").slice(-15).join("\n"), tests },
       };
     }
   }

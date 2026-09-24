@@ -13,6 +13,8 @@ import {
   appendSkip,
   cleanTree,
   diffPaths,
+  FAILED_CAP,
+  failingTests,
   greenRecord,
   isFullSuite,
   readLedger,
@@ -27,7 +29,7 @@ import {
   treeOf,
 } from "../lib/ledger.mjs";
 import { defaultGate } from "../lib/gate.mjs";
-import { tmp } from "./helpers.mjs";
+import { RED_NEXTEST_OUTPUT, tmp } from "./helpers.mjs";
 
 function repo() {
   const dir = tmp("rlx-ledger-repo-");
@@ -283,4 +285,28 @@ test("a served line names the tier, the tree it leaned on and the diff, and is n
 test("the summary is nextest's last Summary line", () => {
   assert.equal(summaryLine("     Summary [   1.0s] 1 test run: 1 passed\n     Summary [ 652.000s] 1940 tests run: 1940 passed, 6 skipped\n"), "1940 tests run: 1940 passed, 6 skipped");
   assert.equal(summaryLine("error: no tests"), null);
+});
+
+test("a red run's record names its failing tests, once each, and a green record carries no new key", () => {
+  assert.deepEqual(failingTests(RED_NEXTEST_OUTPUT), ["rlx-core::golden golden_rose_star", "standalone::shot_cli the_count_column"]);
+  const file = join(tmp(), "suite-ledger.jsonl");
+  appendRecord(file, { tree: "t1", exit: 100, summary: summaryLine(RED_NEXTEST_OUTPUT), failed: failingTests(RED_NEXTEST_OUTPUT), by: "gate 0101-post-close", ms: 10 });
+  const [red] = readLedger(file);
+  assert.deepEqual(red.failed, ["rlx-core::golden golden_rose_star", "standalone::shot_cli the_count_column"]);
+  assert.equal("failed_count" in red, false, "under the cap there is no count");
+
+  appendRecord(file, { tree: "t1", exit: 0, summary: "1805 tests run: 1805 passed", failed: [], by: "gate 0101-post-close", ms: 10 });
+  appendRecord(file, { tree: "t1", exit: 0, summary: "1805 tests run: 1805 passed", failed: failingTests("all green"), by: "gate 0101-post-close", ms: 10 });
+  for (const green of readLedger(file).slice(1)) {
+    assert.deepEqual(Object.keys(green), ["tree", "cmd", "exit", "summary", "by", "at", "ms"], "a green record is unchanged");
+  }
+});
+
+test("a record keeps the first FAILED_CAP failing names and the total past them", () => {
+  const names = Array.from({ length: FAILED_CAP + 5 }, (_, i) => `rlx-core::golden case_${i}`);
+  const file = join(tmp(), "suite-ledger.jsonl");
+  appendRecord(file, { tree: "t1", exit: 100, summary: null, failed: names, by: "hand", ms: 10 });
+  const [red] = readLedger(file);
+  assert.deepEqual(red.failed, names.slice(0, FAILED_CAP));
+  assert.equal(red.failed_count, FAILED_CAP + 5);
 });

@@ -1,6 +1,6 @@
 # 0229 — The conductor reports itself honestly
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-24
 > **Owner skill(s):** dev
 > **Related ADRs:** [0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md),
@@ -152,16 +152,23 @@ ADR-0205 already forbids for backgrounded work — the same loss, differently ca
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by the implementer)_
+**Lane:** `plan-0229-the-conductor-reports-itself-honestly` in `/home/igor/Work/rlx-plan-0229`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The ledger names what failed | dev | not started | |
+| 1 — The ledger names what failed | dev | done | committed with this row |
 | 2 — One reader decides a settled phase | dev | not started | |
 | 3 — A run refuses to start stale | dev | not started | |
 | 4 — The allowlist admits what the tools already grant | dev | not started | |
 
 ### Notes
+
+- Phase 1: the record is written by `appendRecord`/`appendServed` in `lib/ledger.mjs`, and the red
+  gate's detail by `gateDetail` in `lib/lane.mjs`, so both files changed along with `lib/gate.mjs`
+  (whose `failingTests` moved into `lib/ledger.mjs`, now de-duplicated because nextest prints each
+  failure twice). `suite-record.mjs` is unchanged. The count past the cap is a `failed_count` key
+  holding the total. Tests also touched `test/helpers.mjs`, `test/ledger.test.mjs` and
+  `test/lane.test.mjs`.
 
 ### Close triggers
 

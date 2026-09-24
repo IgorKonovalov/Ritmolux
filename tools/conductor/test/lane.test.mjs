@@ -10,7 +10,7 @@ import { test } from "node:test";
 
 import { writeDigest, writeHistory } from "../lib/digest.mjs";
 import { git, resolveCommit, tagObjectType } from "../lib/git.mjs";
-import { runLanes } from "../lib/lane.mjs";
+import { gateDetail, runLanes } from "../lib/lane.mjs";
 import { readLedger } from "../lib/ledger.mjs";
 import { findPlan, readPlanFile } from "../lib/plan.mjs";
 import { validateQueue } from "../lib/queue.mjs";
@@ -467,6 +467,13 @@ test("a gate still red on the close tip after its one repair parks, and main doe
   assert.deepEqual(kinds(rec), ["readiness:architect", "implement:dev", "review:architect", "close:architect", "repair:dev"]);
   assert.equal(resolveCommit("main", repo), mainBefore, "main did not move");
   assert.ok(existsSync(rec.worktree), "the parked plan keeps its worktree");
+});
+
+test("a red gate's park detail names the first failing test, and how many follow it", () => {
+  const failed = (tests) => ({ failed: { name: "cargo nextest", code: 100, tests } });
+  assert.equal(gateDetail(failed(["rlx-core::golden golden_rose_star", "standalone::shot_cli the_count_column"])), "cargo nextest exited 100 - failing: rlx-core::golden golden_rose_star and 1 more");
+  assert.equal(gateDetail(failed(["rlx-core::golden golden_rose_star"])), "cargo nextest exited 100 - failing: rlx-core::golden golden_rose_star");
+  assert.equal(gateDetail(failed([])), "cargo nextest exited 100");
 });
 
 // ADR-0251: the close reads origin/main's CI through `gh` before it merges. The scratch repository
