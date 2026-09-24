@@ -272,5 +272,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0248](0248-the-pipeline-repairs-before-it-parks.md) | The pipeline repairs before it parks: a readiness check at the front, one repair per red, and a close split from its review | accepted 2026-09-24, Plan 0226; amends 0205 |
 | [0249](0249-a-human-phase-may-be-owed-after-the-merge.md) | A human phase marked as not blocking the merge is owed after it, not waited for | accepted 2026-09-24, Plan 0226; amends 0205 |
 | [0250](0250-the-conductor-stays-up-and-resumes-what-the-repository-shows-settled.md) | The conductor stays up, waits instead of stopping, and resumes what the repository shows settled | accepted 2026-09-24, Plan 0226; amends 0205, 0214, 0219 |
-| [0251](0251-a-gated-compile-path-has-a-named-job-and-a-red-upstream-stops-the-next-close.md) | A gated compile path has a named job, and a red upstream stops the next close | proposed 2026-09-24, Plan 0227; generalises 0181 |
+| [0251](0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md) | A gated compile path has a named job, and the upstream reading is advisory | proposed 2026-09-24, Plan 0227; generalises 0181 |
 <!-- roster:end -->
