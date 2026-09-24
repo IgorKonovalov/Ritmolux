@@ -210,8 +210,8 @@ plan about to start `cli_contract` and pauses the run.
 ## Acting on a park
 
 **Five reasons resume themselves** inside a live run, once the tree shows them settled (ADR-0250):
-`human_phase` and `claude_dir` once the phase's log row reads `done` (in the lane, or on `main` when
-the lane is gone), `usage_limit` once the reset it recorded has passed, `main_dirty` once the main
+`human_phase` and `claude_dir` once the phase's log row reads `done`, or `owed` on a human phase
+marked `Blocks merge: no` (in the lane, or on `main` when the lane is gone), `usage_limit` once the reset it recorded has passed, `main_dirty` once the main
 checkout is on `main` and clean, and `studio_install` an hour after it failed, three times at most.
 **None of them resumes over a dirty worktree.** Each self-resume prints a line and writes an inbox
 entry. Every other reason is yours: `resume` it once you have acted.
