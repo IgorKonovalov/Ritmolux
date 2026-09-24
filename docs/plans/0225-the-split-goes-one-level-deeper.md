@@ -143,7 +143,7 @@ single `node` command against the module, and Phase 2's is the real gate.
 |---|---|---|---|
 | 1 — The split recurses | dev | done | `b4e63064` |
 | 2 — The built site passes both gates | dev | done | `98ca086d` |
-| 3 — The prose stops arguing a stop | dev | done | committed with this row |
+| 3 — The prose stops arguing a stop | dev | done | `779ba5fe` |
 
 ### Notes
 
