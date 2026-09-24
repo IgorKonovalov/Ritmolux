@@ -1,6 +1,6 @@
 # 0227 — The gated paths get their jobs, and a red upstream stops the close
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-24
 > **Approved:** 2026-09-24 (user) — queued in lane a. Phase 1 unblocks the macOS release
 > artifacts, which have been absent since v0.146.1.
@@ -183,11 +183,12 @@ flowchart LR
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by the implementer)_
+**Lane:** `plan-0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close`, worktree
+`/home/igor/Work/rlx-plan-0227`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The macOS build compiles again | dev | not started | |
+| 1 — The macOS build compiles again | dev | done | committed with this row |
 | 2 — A reader for origin's CI | dev | not started | |
 | 3 — The close consults it | dev | not started | |
 | 4 — The foobar component joins the push | dev | not started | |
@@ -196,6 +197,9 @@ flowchart LR
 | 7 — The reading that only a push can produce | human | not started | |
 
 ### Notes
+
+- Phase 1: the visibility is `pub(super)`, matching `StreamOutput`, not `pub`. Not compiled here —
+  no local target builds `capture_mac/`; Phase 7's `check (macos-latest)` is the verifier.
 
 ### Close triggers
 
