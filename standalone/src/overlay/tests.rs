@@ -1,6 +1,7 @@
 use super::{
-    CAPTURE_TOP, ListLayout, NAME_CHARS, OverlayAction, OverlayKey, OverlayState, Row,
-    capture_line, fit, header_text, layout, mark_glyph, row_text,
+    CAPTURE_TOP, COL_GUTTER, COL_W, LIST_INSET, ListLayout, NAME_CHARS, OverlayAction, OverlayKey,
+    OverlayState, PANE_IMAGE_H, PANE_IMAGE_W, PANE_PLACEHOLDER, PANE_TEXT_SIZE, PaneSlot, ROW_H,
+    ROWS_TOP, Row, capture_line, fit, header_text, layout, mark_glyph, pane, row_text,
 };
 
 const NAMES: [&str; 4] = ["alpha", "bravo", "charlie", "delta"];
@@ -766,4 +767,120 @@ fn roster_change_reclamps_the_highlight_and_keeps_open() {
     s.on_roster_changed(&small);
     assert_eq!(s.highlight(), 1); // clamped to the new last row
     assert!(s.is_open()); // still open
+}
+
+// ---------------------------------------------------------------------------
+// The preview pane
+// ---------------------------------------------------------------------------
+
+/// The shipped library's size when the pane was placed. Pinned as a number for
+/// the reason [`SHIPPED`] is: the claim is arithmetic over it.
+const LIBRARY: usize = 114;
+
+/// **The pane sits beside the list, clear of every row, at the sizes the app is
+/// run at.** The list is laid out exactly as it is with no pane — `layout` is not
+/// told about it — so what is asserted is that the shipped library's rows leave
+/// the corner the pane occupies empty, whichever row is highlighted, and that
+/// the pane and its caption stay on the surface.
+#[test]
+fn the_pane_is_clear_of_the_shipped_librarys_rows() {
+    for (width, height) in [HD, QHD] {
+        let pane = pane(width, height).unwrap_or_else(|| panic!("{width}x{height} has a pane"));
+        assert!(pane.x + pane.w <= width, "{width}x{height}: off the right");
+        assert!(
+            pane.caption_y + ROW_H <= height,
+            "{width}x{height}: the caption runs off the bottom"
+        );
+        assert_eq!((pane.w, pane.h), (PANE_IMAGE_W, PANE_IMAGE_H));
+
+        let pane_bottom = pane.caption_y + ROW_H;
+        for highlight in [0, LIBRARY - 1] {
+            let list = layout(LIBRARY, highlight, width, height);
+            for row in 0..LIBRARY {
+                let Some((col, r)) = list.place(row) else {
+                    continue;
+                };
+                // A row's text spans its column less the gutter, one pitch tall.
+                let left = LIST_INSET + col as f32 * COL_W;
+                let right = left + COL_W - COL_GUTTER;
+                let top = ROWS_TOP + r as f32 * ROW_H;
+                let bottom = top + ROW_H;
+                let overlaps = left < pane.x + pane.w
+                    && right > pane.x
+                    && top < pane_bottom
+                    && bottom > pane.y;
+                assert!(
+                    !overlaps,
+                    "{width}x{height}: row {row} at column {col}, row {r} lies under the pane"
+                );
+            }
+        }
+    }
+}
+
+/// **The pane never costs the list a column.** A surface too small to keep the
+/// first column clear of it, or the image below the header, has no pane.
+#[test]
+fn a_surface_too_small_for_a_pane_has_none() {
+    for (width, height) in [(640.0, 480.0), (1920.0, 300.0)] {
+        assert_eq!(pane(width, height), None, "{width}x{height}");
+    }
+    let pane = pane(1024.0, 768.0).expect("a 1024x768 window has a pane");
+    assert!(
+        pane.x >= LIST_INSET + COL_W,
+        "the first column runs under the pane"
+    );
+    assert!(pane.y >= ROWS_TOP, "the pane runs into the header");
+}
+
+/// **The pane reads the cache when the highlight lands on another preset**, not
+/// on every frame, and holds a picture only for a preset one was found for — a
+/// preset with none is the placeholder's case, which is a normal state.
+#[test]
+fn the_pane_looks_a_preset_up_once_and_shows_only_what_it_found() {
+    let mut slot = PaneSlot::default();
+    assert!(
+        slot.needs_load("Echo Plate"),
+        "a fresh pane has looked nothing up"
+    );
+    assert!(!slot.shows("Echo Plate"));
+
+    slot.loaded("Echo Plate", true);
+    assert!(
+        !slot.needs_load("Echo Plate"),
+        "the same preset is not read again"
+    );
+    assert!(slot.shows("Echo Plate"));
+    assert!(slot.needs_load("Lace Grid"), "another preset is read");
+    assert!(
+        !slot.shows("Lace Grid"),
+        "one preset's picture never stands for another's"
+    );
+
+    slot.loaded("Lace Grid", false);
+    assert!(
+        !slot.needs_load("Lace Grid"),
+        "a miss is not retried every frame"
+    );
+    assert!(!slot.shows("Lace Grid"), "a miss draws the placeholder");
+
+    slot.forget();
+    assert!(
+        slot.needs_load("Lace Grid"),
+        "a forgotten slot looks up again"
+    );
+}
+
+/// **The placeholder reads as "not yet"** and sits inside the rectangle the
+/// picture will occupy, so the pane is the same shape before and after.
+#[test]
+fn the_placeholder_says_not_yet_inside_the_pictures_rectangle() {
+    assert!(
+        PANE_PLACEHOLDER.contains("yet"),
+        "`{PANE_PLACEHOLDER}` does not read as a picture still to come"
+    );
+    let pane = pane(1920.0, 1080.0).expect("a full-HD window has a pane");
+    let (x, y) = pane.placeholder_at();
+    assert!(x > pane.x && x < pane.x + pane.w);
+    assert!(y > pane.y && y + PANE_TEXT_SIZE < pane.y + pane.h);
 }

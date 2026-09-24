@@ -71,8 +71,8 @@ pub struct ImageRect {
 }
 
 /// Why [`Renderer::set_overlay_image`](super::Renderer::set_overlay_image)
-/// refused an image. Nothing changes on a refusal: the previously set image,
-/// if any, stays set.
+/// refused an image. Nothing changes on a refusal: an image already set stays
+/// set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OverlayImageError {
     /// A dimension is zero, or larger than the adapter's 2D texture limit.

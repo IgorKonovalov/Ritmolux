@@ -268,6 +268,18 @@ pub(crate) fn read_entry(dir: &Path, name: &str) -> Option<Entry> {
     Entry::decode(&bytes).filter(|entry| entry.name == name)
 }
 
+/// The browser's reader: `name`'s cached still, whatever source it was taken
+/// from, or `None` when there is none.
+///
+/// **Not held to the stamp.** A picture of a preset's previous version is what
+/// the pane shows while the current one is rendered, because a slightly stale
+/// picture says more than a placeholder. Held to the size, because a still of
+/// another size drawn into the pane's rectangle would be a distorted one.
+pub(crate) fn cached_still(name: &str) -> Option<Entry> {
+    let dir = cache_dir()?;
+    read_entry(&dir, name).filter(|entry| entry.width == THUMB_W && entry.height == THUMB_H)
+}
+
 /// Write `entry` into `dir`, **atomically**: the bytes go to a temporary file
 /// beside the destination and are renamed onto it.
 ///
@@ -516,7 +528,7 @@ mod tests {
         // A preset with no entry at all is not current either.
         assert!(!is_current(&dir, "Nothing Here", stamp));
 
-        // The same picture at a size this build no longer renders.
+        // The same picture at a size other than the one this build renders.
         let small = sample("Gyre", stamp);
         write_entry(&dir, &small).expect("write the small entry");
         assert!(

@@ -93,6 +93,106 @@ pub const FAV_COLOR: [f32; 4] = [0.95, 0.80, 0.60, 0.95];
 /// The filter-echo header sits above the list; dimmer than the rows.
 pub const HEADER_COLOR: [f32; 4] = [0.6, 0.66, 0.76, 0.9];
 
+// ---------------------------------------------------------------------------
+// The preview pane (ADR-0230)
+// ---------------------------------------------------------------------------
+
+/// The still's drawn size: a cached 160x90 at twice its pixels.
+pub const PANE_IMAGE_W: f32 = 320.0;
+pub const PANE_IMAGE_H: f32 = 180.0;
+/// Gap between the image and its caption.
+const PANE_CAPTION_GAP: f32 = 8.0;
+/// The caption under the image, and the placeholder inside it.
+pub const PANE_TEXT_SIZE: f32 = 18.0;
+pub const PANE_CAPTION_COLOR: [f32; 4] = HEADER_COLOR;
+pub const PANE_PLACEHOLDER_COLOR: [f32; 4] = [0.5, 0.55, 0.64, 0.85];
+/// What the pane says for a preset with no picture yet. A normal state on a
+/// first launch, so it reads as "not yet" rather than as a fault.
+pub const PANE_PLACEHOLDER: &str = "no picture yet";
+
+/// Where the pane draws on a surface: the image's rectangle, and the caption
+/// line under it. Device px from the top-left, like every row.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Pane {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    /// Top of the caption line under the image.
+    pub caption_y: f32,
+}
+
+impl Pane {
+    /// The placeholder's position, inside the image's rectangle.
+    pub fn placeholder_at(&self) -> (f32, f32) {
+        (
+            self.x + PANE_TEXT_SIZE,
+            self.y + (self.h - PANE_TEXT_SIZE) / 2.0,
+        )
+    }
+}
+
+/// The pane for a surface of `width` x `height`, anchored to its bottom-right
+/// corner, or `None` when the surface cannot hold the image below the header
+/// with the list's first column clear of it.
+///
+/// **The list is laid out exactly as it is without a pane.** [`layout`] is not
+/// told about it: the columns flow top-down from the left, so the bottom-right
+/// corner is the last place they reach, and the shipped roster leaves it empty
+/// at 1920x1080. A library long enough to fill the last column to the bottom
+/// draws its rows over the picture, text on top, rather than losing a column
+/// to it.
+///
+/// **A function of the surface alone.** Whether a picture is cached decides what
+/// is drawn inside the pane, never whether it exists or where — so nothing moves
+/// as pictures arrive while the operator arrows through the list.
+pub fn pane(width: f32, height: f32) -> Option<Pane> {
+    let caption_y = height - LIST_INSET - ROW_H;
+    let y = caption_y - PANE_CAPTION_GAP - PANE_IMAGE_H;
+    let x = width - LIST_INSET - PANE_IMAGE_W;
+    (x >= LIST_INSET + COL_W && y >= ROWS_TOP).then_some(Pane {
+        x,
+        y,
+        w: PANE_IMAGE_W,
+        h: PANE_IMAGE_H,
+        caption_y,
+    })
+}
+
+/// Which preset's picture the renderer is holding for the pane, so the cache is
+/// read when the highlight moves to another preset rather than on every frame.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PaneSlot {
+    /// The preset last loaded for, and whether a picture was found for it.
+    loaded: Option<(String, bool)>,
+}
+
+impl PaneSlot {
+    /// Whether the pane has to look `name` up again.
+    pub fn needs_load(&self, name: &str) -> bool {
+        self.loaded.as_ref().is_none_or(|(held, _)| held != name)
+    }
+
+    /// Record that `name` was looked up, and whether a picture was found.
+    pub fn loaded(&mut self, name: &str, found: bool) {
+        self.loaded = Some((name.to_owned(), found));
+    }
+
+    /// Whether the picture held is `name`'s. `false` for a preset looked up and
+    /// not found — the placeholder's case.
+    pub fn shows(&self, name: &str) -> bool {
+        self.loaded
+            .as_ref()
+            .is_some_and(|(held, found)| *found && held == name)
+    }
+
+    /// Forget what was loaded, so the next frame looks it up again — for a
+    /// renderer that dropped the picture with the device it lived on.
+    pub fn forget(&mut self) {
+        self.loaded = None;
+    }
+}
+
 /// The F3 overlay's audio line, built from the **same** startup token the
 /// `diagnostics.log` `capture` column carries — so a screenshot and a log from
 /// one run cannot disagree about why the app is or is not hearing anything.
@@ -345,6 +445,9 @@ pub struct OverlayState {
     /// **A mark you cannot find again is a mark you cannot undo**, which is the
     /// whole reason this state exists rather than hidden being simply gone.
     show_hidden: bool,
+    /// Which preset's picture the preview pane holds. Kept beside the modal
+    /// state because it follows the highlight, and touched by nothing here.
+    pane: PaneSlot,
 }
 
 impl OverlayState {
@@ -381,6 +484,11 @@ impl OverlayState {
     /// Whether hidden presets are in the list.
     pub fn show_hidden(&self) -> bool {
         self.show_hidden
+    }
+
+    /// The preview pane's record of what it holds.
+    pub fn pane_slot(&mut self) -> &mut PaneSlot {
+        &mut self.pane
     }
 
     /// The rows to display as `(absolute roster index, row)`, narrowed by every

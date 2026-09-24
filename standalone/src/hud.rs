@@ -10,6 +10,7 @@
 //! beside the pure layout function that reasons about them, so the pixels drawn
 //! here and the arithmetic tested there cannot drift.
 
+use rlx_core::render::{ImageRect, OverlayImage};
 use standalone::marks::Mark;
 
 use crate::app_state::AppState;
@@ -17,6 +18,7 @@ use crate::console;
 use crate::overlay::{
     self, FAV_COLOR, HEADER_COLOR, LIST_INSET, LIST_TOP, ROW_COLOR, ROW_H, ROW_HL_COLOR, ROW_SIZE,
 };
+use crate::thumbs;
 
 /// On-canvas active-preset-name label: top-left inset (device px), font size,
 /// and a light near-white color legible over most scenes.
@@ -161,6 +163,66 @@ impl AppState {
             }
         };
         overlay::layout(visible_len, self.hud.browse.highlight(), w, h)
+    }
+
+    /// The preview pane on the output, or `None` when the browser is on the
+    /// console — which has no image layer — or the window is too small for one.
+    fn output_pane(&self) -> Option<overlay::Pane> {
+        if self.renderer.aux_size().is_some() {
+            return None;
+        }
+        let size = self.window.inner_size();
+        overlay::pane(size.width as f32, size.height as f32)
+    }
+
+    /// Draw the highlighted preset's cached still into the pane, or its
+    /// placeholder, and its name under it.
+    ///
+    /// The cache is read only when the highlight lands on another preset; every
+    /// other frame queues the rectangle of a picture the renderer already holds.
+    fn queue_pane(&mut self, pane: overlay::Pane, name: &str, lines: &mut Vec<console::Line>) {
+        // A renderer that moved adapters dropped the picture with the device.
+        if self.hud.browse.pane_slot().shows(name) && self.renderer.overlay_image_size().is_none() {
+            self.hud.browse.pane_slot().forget();
+        }
+        if self.hud.browse.pane_slot().needs_load(name) {
+            let still = thumbs::cached_still(name);
+            let shown = still.as_ref().is_some_and(|entry| {
+                self.renderer
+                    .set_overlay_image(Some(OverlayImage {
+                        rgba: &entry.rgba,
+                        width: entry.width,
+                        height: entry.height,
+                    }))
+                    .is_ok()
+            });
+            self.hud.browse.pane_slot().loaded(name, shown);
+        }
+
+        if self.hud.browse.pane_slot().shows(name) {
+            self.renderer.queue_image(ImageRect {
+                x: pane.x,
+                y: pane.y,
+                w: pane.w,
+                h: pane.h,
+            });
+        } else {
+            let (x, y) = pane.placeholder_at();
+            lines.push(console::Line::new(
+                overlay::PANE_PLACEHOLDER.to_owned(),
+                x,
+                y,
+                overlay::PANE_TEXT_SIZE,
+                overlay::PANE_PLACEHOLDER_COLOR,
+            ));
+        }
+        lines.push(console::Line::new(
+            name.to_owned(),
+            pane.x,
+            pane.caption_y,
+            overlay::PANE_TEXT_SIZE,
+            overlay::PANE_CAPTION_COLOR,
+        ));
     }
 
     /// The factor the console's text is shrunk by, or `1.0` with none attached.
@@ -312,6 +374,15 @@ impl AppState {
                     ROW_SIZE,
                     color,
                 ));
+            }
+
+            // The pane beside the list, for the highlighted row. An empty
+            // list highlights nothing, and then the pane is simply absent.
+            let highlighted = visible
+                .get(highlight)
+                .map(|(_, entry)| entry.name.to_owned());
+            if let (Some(pane), Some(name)) = (self.output_pane(), highlighted) {
+                self.queue_pane(pane, &name, &mut modal);
             }
         }
 

@@ -256,8 +256,8 @@ struct ThumbKey {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — One thumbnail, on demand, in a cache | dev | done | 7bd7fc9f |
-| 2 — The renderer draws one image the shell hands it | dev | done | committed with this row |
-| 3 — The pane shows what is cached | dev | not started | |
+| 2 — The renderer draws one image the shell hands it | dev | done | ab582b1b |
+| 3 — The pane shows what is cached | dev | done | committed with this row |
 | 4 — The pass fills the cache by itself | dev | not started | |
 | 5 — A changed preset gets a new picture | dev | not started | |
 
@@ -328,6 +328,25 @@ Where the notes above say "Phase 2", "Phase 3" or "Phase 4", they use the old nu
   `cargo clippy -p rlx-core --all-targets -- -D warnings` is clean.
 - The first-half test holds that no object of the layer exists with a counter the layer keeps, not
   with a wgpu resource count. The same counters hold "setting is the only upload".
+
+**Phase 3 — where the pane sits, and two files beyond the list.**
+
+- The pane is anchored to the output's **bottom-right corner**, and `overlay::layout` is not told
+  about it, so the list's columns are exactly what they were. Reserving a band for the pane on the
+  right was tried first and dropped: at 1920x1080 it takes the 114-preset library from four columns
+  to three and makes it scroll. `the_pane_is_clear_of_the_shipped_librarys_rows` asserts that no
+  placed row of a 114-row list meets the pane at 1920x1080 or 2560x1440. A longer library, or a
+  smaller window where the last column reaches the corner, draws its rows over the picture (the
+  text is drawn after the image).
+- The pane is drawn only on the output. With the operator console open the browser is drawn on the
+  console, which has no image layer, so there is no pane there, and `docs/running.md` says so.
+- The record of which preset's picture the renderer holds (`overlay::PaneSlot`) is a field of
+  `OverlayState`, because the state `hud.rs` can reach lives in `app_state.rs`, which this phase
+  does not list.
+- `standalone/src/thumbs.rs` line 519 carried the word the comment-hygiene gate rejects (`no
+  longer`, from Phase 1). It is reworded here. `core/src/render/image_layer.rs` from Phase 2 had
+  the same problem (`previously`) and is reworded in this commit, although that file is not in
+  Phase 3's list.
 
 ### Close triggers
 
