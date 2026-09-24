@@ -193,8 +193,8 @@ flowchart LR
 | 3 — The close consults it | dev | done | f0a5eee1 |
 | 4 — The foobar component joins the push | dev | done | 0c0ac09b |
 | 5 — The documents say what a machine needs | dev | done | c149b93d |
-| 6 — The close ceremony gains the step | human | not started | |
-| 7 — The reading that only a push can produce | human | not started | |
+| 6 — The close ceremony gains the step | human | owed | |
+| 7 — The reading that only a push can produce | human | owed | |
 
 ### Notes
 
