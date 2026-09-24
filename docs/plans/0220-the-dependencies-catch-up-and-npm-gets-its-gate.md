@@ -298,8 +298,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — npm 11 installs Electron by name | studio-builder | parked: field landed, binary bullet unmet (Notes) | this row's commit |
-| 2 — The lint set moves together | studio-builder | not started | |
+| 1 — npm 11 installs Electron by name | studio-builder | done against the amended bar (binary moved to P4) | f6852988 |
+| 2 — The lint set moves together | studio-builder | done, on eslint 9.39.5 not 10 (Notes) | this row's commit + the reformat after it |
 | 3 — The build and test set moves together | studio-builder | not started | |
 | 4 — Electron 44 and electron-builder 26 | studio-builder | not started | |
 | 5 — The Rust pins that trail | dev | not started | |
@@ -323,6 +323,19 @@ flowchart LR
   to collect (*Electron failed to install correctly*). `windowless.test.ts` and `templates.test.ts`
   pass by skipping (no built player in the lane's `target/`).
 - `npx prettier --check studio/README.md` fails on `main`'s own settings-key table, untouched here.
+- **P1 re-checked 2026-09-24** against the amended done-when: `install-scripts ls` still prints *No
+  packages with unreviewed install scripts.*
+- **P2 stays on eslint 9.39.5** (and `@eslint/js` 9.39.5): `npm install` with eslint 10.11.0 is
+  ERESOLVE, because `eslint-plugin-react` 7.37.5, the latest, declares peer `eslint ^9.7` at most.
+  The rest moved as named: ts-eslint 8.70.1, react-hooks 7.1.1, config-prettier 10.1.8,
+  plugin-react 7.37.5, prettier 3.9.8.
+- **P2 rule switched off:** `react-hooks/set-state-in-effect` (new in react-hooks 7), six sites in
+  `ParamRow.tsx`, `useActivePreset.ts`, `useHeldRotation.ts`, `useRoster.ts`, `Editor.tsx` (two).
+  Each resets local state when a reported fact changes; rewriting them changes render order.
+- **P2 prettier:** 3.9.8 re-joins three short union types onto one line (`osc.ts`,
+  `testing/player.ts`, `Editor.test.tsx`), which 3.3.3 passes. That reformat is the phase's second
+  commit, nothing else in it. `README.md` fails under both versions, so it was left alone.
+- **P2 tests:** same set as P1, 30 files / 280 tests, the same two failing to collect.
 
 ### Close triggers
 

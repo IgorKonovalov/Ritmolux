@@ -66,6 +66,9 @@ export default [
     settings: { react: { version: '18.3' } },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // Six effects reset local state when a reported fact changes; rewriting them as
+      // render-time adjustments changes render order and is its own reviewed change.
+      'react-hooks/set-state-in-effect': 'off',
       'react/jsx-uses-react': 'off',
       'react/react-in-jsx-scope': 'off',
       'no-restricted-imports': [
