@@ -5,7 +5,7 @@
 > **Approved:** 2026-09-24 (user) — queued in lane a. Phase 1 unblocks the macOS release
 > artifacts, which have been absent since v0.146.1.
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0251](../adrs/0251-a-gated-compile-path-has-a-named-job-and-a-red-upstream-stops-the-next-close.md)
+> **Related ADRs:** [0251](../adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)
 > (proposed), [0181](../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md),
 > [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
 > [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
@@ -20,7 +20,9 @@
 The macOS build has been broken since at least `v0.146.1` by one private type, and nothing stopped a
 thing. Phase 1 is the one-word repair. The rest is why nobody noticed: a red arm of `check` on `main`
 costs nothing today, so this plan makes it cost the **next close**, and gives the one gated compile
-path that still has no job before a tag — the foobar component — a job.
+path that still has no job before a tag — the foobar component — a job. The reading is **advisory**:
+it names the failing job at every close and blocks nothing, because the conductor never pushes and so
+cannot clear a red `origin/main` itself.
 
 ## Context & problem
 
@@ -42,7 +44,7 @@ artifacts that never appeared, which is exactly what
 [ADR-0181](../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) recorded for `v0.112.0`. Second
 instance, same class.
 
-[ADR-0251](../adrs/0251-a-gated-compile-path-has-a-named-job-and-a-red-upstream-stops-the-next-close.md)
+[ADR-0251](../adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)
 decides both halves and records the four rejected alternatives.
 
 ## Decision
@@ -98,15 +100,25 @@ flowchart LR
     [ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) keeps
     `cargo deny` out of the hook. `node scripts/check-gate-carriers.mjs` stays green.
 
-### Phase 3 — The close consults it
+### Phase 3 — The close reports it and never blocks on it
 - **Owner skill:** dev
-- **What:** the conductor's close runs Phase 2's script before it merges, and parks on red.
+- **What:** the conductor's close runs Phase 2's script before it merges and **records the reading**.
+  **Amended 2026-09-24, mid-flight**: the first version of this phase parked the plan on red and was
+  implemented that way in `f0a5eee1`. That is withdrawn — see
+  [ADR-0251](../adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)
+  Alternative E. **The conductor never pushes**, so `origin/main` advances only by hand: a refusal
+  would make every close wait on a step the pipeline cannot take, and local merges run ahead of
+  `origin`, so the ref describes an older tree than the one being closed.
 - **Files touched:** `tools/conductor/lib/close.mjs` or `lane.mjs` as the seam dictates,
-  `tools/conductor/test/`, `tools/conductor/README.md`.
-- **Done when:** a close over a red `origin/main` parks with a reason naming the failing job, and the
-  conductor's own suite covers green, red and unreadable with a fake `gh`. `node --test
-  tools/conductor/test/` passes. An unreadable reading proceeds to the merge and the park reason is
-  never `upstream_red` in that case.
+  `tools/conductor/lib/digest.mjs`, `tools/conductor/test/`, `tools/conductor/README.md`.
+- **Done when:**
+  - A close over a red `origin/main` **merges as normal** and writes one line naming the failing job
+    to the run log, and a row to the digest's `Needs you` that survives until the reading is green.
+  - **No park reason `upstream_red` exists.** `git grep -n upstream_red -- tools/conductor` returns
+    nothing outside a comment explaining why it was withdrawn. The commit that introduced it
+    (`f0a5eee1`) is reverted or superseded in this phase, not left dead.
+  - The conductor's own suite covers green, red and unreadable with a fake `gh`, asserting in each
+    case that the merge still happens. `node --test tools/conductor/test/` passes.
 
 ### Phase 4 — The foobar component joins the push
 - **Owner skill:** dev
@@ -159,9 +171,10 @@ flowchart LR
 
 ## Risks & open questions
 
-- **One broken arm stops every close.** A red `main` parks plans unrelated to the failure. That is the
-  intended pressure and it is still a cost; ADR-0251 records it as a Negative. If it bites, the
-  question to reopen is whether the refusal should be per-platform rather than per-run.
+- **Nothing forces the repair.** The reading is advisory by decision, so it can be ignored. Accepted:
+  the alternative deadlocks a pipeline that cannot push. If it is ignored in practice, the question
+  to reopen is what else the digest should do with a reading that has stayed red across several
+  closes — not whether to make it a gate.
 - **`gh` is a new dependency of the close.** Degraded rather than hard, so the guarantee is only as
   strong as the last machine that could read. Phase 2's notice is what keeps that visible.
 - **Phase 4 may find the foobar component already broken.** Nothing has compiled it on a push, ever.
