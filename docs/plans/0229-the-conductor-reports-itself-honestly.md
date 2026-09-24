@@ -156,8 +156,8 @@ ADR-0205 already forbids for backgrounded work — the same loss, differently ca
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The ledger names what failed | dev | done | committed with this row |
-| 2 — One reader decides a settled phase | dev | not started | |
+| 1 — The ledger names what failed | dev | done | `0b08037a` |
+| 2 — One reader decides a settled phase | dev | done | committed with this row |
 | 3 — A run refuses to start stale | dev | not started | |
 | 4 — The allowlist admits what the tools already grant | dev | not started | |
 
@@ -169,6 +169,10 @@ ADR-0205 already forbids for backgrounded work — the same loss, differently ca
   failure twice). `suite-record.mjs` is unchanged. The count past the cap is a `failed_count` key
   holding the total. Tests also touched `test/helpers.mjs`, `test/ledger.test.mjs` and
   `test/lane.test.mjs`.
+- Phase 2: `git grep -c "donePhases(" -- tools/conductor/lib` reads `close.mjs:1`, `lane.mjs:1`,
+  `plan.mjs:3`. The `close.mjs` caller checks that an implement step marked its own phases done and
+  the `lane.mjs` one prints phases as their rows turn done; neither decides whether a park settled.
+  `plan.mjs` holds `donePhases` itself, `nextStep` and `settledPhase`.
 
 ### Close triggers
 

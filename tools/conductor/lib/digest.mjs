@@ -28,7 +28,7 @@ import { laneOpen } from "./lane.mjs";
 import { readLedger } from "./ledger.mjs";
 import { usageReading } from "./live.mjs";
 import { CLAUDE_DIR } from "./outcome.mjs";
-import { donePhases, findPlan, parsePlan, readPlanFile, rowIsOwed } from "./plan.mjs";
+import { findPlan, parsePlan, readPlanFile, rowIsOwed, settledPhase } from "./plan.mjs";
 import { findingWhere, statePaths, totalSpend, writeAtomic } from "./state.mjs";
 
 const HUMAN_REASONS = new Set(["human_phase", "stop_condition", "question", "plan_wrong"]);
@@ -179,8 +179,10 @@ function closedFindings(rec) {
  * - the plan is under `docs/plans/done/` **in the main checkout** with `Status: done` — a close that
  *   landed outside the conductor, which never touches state/conductor.json;
  * - a park on a phase only the owner can do (`human_phase`, `claude_dir`) sits on a phase the plan's
- *   own `## Implementation log` now marks done. That row is read in the lane when the worktree is
- *   still there and in the main checkout otherwise, so a lane removed by hand is not a missing plan.
+ *   own `## Implementation log` now marks done, or owed on a phase marked `Blocks merge: no`
+ *   (`settledPhase`, the same reader `parkStillTrue` asks). That row is read in the lane when the
+ *   worktree is still there and in the main checkout otherwise, so a lane removed by hand is not a
+ *   missing plan.
  *
  * A branch's own `done/` copy is deliberately not enough: a close committed in a lane that has not
  * merged is unfinished work, and a wrong "already settled" tells the owner the opposite. Nothing else
@@ -196,8 +198,9 @@ export function settledPark(rec, repo) {
   if ((reason !== "human_phase" && reason !== CLAUDE_DIR) || !phase) return null;
   const where = rec.worktree && existsSync(rec.worktree) ? rec.worktree : repo;
   const found = findPlan(where, rec.plan);
-  if (!found || !donePhases(readPlanFile(found.path)).has(phase)) return null;
-  return `Phase ${phase} now reads \`done\` in the plan's \`## Implementation log\``;
+  const how = found ? settledPhase(readPlanFile(found.path), phase) : null;
+  if (!how) return null;
+  return `Phase ${phase} now reads \`${how}\` in the plan's \`## Implementation log\``;
 }
 
 /**

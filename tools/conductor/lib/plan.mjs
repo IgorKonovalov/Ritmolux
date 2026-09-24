@@ -144,6 +144,20 @@ export function nonBlocking(phase) {
   return phase?.owner === "human" && phase.blocksMerge === "no";
 }
 
+/**
+ * How the log settles owner phase `id` of `plan`: `done`, `owed` when its row reads owed and the
+ * phase is a human one marked `Blocks merge: no` (ADR-0249), or null while it is neither.
+ *
+ * The one answer to "has the owner's phase settled?" — a park guard, a self-resume and the digest all
+ * ask it here. The marker is read from the phase itself: a bare `owed` row on a blocking phase settles
+ * nothing, or one word in the log would skip a phase the plan says the merge waits for.
+ */
+export function settledPhase(plan, id) {
+  if (donePhases(plan).has(id)) return "done";
+  if (owedPhases(plan).has(id) && nonBlocking(plan.phases.find((p) => p.id === id))) return "owed";
+  return null;
+}
+
 /** Contiguous runs of same-owner phases, in plan order. */
 export function runs(plan) {
   const out = [];

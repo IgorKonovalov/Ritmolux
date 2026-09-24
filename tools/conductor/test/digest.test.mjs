@@ -441,9 +441,9 @@ test("an empty worklist is one line, and says what it found nothing of", () => {
 // each of the two conditions has a case and so does the negative.
 
 /** A repo holding plan 0301 alone, with its phase rows and its directory as the caller asks. */
-function repoWithPlan({ status = "approved (2026-09-14)", rows, done = false }) {
+function repoWithPlan({ status = "approved (2026-09-14)", rows, done = false, blocksMerge }) {
   const repo = tmp("rlx-stale-repo-");
-  writePlan(repo, { number: "0301", title: "A park to judge", status, phases: [{ id: "1", owner: "dev" }, { id: "2", owner: "human" }], rows }, { done });
+  writePlan(repo, { number: "0301", title: "A park to judge", status, phases: [{ id: "1", owner: "dev" }, { id: "2", owner: "human", blocksMerge }], rows }, { done });
   return repo;
 }
 
@@ -471,6 +471,23 @@ test("a human_phase park whose log row now reads done is a record to clear, not 
       "Worktree removed; `resume` reopens it from branch `plan-0301-a-park-to-judge`.",
     "  Clear the record: `node tools/conductor/conductor.mjs resume 0301`",
   ]);
+});
+
+// ADR-0249: an `owed` row settles the park exactly where parkStillTrue says it does, and nowhere else.
+test("a human_phase park whose phase is marked Blocks merge: no and whose row reads owed is settled", () => {
+  const repo = repoWithPlan({ rows: { 1: { state: "done" }, 2: { state: "owed" } }, blocksMerge: "no" });
+  const state = parkedState("human_phase");
+  assert.equal(settledPark(state.plans["0301"], repo), "Phase 2 now reads `owed` in the plan's `## Implementation log`");
+  const text = renderDigest(state, { repo, stateDir: tmp(), now: NOW });
+  assert.match(text, /^1 already settled\.$/m);
+  assert.match(text, /^- \*\*0301\*\* \(`human_phase`\) at Phase 2 parked 2026-09-15 09:00: Phase 2 now reads `owed` in the plan's `## Implementation log`\. /m);
+
+  // A bare owed row on a phase the merge waits for settles nothing, marked or not.
+  for (const blocksMerge of [undefined, "yes"]) {
+    const blocking = repoWithPlan({ rows: { 1: { state: "done" }, 2: { state: "owed" } }, blocksMerge });
+    assert.equal(settledPark(state.plans["0301"], blocking), null, `Blocks merge: ${blocksMerge ?? "(unmarked)"}`);
+    assert.match(renderDigest(state, { repo: blocking, stateDir: tmp(), now: NOW }), /^1 park\.$/m);
+  }
 });
 
 test("a gate_red park whose plan is under done/ is a record to clear", () => {

@@ -49,7 +49,7 @@ import {
 import { CLOSE, take } from "./locks.mjs";
 import { fastForwardMain, mergeMainInto } from "./merge.mjs";
 import { CLAUDE_DIR, CLI_CONTRACT, STUDIO_INSTALL } from "./outcome.mjs";
-import { donePhases, findPlan, nextStep, nonBlocking, owedPhases, rangeLabel, readPlanFile } from "./plan.mjs";
+import { donePhases, findPlan, nextStep, rangeLabel, readPlanFile, settledPhase } from "./plan.mjs";
 import { adoptClose, clearPark, endStep, planContractHash, planRecord, saveState, spendSince, startStep, statePaths, takeResumeAsks } from "./state.mjs";
 import { USAGE_LIMIT, renderPromptFile, runStep } from "./step.mjs";
 
@@ -105,16 +105,6 @@ export function laneOpen(rec) {
 }
 
 /**
- * How the log settles owner phase `id` of `plan`: `done`, `owed` when its row reads owed and the
- * phase is a human one marked `Blocks merge: no`, or null while it is neither.
- */
-function settledAs(plan, id) {
-  if (donePhases(plan).has(id)) return "done";
-  if (owedPhases(plan).has(id) && nonBlocking(plan.phases.find((p) => p.id === id))) return "owed";
-  return null;
-}
-
-/**
  * Why a park still holds, or null when the tree shows it settled. `resume` asks this before it
  * clears a park, and a self-resume asks it first, so the two never disagree on the conditions they
  * share. Only `human_phase`, `claude_dir` and `main_dirty` have a condition here; every other reason
@@ -130,13 +120,12 @@ export function parkStillTrue(rec, repo) {
   // plan's own log says the phase is done, which is the same evidence for both — or owed, for a
   // human phase the plan marks `Blocks merge: no` (ADR-0249). nextStep reads donePhases AND
   // owedPhases, so a guard reading only the first would refuse a resume the loop it protects would
-  // take. The marker is read from the phase itself: a bare `owed` row on a blocking phase settles
-  // nothing, or one word in the log would skip a phase the plan says the merge waits for.
+  // take; settledPhase is the one reader, shared with the digest's settledPark.
   if (reason === "human_phase" || reason === CLAUDE_DIR) {
     const where = laneOpen(rec) ? rec.worktree : repo;
     const found = findPlan(where, rec.plan);
     if (!found) return `plan ${rec.plan} is not in ${where}`;
-    if (!settledAs(readPlanFile(found.path), phase)) {
+    if (!settledPhase(readPlanFile(found.path), phase)) {
       const rel = relative(where, found.path).replace(/\\/g, "/");
       return `Phase ${phase} is still not marked done in the ## Implementation log of ${rel} in ${where}; commit the row there first`;
     }
@@ -162,7 +151,7 @@ export function selfResumeWhy(rec, repo, nowMs = Date.now()) {
     case "human_phase":
     case CLAUDE_DIR: {
       const found = findPlan(laneOpen(rec) ? rec.worktree : repo, rec.plan);
-      return `Phase ${rec.park.phase} reads ${settledAs(readPlanFile(found.path), rec.park.phase)} in the plan's ## Implementation log`;
+      return `Phase ${rec.park.phase} reads ${settledPhase(readPlanFile(found.path), rec.park.phase)} in the plan's ## Implementation log`;
     }
     case "main_dirty":
       return "the main checkout is on main and clean";

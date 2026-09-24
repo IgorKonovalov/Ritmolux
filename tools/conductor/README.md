@@ -164,9 +164,10 @@ plan about to start `cli_contract` and pauses the run.
     never a tag**: the plan is under `docs/plans/done/` **in the main checkout** with `Status: done`
     (a close that landed outside the conductor never touches `state/conductor.json`), or a
     `human_phase` / `claude_dir` park sits on a phase the plan's own `## Implementation log` now marks
-    `done` — read in the lane when the worktree is still there, in the main checkout when it is gone.
-    A close committed in a lane that has not merged is **not** settled. `status` prints the same
-    verdict on the same park. **The digest writes nothing back**: `resume NNNN` clears the record, and
+    `done`, **or** `owed` on a phase marked `Blocks merge: no` — read in the lane when the worktree is
+    still there, in the main checkout when it is gone. A close committed in a lane that has not
+    merged is **not** settled. `status` prints the same verdict on the same park, and both ask the one
+    reader a self-resume asks, `settledPhase` in `lib/plan.mjs`. **The digest writes nothing back**: `resume NNNN` clears the record, and
     it stays your explicit act.
   - **Now** — per lane, the plan, the step and how long it has been in it, and what the plan has
     spent. When no run is live, the last run's end time and its one-line totals.
