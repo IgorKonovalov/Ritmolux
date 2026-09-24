@@ -61,7 +61,8 @@ flowchart LR
   push["push to main"] --> ci["CI: check matrix,<br/>spout, foobar, links..."]
   ci -->|red arm| origin["origin/main is red"]
   origin --> close{"next close reads<br/>origin/main"}
-  close -->|red| park["park / refuse,<br/>naming the job"]
+  close -->|red| report["report and merge,<br/>Needs you line naming the job"]
+  report --> merge
   close -->|green| merge["merge, bump, tag"]
   close -->|cannot read| notice["printed notice,<br/>ADR-0016 shape, proceed"]
   merge --> push
@@ -262,6 +263,5 @@ flowchart LR
 
 ## Followups (after this lands)
 
-- A digest row for a red `origin/main`, alongside the refusal rather than instead of it
-  (ADR-0251 Alternative A).
-- Whether the refusal should be per-platform rather than per-run, if one arm halting the queue bites.
+- Whether the digest should escalate a reading that stays red across several closes (Risks, first
+  bullet).
