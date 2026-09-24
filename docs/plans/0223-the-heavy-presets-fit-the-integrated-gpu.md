@@ -14,8 +14,8 @@
 The ten heaviest presets miss 60 fps on the reference laptop's integrated GPU because every
 internal grid is drawn at the display's full resolution whatever the machine, and the frame's cost
 tracks that grid's area. This plan first gives the engine per-pass GPU timings and an honest stream
-readback, then removes the mechanical waste the analysis found (a grid rounded up 26 %, a
-full-grid handoff copy, clears that a load would do), then lands ADR-0245: an internal grid is a
+readback, then removes the one piece of mechanical waste that proved mechanical (a grid rounded
+up 26 %; the post-chain copy and clears were withdrawn to a followup on 2026-09-24), then lands ADR-0245: an internal grid is a
 fraction of the target, resolved per tier and adapter class, with `[quality] grid_scale` as its
 file key. The fractions for the two integrated rows are measured on the laptop by a person, not
 chosen here. First user-visible behaviour: the `F3` overlay reports the resolved scale beside the
@@ -121,19 +121,28 @@ nothing blessed** except where a done-when says otherwise, and a bless anywhere 
   nothing blessed (every suite capture is at or under 256 a side); the docs cards are regenerated
   and committed in the same phase.
 
-### Phase 4 — The post chain stops copying and clearing what a load covers
-- **Owner skill:** dev
-- **What:** Bloom samples its predecessor's output view instead of owning a full-grid copy of it;
-  the pre-scene `post-chain-input-clear` folds into the scene pass's load op; the bloom
-  down/blur passes load rather than clear a target the fullscreen triangle covers.
-- **Files touched:** `core/src/render/post.rs`, `core/src/render/bloom.rs`,
-  `core/src/render/kaleidoscope.rs`, `core/src/render/trails.rs` (the `PostStage` input seam),
-  `core/src/render/composite.rs`, the `TierConfig::post_cap` docstring (the memory arithmetic that
-  charges the `bloom-src` offscreen).
-- **Done when:** Phase 1's table on Leviathan no longer lists the handoff pass, and the chain's
-  allocation count drops by one full-grid texture (asserted where the stage's resources are
-  built); the whole suite is green with nothing blessed. The tonemap pass stays: it is the format
-  boundary, and folding it is not this plan.
+#### Phase 4 — withdrawn 2026-09-24
+
+The post-chain phase ("the post chain stops copying and clearing what a load covers") is withdrawn
+from this plan. None of its three items survived the implementation's reading:
+
+- **The handoff copy is not bloom's.** `bloom-src` is a handoff buffer the predecessor renders
+  into, and it cannot be removed. The one real full-grid copy is `trails-present-pass`. On the
+  shipped Leviathan that copy feeds the **kaleidoscope**, not bloom. Removing it means widening the
+  `PostStage` seam so that stages lend and borrow views, with one bind-group set per ping-pong side.
+  That is the alpha contract ADR-0055 and ADR-0085 govern, where this composite has had repeated
+  defects, so it is a design question and not mechanical waste.
+- **Folding `post-chain-input-clear` into the scene's load op** means carrying a load op on
+  `SceneTarget` into every scene encoder that opens its own pass, eleven files under
+  `scenes/`, to remove one clear-only pass. On an immediate-mode GPU like the laptop's, that pass
+  is a fast clear.
+- **"Load rather than clear" had the direction wrong.** wgpu 30's own `LoadOp` documentation says
+  a clear is never slower than a load, and a load is what costs on tiled GPUs. The op for a
+  target the triangle covers is `LoadOp::DontCare`, which takes an `unsafe` token.
+
+All three are small against the grid's area term, and after Phase 1 they are measurable. Phase 6
+records their rows, and the followup below decides from that reading. The plan now runs Phase 3,
+then Phase 5.
 
 ### Phase 5 — The grid scale exists, at 1.0 everywhere
 - **Owner skill:** dev
@@ -143,7 +152,8 @@ nothing blessed** except where a done-when says otherwise, and a bless anywhere 
 - **Files touched:** `core/src/render/context.rs` (adapter class beside `is_software`),
   `core/src/render/mod.rs` (`RendererOptions.grid_scale: Option<f32>`, resolution, `apply_tier`
   re-resolves), `core/src/render/tier.rs` (the `(tier, class) -> scale` table and its docs),
-  `core/src/render/grid.rs`, `core/src/render/post.rs`, `core/src/render/scenes/particles/mod.rs`
+  `core/src/render/grid.rs`, `core/src/render/post.rs` (also `SceneTarget::aspect`'s docstring,
+  which still says "a 256 px step" after Phase 3), `core/src/render/scenes/particles/mod.rs`
   (`set_target_size` passes grid texels to `attractor_budget`), `core/src/render/overlay.rs`,
   `standalone/src/config.rs` (`[quality] grid_scale`), `standalone/src/cli.rs`,
   `standalone/src/settings/`, `standalone/src/app_state.rs`, `standalone/src/stream.rs`
@@ -167,7 +177,10 @@ nothing blessed** except where a done-when says otherwise, and a bless anywhere 
 - **Done when:** for each tier the largest scale whose live 1080p reading holds a 60 fps median
   with no sample under 60 across the ten presets is named in the implementation log, together with
   the owner's look verdict at that scale; if no scale reaches it for Rich, that is a result, and it
-  is what promotes backlog 0259.
+  is what promotes backlog 0259. The results file also carries Phase 1's per-pass table for
+  Leviathan at 1080p and each scale, headless, so the withdrawn Phase 4's rows
+  (`trails-present-pass`, `post-chain-input-clear`, the bloom down/blur passes) have an
+  integrated-GPU reading.
 
 ### Phase 7 — The table takes the measured rows, and the documents say so
 - **Owner skill:** dev
@@ -252,7 +265,7 @@ grid_scale = "auto"   # or 0.25..1.0
 | 1 — Every pass reports what it cost | dev | done | 29e1b900 |
 | 2 — The stream readback stops waiting | dev | done | 045025be |
 | 3 — The grid rounds to nearest | dev | done | bd73f508 |
-| 4 — The post chain stops copying and clearing | dev | parked (`plan_wrong`) | |
+| 4 — The post chain stops copying and clearing | dev | withdrawn 2026-09-24 (architect) | |
 | 5 — The grid scale exists, at 1.0 everywhere | dev | not started | |
 | 6 — The two integrated rows are measured | human | not started | |
 | 7 — The table takes the measured rows | dev | not started | |
@@ -382,6 +395,12 @@ grid_scale = "auto"   # or 0.25..1.0
 - **Outstanding `human` phases:**
 
 ## Followups (after this lands)
+
+- The withdrawn Phase 4, decided on Phase 6's per-pass reading. If `trails-present-pass` is a
+  meaningful share of the integrated frame, the answer is a stage that lends its accumulation to its
+  successor, whichever stage that is, and it needs an ADR on the `PostStage` seam first. If the clear
+  passes register, `LoadOp::DontCare` on the targets a fullscreen triangle covers is the op, and
+  bringing `unsafe` into those passes is part of that decision.
 
 - The tonemap as the format boundary could be folded into the last chain pass when no stage is
   active; measure with Phase 1's table first.
