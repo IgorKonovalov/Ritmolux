@@ -190,8 +190,8 @@ flowchart LR
 |---|---|---|---|
 | 1 — The macOS build compiles again | dev | done | 646ca642 |
 | 2 — A reader for origin's CI | dev | done | 1e7e4857 |
-| 3 — The close consults it | dev | done | committed with this row |
-| 4 — The foobar component joins the push | dev | not started | |
+| 3 — The close consults it | dev | done | f0a5eee1 |
+| 4 — The foobar component joins the push | dev | done | committed with this row |
 | 5 — The documents say what a machine needs | dev | not started | |
 | 6 — The close ceremony gains the step | human | not started | |
 | 7 — The reading that only a push can produce | human | not started | |
@@ -209,6 +209,10 @@ flowchart LR
   *a lane for a plan that does not name studio/ installs nothing* counted every live line containing
   `skipped:`, and the unread notice added one. Its filter is narrowed to gate lines; its count of 6
   is unchanged. `node --test tools/conductor/test/` passes.
+- Phase 4: the job runs `packaging/foobar/fetch-sdk.ps1`, then `plugin-foobar/build.ps1`, and
+  not `build-component.ps1`, so packaging and its verification stay in `release.yml` alone. The
+  workflow header's count of single-runner gates went from five to six. Not run: the job needs a
+  Windows runner with MSVC, and the first push is the first time it runs.
 
 ### Close triggers
 
