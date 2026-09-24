@@ -1,7 +1,9 @@
 # 0218 — The reference machine becomes Arch
 
-> **Status:** draft — blocked on [Plan 0219](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md) (re-pointed 2026-09-22; was the Arch migration)
+> **Status:** approved
 > **Created:** 2026-09-20
+> **Approved:** 2026-09-24 (user) — approved and deliberately NOT in
+> `tools/conductor/queue.json`. See the 2026-09-24 amendment below for what it waits on.
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0241](../adrs/0241-linux-leads-and-windows-is-a-peer.md),
 > [0242](../adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md),
@@ -64,6 +66,20 @@
 > - and gains a done-when: the log carries the adapter line one `headless_hardware*` site printed on
 >   the Arch box, naming the NVIDIA dGPU. ADR-0243 stays `proposed` until that line exists, and this
 >   plan's close accepts it.
+
+> **Amended 2026-09-24 (architect) — approved, and the header's BLOCKED paragraph above is
+> superseded.** Both machine blocks are gone: [Plan 0219](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)
+> closed and [Plan 0120](done/0120-the-standalone-ships-on-ubuntu.md) closed, so the Arch box exists
+> with the tree checked out and a green gate on it. Two things still hold this plan out of the
+> conductor's queue, and neither is a design question:
+> - **Phase 1 is a `human` probe, and it is first.** A lane opening on this plan parks on it at
+>   once. The readings are owed by the owner, into this plan's `## Implementation log`, before the
+>   plan is queued — which is the order the Decision argues for, not an accident of sequencing.
+> - **[Plan 0214](0214-the-linux-arm-reports-back.md) has not closed.** The `Runs after` line above
+>   names it, and Phase 2 reads the harness adapter path 0214 is still moving.
+>
+> Nothing else about the plan changes: the phases, their owners and their done-whens stand as
+> written. It joins a lane once Phase 1's readings are in the log and 0214 has closed.
 
 ## TL;DR
 

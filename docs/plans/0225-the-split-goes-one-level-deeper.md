@@ -1,7 +1,9 @@
 # 0225 — The split goes one level deeper
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-23
+> **Approved:** 2026-09-24 (user) — queued first in lane b. The `Pages` workflow is red and
+> the site has not deployed since 2026-09-23, so this one is ahead of the rest of the queue.
 > **Owner skill(s):** dev
 > **Related ADRs:** [0247](../adrs/0247-the-split-recurses-and-the-ceiling-is-an-assertion-about-the-corpus.md) (proposed),
 > [0166](../adrs/0166-a-published-document-splits-into-routes-by-size.md),
@@ -94,8 +96,11 @@ single `node` command against the module, and Phase 2's is the real gate.
   exit 0 against a `site/dist/` built by `npm --prefix site run build`, and the routes gate's
   success line reports a largest split route under 30,000.
 - **Note:** the build renders mermaid through Playwright, so on a machine that has never run it this
-  phase needs `npx --prefix site playwright install --with-deps chromium` first. That download is
-  the only step here needing the network beyond `npm ci`.
+  phase needs `npx --prefix site playwright install chromium` first — no browser is present on the
+  Arch box as of 2026-09-24. **Not `--with-deps`**, which resolves system package names for
+  Debian and Ubuntu only and fails on Arch; the shared libraries chromium needs are the box's own
+  concern, and `playwright install` names what is missing if any is. That download is the only step
+  here needing the network beyond `npm ci`.
 
 ### Phase 3 — The prose stops arguing a stop that no longer exists
 

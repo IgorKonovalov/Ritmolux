@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0226** (ADRs are a separate sequence — next free there is **0247**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0226** (ADRs are a separate sequence — next free there is **0248**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -51,10 +51,10 @@ place. The plan file carries the real link.
 | [0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) | The diffused frame's resolution is measured before it is designed | approved | dev, human | No ADR yet: the quality profile has never run on a track, so Phase 1 renders the pair and Phase 2 may close the plan. Takes backlog 0125. |
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
 | [0217](0217-every-setting-has-a-file-and-a-gate-says-so.md) | Every setting has a file, and a gate says so | approved | dev, studio-builder | ADR-0240: a file defines every setting and the menu edits it. Repairs the one violation - the F3 overlay persists nowhere - then a Rust test and a Node gate hold all three. |
-| [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | Unblocked 2026-09-22 (0219 closed); runs after 0214. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). Phase 3 can stop the plan. |
+| [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 | [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
-| [0225](0225-the-split-goes-one-level-deeper.md) | The split goes one level deeper | draft | dev | ADR-0247 (proposed): the split recurses instead of stopping at `###`. Unblocks `Pages`, red since 2026-09-23 on a 32,711 B route. Four functions assume two levels. |
+| [0225](0225-the-split-goes-one-level-deeper.md) | The split goes one level deeper | approved | dev | Approved 2026-09-24, queued first in lane b. ADR-0247 (proposed): the split recurses instead of stopping at `###`. Unblocks `Pages`, red since 2026-09-23 on a 32,711 B route. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -303,6 +303,13 @@ makes it the safe parallel rather than a second editor of the same files.
   queue is unchanged — each still parks at a human phase mid-plan.
 - **[0215] closed 2026-09-23**, second of the three and the whole of lane b's parallel. What is left
   of the note is [0217] on lane a, and a free lane beside it.
+- **[0225] takes lane b 2026-09-24, ahead of [0223].** The `Pages` workflow is red and the site has
+  not deployed since 2026-09-23, so the plan that repairs it goes first. It is the same shape as the
+  three above — every phase belongs to `dev`, so it runs to a close instead of parking — and it edits
+  only `site/` and `scripts/`, which is what makes it safe beside anything on lane a.
+- **[0218] is approved 2026-09-24 and deliberately not queued.** It is a fourth case of the
+  arithmetic above, and the earliest: its `human` phase is **Phase 1**, so a lane would park before
+  running anything. The readings are owed into its own log first, and [0214] has still to close.
 
 [0202]: 0202-the-three-mechanisms-get-their-gate.md
 [0206]: 0206-the-browser-shows-the-look.md
@@ -313,6 +320,10 @@ makes it the safe parallel rather than a second editor of the same files.
 [0216]: done/0216-the-operator-owns-the-order.md
 [0217]: 0217-every-setting-has-a-file-and-a-gate-says-so.md
 [0220]: 0220-the-dependencies-catch-up-and-npm-gets-its-gate.md
+[0218]: 0218-the-reference-machine-becomes-arch.md
+[0214]: 0214-the-linux-arm-reports-back.md
+[0223]: 0223-the-heavy-presets-fit-the-integrated-gpu.md
+[0225]: 0225-the-split-goes-one-level-deeper.md
 [0224]: done/0224-the-adapter-becomes-a-setting.md
 
 **Spent 2026-09-22, when [0222] closed behind [0221].** The note as written:
