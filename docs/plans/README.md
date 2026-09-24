@@ -51,7 +51,6 @@ place. The plan file carries the real link.
 | [0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) | The diffused frame's resolution is measured before it is designed | approved | dev, human | No ADR yet: the quality profile has never run on a track, so Phase 1 renders the pair and Phase 2 may close the plan. Takes backlog 0125. |
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
-| [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 | [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
 | [0229](0229-the-conductor-reports-itself-honestly.md) | The conductor reports itself honestly | draft | dev | Four ways it misdescribes its own state, all met on 2026-09-24: an unnamed flaky test, a settled park called live, a merged change the running process never loads, and denials the session's own tools moot. |
 <!-- roster:end -->
@@ -313,6 +312,8 @@ makes it the safe parallel rather than a second editor of the same files.
   are now closed, and lane a is free.
 - **[0225] closed 2026-09-24**, and lane b is free for [0223]. The split recurses, the largest route
   is 29,528 B, and `Pages` goes green on the push that carries it.
+- **[0220] closed 2026-09-24** with its Phase 7 owed (ADR-0249), so it holds no lane. Of the four
+  the first note kept off the queue, [0202], [0211] and [0212] remain.
 
 [0202]: 0202-the-three-mechanisms-get-their-gate.md
 [0206]: 0206-the-browser-shows-the-look.md
@@ -322,7 +323,7 @@ makes it the safe parallel rather than a second editor of the same files.
 [0215]: done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md
 [0216]: done/0216-the-operator-owns-the-order.md
 [0217]: done/0217-every-setting-has-a-file-and-a-gate-says-so.md
-[0220]: 0220-the-dependencies-catch-up-and-npm-gets-its-gate.md
+[0220]: done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md
 [0218]: 0218-the-reference-machine-becomes-arch.md
 [0214]: 0214-the-linux-arm-reports-back.md
 [0223]: 0223-the-heavy-presets-fit-the-integrated-gpu.md
@@ -1045,6 +1046,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0220 - The dependencies catch up, and npm gets its gate](done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) - closed 2026-09-24, Phase 7 owed. Review: **no blockers, no majors, three minors (two fixed), one nit.** Version: **0.149.0**. ADR-0244 accepted, Outcome. [Write-up](README-archive.md).
 - [0228 - The resume guard accepts an owed phase](done/0228-the-resume-guard-accepts-an-owed-phase.md) - closed 2026-09-24. Review: **no blockers, no majors, two minors, one nit (two fixed).** Version: none. Closes nothing. [Write-up](README-archive.md).
 - [0227 - The gated paths get their jobs](done/0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close.md) - closed 2026-09-24, Phases 6-7 owed. Review: **no blockers, one major (fixed), two minors (fixed).** Version: **0.148.0**. ADR-0251 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0225 - The split goes one level deeper](done/0225-the-split-goes-one-level-deeper.md) - closed 2026-09-24. Review: **no blockers, no majors, two minors, one nit (all fixed).** Version: **0.147.1**. ADR-0247 accepted, Outcome. Closes nothing. [Write-up](README-archive.md).

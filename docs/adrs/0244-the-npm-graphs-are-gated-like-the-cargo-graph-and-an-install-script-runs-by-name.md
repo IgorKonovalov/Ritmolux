@@ -1,8 +1,8 @@
 # ADR-0244 — The npm graphs are gated like the cargo graph, and an install script runs by name
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-24, at Plan 0220's close (see Outcome)
 > **Date:** 2026-09-22
-> **Related plan(s):** [0220](../plans/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md)
+> **Related plan(s):** [0220](../plans/done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md)
 
 > **Amended 2026-09-24 (architect), while still proposed and unimplemented.** An `allowScripts`
 > entry is **version-pinned**, which the original Decision left open, and the studio needs **three**
@@ -73,7 +73,7 @@ pinned entry unless `--no-allow-scripts-pin` is passed, and `npm config get allo
 returns `true`. We keep that default rather than writing bare names, because a package's
 `postinstall` is *code*, and a version bump ships code nobody has reviewed: pinning makes the bump
 re-state the approval instead of inheriting it. The price is that a bump strands its entry, which
-[Plan 0220](../plans/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md)'s own Phases 3 and 4
+[Plan 0220](../plans/done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md)'s own Phases 3 and 4
 pay as they move `esbuild` and `electron`.
 
 **The studio's list is three entries, not two.** Measured on the Arch box 2026-09-24,

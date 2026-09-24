@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0220 - The dependencies catch up, and npm gets its gate](#0220---the-dependencies-catch-up-and-npm-gets-its-gate)
   - [0228 - The resume guard accepts an owed phase](#0228---the-resume-guard-accepts-an-owed-phase)
   - [0227 - The gated paths get their jobs](#0227---the-gated-paths-get-their-jobs)
   - [0225 - The split goes one level deeper](#0225---the-split-goes-one-level-deeper)
@@ -259,6 +260,23 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0220 - The dependencies catch up, and npm gets its gate](done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md)
+
+- closed 2026-09-24, conductor-run lane `plan-0220-the-dependencies-catch-up-and-npm-gets-its-gate`.
+Phase 1 `f6852988`, Phase 2 `8f569b1d` + reformat `774b0a43`, Phase 3 `bf97b87f`, Phase 4 `d874e9a9`,
+Phase 5 `561a2541`, Phase 6 `b3ab5ecf`. **Phase 7 is owed** (`Blocks merge: no`, ADR-0249). Round 1
+review: **no blockers, no majors, three minors, one nit**. ADR-0244's Outcome was fixed at the close
+in `4b5c76f3` and the plan's TL;DR in `25661afd`. Version **0.149.0** (minor: the studio zip ships
+Electron 44.4.3, the player links wgpu 30.0.1). ADR-0244 accepted with an Outcome. Closes no backlog
+entry. The full review is the plan's own `## Close review` section.
+- **What landed.** Electron 44.4.3 and electron-builder 26.15.3, vite 8, vitest 5, jsdom 30 and the
+  rest of the studio tooling; eslint stays on 9.39.5 until `eslint-plugin-react` accepts 10. A pinned
+  `allowScripts` field. `wgpu` 30.0.1, `toml` 1.1.6, `cc` 1.4.7. `scripts/check-npm-audit.mjs` in its
+  own CI job, `npm-audit`, and every workflow on Node 24.
+- **Open.** The studio-builder skill's Electron half-install bullet is stale, under `.claude/`, with
+  its replacement text in the review. The gate's `npm-<n>` fallback id cannot be allowed (code). The
+  gate runs on push, not on a schedule, and whether it should is the owner's call.
 
 ### [0228 - The resume guard accepts an owed phase](done/0228-the-resume-guard-accepts-an-owed-phase.md)
 

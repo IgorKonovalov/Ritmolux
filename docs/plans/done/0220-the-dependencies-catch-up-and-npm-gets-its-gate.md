@@ -1,14 +1,17 @@
 # 0220 — The dependencies catch up, and npm gets its gate
 
-> **Status:** in-progress
+> **Status:** done - Phase 7 owed, ADR-0249. Closed 2026-09-24 by the conductor: Phases 1-6
+> landed (`f6852988`, `8f569b1d` + `774b0a43`, `bf97b87f`, `d874e9a9`, `561a2541`, `b3ab5ecf`);
+> round 1 review no blockers, no majors, three minors and one nit, two minors fixed at the close.
+> Version 0.149.0. Phase 7 (push, CI on the pushed tree, the release dry run) is owed.
 > **Created:** 2026-09-22
 > **Owner skill(s):** studio-builder, dev, human
-> **Related ADRs:** [0244](../adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md) (proposed),
-> [0178](../adrs/0178-the-studio-shell-conventions.md),
-> [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
-> [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
-> [0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
-> **Runs after:** [0120](done/0120-the-standalone-ships-on-ubuntu.md) for Phases 5-6 only. Both edit
+> **Related ADRs:** [0244](../../adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md) (accepted, Outcome),
+> [0178](../../adrs/0178-the-studio-shell-conventions.md),
+> [0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
+> [0038](../../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
+> [0156](../../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
+> **Runs after:** [0120](0120-the-standalone-ships-on-ubuntu.md) for Phases 5-6 only. Both edit
 > `core/Cargo.toml`'s `wgpu` lines and `.github/workflows/ci.yml`, which 0120 has open on `main`
 > today. Phases 1-4 touch only `studio/` and can run now.
 
@@ -115,7 +118,7 @@ flowchart LR
     both they and the binary check move to Phase 4. `windowless.test.ts` and `templates.test.ts`
     are recorded with their state and are not this phase's bar either; they depend on 0120.
   - The field lists named packages, **pinned** as `pkg@version` — npm's default, per
-    [ADR-0244](../adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md).
+    [ADR-0244](../../adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md).
     `approve --all` and `--no-allow-scripts-pin` are both unused, and the log records the list.
     Measured on the box 2026-09-24, that list is **three** entries, not two: `electron@32.1.2`,
     `esbuild@0.24.0` and `esbuild@0.21.5`, because two `esbuild` versions are in the graph. Confirm
@@ -245,7 +248,7 @@ flowchart LR
 - **Blocks merge:** no
 - **What:** push, then read CI on the new tree and the studio artifacts a release would ship.
   **Marked non-blocking 2026-09-24** under
-  [ADR-0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md), which postdates this plan.
+  [ADR-0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md), which postdates this plan.
   Every criterion below begins with the push, and a push requires the merge, so a blocking phase
   here asks for something only possible after the thing it prevents. The plan merges and this
   reading is owed after it.
@@ -458,6 +461,194 @@ flowchart LR
   `cargo nextest run --workspace` on its own tree: exit 0, 1805 passed, 7 skipped.
 - **Outstanding `human` phases:** Phase 7 (push, CI on the pushed tree including `npm-audit`, `studio`
   on Node 24, `deny` and `spout`; the release dry run)
+
+## Close review
+
+Round 1 was the only round, so no earlier finding was resolved by a fix round. At the close, minor 1
+was fixed in `4b5c76f3` (ADR-0244's dated Outcome) and minor 3 in `25661afd` (this plan's TL;DR and
+diagram). Minor 2 sits under `.claude/` and nit 1 is code, so both stay open for the owner. **Phase 7
+is owed** (ADR-0249): nothing has yet checked CI on the pushed tree (`npm-audit`, `studio` on Node
+24, `deny`, `spout` with `cc` 1.4.7), electron-builder 26 on either packaging recipe, or the Windows
+zip launching its bundled player.
+
+Close-time readings: `check-backlog-claims` OK (46 reductions, 21 entries, 4 unprobeable, 30
+moved-path advisory rows, none this plan's). The translation advisory names `how-it-works.ru.md`,
+`running.ru.md` and `packaging/foobar/READ-ME-FIRST.ru.md` as behind their sources, none of which
+this plan moved. `presets/` was not touched, so there is no curation verdict.
+
+The round 1 review follows in full, with its headings moved down two levels.
+
+### Plan 0220 — close review, round 1
+
+Graded at `f6b8bbb02f142472f2fa15846771c3c088f17de0` on lane `/home/igor/Work/rlx-plan-0220`
+(branch `plan-0220-the-dependencies-catch-up-and-npm-gets-its-gate`), `main` already merged in.
+
+**Verdict: Plan 0220 landed cleanly. No blockers, no majors, three minors and one nit.** All six
+machine phases did what the plan says, and every deviation is disclosed in the log: eslint stays on
+9.39.5 through the fallback Phase 2 allowed, and Phase 4 ran the dev smoke as its pipeline rather than
+through the `dev` script. Phase 7 (`human`, `Blocks merge: no`) is owed after the merge, per ADR-0249.
+The minors are all documentation truth. ADR-0244 needs a dated Outcome at acceptance, and one
+studio-builder skill fact went stale.
+
+#### Evidence run in this session
+
+| Check | Result |
+|---|---|
+| `node .../with-lock.mjs suite -- cargo nextest run --workspace` | `with-lock: skipped cargo nextest run --workspace: tree 35fd4f2 is green in the suite ledger, run by gate 0220-pre-review at 2026-09-24T11:24:33.193Z: 1805 tests run: 1805 passed (5 slow), 7 skipped`. That ledger record is the full-suite evidence, and it matches the log's Phase 5 figure. |
+| `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` | green |
+| `cargo deny --log-level error check` | `advisories ok, bans ok, licenses ok, sources ok` |
+| `Cargo.lock` (via `git grep -a`, because the file is attributed binary) | `wgpu` 30.0.1, `toml` 1.1.6+spec-1.1.0, `cc` 1.4.7 |
+| `npm --prefix studio run typecheck` / `run lint` | green / green |
+| `npm --prefix studio test` | 32 files, 297 tests passed. `window.csp.test.ts` and `presetHandlers.test.ts` collect and pass |
+| `node scripts/check-npm-audit.mjs --self-test` | `26 of 26` |
+| `node scripts/check-npm-audit.mjs` (live registry) | exit 0, with 0 readings in each of the three graphs |
+| `npm --prefix studio view electron@44.4.3 scripts dependencies` | no scripts. Deps include `@electron-internal/extract-zip`, which confirms the log's P4 claim |
+| `check-gate-carriers` | OK (hook 17/17, ci 17/17). `gates.manifest.mjs` and `.githooks/pre-push` are not in the diff |
+| `check-doc-links`, `check-comment-hygiene`, `toc --check`, `check-reader-prose`, `check-system-counts` | all OK |
+| `check-backlog-claims` | OK: 46 reductions, 21 entries, 4 unprobeable. The advisory lists 30 moved paths, and none is this plan's |
+| `git grep -n -e node-version -e "Node 22" -- .github/workflows` | six `'24'` lines, no `22` |
+
+#### Lens 1 — alignment
+
+- The phases landed as planned: P1 `f6852988`, P2 `8f569b1d` + reformat `774b0a43`, P3 `bf97b87f`,
+  P4 `d874e9a9`, P5 `561a2541`, P6 `b3ab5ecf`. Every phase carries exactly one in-vocabulary
+  `**Owner skill:**`. The only `Blocks merge: no` is on Phase 7, the `human` phase, and nothing reads
+  its output.
+- **`studio/package.json`**: the pins match the log. React 18.3.1, zod 3.23.8, TypeScript 5.6.2 and
+  `@types/react*` 18.x are untouched, as "does NOT do" requires. `allowScripts` holds `esbuild@0.28.2`,
+  `electron@44.4.3` (pinned) and `electron-winstaller: false` (denied by name). There is no `--all`.
+- **Phase 2 eslint fallback.** eslint 10 is ERESOLVE against `eslint-plugin-react` 7.37.5's peer
+  range. The plan pre-authorised staying on 9.39.5 and reporting it, and the log reports it. One rule
+  is switched off, `react-hooks/set-state-in-effect`, with a one-line reason in
+  `studio/eslint.config.mjs`, and the log lists its six sites.
+- **Phase 6 gate** (`scripts/check-npm-audit.mjs`). I read the self-test assertions against each
+  done-when clause:
+  - fails on a shipped high (`v1`);
+  - fails on a dev-only critical through the full graph alone (`v2`);
+  - passes a moderate (`v3`);
+  - passes a reasoned allow (`v4`);
+  - fails a reasonless allow (`v5`);
+  - reports a stale allow without failing (`v6`);
+  - fails on a failed request, including non-JSON output, empty output, npm not starting and
+    non-report JSON (`v7`).
+  - It also withholds staleness when any graph failed to answer (`v8`).
+
+  None of these is tautological. Each one names the graph or entry it expects. The exit status of
+  `npm audit` is deliberately not an input, which is correct, since npm exits non-zero both on a
+  finding and on an outage.
+- **Phase 4 security defaults.** The log says `window.ts` holds the one `BrowserWindow` with every
+  ADR-0178 default. No `studio/electron/**` source changed in the diff except the prettier reformat
+  of a union type in `osc.ts` and `testing/player.ts`, so the defaults are exactly as `main` had them.
+- **Phase 5.** The three pins moved on every target line, including the Linux arm. The glyphon
+  comment follows the pin. `deny.toml` is untouched, and the log records that `ttf-parser` 0.25.1 is
+  still pinned through `cosmic-text`/`fontdb` and `sctk-adwaita`.
+- The implementation log (lines 295-459) is shorter than the `## Implementation phases` section
+  (lines 94-259), and the close triggers are present. The `Full suite:` bullet correctly defers to the
+  conductor's pre-review gate, whose ledger record is cited above.
+
+#### Lens 2 — layering, real-time safety, contracts
+
+No Rust source changed, only the three manifests and the lock. The C ABI, spec 0003 and the `Scene`
+seam are untouched. The studio diff is dependency versions, one lint rule and a prettier reformat.
+There is no protocol widening.
+
+#### Lens 3 — doc freshness and bookkeeping
+
+- `docs/developing.md` replaces the obsolete Node 26 hand-extraction recipe with an `allowScripts`
+  paragraph, and adds the gate beside `cargo deny`'s paragraph. `studio/README.md` explains
+  `allowScripts` and the `electron-winstaller` deny. `CLAUDE.md`'s `scripts/` block names the gate as
+  a third CI-only exception.
+- The close owes these, and the review flags them so they cannot slip:
+  - ADR-0244 goes `proposed -> accepted` **with an Outcome** (finding 1).
+  - Its `Related plan(s)` link is re-pointed to `done/`.
+  - The plans index is refreshed.
+  - The version bump: the studio zip now ships Electron 44.4.3 and the player links wgpu 30.0.1, so
+    this is a shipped-artifact change and not docs/chore-only. The level is the close's to pick under
+    ADR-0005, with the studio's two version copies following it.
+  - The `Status:` line reads `done - Phase 7 owed, ADR-0249`.
+
+#### Lens 4 — correctness
+
+- The gate counts advisories at their source, keyed by GHSA id plus package. It skips the bare-name
+  `via` entries that only repeat an upstream advisory. An unknown severity ranks -1, so it prints
+  under the line rather than blocking. That errs toward passing, but npm only emits the five known
+  levels.
+- The CI `npm-audit` job runs `npm audit` against the committed lockfiles without an install. That
+  works on lockfile v3.
+
+#### Lens 5 — design integrity
+
+The gate stays off the pre-push roster and out of `gates.manifest.mjs`, as ADR-0244 decides, and
+`check-gate-carriers` confirms it. Nothing else here bears on the architecture.
+
+#### Findings
+
+##### minor 1 — ADR-0244 must be accepted with a dated Outcome; four of its statements are now false
+`docs/adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md`,
+lines 36-41, 66-82 and 91.
+
+The implementation falsified the following:
+- **(a)** "`electron` fetches its binary in `postinstall`" and "A fresh clone on npm 11 installs a
+  working Electron with no local step". Electron 44 has no install script (`npm view` confirms it). It
+  downloads its binary the first time it is required, so a fresh clone fetches it on the first
+  `npm test` or `npm run dev`, and CI's `studio` job does so at test time.
+- **(b)** "The studio's list is three entries". The final list is `esbuild@0.28.2`, `electron@44.4.3`
+  (which now approves no script) and a by-name deny of `electron-winstaller`.
+- **(c)** "Each npm project's `package.json` carries an `allowScripts` field". `site/` carries none.
+  Its one script, esbuild's, is not needed for its build, as checked on the box in Phase 6.
+- **(d)** "CI gates both npm graphs on a schedule of its own". This was built as its own CI job,
+  triggered on push and pull request, with no `schedule:` trigger. So an advisory published between
+  pushes is seen at the next push, not on a timetable. The plan's Phase 6 file list admits no new
+  workflow file, so that reading is the plan's too.
+
+**Repair (close, Markdown under `docs/`):** accept the ADR with a dated `## Outcome` section stating
+(a)–(d), per the ADR-0054/0074 precedent. Do not edit the body. Whether a `schedule:` trigger in a
+separate workflow is wanted is a followup for the owner, not a close edit.
+
+##### minor 2 — the studio-builder skill still sends a reader to a recipe this plan deleted
+`.claude/skills/studio-builder/references/project-context.md:80`.
+
+The bullet says *"Under Node 26, `npm ci` can leave Electron half-installed, with only `dist/locales/`
+and no `path.txt`. `docs/developing.md`'s Arch block has the hand extraction."* Phase 6 removed that
+block from `docs/developing.md`. Phase 4 made the failure impossible: Electron 44 extracts with
+`@electron-internal/extract-zip` and has no postinstall. This is a fact the plan made false, and it
+sits under `.claude/`, so a headless close cannot apply it (ADR-0210). It is for the owner.
+
+**Replacement text:** replace lines 80-81 with
+
+```
+- **Electron has no install script.** It downloads its binary the first time it is required, so a
+  fresh `npm --prefix studio ci` is followed by one download on the first `npm test` or `npm run dev`
+  (`npx --prefix studio electron --version` triggers it on its own). `allowScripts` in
+  `studio/package.json` names every install script that may run, pinned as `pkg@version` (ADR-0244).
+```
+
+##### minor 3 — the plan's TL;DR and diagram still promise eslint 10
+`docs/plans/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md:20` (TL;DR) and `:82` (diagram
+node `P2`) say "eslint 10". The phase landed on eslint 9.39.5 under its own pre-authorised fallback,
+and the log says so. A reader of the closed plan who stops at the TL;DR gets the wrong version.
+
+**Repair (close, Markdown):** one parenthetical in the TL;DR, "(eslint stays on 9.39.5 until
+`eslint-plugin-react` accepts 10; see the log)", and the diagram label changed to
+`eslint 9.39.5 + ts-eslint 8.70`.
+
+##### nit 1 — a non-GHSA advisory could never be excused
+`scripts/check-npm-audit.mjs:104` falls back to an id of `npm-<source>` when an advisory's `url`
+carries no GHSA id. `readAllow` (line 136) accepts only GHSA-shaped ids, so an advisory of that shape
+at or over its line could be cleared only by a bump. npm's bulk advisory endpoint does key everything
+by GHSA today, so this is theoretical. It is code, so a close leaves it. If it ever bites, accept the
+same `npm-<n>` form in the allow file.
+
+#### Owed after the merge
+
+Phase 7 (`human`) is owed:
+- push, then check that CI is green on `npm-audit`, `studio` on Node 24, `deny` and `spout`, the last
+  being the first compile of `cc` 1.4.7 under the feature;
+- the `workflow_dispatch` release dry run, where electron-builder 26 runs both packaging recipes for
+  the first time;
+- the Windows zip launched with its bundled player.
+
+None of these has run anywhere yet.
 
 ## Followups (after this lands)
 
