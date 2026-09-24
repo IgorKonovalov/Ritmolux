@@ -187,6 +187,11 @@ ADR-0205 already forbids for backgrounded work — the same loss, differently ca
   per denial, because its roster test fails on a rule with no case.
 - `sed -n *` also admits sed's `w` and `e` commands, which write a file and run a shell command.
   `Bash(node *)` was already allowed.
+- Round 1 finding 0 (major, progress counter kept in failing names; fixture hand-written): f1994976.
+  The fixture was recorded from a scratch crate under the lane's gitignored `target/`, run through
+  the suite lock on cargo-nextest 0.9.143.
+- Round 1 finding 1 (minor, `sed -n` is not a boundary; README clause): 53089d56.
+- Round 1 finding 2 (minor, `parkStillTrue` refusal names `owed`): d63afa27.
 
 ### Close triggers
 
