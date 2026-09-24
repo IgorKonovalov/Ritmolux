@@ -7,8 +7,8 @@
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
 use super::{
-    BLOOM, CHAIN_PARAMS, DEFAULT_OCCLUDE, Fold, KALEIDOSCOPE, POST_GRID_STEP, PostChain, PostStage,
-    Routing, STAGE_COUNT, TRAILS, internal_grid_size, route, split_at_bloom,
+    BLOOM, CHAIN_PARAMS, DEFAULT_OCCLUDE, Fold, KALEIDOSCOPE, POST_GRID_STEP, PostChain, PostGrid,
+    PostStage, Routing, STAGE_COUNT, TRAILS, internal_grid_size, route, split_at_bloom,
 };
 use crate::render::TierConfig;
 use crate::render::background::Background;
@@ -16,6 +16,7 @@ use crate::render::capture::{self, CaptureImage};
 use crate::render::context::{RenderContext, RenderError};
 use crate::render::gpu;
 use crate::render::scenes::{declares, spec_names};
+use crate::render::tier::GridScale;
 
 /// The tier every test in this module runs at, and the one every golden
 /// baseline is blessed at (ADR-0045). These tests pin the **policy** — the
@@ -25,9 +26,9 @@ const FLOOR: TierConfig = TierConfig::FLOOR;
 const POST_MAX_W: u32 = FLOOR.post_cap.0;
 const POST_MAX_H: u32 = FLOOR.post_cap.1;
 
-/// [`internal_grid_size`] at the floor cap.
+/// [`internal_grid_size`] at the floor cap and full scale.
 fn floor_grid(surface: (u32, u32)) -> (u32, u32) {
-    internal_grid_size(surface, FLOOR.post_cap)
+    internal_grid_size(surface, GridScale::FULL, FLOOR.post_cap)
 }
 
 // -----------------------------------------------------------------------
@@ -211,7 +212,7 @@ fn the_rich_tier_raises_the_grid_only_where_the_floor_cap_binds() {
     let rich = TierConfig::RICH;
     for target in [(2560, 1440), (3440, 1440), (3840, 2160)] {
         let (fw, fh) = floor_grid(target);
-        let (rw, rh) = internal_grid_size(target, rich.post_cap);
+        let (rw, rh) = internal_grid_size(target, GridScale::FULL, rich.post_cap);
         assert!(
             rw > fw && rh > fh,
             "the floor cap binds at {target:?}, so rich must resolve a larger \
@@ -223,7 +224,7 @@ fn the_rich_tier_raises_the_grid_only_where_the_floor_cap_binds() {
     for target in [(640, 480), (1280, 720), (1600, 900), (1920, 1080)] {
         assert_eq!(
             floor_grid(target),
-            internal_grid_size(target, rich.post_cap),
+            internal_grid_size(target, GridScale::FULL, rich.post_cap),
             "neither cap binds at {target:?}, so the tier must not change the \
              grid — a tier raises a ceiling, not the resolution"
         );
@@ -549,16 +550,16 @@ fn stages_rebuild_on_a_size_change_and_only_on_a_size_change() {
     };
     let format = ctx.surface_format();
     let mut stages = Stages {
-        trails: crate::render::trails::Trails::new(&ctx.device, format, FLOOR.post_cap),
+        trails: crate::render::trails::Trails::new(&ctx.device, format, PostGrid::of(&FLOOR)),
         kaleido: crate::render::kaleidoscope::Kaleidoscope::new(
             &ctx.device,
             format,
-            FLOOR.post_cap,
+            PostGrid::of(&FLOOR),
         ),
         bloom: crate::render::bloom::Bloom::new(
             &ctx.device,
             format,
-            FLOOR.post_cap,
+            PostGrid::of(&FLOOR),
             FLOOR.bloom_levels,
         ),
     };
@@ -702,7 +703,7 @@ fn fold_error_at(ctx: &RenderContext, surface: (u32, u32)) -> f32 {
     let format = ctx.surface_format();
     let mut background = Background::new(&ctx.device, format);
     let mut kaleido =
-        crate::render::kaleidoscope::Kaleidoscope::new(&ctx.device, format, FLOOR.post_cap);
+        crate::render::kaleidoscope::Kaleidoscope::new(&ctx.device, format, PostGrid::of(&FLOOR));
     assert!(kaleido.set_param("kaleido_order", FOLD_ORDER as f32));
 
     let (texture, view) = capture::create_target(&ctx.device, format, surface.0, surface.1);

@@ -33,7 +33,7 @@ use std::fmt::Write as _;
 use crate::diag::{AnalysisMetrics, Metrics};
 
 use super::overlay_font::{GLYPH_H, GLYPH_W, glyph};
-use super::tier::Tier;
+use super::tier::{GridScale, Tier};
 use crate::render::gpu;
 
 /// Instance buffer capacity in quads. Comfortably covers the panel, ~240
@@ -229,7 +229,9 @@ impl Overlay {
     /// `tier` is the active quality tier, named in the readout (ADR-0045) — the
     /// same preset looks different on different machines now, so which tier a run
     /// resolved is diagnostics, not trivia. `demoted` marks a tier the frame-time
-    /// governor took back rather than one that was asked for.
+    /// governor took back rather than one that was asked for, and `grid_scale`
+    /// is printed beside the tier because the same tier draws its grids at a
+    /// different fraction on a different class of adapter (ADR-0245).
     #[allow(
         clippy::too_many_arguments,
         reason = "the frame's overlay inputs, each read once; bundling them would name a struct after this call site"
@@ -244,6 +246,7 @@ impl Overlay {
         analysis: AnalysisMetrics,
         tier: Tier,
         demoted: bool,
+        grid_scale: GridScale,
         frame_ms_samples: impl Iterator<Item = f32>,
     ) {
         let (width, height) = size;
@@ -253,7 +256,7 @@ impl Overlay {
         };
         self.samples.clear();
         self.samples.extend(frame_ms_samples);
-        self.build(vp, metrics, analysis, tier, demoted);
+        self.build(vp, metrics, analysis, tier, demoted, grid_scale);
 
         let n = self.quads.len().min(MAX_QUADS);
         let Some(slice) = self.quads.get(..n) else {
@@ -282,12 +285,13 @@ impl Overlay {
         analysis: AnalysisMetrics,
         tier: Tier,
         demoted: bool,
+        grid_scale: GridScale,
     ) {
         self.quads.clear();
 
         // Build the readout first so the panel sizes to whichever is wider — the
         // text row or the graph — and everything shares one content width.
-        write_readout(&mut self.text, metrics, tier, demoted);
+        write_readout(&mut self.text, metrics, tier, demoted, grid_scale);
         // Text width, excluding the last glyph's trailing gap.
         let text_w = (self.text.chars().count() as f32 * CHAR_ADVANCE - FONT_PX).max(0.0);
         let content_w = text_w.max(SPARK_W);
@@ -458,20 +462,30 @@ fn push_rect(out: &mut Vec<Quad>, vp: Vp, x: f32, y: f32, w: f32, h: f32, color:
 ///
 /// Takes the buffer by `&mut` rather than returning a `String`: the overlay reuses
 /// one allocation across frames, and this runs on every frame the panel is up.
-fn write_readout(out: &mut String, metrics: Metrics, tier: Tier, demoted: bool) {
+fn write_readout(
+    out: &mut String,
+    metrics: Metrics,
+    tier: Tier,
+    demoted: bool,
+    grid_scale: GridScale,
+) {
     out.clear();
     let _ = write!(
         out,
-        "{:.0} FPS  {:.1} MS  {:.0} MB  {}{}",
+        "{:.0} FPS  {:.1} MS  {:.0} MB  {}{} {}",
         metrics.fps,
         metrics.frame_ms_p99,
         metrics.gpu_bytes as f32 / (1024.0 * 1024.0),
         tier.label(),
         // A demoted floor and a pinned floor are the same tier and very different
         // facts, so the marker is what keeps the demotion from being silent
-        // (ADR-0045). One glyph, because the panel is already the width of its
-        // sparkline and this is the only place with room.
+        // (ADR-0045). One glyph, on the tier it qualifies, because the panel is
+        // already the width of its sparkline.
         if demoted { DEMOTED_MARK } else { "" },
+        // The scale last, as a bare fraction: `RICH 0.50` reads as "rich, at
+        // half", and the digits and the point are glyphs the frame-time figures
+        // already need.
+        grid_scale,
     );
 }
 
@@ -519,13 +533,16 @@ mod tests {
     //! does not, and the prose is what Plan 0044's done-when is about.
 
     // Test asserts panic on failure; allowed here over the file's pragma.
-    #![allow(clippy::panic)]
+    #![allow(clippy::panic, clippy::expect_used)]
 
     use super::{
-        DEMOTED_MARK, FREE_LABEL, LEVEL_LABELS, LOCKED_LABEL, Tier, write_readout, write_value_row,
+        DEMOTED_MARK, FREE_LABEL, GridScale, LEVEL_LABELS, LOCKED_LABEL, Tier, write_readout,
+        write_value_row,
     };
     use crate::diag::Metrics;
     use crate::render::overlay_font::{GLYPH_H, glyph};
+
+    const FULL: GridScale = GridScale::FULL;
 
     fn metrics() -> Metrics {
         Metrics {
@@ -549,7 +566,7 @@ mod tests {
         let metrics = metrics();
         let mut text = String::new();
         for tier in [Tier::Floor, Tier::Rich] {
-            write_readout(&mut text, metrics, tier, false);
+            write_readout(&mut text, metrics, tier, false, FULL);
             assert!(
                 text.contains(tier.label()),
                 "the readout does not name the {} tier: {text:?}",
@@ -577,13 +594,37 @@ mod tests {
     #[test]
     fn a_demoted_tier_is_marked_and_a_pinned_one_is_not() {
         let (mut pinned, mut demoted) = (String::new(), String::new());
-        write_readout(&mut pinned, metrics(), Tier::Floor, false);
-        write_readout(&mut demoted, metrics(), Tier::Floor, true);
+        write_readout(&mut pinned, metrics(), Tier::Floor, false, FULL);
+        write_readout(&mut demoted, metrics(), Tier::Floor, true, FULL);
         assert_ne!(pinned, demoted);
-        assert!(demoted.ends_with(DEMOTED_MARK), "{demoted:?}");
-        assert!(!pinned.ends_with(DEMOTED_MARK), "{pinned:?}");
-        // The mark is a suffix, not a replacement: the tier is still named.
+        let marked = format!("{}{DEMOTED_MARK}", Tier::Floor.label());
+        assert!(demoted.contains(&marked), "{demoted:?}");
+        assert!(!pinned.contains(DEMOTED_MARK), "{pinned:?}");
+        // The mark is a suffix on the tier, not a replacement: the tier is still
+        // named, and the scale still follows it.
         assert!(demoted.contains(Tier::Floor.label()));
+        assert!(demoted.ends_with("1.00"), "{demoted:?}");
+    }
+
+    /// **The readout names the grid scale beside the tier** (ADR-0245), in
+    /// glyphs the font has. The scale is what makes one tier two different
+    /// pictures on two classes of adapter, so a screenshot of the panel that
+    /// named the tier and not the scale would leave the question it exists to
+    /// answer open.
+    #[test]
+    fn the_readout_names_the_grid_scale_beside_the_tier() {
+        let mut text = String::new();
+        for (value, printed) in [(1.0, "1.00"), (0.75, "0.75"), (0.5, "0.50"), (0.25, "0.25")] {
+            let scale = GridScale::new(value).expect("in range");
+            write_readout(&mut text, metrics(), Tier::Rich, false, scale);
+            assert!(
+                text.ends_with(&format!("{} {printed}", Tier::Rich.label())),
+                "{text:?}"
+            );
+            for c in printed.chars() {
+                assert_ne!(glyph(c), [0x00; GLYPH_H], "`{c}` of the scale has no glyph");
+            }
+        }
     }
 
     /// **Every character the readout can emit has a glyph.**
@@ -626,18 +667,21 @@ mod tests {
         ] {
             for tier in [Tier::Floor, Tier::Rich] {
                 for demoted in [false, true] {
-                    write_readout(
-                        &mut text,
-                        Metrics {
-                            fps,
-                            frame_ms_p99: p99,
-                            gpu_bytes: bytes,
-                            ..Metrics::default()
-                        },
-                        tier,
-                        demoted,
-                    );
-                    sweep(&text);
+                    for scale in [0.25, 0.5, 1.0] {
+                        write_readout(
+                            &mut text,
+                            Metrics {
+                                fps,
+                                frame_ms_p99: p99,
+                                gpu_bytes: bytes,
+                                ..Metrics::default()
+                            },
+                            tier,
+                            demoted,
+                            GridScale::new(scale).expect("in range"),
+                        );
+                        sweep(&text);
+                    }
                 }
             }
         }

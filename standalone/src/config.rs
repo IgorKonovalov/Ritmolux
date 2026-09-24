@@ -211,6 +211,116 @@ pub struct Quality {
     /// Which tier to pin, or `auto` (the default) to let the engine resolve the
     /// rich tier and demote it if the frame time says so.
     pub tier: TierChoice,
+    /// The fraction of the window every internal grid is drawn at, or `auto`
+    /// (the default) to let the engine pick one for the tier and the adapter
+    /// (ADR-0245). `--grid-scale` and `RLX_GRID_SCALE` win over this, in that
+    /// order, exactly as they do over `tier`.
+    pub grid_scale: GridScaleChoice,
+}
+
+/// A config-file grid-scale choice: a number in `0.25..=1.0`, or `"auto"`.
+///
+/// Written as the bare number or the string, so the file reads
+/// `grid_scale = 0.5` or `grid_scale = "auto"`. A number outside the range is
+/// **refused** with a message naming the range rather than clamped: the file
+/// then fails to parse, and [`Config::load`] says so, as it does for every
+/// other closed-set key here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GridScaleChoice {
+    /// The engine's own table, by tier and adapter class.
+    #[default]
+    Auto,
+    /// This fraction, whatever the tier and the adapter.
+    Fixed(rlx_core::render::GridScale),
+}
+
+impl GridScaleChoice {
+    /// The pin this choice represents, or `None` for `auto`.
+    pub fn pin(self) -> Option<rlx_core::render::GridScale> {
+        match self {
+            GridScaleChoice::Auto => None,
+            GridScaleChoice::Fixed(scale) => Some(scale),
+        }
+    }
+
+    /// Parse the written form — `auto`, case-insensitively, or a number in
+    /// range. One parser for the flag, the environment variable and the file,
+    /// so the three accept the same spellings and refuse them in the same words.
+    pub fn parse(text: &str) -> Result<Self, String> {
+        if text.trim().eq_ignore_ascii_case("auto") {
+            return Ok(GridScaleChoice::Auto);
+        }
+        rlx_core::render::GridScale::parse(text)
+            .map(GridScaleChoice::Fixed)
+            .map_err(|_| {
+                format!(
+                    "`{}` is not a grid scale: expected `auto` or a number from {} to {}",
+                    text.trim(),
+                    rlx_core::render::GridScale::MIN,
+                    rlx_core::render::GridScale::MAX
+                )
+            })
+    }
+
+    /// The word or number the file and the settings row print.
+    pub fn label(self) -> String {
+        match self {
+            GridScaleChoice::Auto => "auto".to_owned(),
+            GridScaleChoice::Fixed(scale) => scale.to_string(),
+        }
+    }
+}
+
+impl Serialize for GridScaleChoice {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            GridScaleChoice::Auto => serializer.serialize_str("auto"),
+            // Through the `f32`'s own shortest decimal, so a hand-written 0.3
+            // is written back as 0.3 and not as the `f64` widening of the
+            // nearest `f32`, 0.30000001192092896.
+            GridScaleChoice::Fixed(scale) => {
+                let shortest: f64 = scale.get().to_string().parse().unwrap_or(1.0);
+                serializer.serialize_f64(shortest)
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for GridScaleChoice {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Choice;
+
+        impl serde::de::Visitor<'_> for Choice {
+            type Value = GridScaleChoice;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(
+                    f,
+                    "\"auto\" or a number from {} to {}",
+                    rlx_core::render::GridScale::MIN,
+                    rlx_core::render::GridScale::MAX
+                )
+            }
+
+            fn visit_str<E: serde::de::Error>(self, text: &str) -> Result<Self::Value, E> {
+                GridScaleChoice::parse(text).map_err(E::custom)
+            }
+
+            fn visit_f64<E: serde::de::Error>(self, value: f64) -> Result<Self::Value, E> {
+                GridScaleChoice::parse(&value.to_string()).map_err(E::custom)
+            }
+
+            fn visit_i64<E: serde::de::Error>(self, value: i64) -> Result<Self::Value, E> {
+                GridScaleChoice::parse(&value.to_string()).map_err(E::custom)
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, value: u64) -> Result<Self::Value, E> {
+                GridScaleChoice::parse(&value.to_string()).map_err(E::custom)
+            }
+        }
+
+        deserializer.deserialize_any(Choice)
+    }
 }
 
 /// A config-file tier choice — the two real tiers plus "let the engine decide".
@@ -824,6 +934,60 @@ source = \"favorites\"
             .is_err(),
             "an unknown source must be refused the same way"
         );
+    }
+
+    /// **`[quality] grid_scale`** (ADR-0245): absent means `auto`, a number in
+    /// range and the word both survive the write a settings change performs,
+    /// and a number outside the range is refused with the range in the message
+    /// rather than clamped into it.
+    #[test]
+    fn the_grid_scale_key_defaults_to_auto_round_trips_and_refuses_its_outside() {
+        use super::GridScaleChoice;
+        use rlx_core::render::GridScale;
+
+        let config: Config = toml::from_str("[quality]\ntier = \"floor\"\n")
+            .expect("a [quality] section predating grid_scale must still parse");
+        assert_eq!(config.quality.grid_scale, GridScaleChoice::Auto);
+
+        for (text, want) in [
+            (
+                "grid_scale = 0.5",
+                GridScaleChoice::Fixed(GridScale::new(0.5).unwrap()),
+            ),
+            ("grid_scale = 1", GridScaleChoice::Fixed(GridScale::FULL)),
+            (
+                "grid_scale = 0.3",
+                GridScaleChoice::Fixed(GridScale::new(0.3).unwrap()),
+            ),
+            ("grid_scale = \"auto\"", GridScaleChoice::Auto),
+        ] {
+            let config: Config =
+                toml::from_str(&format!("[quality]\n{text}\n")).expect("an in-range key parses");
+            assert_eq!(config.quality.grid_scale, want, "{text}");
+            let written = toml::to_string_pretty(&config).expect("config serializes");
+            let back: Config = toml::from_str(&written).expect("its own output parses");
+            assert_eq!(
+                back.quality.grid_scale, want,
+                "{text} did not survive a save"
+            );
+            assert!(
+                written.contains(text),
+                "the key must be written as the operator wrote it: {written}"
+            );
+        }
+
+        for bad in [
+            "grid_scale = 0.1",
+            "grid_scale = 2",
+            "grid_scale = \"half\"",
+        ] {
+            let err = toml::from_str::<Config>(&format!("[quality]\n{bad}\n"))
+                .expect_err("an out-of-range scale must not deserialize");
+            assert!(
+                err.to_string().contains("0.25"),
+                "the refusal of {bad} must name the range: {err}"
+            );
+        }
     }
 
     /// The same guarantee for the banner: the settings row is only "survives a

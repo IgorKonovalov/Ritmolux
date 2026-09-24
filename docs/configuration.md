@@ -30,6 +30,7 @@ telemetry.
 | `--input` | `loopback` \| `line-in` | Where audio comes from (Windows-only) |
 | `--device` | `"<friendly name>"` | Which capture endpoint to open (Windows-only) |
 | `--tier` | `floor` \| `rich` | Pin the quality tier instead of letting the engine pick |
+| `--grid-scale` | `0.25`–`1` \| `auto` | Draw the internal grids at this fraction of the frame — the window and `--stream` both. Overrides `[quality] grid_scale` for one run |
 | `--osc` | `<host:port>` | Publish analyzer telemetry as OSC over UDP, and turn the sink on |
 | `--control` | `<host:port>` | Listen for studio control messages as OSC over UDP, and turn the listener on |
 | `--soak` | `[path]` | Write a long-run frame-time trace; bare, a default path |
@@ -240,6 +241,17 @@ governor demotes it to `floor` once if the display's frame budget is not being h
 demoted, so this is also how you keep `rich` on a machine a transient stall demoted. The tier also
 moves while the app is running — see [Quality tiers](running.md#quality-tiers).
 
+**`--grid-scale <0.25..1|auto>`** sets the fraction of the frame the internal grids are drawn at —
+the post stages' grid (trails, kaleidoscope, bloom) and the attractor's trail field. Those grids are
+where a heavy preset spends its frame, and their cost follows their area, so `0.5` draws a quarter of
+the texels at a visible loss of sharpness and nothing else: the picture's shape does not move. `auto`
+lets the engine pick one for the tier and the kind of GPU — today that is `1` everywhere. Under
+`--stream` it is the only way to draw at less than full size: a headless run takes `1` on any GPU,
+so two machines of different kinds capture the same grids, and neither `[quality] grid_scale` nor
+`RLX_GRID_SCALE` reaches it. A value outside `0.25`–`1` is a usage error naming the range, and the
+app exits, the same way a bad `--tier` does. The scale in force is printed beside the tier in the
+`F3` overlay, and in the header of `--stream`'s pass-cost table together with both grids' sizes.
+
 **`--osc <host:port>`** both aims the sink and turns it on, so `enabled = false` in `config.toml`
 cannot veto a target typed for this run. **Off unless you ask for it.** A target that will not
 resolve is a usage error and the app exits — the same way a bad `--tier` does — whereas a stale
@@ -254,6 +266,7 @@ line per frame.
 |---|---|---|
 | `RLX_PRESET_DIR` | a directory | Read presets from here instead of the seeded per-user directory; edits to `*.toml` there hot-reload live |
 | `RLX_TIER` | `floor` \| `rich` | The same pin as `--tier`, for a one-off run |
+| `RLX_GRID_SCALE` | `0.25`–`1` \| `auto` | The same override as `--grid-scale`, for a one-off windowed run. A bad value is reported and ignored |
 
 `RLX_PRESET_DIR` is read by the headless [`shot`](capturing.md) CLI as well as by the app, so a
 capture and a live run resolve the same library.
@@ -364,10 +377,18 @@ rotates before 20 s. An energy drop can land a change early, but only well past 
 | Key | Default | What it means |
 |---|---|---|
 | `tier` | `"auto"` | `"auto"` lets the engine resolve `rich` and demote it if the frame time says so; `"floor"` and `"rich"` pin it |
+| `grid_scale` | `"auto"` | The fraction of the window the internal grids are drawn at: a number from `0.25` to `1`, or `"auto"` to let the engine pick one for the tier and the kind of GPU (`1` everywhere today). A number outside the range makes the file fail to parse, which the app reports before starting on the defaults |
 
-Precedence, highest first: `--tier`, then `RLX_TIER`, then `[quality] tier`, then auto. A pin made
-from inside the app (`[`, `]`, or the settings menu) is written here, so it survives a restart —
-and the two above still win at the next launch.
+Precedence, highest first, for both keys alike:
+
+| Key | Highest | | | Lowest |
+|---|---|---|---|---|
+| `tier` | `--tier` | `RLX_TIER` | `[quality] tier` | auto |
+| `grid_scale` | `--grid-scale` | `RLX_GRID_SCALE` | `[quality] grid_scale` | auto |
+
+A choice made from inside the app — `[` and `]` or the settings menu's Quality row for the tier, the
+Grid scale row for the scale — is written here, so it survives a restart, and the flag and the
+variable still win at the next launch.
 
 ### `[hud]`
 
@@ -468,6 +489,7 @@ source = "all"
 
 [quality]
 tier = "auto"
+grid_scale = "auto"
 
 [hud]
 preset_name = true
@@ -498,6 +520,7 @@ running app *for that session*.
 | Setting | Highest | | | Lowest |
 |---|---|---|---|---|
 | Quality tier | `--tier` | `RLX_TIER` | `[quality] tier` | auto |
+| Grid scale | `--grid-scale` | `RLX_GRID_SCALE` | `[quality] grid_scale` | auto |
 | Graphics adapter | `--gpu` | | `[output] gpu` | high performance |
 | Preset directory | `RLX_PRESET_DIR` | | | the seeded per-user directory |
 | Input mode | `--input` | | `[input] mode` | `loopback` |

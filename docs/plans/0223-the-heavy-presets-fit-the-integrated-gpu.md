@@ -266,7 +266,7 @@ grid_scale = "auto"   # or 0.25..1.0
 | 2 — The stream readback stops waiting | dev | done | 045025be |
 | 3 — The grid rounds to nearest | dev | done | bd73f508 |
 | 4 — The post chain stops copying and clearing | dev | withdrawn 2026-09-24 (architect) | |
-| 5 — The grid scale exists, at 1.0 everywhere | dev | not started | |
+| 5 — The grid scale exists, at 1.0 everywhere | dev | done | committed with this row |
 | 6 — The two integrated rows are measured | human | not started | |
 | 7 — The table takes the measured rows | dev | not started | |
 
@@ -338,51 +338,49 @@ grid_scale = "auto"   # or 0.25..1.0
 - **Phase 3's grep for committed renders outside `docs/images/` found only `core/tests/golden/`**,
   and every one of those is at or under 256 a side, which is why `cargo nextest run --workspace`
   is green with nothing blessed.
-- **Phase 4 is parked, `plan_wrong`, and the run stopped there — Phase 5 is unstarted.** The
-  phase's first item and its own done-when name different stages, and the difference is what
-  decides how large the change is. What the code holds today:
-  - **Bloom does not own a copy of its predecessor's output.** `bloom-src` is the *handoff
-    buffer*: `Bloom::begin` returns that view and the predecessor renders **into** it, exactly as
-    `kaleido-src` and `trails-composited` are their own stages' handoff buffers. A three-stage
-    chain needs three of them. So "owning a full-grid copy of it" is not true of `bloom-src` in
-    general, and there is nothing to delete by looking at bloom alone.
-  - **It *is* true on one edge, and that edge is trails'.** `Trails` materializes its result in
-    the `PingPongField` accumulation and then copies it out with `trails-present-pass`, which
-    under `Fold::Own` applies an `alpha_scale` of exactly `1.0` and is therefore a plain
-    full-grid copy into whatever the next stage owns. That pass is the only "handoff pass" in
-    the table, and its destination texture is the only removable full-grid allocation.
-  - **On the shipped Leviathan the stage after trails is the kaleidoscope, not bloom.**
-    `presets/attractor_leviathan.toml` binds `trails`, `kaleido_order = "6"` **and**
-    `bloom_amount = "1.4"`, so the chain is `trails -> kaleidoscope -> bloom`. Removing
-    `trails-present-pass` from that preset's table — which the done-when asks for — therefore
-    requires the **kaleidoscope** to sample the accumulation directly, and drops `kaleido-src`
-    rather than `bloom-src`. The `What` describes only bloom; the `Done when` cannot be met
-    without kaleido.
-  - **Either way the mechanism is a widening of the `PostStage` seam, which the `What` does not
-    describe.** A stage would have to *lend* an output view; a stage would have to *borrow* one
-    instead of allocating an input; the chain walk would have to resolve a stage **before** its
-    successor's `begin` rather than after it; and a borrowing stage needs one bind-group set per
-    accumulation side, because the ping-pong alternates every frame and rebuilding a bind group
-    per frame is the per-frame GPU allocation ADR-0030 exists to refuse. The phase's
-    `Files touched` anticipates all of that — it lists `trails.rs` as *"the `PostStage` input
-    seam"* and lists `kaleidoscope.rs` — but the `What` does not, and the alpha contract this
-    seam carries (ADR-0055, ADR-0085) is where this composite has had repeated defects.
-
-  **What Phase 4 needs before it can run:** a `What` that says which stages lend and which
-  borrow, and whether the kaleidoscope is in scope. The phase's other two items —
-  folding `post-chain-input-clear` into the scene pass's load op, and making the bloom
-  down/blur passes load rather than clear a target the fullscreen triangle covers — are
-  unambiguous and were **not** implemented, because a phase lands as one commit meeting its
-  whole done-when.
-- **The suite is red on one pre-existing test, on this lane's filesystem.**
-  `rlx-core render::tonemap::tests::the_scan_reads_the_visibility_the_helpers_actually_set` fails
-  at `core/src/render/tonemap/tests.rs:1431` with `left: ""`, `right: "FRAGMENT"` on the
-  `pub(crate) fn sampler(` needle. It is the failure Plan 0214's `## Implementation log` records
-  and Plan 0214 Phase 2 owns: `rs_files` concatenates `core/src` in unsorted `read_dir` order and
-  the needle also matches the test's own literal. No phase of this plan adds or removes a file
-  under `core/src`, so the walk order it depends on is untouched here. It makes Phase 3's and
-  Phase 4's *"the whole suite is green"* unsatisfiable as stated for as long as it stands; every
-  other test in `-P fast` passes.
+- **Phase 4 parked `plan_wrong` before it was withdrawn.** The park found what the withdrawal
+  text in the phase block now records (the handoff copy is trails', and it feeds the kaleidoscope
+  on Leviathan). Nothing from it was implemented.
+- **The pre-existing tonemap red the earlier runs recorded is gone.** Before Phase 5 the lane took
+  main (`ee1b4409`), and `cargo nextest run --workspace` at Phase 5's tip is 1823 passed and
+  7 skipped, with nothing blessed.
+- **Phase 5, the attractor gets the scale per frame through a new `Scene` hook, and that widens
+  the trait.** The phase reads as if `set_target_size` receives the target, but when a post stage
+  is active it receives *that stage's grid*, which the scale has already shrunk. Scaling there
+  too would draw the trail field at the square of the scale on every staged preset, Leviathan
+  included. `SceneTarget::field_scale` carries the part of the scale the target does not already
+  hold: `1.0` into a stage grid, the whole scale into the destination. The new default-no-op
+  `Scene::set_grid_scale` in `scenes/mod.rs` hands it over from `composite.rs` every frame. That
+  is a per-frame hot-path widening under ADR-0030's three conditions, and the architect decides
+  whether it stands.
+- **Phase 5, the budget counts `target_px * scale^2`, not the quantized trail grid's texels.**
+  Counting the quantized grid would move Rich's live budget at 640x360 from 150 000 to 160 000,
+  because that target's grid is 640x384, and the done-when forbids it. `GridScale::texels` is
+  exact at 1.0, and quantization stays uncounted, as it was before.
+  `scenes::tests::a_full_grid_scale_resolves_todays_budget_at_every_suite_size` compares the law
+  against the target with the scene, for both tiers and both ceilings at the three named sizes.
+- **Phase 5 reached files its list does not name, mechanically:** `trails.rs`,
+  `kaleidoscope.rs` and `bloom.rs` (their cap field became a `PostGrid` of cap and scale),
+  `composite.rs`, `scenes/mod.rs` (the hook above), `tier_governor.rs` (`apply_tier`
+  re-resolves), `standalone/src/run.rs` and `lib.rs` (the flag and the variable reach the
+  window), `console/tests.rs`, and the test files of `post`, `bloom`, `tier` and `render`.
+- **Phase 5's smaller departures.** `RendererOptions.grid_scale` is `Option<GridScale>`, a
+  validated newtype, not `Option<f32>`, because `RendererOptions` derives `Eq`. The resolved
+  scale lives on `TierConfig::grid_scale`. `set_adapter` also re-resolves the scale, for the new
+  adapter's class. The overlay's demotion `*` now follows the tier and not the end of the line
+  (`FLOOR* 1.00`). `--stream` reads only the flag, not the file or `RLX_GRID_SCALE`, as it
+  already does for the tier, and it accepts `--grid-scale=` too.
+- **Phase 5, "an out-of-range key is a usage error" holds for the flag, not for the file.** An
+  out-of-range `--grid-scale` exits naming the range. An out-of-range `[quality] grid_scale`
+  fails the file's parse with the range in the message, and `Config::load` then reports it and
+  starts on the defaults, which is how every other closed-set key is treated (NFR 10). A bad
+  `RLX_GRID_SCALE` is reported and ignored, as `RLX_TIER` is.
+- **Phase 5's `--grid-scale 0.5 --stream --size 1920x1080` invocation was not run.** This
+  session has no `cargo run` and no audio device. What is asserted instead: the renderer's
+  `internal_grids()` is 1024x512 for both grids at that size and scale
+  (`render::tests::a_headless_renderer_resolves_full_scale_on_any_adapter_unless_pinned`, on both
+  the software and the hardware adapter), and `stream::tests::the_pass_table_header_names_the_scale_and_both_grids`
+  checks the header's format.
 
 ### Close triggers
 

@@ -13,7 +13,8 @@ use rlx_core::render::{AdapterChoice, Tier};
 use standalone::gpu::AdapterSource;
 use standalone::osc::OscSink;
 use standalone::{
-    AppDirMigration, PresetDir, migrate_app_dir, resolve_preset_dir, resolve_tier, tier_env,
+    AppDirMigration, PresetDir, grid_scale_env, migrate_app_dir, resolve_grid_scale,
+    resolve_preset_dir, resolve_tier, tier_env,
 };
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, MouseButton, WindowEvent};
@@ -25,10 +26,10 @@ use crate::app_state::{APP_TITLE, AppState, HIDDEN_TICK};
 use crate::capture_start::list_devices_and_exit;
 use crate::cli::{
     InputSource, missing_companion, parse_check_arg, parse_console_flag, parse_control_arg,
-    parse_downbeat_log_arg, parse_events_flag, parse_input_args, parse_osc_arg, parse_preview_arg,
-    parse_soak_arg, parse_strict_flag, parse_tier_arg, print_help, resolve_config_path,
-    resolve_control, resolve_input, resolve_osc, unrecognized_flag, valued_valueless_flag,
-    windowed_flag,
+    parse_downbeat_log_arg, parse_events_flag, parse_grid_scale_arg, parse_input_args,
+    parse_osc_arg, parse_preview_arg, parse_soak_arg, parse_strict_flag, parse_tier_arg,
+    print_help, resolve_config_path, resolve_control, resolve_input, resolve_osc,
+    unrecognized_flag, valued_valueless_flag, windowed_flag,
 };
 use crate::console;
 use crate::preset_dir::startup_preset_names;
@@ -51,6 +52,10 @@ pub(crate) struct App {
     /// The quality-tier pin, already resolved across `--tier` / `RLX_TIER` /
     /// config (Plan 0044). `None` is auto — rich, governed.
     pub(crate) tier: Option<Tier>,
+    /// The grid-scale choice, already resolved across `--grid-scale` /
+    /// `RLX_GRID_SCALE` / `[quality] grid_scale` (ADR-0245). `Auto` lets the
+    /// engine pick from the tier and the adapter.
+    pub(crate) grid_scale: config::GridScaleChoice,
     /// Which adapter the window asks for, already resolved across `--gpu` and
     /// `[output] gpu`, and which of the two named it. Held beside `config`
     /// like the other per-launch flags, so `--gpu` pins this run without
@@ -698,6 +703,29 @@ pub fn run() {
         );
     }
 
+    // Grid scale, the same three sources in the same order and with the same
+    // treatment of a bad value: the flag exits, the env var is reported and
+    // stepped past (ADR-0245).
+    let grid_scale_flag = match parse_grid_scale_arg() {
+        Ok(choice) => choice,
+        Err(msg) => {
+            eprintln!("{msg}");
+            std::process::exit(1);
+        }
+    };
+    let grid_scale_from_env = grid_scale_env().unwrap_or_else(|msg| {
+        eprintln!("{msg}; ignoring");
+        None
+    });
+    let (grid_scale, grid_scale_source) = resolve_grid_scale(
+        grid_scale_flag,
+        grid_scale_from_env,
+        config.quality.grid_scale,
+    );
+    if grid_scale != config::GridScaleChoice::Auto || grid_scale_flag.is_some() {
+        eprintln!("grid scale {} by {grid_scale_source}", grid_scale.label());
+    }
+
     // Audio input, flags over config (Plan 0130 / ADR-0142). A bad `--input`
     // exits for the same reason a bad `--tier` does — it was typed for this run.
     let (input_mode_flag, input_device_flag) = match parse_input_args() {
@@ -830,6 +858,7 @@ pub fn run() {
         soak_path,
         downbeat_log_path,
         tier,
+        grid_scale,
         adapter,
         adapter_source,
         held_preset,

@@ -125,7 +125,7 @@
 )]
 
 use super::gpu;
-use super::post::{Fold, PostStage, internal_grid_size};
+use super::post::{Fold, PostGrid, PostStage};
 use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
 /// `bloom_amount` default — **off**, so an unbound preset never builds the stage.
@@ -863,9 +863,9 @@ pub struct Bloom {
     /// this stage's to default. The neutral stop is the initial value, so a caller
     /// that never sets it gets today's arithmetic exactly.
     exposure: f32,
-    /// The active tier's cap on this stage's internal grid — see
-    /// [`Trails::post_cap`](super::trails::Trails).
-    post_cap: (u32, u32),
+    /// The active tier's cap on this stage's internal grid and the renderer's
+    /// grid scale — see [`Trails::grid`](super::trails::Trails).
+    grid: PostGrid,
     /// The active tier's pyramid depth
     /// ([`TierConfig::bloom_levels`](super::TierConfig::bloom_levels)), resolved
     /// once at construction. Read only through [`level_sizes`], which is pure, so
@@ -908,7 +908,7 @@ impl Bloom {
     pub fn new(
         device: &wgpu::Device,
         surface_format: wgpu::TextureFormat,
-        post_cap: (u32, u32),
+        grid: PostGrid,
         max_levels: u32,
     ) -> Self {
         Self {
@@ -919,7 +919,7 @@ impl Bloom {
             threshold: DEFAULT_THRESHOLD,
             radius: DEFAULT_RADIUS,
             exposure: super::tonemap::DEFAULT_EXPOSURE,
-            post_cap,
+            grid,
             max_levels,
             builds: 0,
         }
@@ -974,7 +974,7 @@ impl PostStage for Bloom {
     /// (ADR-0034) — the same grid the other two stages run at, so a chain of all
     /// three hands off at one resolution.
     fn internal_size(&self, surface: (u32, u32)) -> (u32, u32) {
-        internal_grid_size(surface, self.post_cap)
+        self.grid.size(surface)
     }
 
     /// Build the resources if needed and return the offscreen view the upstream

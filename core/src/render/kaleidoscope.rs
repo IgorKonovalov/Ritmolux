@@ -186,7 +186,7 @@
 
 use crate::render::gpu;
 
-use super::post::{Fold, PostStage, internal_grid_size};
+use super::post::{Fold, PostGrid, PostStage};
 use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
 /// `kaleido_order` default — 1 = identity, so an unbound preset is unaffected.
@@ -906,9 +906,9 @@ pub struct Kaleidoscope {
     zoom: f32,
     tile: f32,
     inner: f32,
-    /// The active tier's cap on this stage's internal grid — see
-    /// [`Trails::post_cap`](super::trails::Trails).
-    post_cap: (u32, u32),
+    /// The active tier's cap on this stage's internal grid and the renderer's
+    /// grid scale — see [`Trails::grid`](super::trails::Trails).
+    grid: PostGrid,
     /// How many times [`Resources::build`] has run — see
     /// [`Trails::builds`](super::trails::Trails).
     builds: u32,
@@ -994,11 +994,7 @@ pub const PARAMS: &[ParamSpec] = &[
 
 impl Kaleidoscope {
     /// Store the device/format for a lazy build; no GPU resources yet.
-    pub fn new(
-        device: &wgpu::Device,
-        surface_format: wgpu::TextureFormat,
-        post_cap: (u32, u32),
-    ) -> Self {
+    pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat, grid: PostGrid) -> Self {
         Self {
             device: device.clone(),
             surface_format,
@@ -1013,7 +1009,7 @@ impl Kaleidoscope {
             zoom: DEFAULT_ZOOM,
             tile: DEFAULT_TILE,
             inner: DEFAULT_INNER,
-            post_cap,
+            grid,
             builds: 0,
         }
     }
@@ -1097,7 +1093,7 @@ impl PostStage for Kaleidoscope {
     /// the one [`resolve`](PostStage::resolve) folds about, is the render target's
     /// (ADR-0037).
     fn internal_size(&self, surface: (u32, u32)) -> (u32, u32) {
-        internal_grid_size(surface, self.post_cap)
+        self.grid.size(surface)
     }
 
     /// Build the resources if needed and return the offscreen view the scene (or

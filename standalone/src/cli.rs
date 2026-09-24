@@ -153,6 +153,12 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
         help: "<floor|rich> pin the quality tier instead of letting the engine pick",
     },
     FlagSpec {
+        name: "--grid-scale",
+        takes_value: true,
+        requires: None,
+        help: "<0.25..1|auto> draw the internal grids at this fraction of the frame",
+    },
+    FlagSpec {
         name: "--osc",
         takes_value: true,
         requires: None,
@@ -540,6 +546,34 @@ pub(crate) fn parse_tier_arg() -> Result<Option<Tier>, String> {
     Ok(None)
 }
 
+/// The grid scale `--grid-scale <n|auto>` / `--grid-scale=<n|auto>` asks for,
+/// or `None` when the flag is absent (ADR-0245).
+///
+/// `Err` on a missing, unparseable or out-of-range value, and the message names
+/// the range: like `--tier`, a bad flag was typed for this run, so starting at
+/// some other scale would answer the wrong question. The windowed path's
+/// reader; `stream::parse` reads the same flag on the headless one.
+pub(crate) fn parse_grid_scale_arg() -> Result<Option<config::GridScaleChoice>, String> {
+    parse_grid_scale_from(std::env::args().skip(1))
+}
+
+/// [`parse_grid_scale_arg`] over an explicit argument list, so the rule is
+/// testable without the process's own.
+pub(crate) fn parse_grid_scale_from(
+    args: impl Iterator<Item = String>,
+) -> Result<Option<config::GridScaleChoice>, String> {
+    let mut args = args;
+    while let Some(arg) = args.next() {
+        if let Some(value) = flag_value(&arg, "--grid-scale", &mut args) {
+            let value = value?;
+            return config::GridScaleChoice::parse(&value)
+                .map(Some)
+                .map_err(|err| format!("--grid-scale: {err}"));
+        }
+    }
+    Ok(None)
+}
+
 /// The value of a single-valued flag, in both spellings, or `None` when the
 /// flag is absent.
 ///
@@ -853,9 +887,42 @@ pub(crate) fn default_downbeat_log_path() -> PathBuf {
 pub(crate) mod tests {
     use super::{
         FLAGS, InputSource, config, help_text, missing_companion, parse_control_arg_from,
-        parse_input_args_from, parse_osc_arg_from, resolve_control, resolve_input, resolve_osc,
-        unrecognized_flag, valued_valueless_flag,
+        parse_grid_scale_from, parse_input_args_from, parse_osc_arg_from, resolve_control,
+        resolve_input, resolve_osc, unrecognized_flag, valued_valueless_flag,
     };
+
+    /// `--grid-scale` in both spellings, `auto` included, and every refusal a
+    /// usage error that names the range (ADR-0245): an out-of-range number,
+    /// a word that is not `auto`, and the flag with nothing after it.
+    #[test]
+    fn the_grid_scale_flag_parses_or_names_its_range() {
+        let argv = |args: &[&str]| args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+        let parse = |args: &[&str]| parse_grid_scale_from(argv(args).into_iter());
+
+        assert_eq!(
+            parse(&["--grid-scale", "0.5"]).map(|c| c.map(config::GridScaleChoice::label)),
+            Ok(Some("0.50".to_owned()))
+        );
+        assert_eq!(
+            parse(&["--grid-scale=0.25"]).map(|c| c.map(config::GridScaleChoice::label)),
+            Ok(Some("0.25".to_owned()))
+        );
+        assert_eq!(
+            parse(&["--grid-scale", "auto"]),
+            Ok(Some(config::GridScaleChoice::Auto))
+        );
+        assert_eq!(parse(&["--tier", "rich"]), Ok(None));
+        for bad in [
+            &["--grid-scale", "0.1"][..],
+            &["--grid-scale=2"],
+            &["--grid-scale", "x"],
+        ] {
+            let err = parse(bad).expect_err("out of range");
+            assert!(err.starts_with("--grid-scale"), "{err}");
+            assert!(err.contains("0.25") && err.contains('1'), "{err}");
+        }
+        assert!(parse(&["--grid-scale"]).is_err());
+    }
 
     /// `--osc` in both spellings, and the empty value refused for the same
     /// reason `--device=` is: it reads as a request and names nothing.

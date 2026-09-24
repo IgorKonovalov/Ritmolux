@@ -102,7 +102,7 @@ pub use scenes::lines::CapOverflow;
 use text::TextLayer;
 #[cfg(feature = "text")]
 pub use text::TextRun;
-pub use tier::{REFERENCE_PX, Tier, TierConfig, attractor_budget};
+pub use tier::{GridScale, REFERENCE_PX, Tier, TierConfig, attractor_budget};
 use tonemap::Tonemap;
 use transition::{Blend, DEFAULT_DURATION_SECS, Transition, TransitionKind};
 
@@ -258,6 +258,11 @@ pub struct RendererOptions {
     /// (ADR-0140). [`SampleBudget::Live`] by default, so every caller that does
     /// not ask resolves exactly what it resolved before the choice existed.
     pub budget: SampleBudget,
+    /// An explicit grid-scale pin, or `None` for auto (ADR-0245) — which a
+    /// window resolves from the tier and the adapter's class, and a headless
+    /// renderer resolves as [`GridScale::FULL`]. A pin wins on both paths and
+    /// survives a tier change and an adapter change.
+    pub grid_scale: Option<GridScale>,
 }
 
 impl RendererOptions {
@@ -304,6 +309,16 @@ pub enum SampleBudget {
     /// Memory bound: `shot --render`, which walks a clip end to end with `dt`
     /// injected and answers to no display.
     Offline,
+}
+
+/// The internal grids a renderer resolves for its target, in texels, width then
+/// height ([`Renderer::internal_grids`], ADR-0245).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InternalGrids {
+    /// The post chain's grid — every active stage runs at this size.
+    pub post: (u32, u32),
+    /// The attractor's trail field, when it draws straight into the target.
+    pub trail: (u32, u32),
 }
 
 /// The channel order the four bytes of a pixel arrive in, for a consumer
@@ -500,6 +515,11 @@ pub struct Renderer {
     /// a demoted floor are distinguishable — otherwise the demotion would be
     /// silent, which ADR-0045 rules out.
     tier_demoted: bool,
+    /// The grid-scale pin this renderer was built with, or last given
+    /// ([`RendererOptions::grid_scale`]). Kept because the scale is re-resolved
+    /// whenever the tier or the adapter moves, and a pin has to survive both; the
+    /// resolved value itself lives in [`tier`](Self::tier).
+    grid_scale_pin: Option<GridScale>,
     /// The display's frame budget in seconds, set by the frontend from its
     /// monitor's refresh rate ([`set_display_hz`](Self::set_display_hz)). Not read
     /// from the platform here — a refresh rate is a shell concern, and `core`
@@ -514,6 +534,23 @@ pub struct Renderer {
     outgoing_state: BindingState,
 }
 
+/// `tier` with its grid scale resolved for `ctx` (ADR-0245): the pin when there
+/// is one, the table's row for this adapter's class on a window, and
+/// [`GridScale::FULL`] on a context with no surface.
+///
+/// The one call every path that takes a [`TierConfig`] goes through —
+/// construction, [`Renderer::set_tier`], the governor's demotion and an adapter
+/// switch — so no rebuild can hand the scenes a tier with the scale left at the
+/// constant's `1.0`.
+fn resolved_tier(ctx: &RenderContext, tier: TierConfig, pin: Option<GridScale>) -> TierConfig {
+    tier.with_grid_scale(tier::resolve_grid_scale(
+        pin,
+        tier.tier,
+        ctx.adapter_class(),
+        ctx.surface.is_some(),
+    ))
+}
+
 impl Renderer {
     /// Everything a renderer is beyond its [`RenderContext`]: the scene roster,
     /// the composite side, the engine-wide post passes, the overlay, and the
@@ -523,8 +560,13 @@ impl Renderer {
     fn from_context(ctx: RenderContext, opts: RendererOptions) -> Self {
         // The one tier resolution in the engine (ADR-0045): a pin wins, and
         // unpinned is `Rich` — the governor's job is to take that back, not to
-        // hedge it here.
-        let tier = TierConfig::for_tier(opts.tier.unwrap_or(Tier::Rich));
+        // hedge it here. The grid scale resolves with it, from the same tier and
+        // this context's adapter (ADR-0245).
+        let tier = resolved_tier(
+            &ctx,
+            TierConfig::for_tier(opts.tier.unwrap_or(Tier::Rich)),
+            opts.grid_scale,
+        );
         // Everything upstream of the tonemap is built against COMPOSITE_FORMAT,
         // not the surface's (ADR-0046): the scenes, both composite sides and the
         // blend all paint in linear light. Only the tonemap, ink, the overlay and
@@ -572,6 +614,7 @@ impl Renderer {
             tier,
             tier_pinned: opts.tier.is_some(),
             tier_demoted: false,
+            grid_scale_pin: opts.grid_scale,
             frame_budget_secs: tier::budget_secs(tier::DEFAULT_DISPLAY_HZ),
             outgoing_state: BindingState::default(),
         };
@@ -638,9 +681,28 @@ impl Renderer {
         tier: Tier,
         adapter: &AdapterChoice,
     ) -> Result<Self, RenderError> {
+        Self::new_headless_scaled(opts, tier, adapter, None)
+    }
+
+    /// [`new_headless_on`](Self::new_headless_on) with an explicit grid-scale
+    /// pin (ADR-0245) — the constructor `--stream --grid-scale` reaches.
+    ///
+    /// `None` is what every other headless constructor passes, and it resolves
+    /// [`GridScale::FULL`] on every adapter, so a capture never depends on the
+    /// class of the machine that took it. A pin is the only way a headless
+    /// renderer draws its grids at less.
+    pub fn new_headless_scaled(
+        opts: HeadlessOptions,
+        tier: Tier,
+        adapter: &AdapterChoice,
+        grid_scale: Option<GridScale>,
+    ) -> Result<Self, RenderError> {
         Ok(Self::from_context(
             RenderContext::new_headless_on(opts.width, opts.height, adapter)?,
-            RendererOptions::pinned(tier),
+            RendererOptions {
+                grid_scale,
+                ..RendererOptions::pinned(tier)
+            },
         ))
     }
 
@@ -743,6 +805,54 @@ impl Renderer {
         self.apply_tier(TierConfig::for_tier(tier));
     }
 
+    /// The fraction of the render target the internal grids are drawn at
+    /// (ADR-0245) — what the diagnostics overlay prints beside the tier.
+    pub fn grid_scale(&self) -> GridScale {
+        self.tier.grid_scale
+    }
+
+    /// The internal grids this renderer resolves for its current target size:
+    /// the post chain's and the attractor's trail field, at the resolved scale.
+    ///
+    /// A **report**, computed on the call from the same functions the stages
+    /// and the scene size themselves with, so it cannot describe a grid neither
+    /// would build. The trail grid is the one the attractor takes when it draws
+    /// straight into the target; behind an active post stage it draws into that
+    /// stage's grid instead, which is [`post`](InternalGrids::post).
+    pub fn internal_grids(&self) -> InternalGrids {
+        let surface = (self.ctx.config.width, self.ctx.config.height);
+        InternalGrids {
+            post: post::internal_grid_size(surface, self.tier.grid_scale, self.tier.post_cap),
+            trail: scenes::particles::scaled_trail_grid_size(
+                surface.0,
+                surface.1,
+                self.tier.grid_scale,
+                self.tier.attractor_trail_cap,
+            ),
+        }
+    }
+
+    /// **Change the grid scale on the running renderer** (ADR-0245): `Some`
+    /// pins it, `None` returns it to auto — the table's row for this tier and
+    /// adapter.
+    ///
+    /// The same rebuild a tier change runs, and for the same reason: both grids
+    /// are sized from the resolved tier config, so the stages and the scenes are
+    /// rebuilt against the new one. The tier itself, its pin and the governor's
+    /// latch do not move.
+    ///
+    /// **A no-op on a surface-less (headless) context**, on the rule
+    /// [`set_tier`](Self::set_tier) follows: a capture's scale is fixed at
+    /// construction ([`new_headless_scaled`](Self::new_headless_scaled)), so a
+    /// public mutator cannot move a baseline.
+    pub fn set_grid_scale(&mut self, scale: Option<GridScale>) {
+        if !tier::tier_change_permitted(self.ctx.surface.is_some()) {
+            return;
+        }
+        self.grid_scale_pin = scale;
+        self.apply_tier(TierConfig::for_tier(self.tier.tier));
+    }
+
     /// **Move the running renderer onto another graphics adapter** (ADR-0246)
     /// — the sibling of [`set_tier`](Self::set_tier) one level down.
     ///
@@ -789,8 +899,17 @@ impl Renderer {
         // the first two of these; the rest are what a device change adds — a
         // member that is rebuilt here and forgotten there, or the reverse,
         // fails at runtime as a stale handle rather than at compile time.
-        let scenes = scenes::create_all(&staged.device, COMPOSITE_FORMAT, &self.tier, self.budget);
-        let side = CompositeSide::new(&staged.device, COMPOSITE_FORMAT, &self.tier);
+        // The grid scale is the new adapter's (ADR-0245): a move from an
+        // integrated GPU to a discrete one changes the table's row, and a pin
+        // survives the move either way. A window is the only path here.
+        let tier = self.tier.with_grid_scale(tier::resolve_grid_scale(
+            self.grid_scale_pin,
+            self.tier.tier,
+            staged.adapter_class(),
+            true,
+        ));
+        let scenes = scenes::create_all(&staged.device, COMPOSITE_FORMAT, &tier, self.budget);
+        let side = CompositeSide::new(&staged.device, COMPOSITE_FORMAT, &tier);
         let blend = Blend::new(&staged.device, COMPOSITE_FORMAT);
         let tonemap = Tonemap::new(&staged.device, staged.config.format);
         let ink = Ink::new(&staged.device, staged.config.format);
@@ -809,6 +928,7 @@ impl Renderer {
         }
         self.preview.close();
         self.ctx.commit(staged);
+        self.tier = tier;
         self.scenes = scenes;
         self.side = side;
         self.blend = blend;
@@ -1449,6 +1569,9 @@ impl Renderer {
             // rather than while encoding it — not a per-frame drawing concern.
             tier_pinned: _,
             frame_budget_secs: _,
+            // Read where the tier is resolved; the frame reads the resolved scale
+            // off `tier`.
+            grid_scale_pin: _,
             // Switch-site policy state (the kind rotation) — not a per-frame concern.
             transitions_started: _,
             // The secondary surface presents on its own encoder in `present_aux`,
@@ -1595,6 +1718,7 @@ impl Renderer {
                 overlay,
                 tier: tier.tier,
                 tier_demoted: *tier_demoted,
+                grid_scale: tier.grid_scale,
             },
         );
 

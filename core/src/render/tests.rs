@@ -308,6 +308,55 @@ fn headless_or_skip(opts: HeadlessOptions) -> Option<Renderer> {
     }
 }
 
+/// **A headless renderer resolves grid scale 1.0 on whatever adapter it lands
+/// on, unless it is pinned** (ADR-0245) — on the software rasterizer every
+/// golden runs on and on the machine's own GPU, whichever class that is.
+///
+/// And the pin reaches both grids: `--stream --grid-scale 0.5 --size 1920x1080`
+/// is a 960x540 fraction, which the 128-texel step rounds to 1024x512 for the
+/// post chain and the trail field alike. The public mutator stays inert on the
+/// capture path, so nothing after construction can move a baseline.
+#[test]
+fn a_headless_renderer_resolves_full_scale_on_any_adapter_unless_pinned() {
+    use super::GridScale;
+
+    for prefer_software in [true, false] {
+        let opts = HeadlessOptions {
+            width: 1920,
+            height: 1080,
+            prefer_software,
+        };
+        let Some(mut r) = headless_or_skip(opts) else {
+            return;
+        };
+        assert_eq!(
+            r.grid_scale(),
+            GridScale::FULL,
+            "headless on {} did not resolve 1.0",
+            r.adapter_description()
+        );
+        assert_eq!(r.internal_grids().post, (1920, 1024));
+        // Inert headless, like `set_tier`.
+        r.set_grid_scale(GridScale::new(0.5));
+        assert_eq!(r.grid_scale(), GridScale::FULL);
+
+        let half = GridScale::new(0.5).expect("in range");
+        let pinned = match Renderer::new_headless_scaled(
+            opts,
+            Tier::Rich,
+            &AdapterChoice::from(prefer_software),
+            Some(half),
+        ) {
+            Ok(r) => r,
+            Err(e) => panic!("the adapter above built once and not twice: {e}"),
+        };
+        assert_eq!(pinned.grid_scale(), half);
+        let grids = pinned.internal_grids();
+        assert_eq!(grids.post, (1024, 512), "post grid at 0.5");
+        assert_eq!(grids.trail, (1024, 512), "trail grid at 0.5");
+    }
+}
+
 #[test]
 fn names_are_yielded_in_roster_order() {
     let r = roster(&["alpha", "bravo", "charlie"]);

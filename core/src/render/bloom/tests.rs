@@ -44,11 +44,7 @@ fn the_rich_tier_runs_a_deeper_pyramid_than_the_floor() {
     use crate::render::TierConfig;
 
     let depth_at = |surface: (u32, u32), tier: &TierConfig| {
-        level_sizes(
-            internal_grid_size(surface, tier.post_cap),
-            tier.bloom_levels,
-        )
-        .len()
+        level_sizes(PostGrid::of(tier).size(surface), tier.bloom_levels).len()
     };
     let display = (1920, 1080);
     let floor = depth_at(display, &TierConfig::FLOOR);
@@ -65,7 +61,7 @@ fn the_rich_tier_runs_a_deeper_pyramid_than_the_floor() {
 
     // The golden capture size, whose grid is 256x256.
     assert_eq!(
-        internal_grid_size((160, 100), TierConfig::FLOOR.post_cap),
+        PostGrid::of(&TierConfig::FLOOR).size((160, 100)),
         (256, 256)
     );
     assert_eq!(depth_at((160, 100), &TierConfig::FLOOR), 4);

@@ -150,6 +150,48 @@ pub fn resolve_tier(
     }
 }
 
+/// Environment variable overriding the grid scale — `auto` or a number from
+/// 0.25 to 1 (ADR-0245). Between `--grid-scale` and `config.toml` in
+/// precedence, the slot [`TIER_ENV`] holds for the tier.
+pub const GRID_SCALE_ENV: &str = "RLX_GRID_SCALE";
+
+/// The choice [`GRID_SCALE_ENV`] makes, or `None` when it is unset or empty.
+///
+/// `Err` on an unparseable or out-of-range value, with the range in the
+/// message; the caller reports it and steps past to the next source, the rule
+/// [`tier_env`] follows, so a stale export cannot stop the show (NFR 10).
+pub fn grid_scale_env() -> Result<Option<config::GridScaleChoice>, String> {
+    parse_grid_scale_env(std::env::var_os(GRID_SCALE_ENV))
+}
+
+/// [`grid_scale_env`]'s rule as a pure function of the raw value.
+fn parse_grid_scale_env(raw: Option<OsString>) -> Result<Option<config::GridScaleChoice>, String> {
+    let Some(raw) = raw.filter(|v| !v.is_empty()) else {
+        return Ok(None);
+    };
+    config::GridScaleChoice::parse(&raw.to_string_lossy())
+        .map(Some)
+        .map_err(|err| format!("{GRID_SCALE_ENV}: {err}"))
+}
+
+/// Resolve the grid-scale choice from its three sources, highest precedence
+/// first: `--grid-scale`, then [`GRID_SCALE_ENV`], then `config.toml` — the
+/// order [`resolve_tier`] uses, reported in the same [`TierSource`] words with
+/// the flag's own name. `auto` from a higher source still wins over a number
+/// below it: it is a choice, not an absence.
+pub fn resolve_grid_scale(
+    flag: Option<config::GridScaleChoice>,
+    env: Option<config::GridScaleChoice>,
+    file: config::GridScaleChoice,
+) -> (config::GridScaleChoice, &'static str) {
+    match (flag, env) {
+        (Some(choice), _) => (choice, "--grid-scale"),
+        (None, Some(choice)) => (choice, GRID_SCALE_ENV),
+        (None, None) if file == config::GridScaleChoice::Auto => (file, "auto"),
+        (None, None) => (file, TierSource::Config.as_str()),
+    }
+}
+
 /// Where the preset directory came from, so the app knows whether to seed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PresetDir {
@@ -482,6 +524,59 @@ mod tests {
         );
         // Nothing set: auto, which the renderer resolves as rich + governor.
         assert_eq!(resolve_tier(None, None, None), (None, TierSource::Auto));
+    }
+
+    /// The grid scale's precedence is the tier's: flag beats env beats the
+    /// file, each reported as what set it — and an explicit `auto` above a
+    /// number is a choice that wins, not an absence that falls through.
+    #[test]
+    fn the_grid_scale_resolves_highest_precedence_first() {
+        use crate::config::GridScaleChoice;
+        use rlx_core::render::GridScale;
+
+        let half = GridScaleChoice::Fixed(GridScale::new(0.5).expect("in range"));
+        let three = GridScaleChoice::Fixed(GridScale::new(0.75).expect("in range"));
+        assert_eq!(
+            resolve_grid_scale(Some(half), Some(three), three),
+            (half, "--grid-scale")
+        );
+        assert_eq!(
+            resolve_grid_scale(None, Some(half), three),
+            (half, GRID_SCALE_ENV)
+        );
+        assert_eq!(
+            resolve_grid_scale(None, None, three),
+            (three, "config.toml")
+        );
+        assert_eq!(
+            resolve_grid_scale(None, None, GridScaleChoice::Auto),
+            (GridScaleChoice::Auto, "auto")
+        );
+        assert_eq!(
+            resolve_grid_scale(Some(GridScaleChoice::Auto), None, half),
+            (GridScaleChoice::Auto, "--grid-scale")
+        );
+    }
+
+    /// The env var reads a number or `auto`, treats empty as unset, and
+    /// **reports** an out-of-range value with the range in the message.
+    #[test]
+    fn the_grid_scale_env_var_parses_or_reports_the_range() {
+        use crate::config::GridScaleChoice;
+
+        assert_eq!(
+            parse_grid_scale_env(Some(OsString::from("0.5"))).map(|c| c.map(|c| c.label())),
+            Ok(Some("0.50".to_owned()))
+        );
+        assert_eq!(
+            parse_grid_scale_env(Some(OsString::from("AUTO"))),
+            Ok(Some(GridScaleChoice::Auto))
+        );
+        assert_eq!(parse_grid_scale_env(None), Ok(None));
+        assert_eq!(parse_grid_scale_env(Some(OsString::new())), Ok(None));
+        let err = parse_grid_scale_env(Some(OsString::from("1.5"))).expect_err("1.5 is over 1");
+        assert!(err.contains(GRID_SCALE_ENV), "{err}");
+        assert!(err.contains("0.25") && err.contains("1.5"), "{err}");
     }
 
     /// The env var parses both tiers, treats empty as unset, and **reports** a

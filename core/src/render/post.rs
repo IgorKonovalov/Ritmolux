@@ -95,6 +95,7 @@
 use super::bloom::Bloom;
 use super::kaleidoscope::Kaleidoscope;
 use super::layer_blend::LayerBlendPass;
+use super::tier::GridScale;
 use super::trails::Trails;
 use crate::preset::LayerBlend;
 use crate::render::gpu;
@@ -130,13 +131,47 @@ const POST_GRID_STEP: u32 = 128;
 /// what is genuinely this call site's, and they stay here with their reasoning
 /// (Plan 0035 Phase 3).
 ///
-/// `cap` is the active tier's [`post_cap`](super::TierConfig::post_cap),
-/// which is why this call site holds no cap constant of its own (Plan 0044
-/// Phase 1). It is passed rather than read from a global so the function
-/// stays pure: a stage resolves it once at construction and the chain's
-/// rebuild comparison keeps answering a pure function of `surface`.
-pub(crate) fn internal_grid_size(surface: (u32, u32), cap: (u32, u32)) -> (u32, u32) {
-    super::grid::grid_size(surface, cap, POST_GRID_STEP)
+/// `cap` is the active tier's [`post_cap`](super::TierConfig::post_cap) and
+/// `scale` its resolved [`grid_scale`](super::TierConfig::grid_scale), which is
+/// why this call site holds no constant for either (Plan 0044 Phase 1,
+/// ADR-0245). Both are passed rather than read from a global so the function
+/// stays pure: a stage resolves them once at construction ([`PostGrid`]) and the
+/// chain's rebuild comparison keeps answering a pure function of `surface`.
+pub(crate) fn internal_grid_size(
+    surface: (u32, u32),
+    scale: GridScale,
+    cap: (u32, u32),
+) -> (u32, u32) {
+    super::grid::grid_size(surface, scale, cap, POST_GRID_STEP)
+}
+
+/// What a post stage's grid is resolved from besides the target: the tier's cap
+/// and the renderer's grid scale, taken together at construction.
+///
+/// One value rather than two fields per stage, so a stage cannot be built with
+/// the cap and handed the scale some other way — the pair is what
+/// [`internal_grid_size`] needs and nothing else.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PostGrid {
+    /// The tier's [`post_cap`](super::TierConfig::post_cap).
+    pub(crate) cap: (u32, u32),
+    /// The resolved [`grid_scale`](super::TierConfig::grid_scale).
+    pub(crate) scale: GridScale,
+}
+
+impl PostGrid {
+    /// The grid policy a stage built against `tier` follows.
+    pub(crate) fn of(tier: &super::TierConfig) -> Self {
+        Self {
+            cap: tier.post_cap,
+            scale: tier.grid_scale,
+        }
+    }
+
+    /// The grid a stage runs at for a render target of `surface`.
+    pub(crate) fn size(self, surface: (u32, u32)) -> (u32, u32) {
+        internal_grid_size(surface, self.scale, self.cap)
+    }
 }
 
 /// Composite positions, in chain order. Named so the routing tests and the
@@ -483,8 +518,9 @@ pub(crate) struct SceneTarget {
     /// The aspect the scene projects at — the **render target's**, never
     /// [`size`](Self::size)'s (ADR-0037).
     ///
-    /// An internal grid is a *resolution, not a shape*: it is quantized to a
-    /// 256 px step and capped, so its aspect is only approximately the target's,
+    /// An internal grid is a *resolution, not a shape*: it is a fraction of the
+    /// target, quantized to a 128 px step with a 256 px floor, and capped, so its
+    /// aspect is only approximately the target's,
     /// and every stage presents with a plain normalized blit that ignores aspect
     /// entirely. The two stretches therefore **cancel**. A scene told the target's
     /// aspect draws itself pre-squashed into a grid of a different shape, and the
@@ -504,6 +540,16 @@ pub(crate) struct SceneTarget {
     /// so a scene with an internal accumulation field matches its actual target
     /// instead of a fixed grid.
     pub size: (u32, u32),
+    /// The part of the renderer's grid scale (ADR-0245) that
+    /// [`size`](Self::size) does **not** already carry — what a scene sizing an
+    /// internal field of its own still has to apply.
+    ///
+    /// Two cases and no third. When a stage is active the scene renders into
+    /// that stage's grid, which the scale already shrank, so this is
+    /// [`GridScale::FULL`]: applying the scale again would draw the field at the
+    /// square of it. When the scene renders into the destination, `size` is the
+    /// target's own and this is the whole scale.
+    pub field_scale: GridScale,
     /// **This frame's routing decision**, made once in [`PostChain::begin`] and
     /// handed back so [`PostChain::resolve`] consumes it rather than recomputing
     /// it (Plan 0031 Phase 6, closing Plan 0030's close-review minor 1).
@@ -545,6 +591,11 @@ pub(crate) struct PostChain {
     /// The layer's bindable `mix` (ADR-0090), reset to full each frame and
     /// routed per frame like a param. Clamped on use.
     layer_mix: f32,
+    /// The renderer's resolved grid scale (ADR-0245), the same one every stage's
+    /// [`PostGrid`] holds. Kept here for the frame the scene renders straight
+    /// into the destination, where no stage grid has applied it yet
+    /// ([`SceneTarget::field_scale`]).
+    grid_scale: GridScale,
 }
 
 impl PostChain {
@@ -562,12 +613,16 @@ impl PostChain {
             // it is an engine-wide pass on the finished frame, so it runs after
             // the chain (and after the transition blend) — ADR-0032.
             stages: [
-                Box::new(Trails::new(device, surface_format, tier.post_cap)),
-                Box::new(Kaleidoscope::new(device, surface_format, tier.post_cap)),
+                Box::new(Trails::new(device, surface_format, PostGrid::of(tier))),
+                Box::new(Kaleidoscope::new(
+                    device,
+                    surface_format,
+                    PostGrid::of(tier),
+                )),
                 Box::new(Bloom::new(
                     device,
                     surface_format,
-                    tier.post_cap,
+                    PostGrid::of(tier),
                     tier.bloom_levels,
                 )),
             ],
@@ -575,6 +630,7 @@ impl PostChain {
             layer_blend: LayerBlendPass::new(device, surface_format),
             layer_mode: None,
             layer_mix: 1.0,
+            grid_scale: tier.grid_scale,
         };
         // The array above *is* the composite order, and the routing contract is
         // written against the positions below (module docs, ADR-0018). Assert they
@@ -759,6 +815,13 @@ impl PostChain {
         self.occlude
     }
 
+    /// The grid scale this chain's stages were built at (ADR-0245) — what a
+    /// scene told the **target's** own size still has to apply to an internal
+    /// field of its own.
+    pub(crate) fn grid_scale(&self) -> GridScale {
+        self.grid_scale
+    }
+
     /// Drop every stage's lazily-built resources (capture rebuild — keeps a
     /// headless capture a pure function of its inputs, NFR §6).
     pub(crate) fn reset_resources(&mut self) {
@@ -807,16 +870,24 @@ impl PostChain {
             let (pre, bloom_active) = split_at_bloom(routing);
             let junction = self.junction_size(bloom_active, surface);
             let scene_stage = pre.scene_stage();
+            // The junction is bloom's grid when bloom runs after the blend, and
+            // the destination's own size otherwise — so the scale is spent in
+            // the first case and still owed in the second.
+            let junction_scale = if bloom_active {
+                GridScale::FULL
+            } else {
+                self.grid_scale
+            };
             match scene_stage {
                 Some(index) => self.stages.get_mut(index).and_then(|stage| {
                     let size = stage.internal_size(surface);
                     let view = stage.begin(encoder, surface)?;
                     clear_transparent(encoder, &view, "post-chain-input-clear");
-                    Some((view, size))
+                    Some((view, size, GridScale::FULL))
                 }),
                 None => self.layer_blend.chain_input(junction, surface).map(|view| {
                     clear_transparent(encoder, &view, "layer-blend-chain-clear");
-                    (view, junction)
+                    (view, junction, junction_scale)
                 }),
             }
         } else {
@@ -830,16 +901,18 @@ impl PostChain {
                 // this the scene would accumulate onto the previous
                 // frame.
                 clear_transparent(encoder, &view, "post-chain-input-clear");
-                Some((view, size))
+                Some((view, size, GridScale::FULL))
             })
         };
-        let (view, size) = first.unwrap_or_else(|| (destination.clone(), surface));
+        let (view, size, field_scale) =
+            first.unwrap_or_else(|| (destination.clone(), surface, self.grid_scale));
         SceneTarget {
             view,
             // `surface`, not `size` — see the field's docs and ADR-0037. The grid
             // is a texel count; the shape is the render target's.
             aspect: surface.0 as f32 / surface.1.max(1) as f32,
             size,
+            field_scale,
             routing,
         }
     }

@@ -50,8 +50,11 @@ impl Renderer {
     /// A dissolve in flight is cancelled rather than migrated: its two sides are
     /// GPU state built at the outgoing tier, and finishing a crossfade across a
     /// tier change is a worse artifact than landing on the incoming preset.
+    ///
+    /// The grid scale is re-resolved for the new tier (ADR-0245) — the table has
+    /// a row per tier — with the renderer's pin, if it has one, still winning.
     pub(super) fn apply_tier(&mut self, tier: TierConfig) {
-        self.tier = tier;
+        self.tier = resolved_tier(&self.ctx, tier, self.grid_scale_pin);
         self.cancel_transition();
         self.incoming_side = None;
         self.side = CompositeSide::new(&self.ctx.device, COMPOSITE_FORMAT, &self.tier);

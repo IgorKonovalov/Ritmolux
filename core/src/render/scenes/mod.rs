@@ -795,6 +795,23 @@ pub(crate) trait Scene {
     /// Phase 2, the third and first hot-path widening — ADR-0030).
     fn set_target_size(&mut self, _width: u32, _height: u32) {}
 
+    /// How much of the renderer's grid scale (ADR-0245) the size handed to
+    /// [`set_target_size`](Self::set_target_size) does **not** already carry —
+    /// the fraction a scene sizing an internal field of its own still applies.
+    ///
+    /// The value depends on the frame's route, which is why it cannot ride
+    /// `configure`: into a post stage the target is that stage's grid, already
+    /// scaled, and this is `1.0`; straight into the destination the target is
+    /// the display's own size and this is the whole scale. A field sized from the
+    /// target alone would therefore be drawn at the square of the scale whenever
+    /// a stage is active.
+    ///
+    /// **Called unconditionally every frame**, immediately before
+    /// `set_target_size`, and under the same ADR-0030 obligations: record the
+    /// value and compare, never build or allocate here. Default no-op — only the
+    /// attractor has a field to size.
+    fn set_grid_scale(&mut self, _scale: crate::render::tier::GridScale) {}
+
     /// How much of this scene's coverage the **backdrop** resolves against, for
     /// the frame it is about to render (ADR-0085). `1.0` is coverage-as-occlusion
     /// — what every frame did before `occlude` existed — and `0.0` is light that
@@ -1235,7 +1252,7 @@ mod tests {
     //! The scene-keying contract (Plan 0030 Phase 3), and the parameter-kind
     //! quantizer declared beside it. Test asserts panic freely; this is not the
     //! render path.
-    #![allow(clippy::panic)]
+    #![allow(clippy::panic, clippy::expect_used)]
 
     use super::{CapOverflow, OverflowContext, ParamKind, Scene, create_all, create_attractor};
     use crate::preset::SystemKind;
@@ -1445,6 +1462,68 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// **At a full grid scale the budget is today's at every size this suite
+    /// names** (ADR-0245), and a fraction is what moves it.
+    ///
+    /// "Before" is the density law against the target alone —
+    /// [`attractor_budget`](crate::render::attractor_budget) of `w * h`, the
+    /// expression the scene evaluated before the grid scale existed — and
+    /// "after" is read off the factory's scene with the scale handed to it the
+    /// way the composite hands it. Every tier and both ceilings, because the
+    /// floor's live ceiling is its anchor and would pass whatever the law did:
+    /// the rich rows are where a count could move.
+    ///
+    /// The half-scale row is the non-vacuity: a 1080p field at 0.5 holds a
+    /// quarter of the target's texels, so the rich live budget falls from its
+    /// ceiling to 2.25x the anchor.
+    #[test]
+    fn a_full_grid_scale_resolves_todays_budget_at_every_suite_size() {
+        use crate::render::tier::GridScale;
+        use crate::render::{SampleBudget, TierConfig, attractor_budget};
+
+        let ctx = match RenderContext::new_headless(64, 64, true) {
+            Ok(ctx) => ctx,
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return;
+            }
+            Err(e) => panic!("headless context build failed: {e}"),
+        };
+
+        for tier in [TierConfig::FLOOR, TierConfig::RICH] {
+            for budget in [SampleBudget::Live, SampleBudget::Offline] {
+                let ceiling = match budget {
+                    SampleBudget::Live => tier.attractor_particles_live_ceiling,
+                    SampleBudget::Offline => tier.attractor_particles_offline_ceiling,
+                };
+                for (w, h) in [(128, 128), (640, 360), (1920, 1080)] {
+                    let before = attractor_budget(tier.attractor_particles, w * h, ceiling);
+                    let mut scene =
+                        create_attractor(&ctx.device, ctx.surface_format(), &tier, budget);
+                    scene.set_grid_scale(GridScale::FULL);
+                    scene.set_target_size(w, h);
+                    assert_eq!(
+                        scene.sample_budget(),
+                        Some(before),
+                        "{:?}/{budget:?} at {w}x{h}: the full-scale budget moved",
+                        tier.tier
+                    );
+                }
+            }
+        }
+
+        let rich = TierConfig::RICH;
+        let mut scene =
+            create_attractor(&ctx.device, ctx.surface_format(), &rich, SampleBudget::Live);
+        scene.set_grid_scale(GridScale::new(0.5).expect("in range"));
+        scene.set_target_size(1920, 1080);
+        assert_eq!(
+            scene.sample_budget(),
+            Some(337_500),
+            "a half-scale 1080p field holds 518 400 texels, 2.25x the reference"
+        );
     }
 
     /// **The built scene draws a trace's anchor count out of an unchanged

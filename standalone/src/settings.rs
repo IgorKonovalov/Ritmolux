@@ -9,13 +9,12 @@
 //! module from holding a `Renderer`, a `Window` or a `Config` — and what makes
 //! the dwell clamps and the row/action mapping assertable as values.
 //!
-//! Two *enums* do cross the seam — [`Tier`] and
-//! [`InputMode`] — because the rows carrying them are
-//! switches over a closed set, and a row that re-spelled the value could
-//! disagree with what `config.toml` holds. Only one of the two is a config type:
-//! `Tier` is `rlx_core::render::Tier`, a core type a config key happens to name.
-//! Both are `Copy` value types, not the `Config` struct, so nothing here reads
-//! or writes a file.
+//! A few *value types* do cross the seam — [`Tier`], [`InputMode`],
+//! [`GridScale`] and [`GridScaleChoice`] — because the rows carrying them hold
+//! a value `config.toml` names, and a row that re-spelled the value could
+//! disagree with what the file holds. `Tier` and `GridScale` are core types a
+//! config key happens to name. All are `Copy`, not the `Config` struct, so
+//! nothing here reads or writes a file.
 //!
 //! # Why not one `ui` module shared with the browser
 //!
@@ -25,9 +24,15 @@
 //! up/down/wrap of about ten lines. They agree where it matters — both wrap
 //! vertically — and that agreement is asserted here rather than inherited.
 
-use rlx_core::render::Tier;
+use rlx_core::render::{GridScale, Tier};
 
-use standalone::config::{InputMode, RotateOrder, RotateSource};
+use standalone::config::{GridScaleChoice, InputMode, RotateOrder, RotateSource};
+
+/// The fixed values the Grid scale row steps through, smallest first; `auto`
+/// sits past the top. Quarters, because a finer step is not a difference an
+/// operator judges by eye, and every one of them is exact in binary, so the
+/// file holds `0.75` and not a float's widening of it.
+pub const GRID_SCALE_STEPS: [f32; 4] = [0.25, 0.5, 0.75, 1.0];
 
 /// Dwell edit step, in seconds. Coarse on purpose: this is a live-show control
 /// operated by eye, not a scheduler.
@@ -69,6 +74,12 @@ impl TierState {
 pub struct SettingsView {
     pub tier: Tier,
     pub tier_state: TierState,
+    /// The grid scale the renderer resolved (ADR-0245) — what is on screen.
+    pub grid_scale: GridScale,
+    /// What decided it: `auto`, or the fixed value `[quality] grid_scale`, the
+    /// flag or the environment variable named. The row steps from this, so a
+    /// press moves the choice rather than the number `auto` happened to pick.
+    pub grid_scale_choice: GridScaleChoice,
     pub auto_rotate: bool,
     /// The order rotation walks the library in (`[rotate] order`).
     pub rotate_order: RotateOrder,
@@ -175,6 +186,10 @@ pub enum SettingsAction {
     /// Close settings and open the browse overlay (`Tab`) — one modal at a time.
     OpenBrowse,
     SetTier(Tier),
+    /// Set the grid scale — a fixed fraction or `auto` — and persist it as
+    /// `[quality] grid_scale` (ADR-0245, ADR-0240). The value is already
+    /// stepped here, so the shell writes and applies it without re-deciding.
+    SetGridScale(GridScaleChoice),
     ToggleAuto,
     /// Switch the order rotation draws in. A switch rather than a toggle, for
     /// the reason the tier row is one: the value a key produces does not depend
@@ -220,6 +235,7 @@ pub enum SettingsAction {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SettingsRow {
     Quality,
+    GridScale,
     Adapter,
     AutoRotate,
     Order,
@@ -240,8 +256,12 @@ pub enum SettingsRow {
 
 impl SettingsRow {
     /// Every row, in display order. The one read-only row stays last.
-    pub const ALL: [SettingsRow; 17] = [
+    pub const ALL: [SettingsRow; 18] = [
         SettingsRow::Quality,
+        // Directly under the tier, because it is resolved from the tier and
+        // qualifies it: `RICH` at 0.50 is a different picture from `RICH` at
+        // 1.00, and the two read as one line of thought (ADR-0245).
+        SettingsRow::GridScale,
         // Beside the tier: both decide what the machine spends on the picture,
         // both rebuild the GPU state when moved, and an operator whose show is
         // slow looks at the two together (ADR-0246).
@@ -279,6 +299,7 @@ impl SettingsRow {
     fn label(self) -> &'static str {
         match self {
             SettingsRow::Quality => "Quality",
+            SettingsRow::GridScale => "Grid scale",
             SettingsRow::Adapter => "Adapter",
             SettingsRow::AutoRotate => "Auto-rotate",
             SettingsRow::Order => "Order",
@@ -306,6 +327,17 @@ impl SettingsRow {
                 "{} {}",
                 view.tier.as_str().to_uppercase(),
                 view.tier_state.suffix()
+            ),
+            // The resolved number, and whether the operator chose it or the
+            // engine did — `auto` resolving 1.00 and a pinned 1.00 are the same
+            // picture and not the same setting.
+            SettingsRow::GridScale => format!(
+                "{} {}",
+                view.grid_scale,
+                match view.grid_scale_choice {
+                    GridScaleChoice::Auto => "(auto)",
+                    GridScaleChoice::Fixed(_) => "(pinned)",
+                }
             ),
             SettingsRow::Adapter => {
                 if view.adapter_count == 0 {
@@ -390,6 +422,9 @@ impl SettingsRow {
             SettingsRow::Quality => {
                 SettingsAction::SetTier(if right { Tier::Rich } else { Tier::Floor })
             }
+            SettingsRow::GridScale => {
+                SettingsAction::SetGridScale(step_grid_scale(view.grid_scale_choice, right))
+            }
             // A walk over the roster, wrapping, with the target decided here
             // so the shell cannot land off the end of a list it did not size.
             // Under two entries there is nowhere to go, and the key is inert
@@ -459,6 +494,35 @@ impl SettingsRow {
             // not a thing a menu can move.
             SettingsRow::Presets => SettingsAction::None,
         }
+    }
+}
+
+/// The grid-scale choice one step from `from`: `Right` raises it through
+/// [`GRID_SCALE_STEPS`] and past the top to `auto`, `Left` lowers it, and both
+/// **stop at their end** rather than wrapping — so key repeat parks on a value
+/// instead of cycling through a full-resolution frame.
+///
+/// `Left` from `auto` lands on the top step, 1.0. A hand-written value between
+/// two steps moves to the neighbouring step on the side the key points, so the
+/// first press is never a no-op.
+pub(crate) fn step_grid_scale(from: GridScaleChoice, right: bool) -> GridScaleChoice {
+    let fixed =
+        |value: f32| GridScale::new(value).map_or(GridScaleChoice::Auto, GridScaleChoice::Fixed);
+    let top = GRID_SCALE_STEPS.last().copied().unwrap_or(GridScale::MAX);
+    match (from, right) {
+        (GridScaleChoice::Auto, true) => GridScaleChoice::Auto,
+        (GridScaleChoice::Auto, false) => fixed(top),
+        (GridScaleChoice::Fixed(scale), true) => GRID_SCALE_STEPS
+            .iter()
+            .copied()
+            .find(|&step| step > scale.get())
+            .map_or(GridScaleChoice::Auto, fixed),
+        (GridScaleChoice::Fixed(scale), false) => GRID_SCALE_STEPS
+            .iter()
+            .rev()
+            .copied()
+            .find(|&step| step < scale.get())
+            .map_or(from, fixed),
     }
 }
 

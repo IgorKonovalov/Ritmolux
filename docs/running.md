@@ -61,7 +61,7 @@ one, so you always land where you asked.
 | `R`       | Switch the rotation **order** — shuffled (the default) or alphabetical by preset name. Persisted |
 | `L`       | Switch what rotation **draws from** — the whole library or your favourites. Persisted |
 | `Tab`     | Open/close the preset browser — opens on the preset you're watching. Arrow keys walk the list and wrap at both ends, left/right step a column, holding an arrow scrolls, type to filter, `Enter` selects (also dissolves), `Esc` closes |
-| `S`       | Open/close the settings menu — quality, adapter, auto-rotate, rotation order, what rotation draws from, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, next-in countdown, console. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
+| `S`       | Open/close the settings menu — quality, grid scale, adapter, auto-rotate, rotation order, what rotation draws from, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, next-in countdown, console. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
 | `C`       | Open/close the **operator console** — a second window on another display carrying the browser, the settings menu, a transport strip and a live preview of the output |
 | `[` / `]` | Drop / raise the quality tier live — pins it for the session and persists the choice |
 | `F`       | Toggle fullscreen                                           |
@@ -232,6 +232,23 @@ resources, so changing it rebuilds them.
 A tier can also be pinned before launch, and what wins there is
 [the precedence in Configuration](configuration.md#quality). The measured budgets each tier is held
 to are in [Non-functional requirements](nfr.md).
+
+### The grid scale
+
+Beside the tier, the `F3` overlay prints a number — `RICH 1.00` — and so does the settings menu's
+**Grid scale** row, directly under **Quality**. It is the fraction of the window the engine's
+internal grids are drawn at: the one the trails, kaleidoscope and bloom stages run on, and the
+attractor's trail field. A heavy preset spends most of its frame filling those grids, so their area
+is its cost, and a smaller fraction trades sharpness for frame time — `0.50` draws a quarter of the
+texels. The picture's shape does not change, only how finely it is resolved.
+
+Out of the box it is `auto`, which lets the engine pick a fraction for the tier and the kind of GPU;
+today that is `1.00` everywhere, and the row reads `1.00 (auto)`. Left and right walk it through
+`0.25`, `0.50`, `0.75`, `1.00` and back to `auto`, stopping at both ends, and write the choice to
+`config.toml` as `[quality] grid_scale`, where it reads `(pinned)`. Each change rebuilds the grids,
+with the same brief re-accumulation of trails a tier change costs. `--grid-scale` and
+`RLX_GRID_SCALE` override the file for one run; the order is in
+[Configuration](configuration.md#quality).
 
 ## The graphics adapter
 

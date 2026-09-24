@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 use rlx_core::audio::{AudioFormat, SampleConsumer};
 use rlx_core::dsp::Analyzer;
-use rlx_core::render::{AdapterChoice, CapOverflow, Renderer, RendererOptions, Tier};
+use rlx_core::render::{AdapterChoice, CapOverflow, GridScale, Renderer, RendererOptions, Tier};
 use standalone::gpu;
 use standalone::marks::Mark;
 use standalone::osc::{OscSink, Telemetry, rms_of};
@@ -339,6 +339,13 @@ pub(crate) struct AppState {
     /// core's surface to render one menu suffix is the wrong trade.
     pub(crate) tier_pinned: bool,
 
+    /// The grid-scale choice in force — resolved at launch across
+    /// `--grid-scale` / `RLX_GRID_SCALE` / `[quality] grid_scale` and replaced by
+    /// the settings row (ADR-0245). Held here for the reason `tier_pinned` is:
+    /// the renderer holds the resolved number, and the row also says whether
+    /// that number was chosen or resolved.
+    pub(crate) grid_scale_choice: config::GridScaleChoice,
+
     /// Operator config (display/fullscreen; grows in later phases) and where to
     /// persist it. `config_path` is `None` when the per-user dir can't be
     /// resolved — hotkey changes then apply live but don't persist.
@@ -462,6 +469,7 @@ impl AppState {
         let soak_path = app.soak_path.take();
         let downbeat_log_path = app.downbeat_log_path.take();
         let tier = app.tier;
+        let grid_scale = app.grid_scale;
         let adapter = std::mem::take(&mut app.adapter);
         let adapter_source = app.adapter_source;
         let held_preset = app.held_preset.take();
@@ -471,15 +479,21 @@ impl AppState {
         let (mut renderer, adapter_note) = build_renderer(
             &window,
             (size.width, size.height),
-            tier,
+            (tier, grid_scale.pin()),
             adapter,
             adapter_source,
             config.output.gpu.as_deref(),
         );
-        // Say which tier the show is running at. The same preset looks different
-        // on different machines now (ADR-0045), so this is the first line an odd
-        // look should be checked against — and F3's overlay repeats it live.
-        eprintln!("quality tier: {}", renderer.tier().as_str());
+        // Say which tier the show is running at, and the grid scale beside it.
+        // The same preset looks different on different machines now (ADR-0045,
+        // ADR-0245), so this is the first line an odd look should be checked
+        // against — and F3's overlay repeats it live.
+        eprintln!(
+            "quality tier: {}, grid scale {} ({})",
+            renderer.tier().as_str(),
+            renderer.grid_scale(),
+            grid_scale.label()
+        );
 
         // The governor measures against the *display's* frame budget, and a
         // refresh rate is a shell concern — the core never reads one itself. An
@@ -543,6 +557,7 @@ impl AppState {
             renderer,
             occluded: false,
             tier_pinned: tier.is_some(),
+            grid_scale_choice: grid_scale,
             last_frame: start,
             last_click: None,
             config,
@@ -1367,6 +1382,31 @@ impl AppState {
         self.window.request_redraw();
     }
 
+    /// Set the grid scale from the settings menu's Grid scale row (ADR-0245),
+    /// and persist it as `[quality] grid_scale` — the file is what the row
+    /// edits (ADR-0240).
+    ///
+    /// Asking for the choice already in force writes nothing and rebuilds
+    /// nothing: the rebuild restarts every accumulation, which is the wrong
+    /// answer to a key held against the end of the row. `--grid-scale` and
+    /// `RLX_GRID_SCALE` still win at the next launch; this writes the key they
+    /// override, as `swap_tier` does for the tier.
+    pub(crate) fn set_grid_scale(&mut self, choice: config::GridScaleChoice) {
+        if choice == self.grid_scale_choice {
+            return;
+        }
+        self.grid_scale_choice = choice;
+        self.config.quality.grid_scale = choice;
+        self.save_config();
+        self.renderer.set_grid_scale(choice.pin());
+        eprintln!(
+            "grid scale: {} ({})",
+            self.renderer.grid_scale(),
+            choice.label()
+        );
+        self.window.request_redraw();
+    }
+
     /// Move the running show onto the adapter at `index` in the cached roster
     /// (the `Adapter` row, ADR-0246), and persist it.
     ///
@@ -1918,6 +1958,8 @@ impl AppState {
             } else {
                 TierState::Auto
             },
+            grid_scale: self.renderer.grid_scale(),
+            grid_scale_choice: self.grid_scale_choice,
             auto_rotate: self.show.director.auto_enabled(),
             rotate_order: self.config.rotate.order,
             rotate_source: self.config.rotate.source,
@@ -1985,6 +2027,7 @@ impl AppState {
                 self.open_browse();
             }
             SettingsAction::SetTier(tier) => self.swap_tier(tier),
+            SettingsAction::SetGridScale(choice) => self.set_grid_scale(choice),
             SettingsAction::SetAdapter(index) => self.swap_adapter(index),
             SettingsAction::ToggleAuto => self.toggle_auto_rotate(),
             SettingsAction::SetOrder(order) => self.set_rotate_order(order),
@@ -2097,7 +2140,7 @@ impl AppState {
 fn build_renderer(
     window: &Arc<Window>,
     (width, height): (u32, u32),
-    tier: Option<Tier>,
+    (tier, grid_scale): (Option<Tier>, Option<GridScale>),
     adapter: AdapterChoice,
     source: gpu::AdapterSource,
     stored: Option<&str>,
@@ -2109,6 +2152,7 @@ fn build_renderer(
         tier,
         adapter,
         budget: rlx_core::render::SampleBudget::Live,
+        grid_scale,
     };
     let err = match Renderer::new(Arc::clone(window), width, height, options(adapter)) {
         Ok(renderer) => return (renderer, source.note()),

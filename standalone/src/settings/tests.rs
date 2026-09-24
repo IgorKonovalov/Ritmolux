@@ -1,12 +1,15 @@
 use super::{
-    DWELL_CEILING, DWELL_FLOOR, DWELL_STEP, InputMode, RotateOrder, RotateSource, SettingsAction,
-    SettingsKey, SettingsRow, SettingsState, SettingsView, Tier, TierState,
+    DWELL_CEILING, DWELL_FLOOR, DWELL_STEP, GridScale, GridScaleChoice, InputMode, RotateOrder,
+    RotateSource, SettingsAction, SettingsKey, SettingsRow, SettingsState, SettingsView, Tier,
+    TierState, step_grid_scale,
 };
 
 fn view() -> SettingsView {
     SettingsView {
         tier: Tier::Rich,
         tier_state: TierState::Auto,
+        grid_scale: GridScale::FULL,
+        grid_scale_choice: GridScaleChoice::Auto,
         auto_rotate: false,
         rotate_order: RotateOrder::Shuffled,
         rotate_source: RotateSource::All,
@@ -259,6 +262,83 @@ fn the_presets_row_emits_nothing() {
     );
 }
 
+/// **The Grid scale row walks quarters and `auto`, and stops at both ends**
+/// (ADR-0245). The row edits `[quality] grid_scale` (ADR-0240), so what it
+/// emits is the value the file will hold: `Left` from `auto` is the top step,
+/// `Right` past 1.0 is `auto`, a held key parks rather than wrapping, and a
+/// hand-written value between two steps moves on the first press.
+#[test]
+fn the_grid_scale_row_walks_quarters_and_auto_and_stops_at_its_ends() {
+    let fixed = |v: f32| GridScaleChoice::Fixed(GridScale::new(v).expect("in range"));
+
+    let mut v = view();
+    assert_eq!(
+        edit_at(SettingsRow::GridScale, false, &v),
+        SettingsAction::SetGridScale(fixed(1.0))
+    );
+    assert_eq!(
+        edit_at(SettingsRow::GridScale, true, &v),
+        SettingsAction::SetGridScale(GridScaleChoice::Auto)
+    );
+
+    // A full walk down from auto and back up, one press at a time.
+    let mut at = GridScaleChoice::Auto;
+    let mut down = Vec::new();
+    for _ in 0..6 {
+        at = step_grid_scale(at, false);
+        down.push(at);
+    }
+    assert_eq!(
+        down,
+        [
+            fixed(1.0),
+            fixed(0.75),
+            fixed(0.5),
+            fixed(0.25),
+            fixed(0.25),
+            fixed(0.25)
+        ],
+        "Left walks the quarters and parks at the bottom"
+    );
+    let mut up = Vec::new();
+    for _ in 0..6 {
+        at = step_grid_scale(at, true);
+        up.push(at);
+    }
+    assert_eq!(
+        up,
+        [
+            fixed(0.5),
+            fixed(0.75),
+            fixed(1.0),
+            GridScaleChoice::Auto,
+            GridScaleChoice::Auto,
+            GridScaleChoice::Auto
+        ],
+        "Right walks back up and parks at auto"
+    );
+
+    // A value off the ladder moves to the neighbour on the key's side.
+    assert_eq!(step_grid_scale(fixed(0.3), false), fixed(0.25));
+    assert_eq!(step_grid_scale(fixed(0.3), true), fixed(0.5));
+
+    // The row shows the resolved number and whether it was chosen.
+    v.grid_scale = GridScale::new(0.5).expect("in range");
+    v.grid_scale_choice = fixed(0.5);
+    let lines = opened().lines(&v);
+    let (_, value) = lines
+        .iter()
+        .find(|(label, _)| *label == "Grid scale")
+        .expect("the row is drawn");
+    assert_eq!(value, "0.50 (pinned)");
+    let lines = opened().lines(&view());
+    let (_, value) = lines
+        .iter()
+        .find(|(label, _)| *label == "Grid scale")
+        .expect("the row is drawn");
+    assert_eq!(value, "1.00 (auto)");
+}
+
 /// **The row roster is the contract**, so it is asserted as a list rather than
 /// as a count: every other test here reaches its row through `ALL`, which means
 /// a reordering would move them all in step and go unnoticed.
@@ -268,6 +348,7 @@ fn the_rows_are_the_ones_the_menu_promises_in_order() {
         SettingsRow::ALL,
         [
             SettingsRow::Quality,
+            SettingsRow::GridScale,
             SettingsRow::Adapter,
             SettingsRow::AutoRotate,
             SettingsRow::Order,

@@ -30,7 +30,7 @@
 use std::io::Write;
 use std::time::Duration;
 
-use rlx_core::render::PixelOrder;
+use rlx_core::render::{GridScale, InternalGrids, PixelOrder};
 use standalone::events::Events;
 
 /// The sender name a receiver lists, unless `--sender` overrides it. Not
@@ -151,6 +151,12 @@ pub struct StreamRequest {
     /// Hold this preset for the whole run and rotate nothing. `None` rotates on
     /// the director's dwell timer.
     pub preset: Option<String>,
+    /// `--grid-scale`: draw the internal grids at this fraction of the frame
+    /// (ADR-0245). `None` is full scale — a headless renderer resolves 1.0 on
+    /// every adapter, so the flag is the only way this path asks for less, and
+    /// neither `[quality] grid_scale` nor `RLX_GRID_SCALE` reaches it, as
+    /// neither tier source does.
+    pub grid_scale: Option<GridScale>,
 }
 
 impl Default for StreamRequest {
@@ -164,6 +170,7 @@ impl Default for StreamRequest {
             sink: Sink::Spout,
             frames: None,
             preset: None,
+            grid_scale: None,
         }
     }
 }
@@ -244,7 +251,21 @@ pub fn parse(args: &[String]) -> Result<Option<StreamRequest>, String> {
                 }
                 request.frames = Some(count);
             }
-            _ => {}
+            "--grid-scale" => {
+                let raw = rest
+                    .next()
+                    .ok_or("--grid-scale: expected a number from 0.25 to 1, or auto")?;
+                request.grid_scale = parse_grid_scale(raw)?;
+            }
+            // The `=` spelling too, unlike the flags above: the windowed reader
+            // takes it, and the roster claims the flag for both run modes, so a
+            // spelling this parser skipped would be walked past as recognized
+            // and then read by nothing.
+            other => {
+                if let Some(raw) = other.strip_prefix("--grid-scale=") {
+                    request.grid_scale = parse_grid_scale(raw)?;
+                }
+            }
         }
     }
     let (default_width, default_height, default_fps) = request.sink.default_geometry();
@@ -276,6 +297,15 @@ fn parse_size(raw: &str) -> Result<(u32, u32), String> {
         ));
     }
     Ok((width, height))
+}
+
+/// `--grid-scale`'s value: a number in range pins it, `auto` asks for what a
+/// headless renderer resolves anyway (1.0), and anything else is a usage error
+/// naming the range — the same parser and words as the windowed flag.
+fn parse_grid_scale(raw: &str) -> Result<Option<GridScale>, String> {
+    standalone::config::GridScaleChoice::parse(raw)
+        .map(standalone::config::GridScaleChoice::pin)
+        .map_err(|err| format!("--grid-scale: {err}"))
 }
 
 fn parse_fps(raw: &str) -> Result<u32, String> {
@@ -369,12 +399,27 @@ const PASS_ROWS: usize = 12;
 /// compute. Pure, so the shape a reader copies out of a log is asserted rather
 /// than eyeballed.
 ///
+/// The header names the grid scale and the two internal grids it resolved
+/// (ADR-0245), because every fill-bound row below is a function of those
+/// grids' area: a row copied out of a log without them cannot be compared
+/// with one taken at another scale.
+///
 /// [`FrameTap::pass_costs`]: rlx_core::render::FrameTap::pass_costs
-pub fn pass_table(rows: &[(&str, f64)], frames: u64) -> String {
+pub fn pass_table(
+    rows: &[(&str, f64)],
+    frames: u64,
+    scale: GridScale,
+    grids: InternalGrids,
+) -> String {
     if frames == 0 || rows.is_empty() {
         return "stream: no pass timings to report".to_owned();
     }
-    let mut out = format!("stream: pass costs, mean per frame over {frames} frames");
+    let (post, trail) = (grids.post, grids.trail);
+    let mut out = format!(
+        "stream: pass costs, mean per frame over {frames} frames, grid scale {scale} \
+         (post grid {}x{}, trail grid {}x{})",
+        post.0, post.1, trail.0, trail.1
+    );
     // The widest label printed, so the millisecond column lines up without a
     // fixed width that a longer label would blow past.
     let width = rows
@@ -761,7 +806,7 @@ pub fn run(
     // The renderer's adapter is a frame-rate choice; the sender's, resolved
     // inside `open_sink`, is a correctness one. Both come from one `--gpu`,
     // resolved against their own rosters (ADR-0146).
-    let mut renderer = Renderer::new_headless_on(
+    let mut renderer = Renderer::new_headless_scaled(
         HeadlessOptions {
             width: request.width,
             height: request.height,
@@ -771,10 +816,17 @@ pub fn run(
         // tier cannot demote itself mid-run the way the window's auto tier can.
         Tier::Rich,
         &gpu::renderer_choice(request.gpu.as_deref()),
+        request.grid_scale,
     )
     .map_err(|err| format!("--stream: {err}"))?;
     let adapter = renderer.adapter_description().to_owned();
     eprintln!("renderer : {adapter}");
+    // Read once: the target size and the scale are both fixed for the run.
+    let (grid_scale, grids) = (renderer.grid_scale(), renderer.internal_grids());
+    eprintln!(
+        "grids    : scale {grid_scale}, post {}x{}, trail {}x{}",
+        grids.post.0, grids.post.1, grids.trail.0, grids.trail.1
+    );
 
     // Read off the renderer, not named here: a headless run draws into the
     // offscreen format and is RGBA by construction, but the question and its one
@@ -990,7 +1042,10 @@ pub fn run(
             eprintln!("{}", costs.line(request.sink));
             if tap.times_passes() {
                 let pass_costs = tap.pass_costs();
-                eprintln!("{}", pass_table(&pass_costs.rows(), pass_costs.frames()));
+                eprintln!(
+                    "{}",
+                    pass_table(&pass_costs.rows(), pass_costs.frames(), grid_scale, grids)
+                );
                 tap.reset_pass_costs();
             }
             eprintln!(
@@ -1021,7 +1076,10 @@ pub fn run(
     }
     if tap.times_passes() && tap.pass_costs().frames() > 0 {
         let pass_costs = tap.pass_costs();
-        eprintln!("{}", pass_table(&pass_costs.rows(), pass_costs.frames()));
+        eprintln!(
+            "{}",
+            pass_table(&pass_costs.rows(), pass_costs.frames(), grid_scale, grids)
+        );
     }
     eprintln!(
         "{}",
@@ -1061,6 +1119,7 @@ fn apply_transport(
     let view = headless_view(
         auto,
         renderer.tier(),
+        renderer.grid_scale(),
         config,
         &show.preset_dir().display().to_string(),
         favourites_marked,
@@ -1110,6 +1169,7 @@ fn apply_transport(
 fn headless_view(
     auto_rotate: bool,
     tier: rlx_core::render::Tier,
+    grid_scale: GridScale,
     config: &standalone::config::Config,
     preset_dir: &str,
     favourites_marked: bool,
@@ -1119,6 +1179,13 @@ fn headless_view(
         // Pinned by construction on this path: `run` asks for `Tier::Rich` and
         // there is no frame-time governor here to demote it.
         tier_state: crate::settings::TierState::Pinned,
+        grid_scale,
+        // A headless renderer's auto is 1.0, so anything else was the flag.
+        grid_scale_choice: if grid_scale == GridScale::FULL {
+            standalone::config::GridScaleChoice::Auto
+        } else {
+            standalone::config::GridScaleChoice::Fixed(grid_scale)
+        },
         auto_rotate,
         rotate_order: config.rotate.order,
         rotate_source: config.rotate.source,
@@ -1353,7 +1420,7 @@ mod tests {
         // rather than re-deriving it.
         let mut sorted = rows;
         sorted.sort_by(|a, b| b.1.total_cmp(&a.1));
-        let table = pass_table(&sorted, 1800);
+        let table = pass_table(&sorted, 1800, GridScale::FULL, FULL_1080P);
         assert!(table.contains("over 1800 frames"), "{table}");
         let draw = table
             .find("attractor-draw-pass")
@@ -1372,8 +1439,67 @@ mod tests {
     /// rows under it.
     #[test]
     fn an_unmeasured_window_reports_no_pass_timings() {
-        assert!(pass_table(&[], 0).contains("no pass timings"));
-        assert!(pass_table(&[("trails-pass", 1.0)], 0).contains("no pass timings"));
+        assert!(pass_table(&[], 0, GridScale::FULL, FULL_1080P).contains("no pass timings"));
+        assert!(
+            pass_table(&[("trails-pass", 1.0)], 0, GridScale::FULL, FULL_1080P)
+                .contains("no pass timings")
+        );
+    }
+
+    /// The grids a full-scale 1080p run resolves.
+    const FULL_1080P: InternalGrids = InternalGrids {
+        post: (1920, 1024),
+        trail: (1920, 1024),
+    };
+
+    /// **The table's header names the grid scale and both grids** (ADR-0245),
+    /// because every fill-bound row under it is a function of their area.
+    #[test]
+    fn the_pass_table_header_names_the_scale_and_both_grids() {
+        let half = InternalGrids {
+            post: (1024, 512),
+            trail: (1024, 512),
+        };
+        let scale = GridScale::new(0.5).expect("in range");
+        let table = pass_table(&[("trails-pass", 1.0)], 60, scale, half);
+        let header = table.lines().next().expect("a header line");
+        assert!(header.contains("grid scale 0.50"), "{header}");
+        assert!(header.contains("post grid 1024x512"), "{header}");
+        assert!(header.contains("trail grid 1024x512"), "{header}");
+    }
+
+    /// `--grid-scale` reaches the request in both spellings, `auto` is the
+    /// headless default spelled out, and an out-of-range value is a usage error
+    /// naming the range (ADR-0245).
+    #[test]
+    fn the_grid_scale_flag_reaches_the_request_or_names_its_range() {
+        let scale = |argv: &[&str]| {
+            parse(&args(argv))
+                .expect("valid")
+                .expect("--stream was given")
+                .grid_scale
+        };
+        assert_eq!(scale(&["--stream"]), None);
+        assert_eq!(
+            scale(&["--grid-scale", "0.5", "--stream", "--size", "1920x1080"]),
+            GridScale::new(0.5)
+        );
+        assert_eq!(
+            scale(&["--stream", "--grid-scale=0.75"]),
+            GridScale::new(0.75)
+        );
+        assert_eq!(scale(&["--stream", "--grid-scale", "auto"]), None);
+        for bad in [
+            &["--stream", "--grid-scale", "0.1"][..],
+            &["--stream", "--grid-scale=1.5"],
+            &["--stream", "--grid-scale"],
+        ] {
+            let err = parse(&args(bad)).expect_err("refused");
+            assert!(
+                err.contains("--grid-scale") && err.contains("0.25"),
+                "{err}"
+            );
+        }
     }
 
     /// The adapters with no timestamp queries get one visible line, not a
@@ -1564,7 +1690,14 @@ mod sink_tests {
             for auto in [true, false] {
                 // The view the applier itself builds, so the test walks the
                 // mapping through the same values the run gives it.
-                let view = headless_view(auto, rlx_core::render::Tier::Rich, &config, "", false);
+                let view = headless_view(
+                    auto,
+                    rlx_core::render::Tier::Rich,
+                    GridScale::FULL,
+                    &config,
+                    "",
+                    false,
+                );
                 let Some(action) = crate::console::action_for_transport(verb, auto, &view) else {
                     continue;
                 };

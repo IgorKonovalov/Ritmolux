@@ -39,7 +39,7 @@
 //! present is a plain stretch (aspect ignored, as the reaction-diffusion present
 //! does), so a point at field NDC `x` lands at target NDC `x` — the field's aspect
 //! cancels out and the projection must use the **target's**. Quantization makes
-//! the two genuinely differ (a 1920x1080 target takes a 2048x1280 grid), so
+//! the two genuinely differ (a 1920x1080 target takes a 1920x1024 grid), so
 //! [`trail_grid_size`] scaling both axes by one factor at the cap is about keeping
 //! the field's *sampling* near-isotropic, not about the shape on screen.
 
@@ -76,7 +76,7 @@ use resources::*;
 use shaders::*;
 
 use crate::render::gpu;
-use crate::render::tier::attractor_budget;
+use crate::render::tier::{GridScale, attractor_budget};
 
 use ifs::{FitLut, IfsFigure, IfsPacked, IfsTable, Levers};
 
@@ -129,7 +129,19 @@ const TRAIL_GRID_STEP: u32 = 128;
 /// doc-comment's worth of noise, and the cost of the churn is a silent scope
 /// expansion. Kept.
 pub fn trail_grid_size(width: u32, height: u32, cap: (u32, u32)) -> (u32, u32) {
-    crate::render::grid::grid_size((width, height), cap, TRAIL_GRID_STEP)
+    scaled_trail_grid_size(width, height, GridScale::FULL, cap)
+}
+
+/// [`trail_grid_size`] for a field drawn at `scale` of the target (ADR-0245) —
+/// what the scene itself resolves, and what a caller reporting the trail grid
+/// of a scaled renderer asks.
+pub fn scaled_trail_grid_size(
+    width: u32,
+    height: u32,
+    scale: GridScale,
+    cap: (u32, u32),
+) -> (u32, u32) {
+    crate::render::grid::grid_size((width, height), scale, cap, TRAIL_GRID_STEP)
 }
 
 /// Wall-clock duration of one attractor iteration (Plan 0014 injected `dt`). The
@@ -637,6 +649,12 @@ pub struct AttractorScene {
     /// resolved once at construction. Read only in `set_target_size`, so the grid
     /// stays a pure function of the target and the cap.
     trail_cap: (u32, u32),
+    /// The part of the grid scale the target size does not already carry
+    /// ([`Scene::set_grid_scale`](crate::render::scenes::Scene::set_grid_scale),
+    /// ADR-0245), recorded each frame before the size and read only in
+    /// `set_target_size`. [`GridScale::FULL`] until something says otherwise, so
+    /// a scene driven without it sizes exactly as it did before it existed.
+    field_scale: GridScale,
     /// The **allocation**: how many particles the storage buffer and the seeded
     /// scatter hold. The tier's own ceiling
     /// ([`attractor_particles_live_ceiling`](crate::render::TierConfig::attractor_particles_live_ceiling),
@@ -935,6 +953,7 @@ impl AttractorScene {
             surface_format,
             res: None,
             trail_cap,
+            field_scale: GridScale::FULL,
             particle_count,
             anchor,
             targeted: false,
@@ -1660,20 +1679,30 @@ impl Scene for AttractorScene {
     /// sized at the ceiling, so a resize is this arithmetic plus the field
     /// rebuild the grid change was always going to cost.
     ///
+    /// **Both are read against the field, not the target** (ADR-0245): the grid
+    /// is the recorded `field_scale` of the target, and the budget counts
+    /// the texels that fraction asks for, so a field drawn smaller is sampled at
+    /// the reference density rather than over-sampled. At
+    /// [`GridScale::FULL`] both are exactly what the target alone resolves.
+    ///
     /// The pixel count saturates rather than wrapping: `u32` overflows past a
     /// 65 535-square target, and the law clamps at the ceiling long before that,
     /// so saturating is exact everywhere it matters.
     fn set_target_size(&mut self, width: u32, height: u32) {
-        let (w, h) = trail_grid_size(width, height, self.trail_cap);
+        let (w, h) = scaled_trail_grid_size(width, height, self.field_scale, self.trail_cap);
         self.trail_w = w;
         self.trail_h = h;
         self.targeted = true;
         self.budget = attractor_budget(
             self.anchor,
-            width.saturating_mul(height),
+            self.field_scale.texels(width.saturating_mul(height)),
             self.particle_count,
         );
         self.active_count = active_particles(self.anchor, self.budget, self.density);
+    }
+
+    fn set_grid_scale(&mut self, scale: GridScale) {
+        self.field_scale = scale;
     }
 
     // No `set_time`. The display rotation was this scene's only reader of the

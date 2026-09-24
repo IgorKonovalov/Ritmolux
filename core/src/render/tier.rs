@@ -51,6 +51,16 @@
 //! [`Renderer::new_headless_tiered`](super::Renderer::new_headless_tiered) is the
 //! deliberate opt-in the `shot` CLI's `--tier` reaches.
 //!
+//! # The grid scale
+//!
+//! One value in a resolved [`TierConfig`] is not the tier's alone:
+//! [`grid_scale`](TierConfig::grid_scale), the fraction of the render target
+//! the internal grids are drawn at (ADR-0245). It comes from the tier **and**
+//! the adapter's class through `grid_scale_for`, or from an explicit pin, and
+//! `resolve_grid_scale` is the one place the three are weighed. It resolves
+//! when the tier does — at construction, on a tier change and on an adapter
+//! change — and a frame never reads it.
+//!
 //! Pure and GPU-free throughout — a tier is a set of numbers, so it is decided
 //! without a device and tested without one.
 
@@ -63,6 +73,8 @@
     clippy::panic,
     clippy::unreachable
 )]
+
+use super::context::AdapterClass;
 
 /// Which quality tier a renderer is running (ADR-0045).
 ///
@@ -112,6 +124,139 @@ impl Tier {
     }
 }
 
+/// The fraction of the render target every internal grid is drawn at — the post
+/// chain's grid and the attractor's trail field (ADR-0245).
+///
+/// A validated value: only [`new`](Self::new) and [`parse`](Self::parse) make
+/// one, and both refuse anything outside [`MIN`](Self::MIN)`..=`[`MAX`](Self::MAX),
+/// NaN included. That is what makes the `Eq` below honest — a `GridScale` is
+/// never NaN, so it equals itself.
+///
+/// A **capacity**, not a look value, in the sense the module docs use: it sets
+/// how many texels a field holds, and a grid is a resolution rather than a
+/// shape (ADR-0037), so the picture's geometry does not move with it. What does
+/// move is sharpness, which is the trade.
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub struct GridScale(f32);
+
+impl Eq for GridScale {}
+
+impl GridScale {
+    /// The smallest fraction accepted. Below a quarter a 1080p field is under
+    /// 480x270 and the grid floor (`grid::MIN_AXIS`) starts deciding the size
+    /// instead of the scale.
+    pub const MIN: f32 = 0.25;
+    /// The largest: the target's own resolution. A grid is never drawn above it.
+    pub const MAX: f32 = 1.0;
+    /// The whole target — every row of the table until it is measured, and what
+    /// a headless renderer resolves unless it is told otherwise.
+    pub const FULL: Self = Self(1.0);
+
+    /// `value` as a scale, or `None` when it is outside `MIN..=MAX` or not a
+    /// number.
+    pub fn new(value: f32) -> Option<Self> {
+        (Self::MIN..=Self::MAX)
+            .contains(&value)
+            .then_some(Self(value))
+    }
+
+    /// Parse a scale from its written form — the flag's value, the environment
+    /// variable's, or a settings value. The error names the accepted range,
+    /// because a caller surfaces it as a usage error verbatim.
+    pub fn parse(text: &str) -> Result<Self, String> {
+        let trimmed = text.trim();
+        trimmed
+            .parse::<f32>()
+            .ok()
+            .and_then(Self::new)
+            .ok_or_else(|| {
+                format!(
+                    "`{trimmed}` is not a grid scale: expected a number from {} to {}",
+                    Self::MIN,
+                    Self::MAX
+                )
+            })
+    }
+
+    /// The fraction itself.
+    pub fn get(self) -> f32 {
+        self.0
+    }
+
+    /// `px` target pixels, as the texels a grid at this scale asks for before it
+    /// is quantized: `round(px * scale^2)`, saturating.
+    ///
+    /// **Exactly `px` at [`FULL`](Self::FULL)**, because `1.0 * 1.0` is exact and
+    /// every `u32` is exact in `f64` — so a count derived from this at scale 1.0
+    /// is the count derived from the target, byte for byte.
+    pub fn texels(self, px: u32) -> u32 {
+        let scaled = (f64::from(px) * f64::from(self.0) * f64::from(self.0)).round();
+        if scaled >= f64::from(u32::MAX) {
+            u32::MAX
+        } else {
+            scaled as u32
+        }
+    }
+}
+
+impl Default for GridScale {
+    fn default() -> Self {
+        Self::FULL
+    }
+}
+
+impl std::fmt::Display for GridScale {
+    /// Two decimals — `1.00`, `0.75` — the form the overlay and a log line print.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:.2}", self.0)
+    }
+}
+
+/// **The grid-scale table**: the fraction a tier draws its internal grids at on
+/// an adapter of `class` (ADR-0245).
+///
+/// The two integrated rows are unmeasured and held at 1.0; their values are a
+/// reading taken on the reference laptop (Plan 0223 Phase 6), not a choice made
+/// here. The discrete, software and other rows are 1.0 **by decision** rather
+/// than by measurement: a discrete GPU holds the display rate
+/// at full resolution, and every golden baseline is taken on a software
+/// rasterizer, so a fraction there would move a picture no measurement asked to
+/// move.
+pub(crate) fn grid_scale_for(tier: Tier, class: AdapterClass) -> GridScale {
+    match (tier, class) {
+        (Tier::Floor, AdapterClass::Integrated) => GridScale::FULL,
+        (Tier::Rich, AdapterClass::Integrated) => GridScale::FULL,
+        (_, AdapterClass::Discrete | AdapterClass::Software | AdapterClass::Other) => {
+            GridScale::FULL
+        }
+    }
+}
+
+/// **The one grid-scale resolution in the engine**: an explicit pin wins, a
+/// renderer with no surface takes [`GridScale::FULL`], and a window takes the
+/// table's row.
+///
+/// The headless arm is the same guarantee [`Renderer::new_headless`] makes
+/// about the tier: a capture is a function of its inputs and not of the machine
+/// that took it, so a `shot` on an integrated laptop and one on a discrete
+/// desktop draw the same grid. A pin is how a headless run asks for less.
+///
+/// Pure, so all three arms are asserted without a device.
+///
+/// [`Renderer::new_headless`]: super::Renderer::new_headless
+pub(crate) fn resolve_grid_scale(
+    pin: Option<GridScale>,
+    tier: Tier,
+    class: AdapterClass,
+    has_surface: bool,
+) -> GridScale {
+    match pin {
+        Some(scale) => scale,
+        None if has_surface => grid_scale_for(tier, class),
+        None => GridScale::FULL,
+    }
+}
+
 /// The capacity values a tier sets. Resolved once at renderer construction and
 /// read at construction/reconfigure time only — never branched on per frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,6 +264,18 @@ pub struct TierConfig {
     /// Which tier these values are, so a demotion and the overlay have one thing
     /// to read rather than a parallel field to keep in step.
     pub tier: Tier,
+
+    /// The fraction of the render target both internal grids are drawn at
+    /// ([`GridScale`], ADR-0245) — the one value here that is not the tier's
+    /// alone.
+    ///
+    /// The constants below carry [`GridScale::FULL`]; the renderer replaces it
+    /// with `resolve_grid_scale`'s answer for its own adapter and pin whenever
+    /// it takes a config, so a `TierConfig` a renderer holds names the scale its
+    /// grids were actually built at. It rides here rather than beside the struct
+    /// because both grids are built from a `TierConfig` already, and a rebuild
+    /// that took the tier and forgot the scale is then not writable.
+    pub grid_scale: GridScale,
 
     /// Cap on a post stage's internal grid (ADR-0034), width then height.
     ///
@@ -510,6 +667,7 @@ impl TierConfig {
     /// The iGPU floor: the pre-tier engine's constants, unchanged.
     pub const FLOOR: Self = Self {
         tier: Tier::Floor,
+        grid_scale: GridScale::FULL,
         post_cap: (1920, 1080),
         bloom_levels: 4,
         attractor_particles: 50_000,
@@ -536,6 +694,7 @@ impl TierConfig {
     /// Until that phase closes, treat every field below as a starting point.
     pub const RICH: Self = Self {
         tier: Tier::Rich,
+        grid_scale: GridScale::FULL,
         post_cap: (2560, 1440),
         bloom_levels: 6,
         attractor_particles: 150_000,
@@ -557,6 +716,14 @@ impl TierConfig {
         match tier {
             Tier::Floor => Self::FLOOR,
             Tier::Rich => Self::RICH,
+        }
+    }
+
+    /// These values with their grids drawn at `scale`.
+    pub const fn with_grid_scale(self, scale: GridScale) -> Self {
+        Self {
+            grid_scale: scale,
+            ..self
         }
     }
 }
@@ -581,9 +748,14 @@ impl Default for TierConfig {
 /// the size whose density is already accepted, so it is where
 /// [`attractor_budget`] resolves to exactly the tier's own anchor.
 ///
-/// **The denominator is target pixels, not grid texels**, and the two differ by
-/// the grid's 256-px quantization — 1.71x here, 1.07x at 720p, 1.26x at 1080p,
-/// 1.00x at 4K. Bounded, and named because the deposit lands per texel.
+/// **The numerator is the grid's texels before quantization** —
+/// [`GridScale::texels`] of the target's pixels, which at [`GridScale::FULL`] is
+/// the target's pixel count exactly — so a field drawn at a fraction of the
+/// target is sampled at the density this reference names rather than
+/// over-sampled for texels it does not have (ADR-0245). What it still does not
+/// count is the grid's 128-texel rounding, a bounded difference either way —
+/// 1.07x here and at 720p, 0.95x at 1080p, 1.00x at a capped 4K — named
+/// because the deposit lands per texel.
 pub const REFERENCE_PX: u32 = 230_400;
 
 /// The attractor's drawn sample budget for a target of `target_px` pixels, before

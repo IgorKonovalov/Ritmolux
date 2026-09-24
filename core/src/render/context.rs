@@ -402,6 +402,38 @@ fn resolve_adapter(
     }
 }
 
+/// The kind of adapter a context runs on, as far as the renderer's own
+/// decisions care (ADR-0245).
+///
+/// Crate-local on purpose: it feeds one table (`tier::grid_scale_for`) and no
+/// scene ever branches on it, so a scene cannot grow a per-GPU look. Everything
+/// wgpu names beyond these four — a virtual GPU, an unknown type — is `Other`,
+/// which the table treats as it treats a discrete part.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AdapterClass {
+    /// A GPU sharing system memory with the CPU — the bandwidth-bound case the
+    /// grid scale exists for.
+    Integrated,
+    /// A GPU with its own memory.
+    Discrete,
+    /// A CPU rasterizer (WARP, llvmpipe) — what every golden capture runs on.
+    Software,
+    /// Anything wgpu reports that is none of the above.
+    Other,
+}
+
+impl AdapterClass {
+    /// The class of an adapter wgpu describes as `device_type`.
+    pub(crate) fn of(device_type: wgpu::DeviceType) -> Self {
+        match device_type {
+            wgpu::DeviceType::IntegratedGpu => AdapterClass::Integrated,
+            wgpu::DeviceType::DiscreteGpu => AdapterClass::Discrete,
+            wgpu::DeviceType::Cpu => AdapterClass::Software,
+            wgpu::DeviceType::VirtualGpu | wgpu::DeviceType::Other => AdapterClass::Other,
+        }
+    }
+}
+
 /// Owns the wgpu instance, surface, device, and queue for one output window.
 ///
 /// `surface` is `None` for a **headless** context (Plan 0013): a device+queue
@@ -431,6 +463,11 @@ pub struct RenderContext {
     /// rasterizer can't render faithfully (e.g. fullscreen-scene + background
     /// pipeline coexistence, a documented WARP quirk).
     is_software: bool,
+    /// What kind of adapter this is, for the one decision that reads it: the
+    /// internal-grid scale (ADR-0245). Set beside [`is_software`](Self::is_software)
+    /// from the same `device_type`, so the two cannot disagree about a CPU
+    /// rasterizer.
+    class: AdapterClass,
     /// The selected adapter's own description — name, backend, device type and
     /// driver — kept as a formatted string rather than as `wgpu::AdapterInfo` so
     /// no consumer has to name a wgpu type to read it.
@@ -523,6 +560,7 @@ impl RenderContext {
             queue,
             config,
             is_software,
+            class: AdapterClass::of(info.device_type),
             adapter: description,
             instance: instance.clone(),
             gpu: adapter,
@@ -589,6 +627,7 @@ impl RenderContext {
             queue,
             config,
             is_software,
+            class: AdapterClass::of(info.device_type),
             adapter: description,
             instance,
             gpu: adapter,
@@ -629,6 +668,11 @@ impl RenderContext {
     /// Whether the active adapter is a CPU/software rasterizer (see the field).
     pub(crate) fn is_software(&self) -> bool {
         self.is_software
+    }
+
+    /// The active adapter's class (see the field).
+    pub(crate) fn adapter_class(&self) -> AdapterClass {
+        self.class
     }
 
     /// The active adapter's description — name, backend, device type, driver —
@@ -722,6 +766,7 @@ impl RenderContext {
             config,
             gpu: adapter,
             is_software: info.device_type == wgpu::DeviceType::Cpu,
+            class: AdapterClass::of(info.device_type),
             adapter: description,
         }))
     }
@@ -744,6 +789,7 @@ impl RenderContext {
         self.queue = staged.queue;
         self.gpu = staged.gpu;
         self.is_software = staged.is_software;
+        self.class = staged.class;
         self.adapter = staged.adapter;
     }
 }
@@ -759,5 +805,14 @@ pub(crate) struct StagedContext {
     pub(crate) config: wgpu::SurfaceConfiguration,
     gpu: wgpu::Adapter,
     is_software: bool,
+    class: AdapterClass,
     adapter: String,
+}
+
+impl StagedContext {
+    /// The class of the adapter this context would move onto — read before the
+    /// commit, so the grid scale the rebuilt scenes take is the new adapter's.
+    pub(crate) fn adapter_class(&self) -> AdapterClass {
+        self.class
+    }
 }

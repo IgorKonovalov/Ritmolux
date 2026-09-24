@@ -19,19 +19,20 @@
 //!
 //! # What the policy is, and what it deliberately is not
 //!
-//! Round each axis up to `step`; when either axis exceeds its cap, scale **both**
-//! by a single factor first. The single factor is Plan 0029's lesson: clamping
+//! Take the grid scale's fraction of the target (ADR-0245); when either axis
+//! then exceeds its cap, scale **both** by a single factor; round each axis to
+//! the nearest `step`. The single factor is Plan 0029's lesson: clamping
 //! each axis independently squashed a 3440x1440 ultrawide into a 16:9 grid, so
 //! the picture's shape changed discontinuously as the window crossed the cap.
 //!
 //! It is **not** an aspect-preserving policy, and it does not try to be. The
-//! round-up to `step` means the grid's ratio is only approximately the target's,
+//! rounding to `step` means the grid's ratio is only approximately the target's,
 //! and that is fine — a grid is a **resolution, not a shape** (ADR-0037). Every
 //! present out of one of these grids is a plain normalized stretch, and any pass
 //! computing screen-destined geometry takes its aspect from the render target, so
-//! the grid's own aspect cancels out of the picture. Once that holds, `step` and
-//! `cap` are pure cost/quality knobs with no geometric side effect. That is the
-//! whole prize, and it is why unifying the arithmetic here does not mean
+//! the grid's own aspect cancels out of the picture. Once that holds, `scale`,
+//! `step` and `cap` are pure cost/quality knobs with no geometric side effect.
+//! That is the whole prize, and it is why unifying the arithmetic here does not mean
 //! unifying the constants: the two call sites cap at different sizes for
 //! different, documented reasons, and those numbers stay theirs.
 //!
@@ -49,6 +50,8 @@
     clippy::unreachable
 )]
 
+use super::tier::GridScale;
+
 /// The smallest a quantized axis may be, whatever the step.
 ///
 /// A grid under this is not worth the rebuild it costs, and both call sites
@@ -56,15 +59,27 @@
 /// a **floor**, not a round-up: an axis at 300 texels lands on the nearest step
 /// above the floor rather than being pushed to a multiple of it.
 const MIN_AXIS: u32 = 256;
-/// The internal grid to rasterize into for a render target of `surface`, capped
-/// at `cap` and quantized to `step` on each axis.
+/// The internal grid to rasterize into for a render target of `surface`, drawn
+/// at `scale` of it, capped at `cap` and quantized to `step` on each axis.
+///
+/// The order is scale, then cap, then quantize: the scale names how much of the
+/// target the grid resolves (ADR-0245), the cap bounds the result, and the step
+/// is applied to what the grid will actually be. At [`GridScale::FULL`] the
+/// first step is the identity — `round(x * 1.0)` is `x` for every `u32` — so
+/// every grid a full-scale renderer resolved before the scale existed it still
+/// resolves.
 ///
 /// Never returns 0 on either axis and never exceeds either cap. Total on every
 /// input: a zero `surface` axis floors to 1, a zero `step` floors to 1, and the
 /// ratio arithmetic is done in `u64` so the products cannot overflow.
-pub(crate) fn grid_size(surface: (u32, u32), cap: (u32, u32), step: u32) -> (u32, u32) {
-    let w = surface.0.max(1);
-    let h = surface.1.max(1);
+pub(crate) fn grid_size(
+    surface: (u32, u32),
+    scale: GridScale,
+    cap: (u32, u32),
+    step: u32,
+) -> (u32, u32) {
+    let w = scale_axis(surface.0, scale);
+    let h = scale_axis(surface.1, scale);
     let (cap_w, cap_h) = (cap.0.max(1), cap.1.max(1));
     // Integer ratio compare and derivation, so the grid is an exact function of
     // the target size on every target rather than a float rounding of one.
@@ -87,6 +102,17 @@ pub(crate) fn grid_size(surface: (u32, u32), cap: (u32, u32), step: u32) -> (u32
         quantize_axis(fit_w, cap_w, step),
         quantize_axis(fit_h, cap_h, step),
     )
+}
+
+/// One target axis at `scale`, rounded to the nearest texel and never 0.
+///
+/// `f64` so a `u32` axis survives the product exactly: at 1.0 the result is the
+/// input, which is what keeps a full-scale grid identical to an unscaled one.
+fn scale_axis(px: u32, scale: GridScale) -> u32 {
+    let scaled = (f64::from(px) * f64::from(scale.get())).round();
+    // Never above `px`, because the scale never exceeds 1.0; the cast cannot
+    // truncate a value that did not fit.
+    (scaled as u32).max(1)
 }
 
 /// Round one axis to the **nearest** `step` multiple, floored at [`MIN_AXIS`]
@@ -125,12 +151,15 @@ mod tests {
     //! what is asserted here is that they are **one function**.
 
     // Test asserts panic on failure; allowed here over the file's pragma.
-    #![allow(clippy::panic)]
+    #![allow(clippy::panic, clippy::expect_used)]
 
-    use super::grid_size;
+    use super::{grid_size, scale_axis};
     use crate::render::TierConfig;
     use crate::render::post::internal_grid_size;
     use crate::render::scenes::particles::trail_grid_size;
+    use crate::render::tier::GridScale;
+
+    const FULL: GridScale = GridScale::FULL;
 
     /// Both call sites' caps at the tier every golden capture runs at (Plan 0044).
     /// These tests pin the shared *policy*, not either tier's numbers.
@@ -157,7 +186,7 @@ mod tests {
     #[test]
     fn the_two_call_sites_are_one_policy() {
         for surface in UNCAPPED {
-            let post = internal_grid_size(surface, FLOOR.post_cap);
+            let post = internal_grid_size(surface, FULL, FLOOR.post_cap);
             let trail = trail_grid_size(surface.0, surface.1, FLOOR.attractor_trail_cap);
             assert_eq!(
                 post, trail,
@@ -176,7 +205,7 @@ mod tests {
     fn the_caps_stay_different_on_purpose() {
         let surface = (3840, 2160);
         assert_ne!(
-            internal_grid_size(surface, FLOOR.post_cap),
+            internal_grid_size(surface, FULL, FLOOR.post_cap),
             trail_grid_size(surface.0, surface.1, FLOOR.attractor_trail_cap),
             "above the post cap the two must diverge — the attractor is allowed a \
              larger grid than the stages, which are charged twice by a dual-live dissolve"
@@ -191,7 +220,7 @@ mod tests {
         for cap in [(1920, 1080), (2560, 1440), (256, 256), (1, 1)] {
             for step in [1, 64, 256, 4096] {
                 for surface in [(1, 1), (17, 3), (640, 480), (3440, 1440), (100, 4000)] {
-                    let (w, h) = grid_size(surface, cap, step);
+                    let (w, h) = grid_size(surface, FULL, cap, step);
                     assert!(w > 0 && h > 0, "{surface:?} {cap:?} {step}: degenerate");
                     assert!(
                         w <= cap.0.max(1) && h <= cap.1.max(1),
@@ -213,13 +242,13 @@ mod tests {
     /// which matters because it runs on every resize on both paths.
     #[test]
     fn a_zero_step_is_total() {
-        assert_eq!(grid_size((640, 480), (1920, 1080), 0), (640, 480));
+        assert_eq!(grid_size((640, 480), FULL, (1920, 1080), 0), (640, 480));
         // A step of one quantizes nothing, so the floor is the only thing left
         // to answer with.
-        assert_eq!(grid_size((0, 0), (1920, 1080), 0), (256, 256));
+        assert_eq!(grid_size((0, 0), FULL, (1920, 1080), 0), (256, 256));
         // …and the cap still wins over the floor, so the result is never
         // larger than the caller allowed.
-        assert_eq!(grid_size((0, 0), (64, 64), 0), (64, 64));
+        assert_eq!(grid_size((0, 0), FULL, (64, 64), 0), (64, 64));
     }
 
     /// **The rounding is to the nearest step, and the floor is a floor.**
@@ -232,25 +261,59 @@ mod tests {
     fn an_axis_rounds_to_the_nearest_step_above_the_floor() {
         const CAP: (u32, u32) = (2560, 1440);
         assert_eq!(
-            grid_size((1920, 1080), CAP, 128),
+            grid_size((1920, 1080), FULL, CAP, 128),
             (1920, 1024),
             "1080 is 8.44 steps of 128: nearest is 8, not 9"
         );
         assert_eq!(
-            grid_size((2048, 1152), CAP, 128),
+            grid_size((2048, 1152), FULL, CAP, 128),
             (2048, 1152),
             "both axes are exact multiples of the step and must not move"
         );
         for small in [(128, 128), (96, 96), (1, 1)] {
             assert_eq!(
-                grid_size(small, CAP, 128),
+                grid_size(small, FULL, CAP, 128),
                 (256, 256),
                 "{small:?} is under the floor on both axes"
             );
         }
         // The 640x360 card the documentation renders: the width is exact, the
         // height rounds up because 2.81 steps is nearer 3 than 2.
-        assert_eq!(grid_size((640, 360), CAP, 128), (640, 384));
+        assert_eq!(grid_size((640, 360), FULL, CAP, 128), (640, 384));
+    }
+
+    /// **The scale is taken first, and at 1.0 it is the identity** (ADR-0245).
+    ///
+    /// The identity half is what lets the scale exist without moving a golden:
+    /// every `u32` axis survives `round(x * 1.0)` unchanged, so a full-scale
+    /// grid is the grid the policy resolved before the scale was an input. The
+    /// half-scale case is the measurement plan's own reading — a 1080p target at
+    /// 0.5 is 960x540 before quantizing, which rounds to 1024x512 — and it lands
+    /// under both caps, so it is the scale and not a cap deciding it.
+    #[test]
+    fn a_full_scale_is_the_identity_and_a_fraction_is_taken_before_the_step() {
+        for axis in [1, 2, 127, 128, 255, 360, 1080, 1920, 4096, 7680, u32::MAX] {
+            assert_eq!(scale_axis(axis, FULL), axis, "{axis} moved at scale 1.0");
+        }
+        let half = GridScale::new(0.5).expect("0.5 is in range");
+        for cap in [TierConfig::FLOOR.post_cap, TierConfig::RICH.post_cap] {
+            assert_eq!(grid_size((1920, 1080), half, cap, 128), (1024, 512));
+        }
+        let quarter = GridScale::new(0.25).expect("0.25 is in range");
+        // 480x270 is under the floor on one axis, so the floor decides it there.
+        assert_eq!(
+            grid_size((1920, 1080), quarter, TierConfig::RICH.post_cap, 128),
+            (512, 256)
+        );
+        // A scale never lifts a grid above the full-scale one.
+        for surface in [(640, 360), (1280, 720), (1920, 1080), (3840, 2160)] {
+            let (fw, fh) = grid_size(surface, FULL, (7680, 4320), 128);
+            let (hw, hh) = grid_size(surface, half, (7680, 4320), 128);
+            assert!(
+                hw <= fw && hh <= fh,
+                "{surface:?}: half {hw}x{hh} over full {fw}x{fh}"
+            );
+        }
     }
 
     /// Pure: the same inputs always yield the same grid, with no wall clock
@@ -260,8 +323,8 @@ mod tests {
     fn the_policy_is_a_pure_function() {
         for surface in [(800, 600), (2048, 1152), (3440, 1440)] {
             assert_eq!(
-                grid_size(surface, (1920, 1080), 256),
-                grid_size(surface, (1920, 1080), 256)
+                grid_size(surface, FULL, (1920, 1080), 256),
+                grid_size(surface, FULL, (1920, 1080), 256)
             );
         }
     }

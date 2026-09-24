@@ -314,6 +314,8 @@ fn view() -> crate::settings::SettingsView {
     crate::settings::SettingsView {
         tier: rlx_core::render::Tier::Rich,
         tier_state: crate::settings::TierState::Pinned,
+        grid_scale: rlx_core::render::GridScale::FULL,
+        grid_scale_choice: standalone::config::GridScaleChoice::Auto,
         auto_rotate: true,
         rotate_order: standalone::config::RotateOrder::Shuffled,
         rotate_source: standalone::config::RotateSource::All,

@@ -1,7 +1,96 @@
 // Test asserts panic on failure; allowed here over the file's pragma.
-#![allow(clippy::panic)]
+#![allow(clippy::panic, clippy::expect_used)]
 
-use super::{Tier, TierConfig, tier_change_permitted};
+use super::{
+    AdapterClass, GridScale, Tier, TierConfig, grid_scale_for, resolve_grid_scale,
+    tier_change_permitted,
+};
+
+const CLASSES: [AdapterClass; 4] = [
+    AdapterClass::Integrated,
+    AdapterClass::Discrete,
+    AdapterClass::Software,
+    AdapterClass::Other,
+];
+
+/// **Every row of the grid-scale table is 1.0** (ADR-0245) until the two
+/// integrated rows are measured — and the constants carry it too, so a
+/// `TierConfig` nobody resolved draws its grids at the target's own size.
+#[test]
+fn every_grid_scale_row_is_full_until_measured() {
+    for tier in [Tier::Floor, Tier::Rich] {
+        for class in CLASSES {
+            assert_eq!(
+                grid_scale_for(tier, class),
+                GridScale::FULL,
+                "{tier:?} on {class:?} is not 1.0"
+            );
+        }
+    }
+    assert_eq!(TierConfig::FLOOR.grid_scale, GridScale::FULL);
+    assert_eq!(TierConfig::RICH.grid_scale, GridScale::FULL);
+}
+
+/// **A headless renderer resolves 1.0 on every adapter unless a pin says
+/// otherwise; a pin wins everywhere; a window takes the table** (ADR-0245).
+///
+/// All three arms, because the one that matters most is the one a wrong
+/// implementation passes most easily: with every table row at 1.0 today, a
+/// resolver that ignored `has_surface` would also answer 1.0 headless. So the
+/// headless arm is asserted against a pin, too — the pin is honoured there and
+/// nothing else is.
+#[test]
+fn a_headless_renderer_resolves_full_unless_pinned() {
+    let half = GridScale::new(0.5).expect("in range");
+    for tier in [Tier::Floor, Tier::Rich] {
+        for class in CLASSES {
+            assert_eq!(
+                resolve_grid_scale(None, tier, class, false),
+                GridScale::FULL,
+                "headless {tier:?} on {class:?} did not resolve 1.0"
+            );
+            assert_eq!(resolve_grid_scale(Some(half), tier, class, false), half);
+            assert_eq!(resolve_grid_scale(Some(half), tier, class, true), half);
+            assert_eq!(
+                resolve_grid_scale(None, tier, class, true),
+                grid_scale_for(tier, class),
+                "a window must take the table's row"
+            );
+        }
+    }
+}
+
+/// The accepted range is `0.25..=1.0`, both ends included, and everything else
+/// — including NaN, which would make `Eq` a lie — is refused with a message
+/// that names the range, because a caller prints it as a usage error.
+#[test]
+fn a_grid_scale_outside_its_range_is_refused_and_the_message_names_it() {
+    for ok in ["0.25", "0.5", " 0.75 ", "1", "1.0"] {
+        assert!(GridScale::parse(ok).is_ok(), "{ok:?} was refused");
+    }
+    for bad in ["0.2", "1.01", "0", "-0.5", "NaN", "inf", "half", ""] {
+        let err = GridScale::parse(bad).expect_err(bad);
+        assert!(
+            err.contains("0.25") && err.contains('1'),
+            "the refusal of {bad:?} does not name the range: {err}"
+        );
+    }
+    assert_eq!(GridScale::new(f32::NAN), None);
+    assert_eq!(GridScale::new(0.25).map(GridScale::get), Some(0.25));
+}
+
+/// **The texel count at full scale is the pixel count, exactly** — which is
+/// what keeps the attractor's budget where it was — and a half scale is a
+/// quarter of it.
+#[test]
+fn a_full_scale_counts_every_pixel_and_a_half_scale_a_quarter() {
+    for px in [0, 1, 16_384, 230_400, 2_073_600, 8_294_400, u32::MAX] {
+        assert_eq!(GridScale::FULL.texels(px), px, "{px} moved at 1.0");
+    }
+    let half = GridScale::new(0.5).expect("in range");
+    assert_eq!(half.texels(2_073_600), 518_400);
+    assert_eq!(format!("{half}"), "0.50");
+}
 
 /// The ADR-0054 guard, **both directions**.
 ///

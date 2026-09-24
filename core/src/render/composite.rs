@@ -58,7 +58,9 @@ pub(super) fn composite_into(
     // Hand the scene its target size before it renders: a scene with an internal
     // accumulation field (the attractor's trails) sizes that field from here rather
     // than a fixed grid (Plan 0027 Phase 2). A no-op for every other scene, and a
-    // cheap unchanged-compare for the attractor.
+    // cheap unchanged-compare for the attractor. The scale first, because the
+    // size is read against it.
+    scene.set_grid_scale(target.field_scale);
     scene.set_target_size(target.size.0, target.size.1);
     // `occlude` reaches whichever pass lands on the backdrop, and that is the
     // chain's last stage whenever one is active (ADR-0085). With an empty chain
@@ -88,11 +90,14 @@ pub(super) fn composite_into(
     if let Some(layer_scene) = side.layer.as_mut() {
         match side.chain.layer_input(encoder, surface) {
             Some(layer_view) => {
+                // Told the target's own size, so the whole scale is still owed.
+                layer_scene.set_grid_scale(side.chain.grid_scale());
                 layer_scene.set_target_size(surface.0, surface.1);
                 layer_scene.set_occlude(post::DEFAULT_OCCLUDE);
                 layer_scene.render(&ctx.queue, encoder, &layer_view, target.aspect);
             }
             None => {
+                layer_scene.set_grid_scale(target.field_scale);
                 layer_scene.set_target_size(target.size.0, target.size.1);
                 layer_scene.set_occlude(if scene_in_scratch {
                     post::DEFAULT_OCCLUDE
@@ -444,6 +449,8 @@ pub(super) struct OnCanvas<'a> {
     /// which is what tells a demoted floor from a pinned one.
     pub(super) tier: Tier,
     pub(super) tier_demoted: bool,
+    /// The grid scale the overlay prints beside the tier (ADR-0245).
+    pub(super) grid_scale: GridScale,
 }
 
 pub(super) fn encode_on_canvas(
@@ -460,6 +467,7 @@ pub(super) fn encode_on_canvas(
         overlay,
         tier,
         tier_demoted,
+        grid_scale,
     } = on_canvas;
     let (width, height) = surface;
     let mut draw_calls = 0;
@@ -489,6 +497,7 @@ pub(super) fn encode_on_canvas(
             diag.analysis(),
             tier,
             tier_demoted,
+            grid_scale,
             diag.stats().samples().map(|s| s * 1000.0),
         );
         draw_calls += 1;
