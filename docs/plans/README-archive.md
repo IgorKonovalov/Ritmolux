@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0228 - The resume guard accepts an owed phase](#0228---the-resume-guard-accepts-an-owed-phase)
   - [0227 - The gated paths get their jobs](#0227---the-gated-paths-get-their-jobs)
   - [0225 - The split goes one level deeper](#0225---the-split-goes-one-level-deeper)
   - [0226 - The conductor stops waiting for the owner](#0226---the-conductor-stops-waiting-for-the-owner)
@@ -258,6 +259,18 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0228 - The resume guard accepts an owed phase](done/0228-the-resume-guard-accepts-an-owed-phase.md)
+
+- closed 2026-09-24, conductor-run lane `plan-0228-the-resume-guard-accepts-an-owed-phase`. Phase 1
+`0717f508`, Phase 2 `7bd1bc42`. Round 1 review: **no blockers, no majors, two minors, one nit**. The
+README minor was fixed at the close in `ea94a754`, and the nit in the plan's own `## Close review`.
+Version **none** (conductor tooling, the 0191 and 0226 precedent). No ADR. Closes no backlog entry.
+- **What landed.** `parkStillTrue` settles a `human_phase` or `claude_dir` park on an `owed` row, but
+  only when the phase is a human phase marked `Blocks merge: no`; a bare `owed` row still refuses.
+  The conductor README's park table and self-resume list say so. This is what lets Plan 0220 resume.
+- **Open.** `settledPark` in `tools/conductor/lib/digest.mjs` still reads `done` alone, so the digest
+  and `status` list an owed-settled park as live. That minor is code and is `dev`'s.
 
 ### [0227 - The gated paths get their jobs](done/0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close.md)
 
