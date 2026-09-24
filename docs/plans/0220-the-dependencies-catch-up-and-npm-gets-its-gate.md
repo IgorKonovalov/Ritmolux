@@ -303,7 +303,7 @@ flowchart LR
 | 3 — The build and test set moves together | studio-builder | done; dev-window and CSP-test bullets carried to P4 (Notes) | this row's commit |
 | 4 — Electron 44 and electron-builder 26 | studio-builder | done; dev smoke run as the dev pipeline, not the `dev` script (Notes) | this row's commit |
 | 5 — The Rust pins that trail | dev | done | 561a2541 |
-| 6 — The npm gate, and CI on Node 24 | dev | done | committed with this row |
+| 6 — The npm gate, and CI on Node 24 | dev | done | b3ab5ecf |
 | 7 — CI on the pushed tree, and a release dry run | human | not started | |
 
 ### Notes
@@ -439,13 +439,18 @@ flowchart LR
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** dependency moves in a shipped artifact (the studio zip carries Electron 44.4.3;
+  the player links wgpu 30.0.1 and toml 1.1.6), studio build/test/lint tooling, and a new CI gate
+  (`scripts/check-npm-audit.mjs`, job `npm-audit`) with CI on Node 24. No player or studio feature.
+- **Operator docs touched:** `docs/developing.md`, `studio/README.md`, `CLAUDE.md` (`scripts/` block)
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 46 reductions across 21 live
+  entries (4 unprobeable), 30 advisory moved-path rows
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Phase 5 ran
+  `cargo nextest run --workspace` on its own tree: exit 0, 1805 passed, 7 skipped.
+- **Outstanding `human` phases:** Phase 7 (push, CI on the pushed tree including `npm-audit`, `studio`
+  on Node 24, `deny` and `spout`; the release dry run)
 
 ## Followups (after this lands)
 
