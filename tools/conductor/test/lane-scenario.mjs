@@ -51,6 +51,9 @@
 // commits, or, with `repairFails` or no GATE_RED to remove, commits `repair-<n>.txt` and leaves the
 // red where it is. `repairParks` makes it park `plan_wrong` without a commit.
 //
+// A `readiness` session prints `ready`, or with `readiness: "plan_wrong"` parks naming Phase 1, or
+// with `readinessCommits` commits a file first, which it must never do.
+//
 // Every session appends `<mode>-start` and `<mode>-end` to FAKE_EVENTS with a timestamp.
 
 import { execFileSync } from "node:child_process";
@@ -150,6 +153,18 @@ export default async ({ args, cwd, vars, env }) => {
       const claimed = ps.bogusCommit ? [...commits, "deadbee"] : commits;
       const through = ps.numericThrough ? Number(ids.at(-1)) : ids.at(-1);
       return { text: block({ kind: "phases_done", plan, through, commits: claimed }), costUsd: ps.implementCost ?? 1, numTurns: ps.numTurns, stream: ps.stream };
+    }
+
+    if (mode === "readiness") {
+      if (ps.readiness === "plan_wrong") {
+        return { text: block({ kind: "parked", plan, phase: "1", reason: "plan_wrong", detail: "Phase 1's What and Done when name different stages" }), costUsd: 0.3 };
+      }
+      if (ps.readinessCommits) {
+        writeFileSync(join(cwd, "readiness-notes.txt"), "a readiness check that writes\n");
+        git("add", "readiness-notes.txt");
+        git("commit", "-q", "-m", "docs: a readiness check that commits");
+      }
+      return { text: block({ kind: "ready", plan }), costUsd: 0.3 };
     }
 
     if (mode === "repair") {

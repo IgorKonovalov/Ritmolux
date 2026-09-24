@@ -339,8 +339,8 @@ behaviour, never at the end.
 | 2 — A human phase can be owed after the merge | dev | done | `6e0b3d2c` |
 | 3 — The lane merges main early, and a conflict gets a merge session | dev | done | `56061b8b` |
 | 4 — A red gate gets one repair session | dev | done | `8f363852` |
-| 5 — The close is its own session, holds the lock alone, and keeps a clean verdict | dev | committed with this row | |
-| 6 — A readiness check reads the plan before any spend | dev | not started | |
+| 5 — The close is its own session, holds the lock alone, and keeps a clean verdict | dev | done | `362d0f02` |
+| 6 — A readiness check reads the plan before any spend | dev | committed with this row | |
 | 7 — The pilot: one resident run over the real queue | human | not started | |
 
 ### Notes
@@ -379,6 +379,14 @@ behaviour, never at the end.
   plan (`MAX_CLOSE_MERGES`). `conductor.mjs` (`adopt-close` now calls `adoptClose`, which keeps a
   recorded clean verdict) and the comment in `lib/locks.mjs` are outside the phase's files, as are the
   fixtures that gained `budget_usd.close`.
+- Phase 6: readiness is keyed on a sha1 of the plan's text above `## Implementation log`
+  (`planContractHash`), not the file's blob hash. The file's blob changes with every phase's log row,
+  so hashing it would re-run readiness on every resume. The check runs lazily, just before the first
+  implement session, so a plan that parks at a `human` or `.claude/` Phase 1 runs none. A plan with
+  implement steps and no readiness record predates the check and is not stopped for one. Existing
+  scenarios gained `readiness:architect` first, which shifted their step indexes and labels
+  (`0101-02-implement`, `0101-04-close`) and the budget scenario's lane spend ($7.50 to $7.80).
+  `test/live.test.mjs`, outside the phase's files, got the same label shift.
 
 ### Close triggers
 

@@ -2,6 +2,7 @@
 //
 //   open the lane (installing the studio's dependencies when the plan declares files under studio/,
 //   since the gate's three studio checks are guarded on a directory no worktree is born with)
+//   -> before the first implement session: one read-only readiness session (ADR-0248)
 //   -> for each same-owner run not done: one implement session, then verify its claim
 //   -> a `human` phase parks, unless it is marked `Blocks merge: no`, when its row is committed
 //      `owed` and the plan runs on without it (ADR-0249)
@@ -46,7 +47,7 @@ import { CLOSE, take } from "./locks.mjs";
 import { fastForwardMain, mergeMainInto } from "./merge.mjs";
 import { CLAUDE_DIR, CLI_CONTRACT, STUDIO_INSTALL } from "./outcome.mjs";
 import { donePhases, findPlan, nextStep, rangeLabel, readPlanFile } from "./plan.mjs";
-import { adoptClose, clearPark, endStep, planRecord, saveState, spendSince, startStep, statePaths, takeResumeAsks } from "./state.mjs";
+import { adoptClose, clearPark, endStep, planContractHash, planRecord, saveState, spendSince, startStep, statePaths, takeResumeAsks } from "./state.mjs";
 import { USAGE_LIMIT, renderPromptFile, runStep } from "./step.mjs";
 
 export const MAX_FIX_ROUNDS = 2;
@@ -629,6 +630,36 @@ async function mergeMain(ctx, rec, where) {
   return mergeSession(ctx, rec, { where, paths: m.paths });
 }
 
+/**
+ * The readiness check (ADR-0248): a read-only architect session that reads the plan against itself
+ * and the tree before any implementation spend, and ends `ready` or parks `plan_wrong`. It runs before
+ * the plan's first implement session, and again only when the plan's contract (planContractHash) has
+ * changed since a `ready`: a park is never remembered as passing, so a plan resumed after one is read
+ * again. A plan with implement steps and no readiness record predates the check and is not stopped
+ * for it. Returns a park, or null.
+ */
+async function readiness(ctx, rec, file) {
+  const hash = planContractHash(readFileSync(file.path, "utf8"));
+  if (rec.readiness?.hash === hash) return null;
+  if (!rec.readiness && rec.steps.some((s) => s.kind === "implement")) return null;
+  const wt = rec.worktree;
+  const before = head(wt);
+  const r = await session(ctx, rec, "readiness", {
+    owner: "architect",
+    prompt: `/architect conductor readiness plan ${rec.plan}`,
+    vars: { plan: rec.plan, plan_file: file.rel, lane: wt, branch: rec.branch, settings: ctx.settingsFile },
+    budget: ctx.local.budget_usd.readiness,
+  });
+  if (r.status === "parked") return { reason: r.reason, detail: r.detail, phase: r.outcome?.phase ?? null, read: r.transcript, resetsAt: r.resetsAt };
+  if (r.outcome.kind !== "ready") return { reason: "disagreement", detail: `readiness returned a ${r.outcome.kind} outcome`, read: r.transcript };
+  if (head(wt) !== before || !isClean(wt)) {
+    return { reason: "disagreement", detail: "the readiness session changed the lane; it reads and changes nothing", read: r.transcript };
+  }
+  rec.readiness = { hash, at: now() };
+  save(ctx);
+  return null;
+}
+
 function planFileIn(cwd, plan) {
   const found = findPlan(cwd, plan);
   return found ? { ...found, rel: relative(cwd, found.path).replace(/\\/g, "/") } : null;
@@ -958,6 +989,9 @@ export async function runPlan(ctx, lane, plan) {
         if (problem) return park(ctx, rec, { reason: "disagreement", phase: next.phases[0], detail: problem, read: `${file.rel} Phase ${next.phases[0]}` });
         continue;
       }
+
+      const ready = await readiness(ctx, rec, file);
+      if (ready) return park(ctx, rec, ready);
 
       const range = rangeLabel(next.phases);
       const before = head(wt);

@@ -8,6 +8,7 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { createHash } from "node:crypto";
 
 import { usageReading } from "./live.mjs";
 
@@ -247,6 +248,17 @@ export function adoptClose(rec, adopted, headSha, at = new Date().toISOString())
   const last = rec.verdicts.at(-1);
   if (!(last && last.blockers === 0 && last.majors === 0)) rec.verdicts.push({ ...adopted.verdict });
   rec.closed = { version: adopted.version, tag: adopted.tag, head: headSha, at, adopted: true };
+}
+
+/**
+ * What a readiness verdict is keyed on (ADR-0248): the plan's text above its `## Implementation log`,
+ * which is the contract a readiness session read. The log below it changes with every phase commit,
+ * so hashing the whole file would re-run readiness on every resume; an edit to a phase is what makes
+ * the old verdict stale.
+ */
+export function planContractHash(text) {
+  const contract = text.replace(/\r\n/g, "\n").split(/^## Implementation log\s*$/m)[0];
+  return createHash("sha1").update(contract).digest("hex");
 }
 
 export function completedSteps(rec) {

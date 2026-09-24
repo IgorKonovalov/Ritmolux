@@ -2,7 +2,8 @@
 
 A Node program that takes approved plans off a queue and runs them to a merged `main` with no owner
 action in between, in up to two git worktree lanes. For each plan it opens a lane, starts one fresh
-headless `claude -p` session per contiguous same-owner run of phases, checks each session's claim
+headless `claude -p` session per contiguous same-owner run of phases, after a read-only readiness
+check of the plan, checks each session's claim
 against `git`, merges `main` into the lane and runs its own gate, starts a fresh headless `architect`
 session that reviews the plan and a second one that closes it on the branch, fast-forwards `main`, and
 removes the lane.
@@ -28,7 +29,7 @@ The decision and its rejected alternatives are ADR-0205. The plan that built it 
    spend.
 
    ```json
-   { "budget_usd": { "implement": 8, "fix": 4, "review": 6, "close": 5, "merge": 3, "repair": 4 }, "run_budget_usd": 150, "max_open_worktrees": 3 }
+   { "budget_usd": { "readiness": 2, "implement": 8, "fix": 4, "review": 6, "close": 5, "merge": 3, "repair": 4 }, "run_budget_usd": 150, "max_open_worktrees": 3 }
    ```
 
    `run_budget_usd` is the ceiling on one run's total spend. A resident run spends while nobody is
@@ -220,7 +221,7 @@ entry. Every other reason is yours: `resume` it once you have acted.
 | `human_phase` | Do the phase. Mark its row `done` in the plan's `## Implementation log` **in the lane** (`WORK/rlx-plan-NNNN`) and commit it there. `resume` checks the row, and a live run resumes it by itself. A phase marked `Blocks merge: no` never parks: see below. |
 | `claude_dir` | The same, and for the same reason: the phase declares a file under `.claude/`, which the CLI will not let a session write (ADR-0210). **Nothing was run** — the park comes before the phase. The detail names the paths. Do the phase in the lane, mark its row `done`, commit; `resume` checks the row. |
 | `studio_install` | The plan declares files under `studio/` and `npm --prefix studio ci` failed, so the gate's three studio checks could not run (ADR-0218). The detail carries the install's tail; the usual cause is no network. **Nothing was run** — the park comes before the first session. Install by hand in the lane, or wait and `resume`, which installs again: the trigger is a missing `studio/node_modules`, so the open lane the park left behind is installed into rather than skipped. |
-| `stop_condition`, `plan_wrong`, `question` | Read the transcript the inbox names. Settle it in a human-started `/architect` session. |
+| `stop_condition`, `plan_wrong`, `question` | Read the transcript the inbox names. Settle it in a human-started `/architect` session. A `plan_wrong` from the readiness check names the phase and the contradiction, and nothing was implemented: edit the plan, or resume to overrule it. |
 | `gate_red` | The gate was red, a repair session ran, and the re-run was red too; or the plan had already run its three repairs. The park reads the second run's log. Fix the defect in the lane. |
 | `review_failed` | Read the last review under `state/reviews/`. Resuming grants two fresh fix rounds. |
 | `disagreement` | A session's claim and `git` differ. Read the detail and the transcript before trusting the lane. |
@@ -230,6 +231,15 @@ entry. Every other reason is yours: `resume` it once you have acted.
 | `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or read the transcript. Resuming re-runs the step from what the plan log and `git` show. |
 | `merge_conflict` | A merge session could not resolve a conflict and parked it, or the close hit one in code. Resolve it in the lane and commit the merge; a resumed plan goes straight back to where it stopped. |
 | `merge_failed`, `main_dirty` | Clean the main checkout, or clear what refused the fast-forward. `main_dirty` resumes itself once the main checkout is on `main` and clean. |
+
+**A readiness check reads the plan before any spend** (ADR-0248). Before a plan's first implement
+session, a fresh read-only `architect` session checks that each phase's *What*, *Files touched* and
+*Done when* agree with each other and with the tree, that every done-when is runnable under the
+allowlist, and that no phase reads a `Blocks merge: no` phase's output. It ends `ready`, or parks
+`plan_wrong` naming the phase before any implementer runs. The conductor checks it left `HEAD` and the
+tree untouched. A `ready` is recorded against a hash of the plan's text above `## Implementation log`,
+so it runs again on resume only when a phase changed; a readiness park is never recorded as passing,
+so resuming one runs it again. The budget is `budget_usd.readiness`, required.
 
 **A red gate gets one repair session, not a park** (ADR-0248). At any stage, a red starts a fresh
 `dev` session, or a `studio-builder` one when the failing command is a studio check, handed the

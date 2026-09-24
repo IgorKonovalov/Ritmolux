@@ -911,8 +911,8 @@ worktree**, so a bare `git stash` / `git stash pop` can take another lane's entr
 
 ### Conductor mode — a review and a close nobody is watching
 
-**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: review` or
-`RLX-CONDUCTOR-MODE: close`.** That line is written by `tools/conductor/` (ADR-0205), which starts this
+**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: readiness`, `review` or
+`close`.** That line is written by `tools/conductor/` (ADR-0205), which starts this
 session headless, as a separate process, in the plan's worktree, handing it the plan, the lane, a round
 number and a review path — and nothing an implementer wrote. That separation is what "fresh session"
 means for a conductor-run plan: this is not an auto-invocation of you from a lane, which stays
@@ -925,6 +925,25 @@ clean verdict is recorded with the tip it graded, and the conductor takes the cl
 `close` session, handed that review's path, which does the bookkeeping and the bump. A close that parks
 keeps the verdict: resuming starts a close again, not a review, unless the lane gained a commit nothing
 has reviewed.
+
+**`readiness`** — before the plan's first implement session, a read that spends nothing on code
+(ADR-0248). **Change nothing**: no edit, no commit, no merge. The conductor checks `HEAD` and the tree
+and parks a session that moved either. Grade **consistency, not the design** — the plan is approved,
+and whether it is a good idea is not the question. Check each phase:
+
+- its *What*, *Files touched* and *Done when* agree with each other (a done-when names no stage, file
+  or behaviour the *What* does not produce, and the *What* needs no file the list omits);
+- every path it names exists in the tree, or the plan says the phase creates it;
+- every seam it relies on (a function, module, type or config key it calls or extends) is inside some
+  phase's *Files touched*, its own or an earlier one's;
+- every done-when is runnable under `settings.conductor.json`'s allowlist, one command per call;
+- no phase reads the output of a `human` phase marked `**Blocks merge:** no`
+  ([ADR-0249](../../../docs/adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)), which is owed
+  after the merge.
+
+End `ready`, or park `plan_wrong` naming the phase and quoting both sides of the contradiction. Park
+only on a contradiction an implementer cannot work around; a matter of taste, or a gap an implementer
+closes in a minute, is `ready`. Your verdict is the owner's to overrule: they edit the plan or resume.
 
 **`review`** — steps 1 to 3, then the outcome.
 
@@ -1013,7 +1032,7 @@ Read the review and the plan; do not grade the plan again. The conductor holds t
    unfinished when the session ends parks the plan `lost_background` whatever the outcome claims.
 
 **The last thing you print is one fenced `rlx-outcome` block** holding one JSON object, in the shapes
-the prompt shows: from a review, `verdict` (the counts, the review path, and `findings` — **every**
+the prompt shows: from a readiness check, `ready` or `parked`; from a review, `verdict` (the counts, the review path, and `findings` — **every**
 finding of the round, each `{severity, file, line, what}`) or `parked`; from a close, `closed` (the
 version and tag, or `null` for a docs/chore-only close, carrying the review's verdict, with `fixed_in`
 on each finding the close repaired) or `parked`. The finding lines are what the owner reads in the morning, verbatim; write each so it

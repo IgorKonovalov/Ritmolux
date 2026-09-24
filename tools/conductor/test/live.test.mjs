@@ -286,7 +286,7 @@ test("run prints a session's milestones in order, the commit before the session 
 
   const toolDir = tmp("rlx-live-tool-");
   writeFileSync(join(toolDir, "queue.json"), JSON.stringify({ lanes: { a: ["0101"] } }));
-  writeFileSync(join(toolDir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4, close: 3, merge: 2, repair: 3 }, run_budget_usd: 60, max_open_worktrees: 3 }));
+  writeFileSync(join(toolDir, "local.json"), JSON.stringify({ budget_usd: { readiness: 1, implement: 5, fix: 3, review: 4, close: 3, merge: 2, repair: 3 }, run_budget_usd: 60, max_open_worktrees: 3 }));
   const p = { ...paths({ repo, toolDir }), settings: join(TOOL_DIR, "settings.conductor.json"), prompts: join(TOOL_DIR, "prompts"), withLock: join(TOOL_DIR, "with-lock.mjs") };
   const liveCopy = join(toolDir, "printed.log");
   writeFileSync(liveCopy, "");
@@ -334,7 +334,7 @@ test("run prints a session's milestones in order, the commit before the session 
   const sha = sh(["log", "--format=%H", "-1", "--grep", "phase 1", "main"], repo).slice(0, 7);
   const find = (re) => out.findIndex((l) => re.test(l));
   const order = [
-    find(/^\d\d:\d\d 0101 implement-01 start  phases 1-2 \(dev\)$/),
+    find(/^\d\d:\d\d 0101 implement-02 start  phases 1-2 \(dev\)$/),
     // The subject's em dash, curly quotes and box-drawing character reach the line as ASCII: the
     // assertion below is what would go red if either `ascii()` call were removed. The sha is still
     // matched exactly, so the ordering this list pins is unweakened.
@@ -343,7 +343,7 @@ test("run prints a session's milestones in order, the commit before the session 
     find(/^\d\d:\d\d 0101   tests  nextest run -p rlx-core: 12 passed, 0 failed, 3 skipped; lock wait 1s, ran 3s$/),
     find(/^\d\d:\d\d 0101   usage  5h 0\.27 \(resets \d\d:\d\d\); 7d 0\.02 \(resets \d\d-\d\d \d\d:\d\d\)$/),
     find(/^\d\d:\d\d 0101   denied PowerShell: cd studio; npx vitest run -- "watch"$/),
-    find(/^\d\d:\d\d 0101 implement-01 end    phases_done, (< 1|\d+) min, \$5\.83, 64 turns$/),
+    find(/^\d\d:\d\d 0101 implement-02 end    phases_done, (< 1|\d+) min, \$5\.83, 64 turns$/),
   ];
   assert.ok(order.every((i) => i >= 0), `every milestone printed:\n${out.join("\n")}`);
   assert.deepEqual([...order].sort((a, b) => a - b), order, `in order:\n${out.join("\n")}`);
