@@ -1,8 +1,8 @@
 # ADR-0247 — The split recurses, and the ceiling is an assertion about the corpus
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-24 (Plan 0225), with an Outcome
 > **Date:** 2026-09-23
-> **Related plan(s):** [0225](../plans/0225-the-split-goes-one-level-deeper.md)
+> **Related plan(s):** [0225](../plans/done/0225-the-split-goes-one-level-deeper.md)
 > **Extends:** [0166](0166-a-published-document-splits-into-routes-by-size.md)
 
 ## Context

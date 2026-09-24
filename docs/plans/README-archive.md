@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0225 - The split goes one level deeper](#0225---the-split-goes-one-level-deeper)
   - [0217 - Every setting has a file, and a gate says so](#0217---every-setting-has-a-file-and-a-gate-says-so)
   - [0215 - The wide seams narrow, and a guard holds them](#0215---the-wide-seams-narrow-and-a-guard-holds-them)
   - [0224 - The adapter becomes a setting](#0224---the-adapter-becomes-a-setting)
@@ -255,6 +256,21 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0225 - The split goes one level deeper](done/0225-the-split-goes-one-level-deeper.md)
+
+- closed 2026-09-24, conductor-run lane `plan-0225-the-split-goes-one-level-deeper`. Phase 1
+`b4e63064`, Phase 2 `98ca086d`, Phase 3 `779ba5fe`, log `f6a476f3`, and the close's prose repairs
+`e4fce8ab`. Round 1 found **no blockers, no majors, two minors and one nit**, all fixed at the close.
+Version **0.147.1** (patch: the red `Pages` workflow repaired). ADR-0247 accepted with an `Outcome`.
+Closes no backlog entry. The full review is the plan's own `## Close review` section.
+- **What landed.** `sectionsAt` in `site/src/plugins/split-document.mjs` builds the split
+  recursively: an oversized section cuts at the next heading level at any depth, and `chunksOf`,
+  `sidebarGroup` and the fragment map follow. 173 routes became 191, not the 182 the ADR counted:
+  two `presets/README.md` rosters split as well. The largest route is `## Checklist` in
+  `docs/on-device-validation.md` at 29,528 B.
+- **Left open.** That checklist has no internal headings, so the next edit to it can turn `Pages`
+  red with no splitter repair available; ADR-0247 records it as editorial debt.
 
 ### [0217 - Every setting has a file, and a gate says so](done/0217-every-setting-has-a-file-and-a-gate-says-so.md)
 

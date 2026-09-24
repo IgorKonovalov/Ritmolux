@@ -1,14 +1,17 @@
 # 0225 — The split goes one level deeper
 
-> **Status:** in-progress
+> **Status:** done (2026-09-24) — phases `b4e63064`, `98ca086d`, `779ba5fe`; close repairs
+> `e4fce8ab`. Mode 4 round 1: no blockers, no majors, two minors and one nit, all fixed at the
+> close. Verified: the Phase 1 command (191 routes, 0 duplicates, largest 29,528 B), both site gates
+> against the built site, the full suite from the ledger. Version 0.147.1.
 > **Created:** 2026-09-23
 > **Approved:** 2026-09-24 (user) — queued first in lane b. The `Pages` workflow is red and
 > the site has not deployed since 2026-09-23, so this one is ahead of the rest of the queue.
 > **Owner skill(s):** dev
-> **Related ADRs:** [0247](../adrs/0247-the-split-recurses-and-the-ceiling-is-an-assertion-about-the-corpus.md) (proposed),
-> [0166](../adrs/0166-a-published-document-splits-into-routes-by-size.md),
-> [0154](../adrs/0154-the-reader-facing-docs-publish-as-a-site.md),
-> [0163](../adrs/0163-a-long-document-carries-a-generated-contents-block.md)
+> **Related ADRs:** [0247](../../adrs/0247-the-split-recurses-and-the-ceiling-is-an-assertion-about-the-corpus.md) (accepted, Outcome),
+> [0166](../../adrs/0166-a-published-document-splits-into-routes-by-size.md),
+> [0154](../../adrs/0154-the-reader-facing-docs-publish-as-a-site.md),
+> [0163](../../adrs/0163-a-long-document-carries-a-generated-contents-block.md)
 
 ## TL;DR
 
@@ -21,7 +24,7 @@ exactly two levels**, so the change is not one line.
 ## Context & problem
 
 `### What the report's columns mean` in `docs/capturing.md` grew past the ceiling when
-[Plan 0207](done/0207-the-commitments-get-their-instruments.md) Phase 2 added the report's cost
+[Plan 0207](0207-the-commitments-get-their-instruments.md) Phase 2 added the report's cost
 columns. It is a `###` with nine `####` children, so its content is already structured for a cut the
 splitter declines to make.
 
@@ -176,3 +179,92 @@ single `node` command against the module, and Phase 2's is the real gate.
   moved-path advisories, none from this plan's files
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
 - **Outstanding `human` phases:** none
+
+## Close review
+
+Round 1, conductor-run, reviewed at `f6a476f3`. No earlier round, so no finding was resolved by a
+fix round.
+
+**Verdict: Plan 0225 landed cleanly; no blockers, no majors, two minors and one nit, all prose, all
+repaired at the close in `e4fce8ab`.**
+
+### Evidence
+
+- **Full suite:** `with-lock: skipped cargo nextest run --workspace: tree 466d572 is green in the
+  suite ledger, run by gate 0225-pre-review at 2026-09-24T06:52:33.636Z: 1805 tests run: 1805 passed
+  (5 slow), 7 skipped`. The plan touches no Rust, so this is the drift guard's standing reading
+  rather than a test of the change.
+- **Phase 1 done-when, re-run by the review:** `{"routes":191,"duplicates":0,"largest":29528}` —
+  under 30,000, no route twice. Matches the log's after-figure.
+- **Phase 2 done-when, re-run against the lane's `site/dist/`:** `check-site-routes.mjs` —
+  `216 built routes, 214 from the published set, every one in the menu; largest split route 29528 B,
+  under 30000`; `check-site-links.mjs` OK with the local `/api/` NOTE (the Pages workflow passes
+  `--require-api`). The `dist/` is Phase 2's build; Phase 3 changed only comments and one failure
+  message, neither of which moves output. The nine `####` routes under
+  `engine/capturing/the-shot-cli/what-the-reports-columns-mean/` exist in the build.
+- **Phase 3 done-when:** `git grep -n "stops at" -- site scripts` returns one line,
+  `scripts/check-doc-links.mjs:269`, about a regex, not the split. `git grep -n
+  "on-device-validation" -- site scripts` returns the ceiling's comment at
+  `site/src/plugins/split-document.mjs:31` and the gate header at `scripts/check-site-routes.mjs:24`.
+- **`cargo doc` / fmt / clippy:** run in the close gate on the tagged tip.
+
+### Lens 1 — alignment
+
+All three phases landed as written, each an own commit, each with an in-vocabulary `dev` owner tag.
+The four functions the plan named all moved: `sectionsAt` replaces the two hand-unrolled levels in
+`splitDocument` with one recursive builder (depth-guarded at 6); `chunksOf` walks the tree;
+`sidebarGroup` builds groups recursively with each parent's route as its `Overview` entry, which is
+exactly what `check-site-routes.mjs`'s orphan property needs; `fragmentMap` needed no edit because it
+iterates `chunksOf`, and the `from`/`to` disjointness `sectionsAt` preserves is what keeps its
+per-chunk slugger correct. `content.config.ts` reads only `chunksOf`/`contentsList`/`kind === 'index'`,
+so a depth-3 parent gets its `In this section` list without change. The log is shorter than the
+phases section and accurate against the tree.
+
+### Lens 2 — layering
+
+`site/` only; no core, ABI or protocol surface touched. One module, one concept.
+
+### Lens 3 — docs and bookkeeping
+
+No operator doc describes the split; the sweep finds nothing to change beyond the two minors below.
+Owed at close: ADR-0247 `proposed -> accepted` with an `Outcome`, the `docs/adrs/README.md` row and
+ADR-0166's `extended by 0247` forward-reference, plan to `done/`, plans README, a patch bump
+(fix-only: a red `Pages` workflow repaired) and the studio sync.
+
+### Lens 4 — correctness
+
+The recursion is conditional on the same 20 KB measurement at every level, measured with the heading
+line as before; slugs are unique among siblings with the parent route disambiguating. No numeric
+assertion was added.
+
+### Lens 5 — design integrity
+
+The special case is gone rather than moved: one builder, one walk, one sidebar item function.
+
+### Findings
+
+**minor**
+
+1. **`docs/adrs/0247-the-split-recurses-and-the-ceiling-is-an-assertion-about-the-corpus.md:71` —
+   the ADR's arithmetic is falsified by its own implementation.** It says *"exactly one qualifies"*,
+   *"nine entries and nine routes"* and *"ten pages"*; the recursion also split two `###` sections in
+   `presets/README.md` (`shape_field` with 5 children, `tuple` with 4), for 18 new routes (173 ->
+   191). The body is append-only once accepted, so the repair is a dated `Outcome` section at
+   acceptance. **Fixed in `e4fce8ab`.**
+2. **`CLAUDE.md:186` — the `scripts/` entry still said a route over the ceiling means *"ADR-0166's
+   arithmetic needs redoing"*,** which Phase 3 retired in both the constant's comment and the gate's
+   failure message. **Fixed in `e4fce8ab`.**
+
+**nit**
+
+3. **`docs/adrs/0247-...md:54` — the Decision says *"until it is under the threshold or has no
+   deeper heading"*; `sectionsAt` searches only `depth + 1`**, so a section that skips a level stays
+   whole. The code's doc comment states this plainly and no instance exists in the corpus. Recorded
+   in the same `Outcome`. **Fixed in `e4fce8ab`.**
+
+### Close notes
+
+- Preset curation: not triggered, `presets/` untouched. Backlog: the plan closes no entry.
+- Backlog probes: exit 0, 21 live entries. Translation advisory: `how-it-works.ru.md`,
+  `running.ru.md` and the foobar `READ-ME-FIRST.ru.md` are stale, none moved by this plan.
+- Version: **0.147.1**, patch — the plan repairs the red `Pages` workflow and ships no feature.
