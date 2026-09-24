@@ -1,0 +1,11 @@
+{
+  "runs": [
+    { "databaseId": 1001, "workflowName": "CI", "workflowFile": "ci.yml", "headBranch": "main", "status": "completed", "conclusion": "success", "headSha": "1111111aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "url": "https://github.com/example/ritmolux/actions/runs/1001" }
+  ],
+  "jobs": {
+    "1001": [
+      { "name": "check (macos-latest)", "conclusion": "success" },
+      { "name": "links", "conclusion": "success" }
+    ]
+  }
+}

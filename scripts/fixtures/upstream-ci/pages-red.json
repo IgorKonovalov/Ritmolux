@@ -1,0 +1,11 @@
+{
+  "runs": [
+    { "databaseId": 3003, "workflowName": "Release", "workflowFile": "release.yml", "headBranch": "main", "status": "completed", "conclusion": "failure", "headSha": "3333333ccccccccccccccccccccccccccccccccc", "url": "https://github.com/example/ritmolux/actions/runs/3003" },
+    { "databaseId": 3002, "workflowName": "Pages", "workflowFile": "pages.yml", "headBranch": "main", "status": "completed", "conclusion": "failure", "headSha": "3333333ccccccccccccccccccccccccccccccccc", "url": "https://github.com/example/ritmolux/actions/runs/3002" },
+    { "databaseId": 3001, "workflowName": "CI", "workflowFile": "ci.yml", "headBranch": "main", "status": "completed", "conclusion": "success", "headSha": "3333333ccccccccccccccccccccccccccccccccc", "url": "https://github.com/example/ritmolux/actions/runs/3001" }
+  ],
+  "jobs": {
+    "3002": [{ "name": "build", "conclusion": "failure" }],
+    "3003": [{ "name": "macos", "conclusion": "failure" }]
+  }
+}

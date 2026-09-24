@@ -545,6 +545,34 @@ stopped matching reports an empty list against a roster that is not empty, which
 possible exit 1. The self-test is here for the reporting path and the three drift shapes, not to
 rescue an exit code that could be a silence.
 
+## `upstream-ci/` — for `check-upstream-ci.mjs`
+
+```
+node scripts/check-upstream-ci.mjs --self-test    # expects exit 0, 13 of 13
+```
+
+**Not a tree the checker walks but a set of answers `gh` gives.** `fake-gh.mjs` stands in for `gh`
+through `RLX_GH`, and each `.json` beside it is one scenario, named through `RLX_FAKE_GH`. The
+self-test runs the script against a throwaway repository with a GitHub `origin`, so nothing here
+touches the network. Nothing runs it on a push either: the script is kept off the gate roster
+because its real answer needs the network ([ADR-0251](../../docs/adrs/0251-a-gated-compile-path-has-a-named-job-and-a-red-upstream-stops-the-next-close.md)).
+
+| Scenario | Case | Expected |
+|----------|------|----------|
+| `green.json` | the newest completed `CI` run on `main` succeeded | exit 0, `upstream CI: OK - run 1001` |
+| `red.json` | it failed, with one failing job among passing and skipped ones | exit 1, naming `check (macos-latest)` and no other job |
+| `pages-red.json` | a `Release` and a `Pages` run, both red and both newer than a green `CI` run | exit 0 on the `CI` run. This is the case the obvious "latest run" reading gets wrong |
+| `cancelled-newest.json` | an in-progress run, then a cancelled one, then a red one | exit 1 on the red one: a cancelled run is passed over |
+| `unauthenticated.json` | `gh` exits 4 with its login prompt | exit 0, `skipped: not read (gh unauthenticated)` |
+| `offline.json` | `gh` cannot reach the API | exit 0, `skipped: not read (no network)` |
+| `no-runs.json` | no `CI` run at all, only a `Pages` one | exit 0, `skipped: not read (no completed CI run)` |
+
+Two unread cases need no scenario: `gh` absent (an `RLX_GH` that does not exist) and no `origin`
+remote (a second throwaway repository without one). **Every unread case also asserts what the output
+does not say**: it must not contain `OK` or `RED`, so a notice that reads like a pass fails the test.
+The last four assertions cover `githubSlug` on the HTTPS, SSH and suffix-less spellings of a
+GitHub remote, and one remote that is not GitHub.
+
 ## `site-links/` — for `check-site-links.mjs`
 
 ```

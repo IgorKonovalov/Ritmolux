@@ -188,8 +188,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The macOS build compiles again | dev | done | committed with this row |
-| 2 — A reader for origin's CI | dev | not started | |
+| 1 — The macOS build compiles again | dev | done | 646ca642 |
+| 2 — A reader for origin's CI | dev | done | committed with this row |
 | 3 — The close consults it | dev | not started | |
 | 4 — The foobar component joins the push | dev | not started | |
 | 5 — The documents say what a machine needs | dev | not started | |
@@ -200,6 +200,10 @@ flowchart LR
 
 - Phase 1: the visibility is `pub(super)`, matching `StreamOutput`, not `pub`. Not compiled here —
   no local target builds `capture_mac/`; Phase 7's `check (macos-latest)` is the verifier.
+- Phase 2: the script also takes `--json` and `--self-test` (13 cases, seeded under
+  `scripts/fixtures/upstream-ci/`, with a section in `scripts/fixtures/README.md`), and exports
+  `readUpstream` for Phase 3. A cancelled or skipped `CI` run is passed over for the next older one.
+  Run for real on 2026-09-24 it exited 1 naming run 35972983139 and `check (macos-latest)`.
 
 ### Close triggers
 
