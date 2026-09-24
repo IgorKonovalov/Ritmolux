@@ -93,7 +93,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: site/package-lock.json
       # `npm ci` rather than `npm install`: it installs the committed lockfile

@@ -184,6 +184,11 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   from the menu rather than only by search, and that no route the splitter
                      #   produced exceeds 30,000 bytes of source (ADR-0166) - a route over that means
                      #   ADR-0166's arithmetic needs redoing, never that the constant needs raising.
+                     #   And EXCEPT check-npm-audit.mjs, CI-only like those two but for another
+                     #   reason: it asks the registry, so its answer moves without a commit, and it
+                     #   runs in ci.yml's own `npm-audit` job. It fails studio's shipped graph
+                     #   (--omit=dev) at high and every full npm graph at critical, excepting only
+                     #   what npm-audit.allow.json names by GHSA id with a reason (ADR-0244).
                      #   Six of them also run in the close ceremony - check-doc-links.mjs,
                      #   check-index-rows.mjs, check-backlog-claims.mjs, toc.mjs,
                      #   check-release-tag.mjs and check-translations.mjs - the first five because a

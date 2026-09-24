@@ -1,0 +1,8 @@
+{
+  "allow": [
+    {
+      "id": "GHSA-fxhi-fxhi-fxhi",
+      "reason": "Seeded: the advisory needs a vector the shipped package never opens."
+    }
+  ]
+}

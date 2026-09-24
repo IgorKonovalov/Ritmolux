@@ -1,0 +1,4 @@
+{
+  "about": "Advisories scripts/check-npm-audit.mjs excuses (ADR-0244). One entry per GHSA id, each with the reason studio/ or site/ is not exposed. An entry without a reason fails the gate, and one no graph reports any more is printed for deletion.",
+  "allow": []
+}

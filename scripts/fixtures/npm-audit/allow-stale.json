@@ -1,0 +1,8 @@
+{
+  "allow": [
+    {
+      "id": "GHSA-fxst-fxst-fxst",
+      "reason": "Seeded: an advisory no graph reports any more."
+    }
+  ]
+}

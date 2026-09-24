@@ -1,0 +1,41 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "electron": {
+      "name": "electron",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 9000001,
+          "name": "electron",
+          "dependency": "electron",
+          "title": "Seeded high advisory in a shipped package",
+          "url": "https://github.com/advisories/GHSA-fxhi-fxhi-fxhi",
+          "severity": "high",
+          "cwe": ["CWE-20"],
+          "cvss": { "score": 7.5, "vectorString": null },
+          "range": "<44.4.0"
+        }
+      ],
+      "effects": ["electron-wrapper"],
+      "range": "<44.4.0",
+      "nodes": ["node_modules/electron"],
+      "fixAvailable": true
+    },
+    "electron-wrapper": {
+      "name": "electron-wrapper",
+      "severity": "high",
+      "isDirect": false,
+      "via": ["electron"],
+      "effects": [],
+      "range": "*",
+      "nodes": ["node_modules/electron-wrapper"],
+      "fixAvailable": true
+    }
+  },
+  "metadata": {
+    "vulnerabilities": { "info": 0, "low": 0, "moderate": 0, "high": 2, "critical": 0, "total": 2 },
+    "dependencies": { "prod": 10, "dev": 20, "optional": 0, "peer": 0, "peerOptional": 0, "total": 30 }
+  }
+}

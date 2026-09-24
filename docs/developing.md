@@ -7,7 +7,8 @@ contributor's page; if you are looking for what the application does, start at
 ## Building
 
 A recent stable **Rust** toolchain (the workspace is edition 2024 — Rust 1.85+) and, for the
-documentation gates, **Node**. From the repo root:
+documentation gates and the two npm projects, **Node**. CI runs Node 24, the active LTS, whose npm
+11 is the one `allowScripts` below assumes. From the repo root:
 
 ```sh
 cargo build                                          # the everyday build
@@ -77,16 +78,15 @@ Two parts of that green are expected skips, not coverage:
 - **The hardware tests take whichever GPU wgpu's default picks.** On that laptop this is the Vega
   iGPU, not the dGPU. They pass there, but their timing reports name the iGPU.
 
-**`npm --prefix studio ci` under Node 26 can leave Electron half-installed.** Electron's postinstall
-extracts only `locales/` and exits 0 without writing `node_modules/electron/path.txt`. The studio's
-tests then fail with *Electron failed to install correctly*. The download itself is intact, so
-extracting it by hand fixes it:
-
-```sh
-rm -rf studio/node_modules/electron/dist
-unzip -q ~/.cache/electron/*/electron-v*-linux-x64.zip -d studio/node_modules/electron/dist
-printf electron > studio/node_modules/electron/path.txt
-```
+**npm 11 runs a dependency's install script only when `allowScripts` names it.** The studio's
+`package.json` lists each approved package pinned as `pkg@version`, and a new entry is a reviewed
+edit, made with `npm --prefix studio install-scripts approve <pkg>` and never with `--all`
+([ADR-0244](adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md)).
+A bump strands its pinned entry, and `npm ci` then succeeds while silently skipping the script, so
+a bump of a listed package re-approves it. `npm --prefix studio install-scripts ls` should print
+*No packages with unreviewed install scripts.* `site/` has no field: the one script its graph holds,
+`esbuild`'s, is not needed for its build. Electron 44 has no install script at all; it downloads
+its binary the first time it runs, which `npx --prefix studio electron --version` triggers.
 
 **The studio run from source reads `"playerPath"` from `~/.config/ritmolux-studio/settings.json`.**
 That is `settings.json` in Electron's per-user directory, which on Linux is
@@ -375,6 +375,21 @@ scoped step it replaces.
 hook — they push it into minutes, and a gate that hurts gets disabled
 ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) Alternative F).
 They are also the checks least likely to break from a local edit.
+
+The **npm audit gate** is outside the hook for `cargo deny`'s reason: it asks the registry, and its
+answer moves when an advisory is published, not when you commit. It runs in CI's `npm-audit` job
+and fails at `high` in the studio's shipped graph (`npm audit --omit=dev`, the packages inside the
+studio zip) and at `critical` in the full graphs of `studio/` and `site/`
+([ADR-0244](adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md)).
+An exception is an entry in `npm-audit.allow.json` at the repository root, a GHSA id with the reason
+the studio or the site is not exposed; an entry without a reason fails the gate, and one whose
+advisory has gone away is printed for deletion. Run it by hand before a push that bumps an npm
+dependency:
+
+```sh
+node scripts/check-npm-audit.mjs              # the three audits, against the registry
+node scripts/check-npm-audit.mjs --self-test  # the gate's own assertions, offline
+```
 
 The **`spout` compile job** (ADR-0181) is outside the hook too, and for neither of those reasons.
 It stages a third-party SDK over the network before it compiles anything, which does not fit the

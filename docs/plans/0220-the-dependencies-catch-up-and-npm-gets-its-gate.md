@@ -302,8 +302,8 @@ flowchart LR
 | 2 — The lint set moves together | studio-builder | done, on eslint 9.39.5 not 10 (Notes) | this row's commit + the reformat after it |
 | 3 — The build and test set moves together | studio-builder | done; dev-window and CSP-test bullets carried to P4 (Notes) | this row's commit |
 | 4 — Electron 44 and electron-builder 26 | studio-builder | done; dev smoke run as the dev pipeline, not the `dev` script (Notes) | this row's commit |
-| 5 — The Rust pins that trail | dev | done | committed with this row |
-| 6 — The npm gate, and CI on Node 24 | dev | not started | |
+| 5 — The Rust pins that trail | dev | done | 561a2541 |
+| 6 — The npm gate, and CI on Node 24 | dev | done | committed with this row |
 | 7 — CI on the pushed tree, and a release dry run | human | not started | |
 
 ### Notes
@@ -414,6 +414,28 @@ flowchart LR
 - **P5 `cc` 1.4.7** compiles on the box as a transitive build dependency (clippy lists it), but the
   `spout` build script that calls it runs only with the feature on Windows. The `spout` CI job is
   owed at Phase 7.
+- **P6 self-test:** `node scripts/check-npm-audit.mjs --self-test` prints *26 of 26*. Fixtures are
+  JSON stand-ins for npm's output under `scripts/fixtures/npm-audit/`, with their own `README.md`
+  there; `scripts/fixtures/README.md` is not in the phase's file list and has no section for them.
+- **P6 live run:** `node scripts/check-npm-audit.mjs` exits 0, 0 advisory readings in each of the
+  three graphs. `npm-audit.allow.json` ships with an empty `allow` list; no entry was needed.
+- **P6 CI job:** `npm-audit` in `ci.yml`, triggered like every other job there (push and pull
+  request). ADR-0244's *on a schedule of its own* was read as its own job, not a `schedule:`
+  trigger, which would re-run every `ci.yml` job.
+- **P6 allow-file shape:** `{ "about": ..., "allow": [{ "id": "GHSA-...", "reason": ... }] }`. An id
+  that is not GHSA-shaped is refused as well as one without a reason. A stale entry is printed and
+  does not fail; staleness is withheld when any audit failed.
+- **P6 site on npm 11:** after `npm --prefix site ci`, npm warns that `esbuild@0.28.2`'s postinstall
+  is unreviewed. `npx --prefix site esbuild --version` still prints 0.28.2, and `npm --prefix site
+  run build` completes (200 pages), so `site/package.json` is unchanged.
+- **P6 Node 22:** the five `node-version: '22'` lines (ci.yml x2, release.yml x2, pages.yml x1)
+  read `'24'`, and the new job is on `'24'`. A `ci.yml` comment naming Node 22 was reworded.
+- **P6 docs:** `docs/developing.md` loses the Node 26 hand-extraction recipe for Electron 32, which
+  Phase 4 made obsolete, in favour of an `allowScripts` paragraph, and gains the gate beside
+  `cargo deny`'s paragraph. `CLAUDE.md`'s `scripts/` block names the gate as a third CI-only exception.
+- **P6 gates:** `check-gate-carriers` (hook 17/17, ci 17/17), `check-doc-links`, `check-reader-prose`,
+  `toc --check`, `check-comment-hygiene` and `check-system-counts` are green. `gates.manifest.mjs`
+  and `.githooks/pre-push` are unchanged.
 
 ### Close triggers
 

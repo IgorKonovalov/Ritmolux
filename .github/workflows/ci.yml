@@ -1,7 +1,8 @@
 # NFR section 7: build, test, doctests, clippy, fmt on Windows, macOS and Linux
-# for every push, plus five single-runner gates - the `spout` feature compile
-# (ADR-0181), the doc-link and roster checks, cargo-deny (supply chain), the rlx-core
-# coverage ratchet (ADR-0033), and Miri over rlx-ring's unsafe.
+# for every push, plus the single-runner gates - the `spout` feature compile
+# (ADR-0181), the doc-link and roster checks, the studio's own suite, cargo-deny
+# and the npm audit (supply chain), the rlx-core coverage ratchet (ADR-0033), and
+# Miri over rlx-ring's unsafe.
 #
 # Live audio is out of CI scope. GPU rendering partly is not: on Windows the DX12
 # WARP software adapter makes headless rendering deterministic, which the golden
@@ -355,11 +356,11 @@ jobs:
       # commands, the two PreToolUse hooks' bite checks and the machine-wide lock.
       # It belongs here for the reason the gates above do - cheap, platform-free,
       # no GPU - and because a fake CLI stands in for claude, it spends nothing and
-      # needs no network. A glob, not a directory: `node --test <dir>` is not a
-      # test-file pattern on Node 22.
+      # needs no network. A glob, not a directory: `node --test <dir>` is not
+      # read as a test-file pattern on every Node release.
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
       - run: node --test "tools/conductor/test/*.test.mjs"
       # And the diffusion filter's own suite (Plan 0106 Phase 7c). It belongs in
       # this job rather than in the `check` matrix for the same reasons the three
@@ -399,6 +400,11 @@ jobs:
   # npm ci rather than npm install: it installs the committed lockfile exactly
   # and fails if package.json and the lockfile disagree, which is the only
   # reason the lockfile is committed at all.
+  #
+  # Node 24 ships npm 11, which runs a dependency's install script only when
+  # `allowScripts` in studio/package.json names it, pinned to its version
+  # (ADR-0244). A bump that strands an entry still installs cleanly here; the
+  # package's script is simply skipped.
   studio:
     runs-on: ubuntu-latest
     defaults:
@@ -408,7 +414,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: studio/package-lock.json
       - run: npm ci
@@ -425,6 +431,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@cargo-deny
       - run: cargo deny check
+
+  # The npm graphs' supply-chain gate (ADR-0244), the counterpart of `deny`
+  # above for studio/ and site/. It fails at `high` in the studio's shipped graph
+  # (`--omit=dev`, what the studio zip carries) and at `critical` in every full
+  # graph, and npm-audit.allow.json holds its exceptions as a GHSA id and a
+  # reason. `npm audit` reads the committed lockfiles, so no install step.
+  #
+  # Its own job rather than a step in `links`: it needs the registry, and its
+  # answer changes without a commit, so a red here says an advisory was
+  # published rather than that a push broke something. For the same reason it
+  # is on neither the pre-push hook nor scripts/gates.manifest.mjs. A registry
+  # outage fails it; the gate never reads a failed request as a pass.
+  # --self-test carries the assertions, since the live run has nothing seeded.
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node scripts/check-npm-audit.mjs --self-test
+      - run: node scripts/check-npm-audit.mjs
 
   # Coverage ratchet (Plan 0032 Phase 4, ADR-0033). Gates `rlx-core` only:
   # `standalone/` is a winit event loop plus two platform capture backends that
