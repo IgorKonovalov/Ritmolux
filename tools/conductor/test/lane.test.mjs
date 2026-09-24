@@ -1433,7 +1433,7 @@ test("parkStillTrue: an owed row settles a human_phase park only on a phase mark
   const { parkStillTrue, selfResumeWhy } = await import("../lib/lane.mjs");
   const at = "2026-09-24T10:00:00.000Z";
   const rec = { plan: "0101", worktree: null, park: { reason: "human_phase", phase: "2", at } };
-  const refused = /^Phase 2 is still not marked done in the ## Implementation log of docs\/plans\/0101-fixture\.md in .*; commit the row there first$/;
+  const refused = /^Phase 2 is still not marked done \(or owed, on a phase marked Blocks merge: no\) in the ## Implementation log of docs\/plans\/0101-fixture\.md in .*; commit the row there first$/;
   const withRow = (blocksMerge, state) => {
     const repo = tmp();
     writePlan(repo, { number: "0101", phases: [dev("1"), { id: "2", owner: "human", blocksMerge }, dev("3")], rows: { 2: { state } } });

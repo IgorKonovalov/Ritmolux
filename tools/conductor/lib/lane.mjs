@@ -127,7 +127,7 @@ export function parkStillTrue(rec, repo) {
     if (!found) return `plan ${rec.plan} is not in ${where}`;
     if (!settledPhase(readPlanFile(found.path), phase)) {
       const rel = relative(where, found.path).replace(/\\/g, "/");
-      return `Phase ${phase} is still not marked done in the ## Implementation log of ${rel} in ${where}; commit the row there first`;
+      return `Phase ${phase} is still not marked done (or owed, on a phase marked Blocks merge: no) in the ## Implementation log of ${rel} in ${where}; commit the row there first`;
     }
   }
   if (reason === "main_dirty" && (currentBranch(repo) !== "main" || !isClean(repo))) {
