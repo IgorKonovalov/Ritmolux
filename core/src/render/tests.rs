@@ -3022,3 +3022,255 @@ fn a_fresh_collage_builds_its_bound_canvas_once_on_its_first_frame() {
         "frame 2 regenerated the canvas, so frame 1 did not build the bound recipe"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The shell's image layer (Plan 0206 Phase 2)
+// ---------------------------------------------------------------------------
+
+/// The image layer's claims, which exist only where the layer does.
+#[cfg(feature = "text")]
+mod image_layer {
+    use super::{AnalysisFrame, HeadlessOptions, Renderer, drawn_calls, headless_or_skip, preset};
+    use crate::render::image_layer::ImageLayerCounts;
+    use crate::render::{ImageRect, OverlayImage, OverlayImageError};
+
+    /// A `w`x`h` image whose every channel varies, so a swapped channel, a flip
+    /// or a colour step applied twice all show up as a mismatch. The values
+    /// span both ends of the byte, where an sRGB round trip is least forgiving.
+    fn pattern(w: u32, h: u32) -> Vec<u8> {
+        let mut rgba = Vec::with_capacity((w * h * 4) as usize);
+        for y in 0..h {
+            for x in 0..w {
+                rgba.push((x * 255 / (w - 1)) as u8);
+                rgba.push((y * 255 / (h - 1)) as u8);
+                rgba.push(((x * 37 + y * 101) % 256) as u8);
+                rgba.push(255);
+            }
+        }
+        rgba
+    }
+
+    fn renderer(width: u32, height: u32) -> Option<Renderer> {
+        let mut renderer = headless_or_skip(HeadlessOptions {
+            width,
+            height,
+            prefer_software: true,
+        })?;
+        renderer.set_presets(vec![preset("ImageProbe")]);
+        Some(renderer)
+    }
+
+    /// **A renderer that never sets an image holds no object of the layer**,
+    /// however many frames it draws — the half of "a frame with no image costs
+    /// what it costs today" a plain renderer can witness.
+    #[test]
+    fn a_renderer_that_sets_no_image_builds_none_of_the_layer() {
+        let Some(mut renderer) = renderer(32, 24) else {
+            return;
+        };
+        assert!(
+            !renderer.image_layer.built(),
+            "a fresh renderer built the layer"
+        );
+        renderer.queue_image(ImageRect {
+            x: 0.0,
+            y: 0.0,
+            w: 8.0,
+            h: 8.0,
+        });
+        for _ in 0..3 {
+            renderer
+                .capture_frame(&AnalysisFrame::default())
+                .expect("capture succeeds");
+        }
+        assert!(
+            !renderer.image_layer.built(),
+            "drawing frames, with a rectangle queued and no image, built the layer"
+        );
+        assert_eq!(renderer.image_layer.counts(), ImageLayerCounts::default());
+        assert_eq!(renderer.overlay_image_size(), None);
+    }
+
+    /// **A frame with nothing queued records no draw call**, with an image set;
+    /// a frame with one queued records exactly one more; and the frame consumes
+    /// the rectangle, so the one after it is back to the baseline.
+    #[test]
+    fn only_a_queued_frame_draws_the_image() {
+        let Some(mut renderer) = renderer(32, 24) else {
+            return;
+        };
+        let baseline = drawn_calls(&mut renderer, "ImageProbe");
+
+        let rgba = pattern(4, 4);
+        renderer
+            .set_overlay_image(Some(OverlayImage {
+                rgba: &rgba,
+                width: 4,
+                height: 4,
+            }))
+            .expect("a well-formed image is accepted");
+        assert_eq!(
+            drawn_calls(&mut renderer, "ImageProbe"),
+            baseline,
+            "an image that is set but not queued cost a draw call"
+        );
+
+        renderer.queue_image(ImageRect {
+            x: 2.0,
+            y: 2.0,
+            w: 4.0,
+            h: 4.0,
+        });
+        assert_eq!(drawn_calls(&mut renderer, "ImageProbe"), baseline + 1);
+        assert_eq!(
+            drawn_calls(&mut renderer, "ImageProbe"),
+            baseline,
+            "a rectangle outlived the frame it was queued for"
+        );
+    }
+
+    /// **Setting is the only upload.** Frames that only queue write no texture
+    /// and create none — and while the rectangle is unchanged they do not even
+    /// rewrite its uniform. A texture is created again only when the
+    /// dimensions change, and a refused image changes nothing.
+    #[test]
+    fn setting_an_image_is_the_only_upload() {
+        let Some(mut renderer) = renderer(32, 24) else {
+            return;
+        };
+        let small = pattern(8, 4);
+        let set = |renderer: &mut Renderer, rgba: &[u8], width, height| {
+            renderer.set_overlay_image(Some(OverlayImage {
+                rgba,
+                width,
+                height,
+            }))
+        };
+        let rect = ImageRect {
+            x: 1.0,
+            y: 1.0,
+            w: 8.0,
+            h: 4.0,
+        };
+
+        set(&mut renderer, &small, 8, 4).expect("accepted");
+        let after_set = renderer.image_layer.counts();
+        assert_eq!((after_set.textures, after_set.uploads), (1, 1));
+
+        for _ in 0..4 {
+            renderer.queue_image(rect);
+            renderer
+                .capture_frame(&AnalysisFrame::default())
+                .expect("capture succeeds");
+        }
+        let after_frames = renderer.image_layer.counts();
+        assert_eq!(
+            (after_frames.textures, after_frames.uploads),
+            (1, 1),
+            "a frame that only queued a rectangle touched the texture"
+        );
+        assert_eq!(
+            after_frames.rect_writes, 1,
+            "an unchanged rectangle was written again on a later frame"
+        );
+
+        // The same size again: new bytes into the same texture.
+        set(&mut renderer, &pattern(8, 4), 8, 4).expect("accepted");
+        let same_size = renderer.image_layer.counts();
+        assert_eq!((same_size.textures, same_size.uploads), (1, 2));
+
+        // A new size is the one thing that reallocates.
+        set(&mut renderer, &pattern(4, 4), 4, 4).expect("accepted");
+        let resized = renderer.image_layer.counts();
+        assert_eq!((resized.textures, resized.uploads), (2, 3));
+        assert_eq!(renderer.overlay_image_size(), Some((4, 4)));
+
+        // Refusals, each leaving everything as it was.
+        assert_eq!(
+            set(&mut renderer, &small, 4, 4),
+            Err(OverlayImageError::Length {
+                expected: 64,
+                got: 128
+            })
+        );
+        assert_eq!(
+            set(&mut renderer, &[], 0, 4),
+            Err(OverlayImageError::Size {
+                width: 0,
+                height: 4
+            })
+        );
+        assert_eq!(renderer.image_layer.counts(), resized);
+        assert_eq!(renderer.overlay_image_size(), Some((4, 4)));
+
+        renderer
+            .set_overlay_image(None)
+            .expect("clearing always succeeds");
+        assert_eq!(renderer.overlay_image_size(), None);
+    }
+
+    /// **A still reads back as it was set.** The image is drawn at its own size
+    /// over a deterministic one-frame capture and the rectangle is read back:
+    /// every channel within one 8-bit level of the bytes that went in, which is
+    /// the sRGB decode-and-encode's rounding and nothing more — a colour step
+    /// applied twice misses by tens of levels in the mid-tones. Outside the
+    /// rectangle the frame is byte-identical to the same capture with no image.
+    #[test]
+    fn a_still_reads_back_as_it_was_set() {
+        const W: u32 = 64;
+        const H: u32 = 48;
+        const IW: u32 = 16;
+        const IH: u32 = 8;
+        const X0: u32 = 20;
+        const Y0: u32 = 10;
+        let Some(mut renderer) = renderer(W, H) else {
+            return;
+        };
+        let frame = AnalysisFrame::default();
+        let bare = renderer
+            .capture_preset("ImageProbe", &frame, 1)
+            .expect("capture succeeds");
+
+        let rgba = pattern(IW, IH);
+        renderer
+            .set_overlay_image(Some(OverlayImage {
+                rgba: &rgba,
+                width: IW,
+                height: IH,
+            }))
+            .expect("accepted");
+        renderer.queue_image(ImageRect {
+            x: X0 as f32,
+            y: Y0 as f32,
+            w: IW as f32,
+            h: IH as f32,
+        });
+        let drawn = renderer
+            .capture_preset("ImageProbe", &frame, 1)
+            .expect("capture succeeds");
+
+        let mut worst = 0u8;
+        for y in 0..H {
+            for x in 0..W {
+                let at = ((y * W + x) * 4) as usize;
+                let inside = (X0..X0 + IW).contains(&x) && (Y0..Y0 + IH).contains(&y);
+                if inside {
+                    let src = (((y - Y0) * IW + (x - X0)) * 4) as usize;
+                    for c in 0..3 {
+                        worst = worst.max(drawn.rgba[at + c].abs_diff(rgba[src + c]));
+                    }
+                } else {
+                    assert_eq!(
+                        drawn.rgba[at..at + 4],
+                        bare.rgba[at..at + 4],
+                        "pixel ({x}, {y}) outside the rectangle changed"
+                    );
+                }
+            }
+        }
+        assert!(
+            worst <= 1,
+            "the rectangle read back {worst} levels off the image it was set from"
+        );
+    }
+}

@@ -255,8 +255,8 @@ struct ThumbKey {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — One thumbnail, on demand, in a cache | dev | done | committed with this row |
-| 2 — The renderer draws one image the shell hands it | dev | not started | |
+| 1 — One thumbnail, on demand, in a cache | dev | done | 7bd7fc9f |
+| 2 — The renderer draws one image the shell hands it | dev | done | committed with this row |
 | 3 — The pane shows what is cached | dev | not started | |
 | 4 — The pass fills the cache by itself | dev | not started | |
 | 5 — A changed preset gets a new picture | dev | not started | |
@@ -312,6 +312,22 @@ or re-specify the pane in terms of what the text layer can actually draw.
 **Architect, 2026-09-24: the plan was amended and the phases renumbered.** A new Phase 2 adds the
 image layer this note asked for. The pane is now Phase 3, the pass Phase 4 and staleness Phase 5.
 Where the notes above say "Phase 2", "Phase 3" or "Phase 4", they use the old numbers.
+
+**Phase 2 (new numbering) — one file beyond the list, one untouched, one done-when premise false.**
+
+- `core/src/render/composite.rs` is edited and is not in `Files touched`: the pass that draws the
+  text is opened in `encode_on_canvas` there, not in `mod.rs`, so drawing inside that pass means
+  editing it. It now opens when either the text or the image has something to draw.
+- `standalone/src/hud.rs` is not touched in this phase. Nothing in Phase 2's done-when needs the
+  shell to call the layer; the first caller is Phase 3's pane.
+- *"The layer compiles only under the `text` feature, so the plugin's cdylib … carry none of it"*:
+  the first half holds, the second does not. `core-cabi/Cargo.toml` depends on `rlx-core` with
+  `features = ["text"]` (the now-playing banner), so the plugin's cdylib compiles this layer in, as
+  it already compiles glyphon. It builds no GPU object there, because nothing in the plugin calls
+  `set_overlay_image`. The default build and `-p rlx-core` without the feature carry none of it:
+  `cargo clippy -p rlx-core --all-targets -- -D warnings` is clean.
+- The first-half test holds that no object of the layer exists with a counter the layer keeps, not
+  with a wgpu resource count. The same counters hold "setting is the only upload".
 
 ### Close triggers
 

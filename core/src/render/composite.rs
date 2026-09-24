@@ -431,13 +431,16 @@ pub(super) fn encode_active_side(
     draw_calls
 }
 
-/// The on-canvas passes that sit on top of the finished frame: the queued text
-/// runs, then the diagnostics overlay. Returns their draw calls.
+/// The on-canvas passes that sit on top of the finished frame: the queued
+/// picture and text runs, then the diagnostics overlay. Returns their draw
+/// calls.
 ///
 /// The overlay draws **last** so it sits on top of the text when both are on.
 pub(super) struct OnCanvas<'a> {
     #[cfg(feature = "text")]
     pub(super) text_layer: &'a mut TextLayer,
+    #[cfg(feature = "text")]
+    pub(super) image_layer: &'a mut ImageLayer,
     pub(super) diag: &'a Diag,
     pub(super) overlay: &'a mut Overlay,
     /// The tier the overlay prints, and whether the governor put it there --
@@ -456,6 +459,8 @@ pub(super) fn encode_on_canvas(
     let OnCanvas {
         #[cfg(feature = "text")]
         text_layer,
+        #[cfg(feature = "text")]
+        image_layer,
         diag,
         overlay,
         tier,
@@ -468,13 +473,24 @@ pub(super) fn encode_on_canvas(
     // (ADR-0009). Standalone-only via the `text` feature; when both this and
     // the diagnostics overlay are on, the overlay draws last so it sits on
     // top of the text.
+    //
+    // The shell's picture rides the same pass, drawn first so a label can sit
+    // on it. A frame with neither queued opens no pass at all.
     #[cfg(feature = "text")]
     {
-        if text_layer.prepare(&ctx.device, &ctx.queue, width, height) {
+        let text = text_layer.prepare(&ctx.device, &ctx.queue, width, height);
+        let image = image_layer.prepare(&ctx.queue, width, height);
+        if text || image {
             // Load: composite over the scene already in the view.
             let mut pass = gpu::color_pass(encoder, "rlx-text-pass", view, wgpu::LoadOp::Load);
-            text_layer.render(&mut pass);
-            draw_calls += 1;
+            if image {
+                image_layer.render(&mut pass);
+                draw_calls += 1;
+            }
+            if text {
+                text_layer.render(&mut pass);
+                draw_calls += 1;
+            }
         }
     }
 
