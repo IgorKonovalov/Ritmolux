@@ -206,9 +206,9 @@ flowchart LR
 |---|---|---|---|
 | 1 — The macOS build compiles again | dev | done | 646ca642 |
 | 2 — A reader for origin's CI | dev | done | 1e7e4857 |
-| 3 — The close consults it | dev | done | f0a5eee1 |
+| 3 — The close reports it and never blocks on it | dev | not started | |
 | 4 — The foobar component joins the push | dev | done | 0c0ac09b |
-| 5 — The documents say what a machine needs | dev | done | c149b93d |
+| 5 — The documents say what a machine needs | dev | not started | |
 | 6 — The close ceremony gains the step | human | owed | |
 | 7 — The reading that only a push can produce | human | owed | |
 
