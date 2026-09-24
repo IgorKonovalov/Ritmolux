@@ -154,3 +154,25 @@ a plan that is already editing that package's version on the same line.
 
 The 2026-09-22 audit, the partial patch bump (`4581c6b5`) and the eslint/typescript-eslint
 incompatibility that bump ran into are recorded in Plan 0220's Context.
+
+## Outcome — 2026-09-24, at Plan 0220's close
+
+The gate was built as decided: `scripts/check-npm-audit.mjs`, the two thresholds, the allow file
+with a mandatory reason, a stale-entry report, and a failed request counted as a failure. It passes
+its self-test and exits 0 against the live registry with an empty allow list. Four statements above
+were falsified by the implementation, and the body stands as written:
+
+- **(a) `electron` no longer fetches its binary in `postinstall`.** Electron 44 has no install
+  script. It downloads its binary the first time it is required, so a fresh clone fetches it on the
+  first `npm test` or `npm run dev`, and CI's `studio` job fetches it at test time. The Positive
+  bullet *"A fresh clone on npm 11 installs a working Electron with no local step"* holds, but by
+  that route rather than by `allowScripts`.
+- **(b) The studio's list is not three entries.** The final `allowScripts` holds `esbuild@0.28.2`,
+  `electron@44.4.3` (which now approves no script), and a by-name deny of `electron-winstaller`,
+  whose Windows 7-Zip copy the `--dir` builds never use.
+- **(c) Not every npm project carries an `allowScripts` field.** `site/` carries none. Its one
+  install script, esbuild's, is not needed for its build, which was checked on the Arch box.
+- **(d) CI does not gate the npm graphs on a schedule.** The gate is its own CI job, `npm-audit` in
+  `ci.yml`, triggered on push and pull request like every other job there, with no `schedule:`
+  trigger. An advisory published between pushes is seen at the next push, not on a timetable.
+  Whether a `schedule:` trigger in a separate workflow is wanted is a followup for the owner.
