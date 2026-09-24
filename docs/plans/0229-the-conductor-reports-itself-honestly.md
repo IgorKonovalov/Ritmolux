@@ -159,7 +159,7 @@ ADR-0205 already forbids for backgrounded work — the same loss, differently ca
 | 1 — The ledger names what failed | dev | done | `0b08037a` |
 | 2 — One reader decides a settled phase | dev | done | `8bf46530` |
 | 3 — A run refuses to start stale | dev | done | `3f151a49` |
-| 4 — The allowlist admits what the tools already grant | dev | done | committed with this row |
+| 4 — The allowlist admits what the tools already grant | dev | done | `6d2d252a` |
 
 ### Notes
 
@@ -190,13 +190,15 @@ ADR-0205 already forbids for backgrounded work — the same loss, differently ca
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature - conductor tooling only (`tools/conductor/`); no Rust, C++ or studio code
+- **Operator docs touched:** `tools/conductor/README.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 - 46 stated reductions hold
+  across 21 live entries (4 unprobeable)
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). `node --test tools/conductor/test/`
+  at the Phase 4 tip: 450 tests, 448 pass, 0 fail
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
 
