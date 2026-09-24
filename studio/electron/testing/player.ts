@@ -25,8 +25,7 @@ const STUDIO = join(__dirname, '..', '..')
 
 /** A built player's path, or why there is none. */
 export type BuiltPlayer =
-  | { path: string; missing?: undefined }
-  | { path?: undefined; missing: string }
+  { path: string; missing?: undefined } | { path?: undefined; missing: string }
 
 let cachedTarget: { dir: string } | { missing: string } | undefined
 
