@@ -6,7 +6,7 @@
 //   { "lanes": { "a": ["0175", "0185"], "b": [] },
 //     "plans": { "0181": { "after": ["0185"] }, "0180": { "add_dirs": ["../milkdrop-corpus"] } } }
 // local.json (never committed, no defaults):
-//   { "budget_usd": { "implement": 5, "fix": 3, "review": 4 }, "max_open_worktrees": 3 }
+//   { "budget_usd": { "implement": 5, "fix": 3, "review": 4 }, "run_budget_usd": 60, "max_open_worktrees": 3 }
 //   optional: "model": { "implement": "opus", ... }, "claude": ["claude"]
 
 import { existsSync, readFileSync } from "node:fs";
@@ -157,7 +157,11 @@ export function pruneQueue(queue, repo) {
   return { queue: { ...queue, lanes }, dropped };
 }
 
-/** Validates local.json. Every budget is required: the conductor carries no default spend. */
+/**
+ * Validates local.json. Every budget is required: the conductor carries no default spend. The
+ * per-step budgets bound one session; `run_budget_usd` bounds one run, which is resident and so
+ * spends while nobody is looking (ADR-0250).
+ */
 export function loadLocal(path) {
   const r = readJson(path, "local.json");
   if (r.error) {
@@ -168,6 +172,9 @@ export function loadLocal(path) {
   for (const kind of STEP_KINDS) {
     const v = local?.budget_usd?.[kind];
     if (typeof v !== "number" || !(v > 0)) errors.push(`local.json: budget_usd.${kind} must be a positive number`);
+  }
+  if (typeof local?.run_budget_usd !== "number" || !(local.run_budget_usd > 0)) {
+    errors.push("local.json: run_budget_usd must be a positive number");
   }
   if (!Number.isInteger(local?.max_open_worktrees) || local.max_open_worktrees < 1) {
     errors.push("local.json: max_open_worktrees must be a positive integer");

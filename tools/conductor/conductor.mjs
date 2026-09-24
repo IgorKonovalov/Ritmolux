@@ -2,9 +2,10 @@
 // The conductor (ADR-0205): takes approved plans off tools/conductor/queue.json and runs them in
 // worktree lanes, one fresh headless `claude -p` session per same-owner run of phases, a conductor
 // gate, a fresh review-and-close session, a fast-forward of main and the lane's removal. It never
-// pushes. Every judgement it cannot make parks the plan.
+// pushes. Every judgement it cannot make parks the plan. `run` is resident (ADR-0250): it lasts until
+// `pause`, `abort` or Ctrl+C, and `--until-idle` ends it once no lane can move.
 //
-//   node tools/conductor/conductor.mjs run [--lane a|b] [--once]
+//   node tools/conductor/conductor.mjs run [--lane a|b] [--once | --until-idle]
 //   node tools/conductor/conductor.mjs status
 //   node tools/conductor/conductor.mjs digest [--history]
 //   node tools/conductor/conductor.mjs resume NNNN
@@ -22,20 +23,34 @@
 
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { pidAlive } from "./with-lock.mjs";
 import { adoptedClose, verifyClose } from "./lib/close.mjs";
 import { settledPark, writeDigest, writeHistory } from "./lib/digest.mjs";
-import { currentBranch, head, isClean } from "./lib/git.mjs";
-import { appendPark, dirtyText, dirtyWorktree } from "./lib/inbox.mjs";
-import { runLanes } from "./lib/lane.mjs";
+import { currentBranch, head } from "./lib/git.mjs";
+import { appendPark, dirtyWorktree } from "./lib/inbox.mjs";
+import { parkStillTrue, runLanes } from "./lib/lane.mjs";
 import { ascii } from "./lib/live.mjs";
-import { CLAUDE_DIR } from "./lib/outcome.mjs";
-import { donePhases, findPlan, readPlanFile } from "./lib/plan.mjs";
 import { loadLocal, loadQueue, pruneQueue, readQueue, startedPlans } from "./lib/queue.mjs";
-import { FINDING_VERBS, askPause, clearPause, disposeFinding, findingRef, findingWhere, loadState, pauseAsk, planRecord, recoverInterrupted, saveState, statePaths, totalSpend } from "./lib/state.mjs";
+import {
+  FINDING_VERBS,
+  askPause,
+  askResume,
+  clearPark,
+  clearPause,
+  disposeFinding,
+  findingRef,
+  findingWhere,
+  loadState,
+  pauseAsk,
+  planRecord,
+  recoverInterrupted,
+  saveState,
+  statePaths,
+  totalSpend,
+} from "./lib/state.mjs";
 import { activeChildren, killTree } from "./lib/step.mjs";
 
 export const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
@@ -132,6 +147,14 @@ export function eventLine(name, d) {
   switch (name) {
     case "worktree-cap":
       return `conductor: lane ${d.lane} stopped at the worktree cap (max_open_worktrees ${d.max}, held by ${d.holding.join(", ")}); ${d.plan} not started`;
+    case "worktree-wait":
+      return `conductor: lane ${d.lane} waits at the worktree cap (max_open_worktrees ${d.max}, held by ${d.holding.join(", ")}) to start ${d.plan}`;
+    case "idle":
+      return `conductor: lane ${d.lane} is idle, watching the queue`;
+    case "self-resume":
+      return `conductor: ${d.plan} resumed itself from ${d.reason}: ${d.why}`;
+    case "resumed":
+      return `conductor: ${d.plan} resumed by the owner from ${d.reason}`;
     case "lane-open":
       return `conductor: ${d.plan} opened its lane at ${d.worktree}`;
     case "park":
@@ -153,11 +176,14 @@ async function cmdRun(args, o) {
   const laneIdx = args.indexOf("--lane");
   const lane = laneIdx >= 0 ? args[laneIdx + 1] : null;
   const pf = preflight(p, { claude: o.claude });
+  const once = args.includes("--once");
+  const untilIdle = args.includes("--until-idle");
   const errors = [...pf.errors];
   if (currentBranch(p.repo) !== "main") errors.push(`the main checkout ${p.repo} is not on main`);
   if (lane && !pf.queue.lanes?.[lane]) errors.push(`queue.json has no lane "${lane}"`);
   const other = runningPid(p);
   if (other) errors.push(`a conductor is already running (pid ${other}); \`status\` shows it, \`abort\` stops it`);
+  if (once && untilIdle) errors.push("--once and --until-idle are two ways to end a run; pass one");
   if (errors.length) {
     for (const e of errors) o.err(`conductor: ${e}`);
     return 1;
@@ -208,7 +234,18 @@ async function cmdRun(args, o) {
     lockDir: o.lockDir,
     lockPollMs: o.lockPollMs,
     pollMs: o.pollMs,
-    once: args.includes("--once"),
+    once,
+    resident: !once && !untilIdle,
+    idlePollMs: o.idlePollMs,
+    stopRequested: o.stopRequested,
+    // A resident run re-reads the committed queue as it looks again, so a plan approved and queued
+    // while it is up starts without a restart.
+    reloadQueue: () => loadQueue(p.queue, p.repo, startedPlans(state)),
+    // And the CLI before every session, since an update may land while it is up.
+    checkCli: () => {
+      const v = claudeVersion(pf.claude);
+      return v.error ? { error: v.error } : { version: v.version, ...cliVerdict(v.version) };
+    },
     paused: () => Boolean(pauseAsk(p.stateDir)),
     lanes: lane ? [lane] : undefined,
     commitPollMs: o.commitPollMs,
@@ -245,7 +282,12 @@ async function cmdRun(args, o) {
     rmSync(pidFile(p), { force: true });
   }
   const recs = Object.values(state.plans);
-  if (ctx.run?.paused) {
+  const paused = ctx.run?.paused;
+  if (paused?.reason === "run_budget") {
+    o.log(`conductor: paused - the run spent its run_budget_usd (${pf.local.run_budget_usd}); the plan in flight finished and no further plan was started.`);
+  } else if (paused?.reason === "cli_version") {
+    o.log(`conductor: paused - the CLI changed under the run and is refused: ${ctx.cliRefused}`);
+  } else if (paused) {
     o.log("conductor: paused - the plan in flight finished and no further plan was started; the ask is cleared.");
   }
   o.log(
@@ -308,30 +350,6 @@ function cmdDigest(args, o) {
   return 0;
 }
 
-/** Why a park still holds, or null when the owner has acted on it. */
-function parkStillTrue(p, rec) {
-  const { reason, phase } = rec.park;
-  // Whatever the reason, no new session starts on a tree the last one left dirty.
-  const dirty = dirtyWorktree(rec.worktree);
-  if (dirty) return `the worktree ${rec.worktree} has uncommitted changes: ${dirtyText(dirty)}; commit them, or \`git restore\` them there, first`;
-  // Both of these park on a phase only the owner can do — one the plan tagged `human`, one whose
-  // files the CLI will not let a session touch (ADR-0210). Either way the lane moves on when the
-  // plan's own log says the phase is done, which is the same evidence for both.
-  if (reason === "human_phase" || reason === CLAUDE_DIR) {
-    const where = rec.worktree && existsSync(rec.worktree) ? rec.worktree : p.repo;
-    const found = findPlan(where, rec.plan);
-    if (!found) return `plan ${rec.plan} is not in ${where}`;
-    if (!donePhases(readPlanFile(found.path)).has(phase)) {
-      const rel = relative(where, found.path).replace(/\\/g, "/");
-      return `Phase ${phase} is still not marked done in the ## Implementation log of ${rel} in ${where}; commit the row there first`;
-    }
-  }
-  if (reason === "main_dirty" && (currentBranch(p.repo) !== "main" || !isClean(p.repo))) {
-    return `the main checkout is still dirty or not on main`;
-  }
-  return null;
-}
-
 function cmdResume(args, o) {
   const p = o.p;
   const [plan] = args;
@@ -339,25 +357,25 @@ function cmdResume(args, o) {
     o.err("usage: conductor.mjs resume NNNN");
     return 2;
   }
-  if (runningPid(p)) {
-    o.err("conductor: a run is in progress; resume after it ends, or `abort` it first");
-    return 1;
-  }
   const state = loadState(p.stateDir);
   const rec = state.plans[plan];
   if (!rec || rec.status !== "parked") {
     o.err(`conductor: plan ${plan} is not parked (${rec?.status ?? "never started"})`);
     return 1;
   }
-  const still = parkStillTrue(p, rec);
+  const still = parkStillTrue(rec, p.repo);
   if (still) {
     o.err(`conductor: refusing to resume ${plan} - its park reason (${rec.park.reason}) still holds: ${still}`);
     return 1;
   }
-  const reason = rec.park.reason;
-  rec.status = "queued";
-  rec.park = null;
-  if (reason === "review_failed") rec.fixRounds = 0;
+  // A live run owns the record and rewrites it whole, so the resume goes to it as an ask it takes on
+  // its next look, checking the condition again there (ADR-0250).
+  if (runningPid(p)) {
+    askResume(p.stateDir, plan);
+    o.log(`conductor: plan ${plan}: the live run takes the resume on its next look, within a minute`);
+    return 0;
+  }
+  clearPark(rec);
   saveState(p.stateDir, state);
   regenerate(p, state);
   o.log(`conductor: plan ${plan} is queued again; \`run\` picks it up in lane ${rec.lane}`);
@@ -629,7 +647,10 @@ function cmdPrune(args, o) {
 
 const COMMANDS = { run: cmdRun, status: cmdStatus, digest: cmdDigest, resume: cmdResume, park: cmdPark, finding: cmdFinding, "adopt-close": cmdAdoptClose, pause: cmdPause, abort: cmdAbort, prune: cmdPrune, check: cmdCheck };
 
-/** `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs, commitPollMs, log, err, signals }. */
+/**
+ * `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs,
+ * idlePollMs, stopRequested, commitPollMs, log, err, signals }.
+ */
 export async function main(argv, overrides = {}) {
   const o = {
     p: paths(),
@@ -641,7 +662,7 @@ export async function main(argv, overrides = {}) {
   const fn = COMMANDS[command];
   if (!fn) {
     o.err(
-      "usage: node tools/conductor/conductor.mjs run [--lane a|b] [--once] | status | digest [--history] | " +
+      "usage: node tools/conductor/conductor.mjs run [--lane a|b] [--once | --until-idle] | status | digest [--history] | " +
         `resume NNNN | park NNNN | finding NNNN [<ref> --${FINDING_VERBS.join("|--")} <reason>] | adopt-close NNNN | pause [--off] | abort | prune | check`,
     );
     return 2;

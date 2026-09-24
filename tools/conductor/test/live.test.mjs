@@ -286,7 +286,7 @@ test("run prints a session's milestones in order, the commit before the session 
 
   const toolDir = tmp("rlx-live-tool-");
   writeFileSync(join(toolDir, "queue.json"), JSON.stringify({ lanes: { a: ["0101"] } }));
-  writeFileSync(join(toolDir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4 }, max_open_worktrees: 3 }));
+  writeFileSync(join(toolDir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4 }, run_budget_usd: 60, max_open_worktrees: 3 }));
   const p = { ...paths({ repo, toolDir }), settings: join(TOOL_DIR, "settings.conductor.json"), prompts: join(TOOL_DIR, "prompts"), withLock: join(TOOL_DIR, "with-lock.mjs") };
   const liveCopy = join(toolDir, "printed.log");
   writeFileSync(liveCopy, "");

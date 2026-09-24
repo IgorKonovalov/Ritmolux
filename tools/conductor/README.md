@@ -12,6 +12,11 @@ the plan on the branch, fast-forwards `main`, and removes the lane.
 `human` phase, a plan's own stop condition, a red gate, a review still failing after two fix rounds,
 a spend cap, a usage limit too far off to wait for, or a session whose claim `git` does not bear out.
 
+**`run` stays up until you pause it** (ADR-0250). A lane with nothing to start looks again every
+minute, re-reading `queue.json`, and a park whose condition the tree now shows settled resumes itself
+(`## Acting on a park` lists which). One `run` per working period is the intended use;
+`run --until-idle` ends once no lane can move, as every run used to.
+
 The decision and its rejected alternatives are ADR-0205. The plan that built it is Plan 0187.
 
 ## Before the first run
@@ -21,9 +26,11 @@ The decision and its rejected alternatives are ADR-0205. The plan that built it 
    spend.
 
    ```json
-   { "budget_usd": { "implement": 8, "fix": 4, "review": 6 }, "max_open_worktrees": 3 }
+   { "budget_usd": { "implement": 8, "fix": 4, "review": 6 }, "run_budget_usd": 150, "max_open_worktrees": 3 }
    ```
 
+   `run_budget_usd` is the ceiling on one run's total spend. A resident run spends while nobody is
+   looking, so reaching it pauses the run: the plans in flight finish and no other starts.
    Every session gets its step's figure as `--max-budget-usd`. **The cap is checked between turns**,
    so a step can overrun it by one turn's cost (see `spike/README.md`). Optionally,
    `"model": { "implement": "opus", "fix": "opus", "review": "opus" }` picks the model per step. When
@@ -55,10 +62,10 @@ All of them run from the main checkout.
 
 | Command | What it does |
 |---|---|
-| `run [--lane a\|b] [--once]` | Runs the queue: both lanes, or one. `--once` stops a lane after one plan. A second conductor is refused while one runs. |
+| `run [--lane a\|b] [--once \| --until-idle]` | Runs the queue: both lanes, or one, until `pause`, `abort` or Ctrl+C. `--until-idle` ends the run once no lane can move; `--once` stops a lane after one plan. A second conductor is refused while one runs. |
 | `status` | Per lane: the plan, the step, the time in it, the spend so far. Then every parked plan with its reason, and whether the repository has already settled it. Regenerates the digest and ends with its path. |
 | `digest [--history]` | Rewrites `digest.md`. `--history` writes the per-run account to `digest-history.md` instead, and is the only thing that ever writes that file. |
-| `resume NNNN` | Queues a parked plan again. Refused while the park's reason still holds, e.g. a `human` phase the plan's log does not yet mark done. |
+| `resume NNNN` | Queues a parked plan again. Refused while the park's reason still holds, e.g. a `human` phase the plan's log does not yet mark done. While a run is live, it leaves the resume for that run, which takes it on its next look. |
 | `park NNNN` | Parks a plan that has not merged, with an inbox entry. |
 | `finding NNNN [<ref> --done\|--wontfix\|--filed <reason>]` | With no verb, lists that plan's closing verdict with an index per finding. With one, records your disposition against the finding `<ref>` names, and the digest stops carrying it. |
 | `adopt-close NNNN` | Records the close a lane already carries, when a session committed one and then lost its outcome. Verifies the branch first and writes nothing unless it passes. |
@@ -77,7 +84,8 @@ has just started. `pause` prints the plan and step each lane is on and how long 
 that wait is legible before you decide to `abort` instead. **A pause does not outlive its run:** it is
 cleared when the run ends, a `run` that finds one left behind by a dead conductor clears it and says
 so, and there is therefore no way to say "start nothing tomorrow" — the answer to that is not to start
-a run. A paused lane records `paused` against every plan it did not start, which the history page's
+a run. **A pause is also how a resident run ordinarily ends**, and a spent `run_budget_usd` or a
+refused CLI version pauses it the same way; the run record names which. A paused lane records `paused` against every plan it did not start, which the history page's
 **Not started** section reads apart from `--once` and from a queue that ran out.
 
 `run` prints one line per milestone as it happens, each one `HH:MM NNNN <what>`. A line indented
@@ -114,11 +122,20 @@ The same lines go to `state/live.log`, under one header per run. They are a disp
 CLI's stream: an event kind the reader does not know prints nothing, so a missing line is never
 evidence that something did not happen.
 
-**A lane stops when opening its next plan would exceed `max_open_worktrees`**, and says so, naming the
-plans that hold the worktrees. That cap is the disk bound, not a queue: the lane does not wait for a
-slot. Remove a finished lane or settle a parked one, then `run` again. **The cap counts worktree
-directories that exist on disk**, so a lane you removed with `git worktree remove` stops counting at
-once, whatever `state/conductor.json` says.
+**A lane waits when opening its next plan would exceed `max_open_worktrees`**, and the digest's **Now**
+names the plan it waits to start and the plans that hold the worktrees. A slot frees when a holder
+merges, resumes itself to a merge, or when you remove a parked plan's lane by hand. Under
+`--until-idle` the lane waits only while a holder is in flight in the run, and otherwise stops and
+says so, as before. **The cap counts worktree directories that exist on disk**, so a lane you removed
+with `git worktree remove` stops counting at once, whatever `state/conductor.json` says.
+
+**An idle lane watches.** With nothing to start, a lane of a resident run sleeps a minute and looks
+again: `queue.json` from the main checkout, the plan files, and any `resume` you asked for meanwhile.
+A plan approved and queued while the run is up starts within the minute. A `queue.json` that no longer
+validates is not taken; the run keeps the queue it had and prints why once. **`claude --version` is
+read again before every session**, so an update installed mid-run is judged before it runs anything:
+a patch above a verified version runs with the warning, and any other unverified version parks the
+plan about to start `cli_contract` and pauses the run.
 
 ## What to read afterwards
 
@@ -181,12 +198,20 @@ once, whatever `state/conductor.json` says.
   did not watch.
 - **`## Close review` in each closed plan** holds the review itself, committed with the close.
 - **`state/inbox.md`** gets one entry per park: the reason, the file to read, the worktree it holds,
-  and the resume command.
+  and the resume command. A park the run cleared itself gets an entry too, naming the condition that
+  settled it, so the inbox is a log as well as a worklist; the digest is the page to read first.
 - **`state/`** holds everything else: `conductor.json` (the runtime record), `transcripts/` (every
   session's stream), `prompts/`, `reviews/`, `gates/` (each gate command's output), `locks.jsonl`
   and `live.log`.
 
 ## Acting on a park
+
+**Five reasons resume themselves** inside a live run, once the tree shows them settled (ADR-0250):
+`human_phase` and `claude_dir` once the phase's log row reads `done` (in the lane, or on `main` when
+the lane is gone), `usage_limit` once the reset it recorded has passed, `main_dirty` once the main
+checkout is on `main` and clean, and `studio_install` an hour after it failed, three times at most.
+**None of them resumes over a dirty worktree.** Each self-resume prints a line and writes an inbox
+entry. Every other reason is yours: `resume` it once you have acted.
 
 | Reason | What to do before `resume` |
 |---|---|

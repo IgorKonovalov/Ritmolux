@@ -6,7 +6,7 @@
 // was in flight when the process died (re-run: its session's commits, if any, are re-derived from
 // the plan log and git, not from this file).
 
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { usageReading } from "./live.mjs";
@@ -25,6 +25,7 @@ export function statePaths(stateDir) {
     inbox: join(stateDir, "inbox.md"),
     lockLog: join(stateDir, "locks.jsonl"),
     pause: join(stateDir, "pause.json"),
+    resumeAsks: join(stateDir, "resume-asks.jsonl"),
   };
 }
 
@@ -56,6 +57,58 @@ export function clearPause(stateDir) {
   const ask = pauseAsk(stateDir);
   if (ask) rmSync(statePaths(stateDir).pause, { force: true });
   return ask;
+}
+
+/**
+ * The resume asks (ADR-0250): what `resume NNNN` leaves for a run that is live. The running conductor
+ * owns conductor.json and rewrites it whole after every step, so a second process writing a cleared
+ * park into it would be overwritten; the ask is appended here instead, and the lane loop takes every
+ * ask on its next look and clears the park itself, after checking the condition again.
+ */
+export function askResume(stateDir, plan, at = new Date().toISOString()) {
+  const { resumeAsks } = statePaths(stateDir);
+  mkdirSync(dirname(resumeAsks), { recursive: true });
+  appendFileSync(resumeAsks, JSON.stringify({ plan, at }) + "\n");
+}
+
+/**
+ * Every pending resume ask, oldest first, and the file removed. The rename first makes an ask
+ * appended while this reads land in a fresh file for the next look rather than be deleted unread.
+ */
+export function takeResumeAsks(stateDir) {
+  const { resumeAsks } = statePaths(stateDir);
+  if (!existsSync(resumeAsks)) return [];
+  const taken = `${resumeAsks}.${process.pid}.taking`;
+  try {
+    renameSync(resumeAsks, taken);
+  } catch {
+    return [];
+  }
+  const text = readFileSync(taken, "utf8");
+  rmSync(taken, { force: true });
+  return text
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => {
+      try {
+        return JSON.parse(l);
+      } catch {
+        return null;
+      }
+    })
+    .filter((a) => a && /^\d{4}$/.test(String(a.plan)));
+}
+
+/**
+ * Clears a park, as `resume` and a self-resume both do: the plan is queued again, and a
+ * `review_failed` park gets its fix rounds back. The park stays in `parks` as history.
+ */
+export function clearPark(rec) {
+  const reason = rec.park?.reason ?? null;
+  rec.status = "queued";
+  rec.park = null;
+  if (reason === "review_failed") rec.fixRounds = 0;
+  return reason;
 }
 
 export function writeAtomic(path, text) {
@@ -187,6 +240,15 @@ export function disposeFinding(finding, verb, reason, at = new Date().toISOStrin
 
 export function completedSteps(rec) {
   return rec.steps.filter((s) => s.ended && s.result?.status !== "interrupted");
+}
+
+/** What every plan's steps started at or after `since` spent: one run's spend, for `run_budget_usd`. */
+export function spendSince(state, since) {
+  let sum = 0;
+  for (const rec of Object.values(state.plans)) {
+    for (const s of rec.steps) if (s.started >= since) sum += s.result?.spendUsd ?? 0;
+  }
+  return sum;
 }
 
 export function totalSpend(rec) {

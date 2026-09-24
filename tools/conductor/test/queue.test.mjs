@@ -1,13 +1,13 @@
 // queue.json and local.json validation, and the conductor's preflight refusals.
 
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
 import { VERIFIED_CLI, paths, preflight } from "../conductor.mjs";
 import { loadLocal, pruneQueue, validateQueue } from "../lib/queue.mjs";
-import { FAKE, tmp, writePlan } from "./helpers.mjs";
+import { FAKE, TOOL_DIR, tmp, writePlan } from "./helpers.mjs";
 
 const dev = (id) => ({ id, owner: "dev" });
 
@@ -97,14 +97,18 @@ test("local.json is required, and every step budget must be set by the owner", (
   const dir = tmp();
   assert.match(loadLocal(join(dir, "local.json")).errors[0], /local\.json not found/);
 
-  writeFileSync(join(dir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, review: 2 }, max_open_worktrees: 2 }));
+  writeFileSync(join(dir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, review: 2 }, run_budget_usd: 60, max_open_worktrees: 2 }));
   assert.deepEqual(loadLocal(join(dir, "local.json")).errors, ["local.json: budget_usd.fix must be a positive number"]);
 
   // The committed example carries zeros on purpose, so copying it without editing is refused.
-  writeFileSync(join(dir, "local.json"), JSON.stringify({ budget_usd: { implement: 0, fix: 0, review: 0 }, max_open_worktrees: 3 }));
-  assert.equal(loadLocal(join(dir, "local.json")).errors.length, 3);
+  writeFileSync(join(dir, "local.json"), readFileSync(join(TOOL_DIR, "local.example.json"), "utf8"));
+  assert.equal(loadLocal(join(dir, "local.json")).errors.length, 4);
 
+  // A resident run spends while nobody is looking, so its ceiling is required too (ADR-0250).
   writeFileSync(join(dir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4 }, max_open_worktrees: 3 }));
+  assert.deepEqual(loadLocal(join(dir, "local.json")).errors, ["local.json: run_budget_usd must be a positive number"]);
+
+  writeFileSync(join(dir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4 }, run_budget_usd: 60, max_open_worktrees: 3 }));
   assert.deepEqual(loadLocal(join(dir, "local.json")).errors, []);
 });
 
@@ -118,7 +122,7 @@ function scratchTool({ local, version }) {
   return paths({ repo, toolDir });
 }
 
-const LOCAL = { budget_usd: { implement: 5, fix: 3, review: 4 }, max_open_worktrees: 3 };
+const LOCAL = { budget_usd: { implement: 5, fix: 3, review: 4 }, run_budget_usd: 60, max_open_worktrees: 3 };
 
 test("preflight refuses to start without local.json", () => {
   const p = scratchTool({ version: "2.1.270 (Claude Code)" });

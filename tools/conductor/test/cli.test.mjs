@@ -23,7 +23,7 @@ function sh(args, cwd) {
 const dev = (id) => ({ id, owner: "dev" });
 const human = (id) => ({ id, owner: "human" });
 
-function setup(plans, lanes, { gate, maxOpenWorktrees = 3, spec = {} } = {}) {
+function setup(plans, lanes, { gate, maxOpenWorktrees = 3, spec = {}, stopRequested, idlePollMs } = {}) {
   const repo = tmp("rlx-cli-repo-");
   sh(["init", "-q", "-b", "main"], repo);
   for (const [k, v] of [["user.email", "t@example.invalid"], ["user.name", "T"], ["commit.gpgsign", "false"], ["tag.gpgSign", "false"], ["core.autocrlf", "false"]]) {
@@ -37,7 +37,7 @@ function setup(plans, lanes, { gate, maxOpenWorktrees = 3, spec = {} } = {}) {
   // The tool directory sits outside the repository, so its state never dirties the main checkout.
   const toolDir = tmp("rlx-cli-tool-");
   writeFileSync(join(toolDir, "queue.json"), JSON.stringify({ lanes }));
-  writeFileSync(join(toolDir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4 }, max_open_worktrees: maxOpenWorktrees }));
+  writeFileSync(join(toolDir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4 }, run_budget_usd: 60, max_open_worktrees: maxOpenWorktrees }));
   const p = { ...paths({ repo, toolDir }), settings: join(TOOL_DIR, "settings.conductor.json"), prompts: join(TOOL_DIR, "prompts"), withLock: join(TOOL_DIR, "with-lock.mjs") };
 
   const specFile = join(toolDir, "spec.json");
@@ -57,6 +57,8 @@ function setup(plans, lanes, { gate, maxOpenWorktrees = 3, spec = {} } = {}) {
     lockDir: tmp("rlx-cli-locks-"),
     lockPollMs: 20,
     pollMs: 50,
+    idlePollMs,
+    stopRequested,
     signals: false,
     log: (s) => out.push(s),
     err: (s) => err.push(s),
@@ -86,7 +88,7 @@ test("run --once runs one plan; a second run skips the park and merges the next;
   assert.equal(existsSync(join(p.stateDir, "conductor.pid")), false, "the pid file is removed when the run ends");
   assert.ok(first.out.at(-1).startsWith("digest: "));
 
-  const second = await cli("run", "--lane", "a");
+  const second = await cli("run", "--lane", "a", "--until-idle");
   assert.equal(second.code, 0, second.err.join("\n"));
   state = loadState(p.stateDir);
   assert.equal(state.plans["0102"].status, "merged");
@@ -116,7 +118,7 @@ test("status names each lane, every parked plan with its reason, and ends with t
 
 test("status regenerates a deleted digest byte for byte", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
-  await cli("run");
+  await cli("run", "--until-idle");
   const before = readFileSync(p.digest, "utf8");
   assert.match(before, /^## Needs you\n\nNothing: no park, no lane stopped at the worktree cap, no open finding\.$/m);
   rmSync(p.digest);
@@ -128,7 +130,7 @@ test("status regenerates a deleted digest byte for byte", async () => {
 // creates the file — nothing writes it until it is asked for.
 test("digest rewrites the page, and digest --history writes the per-run account beside it", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
-  await cli("run");
+  await cli("run", "--until-idle");
   assert.equal(existsSync(p.digestHistory), false, "no run writes the history page");
 
   rmSync(p.digest);
@@ -148,7 +150,7 @@ test("digest rewrites the page, and digest --history writes the per-run account 
 
 test("resume refuses a human-phase park the log does not mark done, and accepts the digest's command once it does", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1"), human("2"), dev("3")] }], { a: ["0101"] });
-  await cli("run");
+  await cli("run", "--until-idle");
   const rec = loadState(p.stateDir).plans["0101"];
   assert.equal(rec.park.reason, "human_phase");
 
@@ -169,7 +171,7 @@ test("resume refuses a human-phase park the log does not mark done, and accepts 
   assert.equal(accepted.code, 0, accepted.err.join("\n"));
   assert.equal(loadState(p.stateDir).plans["0101"].status, "queued");
 
-  const finish = await cli("run");
+  const finish = await cli("run", "--until-idle");
   assert.equal(finish.code, 0);
   const done = loadState(p.stateDir).plans["0101"];
   assert.equal(done.status, "merged", JSON.stringify(done.park));
@@ -180,7 +182,7 @@ test("resume refuses a human-phase park the log does not mark done, and accepts 
 // stale on one and a park on the other.
 test("status marks a park the lane has already settled exactly as the digest does", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1"), human("2"), dev("3")] }], { a: ["0101"] });
-  await cli("run");
+  await cli("run", "--until-idle");
   const rec = loadState(p.stateDir).plans["0101"];
   assert.equal(rec.park.reason, "human_phase");
 
@@ -215,14 +217,14 @@ test("run starts again after a merge, and a resumed sibling of the merged plan r
     ],
     { a: ["0101", "0102"] },
   );
-  const first = await cli("run");
+  const first = await cli("run", "--until-idle");
   assert.equal(first.code, 0, first.err.join("\n"));
   let state = loadState(p.stateDir);
   assert.equal(state.plans["0101"].status, "merged");
   assert.equal(state.plans["0102"].status, "parked");
 
   // The merged plan stays listed in queue.json and now sits under done/; that must not refuse a run.
-  const again = await cli("run");
+  const again = await cli("run", "--until-idle");
   assert.equal(again.code, 0, again.err.join("\n"));
   assert.equal((await cli("check")).code, 0);
 
@@ -232,7 +234,7 @@ test("run starts again after a merge, and a resumed sibling of the merged plan r
   sh(["commit", "-q", "-am", "docs(plans): phase 2 done by the owner"], rec.worktree);
   assert.equal((await cli("resume", "0102")).code, 0);
 
-  const finish = await cli("run");
+  const finish = await cli("run", "--until-idle");
   assert.equal(finish.code, 0, finish.err.join("\n"));
   state = loadState(p.stateDir);
   assert.equal(state.plans["0102"].status, "merged", JSON.stringify(state.plans["0102"].park));
@@ -241,7 +243,7 @@ test("run starts again after a merge, and a resumed sibling of the merged plan r
 test("resume refuses a park whose worktree is dirty, naming the paths, and accepts once it is clean", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
   writeFileSync(join(p.toolDir, "spec.json"), JSON.stringify({ plans: { "0101": { dirtyPark: { untracked: 0 } } } }));
-  await cli("run");
+  await cli("run", "--until-idle");
   const rec = loadState(p.stateDir).plans["0101"];
   assert.equal(rec.park.reason, "check_red");
   assert.deepEqual(rec.park.dirty, { paths: ["VERSION"], more: 0 });
@@ -269,7 +271,7 @@ test("run prints a lane's stop at the worktree cap as it happens", async () => {
     { a: ["0101", "0102"] },
     { maxOpenWorktrees: 1 },
   );
-  const r = await cli("run", "--lane", "a");
+  const r = await cli("run", "--lane", "a", "--until-idle");
   assert.equal(r.code, 0, r.err.join("\n"));
   const stop = r.out.indexOf("conductor: lane a stopped at the worktree cap (max_open_worktrees 1, held by 0101); 0102 not started");
   assert.ok(stop >= 0, r.out.join("\n"));
@@ -292,7 +294,7 @@ test("run refuses a second conductor, and abort with nothing running recovers in
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
   mkdirSync(p.stateDir, { recursive: true });
   writeFileSync(join(p.stateDir, "conductor.pid"), String(process.pid));
-  const refused = await cli("run");
+  const refused = await cli("run", "--until-idle");
   assert.equal(refused.code, 1);
   assert.match(refused.err.join("\n"), /a conductor is already running \(pid \d+\)/);
   rmSync(join(p.stateDir, "conductor.pid"));
@@ -323,6 +325,7 @@ test("pause asked mid-run lets the plan in flight merge, starts no other, and cl
     { a: ["0101", "0102"] },
     { gate: (p) => [writesPause(p)] },
   );
+  // Resident, with nothing else to end it: the pause is what ends the run.
   const r = await cli("run", "--lane", "a");
   assert.equal(r.code, 0, r.err.join("\n"));
   const state = loadState(p.stateDir);
@@ -355,7 +358,7 @@ test("an ask cancelled before the lane looks again lets the next plan start", as
       ],
     },
   );
-  const r = await cli("run", "--lane", "a");
+  const r = await cli("run", "--lane", "a", "--until-idle");
   assert.equal(r.code, 0, r.err.join("\n"));
   const state = loadState(p.stateDir);
   assert.equal(state.plans["0102"].status, "merged", JSON.stringify(state.plans["0102"].park));
@@ -405,7 +408,7 @@ test("a run started with an ask left behind by a dead conductor runs normally an
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
   mkdirSync(p.stateDir, { recursive: true });
   writeFileSync(statePaths(p.stateDir).pause, '{"at":"2026-09-18T20:00:00.000Z","pid":4242}');
-  const r = await cli("run", "--lane", "a");
+  const r = await cli("run", "--lane", "a", "--until-idle");
   assert.equal(r.code, 0, r.err.join("\n"));
   assert.equal(r.out[0], "conductor: a pause left behind by an earlier run was cleared; a pause does not outlive its run");
   const state = loadState(p.stateDir);
@@ -459,7 +462,7 @@ test("a run with no state of its own starts no plan already under done/", async 
   sh(["commit", "-q", "-m", "0090 merged in an earlier run"], repo);
   assert.equal(existsSync(join(p.stateDir, "conductor.json")), false, "the state the picker would read does not exist");
 
-  const r = await cli("run", "--lane", "a");
+  const r = await cli("run", "--lane", "a", "--until-idle");
   assert.equal(r.code, 0, r.err.join("\n"));
   assert.equal(r.out[0], QUEUE_NOTICE);
   const state = loadState(p.stateDir);
@@ -489,7 +492,7 @@ test("run on a checkout with no state/ writes the pid file for the run and remov
     gate: (p) => [{ name: "pid-file-present", cmd: [process.execPath, "-e", `process.exit(require("fs").existsSync(${JSON.stringify(join(p.stateDir, "conductor.pid"))}) ? 0 : 1)`] }],
   });
   assert.equal(existsSync(p.stateDir), false);
-  const r = await cli("run");
+  const r = await cli("run", "--until-idle");
   assert.equal(r.code, 0, r.err.join("\n"));
   const rec = loadState(p.stateDir).plans["0101"];
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
@@ -547,7 +550,7 @@ test("run on a patch above the verified CLI prints the warning, records it on th
   const version = `${top[0]}.${top[1]}.${top[2] + 1}`;
   process.env.FAKE_CLAUDE_VERSION = `${version} (Claude Code)`;
   try {
-    const r = await cli("run");
+    const r = await cli("run", "--until-idle");
     assert.equal(r.code, 0, r.err.join("\n"));
     const { warning } = cliVerdict(version);
     assert.deepEqual(r.err, [`conductor: warning: ${warning}`]);
@@ -561,7 +564,7 @@ test("run on a patch above the verified CLI prints the warning, records it on th
     // The next run on a verified version leaves the page with no warning at all, and the history
     // keeps it on the run that carried it.
     process.env.FAKE_CLAUDE_VERSION = `${VERIFIED_CLI[0]} (Claude Code)`;
-    await cli("run");
+    await cli("run", "--until-idle");
     assert.ok(!readFileSync(p.digest, "utf8").includes("is not a verified CLI version"));
     await cli("digest", "--history");
     const [newest, earlier] = readFileSync(p.digestHistory, "utf8").split(/^## Run /m).slice(1);
@@ -580,7 +583,7 @@ test("unknown commands and malformed plan numbers are usage errors", async () =>
 
 test("adopt-close records the close a lane already carries, and refuses a lane with none", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] }, { spec: { "0101": { loseOutcome: "review" } } });
-  await cli("run");
+  await cli("run", "--until-idle");
   const parked = loadState(p.stateDir).plans["0101"];
   assert.equal(parked.park.reason, "no_outcome");
   assert.equal(parked.closed, null);
@@ -599,7 +602,7 @@ test("adopt-close records the close a lane already carries, and refuses a lane w
   assert.equal(again.code, 1);
   assert.match(again.err.join("\n"), /already recorded closed/);
   assert.equal((await cli("resume", "0101")).code, 0);
-  assert.equal((await cli("run")).code, 0);
+  assert.equal((await cli("run", "--until-idle")).code, 0);
   const merged = loadState(p.stateDir).plans["0101"];
   assert.equal(merged.status, "merged", JSON.stringify(merged.park));
   assert.equal(merged.steps.filter((s) => s.kind === "review").length, 1, "no second review session ran");
@@ -607,7 +610,7 @@ test("adopt-close records the close a lane already carries, and refuses a lane w
 
 test("adopt-close on a lane with no close review changes nothing, and a bad plan number is a usage error", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1"), human("2")] }], { a: ["0101"] });
-  await cli("run");
+  await cli("run", "--until-idle");
   const before = readFileSync(statePaths(p.stateDir).file, "utf8");
   assert.equal(loadState(p.stateDir).plans["0101"].park.reason, "human_phase");
 
@@ -642,7 +645,7 @@ const verdictOf = (findings) => [{ round: 2, blockers: 0, majors: 0, minors: fin
 
 test("finding lists a merged plan's closing verdict, and a disposition records verb, reason and date", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] }, { spec: { "0101": { minors: 2 } } });
-  await cli("run");
+  await cli("run", "--until-idle");
   assert.equal(loadState(p.stateDir).plans["0101"].status, "merged");
 
   const before = await cli("finding", "0101");
@@ -777,7 +780,7 @@ test("finding on a plan with no closing verdict exits non-zero saying why, and a
 test("resume refuses a claude_dir park until the plan's log marks that phase done", async () => {
   const claudePhase = { id: "1", owner: "dev", files: "`.claude/skills/dev/SKILL.md`" };
   const { p, cli } = setup([{ number: "0101", phases: [claudePhase, dev("2")] }], { a: ["0101"] });
-  await cli("run");
+  await cli("run", "--until-idle");
   const rec = loadState(p.stateDir).plans["0101"];
   assert.equal(rec.park.reason, "claude_dir");
   assert.match(rec.park.detail, /\.claude\/skills\/dev\/SKILL\.md/);
@@ -795,4 +798,49 @@ test("resume refuses a claude_dir park until the plan's log marks that phase don
   const accepted = await cli("resume", "0101");
   assert.equal(accepted.code, 0, accepted.err.join("\n"));
   assert.equal(loadState(p.stateDir).plans["0101"].status, "queued");
+});
+
+// ADR-0250: `run` is resident, and `--until-idle` is the run that ends once no lane can move.
+test("run --until-idle ends a run whose queue is empty, and a resident run stays up watching until stopped", async () => {
+  const { cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: [] }, { idlePollMs: 20, stopRequested: () => Date.now() > stopAt });
+  let stopAt = Infinity;
+  const idle = await cli("run", "--until-idle");
+  assert.equal(idle.code, 0, idle.err.join("\n"));
+  assert.match(idle.out.join("\n"), /run ended - 0 merged, 0 parked/);
+  assert.doesNotMatch(idle.out.join("\n"), /watching the queue/);
+
+  const t0 = Date.now();
+  stopAt = t0 + 300;
+  const resident = await cli("run");
+  assert.equal(resident.code, 0, resident.err.join("\n"));
+  assert.ok(Date.now() - t0 >= 300, "the resident run did not end on an empty queue");
+  assert.ok(resident.out.includes("conductor: lane a is idle, watching the queue"), resident.out.join("\n"));
+
+  const both = await cli("run", "--once", "--until-idle");
+  assert.equal(both.code, 1);
+  assert.match(both.err.join("\n"), /--once and --until-idle are two ways to end a run/);
+});
+
+test("check refuses a local.json with no run_budget_usd", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  writeFileSync(p.local, JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4 }, max_open_worktrees: 3 }));
+  const r = await cli("check");
+  assert.equal(r.code, 1);
+  assert.ok(r.err.includes("conductor: local.json: run_budget_usd must be a positive number"), r.err.join("\n"));
+});
+
+test("resume while a run is live leaves an ask for it rather than writing the record under it", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  await cli("park", "0101");
+  // This test process stands in for the live conductor.
+  writeFileSync(join(p.stateDir, "conductor.pid"), String(process.pid));
+  const r = await cli("resume", "0101");
+  rmSync(join(p.stateDir, "conductor.pid"));
+  assert.equal(r.code, 0, r.err.join("\n"));
+  assert.deepEqual(r.out, ["conductor: plan 0101: the live run takes the resume on its next look, within a minute"]);
+  assert.equal(loadState(p.stateDir).plans["0101"].status, "parked", "the record is the run's to change");
+  assert.deepEqual(
+    readFileSync(statePaths(p.stateDir).resumeAsks, "utf8").trim().split("\n").map((l) => JSON.parse(l).plan),
+    ["0101"],
+  );
 });

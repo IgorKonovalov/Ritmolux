@@ -14,7 +14,7 @@ import { runLanes } from "../lib/lane.mjs";
 import { readLedger } from "../lib/ledger.mjs";
 import { findPlan, readPlanFile } from "../lib/plan.mjs";
 import { validateQueue } from "../lib/queue.mjs";
-import { loadState, statePaths } from "../lib/state.mjs";
+import { askResume, loadState, statePaths } from "../lib/state.mjs";
 import { FAKE, TEST_DIR, TOOL_DIR, tmp, writePlan } from "./helpers.mjs";
 
 const SCENARIO = join(TEST_DIR, "lane-scenario.mjs");
@@ -1082,4 +1082,209 @@ test("a second run over an installed lane does not reinstall", async () => {
   // `npm ci` deletes node_modules before it installs, so redoing a good install is not free and is
   // not harmless: the absence of studio/node_modules is the trigger, never the run.
   assert.deepEqual(install.runs(), [parked.worktree], "and not again over a lane that already has its dependencies");
+});
+
+// ADR-0250: a resident run. Each of these ends through `stopRequested` once the scenario has played
+// out, or after a bounded number of idle looks so a regression fails rather than hangs.
+
+/** Marks `id`'s log row done in the lane and commits it, as the owner does after a human phase. */
+function markDone(wt, plan, id) {
+  const planPath = join(wt, "docs", "plans", `${plan}-fixture.md`);
+  writeFileSync(planPath, readFileSync(planPath, "utf8").replace(new RegExp(`^\\| ${id} — Step ${id} \\| human \\| not started \\|`, "m"), `| ${id} — Step ${id} | human | done |`));
+  sh(["add", `docs/plans/${plan}-fixture.md`], wt);
+  sh(["commit", "-q", "-m", `docs(plans): phase ${id} done by the owner`], wt);
+}
+
+/** Makes `ctx` resident, stopping once `done()` holds or after `maxLooks` idle looks. */
+function resident(ctx, { done, maxLooks = 200, onLook = () => {} }) {
+  ctx.resident = true;
+  ctx.idlePollMs = 20;
+  let looks = 0;
+  ctx.onIdleLook = (lane) => {
+    looks += 1;
+    onLook(lane, looks);
+  };
+  ctx.stopRequested = () => done() || looks >= maxLooks;
+  return { looks: () => looks };
+}
+
+const selfResumeEntries = (ctx) => (readFileSync(statePaths(ctx.stateDir).inbox, "utf8").match(/^## .* resumed itself from .*$/gm) ?? []);
+
+test("a resident run resumes a human_phase park the lane's log settles while it is up, and merges it in the same run", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1"), human("2"), dev("3")] }], lanes: { a: ["0101"] } });
+  let marked = false;
+  const r = resident(ctx, {
+    done: () => ctx.state.plans["0101"]?.status === "merged",
+    onLook: () => {
+      const rec = ctx.state.plans["0101"];
+      if (marked || rec?.status !== "parked") return;
+      markDone(rec.worktree, "0101", "2");
+      marked = true;
+    },
+  });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.ok(r.looks() < 200, "the run ended on the merge, not on the look bound");
+  assert.equal(loadState(ctx.stateDir).runs.length, 1, "one runLanes call");
+  assert.deepEqual(kinds(rec), ["implement:dev", "implement:dev", "review:architect"]);
+  assert.deepEqual(rec.parks.map((p) => p.reason), ["human_phase"]);
+  assert.deepEqual(rec.selfResumes.map((x) => x.reason), ["human_phase"]);
+  const entries = selfResumeEntries(ctx);
+  assert.equal(entries.length, 1, entries.join("\n"));
+  assert.match(readFileSync(statePaths(ctx.stateDir).inbox, "utf8"), /^- \*\*Settled:\*\* Phase 2 reads done in the plan's ## Implementation log$/m);
+});
+
+test("a resident run leaves a settled human_phase park alone while its worktree is dirty", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1"), human("2"), dev("3")] }], lanes: { a: ["0101"] } });
+  let markedAt = null;
+  resident(ctx, {
+    done: () => false,
+    maxLooks: 15,
+    onLook: (lane, looks) => {
+      const rec = ctx.state.plans["0101"];
+      if (markedAt !== null || rec?.status !== "parked") return;
+      markDone(rec.worktree, "0101", "2");
+      writeFileSync(join(rec.worktree, "scratch-notes.txt"), "the owner's working file\n");
+      markedAt = looks;
+    },
+  });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.ok(markedAt !== null && markedAt < 15, "the row was marked while the run was up");
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "human_phase");
+  assert.equal(rec.selfResumes, undefined);
+  assert.deepEqual(kinds(rec), ["implement:dev"]);
+  assert.deepEqual(selfResumeEntries(ctx), []);
+});
+
+test("a gate_red park never resumes itself, even once the gate would pass", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  ctx.gate = [{ name: "always-red", cmd: [process.execPath, "-e", "process.exit(1)"] }];
+  resident(ctx, {
+    done: () => false,
+    maxLooks: 10,
+    onLook: () => {
+      ctx.gate = [{ name: "green", cmd: [process.execPath, "-e", "0"] }];
+    },
+  });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "gate_red");
+  assert.equal(rec.selfResumes, undefined);
+  assert.deepEqual(kinds(rec), ["implement:dev"]);
+});
+
+test("a resume the owner asks for while the run is up is taken on the lane's next look", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  ctx.gate = [{ name: "always-red", cmd: [process.execPath, "-e", "process.exit(1)"] }];
+  let asked = false;
+  resident(ctx, {
+    done: () => ctx.state.plans["0101"]?.status === "merged",
+    onLook: () => {
+      if (asked || ctx.state.plans["0101"]?.status !== "parked") return;
+      ctx.gate = [{ name: "green", cmd: [process.execPath, "-e", "0"] }];
+      askResume(ctx.stateDir, "0101");
+      asked = true;
+    },
+  });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(rec.parks.map((p) => p.reason), ["gate_red"]);
+  assert.equal(existsSync(statePaths(ctx.stateDir).resumeAsks), false, "the ask was taken");
+});
+
+test("a lane at the worktree cap waits for a holder in flight, and starts its plan in the same run once the holder merges", async () => {
+  const { ctx, digest } = scratch({
+    plans: [
+      { number: "0101", phases: [dev("1")] },
+      { number: "0102", phases: [dev("1")] },
+    ],
+    lanes: { a: ["0101"], b: ["0102"] },
+    local: { max_open_worktrees: 1 },
+  });
+  const events = ctx.events;
+  let waiting = null;
+  ctx.events = (name, data) => {
+    events(name, data);
+    if (name === "worktree-wait") waiting = digest("## Now");
+  };
+  await runLanes(ctx);
+  const state = loadState(ctx.stateDir);
+  assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+  assert.equal(state.plans["0102"].status, "merged", JSON.stringify(state.plans["0102"].park));
+  assert.equal(state.runs.at(-1).stops, undefined, "a wait is not a stop");
+  assert.ok(waiting, "lane b waited");
+  assert.match(waiting, /^- lane b: waiting at the worktree cap \(`max_open_worktrees` 1\) to start 0102; the slots are held by 0101\.$/m);
+});
+
+test("a plan appended to the queue while a resident run is up is started", async () => {
+  const { ctx, repo, digest } = scratch({
+    plans: [
+      { number: "0101", phases: [dev("1")] },
+      { number: "0102", phases: [dev("1")] },
+    ],
+    lanes: { a: ["0101"] },
+  });
+  let lanes = { a: ["0101"] };
+  ctx.reloadQueue = () => validateQueue({ lanes }, repo, new Set(Object.keys(ctx.state.plans)));
+  let watching = null;
+  resident(ctx, {
+    done: () => ctx.state.plans["0102"]?.status === "merged",
+    onLook: () => {
+      if (watching) return;
+      watching = digest("## Now");
+      lanes = { a: ["0101", "0102"] };
+    },
+  });
+  await runLanes(ctx);
+  const state = loadState(ctx.stateDir);
+  assert.equal(state.plans["0101"].status, "merged");
+  assert.equal(state.plans["0102"].status, "merged", JSON.stringify(state.plans["0102"]?.park));
+  assert.equal(state.runs.length, 1);
+  assert.match(watching, /^- lane a: idle, watching the queue\.$/m);
+});
+
+test("a run whose spend reaches run_budget_usd pauses: the plan in flight merges and no other starts", async () => {
+  const { ctx } = scratch({
+    plans: [
+      { number: "0101", phases: [dev("1")] },
+      { number: "0102", phases: [dev("1")] },
+    ],
+    lanes: { a: ["0101", "0102"] },
+    local: { run_budget_usd: 1.5 },
+  });
+  resident(ctx, { done: () => false, maxLooks: 50 });
+  await runLanes(ctx);
+  const state = loadState(ctx.stateDir);
+  assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+  assert.equal(state.plans["0102"], undefined, "the spent budget held 0102 back");
+  const run = state.runs.at(-1);
+  assert.equal(run.paused.reason, "run_budget");
+  assert.deepEqual(run.paused.lanes, ["a"]);
+  assert.deepEqual(run.notStarted, [{ plan: "0102", lane: "a", reason: "paused" }]);
+});
+
+test("selfResumeWhy: usage_limit once its reset passes, studio_install hourly and three times, the owner's reasons never", async () => {
+  const { selfResumeWhy, STUDIO_RETRIES } = await import("../lib/lane.mjs");
+  const at = "2026-09-24T10:00:00.000Z";
+  const t0 = Date.parse(at);
+  const rec = (park, extra = {}) => ({ plan: "0101", worktree: null, park: { phase: null, at, ...park }, ...extra });
+  const resetsAt = t0 / 1000 + 600;
+  assert.equal(selfResumeWhy(rec({ reason: "usage_limit", resetsAt }), "/nowhere", t0 + 60_000), null);
+  assert.match(selfResumeWhy(rec({ reason: "usage_limit", resetsAt }), "/nowhere", t0 + 20 * 60_000), /usage window reopened/);
+  assert.equal(selfResumeWhy(rec({ reason: "usage_limit" }), "/nowhere", t0 + 24 * 3600_000), null, "no recorded reset is the owner's");
+
+  assert.equal(selfResumeWhy(rec({ reason: "studio_install" }), "/nowhere", t0 + 30 * 60_000), null);
+  assert.match(selfResumeWhy(rec({ reason: "studio_install" }), "/nowhere", t0 + 61 * 60_000), /retry 1 of 3/);
+  const spent = Array.from({ length: STUDIO_RETRIES }, () => ({ reason: "studio_install" }));
+  assert.equal(selfResumeWhy(rec({ reason: "studio_install" }, { selfResumes: spent }), "/nowhere", t0 + 61 * 60_000), null);
+
+  for (const reason of ["gate_red", "review_failed", "disagreement", "plan_wrong", "question", "stop_condition", "cli_contract", "budget", "api", "merge_conflict"]) {
+    assert.equal(selfResumeWhy(rec({ reason }), "/nowhere", t0 + 48 * 3600_000), null, reason);
+  }
 });

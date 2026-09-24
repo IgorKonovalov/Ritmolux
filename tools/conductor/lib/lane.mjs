@@ -12,6 +12,11 @@
 // Every judgement the loop cannot make parks the plan: the plan keeps its worktree and branch, the
 // inbox gains an entry, and the lane moves to the next queued plan whose `after` list has merged.
 // The repository, not the session, is the evidence at every step (close.mjs).
+//
+// A resident run (ADR-0250) never ends on an empty lane: the lane looks again every IDLE_POLL_MS,
+// re-reading the queue, and on every look clears the parks of a closed list whose condition the tree
+// now shows settled. The worktree cap is a wait. `pause`, a spent `run_budget_usd` or a refused CLI
+// version ends it the way ADR-0219's pause does: the plan in flight finishes and no other starts.
 
 import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readSync } from "node:fs";
@@ -20,8 +25,8 @@ import { join, relative } from "node:path";
 import { adoptedClose, verifyClose, verifyFix, verifyImplement } from "./close.mjs";
 import { removeLane, laneNames, openLane } from "./cleanup.mjs";
 import { defaultGate, gateForStage, runGate } from "./gate.mjs";
-import { git, head, resolveCommit } from "./git.mjs";
-import { appendCleanupFailure, appendPark, dirtyWorktree } from "./inbox.mjs";
+import { currentBranch, git, head, isClean, resolveCommit } from "./git.mjs";
+import { appendCleanupFailure, appendPark, appendSelfResume, dirtyText, dirtyWorktree } from "./inbox.mjs";
 import { servedNotice } from "./ledger.mjs";
 import {
   gateReader,
@@ -34,9 +39,9 @@ import {
 } from "./live.mjs";
 import { CLOSE, take } from "./locks.mjs";
 import { fastForwardMain } from "./merge.mjs";
-import { CLAUDE_DIR, STUDIO_INSTALL } from "./outcome.mjs";
+import { CLAUDE_DIR, CLI_CONTRACT, STUDIO_INSTALL } from "./outcome.mjs";
 import { donePhases, findPlan, nextStep, rangeLabel, readPlanFile } from "./plan.mjs";
-import { endStep, planRecord, saveState, startStep, statePaths } from "./state.mjs";
+import { clearPark, endStep, planRecord, saveState, spendSince, startStep, statePaths, takeResumeAsks } from "./state.mjs";
 import { USAGE_LIMIT, renderPromptFile, runStep } from "./step.mjs";
 
 export const MAX_FIX_ROUNDS = 2;
@@ -51,6 +56,19 @@ const USAGE_MARGIN_MS = 2 * 60 * 1000;
 const RESUME_PROMPT =
   "The usage limit that ended this session has reset. Carry on exactly where you stopped, with the same " +
   "scope and the same rules, and finish by printing the rlx-outcome block.";
+
+/** How often a resident run's idle or capped lane looks again (ADR-0250). */
+export const IDLE_POLL_MS = 60 * 1000;
+
+/**
+ * The parks a run clears by itself once the tree shows them settled (ADR-0250). Every other reason
+ * is the owner's: none of them can be read as settled from the tree.
+ */
+export const SELF_RESUME_REASONS = new Set(["human_phase", CLAUDE_DIR, USAGE_LIMIT, "main_dirty", STUDIO_INSTALL]);
+
+/** A failed studio install is retried this long after its park, at most STUDIO_RETRIES times per plan. */
+export const STUDIO_RETRY_MS = 60 * 60 * 1000;
+export const STUDIO_RETRIES = 3;
 
 const now = () => new Date().toISOString();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -69,6 +87,68 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 export function laneOpen(rec) {
   return Boolean(rec?.worktree) && existsSync(rec.worktree);
+}
+
+/**
+ * Why a park still holds, or null when the tree shows it settled. `resume` asks this before it
+ * clears a park, and a self-resume asks it first, so the two never disagree on the conditions they
+ * share. Only `human_phase`, `claude_dir` and `main_dirty` have a condition here; every other reason
+ * is the owner's to judge, and `resume` takes their word for it.
+ */
+export function parkStillTrue(rec, repo) {
+  const { reason, phase } = rec.park;
+  // Whatever the reason, no new session starts on a tree the last one left dirty.
+  const dirty = dirtyWorktree(rec.worktree);
+  if (dirty) return `the worktree ${rec.worktree} has uncommitted changes: ${dirtyText(dirty)}; commit them, or \`git restore\` them there, first`;
+  // Both of these park on a phase only the owner can do — one the plan tagged `human`, one whose
+  // files the CLI will not let a session touch (ADR-0210). Either way the lane moves on when the
+  // plan's own log says the phase is done, which is the same evidence for both.
+  if (reason === "human_phase" || reason === CLAUDE_DIR) {
+    const where = laneOpen(rec) ? rec.worktree : repo;
+    const found = findPlan(where, rec.plan);
+    if (!found) return `plan ${rec.plan} is not in ${where}`;
+    if (!donePhases(readPlanFile(found.path)).has(phase)) {
+      const rel = relative(where, found.path).replace(/\\/g, "/");
+      return `Phase ${phase} is still not marked done in the ## Implementation log of ${rel} in ${where}; commit the row there first`;
+    }
+  }
+  if (reason === "main_dirty" && (currentBranch(repo) !== "main" || !isClean(repo))) {
+    return `the main checkout is still dirty or not on main`;
+  }
+  return null;
+}
+
+/**
+ * The condition that has settled `rec`'s park, as a phrase, or null while it holds or is not the
+ * run's to clear. Only SELF_RESUME_REASONS qualify, and never over a dirty worktree (parkStillTrue).
+ * A `usage_limit` park qualifies once the reset it recorded has passed, and not at all when the CLI
+ * reported none; a `studio_install` park is retried STUDIO_RETRY_MS after it parked, and only
+ * STUDIO_RETRIES times, which is what keeps an install that always fails from looping.
+ */
+export function selfResumeWhy(rec, repo, nowMs = Date.now()) {
+  const reason = rec.park?.reason;
+  if (!SELF_RESUME_REASONS.has(reason)) return null;
+  if (parkStillTrue(rec, repo)) return null;
+  switch (reason) {
+    case "human_phase":
+    case CLAUDE_DIR:
+      return `Phase ${rec.park.phase} reads done in the plan's ## Implementation log`;
+    case "main_dirty":
+      return "the main checkout is on main and clean";
+    case USAGE_LIMIT: {
+      if (typeof rec.park.resetsAt !== "number") return null;
+      const open = rec.park.resetsAt * 1000 + USAGE_MARGIN_MS;
+      return nowMs >= open ? `the usage window reopened at ${new Date(rec.park.resetsAt * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC` : null;
+    }
+    case STUDIO_INSTALL: {
+      const tries = (rec.selfResumes ?? []).filter((r) => r.reason === STUDIO_INSTALL).length;
+      if (tries >= STUDIO_RETRIES) return null;
+      if (nowMs - Date.parse(rec.park.at) < STUDIO_RETRY_MS) return null;
+      return `the install is retried an hour after it failed (retry ${tries + 1} of ${STUDIO_RETRIES})`;
+    }
+    default:
+      return null;
+  }
 }
 
 /** The suite ledger (ADR-0207): the gate reads and writes it, and every session's wrapper is handed it. */
@@ -259,7 +339,7 @@ export async function runLanes(ctx) {
   const lanes = ctx.lanes ?? Object.keys(ctx.queue.lanes);
   ctx.held ??= new Map();
   // `cli` is preflight's reading of `claude --version`, carrying its warning for an unverified patch.
-  const run = { started: now(), ended: null, lanes, ...(ctx.cli ? { cli: ctx.cli } : {}) };
+  const run = { started: now(), ended: null, lanes, ...(ctx.resident && !ctx.once ? { resident: true } : {}), ...(ctx.cli ? { cli: ctx.cli } : {}) };
   ctx.state.runs.push(run);
   ctx.run = run;
   save(ctx);
@@ -293,32 +373,122 @@ function recordNotStarted(ctx, lane, stopped) {
 
 /**
  * Records that `lane` stopped because the run was paused (ADR-0219), so the run's own record tells a
- * pause apart from `--once` and from a queue that simply ran out.
+ * pause apart from `--once` and from a queue that simply ran out. `reason` is what paused it: `asked`
+ * for the owner's `pause`, `run_budget` for a spent `run_budget_usd`, `cli_version` for a CLI the run
+ * refused between sessions (ADR-0250).
  */
-function recordPaused(ctx, lane) {
-  ctx.run.paused ??= { at: now(), lanes: [] };
+function recordPaused(ctx, lane, reason = "asked") {
+  ctx.run.paused ??= { at: now(), lanes: [], reason };
   ctx.run.paused.lanes.push(lane);
   recordNotStarted(ctx, lane, "paused");
   save(ctx);
 }
 
+/** What this run has spent, against `run_budget_usd`; a missing budget never pauses. */
+function runBudgetSpent(ctx) {
+  const cap = ctx.local.run_budget_usd;
+  if (typeof cap !== "number") return false;
+  return spendSince(ctx.state, ctx.run.started) >= cap;
+}
+
+/** Sets a lane's record between plans, saving only when it changed. Returns true when it did. */
+function setLane(ctx, lane, extra) {
+  const next = { plan: null, step: null, ...extra };
+  if (JSON.stringify(ctx.state.lanes[lane] ?? null) === JSON.stringify(next)) return false;
+  ctx.state.lanes[lane] = next;
+  save(ctx);
+  return true;
+}
+
+/**
+ * Re-reads queue.json from the main checkout. A queue that no longer validates is not taken: the
+ * lane keeps the one it had and says so once per distinct error, since a half-edited queue is the
+ * owner mid-change rather than a new instruction.
+ */
+function refreshQueue(ctx) {
+  if (!ctx.reloadQueue) return;
+  const q = ctx.reloadQueue();
+  if (q.errors?.length) {
+    const text = q.errors.join("; ");
+    if (ctx.queueError !== text) live(ctx, "queue", `  lane   queue.json does not validate, the run keeps the queue it had: ${text}`);
+    ctx.queueError = text;
+    return;
+  }
+  ctx.queueError = null;
+  ctx.queue = q;
+}
+
+/**
+ * Takes every `resume` the owner asked for while the run is live and clears the ones whose park no
+ * longer holds, re-checked here since the tree may have moved since the command checked it.
+ */
+function takeAsks(ctx) {
+  for (const ask of takeResumeAsks(ctx.stateDir)) {
+    const rec = ctx.state.plans[ask.plan];
+    if (rec?.status !== "parked" || !rec.park) continue;
+    const still = parkStillTrue(rec, ctx.repo);
+    if (still) {
+      live(ctx, rec.plan, `  lane   resume asked, refused: ${still}`);
+      continue;
+    }
+    const reason = clearPark(rec);
+    live(ctx, rec.plan, `  lane   resumed by the owner from ${reason}`);
+    event(ctx, "resumed", { plan: rec.plan, reason });
+    save(ctx);
+  }
+}
+
+/** Clears every park in `lane`'s queue whose condition the tree now shows settled (ADR-0250). */
+function selfResume(ctx, lane) {
+  const nowMs = Date.now();
+  for (const plan of ctx.queue.lanes[lane] ?? []) {
+    const rec = ctx.state.plans[plan];
+    if (rec?.status !== "parked" || !rec.park) continue;
+    const why = selfResumeWhy(rec, ctx.repo, nowMs);
+    if (!why) continue;
+    const reason = clearPark(rec);
+    (rec.selfResumes ??= []).push({ reason, why, at: now() });
+    appendSelfResume(statePaths(ctx.stateDir).inbox, { plan, reason, why });
+    live(ctx, plan, `  lane   resumed itself from ${reason}: ${why}`);
+    event(ctx, "self-resume", { plan, reason, why });
+    save(ctx);
+  }
+}
+
 async function laneLoop(ctx, lane) {
+  // `--once` runs one plan and ends, resident or not: a lane with nothing to start ends it at once.
+  const resident = Boolean(ctx.resident) && !ctx.once;
+  const idlePoll = ctx.idlePollMs ?? IDLE_POLL_MS;
   for (;;) {
     if (ctx.stopRequested?.()) return recordNotStarted(ctx, lane, "stopped");
     // The pause ask is read here, beside the stop request, and nowhere else: the plan in flight has
     // already finished by the time the loop is back at the top, which is what makes the granularity
-    // the plan rather than the step.
-    if (ctx.paused?.()) return recordPaused(ctx, lane);
+    // the plan rather than the step. A spent run budget and a refused CLI pause the same way.
+    if (ctx.paused?.()) return recordPaused(ctx, lane, "asked");
+    if (ctx.cliRefused) return recordPaused(ctx, lane, "cli_version");
+    if (runBudgetSpent(ctx)) return recordPaused(ctx, lane, "run_budget");
+    takeAsks(ctx);
+    selfResume(ctx, lane);
     const pick = pickNext(ctx, lane);
     if (pick.plan) {
       const rec = ctx.state.plans[pick.plan];
       if (!laneOpen(rec) && openWorktreeCount(ctx.state) >= ctx.local.max_open_worktrees) {
-        // The cap is the disk bound (ADR-0205), so the lane stops rather than waiting; the stop is a
-        // fact in the run record, for the digest and the run's output.
         const holding = Object.values(ctx.state.plans)
           .filter(laneOpen)
           .map((r) => r.plan)
           .sort();
+        // The cap is the disk bound (ADR-0205). A slot can free up while a holder is in flight in
+        // this run, so the lane waits for it; a resident run waits whatever holds the slots, since a
+        // parked holder may resume itself or be removed by hand. Otherwise the lane stops, and the
+        // stop is a fact in the run record, for the digest and the run's output.
+        const inFlight = holding.some((plan) => Object.values(ctx.state.lanes).some((l) => l?.plan === plan));
+        if (resident || inFlight) {
+          const cap = { plan: pick.plan, holding, max: ctx.local.max_open_worktrees };
+          if (setLane(ctx, lane, { cap })) event(ctx, "worktree-wait", { lane, ...cap });
+          await sleep(inFlight ? (ctx.pollMs ?? 5000) : idlePoll);
+          refreshQueue(ctx);
+          continue;
+        }
         const stop = { lane, reason: "worktree_cap", plan: pick.plan, holding, max: ctx.local.max_open_worktrees, at: now() };
         ctx.run.stops ??= [];
         ctx.run.stops.push(stop);
@@ -335,13 +505,22 @@ async function laneLoop(ctx, lane) {
       await sleep(ctx.pollMs ?? 5000);
       continue;
     }
+    if (resident) {
+      if (setLane(ctx, lane, { watching: true })) event(ctx, "idle", { lane });
+      ctx.onIdleLook?.(lane);
+      await sleep(idlePoll);
+      refreshQueue(ctx);
+      continue;
+    }
     return recordNotStarted(ctx, lane, "stopped");
   }
 }
 
-function park(ctx, rec, { reason, detail, phase = null, read = null }) {
+function park(ctx, rec, { reason, detail, phase = null, read = null, resetsAt = null }) {
   rec.status = "parked";
   rec.park = { reason, detail, phase, read, worktree: rec.worktree, at: now() };
+  // The reset a usage limit reported, which is what lets the park clear itself once it passes.
+  if (reason === USAGE_LIMIT && typeof resetsAt === "number") rec.park.resetsAt = resetsAt;
   // No session is trusted to have left the tree clean. The paths are recorded and never reverted:
   // they may be the evidence the owner needs.
   const dirty = dirtyWorktree(rec.worktree);
@@ -360,7 +539,30 @@ function planFileIn(cwd, plan) {
   return found ? { ...found, rel: relative(cwd, found.path).replace(/\\/g, "/") } : null;
 }
 
+/**
+ * Reads `claude --version` again before a session (ADR-0250): an update installed while a resident
+ * run is up would otherwise run sessions on a version the run never judged. Returns a park result for
+ * a refused version, and records it so the run pauses; a patch above a verified one runs with its
+ * warning, printed once per version.
+ */
+function cliRefusal(ctx, rec) {
+  const verdict = ctx.checkCli?.();
+  if (!verdict) return null;
+  if (verdict.error) {
+    ctx.cliRefused = verdict.error;
+    return { status: "parked", reason: CLI_CONTRACT, detail: `no session started, and the run pauses: ${verdict.error}` };
+  }
+  if (verdict.version && ctx.run.cli?.version !== verdict.version) {
+    ctx.run.cli = { version: verdict.version, warning: verdict.warning ?? null };
+    if (verdict.warning) live(ctx, rec.plan, `  lane   warning: ${verdict.warning}`);
+    save(ctx);
+  }
+  return null;
+}
+
 async function session(ctx, rec, kind, { owner, prompt, vars, budget, addDirs = [], info = {} }) {
+  const refused = cliRefusal(ctx, rec);
+  if (refused) return refused;
   const paths = statePaths(ctx.stateDir);
   const label = `${rec.plan}-${String(rec.steps.length + 1).padStart(2, "0")}-${kind}`;
   const appendPromptFile = renderPromptFile(join(ctx.promptsDir, `${kind}.md`), vars, join(paths.prompts, `${label}.md`));
@@ -502,6 +704,7 @@ export async function runPlan(ctx, lane, plan) {
   rec.park = null;
   rec.started ??= now();
   rec.ended = null;
+  ctx.state.lanes[lane] = { plan, step: null };
   save(ctx);
   const budgets = ctx.local.budget_usd;
   const paths = statePaths(ctx.stateDir);
@@ -583,7 +786,7 @@ export async function runPlan(ctx, lane, plan) {
         info: { phases: next.phases },
       });
       if (r.status === "parked") {
-        return park(ctx, rec, { reason: r.reason, detail: r.detail, phase: r.outcome?.phase ?? null, read: r.transcript });
+        return park(ctx, rec, { reason: r.reason, detail: r.detail, phase: r.outcome?.phase ?? null, read: r.transcript, resetsAt: r.resetsAt });
       }
       const problems = verifyImplement({ cwd: wt, plan, phases: next.phases, before, outcome: r.outcome });
       if (problems.length) {
@@ -615,7 +818,7 @@ export async function runPlan(ctx, lane, plan) {
       });
       if (r.status === "parked") {
         lock.release();
-        return park(ctx, rec, { reason: r.reason, detail: r.detail, read: r.transcript });
+        return park(ctx, rec, { reason: r.reason, detail: r.detail, read: r.transcript, resetsAt: r.resetsAt });
       }
       const o = r.outcome;
       if (o.kind === "verdict") {
@@ -643,7 +846,7 @@ export async function runPlan(ctx, lane, plan) {
           addDirs: [paths.reviews],
           info: { round },
         });
-        if (f.status === "parked") return park(ctx, rec, { reason: f.reason, detail: f.detail, read: f.transcript });
+        if (f.status === "parked") return park(ctx, rec, { reason: f.reason, detail: f.detail, read: f.transcript, resetsAt: f.resetsAt });
         const problems = verifyFix({ cwd: wt, before, outcome: f.outcome, findingCount: o.findings.length });
         if (problems.length) {
           return park(ctx, rec, { reason: "disagreement", detail: `fix round ${round}: ${problems.join("; ")}`, read: f.transcript });

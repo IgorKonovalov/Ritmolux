@@ -338,8 +338,12 @@ function nowSection(view) {
   const lanes = view.latest.lanes?.length ? view.latest.lanes : Object.keys(view.laneStates).sort();
   for (const lane of lanes) {
     const l = view.laneStates[lane];
+    if (l?.cap) {
+      out.push(`- lane ${lane}: waiting at the worktree cap (\`max_open_worktrees\` ${l.cap.max}) to start ${l.cap.plan}; the slots are held by ${l.cap.holding.join(", ")}.`);
+      continue;
+    }
     if (!l?.plan) {
-      out.push(`- lane ${lane}: idle.`);
+      out.push(l?.watching ? `- lane ${lane}: idle, watching the queue.` : `- lane ${lane}: idle.`);
       continue;
     }
     const rec = view.plans.find((r) => r.plan === l.plan);

@@ -1,6 +1,6 @@
 # 0226 — The conductor stops waiting for the owner
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-24
 > **Approved:** 2026-09-24 (user). Human-started, not queued; settle 0217 before starting.
 > **Owner skill(s):** dev, human
@@ -331,11 +331,11 @@ behaviour, never at the end.
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(not started)_
+**Lane:** `plan-0226-the-conductor-stops-waiting-for-the-owner` in `WORK/rlx-plan-0226`, human-started
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The run stays up, waits at the cap, and resumes what the tree settled | dev | not started | |
+| 1 — The run stays up, waits at the cap, and resumes what the tree settled | dev | committed with this row | |
 | 2 — A human phase can be owed after the merge | dev | not started | |
 | 3 — The lane merges main early, and a conflict gets a merge session | dev | not started | |
 | 4 — A red gate gets one repair session | dev | not started | |
@@ -344,6 +344,17 @@ behaviour, never at the end.
 | 7 — The pilot: one resident run over the real queue | human | not started | |
 
 ### Notes
+
+- Phase 1: "re-reads the state" is carried by `resume` itself. While a run is live, `resume` checks the
+  park and appends to `state/resume-asks.jsonl`, and the lane takes it on its next look
+  (`lib/state.mjs` `askResume`/`takeResumeAsks`). The run still owns `conductor.json`. `park` and
+  `finding --verb` are still refused during a live run.
+- Phase 1: a CLI version refused between sessions parks the plan about to start `cli_contract`, with
+  no session. It also pauses the run (`run.paused.reason: cli_version`).
+- Phase 1: under `--until-idle` the cap waits only while a holder is in flight in the run. With every
+  holder parked it still stops, which is why the existing cap tests are unchanged.
+- Phase 1: `test/live.test.mjs` is outside the phase's files. Its `local.json` fixture gained
+  `run_budget_usd`, and nothing else changed.
 
 ### Close triggers
 
