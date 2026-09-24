@@ -340,7 +340,7 @@ behaviour, never at the end.
 | 3 — The lane merges main early, and a conflict gets a merge session | dev | done | `56061b8b` |
 | 4 — A red gate gets one repair session | dev | done | `8f363852` |
 | 5 — The close is its own session, holds the lock alone, and keeps a clean verdict | dev | done | `362d0f02` |
-| 6 — A readiness check reads the plan before any spend | dev | committed with this row | |
+| 6 — A readiness check reads the plan before any spend | dev | done | `0bec06ee` |
 | 7 — The pilot: one resident run over the real queue | human | not started | |
 
 ### Notes
@@ -387,15 +387,23 @@ behaviour, never at the end.
   scenarios gained `readiness:architect` first, which shifted their step indexes and labels
   (`0101-02-implement`, `0101-04-close`) and the budget scenario's lane spend ($7.50 to $7.80).
   `test/live.test.mjs`, outside the phase's files, got the same label shift.
+- Followup: `local.json` on this machine lacks `run_budget_usd` and the four new `budget_usd` keys, so
+  `check` and `run` refuse it after the merge until Phase 7's first step is done.
+- Followup: a resident run is live almost always, and `park NNNN` and `finding NNNN <ref> --verb`
+  are still refused while a run is live. Only `resume` got an ask file.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no
+- **Plan header `Closes:`** none
+- **What shipped:** feature (conductor tooling; no Rust, C++ or studio code)
+- **Operator docs touched:** `tools/conductor/README.md`; skill material `.claude/skills/architect/SKILL.md`,
+  `.claude/skills/architect/references/templates/plan.md`, `.claude/skills/dev/SKILL.md`,
+  `.claude/skills/studio-builder/SKILL.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0
+- **Full suite:** `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace` in the
+  lane at `0bec06ee`, exit 0: 1805 run, 1805 passed, 7 skipped. Conductor suite
+  `node --test "tools/conductor/test/*.test.mjs"`: 423 pass, 0 fail, 2 skipped.
+- **Outstanding `human` phases:** Phase 7 (the pilot)
 
 ## Followups (after this lands)
