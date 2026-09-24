@@ -1,18 +1,20 @@
 # 0227 — The gated paths get their jobs, and a red upstream stops the close
 
-> **Status:** in-progress
+> **Status:** done - Phases 6 and 7 owed, ADR-0249. Phases 1-5 `646ca642`, `1e7e4857`,
+> `1fc58a95`, `0c0ac09b`, `417022b7`; round 1 major fixed in `f1bbf1b1`. Round 2 review: no
+> blockers, no majors, two minors (both fixed at the close). ADR-0251 accepted. Version 0.148.0.
 > **Created:** 2026-09-24
 > **Approved:** 2026-09-24 (user) — queued in lane a. Phase 1 unblocks the macOS release
 > artifacts, which have been absent since v0.146.1.
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0251](../adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)
-> (proposed), [0181](../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md),
-> [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
-> [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
-> [0203](../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md),
-> [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
-> [0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md),
-> [0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)
+> **Related ADRs:** [0251](../../adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)
+> (proposed), [0181](../../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md),
+> [0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md),
+> [0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
+> [0203](../../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md),
+> [0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
+> [0210](../../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md),
+> [0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)
 > **Closes:** none
 
 ## TL;DR
@@ -41,10 +43,10 @@ Measured 2026-09-24:
 **Coverage is not the gap.** macOS is in the `check` matrix and reported this on every push.
 **Consequence is the gap** — and `release.yml`'s `needs:` meant the only visible symptom was two
 artifacts that never appeared, which is exactly what
-[ADR-0181](../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) recorded for `v0.112.0`. Second
+[ADR-0181](../../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) recorded for `v0.112.0`. Second
 instance, same class.
 
-[ADR-0251](../adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)
+[ADR-0251](../../adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)
 decides both halves and records the four rejected alternatives.
 
 ## Decision
@@ -94,11 +96,11 @@ flowchart LR
     run" and gets it wrong.
   - **Every unreadable case prints a notice and exits 0**: no network, `gh` absent, `gh`
     unauthenticated, no `origin` remote. The notice is in
-    [ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md)'s shape and says which case it hit. Green
+    [ADR-0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md)'s shape and says which case it hit. Green
     and not-read are never spelled the same way in the output.
   - It is **not** added to `scripts/gates.manifest.mjs`, `.githooks/pre-push` or the CI `links` job:
     it needs the network and its answer changes without a commit, which is why
-    [ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) keeps
+    [ADR-0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) keeps
     `cargo deny` out of the hook. `node scripts/check-gate-carriers.mjs` stays green.
 
 ### Phase 3 — The close reports it and never blocks on it
@@ -106,7 +108,7 @@ flowchart LR
 - **What:** the conductor's close runs Phase 2's script before it merges and **records the reading**.
   **Amended 2026-09-24, mid-flight**: the first version of this phase parked the plan on red and was
   implemented that way in `f0a5eee1`. That is withdrawn — see
-  [ADR-0251](../adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)
+  [ADR-0251](../../adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)
   Alternative E. **The conductor never pushes**, so `origin/main` advances only by hand: a refusal
   would make every close wait on a step the pipeline cannot take, and local merges run ahead of
   `origin`, so the ref describes an older tree than the one being closed.
@@ -159,9 +161,9 @@ flowchart LR
 - **Done when:** the close-ceremony section names `node scripts/check-upstream-ci.mjs`, says it runs
   **before** the merge, and says what a red and an unreadable result each mean. A headless session
   cannot write under `.claude/` whatever the allowlist says
-  ([ADR-0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)),
+  ([ADR-0210](../../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)),
   which is why this phase is `human`; it is marked non-blocking per
-  [ADR-0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md) because the conductor's own
+  [ADR-0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md) because the conductor's own
   close already carries the behaviour from Phase 3.
 
 ### Phase 7 — The reading that only a push can produce
@@ -260,6 +262,101 @@ flowchart LR
   across 21 live entries, 4 unprobeable, and 30 advisory moved-path rows
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
 - **Outstanding `human` phases:** 6 and 7, both `Blocks merge: no`
+
+## Close review
+
+> Conductor-run close, 2026-09-24. **Owed (ADR-0249):** Phases 6 and 7 are merged without and still
+> `owed`. Nothing has yet verified that `check (macos-latest)` is green (Phase 1 is compiled by no
+> local target), that the next `Release` run publishes all six artifacts, or that the human-started
+> close ceremony in `.claude/skills/architect/SKILL.md` carries the upstream read. Round 1's Lens 3
+> names the replacement text for Phase 6.
+
+### Round 2 review (graded at `0c277814`)
+
+**Verdict:** Plan 0227 is ready to close. Round 1's major is fixed in `f1bbf1b1`, and nothing else
+moved except one log line (`0c277814`). There are **no blockers and no majors**. The two minors
+from round 1 remain in the plan's own prose. Both are Markdown, so the close can repair them
+under ADR-0209.
+
+#### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed the
+  ledger record instead of re-running:
+  `with-lock: skipped cargo nextest run --workspace: tree 59b94d5 is green in the suite ledger, run by gate 0227-fix-1 at 2026-09-24T10:05:07.819Z: 1805 tests run: 1805 passed (6 slow), 7 skipped`.
+  That record is this review's full-suite evidence (ADR-0207).
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` is clean.
+- `node --test tools/conductor/test/` ran 429 tests: 427 passed, 0 failed, 2 skipped.
+- `node scripts/check-upstream-ci.mjs --self-test` passed 13 of 13.
+- `check-doc-links.mjs`, `check-comment-hygiene.mjs`, `check-gate-carriers.mjs` (17/17 hook,
+  17/17 ci) and `toc.mjs --check` all report OK. The working tree is clean.
+
+#### Round 1 findings
+
+- **Finding 1 (major), resolved in `f1bbf1b1`.** The third line of the red text at
+  `scripts/check-upstream-ci.mjs:164` now reads `A close reports this and still merges (ADR-0251):
+  repair ${BRANCH} and push; the digest line clears when a later close reads it green.`
+  `redSubject`'s doc comment (line 175) now reads "a live line or the digest". Both match the
+  replacement text round 1 named. `git grep -i refuse` over the script, the three documents,
+  `tools/conductor/README.md` and `lane.mjs`/`digest.mjs` finds no wording left over from the
+  upstream refusal. Every hit belongs to an unrelated rule.
+- **Findings 2 and 3 (minor)** remain unchanged. The log records that they were deliberately left,
+  because they lie outside the log. They are carried forward below.
+
+#### Lenses 1–5
+
+Round 1's reading holds. The only code change since that round is the text of one output string and
+one doc comment. It does not affect the self-test's assertions, which check `upstream CI: RED` and
+the job name, not the closing sentence. Phase alignment, owner tags (Phases 6 and 7 are `human`,
+`Blocks merge: no`, and `owed`), layering, correctness and design integrity are as graded in round
+1. No new numeric assertion was added, and nothing under `core/`, the C ABI or the control protocol
+changed.
+
+#### Owed at the close (bookkeeping)
+
+- ADR-0251 goes `proposed → accepted`.
+- **Version bump: minor.** This is a feature plan: a script, a conductor behaviour and a CI job.
+- Phases 6 and 7 are owed (ADR-0249). The `Status:` line, the `## Close review` and the index bullet
+  must name them. The close review must say that `check (macos-latest)` being green, all six release
+  artifacts, and the human-ceremony read are all still unverified. Round 1's Lens 3 carries the
+  suggested SKILL.md text for Phase 6's owner.
+
+#### Findings
+
+##### minor
+
+1. **This plan's line 64: the Decision flowchart still routes red to `park / refuse, naming the
+   job`.** Phase 3's amendment withdrew that behaviour. **Fix:** relabel the node
+   `report and merge,<br/>Needs you line naming the job` and point its edge at `merge`. This is
+   Markdown, so the close can repair it. **Fixed at the close in `67681698`.**
+2. **This plan's lines 265-267: the Followups are stale.** The first proposes a digest row
+   "alongside the refusal", but that row shipped in Phase 3 and there is no refusal. The second asks
+   whether "the refusal" should be per-platform. **Fix:** delete the first. Rewrite the second as
+   "Whether the digest should escalate a reading that stays red across several closes (Risks, first
+   bullet)", or delete it. This is Markdown, so the close can repair it. **Fixed at the close in
+   `67681698`.**
+
+No blockers. No majors. No nits.
+
+### Earlier rounds
+
+- Round 1, finding 1 (major, `scripts/check-upstream-ci.mjs:164`, the red output still stated the
+  withdrawn refusal): resolved in fix round 1, `f1bbf1b1`.
+
+### Close notes
+
+- `check-backlog-claims.mjs`: OK, 46 reductions across 21 live entries, 4 unprobeable, 30 advisory
+  moved-path rows, none on a path this plan touched. `check-index-rows.mjs`, `check-doc-links.mjs`
+  and `toc.mjs` clean after the bookkeeping.
+- Translation advisory: `docs/how-it-works.ru.md`, `docs/running.ru.md` and
+  `packaging/foobar/READ-ME-FIRST.ru.md` have sources past their stamps; this plan moved none of
+  those sources.
+- `presets/` untouched, so no curation sweep. No backlog entry closed.
+- Phase 6 replacement text, for the owner (round 1, Lens 3), as a new step before "Merge `main` into
+  the plan branch": *"Read `origin/main`'s CI — `node scripts/check-upstream-ci.mjs`, before the
+  merge. Exit 0 with `upstream CI: OK` is green. Exit 1 with `upstream CI: RED` names the failing
+  jobs: close anyway, and put the repair of `main` in the close notes, because the close never blocks
+  on it (ADR-0251). `upstream CI: skipped: not read (<case>)` means nothing was checked; say so in the
+  close notes."*
 
 ## Followups (after this lands)
 

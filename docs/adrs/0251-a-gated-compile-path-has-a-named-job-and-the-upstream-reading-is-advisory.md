@@ -1,8 +1,8 @@
 # ADR-0251 — A gated compile path has a named job, and the upstream reading is advisory
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-24 (Plan 0227 close)
 > **Date:** 2026-09-24
-> **Related plan(s):** [0227](../plans/0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close.md)
+> **Related plan(s):** [0227](../plans/done/0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close.md)
 
 > **Amended 2026-09-24, before acceptance — the upstream read is ADVISORY, never a refusal.** The
 > Decision below originally parked a close over a red `origin/main`. That is withdrawn. **The
