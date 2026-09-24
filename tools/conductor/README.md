@@ -3,8 +3,9 @@
 A Node program that takes approved plans off a queue and runs them to a merged `main` with no owner
 action in between, in up to two git worktree lanes. For each plan it opens a lane, starts one fresh
 headless `claude -p` session per contiguous same-owner run of phases, checks each session's claim
-against `git`, runs its own gate, starts a fresh headless `architect` session that reviews and closes
-the plan on the branch, fast-forwards `main`, and removes the lane.
+against `git`, merges `main` into the lane and runs its own gate, starts a fresh headless `architect`
+session that reviews the plan and a second one that closes it on the branch, fast-forwards `main`, and
+removes the lane.
 
 **It never pushes.** Everything it does stays on this machine until you read what happened and push.
 
@@ -27,7 +28,7 @@ The decision and its rejected alternatives are ADR-0205. The plan that built it 
    spend.
 
    ```json
-   { "budget_usd": { "implement": 8, "fix": 4, "review": 6, "merge": 3, "repair": 4 }, "run_budget_usd": 150, "max_open_worktrees": 3 }
+   { "budget_usd": { "implement": 8, "fix": 4, "review": 6, "close": 5, "merge": 3, "repair": 4 }, "run_budget_usd": 150, "max_open_worktrees": 3 }
    ```
 
    `run_budget_usd` is the ceiling on one run's total spend. A resident run spends while nobody is
@@ -287,7 +288,17 @@ repository's common git directory, whichever worktree it was invoked from. A rep
 checkout cannot be derived — a bare clone, or a `.git` relocated away from its tree — records beside
 the invoked script as before, and says so in one line on stderr.
 
-**A close that landed without an outcome is adopted, never reviewed a second time.** A review session
+**The review and the close are two sessions, and a clean verdict outlives a park** (ADR-0248). The
+review ends on its verdict and commits nothing, with no lock held, so two lanes' reviews run at once.
+A clean verdict is recorded with the tip it graded; the conductor then takes the close lock and starts
+the close, handed the review's path. A close that parks — a red gate, a wrong plan — keeps that
+verdict: `resume` starts a close again, not a review, as long as every commit the lane gained since the
+graded tip is a merge of `main` or a commit a close, merge or repair session made. **Any other commit,
+your own hand fix included, runs a fresh review round**, because nothing has reviewed it. A close that
+meets a conflict in code parks it back to the conductor, which runs a merge session and starts the
+close again. The close's budget is `budget_usd.close`, required.
+
+**A close that landed without an outcome is adopted, never closed a second time.** A close session
 commits its repairs, its `done/` move, its version bump and its tag before it prints anything, so a
 session that dies after that leaves the branch closed and the record open. Before a run reviews
 anything it asks the **branch**: a plan under `done/` with `Status: done` and a `## Close review` is a
@@ -411,8 +422,9 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   served step's own line naming the tier and the tree it leaned on, and the history's Totals counts
   served runs apart from full ones.
 - **The locks.** `with-lock.mjs` holds two machine-wide locks. The **suite** lock stops two lanes
-  running the GPU suites at once. The **close** lock runs from before a review until `main` has
+  running the GPU suites at once. The **close** lock runs from before the close session until `main` has
   fast-forwarded, so a version bump and its tag always land on the `main` they were computed against.
+  It is never held over a review (ADR-0248).
 - **The checks.** The conductor believes the repository, not the session. A claimed commit must
   exist and be new, the plan's log rows must match, the tree must be clean, and a close must leave
   the plan under `done/` with a `## Close review` and an annotated tag on the branch tip. A finding

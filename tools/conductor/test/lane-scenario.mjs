@@ -27,9 +27,13 @@
 // branch. `ledgerFlow` makes the review run its full suite through the wrapper before closing, and the
 // close run the gate's suite through it after the bump and before the tag.
 //
-// `loseOutcome` names a mode whose session does all of its work and then prints no outcome block, as
+// `loseOutcome: "close"` makes the close session do all of its work and then print no outcome block, as
 // 0175's round-1 review did: it committed its repairs, its `done/` move, its bump and its tag, then
 // backgrounded the suite and ended its turn. `dirtyClose` leaves an untracked file behind with it.
+//
+// A `review` session ends on its verdict and commits nothing, unless `reviewCommits`. A clean verdict
+// is closed by a `close` session, which parks `merge_conflict` when main does not merge, and
+// `closeParksOnce` makes the plan's first close park `check_red` after its merge.
 //
 // `phaseDelayMs` makes every phase after the first wait that long before it commits, so the run
 // terminal's phase lines carry durations that differ.
@@ -184,11 +188,9 @@ export default async ({ args, cwd, vars, env }) => {
       return { text: block({ kind: "fixed", plan, round, commits: [sha], resolved: [{ finding: 0, commit: sha }] }), costUsd: 0.5 };
     }
 
-    if (mode === "review") {
-      const round = Number(vars.round);
-      const reviewPath = vars["review-path"];
-      const kind = ps.reviews?.[round - 1] ?? "clean";
-      mkdirSync(join(reviewPath, ".."), { recursive: true });
+    // The findings a round carries, the same whichever session asks: the review reports them, and
+    // the close that follows reads the same review and marks what it repaired.
+    const findingsFor = (round, kind) => {
       const findings =
         kind === "clean"
           ? Array.from({ length: ps.minors ?? 0 }, (_, i) => ({ severity: "minor", file: `phase-${plan}-1.txt`, line: i + 1, what: `minor finding ${i + 1}` }))
@@ -199,19 +201,40 @@ export default async ({ args, cwd, vars, env }) => {
           { severity: "minor", file: `phase-${plan}-1.txt`, line: 2, what: "a duplicated constant, left open" },
         );
       }
+      return findings;
+    };
+    const verdictOf = (round, reviewPath, findings) => ({
+      round,
+      blockers: findings.filter((f) => f.severity === "blocker").length,
+      majors: findings.filter((f) => f.severity === "major").length,
+      minors: findings.filter((f) => f.severity === "minor").length,
+      review_path: reviewPath,
+      findings,
+    });
+
+    if (mode === "review") {
+      const round = Number(vars.round);
+      const reviewPath = vars["review-path"];
+      const kind = ps.reviews?.[round - 1] ?? "clean";
+      mkdirSync(join(reviewPath, ".."), { recursive: true });
+      const findings = findingsFor(round, kind);
       // Mode 4's full suite, through the wrapper as the architect skill's conductor mode says.
       if (ps.ledgerFlow) await suite();
       writeFileSync(reviewPath, `# Review of ${plan}, round ${round}\n\n${findings.map((f) => `- ${f.severity}: ${f.what}`).join("\n")}\n`);
-      const verdict = {
-        round,
-        blockers: findings.filter((f) => f.severity === "blocker").length,
-        majors: findings.filter((f) => f.severity === "major").length,
-        minors: findings.filter((f) => f.severity === "minor").length,
-        review_path: reviewPath,
-        findings,
-      };
-      if (kind !== "clean") return { text: block({ kind: "verdict", plan, ...verdict }), costUsd: 2 };
+      if (ps.reviewCommits) {
+        writeFileSync(join(cwd, "review-notes.txt"), "a review that commits\n");
+        git("add", "review-notes.txt");
+        git("commit", "-q", "-m", "docs: a review that commits");
+      }
+      return { text: block({ kind: "verdict", plan, ...verdictOf(round, reviewPath, findings) }), costUsd: 2 };
+    }
 
+    if (mode === "close") {
+      const round = Number(vars.round);
+      const reviewPath = vars["review-path"];
+      const findings = findingsFor(round, "clean");
+      const verdict = verdictOf(round, reviewPath, findings);
+      const eventsSoFar = readFileSync(env.FAKE_EVENTS, "utf8").split("\n").filter((l) => l.includes(`"plan":"${plan}"`) && l.includes('"close-start"')).length;
       // The close's order: repairs, merge main, bookkeeping and bump, the whole gate, the tag.
       if (ps.closeRepair) {
         const repaired = findings.find((f) => f.what === "a comment the plan made false");
@@ -225,7 +248,16 @@ export default async ({ args, cwd, vars, env }) => {
           repaired.fixed_in = git("rev-parse", "--short=7", "HEAD");
         }
       }
-      git("merge", "-q", "--no-edit", "main");
+      try {
+        git("merge", "-q", "--no-edit", "main");
+      } catch {
+        // A code conflict is not the close's to resolve (ADR-0248): abort and hand it back.
+        git("merge", "--abort");
+        return { text: block({ kind: "parked", plan, reason: "merge_conflict", detail: "main conflicts in code" }), costUsd: 1 };
+      }
+      if (ps.closeParksOnce && eventsSoFar <= 1) {
+        return { text: block({ kind: "parked", plan, reason: "check_red", detail: `${ps.closeParksOnce} red at the close` }), costUsd: 1 };
+      }
       mkdirSync(join(plansDir, "done"), { recursive: true });
       git("mv", `docs/plans/${planName}`, `docs/plans/done/${planName}`);
       const donePath = join(plansDir, "done", planName);
@@ -255,7 +287,7 @@ export default async ({ args, cwd, vars, env }) => {
       if (ps.ledgerFlow) await suite();
       if (ps.lightweightTag) git("tag", `v${version}`);
       else git("tag", "-a", `v${version}`, "-m", `chore: Release v${version}`);
-      if (ps.loseOutcome === "review") {
+      if (ps.loseOutcome === "close") {
         if (ps.dirtyClose) writeFileSync(join(cwd, "suite-output.log"), "still compiling\n");
         return { text: "Still compiling; I'll be notified when the suite exits.", costUsd: 3 };
       }

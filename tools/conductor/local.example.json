@@ -1,5 +1,5 @@
 {
-  "budget_usd": { "implement": 0, "fix": 0, "review": 0, "merge": 0, "repair": 0 },
+  "budget_usd": { "implement": 0, "fix": 0, "review": 0, "close": 0, "merge": 0, "repair": 0 },
   "run_budget_usd": 0,
   "max_open_worktrees": 3
 }

@@ -6,10 +6,11 @@
 //   -> a `human` phase parks, unless it is marked `Blocks merge: no`, when its row is committed
 //      `owed` and the plan runs on without it (ADR-0249)
 //   -> merge main into the lane, a conflict handed to one merge session (ADR-0248)
-//   -> conductor gate -> take the close lock -> review session
+//   -> conductor gate -> review session, no lock held, ending on a verdict
 //      (every gate red gets one repair session and one re-run before it parks `gate_red`, ADR-0248)
-//   -> blockers/majors: release the lock, fix session, verify, gate, re-review (two fix rounds max)
-//   -> closed: verify the close -> gate the close tip -> fast-forward main (one automatic re-merge)
+//   -> blockers/majors: fix session, verify, gate, re-review (two fix rounds max)
+//   -> clean: take the close lock -> close session -> verify the close -> gate the close tip
+//      -> fast-forward main (one automatic re-merge)
 //   -> release the lock
 //   -> remove the lane.
 //
@@ -29,7 +30,7 @@ import { join, relative } from "node:path";
 import { adoptedClose, verifyClose, verifyFix, verifyImplement, verifyMerge, verifyRepair } from "./close.mjs";
 import { removeLane, laneNames, openLane } from "./cleanup.mjs";
 import { AFTER_CLOSE_STAGES, defaultGate, gateForStage, runGate } from "./gate.mjs";
-import { currentBranch, git, head, isClean, resolveCommit } from "./git.mjs";
+import { currentBranch, git, head, isAncestor, isClean, resolveCommit } from "./git.mjs";
 import { appendCleanupFailure, appendPark, appendSelfResume, dirtyText, dirtyWorktree } from "./inbox.mjs";
 import { servedNotice } from "./ledger.mjs";
 import {
@@ -45,13 +46,16 @@ import { CLOSE, take } from "./locks.mjs";
 import { fastForwardMain, mergeMainInto } from "./merge.mjs";
 import { CLAUDE_DIR, CLI_CONTRACT, STUDIO_INSTALL } from "./outcome.mjs";
 import { donePhases, findPlan, nextStep, rangeLabel, readPlanFile } from "./plan.mjs";
-import { clearPark, endStep, planRecord, saveState, spendSince, startStep, statePaths, takeResumeAsks } from "./state.mjs";
+import { adoptClose, clearPark, endStep, planRecord, saveState, spendSince, startStep, statePaths, takeResumeAsks } from "./state.mjs";
 import { USAGE_LIMIT, renderPromptFile, runStep } from "./step.mjs";
 
 export const MAX_FIX_ROUNDS = 2;
 
 /** Repair sessions one plan may run in all; a red after that parks with no session (ADR-0248). */
 export const MAX_REPAIRS = 3;
+
+/** Close restarts one runPlan call makes after a close parks a conflict back to the conductor. */
+export const MAX_CLOSE_MERGES = 2;
 
 // A session the usage limit ends is continued once the window reopens, rather than parked. A reset
 // further off than MAX_USAGE_WAIT_MS (the seven-day window's) parks `usage_limit` instead, as does a
@@ -602,6 +606,7 @@ async function mergeSession(ctx, rec, { where, paths }) {
   if (problems.length) return { reason: "disagreement", detail: `merge session at ${where}: ${problems.join("; ")}`, read: r.transcript };
   const commit = resolveCommit(r.outcome.commit, wt);
   (rec.merges ??= []).push({ where, paths, commit, main: mainTip, session: true, at: now() });
+  recordSessionCommits(rec, "merge", commitsFirstParent(before, wt));
   save(ctx);
   return null;
 }
@@ -808,10 +813,44 @@ async function gateOrRepair(ctx, rec, stage) {
   // A repair on a tip a close produced reaches main without a review; the digest names it by SHA.
   repairs.push({ stage, commits: r.outcome.commits.map((c) => resolveCommit(c, wt)), unreviewed: AFTER_CLOSE_STAGES.has(stage), at: now() });
   rec.repairs = repairs;
+  recordSessionCommits(rec, "repair", commitsFirstParent(before, wt));
   save(ctx);
   const g2 = await gate(ctx, rec, stage, { logSuffix: `-after-repair-${repairs.length}` });
   if (g2.ok) return { g: g2 };
   return { g: g2, park: { reason: "gate_red", detail: `${gateDetail(g2)}; still red after one repair session at ${stage}`, read: g2.failed.log } };
+}
+
+/** The commits `before..HEAD` along the lane's first-parent chain, oldest first: what the lane made. */
+function commitsFirstParent(before, wt) {
+  const r = git(["rev-list", "--reverse", "--first-parent", `${before}..HEAD`], wt);
+  return r.code === 0 && r.stdout ? r.stdout.split("\n") : [];
+}
+
+/** Records commits a close, merge or repair session made, which a clean verdict may be reused over. */
+function recordSessionCommits(rec, kind, shas) {
+  rec.sessionCommits ??= [];
+  for (const sha of shas) rec.sessionCommits.push({ sha, kind });
+}
+
+/**
+ * The last verdict, when it is clean and still grades the lane (ADR-0248): every commit on the lane's
+ * first-parent chain after the tip it graded is a merge whose second parent is on `main`, or a commit
+ * the record says a close, merge or repair session made. Anything else — an owner's hand fix, most of
+ * all — is new code nothing has reviewed, and the caller runs a fresh round. Null otherwise.
+ */
+export function reusableVerdict(rec) {
+  const v = rec.verdicts.at(-1);
+  if (!v || v.blockers > 0 || v.majors > 0 || !v.graded) return null;
+  const wt = rec.worktree;
+  if (!isAncestor(v.graded, "HEAD", wt)) return null;
+  const known = new Set((rec.sessionCommits ?? []).map((c) => c.sha));
+  for (const sha of commitsFirstParent(v.graded, wt)) {
+    if (known.has(sha)) continue;
+    const parents = git(["rev-list", "--parents", "-n", "1", sha], wt).stdout.split(" ").slice(1);
+    if (parents.length === 2 && isAncestor(parents[1], "main", wt)) continue;
+    return null;
+  }
+  return v;
 }
 
 function gateDetail(g) {
@@ -882,8 +921,7 @@ export async function runPlan(ctx, lane, plan) {
       if (problems.length) {
         return park(ctx, rec, { reason: "disagreement", detail: `close found on the branch: ${problems.join("; ")}`, read: adopted.verdict.review_path });
       }
-      rec.verdicts.push({ ...adopted.verdict });
-      rec.closed = { version: adopted.version, tag: adopted.tag, head: head(wt), at: now(), adopted: true };
+      adoptClose(rec, adopted, head(wt));
       event(ctx, "closed", { plan, tag: adopted.tag });
       save(ctx);
     }
@@ -947,86 +985,114 @@ export async function runPlan(ctx, lane, plan) {
     const pre = await gateOrRepair(ctx, rec, "pre-review");
     if (pre.park) return park(ctx, rec, pre.park);
 
+    // Review rounds, with no lock held: a review ends on a verdict, and blockers or majors go to a fix
+    // round. A clean verdict the record still holds from before a close-time park is reused, unless
+    // the lane gained a commit nothing has reviewed since (ADR-0248).
     for (;;) {
-      const lock = await take(CLOSE, {
-        dir: ctx.lockDir,
-        pollMs: ctx.lockPollMs,
-        what: `review ${plan}`,
-        onWaited: (ms) => recordWait(rec, CLOSE, ms),
-      });
+      if (reusableVerdict(rec)) break;
       const round = rec.verdicts.length + 1;
       const file = planFileIn(wt, plan);
       const reviewPath = join(paths.reviews, `${plan}-round-${round}.md`);
+      const graded = head(wt);
       event(ctx, "review-start", { plan, round });
       const r = await session(ctx, rec, "review", {
         owner: "architect",
-        prompt: `/architect conductor review plan ${plan} round ${round} at ${head(wt)}`,
-        vars: { ...common, plan_file: file.rel, round, review_path: reviewPath, prior_rounds: priorRounds(rec) },
+        prompt: `/architect conductor review plan ${plan} round ${round} at ${graded}`,
+        vars: { ...common, plan_file: file.rel, round, review_path: reviewPath, prior_rounds: priorRounds(rec), tip: graded },
         budget: budgets.review,
         addDirs: [paths.reviews],
         info: { round },
       });
+      if (r.status === "parked") return park(ctx, rec, { reason: r.reason, detail: r.detail, read: r.transcript, resetsAt: r.resetsAt });
+      const o = r.outcome;
+      if (o.kind !== "verdict") return park(ctx, rec, { reason: "disagreement", detail: `review returned a ${o.kind} outcome; a review ends on its verdict`, read: r.transcript });
+      if (head(wt) !== graded || !isClean(wt)) {
+        return park(ctx, rec, { reason: "disagreement", detail: `round ${round} review changed the lane; a review commits nothing and leaves the tree clean`, read: r.transcript });
+      }
+      rec.verdicts.push({ round, blockers: o.blockers, majors: o.majors, minors: o.minors, review_path: o.review_path, findings: o.findings, graded });
+      save(ctx);
+      if (o.blockers === 0 && o.majors === 0) break;
+      if (rec.fixRounds >= MAX_FIX_ROUNDS) {
+        return park(ctx, rec, {
+          reason: "review_failed",
+          detail: `round ${round} still carries ${o.blockers} blockers and ${o.majors} majors after ${MAX_FIX_ROUNDS} fix rounds`,
+          read: o.review_path,
+        });
+      }
+      const serious = o.findings.filter((f) => f.severity === "blocker" || f.severity === "major");
+      const owner = serious.every((f) => f.file.replace(/\\/g, "/").startsWith("studio/")) ? "studio-builder" : "dev";
+      const before = head(wt);
+      const f = await session(ctx, rec, "fix", {
+        owner,
+        prompt: `/${owner} conductor fix plan ${plan} round ${round}`,
+        vars: { ...common, plan_file: file.rel, round, review_path: o.review_path, findings: findingsText(o.findings) },
+        budget: budgets.fix,
+        addDirs: [paths.reviews],
+        info: { round },
+      });
+      if (f.status === "parked") return park(ctx, rec, { reason: f.reason, detail: f.detail, read: f.transcript, resetsAt: f.resetsAt });
+      const problems = verifyFix({ cwd: wt, before, outcome: f.outcome, findingCount: o.findings.length });
+      if (problems.length) {
+        return park(ctx, rec, { reason: "disagreement", detail: `fix round ${round}: ${problems.join("; ")}`, read: f.transcript });
+      }
+      rec.fixRounds += 1;
+      rec.fixes.push({
+        round,
+        commits: f.outcome.commits.map((c) => resolveCommit(c, wt)),
+        resolved: f.outcome.resolved.map((x) => ({ finding: x.finding, commit: resolveCommit(x.commit, wt) })),
+      });
+      save(ctx);
+      const fixGate = await gateOrRepair(ctx, rec, `fix-${round}`);
+      if (fixGate.park) return park(ctx, rec, fixGate.park);
+    }
+
+    // The close: its own session, under the close lock, which is held from here until main has
+    // fast-forwarded so the version it bumps lands on the main it was computed against. A close that
+    // meets a code conflict parks it back here; the conductor runs the merge session and starts the
+    // close again, at most MAX_CLOSE_MERGES times in one call.
+    const verdict = rec.verdicts.at(-1);
+    let merges = 0;
+    for (;;) {
+      const lock = await take(CLOSE, { dir: ctx.lockDir, pollMs: ctx.lockPollMs, what: `close ${plan}`, onWaited: (ms) => recordWait(rec, CLOSE, ms) });
+      const file = planFileIn(wt, plan);
+      const before = head(wt);
+      event(ctx, "close-start", { plan, round: verdict.round });
+      const r = await session(ctx, rec, "close", {
+        owner: "architect",
+        prompt: `/architect conductor close plan ${plan} round ${verdict.round}`,
+        vars: { ...common, plan_file: file?.rel ?? "(missing)", round: verdict.round, review_path: verdict.review_path, prior_rounds: priorRounds(rec), tip: verdict.graded ?? before },
+        budget: budgets.close,
+        addDirs: [paths.reviews],
+        info: { round: verdict.round },
+      });
+      // Whatever it ends on, what it committed is the close's, for a later resume's verdict reuse.
+      recordSessionCommits(rec, "close", commitsFirstParent(before, wt));
+      save(ctx);
+      if (r.status === "parked" && r.reason === "merge_conflict" && merges < MAX_CLOSE_MERGES) {
+        lock.release();
+        if (!isClean(wt)) return park(ctx, rec, { reason: "disagreement", detail: "the close parked merge_conflict and left the tree dirty", read: r.transcript });
+        merges += 1;
+        const m = await mergeMain(ctx, rec, "close");
+        if (m) return park(ctx, rec, m);
+        continue;
+      }
       if (r.status === "parked") {
         lock.release();
         return park(ctx, rec, { reason: r.reason, detail: r.detail, read: r.transcript, resetsAt: r.resetsAt });
       }
       const o = r.outcome;
-      if (o.kind === "verdict") {
-        rec.verdicts.push({ round, blockers: o.blockers, majors: o.majors, minors: o.minors, review_path: o.review_path, findings: o.findings });
+      const problems = o.kind === "closed" ? verifyClose({ cwd: wt, plan, outcome: o }) : [`the close returned a ${o.kind} outcome`];
+      if (problems.length) {
         lock.release();
-        save(ctx);
-        if (o.blockers === 0 && o.majors === 0) {
-          return park(ctx, rec, { reason: "disagreement", detail: `round ${round} verdict has no blockers or majors but the plan did not close`, read: o.review_path });
-        }
-        if (rec.fixRounds >= MAX_FIX_ROUNDS) {
-          return park(ctx, rec, {
-            reason: "review_failed",
-            detail: `round ${round} still carries ${o.blockers} blockers and ${o.majors} majors after ${MAX_FIX_ROUNDS} fix rounds`,
-            read: o.review_path,
-          });
-        }
-        const serious = o.findings.filter((f) => f.severity === "blocker" || f.severity === "major");
-        const owner = serious.every((f) => f.file.replace(/\\/g, "/").startsWith("studio/")) ? "studio-builder" : "dev";
-        const before = head(wt);
-        const f = await session(ctx, rec, "fix", {
-          owner,
-          prompt: `/${owner} conductor fix plan ${plan} round ${round}`,
-          vars: { ...common, plan_file: file.rel, round, review_path: o.review_path, findings: findingsText(o.findings) },
-          budget: budgets.fix,
-          addDirs: [paths.reviews],
-          info: { round },
-        });
-        if (f.status === "parked") return park(ctx, rec, { reason: f.reason, detail: f.detail, read: f.transcript, resetsAt: f.resetsAt });
-        const problems = verifyFix({ cwd: wt, before, outcome: f.outcome, findingCount: o.findings.length });
-        if (problems.length) {
-          return park(ctx, rec, { reason: "disagreement", detail: `fix round ${round}: ${problems.join("; ")}`, read: f.transcript });
-        }
-        rec.fixRounds += 1;
-        rec.fixes.push({
-          round,
-          commits: f.outcome.commits.map((c) => resolveCommit(c, wt)),
-          resolved: f.outcome.resolved.map((x) => ({ finding: x.finding, commit: resolveCommit(x.commit, wt) })),
-        });
-        save(ctx);
-        const fixGate = await gateOrRepair(ctx, rec, `fix-${round}`);
-        if (fixGate.park) return park(ctx, rec, fixGate.park);
-        continue;
+        return park(ctx, rec, { reason: "disagreement", detail: `close: ${problems.join("; ")}`, read: r.transcript });
       }
-      if (o.kind === "closed") {
-        const problems = verifyClose({ cwd: wt, plan, outcome: o });
-        if (problems.length) {
-          lock.release();
-          return park(ctx, rec, { reason: "disagreement", detail: `close: ${problems.join("; ")}`, read: r.transcript });
-        }
-        rec.verdicts.push({ ...o.verdict, round });
-        rec.closed = { version: o.version, tag: o.tag, head: head(wt), at: now() };
-        ctx.held.set(plan, lock);
-        event(ctx, "closed", { plan, tag: o.tag });
-        save(ctx);
-        break;
-      }
-      lock.release();
-      return park(ctx, rec, { reason: "disagreement", detail: `review returned a ${o.kind} outcome`, read: r.transcript });
+      // The close's verdict is the review's, with `fixed_in` on what the close repaired.
+      rec.verdicts[rec.verdicts.length - 1] = { ...verdict, ...o.verdict, round: verdict.round, graded: verdict.graded };
+      rec.closed = { version: o.version, tag: o.tag, head: head(wt), at: now() };
+      ctx.held.set(plan, lock);
+      event(ctx, "closed", { plan, tag: o.tag });
+      save(ctx);
+      break;
     }
   }
 

@@ -16,6 +16,7 @@ export const IMPLEMENTER_PARK_REASONS = new Set([
   "question",
   "check_red",
 ]);
+/** A review parks on a plan it cannot grade; a close also on a conflict or a red it cannot fix (ADR-0248). */
 export const REVIEW_PARK_REASONS = new Set(["merge_conflict", "check_red", "plan_wrong"]);
 /** A merge session (ADR-0248) parks `merge_conflict` on a conflict it cannot resolve. */
 export const MERGE_PARK_REASONS = new Set(["merge_conflict", "check_red", "plan_wrong", "question"]);

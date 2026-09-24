@@ -64,7 +64,7 @@ export function scratch({ plans, lanes, after = {}, spec = {}, local = {} }) {
     settingsFile: join(TOOL_DIR, "settings.conductor.json"),
     withLockPath: join(TOOL_DIR, "with-lock.mjs"),
     claude: FAKE,
-    local: { budget_usd: { implement: 5, fix: 3, review: 4, merge: 2, repair: 3 }, max_open_worktrees: 3, ...local },
+    local: { budget_usd: { implement: 5, fix: 3, review: 4, close: 3, merge: 2, repair: 3 }, max_open_worktrees: 3, ...local },
     queue,
     state: loadState(stateDir),
     gate: [
@@ -115,7 +115,7 @@ test("a dev run then a studio-builder run with a clean review merges, tagged, la
   const rec = loadState(ctx.stateDir).plans["0101"];
 
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
-  assert.deepEqual(kinds(rec), ["implement:dev", "implement:studio-builder", "review:architect"]);
+  assert.deepEqual(kinds(rec), ["implement:dev", "implement:studio-builder", "review:architect", "close:architect"]);
   assert.deepEqual(rec.steps[0].phases, ["1", "2"]);
   assert.equal(rec.fixRounds, 0);
   assert.equal(rec.closed.tag, "v0.1.1");
@@ -363,7 +363,7 @@ test("a review with one major takes exactly one fix round and a re-review, then 
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
-  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "fix:dev", "review:architect"]);
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "fix:dev", "review:architect", "close:architect"]);
   assert.equal(rec.fixRounds, 1);
   assert.equal(rec.verdicts.length, 2);
   assert.equal(rec.verdicts[0].majors, 1);
@@ -464,7 +464,7 @@ test("a gate still red on the close tip after its one repair parks, and main doe
   assert.equal(rec.park.reason, "gate_red");
   assert.match(rec.park.detail, /^red-after-close exited 3; still red after one repair session at post-close$/);
   assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close", "post-close"]);
-  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "repair:dev"]);
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "close:architect", "repair:dev"]);
   assert.equal(resolveCommit("main", repo), mainBefore, "main did not move");
   assert.ok(existsSync(rec.worktree), "the parked plan keeps its worktree");
 });
@@ -479,8 +479,8 @@ test("main advancing on a conflicting change between close and merge runs one me
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
-  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "merge:dev"]);
-  assert.deepEqual(rec.steps[2].paths, ["phase-0101-1.txt"]);
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "close:architect", "merge:dev"]);
+  assert.deepEqual(rec.steps[3].paths, ["phase-0101-1.txt"]);
   assert.deepEqual(rec.merges.map((m) => [m.where, m.session]), [["remerge", true]]);
   assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close", "remerge"]);
   assert.equal(readFileSync(join(repo, "phase-0101-1.txt"), "utf8"), "resolved by the merge session\n");
@@ -544,7 +544,7 @@ test("a fast-forward refused while main is already in the branch parks without a
   assert.equal(resolveCommit("HEAD", rec.worktree), rec.closed.head, "no merge commit was made on the branch");
 });
 
-test("two lanes closing at once serialize on the close lock", async () => {
+test("two lanes' reviews run at once, and their closes serialize on the close lock", async () => {
   const { ctx, readEvents } = scratch({
     plans: [
       { number: "0101", phases: [dev("1")] },
@@ -560,14 +560,16 @@ test("two lanes closing at once serialize on the close lock", async () => {
 
   const ev = readEvents();
   const at = (plan, event) => ev.findIndex((e) => e.plan === plan && e.event === event);
-  const reviewStarts = ev.filter((e) => e.event === "review-start");
-  const first = reviewStarts[0].plan;
+  const order = ev.map((e) => `${e.plan}:${e.event}`).join(" ");
+  // No lock over a review (ADR-0248): the second review starts before the first one ends.
+  const reviewer = ev.find((e) => e.event === "review-start").plan;
+  const other = reviewer === "0101" ? "0102" : "0101";
+  assert.ok(at(other, "review-start") < at(reviewer, "review-end"), `the two reviews overlapped: ${order}`);
+  // The close lock: the second close starts only after the first plan's fast-forward.
+  const first = ev.find((e) => e.event === "close-start").plan;
   const second = first === "0101" ? "0102" : "0101";
   assert.ok(at(first, "conductor-ff") >= 0);
-  assert.ok(
-    at(second, "review-start") > at(first, "conductor-ff"),
-    `the second review started only after the first fast-forward: ${ev.map((e) => `${e.plan}:${e.event}`).join(" ")}`,
-  );
+  assert.ok(at(second, "close-start") > at(first, "conductor-ff"), `the second close started only after the first fast-forward: ${order}`);
   // Both versions landed in order on one main.
   assert.deepEqual([state.plans[first].closed.tag, state.plans[second].closed.tag], ["v0.1.1", "v0.1.2"]);
   // The second close merged the first plan's code in; the conductor gated that combination itself.
@@ -738,10 +740,10 @@ test("with no fix round and an unmoved main, a plan executes the full suite twic
   const ledger = readLedger(join(ctx.stateDir, "suite-ledger.jsonl"));
   const executed = ledger.filter((e) => !e.skip);
   const skipped = ledger.filter((e) => e.skip);
-  assert.deepEqual(executed.map((e) => e.by), ["gate 0101-pre-review", "0101-02-review"], "pre-review and the close's gate");
+  assert.deepEqual(executed.map((e) => e.by), ["gate 0101-pre-review", "0101-03-close"], "pre-review and the close's gate");
   assert.deepEqual(skipped.map((e) => [e.by, e.green.by]), [
     ["0101-02-review", "gate 0101-pre-review"],
-    ["gate 0101-post-close", "0101-02-review"],
+    ["gate 0101-post-close", "0101-03-close"],
   ]);
   assert.deepEqual(rec.gates[1].commands.map((c) => c.skipped), [true]);
   assert.match(history("### Totals"), /; 2 suite runs skipped\.$/m);
@@ -802,7 +804,7 @@ test("a red conductor gate runs one repair session, the gate re-runs green, and 
   const rec = loadState(ctx.stateDir).plans["0101"];
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
   assert.deepEqual(rec.parks, []);
-  assert.deepEqual(kinds(rec), ["implement:dev", "repair:dev", "review:architect"]);
+  assert.deepEqual(kinds(rec), ["implement:dev", "repair:dev", "review:architect", "close:architect"]);
   assert.deepEqual(rec.gates.map((g) => [g.label, g.ok]), [["pre-review", false], ["pre-review", true], ["post-close", true]]);
   assert.deepEqual(rec.repairs.map((r) => [r.stage, r.unreviewed]), [["pre-review", false]]);
   assert.equal(existsSync(join(repo, "GATE_RED")), false);
@@ -832,7 +834,7 @@ test("a red post-close repaired once merges with the tag on the repaired tip, an
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
-  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "repair:dev"]);
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "close:architect", "repair:dev"]);
   assert.deepEqual(rec.gates.map((g) => [g.label, g.ok]), [["pre-review", true], ["post-close", false], ["post-close", true]]);
   const [repair] = rec.repairs;
   assert.equal(repair.stage, "post-close");
@@ -865,7 +867,7 @@ test("a close that landed without an outcome is adopted on the next run, with no
   const { ctx, repo } = scratch({
     plans: [{ number: "0101", phases: [dev("1")] }],
     lanes: { a: ["0101"] },
-    spec: { "0101": { loseOutcome: "review" } },
+    spec: { "0101": { loseOutcome: "close" } },
   });
   await runLanes(ctx);
   const parked = ctx.state.plans["0101"];
@@ -880,7 +882,7 @@ test("a close that landed without an outcome is adopted on the next run, with no
 
   const rec = loadState(ctx.stateDir).plans["0101"];
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
-  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect"], "the second run started no session at all");
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "close:architect"], "the second run started no session at all");
   assert.equal(rec.closed.adopted, true);
   assert.equal(rec.closed.tag, "v0.1.1");
   // One version and one tag: the whole point. A second close would have bumped to 0.1.2.
@@ -896,7 +898,7 @@ test("a close on the branch over a dirty tree parks disagreement and names the d
   const { ctx } = scratch({
     plans: [{ number: "0101", phases: [dev("1")] }],
     lanes: { a: ["0101"] },
-    spec: { "0101": { loseOutcome: "review", dirtyClose: true } },
+    spec: { "0101": { loseOutcome: "close", dirtyClose: true } },
   });
   await runLanes(ctx);
   const first = ctx.state.plans["0101"];
@@ -912,7 +914,7 @@ test("a close on the branch over a dirty tree parks disagreement and names the d
   assert.equal(rec.park.reason, "disagreement");
   assert.match(rec.park.detail, /close found on the branch: .*worktree is not clean/);
   assert.equal(rec.closed, null, "nothing was recorded from a close that does not verify");
-  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect"], "and no second review ran");
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "close:architect"], "and no second review ran");
   assert.deepEqual(rec.park.dirty.paths, ["suite-output.log"]);
 });
 
@@ -1190,7 +1192,7 @@ test("a resident run resumes a human_phase park the lane's log settles while it 
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
   assert.ok(r.looks() < 200, "the run ended on the merge, not on the look bound");
   assert.equal(loadState(ctx.stateDir).runs.length, 1, "one runLanes call");
-  assert.deepEqual(kinds(rec), ["implement:dev", "implement:dev", "review:architect"]);
+  assert.deepEqual(kinds(rec), ["implement:dev", "implement:dev", "review:architect", "close:architect"]);
   assert.deepEqual(rec.parks.map((p) => p.reason), ["human_phase"]);
   assert.deepEqual(rec.selfResumes.map((x) => x.reason), ["human_phase"]);
   const entries = selfResumeEntries(ctx);
@@ -1359,8 +1361,8 @@ test("a human phase marked Blocks merge: no is owed: the plan merges with the ph
   const rec = loadState(ctx.stateDir).plans["0101"];
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
   assert.deepEqual(rec.parks, []);
-  assert.deepEqual(kinds(rec), ["implement:dev", "implement:dev", "review:architect"]);
-  assert.deepEqual(rec.steps.map((s) => s.phases ?? null), [["1"], ["3"], null]);
+  assert.deepEqual(kinds(rec), ["implement:dev", "implement:dev", "review:architect", "close:architect"]);
+  assert.deepEqual(rec.steps.map((s) => s.phases ?? null), [["1"], ["3"], null, null]);
   assert.deepEqual(rec.owed.map((o) => o.phase), ["2"]);
   assert.ok(existsSync(join(repo, "phase-0101-3.txt")));
 
@@ -1421,7 +1423,7 @@ test("a conflict on main before pre-review runs one merge session, then the gate
   }
   const rec = loadState(ctx.stateDir).plans["0101"];
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
-  assert.deepEqual(kinds(rec), ["implement:dev", "merge:dev", "review:architect"]);
+  assert.deepEqual(kinds(rec), ["implement:dev", "merge:dev", "review:architect", "close:architect"]);
   assert.deepEqual(rec.merges.map((m) => [m.where, m.session]), [["pre-review", true]]);
   assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close"]);
   assert.ok(Date.parse(rec.gates[0].at) >= Date.parse(rec.steps[1].ended), "the gate ran after the merge session");
@@ -1451,8 +1453,90 @@ test("a second conflict in the same plan gets a second merge session rather than
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
-  assert.deepEqual(kinds(rec), ["implement:dev", "merge:dev", "review:architect", "merge:dev"]);
+  assert.deepEqual(kinds(rec), ["implement:dev", "merge:dev", "review:architect", "close:architect", "merge:dev"]);
   assert.deepEqual(rec.merges.map((m) => m.where), ["pre-review", "remerge"]);
   assert.deepEqual(rec.parks, []);
+  assert.equal(resolveCommit("v0.1.1", repo), resolveCommit("main", repo));
+});
+
+// ADR-0248 item 5: the review ends on its verdict with no lock held, the close is its own session
+// under the lock, and a clean verdict outlives a close-time park.
+
+test("a clean plan's steps read implement, review, close, and the close lock is waited for only after the review ends", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "close:architect"]);
+  const review = rec.steps[1];
+  const waits = rec.lockWaits.filter((w) => w.lock === "close");
+  assert.equal(waits.length, 1, "one close-lock take, for the close");
+  assert.ok(Date.parse(waits[0].at) - waits[0].ms >= Date.parse(review.ended), "the wait began after the review ended");
+  assert.equal(rec.verdicts.length, 1);
+  assert.ok(rec.verdicts[0].graded, "the verdict carries the tip it graded");
+});
+
+test("a review that commits parks disagreement", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { reviewCommits: true } } });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.park.reason, "disagreement");
+  assert.match(rec.park.detail, /a review commits nothing/);
+});
+
+/** Runs 0101 to a close that parks check_red, then hands back the parked record for the resume. */
+async function parkedAtClose() {
+  const s = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeParksOnce: "clippy" } } });
+  await runLanes(s.ctx);
+  const rec = s.ctx.state.plans["0101"];
+  assert.equal(rec.park.reason, "check_red", JSON.stringify(rec.park));
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "close:architect"]);
+  return { ...s, rec };
+}
+
+test("a close that parks, resumed with only a merge of main added, runs no review and one close", async () => {
+  const { ctx, repo, rec } = await parkedAtClose();
+  // main moves, and the owner merges it into the lane: a merge of main, nothing else.
+  writeFileSync(join(repo, "owner-note.txt"), "landed on main meanwhile\n");
+  sh(["add", "owner-note.txt"], repo);
+  sh(["commit", "-q", "-m", "docs: an unrelated commit on main"], repo);
+  sh(["merge", "-q", "--no-edit", "main"], rec.worktree);
+  rec.status = "queued";
+  rec.park = null;
+  await runLanes(ctx);
+  const done = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(done.status, "merged", JSON.stringify(done.park));
+  assert.deepEqual(kinds(done), ["implement:dev", "review:architect", "close:architect", "close:architect"]);
+  assert.equal(done.verdicts.length, 1, "the round-1 verdict was reused");
+});
+
+test("the same resume after a non-merge fix commit in the lane runs a round-2 review", async () => {
+  const { ctx, rec } = await parkedAtClose();
+  writeFileSync(join(rec.worktree, "owner-fix.txt"), "a fix nobody reviewed\n");
+  sh(["add", "owner-fix.txt"], rec.worktree);
+  sh(["commit", "-q", "-m", "fix: the owner's hand fix"], rec.worktree);
+  rec.status = "queued";
+  rec.park = null;
+  await runLanes(ctx);
+  const done = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(done.status, "merged", JSON.stringify(done.park));
+  assert.deepEqual(kinds(done), ["implement:dev", "review:architect", "close:architect", "review:architect", "close:architect"]);
+  assert.deepEqual(done.verdicts.map((v) => v.round), [1, 2]);
+});
+
+test("a close-time code conflict runs one merge session, then one close, and merges", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  const events = ctx.events;
+  ctx.events = (name, data) => {
+    events(name, data);
+    if (name === "review-step") conflictOnMain(repo, "main's own phase 1, landed during the review\n");
+  };
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "close:architect", "merge:dev", "close:architect"]);
+  assert.deepEqual(rec.merges.map((m) => [m.where, m.session]), [["close", true]]);
+  assert.deepEqual(rec.parks, []);
+  assert.equal(readFileSync(join(repo, "phase-0101-1.txt"), "utf8"), "resolved by the merge session\n");
   assert.equal(resolveCommit("v0.1.1", repo), resolveCommit("main", repo));
 });

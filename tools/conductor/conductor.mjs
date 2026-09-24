@@ -36,6 +36,7 @@ import { ascii } from "./lib/live.mjs";
 import { loadLocal, loadQueue, pruneQueue, readQueue, startedPlans } from "./lib/queue.mjs";
 import {
   FINDING_VERBS,
+  adoptClose,
   askPause,
   askResume,
   clearPark,
@@ -536,8 +537,7 @@ function cmdAdoptClose(args, o) {
     for (const problem of problems) o.err(`  - ${problem}`);
     return 1;
   }
-  rec.verdicts.push({ ...adopted.verdict });
-  rec.closed = { version: adopted.version, tag: adopted.tag, head: head(rec.worktree), at: new Date().toISOString(), adopted: true };
+  adoptClose(rec, adopted, head(rec.worktree));
   saveState(p.stateDir, state);
   regenerate(p, state);
   o.log(`conductor: plan ${plan} recorded closed${adopted.tag ? `, tag ${adopted.tag}` : " with no version"} from its ## Close review.`);

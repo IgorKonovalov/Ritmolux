@@ -338,8 +338,8 @@ behaviour, never at the end.
 | 1 — The run stays up, waits at the cap, and resumes what the tree settled | dev | done | `affd4859` |
 | 2 — A human phase can be owed after the merge | dev | done | `6e0b3d2c` |
 | 3 — The lane merges main early, and a conflict gets a merge session | dev | done | `56061b8b` |
-| 4 — A red gate gets one repair session | dev | committed with this row | |
-| 5 — The close is its own session, holds the lock alone, and keeps a clean verdict | dev | not started | |
+| 4 — A red gate gets one repair session | dev | done | `8f363852` |
+| 5 — The close is its own session, holds the lock alone, and keeps a clean verdict | dev | committed with this row | |
 | 6 — A readiness check reads the plan before any spend | dev | not started | |
 | 7 — The pilot: one resident run over the real queue | human | not started | |
 
@@ -371,6 +371,14 @@ behaviour, never at the end.
   `<plan>-<stage>-after-repair-<n>`, so the log the repair session was handed survives. The pre-existing
   post-close red tests now expect a repair session before their park. `lib/merge.mjs` takes a
   `runGate` result carrying `park`. The same fixtures as Phase 3 gained `budget_usd.repair`.
+- Phase 5: the adopted-close scenarios moved their lost outcome from the review to the close
+  (`loseOutcome: "close"`), and their step lists gained `close:architect`. What they assert about
+  adoption is unchanged. Every scenario that closes gained `close:architect` in its step list, and the
+  ledger scenario's close is now step `03-close`. A review that moves the tip or dirties the tree
+  parks `disagreement`. A close-time `merge_conflict` restarts the close at most twice per run of the
+  plan (`MAX_CLOSE_MERGES`). `conductor.mjs` (`adopt-close` now calls `adoptClose`, which keeps a
+  recorded clean verdict) and the comment in `lib/locks.mjs` are outside the phase's files, as are the
+  fixtures that gained `budget_usd.close`.
 
 ### Close triggers
 

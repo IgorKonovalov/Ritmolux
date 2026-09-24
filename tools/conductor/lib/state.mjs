@@ -238,6 +238,17 @@ export function disposeFinding(finding, verb, reason, at = new Date().toISOStrin
   return previous;
 }
 
+/**
+ * Records a close found on the branch (`adoptedClose`) as the plan's close. A clean verdict the
+ * review already recorded stays the plan's verdict, since it carries the findings the adopted one,
+ * read from prose, cannot; with none, the adopted verdict is recorded.
+ */
+export function adoptClose(rec, adopted, headSha, at = new Date().toISOString()) {
+  const last = rec.verdicts.at(-1);
+  if (!(last && last.blockers === 0 && last.majors === 0)) rec.verdicts.push({ ...adopted.verdict });
+  rec.closed = { version: adopted.version, tag: adopted.tag, head: headSha, at, adopted: true };
+}
+
 export function completedSteps(rec) {
   return rec.steps.filter((s) => s.ended && s.result?.status !== "interrupted");
 }
