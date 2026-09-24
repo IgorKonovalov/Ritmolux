@@ -38,6 +38,19 @@ test("closed Plan 0172 reads as a dev run then a studio-builder run, every row d
   assert.deepEqual(nextStep(plan), { kind: "review" });
 });
 
+test("the status word is the leading word, whatever punctuation follows it", () => {
+  const word = (status) => parsePlan(planText({ number: "0101", status, phases: [{ id: "1", owner: "dev" }] })).statusWord;
+  // The first is the shape a conductor close writes: the word, a full stop, then the evidence.
+  assert.equal(word("done. Phases 14ae5f69, 776b946f, and close repairs 80bf58cb."), "done");
+  assert.equal(word("done, closed by the conductor"), "done");
+  assert.equal(word("done — 2026-09-24"), "done");
+  assert.equal(word("done"), "done");
+  assert.equal(word("approved (2026-09-14)"), "approved");
+  assert.equal(word("in-progress; phase 2 of 4"), "in-progress");
+  assert.equal(word("Draft"), "draft");
+  assert.equal(word("`done`"), null);
+});
+
 const MIXED = {
   number: "0101",
   phases: [

@@ -39,7 +39,9 @@ export function parsePlan(raw) {
     number: title ? title[1] : null,
     title: title ? title[2].trim() : null,
     status: status ? status[1].trim() : null,
-    statusWord: status ? status[1].trim().split(/[\s(—–]/)[0].toLowerCase() : null,
+    // The leading word only, letters and hyphens: a status is prose after its word, and the word
+    // can be followed by any punctuation (`done. Phases ...`, `approved (2026-09-14)`, `done —`).
+    statusWord: status ? (status[1].trim().toLowerCase().match(/^[a-z][a-z-]*/)?.[0] ?? null) : null,
     phases: [],
     log: { lane: null, rows: [] },
     hasCloseReview: /^## Close review\s*$/m.test(text),
