@@ -1,6 +1,6 @@
 # 0229 — The conductor reports itself honestly
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-24
 > **Owner skill(s):** dev
 > **Related ADRs:** [0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md),

@@ -52,7 +52,7 @@ place. The plan file carries the real link.
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
-| [0229](0229-the-conductor-reports-itself-honestly.md) | The conductor reports itself honestly | draft | dev | Four ways it misdescribes its own state, all met on 2026-09-24: an unnamed flaky test, a settled park called live, a merged change the running process never loads, and denials the session's own tools moot. |
+| [0229](0229-the-conductor-reports-itself-honestly.md) | The conductor reports itself honestly | approved | dev | Approved 2026-09-24, NOT queued: Phase 4 widens settings.conductor.json, as 0208 does. Four self-misdescriptions: an unnamed flaky test, a settled park called live, a stale process, moot denials. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
