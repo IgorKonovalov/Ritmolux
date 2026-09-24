@@ -1046,7 +1046,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
-- [0220 - The dependencies catch up, and npm gets its gate](done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) - closed 2026-09-24, Phase 7 owed. Review: **no blockers, no majors, three minors (two fixed), one nit.** Version: **0.149.0**. ADR-0244 accepted, Outcome. [Write-up](README-archive.md).
+- [0220 - The dependencies catch up, and npm gets its gate](done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) - closed 2026-09-24. Review: **no blockers, no majors, three minors (two fixed), one nit.** Version: **0.149.0**. ADR-0244 accepted, Outcome. [Write-up](README-archive.md).
 - [0228 - The resume guard accepts an owed phase](done/0228-the-resume-guard-accepts-an-owed-phase.md) - closed 2026-09-24. Review: **no blockers, no majors, two minors, one nit (two fixed).** Version: none. Closes nothing. [Write-up](README-archive.md).
 - [0227 - The gated paths get their jobs](done/0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close.md) - closed 2026-09-24, Phases 6-7 owed. Review: **no blockers, one major (fixed), two minors (fixed).** Version: **0.148.0**. ADR-0251 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0225 - The split goes one level deeper](done/0225-the-split-goes-one-level-deeper.md) - closed 2026-09-24. Review: **no blockers, no majors, two minors, one nit (all fixed).** Version: **0.147.1**. ADR-0247 accepted, Outcome. Closes nothing. [Write-up](README-archive.md).
