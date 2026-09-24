@@ -588,6 +588,60 @@ test("a budget-exhausted step parks with its spend recorded", async () => {
   assert.match(history("### Totals"), /^- lane a: 0 merged, 1 parked, \$7\.50\.$/m);
 });
 
+test("a session the usage limit ends waits for the reset, continues the same session, and merges", async () => {
+  const { ctx, repo, readEvents } = scratch({
+    plans: [{ number: "0101", phases: [dev("1"), dev("2")] }],
+    lanes: { a: ["0101"] },
+    spec: { "0101": { usageLimit: { mode: "implement", resetsInS: 600 } } },
+  });
+  const slept = [];
+  ctx.sleep = async (ms) => slept.push(ms);
+  ctx.usageMarginMs = 0;
+  const calls = join(ctx.stateDir, "calls.jsonl");
+  process.env.FAKE_CLAUDE_LOG = calls;
+  await runLanes(ctx);
+  delete process.env.FAKE_CLAUDE_LOG;
+
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged");
+  assert.deepEqual(rec.parks, []);
+  assert.equal(slept.length, 1);
+  assert.ok(slept[0] > 590_000 && slept[0] <= 600_000, `waited ${slept[0]} ms for a reset 600 s off`);
+
+  const step = rec.steps[0];
+  assert.equal(step.result.status, "ok");
+  assert.equal(step.result.usageWaits.length, 1);
+  assert.match(step.result.usageWaits[0].transcript, /0101-01-implement\.jsonl$/);
+  assert.match(step.result.transcript, /0101-01-implement-resume-1\.jsonl$/);
+  assert.equal(step.result.numTurns, 11, "the turns of both invocations");
+
+  // The second invocation continued the first one's session rather than starting a new one.
+  const implement = readFileSync(calls, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((c) => c.vars.mode === "implement");
+  assert.equal(implement.length, 2);
+  assert.ok(!implement[0].args.includes("--resume"));
+  const firstId = JSON.parse(readFileSync(join(ctx.stateDir, "transcripts", "0101-01-implement.jsonl"), "utf8").split("\n")[0]).session_id;
+  assert.equal(implement[1].args[implement[1].args.indexOf("--resume") + 1], firstId);
+  assert.ok(readEvents().some((e) => e.event === "implement-resumed"));
+  assert.equal(sh(["show", "main:LIMIT_WIP"], repo), "half a phase", "the half-done work survived into the merge");
+  assert.equal(loadState(ctx.stateDir).lanes.a.waitingUntil, undefined);
+});
+
+test("a usage limit whose reset is too far off parks usage_limit with the CLI's message", async () => {
+  const { ctx } = scratch({
+    plans: [{ number: "0101", phases: [dev("1")] }],
+    lanes: { a: ["0101"] },
+    spec: { "0101": { usageLimit: { mode: "implement", resetsInS: 3 * 24 * 3600 } } },
+  });
+  ctx.sleep = async () => assert.fail("a seven-day reset is not waited out");
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "usage_limit");
+  assert.match(rec.park.detail, /You've hit your session limit/);
+  assert.match(rec.park.detail, /more than 6 h away/);
+  assert.deepEqual(rec.park.dirty.paths, ["LIMIT_WIP"], "the half-done work is left for the owner, not reverted");
+});
+
 test("a probe the implement commit breaks and the close repairs is not gated before the review, and merges", async () => {
   const { ctx, repo } = scratch({
     plans: [{ number: "0101", phases: [dev("1")] }],

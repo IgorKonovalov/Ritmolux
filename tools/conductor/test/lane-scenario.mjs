@@ -7,6 +7,11 @@
 //                          "delayMs": { "review": 400 }, "breaksProbe": true, "probeStaysRed": true,
 //                          "dirtyPark": { "untracked": 13 } } } }
 //
+// `usageLimit: { mode, resetsInS }` makes the first session of that mode end on the account's usage
+// limit, as a 429 with a `rejected` rate-limit reading whose window reopens `resetsInS` seconds from
+// now, after writing LIMIT_WIP and leaving it uncommitted. A session started with `--resume` carries on
+// normally and commits the work in progress with its first phase.
+//
 // `dirtyPark` makes the implement session rewrite the tracked VERSION, write `untracked` new files,
 // and park with them all left in the worktree.
 //
@@ -43,7 +48,7 @@ import { runWrapped } from "../with-lock.mjs";
 
 const block = (o) => "Session finished.\n\n```rlx-outcome\n" + JSON.stringify(o) + "\n```\n";
 
-export default async ({ cwd, vars, env }) => {
+export default async ({ args, cwd, vars, env }) => {
   const spec = JSON.parse(readFileSync(env.FAKE_LANE_SPEC, "utf8"));
   const plan = vars.plan;
   const ps = spec.plans?.[plan] ?? {};
@@ -61,6 +66,21 @@ export default async ({ cwd, vars, env }) => {
   if (ps.delayMs?.[mode]) await new Promise((r) => setTimeout(r, ps.delayMs[mode]));
   try {
     if (ps.budget === mode) return { subtype: "error_max_budget_usd", costUsd: 7.5, text: "" };
+    const resumed = args.includes("--resume");
+    if (ps.usageLimit?.mode === mode && !resumed) {
+      writeFileSync(join(cwd, "LIMIT_WIP"), "half a phase\n");
+      const resetsAt = Math.floor(Date.now() / 1000) + ps.usageLimit.resetsInS;
+      return {
+        isError: true,
+        apiErrorStatus: 429,
+        resultText: "You've hit your session limit",
+        costUsd: 2,
+        numTurns: 10,
+        text: "",
+        stream: [{ type: "rate_limit_event", rate_limit_info: { status: "rejected", resetsAt, rateLimitType: "five_hour" } }],
+      };
+    }
+    if (resumed) log(`${mode}-resumed`);
 
     const plansDir = join(cwd, "docs", "plans");
     const planName = readdirSync(plansDir).find((f) => f.startsWith(`${plan}-`));
@@ -96,6 +116,7 @@ export default async ({ cwd, vars, env }) => {
           writeFileSync(join(cwd, "PROBE_RED"), `plan ${plan} delivered what the probe asserts is missing\n`);
           git("add", "PROBE_RED");
         }
+        if (existsSync(join(cwd, "LIMIT_WIP"))) git("add", "LIMIT_WIP");
         // A real commit subject is where the non-ASCII actually comes from: this repository's own log
         // carries em dashes, and a preset name can carry a curly quote. The run terminal is a Windows
         // console, so `ascii()` has to transform this before it is printed (backlog 0235).

@@ -132,6 +132,7 @@ export function readResult(transcript) {
     sessionId: result.session_id ?? sessionId,
     subtype: result.subtype ?? null,
     isError: result.is_error === true,
+    apiErrorStatus: typeof result.api_error_status === "number" ? result.api_error_status : null,
     terminalReason: result.terminal_reason ?? null,
     spendUsd: typeof result.total_cost_usd === "number" ? result.total_cost_usd : null,
     numTurns: result.num_turns ?? null,

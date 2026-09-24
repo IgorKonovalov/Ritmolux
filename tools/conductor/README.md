@@ -10,7 +10,7 @@ the plan on the branch, fast-forwards `main`, and removes the lane.
 
 **Anything it cannot decide parks the plan**, and the lane moves on to the next plan. That covers a
 `human` phase, a plan's own stop condition, a red gate, a review still failing after two fix rounds,
-a spend cap, or a session whose claim `git` does not bear out.
+a spend cap, a usage limit too far off to wait for, or a session whose claim `git` does not bear out.
 
 The decision and its rejected alternatives are ADR-0205. The plan that built it is Plan 0187.
 
@@ -199,8 +199,19 @@ once, whatever `state/conductor.json` says.
 | `disagreement` | A session's claim and `git` differ. Read the detail and the transcript before trusting the lane. |
 | `cli_contract` | The CLI ran a session without the project hooks, or without loading the skill it invoked. Read the detail and the transcript, then verify the CLI version before resuming (`## When the CLI updates`). |
 | `lost_background` | The session started a command in the background and ended with it unfinished, so that work was killed with the session. Its commits are still in the lane. Read the detail for the command, check what the lane actually contains, then resume: the step runs again from what the plan log and `git` show. |
-| `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or wait out a usage limit. Resuming re-runs the step from what the plan log and `git` show. |
+| `usage_limit` | The account's usage limit ended a session, and the conductor did not wait it out, because the reset was more than 6 h away (the seven-day window), the CLI reported none, or the step had already been continued three times. The detail says which. The session's half-done work is still in the lane, uncommitted, so `resume` refuses it until you commit or `git restore` it. Resuming then re-runs the step from what the plan log and `git` show. |
+| `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or read the transcript. Resuming re-runs the step from what the plan log and `git` show. |
 | `merge_conflict`, `merge_failed`, `main_dirty` | Resolve it in the lane, or clean the main checkout. A resumed plan goes straight back to the fast-forward. |
+
+**A usage limit is waited out, not parked.** When the account's limit ends a session (a 429 with a
+`rejected` rate-limit reading), the lane sleeps until the window reopens, plus two minutes, and then
+continues **the same session** with `claude -p --resume <session_id>`, so its context and its
+uncommitted work carry on. The run terminal prints `usage  limit reached; waiting N min, until HH:MM
+UTC`, and `status` and the digest's **Now** show the lane waiting. A step is continued at most three
+times, and a reset more than 6 h away parks `usage_limit` instead. The transcripts are
+`<step>.jsonl`, then `<step>-resume-1.jsonl` and so on. The step's spend is the last invocation's
+figure, because the CLI reports a continued session's cost cumulatively (`spike/README.md`).
+`abort` during the wait works as always: the step runs again from scratch on the next `run`.
 
 **A suite you run by hand counts.** Run one through the wrapper —
 `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace` — and, because the
