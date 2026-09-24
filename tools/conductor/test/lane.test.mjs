@@ -1353,6 +1353,26 @@ test("selfResumeWhy: usage_limit once its reset passes, studio_install hourly an
   }
 });
 
+test("parkStillTrue: an owed row settles a human_phase park only on a phase marked Blocks merge: no", async () => {
+  const { parkStillTrue, selfResumeWhy } = await import("../lib/lane.mjs");
+  const at = "2026-09-24T10:00:00.000Z";
+  const rec = { plan: "0101", worktree: null, park: { reason: "human_phase", phase: "2", at } };
+  const refused = /^Phase 2 is still not marked done in the ## Implementation log of docs\/plans\/0101-fixture\.md in .*; commit the row there first$/;
+  const withRow = (blocksMerge, state) => {
+    const repo = tmp();
+    writePlan(repo, { number: "0101", phases: [dev("1"), { id: "2", owner: "human", blocksMerge }, dev("3")], rows: { 2: { state } } });
+    return repo;
+  };
+
+  const owedNonBlocking = withRow("no", "owed");
+  assert.equal(parkStillTrue(rec, owedNonBlocking), null);
+  assert.equal(selfResumeWhy(rec, owedNonBlocking), "Phase 2 reads owed in the plan's ## Implementation log");
+  assert.match(parkStillTrue(rec, withRow("no", "not started")), refused);
+  assert.match(parkStillTrue(rec, withRow(undefined, "owed")), refused, "a bare owed row does not pass a blocking phase");
+  assert.match(parkStillTrue(rec, withRow("yes", "owed")), refused, "nor does one on a phase marked Blocks merge: yes");
+  assert.equal(parkStillTrue(rec, withRow(undefined, "done")), null);
+});
+
 // ADR-0249.
 test("a human phase marked Blocks merge: no is owed: the plan merges with the phases after it, the row reads owed, and the digest says so", async () => {
   const phases = [dev("1"), { id: "2", owner: "human", blocksMerge: "no" }, dev("3")];

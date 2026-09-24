@@ -1,6 +1,6 @@
 # 0228 — The resume guard accepts an owed phase
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-24
 > **Approved:** 2026-09-24 (user) — queued in lane b. Plan 0220 is parked on this and cannot clear.
 > **Owner skill(s):** dev
@@ -98,11 +98,11 @@ to `done`. The phase's own `**Blocks merge:** no` marker is what makes `owed` le
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by the implementer)_
+**Lane:** `plan-0228-the-resume-guard-accepts-an-owed-phase` in `/home/igor/Work/rlx-plan-0228`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The guard accepts owed | dev | not started | |
+| 1 — The guard accepts owed | dev | committed with this row | |
 | 2 — The operator guide says what owed means at a resume | dev | not started | |
 
 ### Notes
