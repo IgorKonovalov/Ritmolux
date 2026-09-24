@@ -208,7 +208,7 @@ flowchart LR
 | 2 — A reader for origin's CI | dev | done | 1e7e4857 |
 | 3 — The close reports it and never blocks on it | dev | done | 1fc58a95 |
 | 4 — The foobar component joins the push | dev | done | 0c0ac09b |
-| 5 — The documents say what a machine needs | dev | done | committed with this row |
+| 5 — The documents say what a machine needs | dev | done | 417022b7 |
 | 6 — The close ceremony gains the step | human | owed | |
 | 7 — The reading that only a push can produce | human | owed | |
 
