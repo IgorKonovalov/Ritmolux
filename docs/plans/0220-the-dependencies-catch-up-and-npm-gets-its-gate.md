@@ -18,7 +18,8 @@ The studio ships Electron 32 inside its release zip, twelve majors behind, and `
 critical and 14 high advisories in its graph. The cause is that nothing watches the npm graphs, while
 `cargo deny` has watched the Rust one from the start. This plan brings the studio's toolchain and
 runtime current: Electron 44, electron-builder 26, vite 8, vitest 5, eslint 10 with a matching
-typescript-eslint, and the rest of the build and test tooling. It lets npm 11 install Electron's
+typescript-eslint (eslint stays on 9.39.5 until `eslint-plugin-react` accepts 10; see the log), and
+the rest of the build and test tooling. It lets npm 11 install Electron's
 binary by naming it. It takes the three Rust pins that trail by a patch or a minor. And it adds the
 gate that stops this from accumulating again (ADR-0244), with CI moved to Node 24 LTS. React 18,
 zod 3 and TypeScript 5 stay where they are.
@@ -79,7 +80,7 @@ LTS and it closes most of the gap to the box's Node 26 without chasing a release
 flowchart LR
     subgraph studio["studio/ (studio-builder)"]
         P1["P1 allowScripts<br/>electron, esbuild"]
-        P2["P2 lint set<br/>eslint 10 + ts-eslint 8.70"]
+        P2["P2 lint set<br/>eslint 9.39.5 + ts-eslint 8.70"]
         P3["P3 build/test set<br/>vite 8, vitest 5, esbuild, jsdom"]
         P4["P4 electron 44<br/>+ electron-builder 26"]
     end
