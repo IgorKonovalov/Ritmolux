@@ -214,15 +214,17 @@ export function servingRecord(path, tree, cwd) {
 export const FAILED_CAP = 20;
 
 /**
- * nextest's per-test failure lines, e.g. `        FAIL [   1.234s] rlx-core::golden name`, each name
- * once and in first-seen order. nextest prints every failure twice — as it happens and again under
- * its closing `Summary` — so the second sighting is dropped rather than counted.
+ * nextest's per-test failure lines, e.g. `        FAIL [   1.234s] (1804/1805) rlx-core::golden name`,
+ * each name once and in first-seen order. The `(n/total)` progress counter is run-specific and is
+ * dropped, so it never reaches a record or splits one failure into two names. nextest prints every
+ * failure twice — as it happens and again under its closing `Summary` — so the second sighting is
+ * dropped rather than counted.
  *
  * Trap: this is keyed to nextest's `FAIL [` shape. If that changes the list comes back empty and the
- * record merely loses its names; the recorded fixture in ledger.test.mjs is what makes that visible.
+ * record merely loses its names; the recorded fixture in test/helpers.mjs is what makes that visible.
  */
 export function failingTests(output) {
-  const names = [...String(output ?? "").matchAll(/^\s*(?:FAIL|TIMEOUT|SIGSEGV|SIGABRT) \[[^\]]*\]\s+(.+?)\s*$/gm)].map((m) => m[1]);
+  const names = [...String(output ?? "").matchAll(/^\s*(?:FAIL|TIMEOUT|SIGSEGV|SIGABRT) \[[^\]]*\]\s+(?:\(\s*\d+\/\d+\)\s+)?(.+?)\s*$/gm)].map((m) => m[1]);
   return [...new Set(names)];
 }
 

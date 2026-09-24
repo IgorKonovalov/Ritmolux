@@ -288,11 +288,12 @@ test("the summary is nextest's last Summary line", () => {
 });
 
 test("a red run's record names its failing tests, once each, and a green record carries no new key", () => {
-  assert.deepEqual(failingTests(RED_NEXTEST_OUTPUT), ["rlx-core::golden golden_rose_star", "standalone::shot_cli the_count_column"]);
+  assert.deepEqual(failingTests(RED_NEXTEST_OUTPUT), ["red-scratch::golden golden_rose_star", "red-scratch::shot_cli the_count_column"]);
   const file = join(tmp(), "suite-ledger.jsonl");
   appendRecord(file, { tree: "t1", exit: 100, summary: summaryLine(RED_NEXTEST_OUTPUT), failed: failingTests(RED_NEXTEST_OUTPUT), by: "gate 0101-post-close", ms: 10 });
   const [red] = readLedger(file);
-  assert.deepEqual(red.failed, ["rlx-core::golden golden_rose_star", "standalone::shot_cli the_count_column"]);
+  assert.equal(red.summary, "6 tests run: 4 passed, 2 failed, 0 skipped");
+  assert.deepEqual(red.failed, ["red-scratch::golden golden_rose_star", "red-scratch::shot_cli the_count_column"]);
   assert.equal("failed_count" in red, false, "under the cap there is no count");
 
   appendRecord(file, { tree: "t1", exit: 0, summary: "1805 tests run: 1805 passed", failed: [], by: "gate 0101-post-close", ms: 10 });
@@ -300,6 +301,16 @@ test("a red run's record names its failing tests, once each, and a green record 
   for (const green of readLedger(file).slice(1)) {
     assert.deepEqual(Object.keys(green), ["tree", "cmd", "exit", "summary", "by", "at", "ms"], "a green record is unchanged");
   }
+});
+
+test("a failing name drops nextest's progress counter, so a failure printed twice is recorded once", () => {
+  const out = [
+    "        FAIL [   1.234s] (1804/1805) rlx-core::golden golden_rose_star",
+    "     Summary [ 401.456s] 1805 tests run: 1804 passed, 1 failed, 7 skipped",
+    "        FAIL [   1.234s] (   3/1805) rlx-core::golden golden_rose_star",
+    "        FAIL [   1.234s] rlx-core::golden golden_rose_star",
+  ].join("\n");
+  assert.deepEqual(failingTests(out), ["rlx-core::golden golden_rose_star"]);
 });
 
 test("a record keeps the first FAILED_CAP failing names and the total past them", () => {

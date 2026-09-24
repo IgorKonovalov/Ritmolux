@@ -183,8 +183,8 @@ test("a wrapped full suite that fails records both failing tests' names from nex
   assert.equal(r.value, 100);
   const [rec] = readLedger(s.ledger);
   assert.equal(rec.exit, 100);
-  assert.equal(rec.summary, "1805 tests run: 1803 passed (11 slow), 2 failed, 11 skipped");
-  assert.deepEqual(rec.failed, ["rlx-core::golden golden_rose_star", "standalone::shot_cli the_count_column"]);
+  assert.equal(rec.summary, "6 tests run: 4 passed, 2 failed, 0 skipped");
+  assert.deepEqual(rec.failed, ["red-scratch::golden golden_rose_star", "red-scratch::shot_cli the_count_column"]);
 });
 
 test("any other argument vector neither skips nor records", async () => {
