@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0251.** *(0120 was reserved for
+**Next free number: 0252.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -272,4 +272,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0248](0248-the-pipeline-repairs-before-it-parks.md) | The pipeline repairs before it parks: a readiness check at the front, one repair per red, and a close split from its review | accepted 2026-09-24, Plan 0226; amends 0205 |
 | [0249](0249-a-human-phase-may-be-owed-after-the-merge.md) | A human phase marked as not blocking the merge is owed after it, not waited for | accepted 2026-09-24, Plan 0226; amends 0205 |
 | [0250](0250-the-conductor-stays-up-and-resumes-what-the-repository-shows-settled.md) | The conductor stays up, waits instead of stopping, and resumes what the repository shows settled | accepted 2026-09-24, Plan 0226; amends 0205, 0214, 0219 |
+| [0251](0251-a-gated-compile-path-has-a-named-job-and-a-red-upstream-stops-the-next-close.md) | A gated compile path has a named job, and a red upstream stops the next close | proposed 2026-09-24, Plan 0227; generalises 0181 |
 <!-- roster:end -->
