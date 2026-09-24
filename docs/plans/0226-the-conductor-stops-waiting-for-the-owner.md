@@ -1,7 +1,8 @@
 # 0226 — The conductor stops waiting for the owner
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-24
+> **Approved:** 2026-09-24 (user). Human-started, not queued; settle 0217 before starting.
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0248](../adrs/0248-the-pipeline-repairs-before-it-parks.md) (proposed),
 > [0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md) (proposed),
