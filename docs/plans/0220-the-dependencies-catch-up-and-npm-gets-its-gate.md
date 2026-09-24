@@ -300,7 +300,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — npm 11 installs Electron by name | studio-builder | done against the amended bar (binary moved to P4) | f6852988 |
 | 2 — The lint set moves together | studio-builder | done, on eslint 9.39.5 not 10 (Notes) | this row's commit + the reformat after it |
-| 3 — The build and test set moves together | studio-builder | not started | |
+| 3 — The build and test set moves together | studio-builder | done; dev-window and CSP-test bullets carried to P4 (Notes) | this row's commit |
 | 4 — Electron 44 and electron-builder 26 | studio-builder | not started | |
 | 5 — The Rust pins that trail | dev | not started | |
 | 6 — The npm gate, and CI on Node 24 | dev | not started | |
@@ -336,6 +336,30 @@ flowchart LR
   `testing/player.ts`, `Editor.test.tsx`), which 3.3.3 passes. That reformat is the phase's second
   commit, nothing else in it. `README.md` fails under both versions, so it was left alone.
 - **P2 tests:** same set as P1, 30 files / 280 tests, the same two failing to collect.
+- **P3 pins:** vite 8.3.0, plugin-react 6.1.1, vitest 5.0.1, jsdom 30.1.1, esbuild 0.28.2,
+  testing-library/react 16.3.3, jest-dom 7.0.1, concurrently 10.0.5, cross-env 10.1.0, wait-on 9.1.0,
+  `@codemirror/*` commands 6.11.1 / language 6.12.4 / lint 6.9.7 / state 6.7.6 / view 6.43.13,
+  `@lezer/highlight` 1.2.4. No config or source file needed a change.
+- **P3 deviation: `@types/node` 22.7.4 -> 22.20.4**, same major. vite 8 declares an optional peer
+  `@types/node >=22.12.0` that npm enforces against an installed copy. Phase 4 still sets the major.
+- **P3 install order:** a one-shot `npm install` is ERESOLVE, because the old vitest 2 subtree and the
+  root `esbuild` 0.24.0 hold vite ^5 peers while the new plugin-react is placed. It went through as
+  `install esbuild @types/node`, then `uninstall vitest vite @vitejs/plugin-react`, then an install
+  of the new set by name. No `--force`, no `--legacy-peer-deps`.
+- **P3 allowScripts:** vite 8 bundles with rolldown, so the graph has one `esbuild`, 0.28.2.
+  `install-scripts approve esbuild` removed `esbuild@0.24.0` and `esbuild@0.21.5` as stale and
+  added `esbuild@0.28.2`. After `rm -rf studio/node_modules` and `npm --prefix studio ci`,
+  `install-scripts ls` prints *No packages with unreviewed install scripts.*
+- **P3 tests:** same set as P2, 30 files / 280 tests, the same two failing to collect.
+- **P3 build:** `dist/main/index.cjs`, `dist/preload/index.cjs` and `dist/renderer/` built. The
+  `<meta>` CSP is intact in `dist/renderer/index.html`. vite 8 warns that the 558 kB renderer chunk
+  is over 500 kB; it is not an error.
+- **P3 unmet, carried to P4:** `npm run dev` reaching the window, `window.csp.test.ts` passing, and
+  whether vite 8 changed the dev server's injected headers all need the Electron binary, which the
+  amended P1 places at P4. P4 reruns all three.
+- **P3 audit:** `14 vulnerabilities (13 high, 1 critical)`. It lists none of vite, vitest,
+  `@vitest/mocker`, vite-node, esbuild or plugin-react. What is left is electron, extract-zip,
+  electron-builder's tree and tar.
 
 ### Close triggers
 
