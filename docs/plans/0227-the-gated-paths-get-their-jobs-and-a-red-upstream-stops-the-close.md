@@ -141,7 +141,10 @@ flowchart LR
     still builds and closes, with a printed notice rather than a silent pass.
   - `docs/developing.md` gains the gated-path roster as a table: which job compiles `capture_mac/`,
     `spout` and `plugin-foobar/`, and the standing fact that **nothing local compiles any of them**.
-  - `docs/releasing.md` says a close refuses over a red `origin/main` and how to clear it.
+  - `docs/releasing.md` says a close **reports** `origin/main`'s CI and never blocks on it, why
+    (the conductor cannot push, so it cannot clear the ref it would be waiting on), and where the
+    reading appears. **Amended 2026-09-24** with Phase 3; the wording that shipped in `c149b93d`
+    describes the withdrawn blocking behaviour and is corrected here.
   - Every Plan and ADR citation in these three is inside a markdown link, never bare —
     `node scripts/check-reader-prose.mjs` is green, as are `check-doc-links.mjs`,
     `check-index-rows.mjs` and `toc.mjs --check`.
