@@ -161,7 +161,7 @@ export function describe(r) {
         text:
           `upstream CI: RED - ${at(r)} concluded ${r.conclusion}; ${jobs}\n` +
           `  ${r.url}\n` +
-          `A close refuses over a red ${BRANCH} (ADR-0251): repair ${BRANCH} and push, and close once its ${WORKFLOW_NAME} run is green.`,
+          `A close reports this and still merges (ADR-0251): repair ${BRANCH} and push; the digest line clears when a later close reads it green.`,
       };
     }
     default:
@@ -172,7 +172,7 @@ export function describe(r) {
   }
 }
 
-/** The shorthand a park reason or a live line carries: the failing jobs, or the run when none were listed. */
+/** The shorthand a live line or the digest carries: the failing jobs, or the run when none were listed. */
 export function redSubject(r) {
   return r.jobs?.length ? r.jobs.join(", ") : `run ${r.run}`;
 }
