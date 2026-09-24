@@ -19,7 +19,7 @@
 // else; neither page summarizes review prose. An event (a step, a park, a merge) belongs to the
 // latest run that had started by the event's timestamp.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { tagObjectType } from "./git.mjs";
@@ -28,7 +28,7 @@ import { laneOpen } from "./lane.mjs";
 import { readLedger } from "./ledger.mjs";
 import { usageReading } from "./live.mjs";
 import { CLAUDE_DIR } from "./outcome.mjs";
-import { donePhases, findPlan, readPlanFile } from "./plan.mjs";
+import { donePhases, findPlan, parsePlan, readPlanFile, rowIsOwed } from "./plan.mjs";
 import { findingWhere, statePaths, totalSpend, writeAtomic } from "./state.mjs";
 
 const HUMAN_REASONS = new Set(["human_phase", "stop_condition", "question", "plan_wrong"]);
@@ -201,6 +201,27 @@ export function settledPark(rec, repo) {
 }
 
 /**
+ * Every phase a closed plan still owes (ADR-0249): the `owed` rows of each plan under
+ * `docs/plans/done/` in `repo`, the main checkout. Read from the tree and never from `state/`, so a
+ * wiped state directory and a close that happened outside the conductor both still show it, and
+ * the owner's commit marking the row done is the whole of settling it.
+ */
+export function owedPhasesInDone(repo) {
+  const dir = join(repo, "docs", "plans", "done");
+  if (!existsSync(dir)) return [];
+  const out = [];
+  for (const file of readdirSync(dir).filter((f) => /^\d{4}-.*\.md$/.test(f)).sort()) {
+    const text = readFileSync(join(dir, file), "utf8");
+    if (!/\|\s*owed\b/i.test(text)) continue;
+    const doc = parsePlan(text);
+    for (const row of doc.log.rows.filter(rowIsOwed)) {
+      out.push({ plan: doc.number ?? file.slice(0, 4), phase: row.id, title: row.title, rel: `docs/plans/done/${file}` });
+    }
+  }
+  return out;
+}
+
+/**
  * The one traversal of `state`, `state/` and git both pages render from. `now` is an option so a
  * test can pin the clock the current page's ages read.
  */
@@ -225,6 +246,7 @@ export function readDigestState(state, { repo, stateDir, now = Date.now() }) {
     merged: plans.filter((r) => r.status === "merged"),
     stops: latest?.stops ?? [],
     cli: latest?.cli ?? null,
+    owed: repo ? owedPhasesInDone(repo) : [],
   };
 }
 
@@ -261,7 +283,7 @@ function standingParkLines(view, rec) {
 /** The current page's first section: everything waiting on the owner, and nothing else. */
 function needsYou(view) {
   const lines = [];
-  const counts = { parked: 0, stops: 0, findings: 0, lanes: 0 };
+  const counts = { parked: 0, stops: 0, findings: 0, lanes: 0, owed: 0 };
   // The run carries its own CLI reading, so the line stops appearing on the first run whose version is listed.
   if (view.cli?.warning) {
     lines.push(`- **claude ${view.cli.version} is not a verified CLI version** - the last run went ahead with a warning (ADR-0208): ${view.cli.warning}.`);
@@ -269,6 +291,13 @@ function needsYou(view) {
   for (const rec of view.parked) {
     counts.parked += 1;
     lines.push(...standingParkLines(view, rec));
+  }
+  for (const o of view.owed) {
+    counts.owed += 1;
+    lines.push(
+      `- **${o.plan} owes Phase ${o.phase}** (${o.title}): merged without it (\`Blocks merge: no\`). ` +
+        `Do it, then mark its row \`done\` in \`${o.rel}\` on main and commit; the line leaves with the commit.`,
+    );
   }
   for (const s of view.stops) {
     counts.stops += 1;
@@ -314,6 +343,7 @@ function needsYou(view) {
   const parts = [];
   if (counts.parked) parts.push(plural(counts.parked, "park"));
   if (view.settled.length) parts.push(`${view.settled.length} already settled`);
+  if (counts.owed) parts.push(`${plural(counts.owed, "owed phase")}`);
   if (counts.stops) parts.push(`${plural(counts.stops, "lane")} stopped at the worktree cap`);
   if (counts.findings) parts.push(`${plural(counts.findings, "merge")} with open findings`);
   if (counts.lanes) parts.push(`${plural(counts.lanes, "lane")} still on disk after a merge`);

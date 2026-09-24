@@ -164,6 +164,18 @@ phases so each lane's run is contiguous** — an alternation that could have bee
 buys nothing. What is still worth avoiding is a crossing that is really a *protocol* question:
 that is an ADR before the plan, not a phase boundary.
 
+**A `human` phase may carry `- **Blocks merge:** no` beside its owner tag, and no other phase may**
+([ADR-0249](../../../docs/adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)). The conductor then
+merges what the machine built and owes the phase afterwards, instead of parking the plan in front of
+it; the phase's log row reads `owed` and the digest carries it until the owner marks it `done` on
+`main`. Write it only on a phase **whose output no later phase reads and whose absence leaves every
+claim of the plan true, if unverified**: an on-device check, a rig session, a judgement of what
+shipped. Never on an input — a signing certificate, a corpus someone has to fetch, a measurement a
+later phase uses as its threshold — because building past one produces work that silently used a
+default in its place. Without the field a human phase blocks, as it always has; its position in the
+plan means nothing. The readiness check (ADR-0248) rejects a plan in which a later phase depends on a
+phase marked `no`, and the plan reader rejects the field on a `dev` or `studio-builder` phase.
+
 **Do the arithmetic on every numeric done-when before the plan ships.** A done-when is the contract
 `dev` is held to, so an unchecked number costs either a mid-phase stop to litigate it or — worse — an
 implementation tuned until the wrong number is satisfied. Plan 0033 shipped three in one plan: "90 %
@@ -932,7 +944,10 @@ it and the rest of this skill disagree, it wins for that session only.
       after `## Implementation log`: this round's review in full, then one line for every finding an
       earlier round raised and a fix round resolved, naming the fix commit. A conductor-run close has
       no reader in the room; that section is the evidence of what was checked, and it moves into
-      `done/` beside the log it graded.
+      `done/` beside the log it graded. **A row reading `owed`** is a `Blocks merge: no` human phase the
+      conductor merged without (ADR-0249): leave it `owed`, never `done`. The `Status:` line reads
+      `done` and names it (`done - Phase 7 owed, ADR-0249`), the `## Close review` states what the
+      owed phase has not yet checked, and the plans index's recently-closed bullet names it too.
    4. **The whole gate on that tip**: `fmt`, `clippy`, `nextest` as exactly
       `... suite -- cargo nextest run --workspace` through the wrapper, and `cargo doc`, with nothing
       left uncommitted. **A red here parks `check_red`.** Do not tag, and do not work around it.

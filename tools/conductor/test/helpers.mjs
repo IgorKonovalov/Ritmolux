@@ -64,7 +64,7 @@ export function tmp(prefix = "rlx-conductor-test-") {
 }
 
 /**
- * spec: { number, title?, status?, phases: [{ id, owner, title?, stop?, files? }],
+ * spec: { number, title?, status?, phases: [{ id, owner, title?, stop?, files?, blocksMerge? }],
  *         rows?: { [id]: { state, commit? } }, closeReview?: string, lane? }
  */
 export function planText(spec) {
@@ -92,6 +92,7 @@ export function planText(spec) {
     lines.push(`- **Files touched:** \`phase-${p.id}.txt\`${p.files ? `, ${p.files}` : ""}`);
     lines.push(`- **Done when:** the file exists.`);
     if (p.stop) lines.push(`- **Stop condition:** ${p.stop}`);
+    if (p.blocksMerge) lines.push(`- **Blocks merge:** ${p.blocksMerge}`);
     lines.push("");
   }
   lines.push("## Implementation log", "", `**Lane:** ${spec.lane ?? "_(unset)_"}`, "");

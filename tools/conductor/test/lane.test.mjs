@@ -1288,3 +1288,42 @@ test("selfResumeWhy: usage_limit once its reset passes, studio_install hourly an
     assert.equal(selfResumeWhy(rec({ reason }), "/nowhere", t0 + 48 * 3600_000), null, reason);
   }
 });
+
+// ADR-0249.
+test("a human phase marked Blocks merge: no is owed: the plan merges with the phases after it, the row reads owed, and the digest says so", async () => {
+  const phases = [dev("1"), { id: "2", owner: "human", blocksMerge: "no" }, dev("3")];
+  const { ctx, repo, digest } = scratch({ plans: [{ number: "0101", phases }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(rec.parks, []);
+  assert.deepEqual(kinds(rec), ["implement:dev", "implement:dev", "review:architect"]);
+  assert.deepEqual(rec.steps.map((s) => s.phases ?? null), [["1"], ["3"], null]);
+  assert.deepEqual(rec.owed.map((o) => o.phase), ["2"]);
+  assert.ok(existsSync(join(repo, "phase-0101-3.txt")));
+
+  const closed = findPlan(repo, "0101");
+  assert.ok(closed.done);
+  assert.deepEqual(readPlanFile(closed.path).log.rows.map((r) => [r.id, r.state.split(" ")[0]]), [["1", "committed"], ["2", "owed"], ["3", "committed"]]);
+  const owedLines = () => digest("## Needs you").split("\n").filter((l) => l.includes(" owes Phase "));
+  assert.equal(owedLines().length, 1, digest("## Needs you"));
+  assert.match(owedLines()[0], /^- \*\*0101 owes Phase 2\*\* \(Step 2\): merged without it/);
+
+  // The owner does the phase and marks the row done on main: the line goes, and state/ is not written.
+  const stateBefore = readFileSync(statePaths(ctx.stateDir).file, "utf8");
+  writeFileSync(closed.path, readFileSync(closed.path, "utf8").replace("| human | owed |", "| human | done |"));
+  sh(["commit", "-q", "-am", "docs(plans): 0101 Phase 2 done on the device"], repo);
+  ctx.onChange();
+  assert.equal(owedLines().length, 0, digest("## Needs you"));
+  assert.equal(readFileSync(statePaths(ctx.stateDir).file, "utf8"), stateBefore);
+});
+
+test("the same plan without Blocks merge parks human_phase at Phase 2, as before", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1"), human("2"), dev("3")] }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "human_phase");
+  assert.equal(rec.park.phase, "2");
+  assert.equal(rec.owed, undefined);
+});

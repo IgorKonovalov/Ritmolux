@@ -170,7 +170,9 @@ For **each phase in order**:
    worktree path, or `main` directly), then set this phase's row in the `phase | owner | state |
    commit` table. The row for the phase you are committing right now reads `committed with this
    row`; backfill the real SHA into the previous phase's row as you go, so every landed row but the
-   one in flight carries one. **The edit rides inside this phase's own commit** — never a separate
+   one in flight carries one. A row may also read **`owed`**: the conductor wrote it for a `human`
+   phase marked `Blocks merge: no` that the plan merges without (ADR-0249). Leave it as it is; it turns
+   `done` only when the owner does the phase. **The edit rides inside this phase's own commit** — never a separate
    commit — and is staged by explicit path alongside the phase's files. If the plan predates this
    convention and has no `## Implementation log` section, **create it** from the skeleton in
    `.claude/skills/architect/references/templates/plan.md`; a missing skeleton is not a reason to

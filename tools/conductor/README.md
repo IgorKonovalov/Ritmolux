@@ -215,7 +215,7 @@ entry. Every other reason is yours: `resume` it once you have acted.
 
 | Reason | What to do before `resume` |
 |---|---|
-| `human_phase` | Do the phase. Mark its row `done` in the plan's `## Implementation log` **in the lane** (`WORK/rlx-plan-NNNN`) and commit it there. `resume` checks the row. |
+| `human_phase` | Do the phase. Mark its row `done` in the plan's `## Implementation log` **in the lane** (`WORK/rlx-plan-NNNN`) and commit it there. `resume` checks the row, and a live run resumes it by itself. A phase marked `Blocks merge: no` never parks: see below. |
 | `claude_dir` | The same, and for the same reason: the phase declares a file under `.claude/`, which the CLI will not let a session write (ADR-0210). **Nothing was run** — the park comes before the phase. The detail names the paths. Do the phase in the lane, mark its row `done`, commit; `resume` checks the row. |
 | `studio_install` | The plan declares files under `studio/` and `npm --prefix studio ci` failed, so the gate's three studio checks could not run (ADR-0218). The detail carries the install's tail; the usual cause is no network. **Nothing was run** — the park comes before the first session. Install by hand in the lane, or wait and `resume`, which installs again: the trigger is a missing `studio/node_modules`, so the open lane the park left behind is installed into rather than skipped. |
 | `stop_condition`, `plan_wrong`, `question` | Read the transcript the inbox names. Settle it in a human-started `/architect` session. |
@@ -227,6 +227,15 @@ entry. Every other reason is yours: `resume` it once you have acted.
 | `usage_limit` | The account's usage limit ended a session, and the conductor did not wait it out, because the reset was more than 6 h away (the seven-day window), the CLI reported none, or the step had already been continued three times. The detail says which. The session's half-done work is still in the lane, uncommitted, so `resume` refuses it until you commit or `git restore` it. Resuming then re-runs the step from what the plan log and `git` show. |
 | `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or read the transcript. Resuming re-runs the step from what the plan log and `git` show. |
 | `merge_conflict`, `merge_failed`, `main_dirty` | Resolve it in the lane, or clean the main checkout. A resumed plan goes straight back to the fast-forward. |
+
+**A `human` phase marked `Blocks merge: no` is owed, not waited for** (ADR-0249). The conductor
+commits its log row as `owed` in the lane, runs the phases after it, reviews, closes and merges as
+though it were not there. The digest's **Needs you** then carries one line per owed phase, read from
+every plan under `docs/plans/done/` in the main checkout, so it survives a wiped `state/`. Do the phase
+when you can, mark its row `done` in the closed plan **on `main`**, and commit: the line leaves with
+the commit, and no command records it. A phase that finds a problem does not reopen its plan; the
+finding becomes a backlog entry or a new plan. The field on a `dev` or `studio-builder` phase is a
+plan error `check` reports.
 
 **A usage limit is waited out, not parked.** When the account's limit ends a session (a 429 with a
 `rejected` rate-limit reading), the lane sleeps until the window reopens, plus two minutes, and then

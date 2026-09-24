@@ -3,7 +3,9 @@
 //   open the lane (installing the studio's dependencies when the plan declares files under studio/,
 //   since the gate's three studio checks are guarded on a directory no worktree is born with)
 //   -> for each same-owner run not done: one implement session, then verify its claim
-//   -> a `human` phase parks -> conductor gate -> take the close lock -> review session
+//   -> a `human` phase parks, unless it is marked `Blocks merge: no`, when its row is committed
+//      `owed` and the plan runs on without it (ADR-0249)
+//   -> conductor gate -> take the close lock -> review session
 //   -> blockers/majors: release the lock, fix session, verify, gate, re-review (two fix rounds max)
 //   -> closed: verify the close -> gate the close tip -> fast-forward main (one automatic re-merge)
 //   -> release the lock
@@ -19,7 +21,7 @@
 // version ends it the way ADR-0219's pause does: the plan in flight finishes and no other starts.
 
 import { spawnSync } from "node:child_process";
-import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { adoptedClose, verifyClose, verifyFix, verifyImplement } from "./close.mjs";
@@ -534,6 +536,33 @@ function park(ctx, rec, { reason, detail, phase = null, read = null, resetsAt = 
   return rec;
 }
 
+/**
+ * Records `phases` owed (ADR-0249): their log rows read `owed` in the lane's plan, committed by the
+ * conductor itself, and the record lists them. Returns a park detail, or null. The row is the
+ * record the close and the digest read; the state's copy is for the history.
+ */
+function markOwed(ctx, rec, file, phases) {
+  const wt = rec.worktree;
+  let text = readFileSync(file.path, "utf8");
+  for (const id of phases) {
+    const row = new RegExp(`^(\\|\\s*${id} [—–-] [^|]*\\|[^|]*\\|)[^|]*(\\|[^|]*\\|\\s*)$`, "m");
+    if (!row.test(text)) return `Phase ${id} is marked Blocks merge: no, but ${file.rel} has no ## Implementation log row for it to mark owed`;
+    text = text.replace(row, "$1 owed $2");
+  }
+  writeFileSync(file.path, text);
+  const range = rangeLabel(phases);
+  const add = git(["add", "--", file.rel], wt);
+  const commit = add.code === 0 ? git(["commit", "-q", "-m", `docs(plans): ${rec.plan} Phase ${range} is owed after the merge`, "--", file.rel], wt) : add;
+  if (commit.code !== 0) return `could not commit Phase ${range} owed in ${file.rel}: ${commit.stderr}`;
+  const sha = head(wt);
+  rec.owed ??= [];
+  for (const phase of phases) rec.owed.push({ phase, commit: sha, at: now() });
+  live(ctx, rec.plan, `  lane   Phase ${range} is owed after the merge (Blocks merge: no), row committed in ${sha.slice(0, 7)}`);
+  event(ctx, "owed", { plan: rec.plan, phases });
+  save(ctx);
+  return null;
+}
+
 function planFileIn(cwd, plan) {
   const found = findPlan(cwd, plan);
   return found ? { ...found, rel: relative(cwd, found.path).replace(/\\/g, "/") } : null;
@@ -775,6 +804,11 @@ export async function runPlan(ctx, lane, plan) {
         });
       }
       if (next.kind === "review") break;
+      if (next.kind === "owed") {
+        const problem = markOwed(ctx, rec, file, next.phases);
+        if (problem) return park(ctx, rec, { reason: "disagreement", phase: next.phases[0], detail: problem, read: `${file.rel} Phase ${next.phases[0]}` });
+        continue;
+      }
 
       const range = rangeLabel(next.phases);
       const before = head(wt);

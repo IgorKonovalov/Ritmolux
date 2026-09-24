@@ -3,7 +3,7 @@
 // disagreement with the problems as its detail. The session's word is never the evidence.
 
 import { commitsBetween, git, head, isAncestor, isClean, resolveCommit, tagObjectType } from "./git.mjs";
-import { donePhases, findPlan, readPlanFile } from "./plan.mjs";
+import { donePhases, findPlan, nonBlocking, readPlanFile, rowIsOwed } from "./plan.mjs";
 
 /**
  * The close a session already committed on this branch, or null: the plan under `done/` with
@@ -161,9 +161,20 @@ function repairProblems(outcome, cwd, plan) {
 }
 
 /**
- * A close: the plan moved to done/ with Status done and a ## Close review section, a clean tree,
- * every repaired finding's commit on the branch and touching its file, and — when a version
- * moved — an annotated tag on the branch tip.
+ * An `owed` row is a close's to leave only on a human phase the plan marks `Blocks merge: no`
+ * (ADR-0249); on any other phase it is a phase the plan closed without.
+ */
+function owedProblems(doc, plan) {
+  const byId = new Map(doc.phases.map((p) => [p.id, p]));
+  return doc.log.rows
+    .filter((row) => rowIsOwed(row) && byId.has(row.id) && !nonBlocking(byId.get(row.id)))
+    .map((row) => `plan ${plan} Phase ${row.id} reads owed, but only a human phase marked Blocks merge: no may be owed`);
+}
+
+/**
+ * A close: the plan moved to done/ with Status done and a ## Close review section, no row owed that
+ * may not be, a clean tree, every repaired finding's commit on the branch and
+ * touching its file, and — when a version moved — an annotated tag on the branch tip.
  */
 export function verifyClose({ cwd, plan, outcome }) {
   const problems = [];
@@ -174,6 +185,7 @@ export function verifyClose({ cwd, plan, outcome }) {
     const doc = readPlanFile(found.path);
     if (doc.statusWord !== "done") problems.push(`plan ${plan} Status is "${doc.status}", not done`);
     if (!doc.hasCloseReview) problems.push(`plan ${plan} has no ## Close review section`);
+    problems.push(...owedProblems(doc, plan));
   }
   if (!isClean(cwd)) problems.push("the worktree is not clean");
   problems.push(...repairProblems(outcome, cwd, plan));

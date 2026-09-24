@@ -335,8 +335,8 @@ behaviour, never at the end.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The run stays up, waits at the cap, and resumes what the tree settled | dev | committed with this row | |
-| 2 — A human phase can be owed after the merge | dev | not started | |
+| 1 — The run stays up, waits at the cap, and resumes what the tree settled | dev | done | `affd4859` |
+| 2 — A human phase can be owed after the merge | dev | committed with this row | |
 | 3 — The lane merges main early, and a conflict gets a merge session | dev | not started | |
 | 4 — A red gate gets one repair session | dev | not started | |
 | 5 — The close is its own session, holds the lock alone, and keeps a clean verdict | dev | not started | |
@@ -355,6 +355,12 @@ behaviour, never at the end.
   holder parked it still stops, which is why the existing cap tests are unchanged.
 - Phase 1: `test/live.test.mjs` is outside the phase's files. Its `local.json` fixture gained
   `run_budget_usd`, and nothing else changed.
+- Phase 2: `verifyClose` checks only that an `owed` row sits on a `Blocks merge: no` human phase. It
+  does not require every other row to read done, because the close fixtures in `test/close.test.mjs`
+  carry rows that do not.
+- Phase 2: `test/helpers.mjs` is outside the phase's files. `planText` gained a `blocksMerge` phase
+  field. The conductor commits the `owed` row itself, as `docs(plans): NNNN Phase N is owed after the
+  merge`.
 
 ### Close triggers
 
