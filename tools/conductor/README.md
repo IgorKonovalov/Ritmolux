@@ -410,7 +410,9 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   session denied `ls` lists the directory with `Glob` on its next turn. So `ls`, `printenv`, `grep` and
   `sed -n` run. `cp` and `mv` stay refused, because `Write` is the reviewed path for creating a file
   and a shell copy is how a session sidesteps it; `gh` stays refused, because it reaches the network
-  and authenticates as the owner. The roster grows from denials a session actually hit, never from
+  and authenticates as the owner. `sed -n` also carries sed's `e` and `w` commands, so, like the
+  `node *` rule already allowed, it is not a boundary; the refusals of `cp`, `mv` and `gh` steer a
+  session to the reviewed tool, they do not fence it. The roster grows from denials a session actually hit, never from
   imagination, so a command no session was refused gets no entry.
 - **An environment variable ahead of a command is allowed by name, never by shape.** A rule for
   `VAR=value <allowed command>` would admit every variable there is, including the ones that change
