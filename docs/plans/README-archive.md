@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0229 - The conductor reports itself honestly](#0229---the-conductor-reports-itself-honestly)
   - [0220 - The dependencies catch up, and npm gets its gate](#0220---the-dependencies-catch-up-and-npm-gets-its-gate)
   - [0228 - The resume guard accepts an owed phase](#0228---the-resume-guard-accepts-an-owed-phase)
   - [0227 - The gated paths get their jobs](#0227---the-gated-paths-get-their-jobs)
@@ -260,6 +261,21 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0229 - The conductor reports itself honestly](done/0229-the-conductor-reports-itself-honestly.md)
+
+- closed 2026-09-24, conductor-run lane `plan-0229-the-conductor-reports-itself-honestly`. Phase 1
+`0b08037a`, Phase 2 `8bf46530`, Phase 3 `3f151a49`, Phase 4 `6d2d252a`. Round 1 review: **no
+blockers, one major, two minors**, all fixed by a `dev` round (`f1994976`, `53089d56`, `d63afa27`).
+Round 2 review: **clean**. Version **none** (conductor tooling, the 0191, 0226 and 0228 precedent).
+No ADR. Closes no backlog entry. The full review is the plan's own `## Close review` section.
+- **What landed.** A red suite record keeps the failing test names (`failed`, capped at 20, with
+  `failed_count`), parsed from a recorded nextest run, and a red gate's park names the first one.
+  `settledPhase` in `plan.mjs` is the one reader of a settled park, so the digest and `status` agree
+  with `resume` on an owed phase. A run whose `tools/conductor/` sources change on disk pauses and
+  says so, and `resume`, `park` and `status` print the same notice. The conductor allowlist admits
+  `ls`, `printenv`, `grep` and `sed -n`, and still refuses `cp`, `mv` and `gh`.
+- **Open.** The 2026-09-24 flake is still unidentified; the next occurrence names itself.
 
 ### [0220 - The dependencies catch up, and npm gets its gate](done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md)
 

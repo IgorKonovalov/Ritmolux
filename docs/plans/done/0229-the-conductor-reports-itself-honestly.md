@@ -1,13 +1,15 @@
 # 0229 — The conductor reports itself honestly
 
-> **Status:** in-progress
+> **Status:** done - Phases 1-4 `0b08037a`, `8bf46530`, `3f151a49`, `6d2d252a`; round 1 fixes
+> `f1994976`, `53089d56`, `d63afa27`. Round 2 review clean: no blockers, no majors, no minors; full
+> suite 1805 passed. Version none (conductor tooling). Closed 2026-09-24.
 > **Created:** 2026-09-24
 > **Owner skill(s):** dev
-> **Related ADRs:** [0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md),
-> [0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md),
-> [0250](../adrs/0250-the-conductor-stays-up-and-resumes-what-the-repository-shows-settled.md),
-> [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
-> [0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
+> **Related ADRs:** [0207](../../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md),
+> [0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md),
+> [0250](../../adrs/0250-the-conductor-stays-up-and-resumes-what-the-repository-shows-settled.md),
+> [0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
+> [0210](../../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
 > **Closes:** none
 
 ## TL;DR
@@ -49,9 +51,9 @@ capability through `Read`, `Glob`, `Grep` and `Write`, so the denial buys no saf
 ## Decision
 
 Repair all four. None changes a decision the project has taken; each makes one mechanism agree with
-a decision already recorded — [ADR-0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md)
-for the ledger, [ADR-0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md) for what
-settles a park, and [ADR-0250](../adrs/0250-the-conductor-stays-up-and-resumes-what-the-repository-shows-settled.md)
+a decision already recorded — [ADR-0207](../../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md)
+for the ledger, [ADR-0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md) for what
+settles a park, and [ADR-0250](../../adrs/0250-the-conductor-stays-up-and-resumes-what-the-repository-shows-settled.md)
 for a resident run that is supposed to reflect the repository.
 
 **No ADR.** Three of the four have no alternative worth recording. The fourth, the stale-process
@@ -204,6 +206,92 @@ ADR-0205 already forbids for backgrounded work — the same loss, differently ca
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207). `node --test tools/conductor/test/`
   at the Phase 4 tip: 450 tests, 448 pass, 0 fail
 - **Outstanding `human` phases:** none
+
+## Close review
+
+The round 2 review, graded at `0f75a8a3f78051e50e1b89cbe6146ba14d34f77a`, in full:
+
+> # Plan 0229 — close review, round 2
+>
+> Graded at `0f75a8a3f78051e50e1b89cbe6146ba14d34f77a` on `plan-0229-the-conductor-reports-itself-honestly`
+> (`/home/igor/Work/rlx-plan-0229`), with `main` already merged in by the conductor.
+>
+> **Verdict: Plan 0229 is clean. The fix round resolved all three round-1 findings. Every gate is
+> green, and there are no blockers, majors, minors or nits.**
+>
+> ## Evidence
+>
+> - **Full suite**: `node ".../with-lock.mjs" suite -- cargo nextest run --workspace` ran in full in
+>   this session. It did not skip. Result: `Summary [ 409.417s] 1805 tests run: 1805 passed (3 slow), 7 skipped`,
+>   and the wrapper reported `with-lock: "suite" waited 0.0s, held 409.8s`. The output contains no
+>   `FAIL` line.
+> - **Rustdoc**: `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` passed.
+> - **Conductor tests**: `node --test tools/conductor/test/` ran 451 tests: 449 passed, 0 failed,
+>   2 skipped. That is round 1's 450 tests plus the new progress-counter case.
+> - **Doc links**: `node scripts/check-doc-links.mjs` is OK (567 files).
+> - **Tree**: `git status --short` was empty after every run.
+>
+> ## Round-1 findings, re-checked against the tree
+>
+> 1. **major: the parser kept nextest's progress counter; the fixture was hand-written.** Resolved in
+>    `f1994976`.
+>    - `failingTests` (`tools/conductor/lib/ledger.mjs:226`) now drops an optional
+>      `\(\s*\d+/\d+\)\s+` after the duration bracket.
+>    - `RED_NEXTEST_OUTPUT` (`tools/conductor/test/helpers.mjs:128`) is now a real recorded run from
+>      cargo-nextest 0.9.143, taken through the wrapper's pipe. It has the counters, the
+>      `stdout ───` / `stderr ───` sections, and the `Summary` block that reprints both failures. That
+>      is the same shape as this review's own suite output.
+>    - A new case in `ledger.test.mjs` feeds the same failure three ways: with a padded counter, with a
+>      different counter, and with no counter. It asserts that exactly one bare name comes back.
+>    - The cases in `with-lock.test.mjs` and `ledger.test.mjs` now assert the recorded summary line and
+>      both names.
+>    - `gate.mjs:209` and `with-lock.mjs:357` both call this one parser, so both record writers get the
+>      fix.
+>    - The repository's nextest config sets no retries, so the `TRY n FAIL` line shape cannot appear
+>      here and needs no case.
+> 2. **minor: the README implied `sed -n` was a boundary.** Resolved in `53089d56`. The README now
+>    carries the suggested clause almost word for word: `sed -n` carries `e` and `w`, and the refusals
+>    of `cp`, `mv` and `gh` steer a session to the reviewed tool rather than fence it.
+> 3. **minor: `parkStillTrue`'s refusal did not mention `owed`.** Resolved in `d63afa27`. The refusal
+>    at `tools/conductor/lib/lane.mjs:130` now reads
+>    `... still not marked done (or owed, on a phase marked Blocks merge: no) ...`, and the regex in
+>    `lane.test.mjs` is updated to match.
+>
+> The implementation log's notes name all three fixes and their commits.
+>
+> ## Lenses
+>
+> - **Lens 1, alignment**: round 1's reading of Phases 1 to 4 still holds. The fix round changed only
+>   what those three findings named. Every phase has exactly one `dev` owner tag, and the plan has no
+>   `human` phases. The log is shorter than the phases section.
+> - **Lens 2 and lens 5, layering and design**: no Rust, C++ or studio code changed. There is still
+>   one parser and one settled-phase reader.
+> - **Lens 3, docs and bookkeeping**: `tools/conductor/README.md` is current. The close still owes:
+>   - the version bump (conductor tooling feature; the close picks the level);
+>   - the `done/` move and the `Status:` flip;
+>   - the plans index;
+>   - the `## Close review` section, carrying the three round-1 rows above with their fix commits.
+>
+>   No ADRs pair with this plan, and it touched no `presets/`.
+> - **Lens 4, correctness**: the parser now reads the shape this repository's nextest actually prints.
+>   The fixture is a recording, so a future change to nextest's output shape shows up as a failing
+>   test, which is what the plan's Risks section asked for.
+>
+> ## Findings
+>
+> None.
+
+Findings an earlier round raised and a fix round resolved:
+
+- Round 1, major: `failingTests` kept nextest's progress counter in a failing name, and the fixture
+  was hand-written. Fixed in `f1994976`.
+- Round 1, minor: the conductor README implied `sed -n` was a boundary. Fixed in `53089d56`.
+- Round 1, minor: `parkStillTrue`'s refusal did not mention `owed`. Fixed in `d63afa27`.
+
+Close notes: version **none**. Conductor tooling ships in no artifact, which is the 0191, 0226 and
+0228 precedent. No paired ADR, no `presets/` change, no backlog entry closed. Backlog probes: 46 reductions hold
+across 21 live entries. Translation advisory: `how-it-works.ru.md`, `running.ru.md` and the foobar
+`READ-ME-FIRST.ru.md` are behind their sources, none moved by this plan.
 
 ## Followups (after this lands)
 
