@@ -192,7 +192,7 @@ flowchart LR
 | 2 — A reader for origin's CI | dev | done | 1e7e4857 |
 | 3 — The close consults it | dev | done | f0a5eee1 |
 | 4 — The foobar component joins the push | dev | done | 0c0ac09b |
-| 5 — The documents say what a machine needs | dev | done | committed with this row |
+| 5 — The documents say what a machine needs | dev | done | c149b93d |
 | 6 — The close ceremony gains the step | human | not started | |
 | 7 — The reading that only a push can produce | human | not started | |
 
@@ -219,13 +219,16 @@ flowchart LR
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature. A new script, a new conductor park reason and a new CI job, plus a
+  compile fix in `standalone/src/capture_mac/rt.rs`.
+- **Operator docs touched:** `README.md`, `docs/developing.md`, `docs/releasing.md`,
+  `tools/conductor/README.md`, `scripts/fixtures/README.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, with 46 reductions holding
+  across 21 live entries, 4 unprobeable, and 30 advisory moved-path rows
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
+- **Outstanding `human` phases:** 6 and 7, both `Blocks merge: no`
 
 ## Followups (after this lands)
 
