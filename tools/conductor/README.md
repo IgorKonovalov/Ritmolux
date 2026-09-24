@@ -252,6 +252,23 @@ the conductor moves the annotated tag onto the repaired tip, and the digest's **
 such commit by SHA until `origin/main` holds it. Read those before you push. The budget is
 `budget_usd.repair`, required.
 
+**A red `origin/main` is reported at every close and never stops one** (ADR-0251). With the close lock
+held and before the close session starts, the lane runs `scripts/check-upstream-ci.mjs`'s reader
+against the main checkout's `origin`: the newest completed run of the `CI` workflow on `main`, through
+`gh`. `Pages` and `Release` runs are never read, and a cancelled run is passed over. Whatever it reads,
+the close goes ahead. The conductor never pushes, so `origin/main` moves only when you push, and a
+close that waited on it would wait on a step no session can take; there is no park reason for it.
+
+- **Red:** the live log gets one line, `upstream CI: RED - run <id> at <sha> concluded failure, failing
+  <jobs>; closing anyway`, and the digest's **Needs you** carries a line naming the run and the
+  failing jobs. That line stays until a later close reads `origin/main` green; an unread reading in
+  between does not clear it. Repair `main` and push.
+- **Unread**, because there is no `origin`, no `gh`, an unauthenticated `gh` or no network: the live
+  log gets `upstream CI: skipped: not read (<case>)`. A machine without `gh auth login` therefore
+  closes as before, and the live log shows that nothing was read.
+
+Every reading, green, red or unread, is kept on the plan's record as `upstream`.
+
 **A merge that conflicts gets one merge session, not a park** (ADR-0248). The lane merges `main` itself
 before the `pre-review` gate, so the gate and the review see the tree that will reach `main`, and it
 merges again before the fast-forward when `main` moved meanwhile. A conflict at either point is

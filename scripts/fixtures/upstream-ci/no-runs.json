@@ -1,0 +1,6 @@
+{
+  "runs": [
+    { "databaseId": 5001, "workflowName": "Pages", "workflowFile": "pages.yml", "headBranch": "main", "status": "completed", "conclusion": "success", "headSha": "5555551eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "url": "https://github.com/example/ritmolux/actions/runs/5001" }
+  ],
+  "jobs": {}
+}

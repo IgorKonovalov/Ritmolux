@@ -392,6 +392,32 @@ cargo check -p standalone --features spout
 
 Bypass once with `git push --no-verify`.
 
+## The gated compile paths
+
+Three parts of the tree compile only on a platform or with an SDK that the everyday loop does not
+have. **Nothing local compiles any of them**: not `cargo build`, not `clippy --all-targets`, not
+`nextest`, and not the pre-push hook. Each one is compiled before a tag by a CI job that names it
+([ADR-0251](adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)):
+
+| Gated path | Why the local loop cannot see it | Compiled before a tag by |
+|---|---|---|
+| `standalone/src/capture_mac/` | `#[cfg(target_os = "macos")]`, so no Windows or Linux target type-checks it | `check (macos-latest)` in `ci.yml` |
+| `cfg(feature = "spout")` in `standalone/` | off by default, and code behind a disabled feature is not type-checked | the `spout` job in `ci.yml` ([ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md)) |
+| `plugin-foobar/` | C++ against the third-party foobar2000 SDK, which is gitignored; no cargo command builds it | the `foobar` job in `ci.yml` |
+
+`release.yml`'s jobs build all three again at tag time, and its `needs:` skips the release when any
+fails. So a break in one of them is read **by name, on the push that caused it**, from the job
+above. If nobody reads it, the only sign is an artifact missing from a release. The macOS build was
+red for two releases that way.
+
+**A red job on `main` is named at the next close, which still goes ahead.** Before a close merges,
+it reads the newest `CI` run for `origin/main` with `node scripts/check-upstream-ci.mjs`. A red run
+is reported with the failing job named; `Pages` and `Release` runs are never read. The reading needs
+`gh auth login` on the machine doing the close. Without it, or without a network, the script prints
+`upstream CI: skipped: not read (<case>)` and exits 0, so the output says nothing was checked.
+[Releasing](releasing.md#a-close-reports-a-red-main-and-never-blocks-on-it) says where the reading
+appears and why it never blocks.
+
 ## Disk
 
 Every worktree builds into its own `target/`, and cargo collects nothing in it on its own.

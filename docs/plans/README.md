@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0229** (ADRs are a separate sequence — next free there is **0251**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0229** (ADRs are a separate sequence — next free there is **0252**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -53,7 +53,6 @@ place. The plan file carries the real link.
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 | [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
-| [0227](0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close.md) | The gated paths get their jobs, and a red upstream stops the close | approved | dev, human | ADR-0251: the macOS build broke and nothing stopped it. A close refuses over a red `origin/main`; the foobar C++ gains a push job. |
 | [0228](0228-the-resume-guard-accepts-an-owed-phase.md) | The resume guard accepts an owed phase | approved | dev | `parkStillTrue` accepts only `done`, so a plan parked before being marked `Blocks merge: no` can never resume. Plan 0220 is stuck there now. |
 <!-- roster:end -->
 
@@ -1046,6 +1045,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0227 - The gated paths get their jobs](done/0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close.md) - closed 2026-09-24, Phases 6-7 owed. Review: **no blockers, one major (fixed), two minors (fixed).** Version: **0.148.0**. ADR-0251 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0225 - The split goes one level deeper](done/0225-the-split-goes-one-level-deeper.md) - closed 2026-09-24. Review: **no blockers, no majors, two minors, one nit (all fixed).** Version: **0.147.1**. ADR-0247 accepted, Outcome. Closes nothing. [Write-up](README-archive.md).
 - [0226 - The conductor stops waiting for the owner](done/0226-the-conductor-stops-waiting-for-the-owner.md) - closed 2026-09-24, Phase 7 owed. Review: **one major (fixed), three minors.** Version: none. ADR-0248 + 0249 + 0250 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0217 - Every setting has a file, and a gate says so](done/0217-every-setting-has-a-file-and-a-gate-says-so.md) - closed 2026-09-24. Review: **no blockers, no majors, three minors, one nit (two fixed).** Version: **0.147.0**. ADR-0240 accepted. Closes nothing. [Write-up](README-archive.md).

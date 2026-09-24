@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0227 - The gated paths get their jobs](#0227---the-gated-paths-get-their-jobs)
   - [0225 - The split goes one level deeper](#0225---the-split-goes-one-level-deeper)
   - [0226 - The conductor stops waiting for the owner](#0226---the-conductor-stops-waiting-for-the-owner)
   - [0217 - Every setting has a file, and a gate says so](#0217---every-setting-has-a-file-and-a-gate-says-so)
@@ -257,6 +258,24 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0227 - The gated paths get their jobs](done/0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close.md)
+
+- closed 2026-09-24, conductor-run lane
+`plan-0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close`. Phase 1 `646ca642`,
+Phase 2 `1e7e4857`, Phase 3 `1fc58a95`, Phase 4 `0c0ac09b`, Phase 5 `417022b7`. **Phases 6 and 7 are
+owed** (`Blocks merge: no`, ADR-0249). Round 1 found one major, fixed in `f1bbf1b1`; round 2 found
+**no blockers, no majors, two minors**, both fixed at the close in `67681698`. Version **0.148.0**
+(minor: a new script, a conductor behaviour and a CI job). ADR-0251 accepted. Closes no backlog
+entry. The full review is the plan's own `## Close review` section.
+- **What landed.** `OutputIvars` in `standalone/src/capture_mac/rt.rs` is `pub(super)`, the one-word
+  repair of the macOS build. `scripts/check-upstream-ci.mjs` reads `origin/main`'s `CI` workflow
+  through `gh`, names the failing job on red and prints a notice on every unreadable case. The
+  conductor's close records that reading and a `Needs you` digest line, and never parks on it: the
+  first, blocking version was withdrawn mid-flight (ADR-0251 Alternative E). `ci.yml` gains a
+  concurrent `foobar` job.
+- **Owed.** Nothing has yet seen `check (macos-latest)` green, the next `Release` publish all six
+  artifacts, or the upstream read in the human-started close ceremony under `.claude/`.
 
 ### [0225 - The split goes one level deeper](done/0225-the-split-goes-one-level-deeper.md)
 
