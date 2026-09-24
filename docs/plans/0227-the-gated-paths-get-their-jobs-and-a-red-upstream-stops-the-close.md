@@ -243,6 +243,9 @@ flowchart LR
   files moved too. Outside this phase's list: the same rename left one link in
   `scripts/fixtures/README.md` broken, which kept `check-doc-links.mjs` red; it is corrected in
   this phase's commit.
+- Review round 1, finding 0 (major): the script's red output and `redSubject`'s comment no longer
+  name the withdrawn refusal, in `f1bbf1b1`. `--self-test` 13 of 13. Findings 1 and 2 (minor) sit
+  in the Decision flowchart and the Followups, outside the log, and are left.
 
 ### Close triggers
 
