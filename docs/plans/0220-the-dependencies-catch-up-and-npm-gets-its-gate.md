@@ -241,7 +241,13 @@ flowchart LR
 
 ### Phase 7 — CI on the pushed tree, and a release dry run
 - **Owner skill:** `human`
+- **Blocks merge:** no
 - **What:** push, then read CI on the new tree and the studio artifacts a release would ship.
+  **Marked non-blocking 2026-09-24** under
+  [ADR-0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md), which postdates this plan.
+  Every criterion below begins with the push, and a push requires the merge, so a blocking phase
+  here asks for something only possible after the thing it prevents. The plan merges and this
+  reading is owed after it.
 - **Files touched:** this plan's log.
 - **Done when:**
   - Every CI job is green on the pushed `main`: the new npm audit job, the `studio` job on Node 24,
