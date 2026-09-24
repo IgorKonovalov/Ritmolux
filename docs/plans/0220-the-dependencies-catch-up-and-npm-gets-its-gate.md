@@ -302,7 +302,7 @@ flowchart LR
 | 2 — The lint set moves together | studio-builder | done, on eslint 9.39.5 not 10 (Notes) | this row's commit + the reformat after it |
 | 3 — The build and test set moves together | studio-builder | done; dev-window and CSP-test bullets carried to P4 (Notes) | this row's commit |
 | 4 — Electron 44 and electron-builder 26 | studio-builder | done; dev smoke run as the dev pipeline, not the `dev` script (Notes) | this row's commit |
-| 5 — The Rust pins that trail | dev | not started | |
+| 5 — The Rust pins that trail | dev | done | committed with this row |
 | 6 — The npm gate, and CI on Node 24 | dev | not started | |
 | 7 — CI on the pushed tree, and a release dry run | human | not started | |
 
@@ -400,6 +400,20 @@ flowchart LR
   `--dir` and `-c.extraMetadata.version`, all unchanged in electron-builder 26, so neither is
   edited, and neither is `electron-builder.yml`. They run for the first time at Phase 7.
 - `version` and `EXPECTED_PLAYER_VERSION` are untouched.
+- **P5 lock:** `cargo update --workspace` moved, beside the three pins, `find-msvc-tools` 0.1.13,
+  `toml_parser` 1.1.3, and the `wasm-bindgen` / `js-sys` / `web-sys` set to 0.2.128 / 0.3.105. It
+  reports 45 dependencies still behind latest, which it does not move. `wgpu-core`, `wgpu-hal` and
+  `naga` stay 30.0.0; only the `wgpu` facade has a 30.0.1. The glyphon comment in
+  `core/Cargo.toml` names the new pin.
+- **P5 deny:** `cargo deny --log-level error check` prints *advisories ok, bans ok, licenses ok,
+  sources ok*.
+- **P5 ttf-parser:** still 0.25.1, through `fontdb` 0.23.0 under `cosmic-text` 0.19.0 (glyphon), and
+  through `owned_ttf_parser` 0.25.1 under winit's `sctk-adwaita`. `deny.toml` is unchanged.
+- **P5 full suite:** `cargo nextest run --workspace`: *Summary [485.633s] 1805 tests run: 1805
+  passed (5 slow), 7 skipped*. No golden moved (`git status` shows only the three manifests/lock).
+- **P5 `cc` 1.4.7** compiles on the box as a transitive build dependency (clippy lists it), but the
+  `spout` build script that calls it runs only with the feature on Windows. The `spout` CI job is
+  owed at Phase 7.
 
 ### Close triggers
 
