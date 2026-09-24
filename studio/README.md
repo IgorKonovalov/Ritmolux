@@ -96,6 +96,11 @@ Node, and ESLint refuses the import as well.
 | `npm run lint`      | ESLint                                                                     |
 | `npm run typecheck` | All four projects                                                          |
 
+`allowScripts` in `package.json` names, pinned as `pkg@version`, every
+dependency whose install script `npm ci` may run; npm 11 skips all others. A new
+entry is a reviewed edit (ADR-0244), made with `npm install-scripts approve
+<pkg>` and checked with `npm install-scripts ls`.
+
 ## Finding the player
 
 In this order (ADR-0178), first hit wins:

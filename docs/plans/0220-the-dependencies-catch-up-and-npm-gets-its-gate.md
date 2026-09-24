@@ -1,6 +1,6 @@
 # 0220 — The dependencies catch up, and npm gets its gate
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-22
 > **Owner skill(s):** studio-builder, dev, human
 > **Related ADRs:** [0244](../adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md) (proposed),
@@ -282,11 +282,11 @@ flowchart LR
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(to be filled by the implementer)_
+**Lane:** `/home/igor/Work/rlx-plan-0220`, branch `plan-0220-the-dependencies-catch-up-and-npm-gets-its-gate` (conductor)
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — npm 11 installs Electron by name | studio-builder | not started | |
+| 1 — npm 11 installs Electron by name | studio-builder | parked: field landed, binary bullet unmet (Notes) | this row's commit |
 | 2 — The lint set moves together | studio-builder | not started | |
 | 3 — The build and test set moves together | studio-builder | not started | |
 | 4 — Electron 44 and electron-builder 26 | studio-builder | not started | |
@@ -295,6 +295,22 @@ flowchart LR
 | 7 — CI on the pushed tree, and a release dry run | human | not started | |
 
 ### Notes
+
+- **P1 list** (`npm install-scripts approve electron esbuild`, pinned, no `--all`): `electron@32.1.2`,
+  `esbuild@0.24.0`, `esbuild@0.21.5`. After `rm -rf studio/node_modules` and `npm --prefix studio ci`
+  (npm 11.19.1, Node 26.8.2), `install-scripts ls` prints *No packages with unreviewed install
+  scripts.*
+- **P1 unmet: the Electron binary still does not land.** The postinstall now runs, but Electron
+  32's `install.js` extracts with `extract-zip` 2.0.1 (yauzl 2.10.0), which on Node 26 writes one
+  entry (`dist/locales/hr.pak`, 394 KB) and lets the process exit 0 with the promise neither resolved
+  nor rejected - reproduced with a scratch script calling `extract-zip` directly on the cached
+  `electron-v32.1.2-linux-x64.zip`. No `path.txt`, no `dist/electron`. So the plan's Context line
+  (npm 11 blocking scripts is why the binary is missing) is half the cause on this box; `electron`
+  44.4.3 depends on `@electron-internal/extract-zip` instead (`npm view`), so Phase 4 may clear it.
+- **P1 tests**: 30 files / 280 tests pass; `window.csp.test.ts` and `presetHandlers.test.ts` fail
+  to collect (*Electron failed to install correctly*). `windowless.test.ts` and `templates.test.ts`
+  pass by skipping (no built player in the lane's `target/`).
+- `npx prettier --check studio/README.md` fails on `main`'s own settings-key table, untouched here.
 
 ### Close triggers
 
