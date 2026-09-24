@@ -54,6 +54,17 @@ its column list and gains a pane**, rather than becoming a grid, because the lis
 type-to-filter are worth more than tiling — a grid shows fewer presets at once, which is the
 opposite of the problem.
 
+**Amended 2026-09-24, when the plan parked at Phase 2:** the shell has no way to put pixels on
+screen. `Renderer::queue_text` is the only drawing call it has, and the device, the queue and the
+surface stay private inside `core`, per ADR-0001 and ADR-0009. We will add an image layer in `core`,
+next to the text layer and behind the same `text` feature. That is the same reasoning ADR-0009
+applied to text: the device lives in `core`, and a feature flag, not a crate boundary, keeps the
+layer out of the plugin build. Two alternatives were rejected. Handing the shell the device and
+queue would widen exactly the boundary ADR-0001 draws. A text-only pane, a name plus a palette
+swatch, would not show the look, and showing the look is what this plan is for. The owner set the
+one condition this layer has to meet: it must not cost the app anything. A frame with no image
+queued therefore pays nothing, and Phase 2 holds that as a done-when.
+
 ## Architecture diagram
 
 ```mermaid
@@ -105,13 +116,40 @@ pictures there is a separate question with a separate protocol cost.
   [ADR-0228](../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)'s precedent
   that user state may be lost but may not prevent launch.
 
-### Phase 2 — The pane shows what is cached
+### Phase 2 — The renderer draws one image the shell hands it
+
+- **Owner skill:** dev
+- **What:** A shell-facing image layer beside the text layer (amended 2026-09-24, see the note
+  under `## Decision`). The shell sets one RGBA8 image, and the renderer uploads it once into a
+  texture it keeps. Each frame the shell may queue a rectangle to draw that image into, the same way
+  it queues `TextRun`s. The draw happens inside the pass that already draws the text, before the
+  text, so a label can sit on top of the picture. Illustrative shape: `set_overlay_image(Option<
+  OverlayImage { rgba: &[u8], width, height }>)` and `queue_image(ImageRect { x, y, w, h })`.
+- **Files touched:** a new `core/src/render/image_layer.rs` (carrying the hot-path pragma, since
+  `render/` is in the hygiene scan set), `core/src/render/mod.rs`, `core/src/render/tests.rs`,
+  `core/Cargo.toml` only if the feature wiring needs it, `standalone/src/hud.rs`.
+- **Done when:**
+  - **A frame with no queued image costs what it costs today.** No texture, pipeline or bind
+    group exists until the first `set_overlay_image`, and a frame with nothing queued records no
+    draw call. A test holds the first half with a plain renderer, the way Plan 0223 Phase 1 held
+    that no query set exists.
+  - **Setting an image is the only upload.** A frame that only queues a rectangle writes no
+    texture and allocates nothing. The texture is reallocated only when the image's dimensions
+    change.
+  - **A still reads back as `shot` wrote it.** A headless test sets a known image, queues it over
+    a flat scene and reads back the rectangle, within the capture path's existing tolerance. The
+    texture format matches how the cache bytes are encoded, so no colour step is applied twice.
+  - The layer compiles only under the `text` feature, so the plugin's cdylib, the default build
+    and the core suite without that feature carry none of it.
+
+### Phase 3 — The pane shows what is cached
 
 - **Owner skill:** dev
 - **What:** The browser gains a preview pane reading the cache. Valuable before anything fills it
   automatically, because Phase 1's mode can populate it by hand.
 - **Files touched:** `standalone/src/overlay.rs`, `standalone/src/overlay/tests.rs`,
-  `docs/running.md`.
+  `standalone/src/hud.rs` (reads the cache entry when the highlight changes and draws through Phase
+  2's layer), `standalone/src/thumbs.rs` (the reader), `docs/running.md`.
 - **Done when:** highlighting a preset in the browser shows its cached still beside the list, and
   the list keeps its columns, its wrapping and its type-to-filter unchanged. **A preset with no
   cached image shows its name and a placeholder** — that is a normal state on first launch and it
@@ -119,7 +157,7 @@ pictures there is a separate question with a separate protocol cost.
   images arrive, because a roster that reflows while you are arrowing through it is worse than one
   with no pictures.
 
-### Phase 3 — The pass fills the cache by itself
+### Phase 4 — The pass fills the cache by itself
 
 - **Owner skill:** dev
 - **What:** The background walk — spawn, throttle, stop, report.
@@ -141,7 +179,7 @@ pictures there is a separate question with a separate protocol cost.
   - **It can be turned off** — a `config.toml` key and a settings row, because a user on battery or
     on a locked-down machine needs the app to stop trying.
 
-### Phase 4 — A changed preset gets a new picture
+### Phase 5 — A changed preset gets a new picture
 
 - **Owner skill:** dev
 - **What:** Staleness, which is what makes this usable in the authoring loop.
@@ -171,12 +209,12 @@ struct ThumbKey {
 ## Risks & open questions
 
 - **The first-launch experience is the weakest part of this design, and it is what a new user
-  meets.** For the first minutes the pane is mostly placeholders. Phase 3 does not add a progress
+  meets.** For the first minutes the pane is mostly placeholders. Phase 4 does not add a progress
   UI; if that reads as broken rather than as filling, the answer is a visible indication of
   progress and it is a followup, not a silent widening.
 - **A second GPU context may not be available.** ADR-0010 recorded the driver memory floor once;
   the pass pays it twice while running. On a constrained machine the child may fail to start at
-  all, which Phase 3 handles by giving up and saying so — but the *feature* is then simply absent,
+  all, which Phase 4 handles by giving up and saying so — but the *feature* is then simply absent,
   and nothing in this plan makes it work there.
 - **Repeated process spawns can look like malware.** 114 launches of one executable in minutes is a
   pattern endpoint security throttles. It is named in ADR-0230 and handled only by reporting.
@@ -198,8 +236,10 @@ struct ThumbKey {
 - **It does not animate anything.** A still per preset — a loop multiplies storage and render cost
   by its frame count, and the still is already the expensive part.
 - **It does not ship any picture.** Nothing enters the binary, the zip or `presets/`.
-- **It does not touch `core`, the C ABI or the control protocol**, so neither the foobar component
-  nor the studio gains thumbnails. The studio's own preset list is a separate question and would
+- **It does not touch the C ABI or the control protocol**, so neither the foobar component nor the
+  studio gains thumbnails. It does touch `core` once, in Phase 2: an image layer behind the `text`
+  feature, which the component's build does not enable. That line originally read "does not touch
+  `core`", and it was amended on 2026-09-24. The studio's own preset list is a separate question and would
   cost a protocol widening.
 - **It does not re-derive NFR §4's size cap**, though this plan is what discovered the cap is
   breached. That measurement wants its own backlog entry and its own decision, and hanging it on a
@@ -216,9 +256,10 @@ struct ThumbKey {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — One thumbnail, on demand, in a cache | dev | done | committed with this row |
-| 2 — The pane shows what is cached | dev | not started | |
-| 3 — The pass fills the cache by itself | dev | not started | |
-| 4 — A changed preset gets a new picture | dev | not started | |
+| 2 — The renderer draws one image the shell hands it | dev | not started | |
+| 3 — The pane shows what is cached | dev | not started | |
+| 4 — The pass fills the cache by itself | dev | not started | |
+| 5 — A changed preset gets a new picture | dev | not started | |
 
 ### Notes
 
@@ -267,6 +308,10 @@ Phase 2's pane, so the run stops here rather than skipping past it.
 Two ways out, and the choice is the architect's: widen the plan with a core image-overlay phase (and
 say whether the "does not touch `core`" line meant the C ABI and the protocol rather than the crate),
 or re-specify the pane in terms of what the text layer can actually draw.
+
+**Architect, 2026-09-24: the plan was amended and the phases renumbered.** A new Phase 2 adds the
+image layer this note asked for. The pane is now Phase 3, the pass Phase 4 and staleness Phase 5.
+Where the notes above say "Phase 2", "Phase 3" or "Phase 4", they use the old numbers.
 
 ### Close triggers
 
