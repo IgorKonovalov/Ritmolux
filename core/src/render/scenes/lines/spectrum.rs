@@ -67,8 +67,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::super::Scene;
 use super::super::common;
+use super::super::{Scene, SeriesBound};
 use super::renderer::{LineRenderer, SegmentInstance, StrokeMetric, miter_extension};
 use super::{
     CapOverflow, GeneratorConfig, MirrorSpec, OverflowContext, ViewTransform, replicate_mirror,
@@ -642,6 +642,36 @@ impl SpectrumScene {
     }
 }
 
+impl SeriesBound for SpectrumScene {
+    fn set_param_series(&mut self, name: &str, values: &[f32]) {
+        let Some(row) = SERIES_PARAMS.iter().position(|&p| p == name) else {
+            // Not a per-element parameter on this scene (the whole-figure ones:
+            // radius, rotation, the view transform, the mirror, hue_spread,
+            // palette_mix, saturation). Fall back to the element-0 value rather
+            // than dropping the binding — the same reading the caller gives a
+            // scene with no per-element surface at all.
+            if let Some(&first) = values.first() {
+                self.set_param(name, first);
+            }
+            return;
+        };
+        let (Some(dst), Some(active)) = (self.series.get_mut(row), self.series_active.get_mut(row))
+        else {
+            return; // unreachable: `position` returned an in-range row
+        };
+        // Copy rather than borrow: the caller's slice is the renderer's scratch,
+        // reused by the next binding. `n` is the overlap, so a scratch sized for
+        // a different element count can neither overrun nor leave stale values
+        // beyond it (the rest of the row keeps whatever it held; only the first
+        // `n` are read, because `update` walks `lengths`, which is `n` long).
+        let n = dst.len().min(values.len());
+        if let (Some(dst), Some(src)) = (dst.get_mut(..n), values.get(..n)) {
+            dst.copy_from_slice(src);
+        }
+        *active = n > 0;
+    }
+}
+
 impl Scene for SpectrumScene {
     fn name(&self) -> &'static str {
         "spectrum"
@@ -701,31 +731,8 @@ impl Scene for SpectrumScene {
         }
     }
 
-    fn set_param_series(&mut self, name: &str, values: &[f32]) {
-        let Some(row) = SERIES_PARAMS.iter().position(|&p| p == name) else {
-            // Not a per-element parameter on this scene (the whole-figure ones:
-            // radius, rotation, the view transform, the mirror, hue_spread,
-            // palette_mix, saturation). Fall back to the trait's rule — the
-            // element-0 value — rather than dropping the binding.
-            if let Some(&first) = values.first() {
-                self.set_param(name, first);
-            }
-            return;
-        };
-        let (Some(dst), Some(active)) = (self.series.get_mut(row), self.series_active.get_mut(row))
-        else {
-            return; // unreachable: `position` returned an in-range row
-        };
-        // Copy rather than borrow: the caller's slice is the renderer's scratch,
-        // reused by the next binding. `n` is the overlap, so a scratch sized for
-        // a different element count can neither overrun nor leave stale values
-        // beyond it (the rest of the row keeps whatever it held; only the first
-        // `n` are read, because `update` walks `lengths`, which is `n` long).
-        let n = dst.len().min(values.len());
-        if let (Some(dst), Some(src)) = (dst.get_mut(..n), values.get(..n)) {
-            dst.copy_from_slice(src);
-        }
-        *active = n > 0;
+    fn as_series_bound(&mut self) -> Option<&mut dyn SeriesBound> {
+        Some(self)
     }
 
     fn set_palette(&mut self, palette: &Palette) {

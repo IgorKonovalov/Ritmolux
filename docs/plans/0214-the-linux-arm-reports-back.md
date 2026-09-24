@@ -248,3 +248,102 @@ Both failed in the same place. Every other job was green, including the `windows
   make the file order deterministic, **and** make each needle identify its one definition (for
   example `pub(crate) fn texture(binding`), since sorting alone keeps a match that depends on
   filenames sorting in a particular order.
+
+### Phase 2, first pass (2026-09-23)
+
+**Lane:** `main` directly. **Commit:** `b47dc0f1`.
+
+The one failure Phase 1 recorded is repaired in `core/src/render/tonemap/tests.rs`. The walk is
+sorted through a new `sorted_rs_files`, which both scans in that file now call; the needle scan
+leaves its own file out of the concatenation; three needles are narrowed to `...(binding`; and each
+needle is asserted to match exactly one place in `core/src`.
+
+**Two readings that correct the cause recorded above**, both taken here rather than read from
+source:
+
+- **The wrong hit is the test's own literal, not `preview.rs:245`.** When a needle matches itself,
+  the next `ShaderStages::` is the one in its own assertion message, `ShaderStages::{found}`, where
+  `::` is followed by `{`; the visibility parser reads an empty alphanumeric run and returns `""`.
+  That is the `left: ""` both runs reported. `preview.rs:245` is a second match and a real hazard,
+  but it is not what fired.
+- **All four needles fail under the runner's order, not one.** Running the scan's logic over the
+  real tree in both directions: the old logic in sorted order reads all four correctly; the old
+  logic in reversed order reads `""` for all four; the new logic reads all four correctly in both
+  orders, each with exactly one match. nextest reported the first assertion to fire, so the arm was
+  never one match away from green.
+
+**The failure was reproduced on this machine, not only on the runners.** Under the conductor on
+2026-09-23, Plan 0223's lane failed this test at 18:31 on the `pub(crate) fn sampler(` needle
+(`left: ""`, `right: "FRAGMENT"`), while Plan 0215's lane ran `-P fast` green at 18:45. One box, one
+filesystem, two worktrees, opposite results.
+
+**No test's platform gate was widened or loosened**, and none was touched: the repair is confined to
+how one scan enumerates and searches `core/src`, and the assertion it now makes is strictly stronger
+than the one it replaces.
+
+**Checks:** `cargo fmt --all --check` clean; `cargo clippy --workspace --all-targets -- -D warnings`
+clean; `cargo nextest run --workspace -P fast` 1718 passed, 0 failed, 86 skipped.
+
+**Still owed on this phase, and only the owner can take it.** nextest cancelled on this failure, so
+the 810 tests behind it and the job's later steps - doctests, clippy, fmt, doc - plus the adapter
+line and the GPU-test list Phase 1's done-when names, have still never run. They arrive on the next
+push, and this phase stays open until that reading is green or hands back a shorter list.
+
+**One deviation, flagged rather than taken:** `Status:` is left at `approved` rather than flipped to
+`in-progress`. No plan on `main` carries `in-progress`, the roster row in `docs/plans/README.md`
+states `approved`, and this plan alternates between `human` pushes and `dev` repairs across many
+sessions, so the flip would sit desynced from that index indefinitely.
+
+### Phase 2, second pass (2026-09-23)
+
+**Lane:** `main` directly. **Commit:** `f6bd0bf5`.
+
+**The first pass worked, read from run
+[35916291035](https://github.com/IgorKonovalov/Ritmolux/actions/runs/35916291035) on `6ae4af8c`.**
+The arm went from `885/1695 tests run` to `1441/1718`, so 556 tests that had never executed on Linux
+now do, and every other job on that run is green - `check (windows-latest)`, `check (macos-latest)`,
+`coverage`, `spout`, `miri`, `deny`, `studio`, `links`. nextest still cancelled, on a different and
+genuinely Linux-only failure, which is this pass.
+
+**The second failure:** `standalone::help_cli
+an_unhonourable_command_line_is_refused_before_anything_is_built` at `standalone/tests/help_cli.rs:218`.
+`--preset a-name-no-preset-has` exited 101, not 2, because the process panicked at
+`standalone/src/run.rs:670`: *"failed to create event loop: neither WAYLAND_DISPLAY nor
+WAYLAND_SOCKET nor DISPLAY is set."*
+
+**Cause, and it is narrower than it first looks.** The six comments in `run.rs` that say a flag is
+judged *before the window exists* are all accurate: the window is created later, in `resumed`. What
+was wrong is that `EventLoop::new()` itself needs a display server on Linux, and it was constructed
+177 lines before the validation it is supposed to follow. On Windows and macOS that call cannot
+fail, so the ordering was invisible there and the guarantee appeared to hold. The local binding it
+produced was read in exactly one place, `run_app`, so the repair is to construct it there.
+
+**Reproduced here before it was repaired, and the other cases it was hiding.** With `DISPLAY`,
+`WAYLAND_DISPLAY` and `WAYLAND_SOCKET` all unset on the Arch box:
+
+| headless command line | before | after | expected |
+|---|---|---|---|
+| `--preset a-name-no-preset-has` | 101 | 2 | 2 |
+| `--preview syphon` | 101 | 2 | 2 |
+| `--tier nonsense` | 101 | 1 | 1 |
+| `--definitely-not-a-flag` | 2 | 2 | 2 |
+
+The last row is the control: it is parsed in `stream::parse`, which already ran before the event
+loop, and it was correct throughout. The second row is the case the same test asserts a few lines
+below the one that fired, so the arm had at least one more failure queued behind it.
+
+**No test's platform gate was widened or loosened**, and none was touched. No test changed at all:
+the repair is one statement moved inside `run`.
+
+**Checks, every one with no display server set:** `standalone::help_cli` 3 passed, 0 failed;
+`cargo nextest run --workspace -P fast` 1722 passed, 0 failed, 86 skipped; `cargo fmt --all --check`
+clean; `cargo clippy --workspace --all-targets -- -D warnings` clean.
+
+**A finding for `architect`, not acted on.** This class is invisible on Windows and macOS by
+construction - `EventLoop::new()` cannot fail there - so the ubuntu arm is the only thing that can
+catch it, and it catches it as a panic in an unrelated assertion rather than as itself. Whether the
+ordering deserves a guard of its own is a design question this pass did not answer.
+
+**Still owed on this phase.** The arm cancelled before its later steps again, so `cargo test --doc`,
+`clippy`, `fmt` and `doc` on Linux, the adapter Phase 1's done-when names, and the list of
+GPU-touching tests that ran rather than skipped are all still unread. They arrive on the next push.

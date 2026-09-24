@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0247.** *(0120 was reserved for
+**Next free number: 0248.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -259,7 +259,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0235](0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md) | A gallery card's hop is chosen per family, and the signal outlasts it | accepted 2026-09-22 (Plan 0210) |
 | [0236](0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md) | A diffused render varies by prompt on bar boundaries, and the seed stays fixed | proposed |
 | [0237](0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md) | The hook runs cargo only when the push moved Rust, and serves the rest from the ledger | accepted 2026-09-22 (Plan 0213), supersedes 0033 in part |
-| [0238](0238-a-scene-declares-a-capability-and-the-engine-stops-enumerating-kinds.md) | A scene declares a capability, and the engine stops enumerating kinds | proposed |
+| [0238](0238-a-scene-declares-a-capability-and-the-engine-stops-enumerating-kinds.md) | A scene declares a capability, and the engine stops enumerating kinds | accepted 2026-09-23, Plan 0215 |
 | [0239](0239-rotation-carries-two-orders-and-the-shuffles-seed-varies-per-launch.md) | Rotation carries two orders, and the shuffle's seed varies per launch | accepted 2026-09-23 (Plan 0216) |
 | [0240](0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md) | A setting lives in a file, and the in-app menu edits that file | accepted 2026-09-20, Plan 0217 |
 | [0241](0241-linux-leads-and-windows-is-a-peer.md) | Linux leads, and Windows stays a peer | accepted 2026-09-20, Plan 0218 |
@@ -268,4 +268,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0244](0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md) | The npm graphs are gated like the cargo graph, and an install script runs by name | proposed 2026-09-22, Plan 0220 |
 | [0245](0245-an-internal-grid-is-a-fraction-of-the-target-resolved-per-tier-and-adapter-class.md) | An internal grid is a fraction of the render target, resolved per tier and adapter class, and the sample budget counts against the grid | proposed 2026-09-22, Plan 0223; supplements 0034, 0140 |
 | [0246](0246-the-adapter-is-a-setting-and-the-window-prefers-high-performance.md) | The adapter is a setting, not a launch constant: the window prefers high performance, a file key holds the choice, and it moves without a restart | accepted 2026-09-23, Plan 0224; amends 0155 |
+| [0247](0247-the-split-recurses-and-the-ceiling-is-an-assertion-about-the-corpus.md) | The split recurses, and the ceiling is an assertion about the corpus | proposed 2026-09-23, Plan 0225; extends 0166 |
 <!-- roster:end -->

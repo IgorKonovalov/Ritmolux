@@ -837,6 +837,12 @@ fn visibility(body: &str, at: usize, rule: Vis, label: &str) -> String {
     }
 }
 
+/// Every `.rs` file under `dir`, in `read_dir`'s order.
+///
+/// That order is the filesystem's and is not sorted: it differs between
+/// filesystems, and between two worktrees of one checkout on one machine. Use
+/// [`sorted_rs_files`] rather than this directly — a scan that concatenates
+/// the result and takes a first match reads a different file per box.
 fn rs_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
     for entry in std::fs::read_dir(dir).expect("read a core/src directory") {
         let path = entry.expect("a directory entry").path();
@@ -846,6 +852,18 @@ fn rs_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
             out.push(path);
         }
     }
+}
+
+/// Every `.rs` file under `core/src`, sorted by path.
+///
+/// The sort is what makes the scans below read the same bytes in the same
+/// order on every machine.
+fn sorted_rs_files() -> Vec<std::path::PathBuf> {
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut files = Vec::new();
+    rs_files(&src, &mut files);
+    files.sort();
+    files
 }
 
 /// The text from `text[0]` up to the delimiter that closes an already-open
@@ -974,10 +992,7 @@ fn layouts_in(text: &str, file: &str) -> Vec<Layout> {
 
 /// Every bind-group layout in `core/src`, sorted by file for a stable printout.
 fn all_layouts() -> Vec<Layout> {
-    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let mut files = Vec::new();
-    rs_files(&src, &mut files);
-    files.sort();
+    let files = sorted_rs_files();
 
     let mut all = Vec::new();
     for file in &files {
@@ -1407,22 +1422,33 @@ fn the_bloom_layouts_are_four_shapes_nothing_else_shares() {
 /// visibility and pairs would split or merge on it silently.
 #[test]
 fn the_scan_reads_the_visibility_the_helpers_actually_set() {
-    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let mut files = Vec::new();
-    rs_files(&src, &mut files);
-    let mut crate_text = String::new();
-    for file in &files {
-        crate_text.push_str(&std::fs::read_to_string(file).expect("read a core source file"));
-    }
+    // This file is left out of the concatenation. Every needle below also
+    // occurs here as its own literal, and the first `ShaderStages::` after one
+    // of those is the `ShaderStages::{found}` of the assertion message, whose
+    // visibility reads as the empty string.
+    let crate_text: String = sorted_rs_files()
+        .iter()
+        .filter(|file| !file.ends_with("render/tonemap/tests.rs"))
+        .map(|file| std::fs::read_to_string(file).expect("read a core source file"))
+        .collect();
 
     // `(the helper's definition, the visibility MARKERS says it sets)`. Each
-    // definition is matched to the first `ShaderStages::` inside it.
+    // definition is matched to the first `ShaderStages::` inside it, so each
+    // needle has to name exactly one place in the crate — asserted below,
+    // because a needle matching two reads whichever file sorts first.
     for (definition, expected) in [
-        ("pub(crate) fn texture(", "FRAGMENT"),
-        ("pub(crate) fn sampler(", "FRAGMENT"),
-        ("pub(super) fn storage_entry(", "COMPUTE"),
+        ("pub(crate) fn texture(binding", "FRAGMENT"),
+        ("pub(crate) fn sampler(binding", "FRAGMENT"),
+        ("pub(super) fn storage_entry(binding", "COMPUTE"),
         ("let lut_vertex_texture = |binding: u32|", "VERTEX"),
     ] {
+        let hits = crate_text.matches(definition).count();
+        assert_eq!(
+            hits, 1,
+            "`{definition}` names {hits} places in core/src, not one. The scan \
+             takes the first, so a second match makes the visibility it reads \
+             depend on which file sorts first. Narrow the needle."
+        );
         let at = crate_text
             .find(definition)
             .unwrap_or_else(|| panic!("`{definition}` is still in core/src"));

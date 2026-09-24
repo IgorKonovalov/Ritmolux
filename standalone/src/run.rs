@@ -666,9 +666,6 @@ pub fn run() {
         }
     }
 
-    // expect: init-time invariant — without an event loop there is no app.
-    let event_loop = EventLoop::new().expect("failed to create event loop");
-
     // Load the operator config before the window exists so the first frame can
     // open on the right display; a missing/garbled file degrades to windowed
     // defaults (NFR 10).
@@ -844,6 +841,15 @@ pub fn run() {
         console_flag: parse_console_flag(),
         state: None,
     };
+    // Constructed here, after every value typed for this run has been judged.
+    // On Linux this call needs a display server, so a headless box fails it —
+    // and every flag checked above would otherwise be unreachable there, making
+    // a usage error arrive as a panic about Wayland. The window itself is still
+    // created later, in `resumed`.
+    //
+    // expect: init-time invariant — without an event loop there is no app.
+    let event_loop = EventLoop::new().expect("failed to create event loop");
+
     if let Err(err) = event_loop.run_app(&mut app) {
         eprintln!("event loop error: {err}");
         std::process::exit(1);
