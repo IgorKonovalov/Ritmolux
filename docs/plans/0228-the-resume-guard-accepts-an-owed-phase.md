@@ -102,8 +102,8 @@ to `done`. The phase's own `**Blocks merge:** no` marker is what makes `owed` le
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The guard accepts owed | dev | committed with this row | |
-| 2 — The operator guide says what owed means at a resume | dev | not started | |
+| 1 — The guard accepts owed | dev | done | `0717f508` |
+| 2 — The operator guide says what owed means at a resume | dev | committed with this row | |
 
 ### Notes
 
