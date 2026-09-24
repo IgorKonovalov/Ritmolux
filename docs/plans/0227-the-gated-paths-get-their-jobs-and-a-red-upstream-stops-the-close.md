@@ -1,7 +1,9 @@
 # 0227 — The gated paths get their jobs, and a red upstream stops the close
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-24
+> **Approved:** 2026-09-24 (user) — queued in lane a. Phase 1 unblocks the macOS release
+> artifacts, which have been absent since v0.146.1.
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0251](../adrs/0251-a-gated-compile-path-has-a-named-job-and-a-red-upstream-stops-the-next-close.md)
 > (proposed), [0181](../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md),
