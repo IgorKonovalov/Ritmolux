@@ -203,6 +203,22 @@ const CASES = [
   { tool: "Bash", command: "awk '/a/,/b/' docs/developing.md", allowed: false, why: "`awk` writes files and runs commands" },
   { tool: "Bash", command: "awk '/^## Disk/,/^## /' docs/developing.md | grep -c config.toml", allowed: false, why: "the done-when pipe: its `awk` part is refused" },
 
+  // The eight commands the 2026-09-24 sessions were refused. A command is admitted when the session
+  // already holds the capability through Read, Glob, Grep or Write; the rest stay refused.
+  { tool: "Bash", command: "ls", allowed: true },
+  { tool: "Bash", command: "ls -la tools/conductor/lib", allowed: true },
+  { tool: "Bash", command: "printenv RLX_CONDUCTOR", allowed: true },
+  { tool: "Bash", command: "grep -n settledPark tools/conductor/lib/digest.mjs", allowed: true },
+  { tool: "Bash", command: "sed -n 180,200p tools/conductor/lib/digest.mjs", allowed: true },
+  { tool: "Bash", command: "sed -i s/a/b/ core/src/lib.rs", allowed: false, why: "only `sed -n` is admitted; an in-place edit is Edit's" },
+  { tool: "Bash", command: "sed s/a/b/ core/src/lib.rs", allowed: false },
+  { tool: "Bash", command: "cp core/src/lib.rs core/src/lib2.rs", allowed: false, why: "Write is the reviewed path for creating a file" },
+  { tool: "Bash", command: "mv core/src/lib.rs core/src/lib2.rs", allowed: false, why: "same" },
+  { tool: "Bash", command: "gh run list", allowed: false, why: "reaches the network and authenticates as the owner" },
+  { tool: "Bash", command: "target/debug/shot --preset rose_star", allowed: false, why: "a bare binary path runs any program" },
+  { tool: "Bash", command: 'git grep -n -E "settledPark|parkStillTrue" -- tools/conductor', allowed: false, why: "the alternation's `|` splits the command" },
+  { tool: "Bash", command: "git grep -n -e settledPark -e parkStillTrue -- tools/conductor", allowed: true, why: "the same search, spelled without a `|`" },
+
   // The lane is the bound. A deletion whose path leaves it is refused however it is spelled.
   { tool: "Bash", command: "rm -rf ../rlx-plan-0175", allowed: false, why: "escapes the worktree" },
   { tool: "Bash", command: "rm ../../secrets.txt", allowed: false },

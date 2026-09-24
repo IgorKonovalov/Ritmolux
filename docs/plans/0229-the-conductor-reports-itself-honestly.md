@@ -158,8 +158,8 @@ ADR-0205 already forbids for backgrounded work — the same loss, differently ca
 |---|---|---|---|
 | 1 — The ledger names what failed | dev | done | `0b08037a` |
 | 2 — One reader decides a settled phase | dev | done | `8bf46530` |
-| 3 — A run refuses to start stale | dev | done | committed with this row |
-| 4 — The allowlist admits what the tools already grant | dev | not started | |
+| 3 — A run refuses to start stale | dev | done | `3f151a49` |
+| 4 — The allowlist admits what the tools already grant | dev | done | committed with this row |
 
 ### Notes
 
@@ -178,6 +178,15 @@ ADR-0205 already forbids for backgrounded work — the same loss, differently ca
   `tools/conductor/` and is not in it. The record is `state/conductor.sources.json`, written at start
   and removed at the run's end, on interrupt and by `abort`. The notice goes to stderr. The new module
   is `lib/sources.mjs`.
+- Phase 4 was built from these eight denials: `ls`, `sed`, `grep`, `cp`, `printenv`, a bare binary
+  path, `git grep -E` with an alternation, and `gh`. Four are admitted (`ls *`, `printenv *`,
+  `grep *`, `sed -n *`); `cp` and `gh` stay refused, as does `mv`, which was not among the eight; the
+  bare binary path and the `git grep -E` alternation get no entry and stay refused, the second because
+  the matcher splits the command at the `|` inside the quotes. No deny entry was added: all of these
+  are refused by being absent. `test/settings.test.mjs`, outside the phase's file list, gained one case
+  per denial, because its roster test fails on a rule with no case.
+- `sed -n *` also admits sed's `w` and `e` commands, which write a file and run a shell command.
+  `Bash(node *)` was already allowed.
 
 ### Close triggers
 

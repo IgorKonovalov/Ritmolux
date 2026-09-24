@@ -405,6 +405,13 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   reads each command of a compound call on its own, so `cd studio; npm run typecheck` is refused for
   its `cd` — the prompts tell a session to run one command per call and pass `--prefix` instead.
   **Every rule has a case in `test/settings.test.mjs`**, which fails on a rule added without one.
+- **A command is admitted when the session already holds that capability through `Read`, `Glob`,
+  `Grep` or `Write`, and refused otherwise.** Admitting such a command buys turns, not power: a
+  session denied `ls` lists the directory with `Glob` on its next turn. So `ls`, `printenv`, `grep` and
+  `sed -n` run. `cp` and `mv` stay refused, because `Write` is the reviewed path for creating a file
+  and a shell copy is how a session sidesteps it; `gh` stays refused, because it reaches the network
+  and authenticates as the owner. The roster grows from denials a session actually hit, never from
+  imagination, so a command no session was refused gets no entry.
 - **An environment variable ahead of a command is allowed by name, never by shape.** A rule for
   `VAR=value <allowed command>` would admit every variable there is, including the ones that change
   what a build produces, so the allowlist instead lists the ones this project documents:
