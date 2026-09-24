@@ -1,16 +1,16 @@
 # 0226 — The conductor stops waiting for the owner
 
-> **Status:** in-progress
+> **Status:** done - Phase 7 owed, ADR-0249. Closed 2026-09-24 (human-started lane). Phases 1-6 `affd4859`, `6e0b3d2c`, `56061b8b`, `8f363852`, `362d0f02`, `0bec06ee`. Mode 4: one major (the implementer skills' conductor mode did not admit `repair`), fixed at the close in `ee17e357`; three minors open. Full workspace suite (1805 passed, 7 skipped), `cargo doc -D warnings` and the conductor tests (423 pass) verified green at the close. Version: none (conductor tooling, nothing a release ships).
 > **Created:** 2026-09-24
 > **Approved:** 2026-09-24 (user). Human-started, not queued; settle 0217 before starting.
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0248](../adrs/0248-the-pipeline-repairs-before-it-parks.md) (proposed),
-> [0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md) (proposed),
-> [0250](../adrs/0250-the-conductor-stays-up-and-resumes-what-the-repository-shows-settled.md) (proposed),
-> [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
-> [0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md),
-> [0214](../adrs/0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md),
-> [0219](../adrs/0219-the-conductor-can-be-asked-to-finish-and-stop-and-the-ask-does-not-outlive-the-run.md)
+> **Related ADRs:** [0248](../../adrs/0248-the-pipeline-repairs-before-it-parks.md) (proposed),
+> [0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md) (proposed),
+> [0250](../../adrs/0250-the-conductor-stays-up-and-resumes-what-the-repository-shows-settled.md) (proposed),
+> [0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
+> [0209](../../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md),
+> [0214](../../adrs/0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md),
+> [0219](../../adrs/0219-the-conductor-can-be-asked-to-finish-and-stop-and-the-ask-does-not-outlive-the-run.md)
 > **Closes:** none
 > **Runs human-started, NOT queued.** It rewrites the pipeline the conductor would run it with, and
 > Phases 2, 3, 5 and 6 edit `.claude/skills/`, which a headless session cannot write (ADR-0210).
@@ -263,6 +263,7 @@ behaviour, never at the end.
 ### Phase 7 — The pilot: one resident run over the real queue
 
 - **Owner skill:** human
+- **Blocks merge:** no
 - **What:** Write the four new budget keys and `run_budget_usd` into `local.json`, then start one
   `run` over the queue as it stands and leave it up through at least one night. Afterwards, read the
   digest and `digest --history`. Record the following in this plan's `### Notes`:
@@ -341,7 +342,7 @@ behaviour, never at the end.
 | 4 — A red gate gets one repair session | dev | done | `8f363852` |
 | 5 — The close is its own session, holds the lock alone, and keeps a clean verdict | dev | done | `362d0f02` |
 | 6 — A readiness check reads the plan before any spend | dev | done | `0bec06ee` |
-| 7 — The pilot: one resident run over the real queue | human | not started | |
+| 7 — The pilot: one resident run over the real queue | human | owed | |
 
 ### Notes
 
@@ -391,6 +392,10 @@ behaviour, never at the end.
   `check` and `run` refuse it after the merge until Phase 7's first step is done.
 - Followup: a resident run is live almost always, and `park NNNN` and `finding NNNN <ref> --verb`
   are still refused while a run is live. Only `resume` got an ask file.
+
+- Close (architect, 2026-09-24): Phase 7 is the pilot of the merged conductor and cannot run before the
+  merge, so the close gave it `Blocks merge: no` and left its row `owed` (ADR-0249). The review's one
+  major, a repair session its own skill would not admit, is fixed in `ee17e357`.
 
 ### Close triggers
 

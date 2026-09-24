@@ -1,8 +1,8 @@
 # ADR-0250 — The conductor stays up, waits instead of stopping, and resumes what the repository shows settled
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-24 (Plan 0226)
 > **Date:** 2026-09-24
-> **Related plan(s):** [0226](../plans/0226-the-conductor-stops-waiting-for-the-owner.md)
+> **Related plan(s):** [0226](../plans/done/0226-the-conductor-stops-waiting-for-the-owner.md)
 > **Amends:** [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)
 > (`resume` as the owner's act, and a lane that stops at the worktree cap),
 > [0214](0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md)

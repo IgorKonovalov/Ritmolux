@@ -54,7 +54,6 @@ place. The plan file carries the real link.
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 | [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
 | [0225](0225-the-split-goes-one-level-deeper.md) | The split goes one level deeper | approved | dev | Approved 2026-09-24, queued first in lane b. ADR-0247 (proposed): the split recurses instead of stopping at `###`. Unblocks `Pages`, red since 2026-09-23 on a 32,711 B route. |
-| [0226](0226-the-conductor-stops-waiting-for-the-owner.md) | The conductor stops waiting for the owner | approved | dev, human | ADR-0248 + 0249 + 0250 (proposed): resident run, owed human phases, readiness + merge/repair sessions, close split from review. Runs human-started, NOT queued. Settle 0217 first. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -1044,6 +1043,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0226 - The conductor stops waiting for the owner](done/0226-the-conductor-stops-waiting-for-the-owner.md) - closed 2026-09-24, Phase 7 owed. Review: **one major (fixed), three minors.** Version: none. ADR-0248 + 0249 + 0250 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0217 - Every setting has a file, and a gate says so](done/0217-every-setting-has-a-file-and-a-gate-says-so.md) - closed 2026-09-24. Review: **no blockers, no majors, three minors, one nit (two fixed).** Version: **0.147.0**. ADR-0240 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0215 - The wide seams narrow, and a guard holds them](done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md) - closed 2026-09-23. Review: **no blockers, no majors, three minors, two nits (two fixed).** Version: **0.146.1**. ADR-0238 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0224 - The adapter becomes a setting](done/0224-the-adapter-becomes-a-setting.md) - closed 2026-09-23. Review: **no blockers, no majors, two minors, one nit (all three fixed).** Version: **0.146.0**. ADR-0246 accepted. Closes nothing. [Write-up](README-archive.md).
