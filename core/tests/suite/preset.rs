@@ -2545,8 +2545,11 @@ fn the_additive_particle_scenes_share_one_level_param() {
 /// `trails` uses. Scanning the source is what lets this guard cover scenes that
 /// need a GPU device to instantiate.
 fn set_param_arm_names(text: &str, file: &std::path::Path) -> Vec<String> {
+    // The open paren is load-bearing: `set_param_series` shares the prefix and
+    // sits above `set_param` in at least one scene file, so a prefix search
+    // would read that body instead and find no arms at all.
     let start = text
-        .find("fn set_param")
+        .find("fn set_param(")
         .unwrap_or_else(|| panic!("{}: no set_param found", file.display()));
     // The body ends at the first line that closes the fn at 4-space indent.
     let rest = &text[start..];

@@ -80,7 +80,7 @@ impl Renderer {
         // the intermediate's one real claim — that a frame routed through it is
         // byte-identical to one drawn straight at the target — be asserted with
         // no window, in `core/tests/suite/console_preview.rs`.
-        let preview = self.preview.take();
+        let preview = self.preview.take_target();
         capture::record_clear(&mut encoder, preview.as_ref().map_or(&view, |p| &p.view));
         let _ = self.draw_frame(
             frame,
@@ -93,7 +93,7 @@ impl Renderer {
         if let Some(p) = preview.as_ref() {
             p.record_copy_to(&mut encoder, &texture);
         }
-        self.preview = preview;
+        self.preview.restore_target(preview);
         // The preview readback advances on **every** frame drawn through the
         // intermediate, which is this path as much as the present path: the two
         // record the same clear, draw and copy, and stating the rule once is
@@ -101,11 +101,11 @@ impl Renderer {
         // (`core/tests/suite/console_preview.rs`). It changes nothing about the image
         // returned below — it is an extra copy out of the intermediate, not a
         // change to what was drawn into it.
-        let recorded = self.step_preview_readback(&mut encoder);
+        let recorded = self.preview.step_readback(&self.ctx.device, &mut encoder);
         capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, width, height);
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
         if recorded {
-            self.arm_preview_readback();
+            self.preview.arm_readback();
         }
 
         #[cfg(feature = "text")]

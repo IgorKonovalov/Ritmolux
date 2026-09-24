@@ -423,24 +423,11 @@ pub struct Renderer {
     /// so the `None` case is the whole cost of the feature while unused.
     #[cfg(feature = "text")]
     aux: Option<AuxTarget>,
-    /// The program preview's intermediate (ADR-0143), `None` unless a shell has
-    /// opened one. While it is `Some` the frame is drawn into it and reaches the
-    /// real destination by an exact copy; while it is `None` nothing is
-    /// allocated, no copy is encoded and the frame path is what it was — which
-    /// is what makes the console free when it is closed.
-    preview: Option<preview::PreviewTarget>,
-    /// The preview's non-blocking readback (Plan 0158 Phase 6), `None` unless a
-    /// shell opened one. While it is `Some` each frame drawn through the
-    /// intermediate records one `copy_texture_to_buffer` and polls the previous
-    /// frame's map; while it is `None` nothing is allocated and the frame path
-    /// costs one `Option` test.
-    preview_readback: Option<preview_readback::PreviewReadback>,
-    /// The most recent frame the readback produced and nothing has taken.
-    ///
-    /// One slot rather than a queue: a preview wants the newest picture, and a
-    /// consumer that fell behind is better served by the current frame than by
-    /// the backlog it missed.
-    preview_frame: Option<CaptureImage>,
+    /// The program preview (ADR-0143): the intermediate, its readback and the
+    /// frame that readback produced, as **one** owner rather than three fields
+    /// a caller could move two of. Closed until a shell opens it, and closed it
+    /// allocates nothing and costs the frame one `Option` test.
+    preview: preview::PreviewService,
     /// The now-playing banner (ADR-0110): a string a shell pushes in, plus the
     /// `dt`-driven envelope that fades it. Present in every build — a plugin
     /// build without the `text` feature holds the state and draws nothing.
@@ -571,9 +558,7 @@ impl Renderer {
             text_layer,
             #[cfg(feature = "text")]
             aux: None,
-            preview: None,
-            preview_readback: None,
-            preview_frame: None,
+            preview: preview::PreviewService::closed(),
             now_playing: NowPlaying::default(),
             cap_overflow: None,
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
@@ -812,8 +797,8 @@ impl Renderer {
         let overlay = Overlay::new(&staged.device, staged.config.format);
         #[cfg(feature = "text")]
         let text_layer = TextLayer::new(&staged.device, &staged.queue, staged.config.format);
-        let preview_size = self.preview.as_ref().map(preview::PreviewTarget::size);
-        let readback_size = self.preview_readback_size();
+        let preview_open = self.preview.is_open();
+        let readback_size = self.preview.readback_size();
 
         // The commit point: nothing below can fail.
         self.cancel_transition();
@@ -822,9 +807,7 @@ impl Renderer {
         {
             self.aux = None;
         }
-        self.preview = None;
-        self.preview_readback = None;
-        self.preview_frame = None;
+        self.preview.close();
         self.ctx.commit(staged);
         self.scenes = scenes;
         self.side = side;
@@ -843,18 +826,18 @@ impl Renderer {
         // not of this switch, which has already happened: the readback then
         // stays closed and `preview_readback_size` says so, rather than an
         // `Err` claiming the picture was left untouched.
-        if preview_size.is_some() {
-            self.preview = Some(preview::PreviewTarget::new(
+        if preview_open {
+            self.preview.open_target(
                 &self.ctx.device,
                 self.ctx.surface_format(),
                 self.ctx.config.width,
                 self.ctx.config.height,
-            ));
+            );
         }
         if let Some((width, height)) = readback_size
             && self.open_preview_readback(width, height).is_err()
         {
-            self.preview_readback = None;
+            self.preview.close_readback();
         }
         self.configure_active_scene();
         Ok(())
@@ -916,13 +899,13 @@ impl Renderer {
         // changes what that blit reads and nothing about the geometry the
         // readback hands out — which is what lets a consumer be told the size
         // once, before the first frame, and never again (ADR-0187).
-        if self.preview.is_some() {
-            self.preview = Some(preview::PreviewTarget::new(
+        if self.preview.is_open() {
+            self.preview.open_target(
                 &self.ctx.device,
                 self.ctx.surface_format(),
                 self.ctx.config.width,
                 self.ctx.config.height,
-            ));
+            );
         }
     }
 
@@ -941,12 +924,12 @@ impl Renderer {
         if !self.ctx.can_copy_to_target() {
             return Err(RenderError::UnsupportedSurface);
         }
-        self.preview = Some(preview::PreviewTarget::new(
+        self.preview.open_target(
             &self.ctx.device,
             self.ctx.surface_format(),
             self.ctx.config.width,
             self.ctx.config.height,
-        ));
+        );
         Ok(())
     }
 
@@ -957,14 +940,12 @@ impl Renderer {
     /// so one left behind would hold a staging buffer for a texture that no
     /// longer exists and never yield another frame.
     pub fn close_preview(&mut self) {
-        self.preview = None;
-        self.preview_readback = None;
-        self.preview_frame = None;
+        self.preview.close();
     }
 
     /// The open preview's size and identity, or `None` when closed.
     pub fn preview_state(&self) -> Option<((u32, u32), u64)> {
-        self.preview.as_ref().map(|p| (p.size(), p.generation()))
+        self.preview.state()
     }
 
     /// **The channel order every frame this renderer hands a consumer carries.**
@@ -1079,7 +1060,7 @@ impl Renderer {
     #[cfg(feature = "text")]
     pub fn present_aux(&mut self, runs: &[TextRun<'_>]) -> Result<(), RenderError> {
         match self.aux.as_mut() {
-            Some(aux) => aux.present(&self.ctx, runs, self.preview.as_ref()),
+            Some(aux) => aux.present(&self.ctx, runs, self.preview.target()),
             None => Ok(()),
         }
     }
@@ -1347,7 +1328,7 @@ impl Renderer {
         // Moved out of `self` for the draw, which takes `&mut self`; put back
         // below. With no preview open this is `None` and the frame is drawn
         // straight at the swapchain view, exactly as it was.
-        let preview = self.preview.take();
+        let preview = self.preview.take_target();
         // The one live call site: a preset that asked for `seed = "random"` gets
         // the salt it drew at load (ADR-0051). Every other caller of `draw_frame`
         // is a capture and pins.
@@ -1362,16 +1343,16 @@ impl Renderer {
         if let Some(p) = preview.as_ref() {
             p.record_copy_to(&mut encoder, &surface_tex.texture);
         }
-        self.preview = preview;
+        self.preview.restore_target(preview);
         // The readback rides this frame's own submission and takes the previous
         // frame's map on the way past, without waiting for either. `false` when
         // no readback is open or when the map has not landed.
-        let recorded = self.step_preview_readback(&mut encoder);
+        let recorded = self.preview.step_readback(&self.ctx.device, &mut encoder);
 
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
         self.ctx.queue.present(surface_tex);
         if recorded {
-            self.arm_preview_readback();
+            self.preview.arm_readback();
         }
 
         // Free atlas glyphs unused this frame and clear the queue for the next.
@@ -1443,12 +1424,10 @@ impl Renderer {
             now_playing: _,
             // Set at preset load, surfaced by the frontend — not a per-frame concern.
             cap_overflow: _,
-            // Stepped either side of the submission in `render`, which is where
-            // the encoder and the queue both are; a frame encode never sees them.
-            preview_readback: _,
-            preview_frame: _,
-            // The caller decided which view this frame draws into and owns the
-            // copy out of it; from in here the intermediate is just the target.
+            // The caller decided which view this frame draws into, owns the copy
+            // out of it, and steps the readback either side of the submission
+            // where the encoder and the queue both are; from in here the
+            // intermediate is just the target.
             preview: _,
             series_scratch,
             vertex_scratch,

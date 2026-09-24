@@ -736,6 +736,150 @@ fn a_per_element_binding_varies_and_a_plain_one_does_not() {
     evaluate_series(&ramp, &vars, &mut []);
 }
 
+/// A stand-in scene that records what reaches it, and declares the two
+/// binding capabilities or neither. Nothing GPU: `render` is never called.
+struct StubScene {
+    /// Every `(name, value)` that arrived through `set_param`.
+    scalars: std::rc::Rc<std::cell::RefCell<Vec<(String, f32)>>>,
+    /// Whether this scene declares the per-element and per-vertex surfaces.
+    capable: bool,
+    /// The last series and per-vertex table it was handed.
+    series: Vec<f32>,
+    vertex: Vec<f32>,
+}
+
+impl super::scenes::SeriesBound for StubScene {
+    fn set_param_series(&mut self, _name: &str, values: &[f32]) {
+        self.series = values.to_vec();
+    }
+}
+
+impl super::scenes::PerVertexBound for StubScene {
+    fn set_per_vertex(&mut self, _name: &str, values: &[f32]) {
+        self.vertex = values.to_vec();
+    }
+}
+
+impl super::scenes::Scene for StubScene {
+    fn name(&self) -> &'static str {
+        "stub"
+    }
+    fn update(&mut self, _frame: &AnalysisFrame) {}
+    fn render(
+        &mut self,
+        _queue: &wgpu::Queue,
+        _encoder: &mut wgpu::CommandEncoder,
+        _view: &wgpu::TextureView,
+        _aspect: f32,
+    ) {
+        panic!("the stub scene is never drawn");
+    }
+    fn set_param(&mut self, name: &str, value: f32) {
+        self.scalars.borrow_mut().push((name.to_owned(), value));
+    }
+    fn as_series_bound(&mut self) -> Option<&mut dyn super::scenes::SeriesBound> {
+        self.capable.then_some(self)
+    }
+    fn as_per_vertex_bound(&mut self) -> Option<&mut dyn super::scenes::PerVertexBound> {
+        self.capable.then_some(self)
+    }
+}
+
+/// **A capability a scene lacks is answered by the caller, not swallowed by the
+/// seam** (ADR-0238) — and the two absences are answered *differently*, which
+/// is the whole reason the accessor default is `None` rather than a no-op body.
+///
+/// A series degrades to element 0, because that is the reading the binding
+/// would have got outside a per-element evaluation. A per-vertex table is not
+/// evaluated at all, because its first element is the top-left corner and no
+/// whole-scene reading of it exists — so the scratch it would have been written
+/// into is left exactly as the caller handed it over, which is what this
+/// asserts rather than asserting that "nothing happened".
+#[test]
+fn a_binding_at_a_scene_without_the_capability_is_answered_at_the_call_site() {
+    use super::scenes::Scene;
+
+    let scalars = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let stub = |capable: bool| -> Box<dyn Scene> {
+        Box::new(StubScene {
+            scalars: std::rc::Rc::clone(&scalars),
+            capable,
+            series: Vec::new(),
+            vertex: Vec::new(),
+        })
+    };
+    let vertex_binding = |expr: &str| crate::preset::Binding {
+        name: "warp".to_owned(),
+        expr: compile(expr).expect("compiles"),
+        tau: Easing::INSTANT,
+        hold: None,
+        kind: ParamKind::Modal,
+    };
+    let vars = Variables::default();
+
+    // --- The scene that declares neither surface ---
+    let mut plain = stub(false);
+    assert!(
+        plain.as_series_bound().is_none() && plain.as_per_vertex_bound().is_none(),
+        "the stub was asked to declare nothing and declared something"
+    );
+
+    super::apply_series(&mut plain, "size", &[0.25, 0.5, 0.75]);
+    assert_eq!(
+        scalars.borrow().as_slice(),
+        [("size".to_owned(), 0.25)],
+        "a series at a scene with no per-element surface must land as element 0 \
+         through set_param, not vanish"
+    );
+
+    // The caller's scratch, pre-filled: what is still here afterwards is the
+    // evidence that the walk never ran.
+    let mut buf = [-7.0f32; 4];
+    super::apply_per_vertex(
+        &mut plain,
+        &[vertex_binding("1.0")],
+        &vars,
+        &mut super::VertexSurface {
+            mesh: (1, 1),
+            aspect: 1.0,
+            buf: &mut buf,
+        },
+    );
+    assert_eq!(
+        buf, [-7.0; 4],
+        "a per-vertex table at a scene with no vertices must not be evaluated"
+    );
+    assert_eq!(
+        scalars.borrow().len(),
+        1,
+        "and it must not degrade to a scalar either"
+    );
+
+    // --- The scene that declares both ---
+    let mut capable = stub(true);
+    super::apply_series(&mut capable, "size", &[0.25, 0.5, 0.75]);
+    assert_eq!(
+        scalars.borrow().len(),
+        1,
+        "a scene with a per-element surface takes the whole series, so no \
+         scalar is written"
+    );
+    super::apply_per_vertex(
+        &mut capable,
+        &[vertex_binding("1.0")],
+        &vars,
+        &mut super::VertexSurface {
+            mesh: (1, 1),
+            aspect: 1.0,
+            buf: &mut buf,
+        },
+    );
+    assert_eq!(
+        buf, [1.0; 4],
+        "a scene with vertices has its table evaluated into the scratch"
+    );
+}
+
 /// The element count a preset asks the render layer to evaluate for: its
 /// `[spectrum] elements`, zero for every other system — which is what makes
 /// the per-element branch unreachable for them — and always bounded by the
@@ -2891,12 +3035,9 @@ fn the_declared_pixel_order_is_the_one_the_frames_carry() {
             .open_preview_readback(32, 18)
             .expect("a readback opens at a nameable format");
         let mirror = renderer
-            .preview_readback
-            .as_ref()
-            .expect("the readback is open")
-            .tap
-            .texture()
-            .format();
+            .preview
+            .readback_tap_format()
+            .expect("the readback is open");
         assert_eq!(
             PixelOrder::of(mirror),
             Some(declared),
@@ -2959,9 +3100,9 @@ fn a_format_with_no_name_is_refused_rather_than_guessed() {
 /// holds, so a value the `Scene` trait cannot report is readable after the
 /// renderer has driven that scene through its real evaluation path.
 ///
-/// `mirror_overflow` and `feedback_field` hand out a borrow a `RefCell` cannot
-/// outlive, so they keep the trait's `None`; neither scene observed here has
-/// either.
+/// `mirror_overflow` and every capability accessor hand out a borrow a
+/// `RefCell` cannot outlive, so they keep the trait's `None`. Neither scene
+/// observed here has any of them, so nothing is hidden by that.
 struct Observed<T>(std::rc::Rc<std::cell::RefCell<T>>);
 
 impl<T: super::scenes::Scene> super::scenes::Scene for Observed<T> {
@@ -2998,12 +3139,6 @@ impl<T: super::scenes::Scene> super::scenes::Scene for Observed<T> {
     fn set_param(&mut self, name: &str, value: f32) {
         self.0.borrow_mut().set_param(name, value);
     }
-    fn set_param_series(&mut self, name: &str, values: &[f32]) {
-        self.0.borrow_mut().set_param_series(name, values);
-    }
-    fn set_per_vertex(&mut self, name: &str, values: &[f32]) {
-        self.0.borrow_mut().set_per_vertex(name, values);
-    }
     fn configure(
         &mut self,
         cfg: &super::scenes::GeneratorConfig,
@@ -3012,12 +3147,6 @@ impl<T: super::scenes::Scene> super::scenes::Scene for Observed<T> {
     }
     fn set_palette(&mut self, palette: &super::palette::Palette) {
         self.0.borrow_mut().set_palette(palette);
-    }
-    fn set_feedback(&mut self, cfg: super::feedback::FeedbackConfig) {
-        self.0.borrow_mut().set_feedback(cfg);
-    }
-    fn sample_budget(&self) -> Option<u32> {
-        self.0.borrow().sample_budget()
     }
 }
 

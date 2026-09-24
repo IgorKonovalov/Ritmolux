@@ -1,8 +1,8 @@
 # ADR-0238 — A scene declares a capability, and the engine stops enumerating kinds
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-23
 > **Date:** 2026-09-20
-> **Related plan(s):** [Plan 0215](../plans/0215-the-wide-seams-narrow-and-a-guard-holds-them.md)
+> **Related plan(s):** [Plan 0215](../plans/done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md)
 
 ## Context
 

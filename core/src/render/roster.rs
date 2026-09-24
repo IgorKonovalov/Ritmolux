@@ -835,8 +835,11 @@ impl Renderer {
         live.chain.set_feedback(preset.feedback);
         // ...and to the scene, which is the SECOND sink of the same table
         // (ADR-0048): the attractor's internal trail. Unconditional for the same
-        // reason, and a no-op for every other scene.
-        scene.set_feedback(preset.feedback);
+        // reason, and skipped outright by a scene that keeps no accumulation of
+        // its own, which it says by answering `None` (ADR-0238).
+        if let Some(sink) = scene.as_feedback_sink() {
+            sink.set_feedback(preset.feedback);
+        }
         // Structural config (ADR-0007), if any: capture segment-cap truncation so
         // the frontend can surface it (never a silent cut). `None` for the
         // fit/no-config case.
@@ -870,7 +873,9 @@ impl Renderer {
                     *budget,
                 );
             layer_scene.set_palette(&baked);
-            layer_scene.set_feedback(crate::render::feedback::FeedbackConfig::default());
+            if let Some(sink) = layer_scene.as_feedback_sink() {
+                sink.set_feedback(crate::render::feedback::FeedbackConfig::default());
+            }
             if let Some(cfg) = layer.config.as_ref() {
                 let overflow = layer_scene.configure(cfg);
                 if cap_overflow.is_none() {
@@ -884,7 +889,9 @@ impl Renderer {
             // same three hand-offs a fresh one would have been built with.
             (false, Some(layer), Some(layer_scene)) => {
                 layer_scene.set_palette(&baked);
-                layer_scene.set_feedback(crate::render::feedback::FeedbackConfig::default());
+                if let Some(sink) = layer_scene.as_feedback_sink() {
+                    sink.set_feedback(crate::render::feedback::FeedbackConfig::default());
+                }
                 if let Some(cfg) = layer.config.as_ref() {
                     let overflow = layer_scene.configure(cfg);
                     if cap_overflow.is_none() {
