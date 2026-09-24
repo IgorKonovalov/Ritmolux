@@ -1,9 +1,9 @@
 # 0220 — The dependencies catch up, and npm gets its gate
 
-> **Status:** done - Phase 7 owed, ADR-0249. Closed 2026-09-24 by the conductor: Phases 1-6
+> **Status:** done. Closed 2026-09-24 by the conductor: Phases 1-6
 > landed (`f6852988`, `8f569b1d` + `774b0a43`, `bf97b87f`, `d874e9a9`, `561a2541`, `b3ab5ecf`);
 > round 1 review no blockers, no majors, three minors and one nit, two minors fixed at the close.
-> Version 0.149.0. Phase 7 (push, CI on the pushed tree, the release dry run) is owed.
+> Version 0.149.0. Phase 7 done after the merge, 2026-09-24, without the Windows launch (see its row).
 > **Created:** 2026-09-22
 > **Owner skill(s):** studio-builder, dev, human
 > **Related ADRs:** [0244](../../adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md) (accepted, Outcome),
@@ -314,7 +314,7 @@ flowchart LR
 | 4 — Electron 44 and electron-builder 26 | studio-builder | done; dev smoke run as the dev pipeline, not the `dev` script (Notes) | this row's commit |
 | 5 — The Rust pins that trail | dev | done | 561a2541 |
 | 6 — The npm gate, and CI on Node 24 | dev | done | b3ab5ecf |
-| 7 — CI on the pushed tree, and a release dry run | human | owed | |
+| 7 — CI on the pushed tree, and a release dry run | human | done 2026-09-24 after the merge; the Windows launch is waived by the owner, not run (Owed after the merge) | f71139e6 (the pushed tree) |
 
 ### Notes
 
@@ -649,6 +649,20 @@ Phase 7 (`human`) is owed:
 - the Windows zip launched with its bundled player.
 
 None of these has run anywhere yet.
+
+**Read 2026-09-24, after the owner's push of `f71139e6`:**
+- CI run `36013832275` on that tree: every job green, `npm-audit`, `studio`, `deny` and `spout` among
+  them, so `cc` 1.4.7 compiled under the `spout` feature.
+- No `workflow_dispatch` dry run was needed: the `v0.149.0` tag push ran the real `release.yml`
+  (run `36013833264`, success), so electron-builder 26 built both studio zips and all six artifacts
+  published.
+- Studio zip sizes against v0.148.0 and against NFR section 4's recorded 118,073,278 B (v0.113.0):
+  Windows `ritmolux-studio-v0.149.0-windows-x64.zip` **168,126,806 B** (v0.148.0: 121,914,549 B,
+  +38 %); macOS `ritmolux-studio-v0.149.0-macos-universal.zip` **236,804,687 B** (v0.148.0:
+  187,754,734 B, +26 %). The growth is Electron 32 to 44. The studio's figure is recorded, not
+  capped, so nothing fails; NFR section 4's row was not updated here.
+- **Not run: the Windows zip launched with its bundled player.** The owner marked the phase done
+  without it and will check it later. Until then nothing has launched an electron-builder 26 studio.
 
 ## Followups (after this lands)
 
