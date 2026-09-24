@@ -112,3 +112,18 @@ exactly one qualifies.
 - **Add `###` headings to `## Checklist` in this decision.** Rejected as scope: it is the right
   repair for that document and it is an editorial judgement about a checklist someone runs by hand,
   not a consequence of the splitter. Recorded above so it is a known debt rather than a surprise.
+
+## Outcome (2026-09-24, Plan 0225)
+
+Two statements above are falsified by the implementation; the body stands as written.
+
+- **More than one section qualified.** *"Exactly one qualifies"*, *"nine entries and nine routes"*
+  and *"ten pages"* counted only the offender in `docs/capturing.md`. The recursion also split two
+  `###` sections of `presets/README.md` that were over 20 KB with `####` children — the
+  `shape_field` roster (5 children) and the `tuple` roster (4) — so the published set went from 173
+  routes to 191, not 182. The largest route after the change is 29,528 bytes, `## Checklist` in
+  `docs/on-device-validation.md`, exactly as the Negative section predicted.
+- **The recursion looks one level down, not at any deeper heading.** The Decision's *"until it is
+  under the threshold or has no deeper heading"* is implemented as *no heading at the next level*:
+  a section over the threshold whose headings skip a level stays whole. No section in the corpus
+  does that today; `sectionsAt` in `site/src/plugins/split-document.mjs` documents the rule.

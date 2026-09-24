@@ -182,8 +182,9 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   a built file, and that every off-site href is absolute https (ADR-0154);
                      #   check-site-routes.mjs asserts that every route the build serves is reachable
                      #   from the menu rather than only by search, and that no route the splitter
-                     #   produced exceeds 30,000 bytes of source (ADR-0166) - a route over that means
-                     #   ADR-0166's arithmetic needs redoing, never that the constant needs raising.
+                     #   produced exceeds 30,000 bytes of source (ADR-0166) - an assertion about the
+                     #   corpus, since the split already recurses at every heading level (ADR-0247),
+                     #   so a route over it wants headings in its source, never a raised constant.
                      #   Six of them also run in the close ceremony - check-doc-links.mjs,
                      #   check-index-rows.mjs, check-backlog-claims.mjs, toc.mjs,
                      #   check-release-tag.mjs and check-translations.mjs - the first five because a
