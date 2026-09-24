@@ -257,8 +257,8 @@ struct ThumbKey {
 |---|---|---|---|
 | 1 — One thumbnail, on demand, in a cache | dev | done | 7bd7fc9f |
 | 2 — The renderer draws one image the shell hands it | dev | done | ab582b1b |
-| 3 — The pane shows what is cached | dev | done | committed with this row |
-| 4 — The pass fills the cache by itself | dev | not started | |
+| 3 — The pane shows what is cached | dev | done | 9f710df5 |
+| 4 — The pass fills the cache by itself | dev | committed, frame-time reading owed | committed with this row |
 | 5 — A changed preset gets a new picture | dev | not started | |
 
 ### Notes
@@ -347,6 +347,35 @@ Where the notes above say "Phase 2", "Phase 3" or "Phase 4", they use the old nu
   longer`, from Phase 1). It is reworded here. `core/src/render/image_layer.rs` from Phase 2 had
   the same problem (`previously`) and is reworded in this commit, although that file is not in
   Phase 3's list.
+
+**Phase 4 — the frame-time reading is not taken, and six files are beyond the list.**
+
+- **Done-when not met: *"the show's frame timing is unaffected while the pass runs, measured … with
+  the pass on and off in the same session on the same adapter"*.** No reading was taken. The
+  conductor session that implemented the phase is headless. The windowed app has no timed exit, and
+  the headless `--stream` run does not start the pass, so the session cannot run the comparison.
+  The instrument is in place instead. Every pass writes `# thumbnail pass: start, N of M presets to
+  render` and a closing `# thumbnail pass: done|stopped|gave up …` line to `diagnostics.log`,
+  between the 1 Hz rows. The rows between those two lines are "pass on", and the rows after the
+  closing line are "pass off", in one session on one adapter. A first launch with an empty
+  `thumbnails/` directory covers the whole library, and `[thumbnails] enabled = false` gives a
+  whole session with the pass off. The reading needs someone at a display.
+- The config key and the settings row the done-when asks for need `standalone/src/config.rs`
+  (`[thumbnails] enabled`) and `standalone/src/settings.rs` (the `Thumbnails` row), neither of which
+  is in `Files touched`. Adding a `SettingsView` field also moved `standalone/src/stream.rs` (the
+  headless run's view reports `false`, because no pass runs there), `standalone/src/settings/tests.rs`
+  (the fixture, the pinned row roster, the row's action) and `standalone/src/console/tests.rs` (the
+  fixture). `standalone/src/hud.rs` changes one comment, from a seventeen-row menu to an eighteen-row
+  one. `standalone/src/diaglog.rs` is not touched: `DiagLog::note` already writes a one-off line.
+- The pass runs on its own thread (`thumbs::Pass`). The frame loop only drains a channel. On Unix a
+  child runs under `nice -n 10`, falling back to normal priority, with one note, where `nice` is
+  absent. On Windows it runs with `BELOW_NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW`, and that branch
+  was neither compiled nor run on this Linux box. A child is killed and counted as failed after
+  60 s. Three failures in a row stop the pass for the launch.
+- The three stub-driven tests of the pass (one child at a time, give-up, stop kills the child) are
+  `#[cfg(unix)]`, because the stand-in for the player is a shell script.
+- A picture that lands makes the pane look its highlighted preset up again, whichever preset
+  landed: one small file read per landed picture.
 
 ### Close triggers
 

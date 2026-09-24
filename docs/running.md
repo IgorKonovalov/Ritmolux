@@ -122,6 +122,11 @@ render on this machine, read from the thumbnail cache beside `config.toml` (see
 [the `thumbnails/` directory](configuration.md#the-third-thing-in-that-directory-thumbnails)). A
 preset with no picture yet shows its name and
 **no picture yet** in its place, which is the normal state on a first launch rather than a fault.
+The pictures are made in the background from the moment the app starts, one preset at a time, and
+the pane fills in as they land; covering the shipped library takes minutes rather than seconds, and
+the next launch picks up whatever the last one did not reach. The settings menu's **Thumbnails** row
+turns that off (`[thumbnails] enabled`, see [Configuration](configuration.md#thumbnails)), which is
+what a machine on battery wants.
 The picture never moves the list: the columns are laid out as they would be without it, and the
 corner is the last place they reach. It is drawn on the main window only. With the operator console
 open, the browser moves to the console and has no picture.

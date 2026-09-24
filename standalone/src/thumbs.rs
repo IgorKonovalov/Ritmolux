@@ -24,8 +24,14 @@
 //! sink is open (ADR-0176), and each of these lines is a diagnostic about what
 //! the run did rather than a document anything parses.
 
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
+use std::process::{Child, Command, Stdio};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread::JoinHandle;
+use std::time::{Duration, UNIX_EPOCH};
 
 use rlx_core::preset::Preset;
 use rlx_core::render::Tier;
@@ -327,6 +333,342 @@ fn library() -> Vec<Preset> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// The pass: the parent's side (ADR-0230)
+// ---------------------------------------------------------------------------
+
+/// How often the pass's worker looks at a running child and at the stop flag.
+/// Also the bound on how long stopping the pass can hold up shutdown, before
+/// the kill itself.
+const CHILD_POLL: Duration = Duration::from_millis(50);
+
+/// How many [`CHILD_POLL`]s one child may run before it is killed and counted
+/// as failed: 60 s, an order of magnitude past the 5.65 s ADR-0230 measured
+/// for one still, so a slow GPU is not cut off and a hung child cannot hold
+/// the pass forever.
+const CHILD_POLLS: u32 = 1200;
+
+/// Failed renders in a row after which the pass stops for this launch. One
+/// failure is a preset; several in a row are the machine — no second GPU
+/// context, or a scanner refusing the spawns — and retrying into that is the
+/// loop the pass must not become.
+const GIVE_UP_AFTER: u32 = 3;
+
+/// How far below normal a child runs on a Unix, as `nice`'s increment.
+#[cfg(unix)]
+const NICE: &str = "10";
+
+/// `BELOW_NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW`.
+#[cfg(windows)]
+const CREATION_FLAGS: u32 = 0x0000_4000 | 0x0800_0000;
+
+/// What the pass reports to the frame loop.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PassEvent {
+    /// One line for `diagnostics.log`.
+    Note(String),
+    /// A picture of this preset was written; a pane showing it reads it again.
+    Landed(String),
+}
+
+/// The background pass: walks the library on a worker thread and renders each
+/// preset whose picture is missing or stale, one child process at a time.
+///
+/// **Nothing here blocks the frame loop.** The worker owns the child, the
+/// library load and every file read; the frame loop only drains a channel with
+/// [`drain`](Self::drain). **Nothing here blocks shutdown beyond one poll**:
+/// dropping the pass raises the stop flag, the worker kills a running child at
+/// its next poll, and the join waits for that. A child killed mid-write leaves
+/// a temporary file no reader looks for, and the next pass discards it.
+pub(crate) struct Pass {
+    stop: Arc<AtomicBool>,
+    events: Receiver<PassEvent>,
+    worker: Option<JoinHandle<()>>,
+}
+
+impl Pass {
+    /// Start the pass. A worker thread that cannot be spawned is reported as
+    /// one note on the first drain and the pass is simply absent.
+    pub(crate) fn start() -> Pass {
+        Pass::spawn(walk)
+    }
+
+    /// A pass that renders exactly `names` with `exe` standing in for the
+    /// player — the render loop without the library or the cache behind it.
+    #[cfg(test)]
+    fn start_with(exe: PathBuf, names: Vec<String>) -> Pass {
+        Pass::spawn(move |stop, tx| render_all(&exe, &names, stop, tx))
+    }
+
+    fn spawn(work: impl FnOnce(&AtomicBool, &Sender<PassEvent>) + Send + 'static) -> Pass {
+        let stop = Arc::new(AtomicBool::new(false));
+        let (tx, events) = mpsc::channel();
+        let flag = Arc::clone(&stop);
+        let worker = std::thread::Builder::new()
+            .name("rlx-thumbnails".to_owned())
+            .spawn(move || work(&flag, &tx));
+        let worker = match worker {
+            Ok(handle) => Some(handle),
+            Err(err) => {
+                let (tx, rx) = mpsc::channel();
+                let _ = tx.send(PassEvent::Note(format!(
+                    "thumbnails off: cannot start the pass ({err})"
+                )));
+                return Pass {
+                    stop,
+                    events: rx,
+                    worker: None,
+                };
+            }
+        };
+        Pass {
+            stop,
+            events,
+            worker,
+        }
+    }
+
+    /// Hand every event the worker has sent since the last call to `each`.
+    /// Never waits.
+    pub(crate) fn drain(&mut self, mut each: impl FnMut(PassEvent)) {
+        while let Ok(event) = self.events.try_recv() {
+            each(event);
+        }
+    }
+
+    /// Stop the pass: kill a running child and wait for the worker to leave.
+    /// Idempotent.
+    pub(crate) fn stop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
+}
+
+impl Drop for Pass {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
+/// How one child ended.
+enum Render {
+    Wrote,
+    Failed(String),
+    /// The pass was stopped while it ran; the child was killed.
+    Stopped,
+    /// The process could not be started at all.
+    Unstartable(String),
+}
+
+/// The worker: resolve the cache and the library, then render what is missing
+/// in roster order, reporting through `tx`.
+fn walk(stop: &AtomicBool, tx: &Sender<PassEvent>) {
+    let note = |line: String| {
+        let _ = tx.send(PassEvent::Note(line));
+    };
+    let dir = match ensure_cache_dir() {
+        Ok(dir) => dir,
+        Err(reason) => return note(unavailable_note(&reason)),
+    };
+    discard_partials(&dir);
+    let exe = match std::env::current_exe() {
+        Ok(exe) => exe,
+        Err(err) => {
+            return note(format!(
+                "thumbnails off: cannot locate this executable ({err})"
+            ));
+        }
+    };
+
+    let presets = library();
+    let total = presets.len();
+    let missing: Vec<String> = presets
+        .iter()
+        .filter(|preset| {
+            !is_current(
+                &dir,
+                &preset.name,
+                Stamp::for_source(preset.source.as_deref()),
+            )
+        })
+        .map(|preset| preset.name.clone())
+        .collect();
+    drop(presets);
+    if missing.is_empty() {
+        return;
+    }
+    note(format!(
+        "thumbnail pass: start, {} of {total} presets to render",
+        missing.len()
+    ));
+    render_all(&exe, &missing, stop, tx);
+}
+
+/// Render each of `missing` in turn, one child at a time, until the list is
+/// done, the pass is stopped, or it gives up.
+fn render_all(exe: &Path, missing: &[String], stop: &AtomicBool, tx: &Sender<PassEvent>) {
+    let note = |line: String| {
+        let _ = tx.send(PassEvent::Note(line));
+    };
+    let (mut rendered, mut failed, mut streak) = (0usize, 0usize, 0u32);
+    let mut plain_priority = false;
+    for name in missing {
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+        match render_child(exe, name, stop, &mut plain_priority, &note) {
+            Render::Wrote => {
+                rendered += 1;
+                streak = 0;
+                let _ = tx.send(PassEvent::Landed(name.clone()));
+            }
+            Render::Failed(reason) => {
+                failed += 1;
+                streak += 1;
+                note(format!("thumbnail failed: {name}: {reason}"));
+                if streak >= GIVE_UP_AFTER {
+                    return note(format!(
+                        "thumbnail pass: gave up after {streak} failures in a row; \
+                         {rendered} rendered this launch, the rest wait for the next"
+                    ));
+                }
+            }
+            Render::Stopped => {
+                return note(format!(
+                    "thumbnail pass: stopped, {rendered} rendered, {} left for the next launch",
+                    missing.len() - rendered - failed
+                ));
+            }
+            Render::Unstartable(reason) => {
+                return note(format!("thumbnails off: cannot start a render ({reason})"));
+            }
+        }
+    }
+    note(format!(
+        "thumbnail pass: done, {rendered} rendered, {failed} failed"
+    ));
+}
+
+/// Remove the temporary files a killed child left behind, so a half-written
+/// entry is discarded rather than kept. [`read_entry`] never opens one either
+/// way; this is housekeeping, not correctness.
+fn discard_partials(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "rlxthumb-part") {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
+
+/// The command that renders `name` in a child, at low OS priority.
+///
+/// On a Unix the priority is `nice`'s, because the standard library has no call
+/// for it; `plain` spawns the executable directly, for a system with no `nice`.
+fn child_command(exe: &Path, name: &str, plain: bool) -> Command {
+    #[cfg(unix)]
+    let mut command = if plain {
+        Command::new(exe)
+    } else {
+        let mut command = Command::new("nice");
+        command.arg("-n").arg(NICE).arg(exe);
+        command
+    };
+    #[cfg(not(unix))]
+    let mut command = {
+        let _ = plain;
+        Command::new(exe)
+    };
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(CREATION_FLAGS);
+    }
+    command
+        .arg("--thumb")
+        .arg(name)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    command
+}
+
+/// Render `name` in one child and wait for it, polling so the stop flag is
+/// honoured while it runs.
+fn render_child(
+    exe: &Path,
+    name: &str,
+    stop: &AtomicBool,
+    plain: &mut bool,
+    note: &impl Fn(String),
+) -> Render {
+    let mut child = match child_command(exe, name, *plain).spawn() {
+        Ok(child) => child,
+        // No `nice` on this system: run at normal priority, and say so once.
+        Err(err) if !*plain && err.kind() == std::io::ErrorKind::NotFound => {
+            *plain = true;
+            note("thumbnail pass: `nice` not found, renders run at normal priority".to_owned());
+            match child_command(exe, name, true).spawn() {
+                Ok(child) => child,
+                Err(err) => return Render::Unstartable(err.to_string()),
+            }
+        }
+        Err(err) => return Render::Unstartable(err.to_string()),
+    };
+    // Drained on its own thread so a chatty child cannot fill the pipe and
+    // stall; read after it exits for the failure's reason.
+    let stderr = child.stderr.take().map(|mut pipe| {
+        std::thread::spawn(move || {
+            let mut text = String::new();
+            let _ = pipe.read_to_string(&mut text);
+            text
+        })
+    });
+    let reason = |stderr: Option<JoinHandle<String>>| {
+        stderr
+            .and_then(|reader| reader.join().ok())
+            .and_then(|text| {
+                text.lines()
+                    .rev()
+                    .find(|l| !l.trim().is_empty())
+                    .map(str::to_owned)
+            })
+    };
+
+    for _ in 0..CHILD_POLLS {
+        if stop.load(Ordering::Relaxed) {
+            kill(&mut child);
+            return Render::Stopped;
+        }
+        match child.try_wait() {
+            Ok(Some(status)) if status.success() => return Render::Wrote,
+            Ok(Some(status)) => {
+                return Render::Failed(reason(stderr).unwrap_or_else(|| status.to_string()));
+            }
+            Ok(None) => std::thread::sleep(CHILD_POLL),
+            Err(err) => {
+                kill(&mut child);
+                return Render::Failed(err.to_string());
+            }
+        }
+    }
+    kill(&mut child);
+    Render::Failed(format!(
+        "no picture after {} s",
+        CHILD_POLL.as_millis() * u128::from(CHILD_POLLS) / 1000
+    ))
+}
+
+fn kill(child: &mut Child) {
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
 /// The `--thumb` mode's exit code, or `None` when this run is not that mode and
 /// the ordinary launch path should proceed.
 ///
@@ -563,6 +905,182 @@ mod tests {
         // A name far longer than the slug budget still yields one path.
         let long = "x".repeat(400);
         assert!(entry_file_name(&long).len() < 80);
+    }
+
+    /// An executable shell script standing in for the player: it is run as
+    /// `<script> --thumb <name>`, so `$2` is the preset.
+    #[cfg(unix)]
+    fn stub(dir: &Path, body: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let path = dir.join("stub.sh");
+        std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).expect("write the stub");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+            .expect("make the stub executable");
+        path
+    }
+
+    fn names(names: &[&str]) -> Vec<String> {
+        names.iter().map(|name| (*name).to_owned()).collect()
+    }
+
+    /// Let the worker run out on its own — no stop — and take what it said.
+    fn finish(mut pass: Pass) -> Vec<PassEvent> {
+        if let Some(worker) = pass.worker.take() {
+            worker.join().expect("the worker does not panic");
+        }
+        let mut events = Vec::new();
+        pass.drain(|event| events.push(event));
+        events
+    }
+
+    fn notes(events: &[PassEvent]) -> Vec<&str> {
+        events
+            .iter()
+            .filter_map(|event| match event {
+                PassEvent::Note(line) => Some(line.as_str()),
+                PassEvent::Landed(_) => None,
+            })
+            .collect()
+    }
+
+    /// **At most one child runs at a time, and the pass stops when the list is
+    /// covered.** Each stub takes a lock directory for its whole run and fails
+    /// if another holds it, so an overlap would surface as a failure; every
+    /// preset lands, in order, and the worker leaves on its own.
+    #[cfg(unix)]
+    #[test]
+    fn the_pass_runs_one_child_at_a_time_and_ends_when_covered() {
+        let dir = scratch("one-at-a-time");
+        let lock = dir.join("lock");
+        let exe = stub(
+            &dir,
+            &format!(
+                "mkdir '{lock}' || exit 7\nsleep 0.1\nrmdir '{lock}'\nexit 0",
+                lock = lock.display()
+            ),
+        );
+        let events = finish(Pass::start_with(exe, names(&["A", "B", "C", "D"])));
+
+        let landed: Vec<&str> = events
+            .iter()
+            .filter_map(|event| match event {
+                PassEvent::Landed(name) => Some(name.as_str()),
+                PassEvent::Note(_) => None,
+            })
+            .collect();
+        assert_eq!(landed, ["A", "B", "C", "D"], "notes: {:?}", notes(&events));
+        assert_eq!(
+            notes(&events).last().copied(),
+            Some("thumbnail pass: done, 4 rendered, 0 failed")
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// **The pass gives up rather than looping.** A child that fails is named
+    /// once, with the reason it printed, and is not retried; after
+    /// [`GIVE_UP_AFTER`] failures in a row the pass stops and says so, and the
+    /// presets after that are not attempted this launch.
+    #[cfg(unix)]
+    #[test]
+    fn failing_children_are_named_once_and_the_pass_gives_up() {
+        let dir = scratch("give-up");
+        let exe = stub(&dir, "echo \"no adapter for $2\" >&2\nexit 3");
+        let events = finish(Pass::start_with(exe, names(&["A", "B", "C", "D", "E"])));
+        let notes = notes(&events);
+
+        for name in ["A", "B", "C"] {
+            let lines: Vec<&&str> = notes
+                .iter()
+                .filter(|line| line.starts_with(&format!("thumbnail failed: {name}:")))
+                .collect();
+            assert_eq!(lines.len(), 1, "{name} is named once: {notes:?}");
+            assert!(
+                lines[0].ends_with(&format!("no adapter for {name}")),
+                "the child's own reason is carried: {}",
+                lines[0]
+            );
+        }
+        assert!(
+            !notes
+                .iter()
+                .any(|line| line.contains(": D:") || line.contains(": E:")),
+            "the pass kept going after giving up: {notes:?}"
+        );
+        assert!(
+            notes
+                .last()
+                .is_some_and(|line| line.starts_with("thumbnail pass: gave up after 3")),
+            "{notes:?}"
+        );
+        assert!(!events.iter().any(|e| matches!(e, PassEvent::Landed(_))));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// **Stopping the pass kills the running child and does not wait it out.**
+    /// The stub would run for a minute; the stop returns within a few polls,
+    /// and the child's process is gone.
+    #[cfg(unix)]
+    #[test]
+    fn stopping_the_pass_kills_the_running_child() {
+        let dir = scratch("stop");
+        let pid = dir.join("pid");
+        let exe = stub(
+            &dir,
+            &format!("echo $$ > '{}'\nexec sleep 60", pid.display()),
+        );
+        let mut pass = Pass::start_with(exe, names(&["A", "B"]));
+        // Wait for the child to be running, by its own pid file.
+        for _ in 0..200 {
+            if std::fs::read_to_string(&pid).is_ok_and(|text| !text.trim().is_empty()) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        let child = std::fs::read_to_string(&pid).expect("the child started");
+        let child = child.trim();
+
+        let (done_tx, done_rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            pass.stop();
+            let mut events = Vec::new();
+            pass.drain(|event| events.push(event));
+            let _ = done_tx.send(events);
+        });
+        let events = done_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("stopping the pass waited out a child that runs for a minute");
+        assert!(
+            notes(&events)
+                .last()
+                .is_some_and(|line| line.starts_with("thumbnail pass: stopped")),
+            "{:?}",
+            notes(&events)
+        );
+        assert!(
+            !Path::new(&format!("/proc/{child}")).exists() || !cfg!(target_os = "linux"),
+            "child {child} outlived the pass"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// **A half-written entry is discarded**: the temporary file a killed child
+    /// leaves is removed by the next pass, and an entry beside it is kept.
+    #[test]
+    fn the_pass_discards_what_a_killed_child_left() {
+        let dir = scratch("partials");
+        let entry = sample("Gyre", Stamp::EMBEDDED);
+        write_entry(&dir, &entry).expect("write the entry");
+        let partial = entry_path(&dir, "Lace Grid").with_extension("rlxthumb-part");
+        std::fs::write(&partial, b"RLXT half").expect("write a partial");
+
+        discard_partials(&dir);
+        assert!(!partial.exists(), "the half-written file survived");
+        assert_eq!(
+            read_entry(&dir, "Gyre"),
+            Some(entry),
+            "a whole entry went with it"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A preset with no file on disk stamps as [`Stamp::EMBEDDED`], and one with

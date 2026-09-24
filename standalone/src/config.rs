@@ -29,6 +29,28 @@ pub struct Config {
     pub osc: Osc,
     pub control: Control,
     pub console: Console,
+    pub thumbnails: Thumbnails,
+}
+
+/// `[thumbnails]` — the background pass that renders the browser's pictures
+/// (ADR-0230).
+///
+/// **On by default**, because the pictures are what the browser is for and a
+/// pass that must be asked for leaves every first launch with placeholders.
+/// Off stops the pass and spawns nothing; pictures already cached still show.
+/// A machine on battery, or one whose security software objects to the app
+/// launching copies of itself, is the case the key exists for.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Thumbnails {
+    /// Render missing and stale pictures in the background.
+    pub enabled: bool,
+}
+
+impl Default for Thumbnails {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 /// `[control]` — the studio control-in listener (ADR-0176).

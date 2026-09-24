@@ -306,7 +306,8 @@ the file to forget every mark.
 Beside the two files sits a directory the app fills by itself: `thumbnails/`, one cache entry per
 preset, each a 160x90 still of what that preset looks like. Nothing ships in it — the pictures are
 rendered on this machine, because the binary has room for neither the images nor an image codec
-([ADR-0230](adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md)).
+([ADR-0230](adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md)). The
+[`[thumbnails]`](#thumbnails) section below turns the pass that fills it on and off.
 
 An entry is named for its preset and carries the **modification time and length** of the `.toml` it
 was rendered from, which is what makes it stale: edit a preset in an `RLX_PRESET_DIR` library and its
@@ -467,6 +468,34 @@ they cost in practice is in [Running the app](running.md).
 show's, and the show defaults to `0`. On a single-monitor machine this falls back to the only
 monitor there is, which is the correct degrade rather than a failure.
 
+### `[thumbnails]`
+
+The background pass that renders the browser's pictures into
+[`thumbnails/`](#the-third-thing-in-that-directory-thumbnails). **On by default**, because the
+pictures are what the browser's pane is for.
+
+| Key | Default | What it means |
+|---|---|---|
+| `enabled` | `true` | Render missing and stale pictures in the background, from launch |
+
+The pass starts when the app does, whether or not the browser is ever opened, and renders one
+preset at a time by starting the app's own executable with `--thumb`, at low priority (`nice` on
+Linux and macOS, below-normal priority on Windows). It stops when every preset has a current
+picture and starts again at the next launch for whatever is still missing. It never waits in the
+show's frame loop, and closing the app kills a render in flight; the half-written file that leaves
+is discarded by the next pass.
+
+**It gives up rather than retrying.** A render that fails is named once in `diagnostics.log` with the
+reason the child printed, and is not retried until the next launch; three failures in a row stop the
+pass for the rest of the run. That is where a machine with no room for a second graphics context, or
+security software that blocks an app from starting copies of itself, shows up. Every pass writes a
+`thumbnail pass:` line to the same log when it starts and when it ends, which splits the log's
+frame-time rows into the stretch the pass ran in and the stretch after it.
+
+Turn it off on a machine running on battery or under security software that objects: the settings
+menu's **Thumbnails** row writes this key, and turning it off also stops a pass that is running.
+Pictures already in the cache still show either way.
+
 ### A complete file
 
 Every key at its default. `display_name` in `[output]` and `[console]`, and `gpu` in `[output]`,
@@ -516,6 +545,9 @@ enabled = false
 display = 1
 frame_latency = 1
 present_every_n = 1
+
+[thumbnails]
+enabled = true
 ```
 
 ## Precedence

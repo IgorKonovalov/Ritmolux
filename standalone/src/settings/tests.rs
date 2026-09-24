@@ -27,6 +27,7 @@ fn view() -> SettingsView {
         now_playing: true,
         next_rotation: true,
         console: false,
+        thumbnails: true,
         adapter_index: 1,
         adapter_count: 2,
         adapter_name: "NVIDIA GeForce RTX 3080 Laptop GPU".to_owned(),
@@ -104,6 +105,10 @@ fn each_row_emits_the_action_its_table_row_names() {
         assert_eq!(
             edit_at(SettingsRow::NextRotation, right, &v),
             SettingsAction::ToggleNextRotation
+        );
+        assert_eq!(
+            edit_at(SettingsRow::Thumbnails, right, &v),
+            SettingsAction::ToggleThumbnails
         );
         assert_eq!(
             edit_at(SettingsRow::InputDevice, right, &v),
@@ -283,6 +288,7 @@ fn the_rows_are_the_ones_the_menu_promises_in_order() {
             SettingsRow::NowPlaying,
             SettingsRow::NextRotation,
             SettingsRow::Console,
+            SettingsRow::Thumbnails,
             SettingsRow::Presets,
         ]
     );

@@ -112,6 +112,9 @@ pub struct SettingsView {
     /// window state, not the config key: the row reports what is on screen, so
     /// a console opened by `--console` or the `C` hotkey reads correctly here.
     pub console: bool,
+    /// Whether the background pass renders the browser's pictures
+    /// (`[thumbnails] enabled`).
+    pub thumbnails: bool,
     /// Position of the running graphics adapter in the shell's cached roster,
     /// and how big that roster is (ADR-0246). A count under two means there is
     /// nowhere to move to — one adapter, or an enumeration that failed — and
@@ -207,6 +210,8 @@ pub enum SettingsAction {
     /// Open or close the operator console (ADR-0143). The state machine says
     /// only that it changed; the shell owns the window.
     ToggleConsole,
+    /// Start or stop the background thumbnail pass, persisted (ADR-0230).
+    ToggleThumbnails,
     /// Move the running show onto the adapter at this position in the shell's
     /// cached roster, and persist it (ADR-0246). The position is already
     /// stepped and wrapped here, so the shell switches without re-deciding
@@ -235,12 +240,13 @@ pub enum SettingsRow {
     NowPlaying,
     NextRotation,
     Console,
+    Thumbnails,
     Presets,
 }
 
 impl SettingsRow {
     /// Every row, in display order. The one read-only row stays last.
-    pub const ALL: [SettingsRow; 17] = [
+    pub const ALL: [SettingsRow; 18] = [
         SettingsRow::Quality,
         // Beside the tier: both decide what the machine spends on the picture,
         // both rebuild the GPU state when moved, and an operator whose show is
@@ -273,6 +279,9 @@ impl SettingsRow {
         // console is also about what the operator sees rather than about the
         // show, but it opens a window rather than changing the canvas.
         SettingsRow::Console,
+        // Beside the read-only library row: both are about the library rather
+        // than the show, and this one decides whether its pictures are made.
+        SettingsRow::Thumbnails,
         SettingsRow::Presets,
     ];
 
@@ -294,6 +303,7 @@ impl SettingsRow {
             SettingsRow::NowPlaying => "Now playing",
             SettingsRow::NextRotation => "Next in",
             SettingsRow::Console => "Console",
+            SettingsRow::Thumbnails => "Thumbnails",
             SettingsRow::Presets => "Presets",
         }
     }
@@ -374,6 +384,7 @@ impl SettingsRow {
             SettingsRow::NowPlaying => on_off(view.now_playing).to_owned(),
             SettingsRow::NextRotation => on_off(view.next_rotation).to_owned(),
             SettingsRow::Console => on_off(view.console).to_owned(),
+            SettingsRow::Thumbnails => on_off(view.thumbnails).to_owned(),
             SettingsRow::Presets => view.preset_dir.clone(),
         }
     }
@@ -454,6 +465,7 @@ impl SettingsRow {
             SettingsRow::NowPlaying => SettingsAction::ToggleNowPlaying,
             SettingsRow::NextRotation => SettingsAction::ToggleNextRotation,
             SettingsRow::Console => SettingsAction::ToggleConsole,
+            SettingsRow::Thumbnails => SettingsAction::ToggleThumbnails,
             // Read-only: it tells you where presets are loaded from, which is a
             // launch-time resolution (`RLX_PRESET_DIR`, then the per-user dir),
             // not a thing a menu can move.

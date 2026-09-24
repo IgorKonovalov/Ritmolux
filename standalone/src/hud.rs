@@ -321,7 +321,7 @@ impl AppState {
 
             // One column, always: the roster fits any window this app opens in —
             // the rows start at `ROWS_TOP` (94 px) with a 30 px pitch, so a
-            // seventeen-row menu ends at 604 px — and a settings menu that
+            // eighteen-row menu ends at 634 px — and a settings menu that
             // reflowed would move a row out from under the operator's hand
             // mid-edit.
             for (row, (label, value)) in self.hud.settings.lines(&view).into_iter().enumerate() {
