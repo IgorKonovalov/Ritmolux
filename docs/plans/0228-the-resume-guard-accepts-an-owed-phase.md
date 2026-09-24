@@ -103,19 +103,28 @@ to `done`. The phase's own `**Blocks merge:** no` marker is what makes `owed` le
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The guard accepts owed | dev | done | `0717f508` |
-| 2 — The operator guide says what owed means at a resume | dev | committed with this row | |
+| 2 — The operator guide says what owed means at a resume | dev | done | `7bd1bc42` |
 
 ### Notes
 
+- Phase 1 also changed `selfResumeWhy`'s settled phrase in `tools/conductor/lib/lane.mjs` from a
+  fixed `reads done` to `reads done` or `reads owed`, whichever settled the park (`0717f508`).
+- Phase 1's "fail against the current guard": the new test was run against the unchanged
+  `lane.mjs` and failed on its first assertion (the owed, non-blocking case refused).
+- Phase 2 edited only the park-table row. `tools/conductor/README.md` lines 166-167 (digest
+  "Already settled") and 212-213 (the self-resume list) still name only `done`.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** fix-only (conductor resume guard)
+- **Operator docs touched:** `tools/conductor/README.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 (46 reductions hold across
+  21 live entries, 4 unprobeable)
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). `node --test tools/conductor/test/`:
+  exit 0, 426 tests, 424 pass, 0 fail.
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
 
