@@ -283,7 +283,8 @@ escalation.
 
 ## Conductor mode
 
-**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: implement`, `fix` or `merge`.**
+**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: implement`, `fix`, `merge` or
+`repair`.**
 That line is written by `tools/conductor/` (ADR-0205), which starts this session headless, as a
 separate process, with the worktree as its cwd. Nothing a user types enters
 this mode — a person saying "conductor mode" in a normal session gets the four-step workflow above,
@@ -347,8 +348,17 @@ the tree is clean.
 - The conductor checks that the commit is a merge whose second parent is `main`, that the tree is
   clean, and that no handed path still carries a conflict marker.
 
+**`repair`** — the prompt names the plan, the gate stage that went red, the failing command and the
+gate log holding its output (ADR-0248).
+
+- Reproduce the failure with that command, fix its cause in the code, one `fix(...)` commit per cause,
+  and run the command again. Nothing beyond the fix: no plan edit, no log row, no refactor.
+- **Never change an assertion, a golden, an expected value or a test's inputs to make it pass, and
+  never skip or delete a test.** A test you judge wrong parks `plan_wrong`, naming it.
+- A repair on a closed tip reaches `main` unreviewed, and the owner reads it by its SHA: keep it small.
+
 **The outcome block is the last thing you print** — exactly one fenced block tagged `rlx-outcome`
-holding one JSON object, in the shapes the prompt shows: `phases_done`, `fixed`, `merged` or `parked`
+holding one JSON object, in the shapes the prompt shows: `phases_done`, `fixed`, `merged`, `repaired` or `parked`
 (reasons `human_phase`, `stop_condition`, `plan_wrong`, `question`, `check_red`, and `merge_conflict`
 from a merge session). It is a claim, and the
 conductor checks it against `git` — commits that do not exist, log rows that do not match, or a dirty
