@@ -310,7 +310,7 @@ flowchart LR
 | 4 — Electron 44 and electron-builder 26 | studio-builder | done; dev smoke run as the dev pipeline, not the `dev` script (Notes) | this row's commit |
 | 5 — The Rust pins that trail | dev | done | 561a2541 |
 | 6 — The npm gate, and CI on Node 24 | dev | done | b3ab5ecf |
-| 7 — CI on the pushed tree, and a release dry run | human | not started | |
+| 7 — CI on the pushed tree, and a release dry run | human | owed | |
 
 ### Notes
 
