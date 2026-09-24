@@ -99,7 +99,12 @@ Node, and ESLint refuses the import as well.
 `allowScripts` in `package.json` names, pinned as `pkg@version`, every
 dependency whose install script `npm ci` may run; npm 11 skips all others. A new
 entry is a reviewed edit (ADR-0244), made with `npm install-scripts approve
-<pkg>` and checked with `npm install-scripts ls`.
+<pkg>` and checked with `npm install-scripts ls`. An entry set to `false`, made
+with `npm install-scripts deny <pkg>`, keeps a script we never need from running:
+`electron-winstaller` copies a 7-Zip for the Squirrel installer, which a `--dir`
+build never makes. Electron itself fetches its binary the first time it is
+required, not at install, so a fresh checkout downloads it on the first `npm test`
+or `npm run dev`.
 
 ## Finding the player
 

@@ -301,7 +301,7 @@ flowchart LR
 | 1 — npm 11 installs Electron by name | studio-builder | done against the amended bar (binary moved to P4) | f6852988 |
 | 2 — The lint set moves together | studio-builder | done, on eslint 9.39.5 not 10 (Notes) | this row's commit + the reformat after it |
 | 3 — The build and test set moves together | studio-builder | done; dev-window and CSP-test bullets carried to P4 (Notes) | this row's commit |
-| 4 — Electron 44 and electron-builder 26 | studio-builder | not started | |
+| 4 — Electron 44 and electron-builder 26 | studio-builder | done; dev smoke run as the dev pipeline, not the `dev` script (Notes) | this row's commit |
 | 5 — The Rust pins that trail | dev | not started | |
 | 6 — The npm gate, and CI on Node 24 | dev | not started | |
 | 7 — CI on the pushed tree, and a release dry run | human | not started | |
@@ -360,6 +360,46 @@ flowchart LR
 - **P3 audit:** `14 vulnerabilities (13 high, 1 critical)`. It lists none of vite, vitest,
   `@vitest/mocker`, vite-node, esbuild or plugin-react. What is left is electron, extract-zip,
   electron-builder's tree and tar.
+- **P4 pins:** electron 44.4.3 (as the plan names; the audit's fix line offers 44.4.5, and 44.4.3 is
+  outside every listed range), electron-builder 26.15.3. `process.versions.node` in the running
+  Electron 44 app reads **24.21.0** (Chrome 152), so `@types/node` is 24.13.6.
+- **P4 allowScripts: electron 44 has no install script.** Its `index.js` downloads the binary the
+  first time it is required. `install-scripts approve electron` still removed `electron@32.1.2` as
+  stale and wrote `electron@44.4.3`, which now approves no script. electron-builder 26 brings
+  `electron-winstaller@5.4.0` (via the squirrel-windows target), whose `install` copies a Windows
+  7-Zip. The `--dir` builds never use it, so it is **denied by name** (`"electron-winstaller":
+  false`, unpinned, via `install-scripts deny`). `studio/README.md` says both.
+- **P4 binary:** after `rm -rf studio/node_modules` and `npm --prefix studio ci`, `install-scripts ls`
+  prints *No packages with unreviewed install scripts.*, and `npx --prefix studio electron
+  --version` prints *Downloading Electron binary...* then `v44.4.3`.
+- **P4 tests:** 32 files / 297 tests pass. `window.csp.test.ts` and `presetHandlers.test.ts` now
+  collect and pass (+17 tests). With the player built in this lane's `target/`, `windowless.test.ts`
+  and `templates.test.ts` run rather than skip.
+- **P4 security defaults:** `window.ts` holds the one `new BrowserWindow`, with `contextIsolation:
+  true`, `nodeIntegration: false`, `sandbox: true`, `show: false` + `ready-to-show`,
+  `setWindowOpenHandler` and `will-navigate`. No Electron breaking change between 32 and 44 touched
+  the studio: every API it imports (`app`, `BrowserWindow`, `session.webRequest`, `shell`,
+  `ipcMain`/`ipcRenderer`, `contextBridge`, `MessageChannelMain`, `webContents.capturePage` and
+  `postMessage`) typechecks unchanged against 44's `electron.d.ts`. No `electron/**` edit.
+- **P4 dev smoke (deviation):** the `dev` script never exits, and a conductor session cannot
+  background it. So the same pipeline ran as `npm --prefix studio exec -- concurrently -k` over
+  `vite studio/renderer --config studio/vite.config.ts` and `wait-on ... && cross-env
+  ELECTRON_RENDERER_URL=http://localhost:5273 electron studio --user-data-dir=<scratch> --capture
+  <png>`, with a scratch `settings.json` whose `playerPath` is
+  `/home/igor/Work/rlx-plan-0220/target/debug/ritmolux` (`cargo build -p standalone --bin
+  ritmolux`). The player spawned (control on 127.0.0.1, 116 presets). The capture shows *Echo
+  Plate* painting, footer `stream 640x360 @ 0 bgra8`, `856 painted · 255 dropped`. Electron exited
+  0, and `pgrep -a ritmolux` afterwards is empty. The main and preload watchers were not in the
+  run; they are esbuild's `--watch` over the bundles `npm run build` produced.
+- **P4 vite 8 dev headers (carried from P3):** `curl -sI` against the dev server returns no
+  `Content-Security-Policy` header, only `Vary`, `Content-Type`, `Cache-Control`, `Etag`. The studio's
+  `onHeadersReceived` hook writes the only policy, as before.
+- **P4 audit:** `npm audit --omit=dev` and `npm audit` both print *found 0 vulnerabilities*.
+  Nothing is left for Phase 6's allow file from `studio/`.
+- **P4 packaging:** `bundle-studio.sh` and `build-studio.ps1` use `--win`/`--mac --universal`
+  `--dir` and `-c.extraMetadata.version`, all unchanged in electron-builder 26, so neither is
+  edited, and neither is `electron-builder.yml`. They run for the first time at Phase 7.
+- `version` and `EXPECTED_PLAYER_VERSION` are untouched.
 
 ### Close triggers
 
