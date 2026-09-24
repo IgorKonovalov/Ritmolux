@@ -223,7 +223,6 @@ entry. Every other reason is yours: `resume` it once you have acted.
 | `studio_install` | The plan declares files under `studio/` and `npm --prefix studio ci` failed, so the gate's three studio checks could not run (ADR-0218). The detail carries the install's tail; the usual cause is no network. **Nothing was run** — the park comes before the first session. Install by hand in the lane, or wait and `resume`, which installs again: the trigger is a missing `studio/node_modules`, so the open lane the park left behind is installed into rather than skipped. |
 | `stop_condition`, `plan_wrong`, `question` | Read the transcript the inbox names. Settle it in a human-started `/architect` session. A `plan_wrong` from the readiness check names the phase and the contradiction, and nothing was implemented: edit the plan, or resume to overrule it. |
 | `gate_red` | The gate was red, a repair session ran, and the re-run was red too; or the plan had already run its three repairs. The park reads the second run's log. Fix the defect in the lane. |
-| `upstream_red` | The newest `CI` run for `origin/main` was red when the close was about to start, so no close session ran and nothing was merged, bumped or tagged (ADR-0251). The detail names the failing jobs and the park reads the run's URL. Repair `main`, push, wait for its `CI` run to go green, then `resume`: the close reads it again. |
 | `review_failed` | Read the last review under `state/reviews/`. Resuming grants two fresh fix rounds. |
 | `disagreement` | A session's claim and `git` differ. Read the detail and the transcript before trusting the lane. |
 | `cli_contract` | The CLI ran a session without the project hooks, or without loading the skill it invoked. Read the detail and the transcript, then verify the CLI version before resuming (`## When the CLI updates`). |
@@ -253,15 +252,22 @@ the conductor moves the annotated tag onto the repaired tip, and the digest's **
 such commit by SHA until `origin/main` holds it. Read those before you push. The budget is
 `budget_usd.repair`, required.
 
-**A red `origin/main` stops the close** (ADR-0251). With the close lock held and before the close
-session starts, the lane runs `scripts/check-upstream-ci.mjs`'s reader against the main checkout's
-`origin`: the newest completed run of the `CI` workflow on `main`, through `gh`. `Pages` and `Release`
-runs are never read, and a cancelled run is passed over. A red run parks `upstream_red`, naming the
-failing jobs. A reading that cannot be taken, because there is no `origin`, no `gh`, an
-unauthenticated `gh` or no network, prints `upstream CI: skipped: not read (<case>)` as a live line
-and the close goes ahead. Every reading, green, red or unread, is kept on the plan's record as
-`upstream`. A machine without `gh auth login` therefore closes as before, and the live log shows that
-nothing was read.
+**A red `origin/main` is reported at every close and never stops one** (ADR-0251). With the close lock
+held and before the close session starts, the lane runs `scripts/check-upstream-ci.mjs`'s reader
+against the main checkout's `origin`: the newest completed run of the `CI` workflow on `main`, through
+`gh`. `Pages` and `Release` runs are never read, and a cancelled run is passed over. Whatever it reads,
+the close goes ahead. The conductor never pushes, so `origin/main` moves only when you push, and a
+close that waited on it would wait on a step no session can take; there is no park reason for it.
+
+- **Red:** the live log gets one line, `upstream CI: RED - run <id> at <sha> concluded failure, failing
+  <jobs>; closing anyway`, and the digest's **Needs you** carries a line naming the run and the
+  failing jobs. That line stays until a later close reads `origin/main` green; an unread reading in
+  between does not clear it. Repair `main` and push.
+- **Unread**, because there is no `origin`, no `gh`, an unauthenticated `gh` or no network: the live
+  log gets `upstream CI: skipped: not read (<case>)`. A machine without `gh auth login` therefore
+  closes as before, and the live log shows that nothing was read.
+
+Every reading, green, red or unread, is kept on the plan's record as `upstream`.
 
 **A merge that conflicts gets one merge session, not a park** (ADR-0248). The lane merges `main` itself
 before the `pre-review` gate, so the gate and the review see the tree that will reach `main`, and it

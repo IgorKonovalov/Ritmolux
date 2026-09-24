@@ -206,7 +206,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — The macOS build compiles again | dev | done | 646ca642 |
 | 2 — A reader for origin's CI | dev | done | 1e7e4857 |
-| 3 — The close reports it and never blocks on it | dev | not started | |
+| 3 — The close reports it and never blocks on it | dev | done | committed with this row |
 | 4 — The foobar component joins the push | dev | done | 0c0ac09b |
 | 5 — The documents say what a machine needs | dev | not started | |
 | 6 — The close ceremony gains the step | human | owed | |
@@ -221,10 +221,15 @@ flowchart LR
   `readUpstream` for Phase 3. A cancelled or skipped `CI` run is passed over for the next older one.
   Run for real on 2026-09-24 it exited 1 naming run 35972983139 and `check (macos-latest)`.
 - Phase 3: the seam is `lane.mjs`, and the read runs under the close lock before each close session.
-  The fake `gh` is the fixture from Phase 2, reached through `ctx.upstreamEnv`. The existing test
-  *a lane for a plan that does not name studio/ installs nothing* counted every live line containing
-  `skipped:`, and the unread notice added one. Its filter is narrowed to gate lines; its count of 6
-  is unchanged. `node --test tools/conductor/test/` passes.
+  `f0a5eee1` is superseded forward, not reverted: its read, record and tests stay, the park and
+  its README row are gone. The digest line is derived from the newest red or green reading across
+  every plan record; an unread reading neither raises nor clears it. The fake `gh` is the fixture
+  from Phase 2, reached through `ctx.upstreamEnv`. The existing test *a lane for a plan that does
+  not name studio/ installs nothing* counted every live line containing `skipped:`, and the unread
+  notice added one. Its filter is narrowed to gate lines; its count of 6 is unchanged.
+- Phase 3, not acted on: `scripts/check-upstream-ci.mjs`'s own red output (Phase 2's file, outside
+  this phase's list) still ends `A close refuses over a red main (ADR-0251)`. The conductor prints
+  its own line and does not show it; a person running the script by hand does see it.
 - Phase 4: the job runs `packaging/foobar/fetch-sdk.ps1`, then `plugin-foobar/build.ps1`, and
   not `build-component.ps1`, so packaging and its verification stay in `release.yml` alone. The
   workflow header's count of single-runner gates went from five to six. Not run: the job needs a
@@ -237,8 +242,8 @@ flowchart LR
 
 - **`presets/` touched:** no
 - **Plan header `Closes:`** none
-- **What shipped:** feature. A new script, a new conductor park reason and a new CI job, plus a
-  compile fix in `standalone/src/capture_mac/rt.rs`.
+- **What shipped:** feature. A new script, a conductor upstream reading with a digest line (no
+  park reason) and a new CI job, plus a compile fix in `standalone/src/capture_mac/rt.rs`.
 - **Operator docs touched:** `README.md`, `docs/developing.md`, `docs/releasing.md`,
   `tools/conductor/README.md`, `scripts/fixtures/README.md`
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, with 46 reductions holding

@@ -637,3 +637,24 @@ test("an unreviewed repair is listed by SHA until origin/main holds it; a review
   spawnSync("git", ["update-ref", "refs/remotes/origin/main", head], { cwd: repo });
   assert.deepEqual(needs(renderDigest(state, { repo, stateDir: tmp(), now: NOW })), []);
 });
+
+// ADR-0251: a red origin/main never stops a close, so the worklist is where it stays visible.
+test("a red origin/main reading is one Needs you line that an unread reading keeps and a green one clears", () => {
+  const merged = (plan, upstream) => ({
+    plan, status: "merged", lane: "a", worktree: null, branch: `plan-${plan}-x`, steps: [], park: null, parks: [], fixRounds: 0,
+    verdicts: [], fixes: [], gates: [], lockWaits: [], merge: { head: "0".repeat(40), remerged: false, at: upstream.at }, upstream: [upstream],
+  });
+  const red = { state: "red", run: 2001, sha: "2222222222222222222222222222222222222222", url: "https://github.com/example/ritmolux/actions/runs/2001", jobs: ["check (macos-latest)"], case: null, at: "2026-09-15T10:00:00.000Z" };
+  const unread = { state: "unread", run: null, sha: null, url: null, jobs: null, case: "gh absent", at: "2026-09-15T10:30:00.000Z" };
+  const green = { state: "green", run: 2002, sha: "3333333333333333333333333333333333333333", url: null, jobs: null, case: null, at: "2026-09-15T11:00:00.000Z" };
+  const state = (plans) => ({ version: 1, runs: [{ started: "2026-09-15T09:00:00.000Z", ended: "2026-09-15T12:00:00.000Z", lanes: ["a"] }], lanes: {}, plans });
+  const needs = (s) => renderDigest(s, { repo: tmp(), stateDir: tmp(), now: NOW }).split("\n").filter((l) => l.includes("origin/main"));
+
+  assert.deepEqual(needs(state({ "0201": merged("0201", red) })), [
+    "origin/main red.",
+    "- **origin/main's CI is red**: run 2001 at `2222222`, failing check (macos-latest), read by 0201's close 2026-09-15 10:00. " +
+      "Repair main and push; https://github.com/example/ritmolux/actions/runs/2001. The line leaves when a later close reads it green.",
+  ]);
+  assert.equal(needs(state({ "0201": merged("0201", red), "0202": merged("0202", unread) })).length, 2, "an unread reading does not clear it");
+  assert.deepEqual(needs(state({ "0201": merged("0201", red), "0202": merged("0202", unread), "0203": merged("0203", green) })), []);
+});

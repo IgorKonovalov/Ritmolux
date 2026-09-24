@@ -10,7 +10,7 @@
 //   -> conductor gate -> review session, no lock held, ending on a verdict
 //      (every gate red gets one repair session and one re-run before it parks `gate_red`, ADR-0248)
 //   -> blockers/majors: fix session, verify, gate, re-review (two fix rounds max)
-//   -> clean: take the close lock -> read origin/main's CI, a red one parking `upstream_red`
+//   -> clean: take the close lock -> read origin/main's CI and report it, never refusing on it
 //      (ADR-0251) -> close session -> verify the close -> gate the close tip
 //      -> fast-forward main (one automatic re-merge)
 //   -> release the lock
@@ -887,29 +887,35 @@ export function reusableVerdict(rec) {
   return v;
 }
 
-/** The park reason for a close refused over a red `origin/main` (ADR-0251). */
-export const UPSTREAM_RED = "upstream_red";
-
 /**
- * Reads the `CI` workflow's newest conclusion for `origin/main` before a close merges onto it
- * (ADR-0251). Returns a park for a red reading, naming the failing jobs, and null otherwise. A
- * reading that could not be taken proceeds, with its notice printed as a live line and kept on the
- * record, so a close that went ahead unread says so rather than looking like one that read green.
- * `ctx.upstreamEnv` is the environment `gh` runs under, which is how the suite hands it a fake.
+ * Reads the `CI` workflow's newest conclusion for `origin/main` before a close merges onto it, and
+ * reports it (ADR-0251). The reading never parks or delays the close, whatever it says: the
+ * conductor never pushes, so `origin/main` moves only by hand and a close waiting on it would wait
+ * on a step no session can take. There is deliberately no park reason for a red reading — one
+ * existed briefly and was withdrawn for exactly that deadlock.
+ *
+ * Every reading is kept on the record as `rec.upstream`, which the digest's `Needs you` reads; a red
+ * one also prints a live line naming the failing jobs, and an unread one prints its notice, so a
+ * close that went ahead unread never looks like one that read green. `ctx.upstreamEnv` is the
+ * environment `gh` runs under, which is how the suite hands it a fake.
  */
-function upstreamPark(ctx, rec) {
+function readUpstreamBeforeClose(ctx, rec) {
   const r = readUpstream({ cwd: ctx.repo, env: ctx.upstreamEnv ?? process.env });
-  (rec.upstream ??= []).push({ state: r.state, run: r.run ?? null, jobs: r.jobs ?? null, case: r.case ?? null, at: now() });
+  (rec.upstream ??= []).push({
+    state: r.state,
+    run: r.run ?? null,
+    sha: r.sha ?? null,
+    url: r.url ?? null,
+    jobs: r.jobs ?? null,
+    case: r.case ?? null,
+    at: now(),
+  });
   save(ctx);
-  live(ctx, rec.plan, `  lane   ${describeUpstream(r).text.split("\n")[0]}`);
-  if (r.state !== "red") return null;
-  return {
-    reason: UPSTREAM_RED,
-    detail:
-      `origin/main is red before the close: CI run ${r.run} at ${String(r.sha).slice(0, 7)} concluded ${r.conclusion}, ` +
-      `failing ${redSubject(r)}. Repair main and push; resume once CI on main is green. Nothing was closed.`,
-    read: r.url ?? null,
-  };
+  const line =
+    r.state === "red"
+      ? `upstream CI: RED - run ${r.run} at ${String(r.sha).slice(0, 7)} concluded ${r.conclusion}, failing ${redSubject(r)}; closing anyway (ADR-0251)`
+      : describeUpstream(r).text.split("\n")[0];
+  live(ctx, rec.plan, `  lane   ${line}`);
 }
 
 function gateDetail(g) {
@@ -1116,12 +1122,9 @@ export async function runPlan(ctx, lane, plan) {
     let merges = 0;
     for (;;) {
       const lock = await take(CLOSE, { dir: ctx.lockDir, pollMs: ctx.lockPollMs, what: `close ${plan}`, onWaited: (ms) => recordWait(rec, CLOSE, ms) });
-      // Read under the lock, so a close that waited on another reads main as it is now.
-      const upstream = upstreamPark(ctx, rec);
-      if (upstream) {
-        lock.release();
-        return park(ctx, rec, upstream);
-      }
+      // Read under the lock, so a close that waited on another reads main as it is now. The reading
+      // is reported and never refuses the close.
+      readUpstreamBeforeClose(ctx, rec);
       const file = planFileIn(wt, plan);
       const before = head(wt);
       event(ctx, "close-start", { plan, round: verdict.round });

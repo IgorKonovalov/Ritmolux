@@ -479,32 +479,39 @@ function withUpstream(ctx, repo, scenario) {
   ctx.upstreamEnv = { ...process.env, RLX_GH: join(UPSTREAM_FIXTURES, "fake-gh.mjs"), RLX_FAKE_GH: join(UPSTREAM_FIXTURES, `${scenario}.json`) };
 }
 
-test("a red origin/main parks the close before its session, naming the failing job, and main does not move", async () => {
-  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+test("a red origin/main is reported and the close still merges, naming the failing job in the log and the digest", async () => {
+  const { ctx, repo, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
   withUpstream(ctx, repo, "red");
+  const lines = [];
+  ctx.live = (line) => lines.push(line);
   const mainBefore = resolveCommit("main", repo);
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
-  assert.equal(rec.status, "parked");
-  assert.equal(rec.park.reason, "upstream_red");
-  assert.match(rec.park.detail, /CI run 2001 at 2222222 concluded failure, failing check \(macos-latest\)\./);
-  assert.equal(rec.park.read, "https://github.com/example/ritmolux/actions/runs/2001");
-  assert.deepEqual(kinds(rec), ["readiness:architect", "implement:dev", "review:architect"], "no close session started");
-  assert.equal(resolveCommit("main", repo), mainBefore, "main did not move");
-  assert.equal(tagObjectType("v0.1.1", repo), null, "no tag was written");
-  assert.match(readFileSync(statePaths(ctx.stateDir).inbox, "utf8"), /plan 0101 parked: upstream_red/);
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(rec.parks, [], "a red reading never parks");
+  assert.ok(kinds(rec).includes("close:architect"), `the close session ran: ${kinds(rec)}`);
+  assert.notEqual(resolveCommit("main", repo), mainBefore, "main moved");
+  assert.equal(tagObjectType("v0.1.1", repo), "tag", "the close tagged");
+  assert.deepEqual(rec.upstream.map((u) => [u.state, u.run, u.jobs]), [["red", 2001, ["check (macos-latest)"]]]);
+  const red = lines.filter((l) => l.includes("upstream CI: RED"));
+  assert.equal(red.length, 1, lines.join("\n"));
+  assert.match(red[0], /run 2001 at 2222222 concluded failure, failing check \(macos-latest\); closing anyway/);
+  const needs = digest("## Needs you");
+  assert.match(needs, /^origin\/main red\.$/m, needs);
+  assert.match(needs, /origin\/main's CI is red\*\*: run 2001 at `2222222`, failing check \(macos-latest\), read by 0101's close/);
 });
 
 test("a green origin/main lets the close run, and the reading is recorded", async () => {
-  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  const { ctx, repo, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
   withUpstream(ctx, repo, "green");
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
   assert.deepEqual(rec.upstream.map((u) => [u.state, u.run]), [["green", 1001]]);
+  assert.doesNotMatch(digest("## Needs you"), /origin\/main/);
 });
 
-test("an origin/main that cannot be read proceeds to the merge, and never parks upstream_red", async () => {
+test("an origin/main that cannot be read proceeds to the merge, and never parks", async () => {
   for (const [scenario, why] of [
     ["offline", "no network"],
     ["unauthenticated", "gh unauthenticated"],
@@ -516,7 +523,7 @@ test("an origin/main that cannot be read proceeds to the merge, and never parks 
     await runLanes(ctx);
     const rec = loadState(ctx.stateDir).plans["0101"];
     assert.equal(rec.status, "merged", `${scenario}: ${JSON.stringify(rec.park)}`);
-    assert.ok(!rec.parks.some((p) => p.reason === "upstream_red"), scenario);
+    assert.deepEqual(rec.parks, [], scenario);
     assert.deepEqual(rec.upstream.map((u) => [u.state, u.case]), [["unread", why]]);
     assert.ok(lines.some((l) => l.includes(`upstream CI: skipped: not read (${why})`)), `${scenario}: the notice is printed`);
   }

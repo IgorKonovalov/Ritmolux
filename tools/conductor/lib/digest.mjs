@@ -235,6 +235,23 @@ function unreviewedRepairs(rec, repo) {
 }
 
 /**
+ * The newest reading of `origin/main`'s CI any close took (ADR-0251), across every plan's record, that
+ * actually read something. An unread reading is skipped rather than returned: it says nothing about
+ * main, so a red reading stays on the page until a later close reads green, and never leaves because
+ * a machine without `gh` closed after it. Null when no close ever read one.
+ */
+export function latestUpstream(plans) {
+  let best = null;
+  for (const rec of plans) {
+    for (const u of rec.upstream ?? []) {
+      if (u.state !== "green" && u.state !== "red") continue;
+      if (!best || u.at > best.at) best = { ...u, plan: rec.plan };
+    }
+  }
+  return best;
+}
+
+/**
  * The one traversal of `state`, `state/` and git both pages render from. `now` is an option so a
  * test can pin the clock the current page's ages read.
  */
@@ -260,6 +277,7 @@ export function readDigestState(state, { repo, stateDir, now = Date.now() }) {
     stops: latest?.stops ?? [],
     cli: latest?.cli ?? null,
     owed: repo ? owedPhasesInDone(repo) : [],
+    upstream: latestUpstream(plans),
   };
 }
 
@@ -296,10 +314,21 @@ function standingParkLines(view, rec) {
 /** The current page's first section: everything waiting on the owner, and nothing else. */
 function needsYou(view) {
   const lines = [];
-  const counts = { parked: 0, stops: 0, findings: 0, lanes: 0, owed: 0, repairs: 0 };
+  const counts = { parked: 0, stops: 0, findings: 0, lanes: 0, owed: 0, repairs: 0, upstream: 0 };
   // The run carries its own CLI reading, so the line stops appearing on the first run whose version is listed.
   if (view.cli?.warning) {
     lines.push(`- **claude ${view.cli.version} is not a verified CLI version** - the last run went ahead with a warning (ADR-0208): ${view.cli.warning}.`);
+  }
+  // A red origin/main never stopped the close that read it (ADR-0251); this line is where it costs
+  // something, and it leaves only when a later close reads green.
+  const u = view.upstream;
+  if (u?.state === "red") {
+    counts.upstream = 1;
+    const jobs = u.jobs?.length ? u.jobs.join(", ") : `run ${u.run}`;
+    lines.push(
+      `- **origin/main's CI is red**: run ${u.run}${u.sha ? ` at \`${short(u.sha)}\`` : ""}, failing ${jobs}, read by ${u.plan}'s close ${stamp(u.at)}. ` +
+        `Repair main and push${u.url ? `; ${u.url}` : ""}. The line leaves when a later close reads it green.`,
+    );
   }
   for (const rec of view.parked) {
     counts.parked += 1;
@@ -358,6 +387,7 @@ function needsYou(view) {
     );
   }
   const parts = [];
+  if (counts.upstream) parts.push("origin/main red");
   if (counts.parked) parts.push(plural(counts.parked, "park"));
   if (view.settled.length) parts.push(`${view.settled.length} already settled`);
   if (counts.owed) parts.push(`${plural(counts.owed, "owed phase")}`);
