@@ -37,9 +37,20 @@ import { fastForwardMain } from "./merge.mjs";
 import { CLAUDE_DIR, STUDIO_INSTALL } from "./outcome.mjs";
 import { donePhases, findPlan, nextStep, rangeLabel, readPlanFile } from "./plan.mjs";
 import { endStep, planRecord, saveState, startStep, statePaths } from "./state.mjs";
-import { renderPromptFile, runStep } from "./step.mjs";
+import { USAGE_LIMIT, renderPromptFile, runStep } from "./step.mjs";
 
 export const MAX_FIX_ROUNDS = 2;
+
+// A session the usage limit ends is continued once the window reopens, rather than parked. A reset
+// further off than MAX_USAGE_WAIT_MS (the seven-day window's) parks `usage_limit` instead, as does a
+// reset the CLI did not report or a step that has already been continued MAX_USAGE_RESUMES times.
+// The margin is there because the window reopens on the server's clock, not this machine's.
+export const MAX_USAGE_WAIT_MS = 6 * 60 * 60 * 1000;
+export const MAX_USAGE_RESUMES = 3;
+const USAGE_MARGIN_MS = 2 * 60 * 1000;
+const RESUME_PROMPT =
+  "The usage limit that ended this session has reset. Carry on exactly where you stopped, with the same " +
+  "scope and the same rules, and finish by printing the rlx-outcome block.";
 
 const now = () => new Date().toISOString();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -363,33 +374,72 @@ async function session(ctx, rec, kind, { owner, prompt, vars, budget, addDirs = 
   const reader = streamReader({ readOutput: ctx.readOutput ?? readTail, shared: (ctx.liveShared ??= {}) });
   const watch = watchCommits(ctx, rec, rec.plan);
   const t0 = Date.now();
-  const result = await runStep({
-    onStreamEvent: ctx.live ? (e) => reader.lines(e).forEach((body) => live(ctx, rec.plan, body)) : undefined,
-    claude: ctx.claude,
-    cwd: rec.worktree,
-    prompt,
-    settingsFile: ctx.settingsFile,
-    appendPromptFile,
-    budgetUsd: budget,
-    model: ctx.local.model?.[kind],
-    addDirs: [...addDirs, ...(ctx.queue.plans[rec.plan]?.add_dirs ?? []).map((d) => join(ctx.repo, d))],
-    transcriptPath: join(paths.transcripts, `${label}.jsonl`),
-    skill: owner,
-    hookLog: join(ctx.stateDir, "hooks", `${label}.log`),
-    env: {
-      RLX_LOCK_LOG: paths.lockLog,
-      RLX_SUITE_LEDGER: suiteLedger(ctx),
-      RLX_SUITE_LEDGER_BY: label,
-      ...(ctx.lockDir ? { RLX_LOCK_DIR: ctx.lockDir } : {}),
-    },
-    expectPlan: rec.plan,
-  });
+  const segment = (n, resume) =>
+    runStep({
+      onStreamEvent: ctx.live ? (e) => reader.lines(e).forEach((body) => live(ctx, rec.plan, body)) : undefined,
+      claude: ctx.claude,
+      cwd: rec.worktree,
+      prompt: resume ? RESUME_PROMPT : prompt,
+      resume,
+      settingsFile: ctx.settingsFile,
+      appendPromptFile,
+      budgetUsd: budget,
+      model: ctx.local.model?.[kind],
+      addDirs: [...addDirs, ...(ctx.queue.plans[rec.plan]?.add_dirs ?? []).map((d) => join(ctx.repo, d))],
+      transcriptPath: join(paths.transcripts, n === 0 ? `${label}.jsonl` : `${label}-resume-${n}.jsonl`),
+      skill: owner,
+      hookLog: join(ctx.stateDir, "hooks", `${label}.log`),
+      env: {
+        RLX_LOCK_LOG: paths.lockLog,
+        RLX_SUITE_LEDGER: suiteLedger(ctx),
+        RLX_SUITE_LEDGER_BY: label,
+        ...(ctx.lockDir ? { RLX_LOCK_DIR: ctx.lockDir } : {}),
+      },
+      expectPlan: rec.plan,
+    });
+  const first = await segment(0);
+  let result = first;
+  const waits = [];
+  let turns = first.numTurns ?? 0;
+  while (result.status === "parked" && result.reason === USAGE_LIMIT) {
+    const why = usageWaitRefusal(result, waits.length, Date.now());
+    if (why) {
+      result = { ...result, detail: `${result.detail} (${why})` };
+      break;
+    }
+    const waitMs = Math.max(0, result.resetsAt * 1000 - Date.now()) + (ctx.usageMarginMs ?? USAGE_MARGIN_MS);
+    const until = new Date(Date.now() + waitMs);
+    waits.push({ transcript: result.transcript, resetsAt: result.resetsAt, waitedMs: waitMs, at: now() });
+    ctx.state.lanes[rec.lane] = { ...ctx.state.lanes[rec.lane], waitingUntil: until.toISOString() };
+    save(ctx);
+    live(ctx, rec.plan, `  usage  limit reached; waiting ${Math.round(waitMs / 60000)} min, until ${until.toISOString().slice(11, 16)} UTC, then continuing the session`);
+    event(ctx, "usage-wait", { plan: rec.plan, label, until: until.toISOString() });
+    await (ctx.sleep ?? sleep)(waitMs);
+    ctx.state.lanes[rec.lane] = { plan: rec.plan, step: label, stepStarted: entry.started };
+    save(ctx);
+    result = await segment(waits.length, result.sessionId);
+    turns += result.numTurns ?? 0;
+  }
+  if (waits.length) result = { ...result, numTurns: turns, rateLimitFirst: first.rateLimitFirst, usageWaits: waits };
   watch.stop();
   live(ctx, rec.plan, stepEndBody({ label, result, ms: Date.now() - t0 }));
   endStep(ctx.stateDir, ctx.state, entry, result);
   ctx.state.lanes[rec.lane] = { plan: rec.plan, step: null };
   save(ctx);
   return result;
+}
+
+/**
+ * Why a usage-limited step is parked rather than waited out, or null when it can wait: the CLI
+ * reported no reset, the reset is further off than MAX_USAGE_WAIT_MS, the session has no id to
+ * continue, or the step has been continued MAX_USAGE_RESUMES times already.
+ */
+export function usageWaitRefusal(result, resumes, nowMs) {
+  if (!result.sessionId) return "no session id to continue";
+  if (typeof result.resetsAt !== "number") return "the CLI reported no reset time";
+  if (resumes >= MAX_USAGE_RESUMES) return `already continued ${resumes} times`;
+  if (result.resetsAt * 1000 - nowMs > MAX_USAGE_WAIT_MS) return `the reset is more than ${MAX_USAGE_WAIT_MS / 3600000} h away`;
+  return null;
 }
 
 async function gate(ctx, rec, label) {

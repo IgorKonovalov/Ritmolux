@@ -153,6 +153,41 @@ test("a budget-exhausted session parks as budget with its spend", async () => {
   assert.equal(r.terminalReason, "budget_exhausted");
 });
 
+test("a session the usage limit ends parks usage_limit with the reset and the CLI's message", async () => {
+  const resetsAt = 1790193000;
+  const { r } = await step({
+    isError: true,
+    apiErrorStatus: 429,
+    resultText: "You've hit your session limit · resets 9:50pm (Europe/Belgrade)",
+    costUsd: 37.78,
+    text: "",
+    stream: [{ type: "rate_limit_event", rate_limit_info: { status: "rejected", resetsAt } }],
+  });
+  assert.equal(r.status, "parked");
+  assert.equal(r.reason, "usage_limit");
+  assert.equal(r.resetsAt, resetsAt);
+  assert.equal(r.spendUsd, 37.78);
+  assert.match(r.detail, /^usage limit reached, resets 2026-09-23T19:50:00.000Z: /);
+  assert.match(r.detail, /You've hit your session limit/);
+  assert.ok(r.sessionId, "the session id the lane continues");
+});
+
+test("an error result that is not the usage limit parks api, carrying the result text when there are no errors", async () => {
+  const { r } = await step({ isError: true, apiErrorStatus: 500, resultText: "Internal server error", text: "" });
+  assert.equal(r.reason, "api");
+  assert.match(r.detail, /Internal server error/);
+  assert.equal(r.resetsAt, undefined);
+});
+
+test("a resumed step continues the named session", async () => {
+  const { r, calls } = await step({ text: outcomeBlock(DONE) }, { resume: "abc-session", prompt: "carry on" });
+  assert.equal(r.status, "ok");
+  const [call] = calls;
+  assert.equal(call.args[call.args.indexOf("--resume") + 1], "abc-session");
+  assert.equal(call.args[call.args.indexOf("-p") + 1], "carry on");
+  assert.equal(r.sessionId, "abc-session");
+});
+
 test("a session that ends with no result event parks as an API failure", async () => {
   const { r } = await step({ noResult: true, exitCode: 1 });
   assert.equal(r.status, "parked");

@@ -344,7 +344,8 @@ function nowSection(view) {
     }
     const rec = view.plans.find((r) => r.plan === l.plan);
     const where = l.step ? `step \`${l.step}\` for ${duration(view.now - Date.parse(l.stepStarted))}` : "between steps";
-    out.push(`- lane ${lane}: ${l.plan}, ${where}, ${usd(rec ? totalSpend(rec) : 0)} spent so far.`);
+    const waiting = l.waitingUntil ? `, waiting out the usage limit until ${stamp(l.waitingUntil)}` : "";
+    out.push(`- lane ${lane}: ${l.plan}, ${where}${waiting}, ${usd(rec ? totalSpend(rec) : 0)} spent so far.`);
   }
   out.push(`- run started ${stamp(view.latest.started)}, ${duration(view.now - Date.parse(view.latest.started))} ago.`, "");
   return out;

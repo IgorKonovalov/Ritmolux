@@ -8,7 +8,7 @@
 //   FAKE_CLAUDE_SCENARIO  path to an ES module whose default export is
 //                         async ({ args, cwd, env, prompt, append, vars }) =>
 //                           { text?, subtype?, exitCode?, costUsd?, numTurns?, noResult?, stream?,
-//                             skills?, hooks? }
+//                             skills?, hooks?, isError?, apiErrorStatus?, resultText? }
 //                         `skills` replaces system/init's skill list (null omits it); `hooks: false`
 //                         makes a shell call in `stream` leave no line in RLX_HOOK_LOG.
 //                         It may run git in `cwd` to make the commits a real session would.
@@ -16,6 +16,10 @@
 //                         text, in the shapes a real session emits: an assistant tool_use, a user
 //                         tool_result, system/task_notification, system/permission_denied,
 //                         rate_limit_event. A string entry is written as a raw line, JSON or not.
+//                         `isError`, `apiErrorStatus` and `resultText` shape an error result the way
+//                         the API's usage limit ends a session: subtype success, is_error true, a
+//                         429 status and the limit's message as the result text. `--resume <id>`
+//                         continues that session id, as the real CLI does.
 //   FAKE_CLAUDE_LOG       JSONL file receiving one record per invocation: args, cwd, and the
 //                         RLX_ environment the session saw.
 //   FAKE_CLAUDE_VERSION   what `--version` prints (default: the verified CLI's string).
@@ -53,7 +57,7 @@ if (process.env.FAKE_CLAUDE_LOG) {
   );
 }
 
-const sessionId = `fake-${process.pid}-${Date.now()}`;
+const sessionId = flag("--resume") ?? `fake-${process.pid}-${Date.now()}`;
 const emit = (e) => process.stdout.write(JSON.stringify({ ...e, session_id: sessionId }) + "\n");
 
 let outcome = { text: "no scenario", subtype: "success" };
@@ -92,13 +96,14 @@ if (!outcome.noResult) {
   emit({
     type: "result",
     subtype,
-    is_error: subtype !== "success",
-    terminal_reason: budget ? "budget_exhausted" : subtype === "success" ? "completed" : "error",
+    is_error: outcome.isError ?? subtype !== "success",
+    terminal_reason: budget ? "budget_exhausted" : outcome.isError ? "api_error" : subtype === "success" ? "completed" : "error",
     total_cost_usd: outcome.costUsd ?? 0.01,
     num_turns: outcome.numTurns ?? 1,
-    result: subtype === "success" ? outcome.text ?? "" : undefined,
+    result: subtype === "success" ? outcome.resultText ?? outcome.text ?? "" : undefined,
+    ...(outcome.apiErrorStatus ? { api_error_status: outcome.apiErrorStatus } : {}),
     errors: budget ? [`Reached maximum budget ($${flag("--max-budget-usd")})`] : subtype === "success" ? undefined : ["fake error"],
     permission_denials: [],
   });
 }
-process.exit(outcome.exitCode ?? (outcome.subtype && outcome.subtype !== "success" ? 1 : 0));
+process.exit(outcome.exitCode ?? ((outcome.subtype && outcome.subtype !== "success") || outcome.isError ? 1 : 0));

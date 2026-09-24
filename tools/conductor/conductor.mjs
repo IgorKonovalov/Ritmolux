@@ -271,7 +271,8 @@ function cmdStatus(args, o) {
     }
     const rec = state.plans[l.plan];
     const step = l.step ? `step ${l.step} for ${minutes(l.stepStarted)}` : "between steps";
-    o.log(`lane ${lane}: plan ${l.plan}, ${step}, spend so far $${totalSpend(rec).toFixed(2)}`);
+    const waiting = l.waitingUntil ? `, waiting out the usage limit until ${l.waitingUntil}` : "";
+    o.log(`lane ${lane}: plan ${l.plan}, ${step}${waiting}, spend so far $${totalSpend(rec).toFixed(2)}`);
   }
   const parked = Object.values(state.plans).filter((r) => r.status === "parked");
   if (parked.length === 0) o.log("parked: none");
