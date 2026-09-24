@@ -142,7 +142,8 @@ single `node` command against the module, and Phase 2's is the real gate.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The split recurses | dev | done | `b4e63064` |
-| 2 — The built site passes both gates | dev | done | committed with this row |
+| 2 — The built site passes both gates | dev | done | `98ca086d` |
+| 3 — The prose stops arguing a stop | dev | done | committed with this row |
 
 ### Notes
 
@@ -157,3 +158,21 @@ single `node` command against the module, and Phase 2's is the real gate.
   214 from the published set, every one in the menu; largest split route 29528 B`. Links gate ran
   without a `dist/api/` tree, so `/api/` hrefs were not checked locally. Starlight rendered the
   three-deep collapsed groups; the flatten fallback in Risks was not needed.
+- Phase 3 gave `ROUTE_SOURCE_CEILING` its own doc comment, split out of the module's header block,
+  and also rewrote the oversized-route failure message in `check-site-routes.mjs`, which still
+  pointed at new ADR-0166 arithmetic.
+- Followup not acted on: `CLAUDE.md`'s `scripts/` entry still says a route over the ceiling means
+  *ADR-0166's arithmetic needs redoing*; outside this plan's files.
+- Followup not acted on: ADR-0247's *"exactly one qualifies"* is contradicted by the three
+  sections that split one level deeper (Notes, Phase 1).
+
+### Close triggers
+
+- **`presets/` touched:** no
+- **Plan header `Closes:`** none
+- **What shipped:** fix-only (site build; the `Pages` workflow's route-size failure)
+- **Operator docs touched:** none
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0; 21 live entries, 30
+  moved-path advisories, none from this plan's files
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
+- **Outstanding `human` phases:** none

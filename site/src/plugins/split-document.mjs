@@ -7,18 +7,31 @@ import { stripProvenanceText } from './strip-provenance.mjs';
  * (ADR-0166).
  *
  * The thresholds are the whole decision, and they are measured rather than
- * chosen: 40 KB selects the documents a reader cannot navigate, 20 KB selects
- * the sections that stay unnavigable after a flat split, and the split stops at
- * `###` because a third level shatters coherent small sections into pages with
- * nothing on them. `ROUTE_SOURCE_CEILING` is not a lever - it is the assertion
- * that the two above did their job, and a route over it means the arithmetic in
- * ADR-0166 needs redoing, not that the constant needs raising.
+ * chosen: 40 KB selects the documents a reader cannot navigate, and 20 KB
+ * selects the sections that stay unnavigable after a flat split. The second is
+ * applied recursively (ADR-0247): a section over it splits at the next heading
+ * level, and so does each of its pieces, until every piece is under it or has
+ * no heading one level down. The condition is what keeps coherent small
+ * sections whole - an unconditional deeper cut would shatter them into pages
+ * with nothing on them - so no terminal depth is needed.
  *
  * Nothing under `docs/` or `presets/` is edited to make this work: the split
  * reads the source text and emits chunks of it (ADR-0154).
  */
 export const DOCUMENT_SPLIT_BYTES = 40_000;
 export const SECTION_SPLIT_BYTES = 20_000;
+
+/**
+ * The largest route source `scripts/check-site-routes.mjs` accepts.
+ *
+ * Not a lever, and an assertion about the corpus rather than about this
+ * algorithm (ADR-0247): the recursion guarantees only that a route over
+ * `SECTION_SPLIT_BYTES` has no heading one level down to cut at, so a long run
+ * of prose with no heading inside can exceed this and nothing here repairs it.
+ * `## Checklist` in `docs/on-device-validation.md` is the standing instance.
+ * The repair for a route over it is editorial - headings in the source - never
+ * a raised constant.
+ */
 export const ROUTE_SOURCE_CEILING = 30_000;
 
 /**
@@ -239,7 +252,8 @@ export function contentsList(chunk, base, heading) {
  * Generated rather than hand-listed: 46 entries written out by hand is the
  * shape of roster that has rotted repeatedly in this repository, and a heading
  * rename would silently orphan a route. A section that split again nests its
- * subsections under itself, so the menu is never a flat list of 45 siblings.
+ * subsections under itself, at whatever depth the split reached, so the menu is
+ * never a flat list of 45 siblings.
  *
  * The group's own label is the document's DECLARED title, not a second string
  * passed in beside it: the menu entry and the page `<h1>` are one fact
