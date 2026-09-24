@@ -217,6 +217,10 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   dated records (plans, ADRs, the backlog), because a count goes stale whether
                      #   or not it is right today, and it reads .rs WHOLE since the instance that
                      #   survived two closes was an assertion message (ADR-0202);
+                     #   check-settings-have-files.mjs holds the two applications a Rust test
+                     #   cannot see to ADR-0240 - no browser storage under studio/, and every
+                     #   plugin-foobar/ `cfg_*` declaration named in docs/configuration.md, with
+                     #   `settings-allow: <why>` on the line as the escape;
                      #   check-gate-carriers.mjs asserts that .githooks/pre-push and the CI `links`
                      #   job each run the ordered roster held in scripts/gates.manifest.mjs, in that
                      #   order - the manifest being DATA rather than a gate, and the one the
