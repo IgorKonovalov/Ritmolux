@@ -26,7 +26,7 @@ The decision and its rejected alternatives are ADR-0205. The plan that built it 
    spend.
 
    ```json
-   { "budget_usd": { "implement": 8, "fix": 4, "review": 6 }, "run_budget_usd": 150, "max_open_worktrees": 3 }
+   { "budget_usd": { "implement": 8, "fix": 4, "review": 6, "merge": 3 }, "run_budget_usd": 150, "max_open_worktrees": 3 }
    ```
 
    `run_budget_usd` is the ceiling on one run's total spend. A resident run spends while nobody is
@@ -226,7 +226,18 @@ entry. Every other reason is yours: `resume` it once you have acted.
 | `lost_background` | The session started a command in the background and ended with it unfinished, so that work was killed with the session. Its commits are still in the lane. Read the detail for the command, check what the lane actually contains, then resume: the step runs again from what the plan log and `git` show. |
 | `usage_limit` | The account's usage limit ended a session, and the conductor did not wait it out, because the reset was more than 6 h away (the seven-day window), the CLI reported none, or the step had already been continued three times. The detail says which. The session's half-done work is still in the lane, uncommitted, so `resume` refuses it until you commit or `git restore` it. Resuming then re-runs the step from what the plan log and `git` show. |
 | `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or read the transcript. Resuming re-runs the step from what the plan log and `git` show. |
-| `merge_conflict`, `merge_failed`, `main_dirty` | Resolve it in the lane, or clean the main checkout. A resumed plan goes straight back to the fast-forward. |
+| `merge_conflict` | A merge session could not resolve a conflict and parked it, or the close hit one in code. Resolve it in the lane and commit the merge; a resumed plan goes straight back to where it stopped. |
+| `merge_failed`, `main_dirty` | Clean the main checkout, or clear what refused the fast-forward. `main_dirty` resumes itself once the main checkout is on `main` and clean. |
+
+**A merge that conflicts gets one merge session, not a park** (ADR-0248). The lane merges `main` itself
+before the `pre-review` gate, so the gate and the review see the tree that will reach `main`, and it
+merges again before the fast-forward when `main` moved meanwhile. A conflict at either point is
+aborted and handed to a fresh `dev` session, or a `studio-builder` one when every conflicted path is
+under `studio/`, which redoes the merge, resolves it and commits. The conductor then checks the
+result: a merge commit whose second parent is `main`, a clean tree, and no conflict marker in the
+paths it handed over. The gate runs next as usual. Each conflict gets its own session, and a merge
+session that cannot resolve one parks `merge_conflict`. Its budget is `budget_usd.merge` in
+`local.json`, which is required.
 
 **A `human` phase marked `Blocks merge: no` is owed, not waited for** (ADR-0249). The conductor
 commits its log row as `owed` in the lane, runs the phases after it, reviews, closes and merges as
@@ -403,7 +414,8 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
 The conductor runs its own gate in the worktree and ignores any session's claim that the checks
 passed. **What runs at each stage is `gateForStage` in `lib/gate.mjs`, and nowhere else**: read it
 there rather than from a copy here, which would drift. The commands run in order and stop at the
-first red. The gate runs at four stages: `pre-review` after the last implementer run, `fix-N` after
+first red. The gate runs at four stages: `pre-review` after the last implementer run and the lane's
+merge of `main`, `fix-N` after
 each fix round, `post-close` on the tip a close produced before `main` moves, and `remerge` after the
 automatic re-merge of a moved `main`. Only the last two run a step marked `afterClose`. **A full
 workspace suite the conductor saw pass is not run again on the same tree** (ADR-0207), and **a tree

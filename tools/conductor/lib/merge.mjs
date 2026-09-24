@@ -1,4 +1,4 @@
-// Fast-forwarding main to a closed plan's branch, from the main checkout.
+// Merging main into a lane, and fast-forwarding main to a closed plan's branch from the main checkout.
 //
 // Refuses a main checkout that is dirty or not on main — the owner's work in progress is never
 // touched. Three things can stand between a close and the fast-forward, and each is handled once:
@@ -8,13 +8,35 @@
 //     merge park whose conflict the owner resolved in the lane. The gate runs on the new tip and the
 //     annotated tag moves onto it before anything reaches main. A missing `gatedHead` gates too.
 //   - main moved since the close (main is not an ancestor of the branch): one automatic re-merge in
-//     the worktree, the gate again, the tag moved, the fast-forward retried once.
+//     the worktree, the gate again, the tag moved, the fast-forward retried once. A re-merge that
+//     conflicts is aborted and handed to `resolveConflict`, which runs one merge session (ADR-0248);
+//     without one it parks `merge_conflict`.
 //   - the fast-forward is refused although main IS an ancestor (a held index.lock, a file in the
 //     way): nothing a re-merge can fix, so it parks at once rather than paying for a gate.
 //
 // `onGated(sha)` reports each tip the gate passed on, so a resumed plan does not gate it twice.
 
 import { currentBranch, git, head, isAncestor, isClean, resolveCommit, tagMessage, tagObjectType } from "./git.mjs";
+
+/** The paths a merge in progress left conflicted in `cwd`, `/`-separated. */
+export function conflictedPaths(cwd) {
+  const r = git(["diff", "--name-only", "--diff-filter=U"], cwd);
+  return r.code === 0 && r.stdout ? r.stdout.split("\n").map((p) => p.replace(/\\/g, "/")) : [];
+}
+
+/**
+ * Merges `main` into the worktree's branch. Returns { ok: true, merged } — `merged` false when main
+ * was already in the branch — or { ok: false, paths, detail } for a conflict, with the merge aborted
+ * so the tree is clean again and the conflicted paths are what a merge session is handed.
+ */
+export function mergeMainInto(worktree) {
+  if (isAncestor("main", "HEAD", worktree)) return { ok: true, merged: false };
+  const r = git(["merge", "--no-edit", "main"], worktree);
+  if (r.code === 0) return { ok: true, merged: true };
+  const paths = conflictedPaths(worktree);
+  git(["merge", "--abort"], worktree);
+  return { ok: false, paths, detail: r.stdout.split("\n").slice(-3).join(" ") };
+}
 
 /** Moves annotated `tag` onto the worktree's tip, keeping its message. Returns a park or null. */
 function moveTag(tag, worktree) {
@@ -30,7 +52,7 @@ function moveTag(tag, worktree) {
   return null;
 }
 
-export async function fastForwardMain({ repo, worktree, branch, tag, gatedHead, runGate, onGated }) {
+export async function fastForwardMain({ repo, worktree, branch, tag, gatedHead, runGate, onGated, resolveConflict }) {
   if (currentBranch(repo) !== "main") {
     return { ok: false, reason: "main_dirty", detail: `the main checkout is on "${currentBranch(repo)}", not main` };
   }
@@ -57,10 +79,11 @@ export async function fastForwardMain({ repo, worktree, branch, tag, gatedHead, 
     return { ok: false, reason: "merge_failed", detail: `fast-forward refused although main is already in ${branch}: ${first.stderr}` };
   }
 
-  const merge = git(["merge", "--no-edit", "main"], worktree);
-  if (merge.code !== 0) {
-    git(["merge", "--abort"], worktree);
-    return { ok: false, reason: "merge_conflict", detail: `main moved and does not merge into ${branch}: ${merge.stdout.split("\n").slice(-3).join(" ")}` };
+  const merge = mergeMainInto(worktree);
+  if (!merge.ok) {
+    if (!resolveConflict) return { ok: false, reason: "merge_conflict", detail: `main moved and does not merge into ${branch}: ${merge.detail}` };
+    const park = await resolveConflict(merge.paths);
+    if (park) return park;
   }
   remerged = true;
   const gate = await runGate("remerge");

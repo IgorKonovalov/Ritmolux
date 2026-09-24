@@ -103,6 +103,41 @@ export function verifyFix({ cwd, before, outcome, findingCount }) {
   return problems;
 }
 
+/** The lines of `paths` in `cwd`'s working tree that still carry a conflict marker, as `path:line`. */
+function markerLines(paths, cwd) {
+  if (paths.length === 0) return [];
+  const r = git(["grep", "-n", "-I", "-E", "^(<{7}|>{7})( |$)", "--", ...paths], cwd);
+  return r.code === 0 && r.stdout ? r.stdout.split("\n").map((l) => l.split(":").slice(0, 2).join(":")) : [];
+}
+
+/**
+ * A merge session (ADR-0248): its commit exists, was made by this step, is on the branch tip's
+ * history, is a merge whose second parent is `main` as the conductor saw it when it handed the
+ * conflict over (or a later main tip, when main moved again meanwhile), the tree is clean, and no
+ * path it was handed still carries a conflict marker. `git grep` reads the working tree, which the
+ * clean-tree check makes the committed one.
+ */
+export function verifyMerge({ cwd, before, mainTip, paths, outcome }) {
+  if (outcome.kind !== "merged") return [`expected a merged outcome, got ${outcome.kind}`];
+  const problems = [];
+  const made = commitsBetween(before, head(cwd), cwd);
+  const full = resolveCommit(outcome.commit, cwd);
+  if (!full) problems.push(`claimed merge commit ${outcome.commit} does not exist`);
+  else if (!made.includes(full)) problems.push(`claimed merge commit ${outcome.commit} was not made by this step`);
+  else {
+    const parents = git(["rev-list", "--parents", "-n", "1", full], cwd).stdout.split(" ").slice(1);
+    const second = parents[1];
+    if (parents.length !== 2) problems.push(`${outcome.commit} is not a two-parent merge commit`);
+    else if (second !== mainTip && !(isAncestor(mainTip, second, cwd) && isAncestor(second, "main", cwd))) {
+      problems.push(`${outcome.commit}'s second parent ${second.slice(0, 7)} is not main's tip ${mainTip.slice(0, 7)}`);
+    }
+  }
+  if (!isClean(cwd)) problems.push("the worktree is not clean");
+  const markers = markerLines(paths, cwd);
+  if (markers.length) problems.push(`conflict markers left in ${markers.join(", ")}`);
+  return problems;
+}
+
 /** The paths a commit changes, `/`-separated; a merge commit is compared against its first parent. */
 function changedPaths(sha, cwd) {
   const r = git(["diff-tree", "-r", "-m", "--first-parent", "--no-commit-id", "--name-only", "--root", sha], cwd);

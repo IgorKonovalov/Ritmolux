@@ -5,6 +5,7 @@
 //   -> for each same-owner run not done: one implement session, then verify its claim
 //   -> a `human` phase parks, unless it is marked `Blocks merge: no`, when its row is committed
 //      `owed` and the plan runs on without it (ADR-0249)
+//   -> merge main into the lane, a conflict handed to one merge session (ADR-0248)
 //   -> conductor gate -> take the close lock -> review session
 //   -> blockers/majors: release the lock, fix session, verify, gate, re-review (two fix rounds max)
 //   -> closed: verify the close -> gate the close tip -> fast-forward main (one automatic re-merge)
@@ -24,7 +25,7 @@ import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { adoptedClose, verifyClose, verifyFix, verifyImplement } from "./close.mjs";
+import { adoptedClose, verifyClose, verifyFix, verifyImplement, verifyMerge } from "./close.mjs";
 import { removeLane, laneNames, openLane } from "./cleanup.mjs";
 import { defaultGate, gateForStage, runGate } from "./gate.mjs";
 import { currentBranch, git, head, isClean, resolveCommit } from "./git.mjs";
@@ -40,7 +41,7 @@ import {
   streamReader,
 } from "./live.mjs";
 import { CLOSE, take } from "./locks.mjs";
-import { fastForwardMain } from "./merge.mjs";
+import { fastForwardMain, mergeMainInto } from "./merge.mjs";
 import { CLAUDE_DIR, CLI_CONTRACT, STUDIO_INSTALL } from "./outcome.mjs";
 import { donePhases, findPlan, nextStep, rangeLabel, readPlanFile } from "./plan.mjs";
 import { clearPark, endStep, planRecord, saveState, spendSince, startStep, statePaths, takeResumeAsks } from "./state.mjs";
@@ -563,6 +564,62 @@ function markOwed(ctx, rec, file, phases) {
   return null;
 }
 
+/**
+ * One merge session for a conflict the conductor hit merging `main` at `where` (ADR-0248): `dev`, or
+ * `studio-builder` when every conflicted path is under `studio/`. It is handed the paths, redoes the
+ * merge and commits it; the conductor verifies the commit against `git`. Returns a park, or null once
+ * the lane carries a verified merge. One session per conflict: a second conflict later in the plan
+ * gets its own.
+ */
+async function mergeSession(ctx, rec, { where, paths }) {
+  const wt = rec.worktree;
+  const owner = paths.length > 0 && paths.every((p) => p.startsWith("studio/")) ? "studio-builder" : "dev";
+  const mainTip = resolveCommit("main", wt);
+  const before = head(wt);
+  const file = planFileIn(wt, rec.plan);
+  const r = await session(ctx, rec, "merge", {
+    owner,
+    prompt: `/${owner} conductor merge plan ${rec.plan} at ${where}`,
+    vars: {
+      plan: rec.plan,
+      lane: wt,
+      branch: rec.branch,
+      with_lock: ctx.withLockPath,
+      plan_file: file?.rel ?? "(missing)",
+      where,
+      main_tip: mainTip,
+      conflicted: paths.join(", "),
+    },
+    budget: ctx.local.budget_usd.merge,
+    info: { where, paths },
+  });
+  if (r.status === "parked") return { reason: r.reason, detail: r.detail, read: r.transcript, resetsAt: r.resetsAt };
+  const problems = verifyMerge({ cwd: wt, before, mainTip, paths, outcome: r.outcome });
+  if (problems.length) return { reason: "disagreement", detail: `merge session at ${where}: ${problems.join("; ")}`, read: r.transcript };
+  const commit = resolveCommit(r.outcome.commit, wt);
+  (rec.merges ??= []).push({ where, paths, commit, main: mainTip, session: true, at: now() });
+  save(ctx);
+  return null;
+}
+
+/**
+ * Merges `main` into the lane at `where`, and hands a conflict to one merge session. Returns a park,
+ * or null once `main` is in the lane.
+ */
+async function mergeMain(ctx, rec, where) {
+  const m = mergeMainInto(rec.worktree);
+  if (m.ok) {
+    if (m.merged) {
+      (rec.merges ??= []).push({ where, commit: head(rec.worktree), session: false, at: now() });
+      live(ctx, rec.plan, `  lane   merged main at ${where}, ${head(rec.worktree).slice(0, 7)}`);
+      save(ctx);
+    }
+    return null;
+  }
+  live(ctx, rec.plan, `  lane   main conflicts at ${where} in ${m.paths.join(", ")}; starting a merge session`);
+  return mergeSession(ctx, rec, { where, paths: m.paths });
+}
+
 function planFileIn(cwd, plan) {
   const found = findPlan(cwd, plan);
   return found ? { ...found, rel: relative(cwd, found.path).replace(/\\/g, "/") } : null;
@@ -828,6 +885,11 @@ export async function runPlan(ctx, lane, plan) {
       }
     }
 
+    // The gate and the review see the tree that will merge, and a conflict surfaces while the plan is
+    // still an implementer's (ADR-0248).
+    const early = await mergeMain(ctx, rec, "pre-review");
+    if (early) return park(ctx, rec, early);
+
     const g = await gate(ctx, rec, "pre-review");
     if (!g.ok) return park(ctx, rec, { reason: "gate_red", detail: gateDetail(g), read: g.failed.log });
 
@@ -844,7 +906,7 @@ export async function runPlan(ctx, lane, plan) {
       event(ctx, "review-start", { plan, round });
       const r = await session(ctx, rec, "review", {
         owner: "architect",
-        prompt: `/architect conductor review plan ${plan} round ${round}`,
+        prompt: `/architect conductor review plan ${plan} round ${round} at ${head(wt)}`,
         vars: { ...common, plan_file: file.rel, round, review_path: reviewPath, prior_rounds: priorRounds(rec) },
         budget: budgets.review,
         addDirs: [paths.reviews],
@@ -930,8 +992,9 @@ export async function runPlan(ctx, lane, plan) {
         rec.gatedHead = sha;
         save(ctx);
       },
+      resolveConflict: (paths) => mergeSession(ctx, rec, { where: "remerge", paths }).then((p) => (p ? { ok: false, ...p } : null)),
     });
-    if (!m.ok) return park(ctx, rec, { reason: m.reason, detail: m.detail, read: m.gate?.failed?.log ?? null });
+    if (!m.ok) return park(ctx, rec, { reason: m.reason, detail: m.detail, read: m.read ?? m.gate?.failed?.log ?? null, resetsAt: m.resetsAt });
     rec.merge = { head: m.head, remerged: m.remerged, at: now() };
     event(ctx, "ff", { plan, head: m.head });
   } finally {

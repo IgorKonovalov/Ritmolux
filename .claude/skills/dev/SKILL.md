@@ -283,9 +283,9 @@ escalation.
 
 ## Conductor mode
 
-**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: implement` or
-`RLX-CONDUCTOR-MODE: fix`.** That line is written by `tools/conductor/` (ADR-0205), which starts this
-session headless, as a separate process, with the worktree as its cwd. Nothing a user types enters
+**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: implement`, `fix` or `merge`.**
+That line is written by `tools/conductor/` (ADR-0205), which starts this session headless, as a
+separate process, with the worktree as its cwd. Nothing a user types enters
 this mode — a person saying "conductor mode" in a normal session gets the four-step workflow above,
 restate-and-wait included. Where this section and the rest of the skill disagree, this section wins,
 and only for the session the conductor started.
@@ -334,9 +334,23 @@ implementer run.
   and the commit. Nothing else in the plan moves.
 - A finding you think is wrong is not yours to overrule: park with `plan_wrong` and name it.
 
+**`merge`** — the prompt names the plan, where the conductor merged `main` (`pre-review`, `close` or
+`remerge`), `main`'s tip and the paths that conflicted (ADR-0248). The conductor aborted its merge, so
+the tree is clean.
+
+- Redo `git merge --no-edit main`, resolve every conflicted path, and commit the merge with
+  `git commit --no-edit`. Keep both sides' intent; where they cannot both hold, keep `main`'s behaviour
+  and adapt the plan's side. Nothing beyond the resolution: no refactor, no plan edit, no log row.
+- Run what the resolved files need to build, through the suite lock as above.
+- A conflict that needs the owner's decision, or a file under `.claude/`, parks `merge_conflict`,
+  after `git merge --abort`.
+- The conductor checks that the commit is a merge whose second parent is `main`, that the tree is
+  clean, and that no handed path still carries a conflict marker.
+
 **The outcome block is the last thing you print** — exactly one fenced block tagged `rlx-outcome`
-holding one JSON object, in the shapes the prompt shows: `phases_done`, `fixed` or `parked` (reasons
-`human_phase`, `stop_condition`, `plan_wrong`, `question`, `check_red`). It is a claim, and the
+holding one JSON object, in the shapes the prompt shows: `phases_done`, `fixed`, `merged` or `parked`
+(reasons `human_phase`, `stop_condition`, `plan_wrong`, `question`, `check_red`, and `merge_conflict`
+from a merge session). It is a claim, and the
 conductor checks it against `git` — commits that do not exist, log rows that do not match, or a dirty
 tree park the plan as a disagreement.
 

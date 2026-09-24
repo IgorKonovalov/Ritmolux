@@ -38,6 +38,10 @@
 // the implement session, after each commit, wait until the file FAKE_LIVE_FILE names holds a line
 // naming that commit: proof the conductor printed it while the session was still running.
 //
+// A `merge` session redoes `git merge main`, resolves each path it was handed by writing
+// "resolved by the merge session", commits and prints `merged`. `mergeParks` makes it park
+// `merge_conflict` instead; `mergeMarker` makes it commit the conflicted files with their markers in.
+//
 // Every session appends `<mode>-start` and `<mode>-end` to FAKE_EVENTS with a timestamp.
 
 import { execFileSync } from "node:child_process";
@@ -133,6 +137,19 @@ export default async ({ args, cwd, vars, env }) => {
       const claimed = ps.bogusCommit ? [...commits, "deadbee"] : commits;
       const through = ps.numericThrough ? Number(ids.at(-1)) : ids.at(-1);
       return { text: block({ kind: "phases_done", plan, through, commits: claimed }), costUsd: ps.implementCost ?? 1, numTurns: ps.numTurns, stream: ps.stream };
+    }
+
+    if (mode === "merge") {
+      if (ps.mergeParks) return { text: block({ kind: "parked", plan, reason: "merge_conflict", detail: "the two sides contradict each other" }), costUsd: 0.5 };
+      try {
+        git("merge", "--no-edit", "main");
+      } catch {}
+      for (const p of (vars.conflicted ?? "").split(", ").filter(Boolean)) {
+        if (!ps.mergeMarker) writeFileSync(join(cwd, p), "resolved by the merge session\n");
+        git("add", p);
+      }
+      git("commit", "-q", "--no-edit");
+      return { text: block({ kind: "merged", plan, commit: git("rev-parse", "--short", "HEAD") }), costUsd: 0.5 };
     }
 
     if (mode === "fix") {

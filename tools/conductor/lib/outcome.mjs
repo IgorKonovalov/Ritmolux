@@ -17,6 +17,8 @@ export const IMPLEMENTER_PARK_REASONS = new Set([
   "check_red",
 ]);
 export const REVIEW_PARK_REASONS = new Set(["merge_conflict", "check_red", "plan_wrong"]);
+/** A merge session (ADR-0248) parks `merge_conflict` on a conflict it cannot resolve. */
+export const MERGE_PARK_REASONS = new Set(["merge_conflict", "check_red", "plan_wrong", "question"]);
 
 /**
  * The park the conductor itself gives a session whose CLI broke the headless contract (ADR-0208): it
@@ -208,10 +210,13 @@ function validate(o) {
       }
       return null;
     case "parked":
-      if (!IMPLEMENTER_PARK_REASONS.has(o.reason) && !REVIEW_PARK_REASONS.has(o.reason)) {
+      if (!IMPLEMENTER_PARK_REASONS.has(o.reason) && !REVIEW_PARK_REASONS.has(o.reason) && !MERGE_PARK_REASONS.has(o.reason)) {
         return `parked.reason "${o.reason}" is not a known reason`;
       }
       if (typeof o.detail !== "string" || !o.detail) return "parked.detail missing";
+      return null;
+    case "merged":
+      if (!isShaList([o.commit])) return "merged.commit is not a SHA";
       return null;
     case "verdict":
       return validateVerdict(o, "verdict");

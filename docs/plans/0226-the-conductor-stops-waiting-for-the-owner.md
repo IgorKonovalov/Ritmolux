@@ -336,8 +336,8 @@ behaviour, never at the end.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The run stays up, waits at the cap, and resumes what the tree settled | dev | done | `affd4859` |
-| 2 — A human phase can be owed after the merge | dev | committed with this row | |
-| 3 — The lane merges main early, and a conflict gets a merge session | dev | not started | |
+| 2 — A human phase can be owed after the merge | dev | done | `6e0b3d2c` |
+| 3 — The lane merges main early, and a conflict gets a merge session | dev | committed with this row | |
 | 4 — A red gate gets one repair session | dev | not started | |
 | 5 — The close is its own session, holds the lock alone, and keeps a clean verdict | dev | not started | |
 | 6 — A readiness check reads the plan before any spend | dev | not started | |
@@ -361,6 +361,11 @@ behaviour, never at the end.
 - Phase 2: `test/helpers.mjs` is outside the phase's files. `planText` gained a `blocksMerge` phase
   field. The conductor commits the `owed` row itself, as `docs(plans): NNNN Phase N is owed after the
   merge`.
+- Phase 3: the review's `-p` prompt names the tip it reviews (`... round N at <sha>`), which leaves
+  `prompts/review.md` to Phase 5. The re-merge test now expects a merge session. The owner-resolves
+  test keeps its park through a fake merge session that parks (`mergeParks`). `test/cli.test.mjs`,
+  `test/live.test.mjs` and `test/queue.test.mjs` are outside the phase's files, and their `local.json`
+  fixtures gained `budget_usd.merge`. `test/fake-claude.mjs` needed no change.
 
 ### Close triggers
 

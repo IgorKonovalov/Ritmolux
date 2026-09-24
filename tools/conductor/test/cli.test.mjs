@@ -37,7 +37,7 @@ function setup(plans, lanes, { gate, maxOpenWorktrees = 3, spec = {}, stopReques
   // The tool directory sits outside the repository, so its state never dirties the main checkout.
   const toolDir = tmp("rlx-cli-tool-");
   writeFileSync(join(toolDir, "queue.json"), JSON.stringify({ lanes }));
-  writeFileSync(join(toolDir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4 }, run_budget_usd: 60, max_open_worktrees: maxOpenWorktrees }));
+  writeFileSync(join(toolDir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4, merge: 2 }, run_budget_usd: 60, max_open_worktrees: maxOpenWorktrees }));
   const p = { ...paths({ repo, toolDir }), settings: join(TOOL_DIR, "settings.conductor.json"), prompts: join(TOOL_DIR, "prompts"), withLock: join(TOOL_DIR, "with-lock.mjs") };
 
   const specFile = join(toolDir, "spec.json");
@@ -823,7 +823,7 @@ test("run --until-idle ends a run whose queue is empty, and a resident run stays
 
 test("check refuses a local.json with no run_budget_usd", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
-  writeFileSync(p.local, JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4 }, max_open_worktrees: 3 }));
+  writeFileSync(p.local, JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4, merge: 2 }, max_open_worktrees: 3 }));
   const r = await cli("check");
   assert.equal(r.code, 1);
   assert.ok(r.err.includes("conductor: local.json: run_budget_usd must be a positive number"), r.err.join("\n"));

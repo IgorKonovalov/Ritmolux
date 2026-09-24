@@ -64,7 +64,7 @@ export function scratch({ plans, lanes, after = {}, spec = {}, local = {} }) {
     settingsFile: join(TOOL_DIR, "settings.conductor.json"),
     withLockPath: join(TOOL_DIR, "with-lock.mjs"),
     claude: FAKE,
-    local: { budget_usd: { implement: 5, fix: 3, review: 4 }, max_open_worktrees: 3, ...local },
+    local: { budget_usd: { implement: 5, fix: 3, review: 4, merge: 2 }, max_open_worktrees: 3, ...local },
     queue,
     state: loadState(stateDir),
     gate: [
@@ -468,7 +468,7 @@ test("a red gate on the close tip parks and main does not move", async () => {
   assert.ok(existsSync(rec.worktree), "the parked plan keeps its worktree");
 });
 
-test("main advancing on a conflicting change between close and merge parks", async () => {
+test("main advancing on a conflicting change between close and merge runs one merge session, and merges", async () => {
   const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
   ctx.beforeMerge = async () => {
     writeFileSync(join(repo, "phase-0101-1.txt"), "a different phase 1 on main\n");
@@ -477,14 +477,18 @@ test("main advancing on a conflicting change between close and merge parks", asy
   };
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
-  assert.equal(rec.status, "parked");
-  assert.equal(rec.park.reason, "merge_conflict");
-  assert.ok(existsSync(rec.worktree));
-  assert.equal(git(["status", "--porcelain"], rec.worktree).stdout, "", "the aborted merge left the worktree clean");
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "merge:dev"]);
+  assert.deepEqual(rec.steps[2].paths, ["phase-0101-1.txt"]);
+  assert.deepEqual(rec.merges.map((m) => [m.where, m.session]), [["remerge", true]]);
+  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close", "remerge"]);
+  assert.equal(readFileSync(join(repo, "phase-0101-1.txt"), "utf8"), "resolved by the merge session\n");
+  assert.equal(resolveCommit("v0.1.1", repo), resolveCommit("main", repo), "the tag moved onto the resolved tip");
 });
 
 test("a conflict the owner resolves in the lane is gated and re-tagged before main moves", async () => {
-  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  // The merge session parks, which is what leaves the conflict to the owner.
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { mergeParks: true } } });
   ctx.beforeMerge = async () => {
     writeFileSync(join(repo, "phase-0101-1.txt"), "a different phase 1 on main\n");
     sh(["add", "phase-0101-1.txt"], repo);
@@ -1326,4 +1330,71 @@ test("the same plan without Blocks merge parks human_phase at Phase 2, as before
   assert.equal(rec.park.reason, "human_phase");
   assert.equal(rec.park.phase, "2");
   assert.equal(rec.owed, undefined);
+});
+
+// ADR-0248 items 2 and 3: main merges into the lane before pre-review, and a conflict gets one merge
+// session wherever it happens.
+
+/** Commits `text` as phase-0101-1.txt on main, which conflicts with the lane's own Phase 1. */
+function conflictOnMain(repo, text) {
+  writeFileSync(join(repo, "phase-0101-1.txt"), text);
+  sh(["add", "phase-0101-1.txt"], repo);
+  sh(["commit", "-q", "-m", "feat: a conflicting commit on main"], repo);
+}
+
+/** Commits a conflict on main while the implement session runs, so the early merge meets it. */
+function conflictDuringImplement(ctx, repo) {
+  const events = ctx.events;
+  ctx.events = (name, data) => {
+    events(name, data);
+    if (name === "implement-step") conflictOnMain(repo, "main's own phase 1\n");
+  };
+}
+
+test("a conflict on main before pre-review runs one merge session, then the gate, and the review sees the merged tip", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  conflictDuringImplement(ctx, repo);
+  const calls = join(ctx.stateDir, "calls.jsonl");
+  process.env.FAKE_CLAUDE_LOG = calls;
+  try {
+    await runLanes(ctx);
+  } finally {
+    delete process.env.FAKE_CLAUDE_LOG;
+  }
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(kinds(rec), ["implement:dev", "merge:dev", "review:architect"]);
+  assert.deepEqual(rec.merges.map((m) => [m.where, m.session]), [["pre-review", true]]);
+  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close"]);
+  assert.ok(Date.parse(rec.gates[0].at) >= Date.parse(rec.steps[1].ended), "the gate ran after the merge session");
+
+  const merge = rec.merges[0].commit;
+  const review = readFileSync(calls, "utf8").trim().split("\n").map((l) => JSON.parse(l)).find((c) => c.vars.mode === "review");
+  assert.equal(review.args[review.args.indexOf("-p") + 1], `/architect conductor review plan 0101 round 1 at ${merge}`);
+  assert.equal(readFileSync(join(repo, "phase-0101-1.txt"), "utf8"), "resolved by the merge session\n");
+});
+
+test("a merge session that leaves a conflict marker parks disagreement", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { mergeMarker: true } } });
+  conflictDuringImplement(ctx, repo);
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "disagreement");
+  assert.match(rec.park.detail, /^merge session at pre-review: conflict markers left in phase-0101-1\.txt:1/);
+  assert.deepEqual(kinds(rec), ["implement:dev", "merge:dev"], "no gate and no review on a tree with markers");
+  assert.deepEqual(rec.gates ?? [], []);
+});
+
+test("a second conflict in the same plan gets a second merge session rather than a park", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  conflictDuringImplement(ctx, repo);
+  ctx.beforeMerge = async () => conflictOnMain(repo, "main's phase 1, changed again\n");
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(kinds(rec), ["implement:dev", "merge:dev", "review:architect", "merge:dev"]);
+  assert.deepEqual(rec.merges.map((m) => m.where), ["pre-review", "remerge"]);
+  assert.deepEqual(rec.parks, []);
+  assert.equal(resolveCommit("v0.1.1", repo), resolveCommit("main", repo));
 });
