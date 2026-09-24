@@ -27,9 +27,13 @@
 // branch. `ledgerFlow` makes the review run its full suite through the wrapper before closing, and the
 // close run the gate's suite through it after the bump and before the tag.
 //
-// `loseOutcome` names a mode whose session does all of its work and then prints no outcome block, as
+// `loseOutcome: "close"` makes the close session do all of its work and then print no outcome block, as
 // 0175's round-1 review did: it committed its repairs, its `done/` move, its bump and its tag, then
 // backgrounded the suite and ended its turn. `dirtyClose` leaves an untracked file behind with it.
+//
+// A `review` session ends on its verdict and commits nothing, unless `reviewCommits`. A clean verdict
+// is closed by a `close` session, which parks `merge_conflict` when main does not merge, and
+// `closeParksOnce` makes the plan's first close park `check_red` after its merge.
 //
 // `phaseDelayMs` makes every phase after the first wait that long before it commits, so the run
 // terminal's phase lines carry durations that differ.
@@ -37,6 +41,18 @@
 // `stream` is a list of events the implement session emits (see fake-claude.mjs). `awaitLive` makes
 // the implement session, after each commit, wait until the file FAKE_LIVE_FILE names holds a line
 // naming that commit: proof the conductor printed it while the session was still running.
+//
+// A `merge` session redoes `git merge main`, resolves each path it was handed by writing
+// "resolved by the merge session", commits and prints `merged`. `mergeParks` makes it park
+// `merge_conflict` instead; `mergeMarker` makes it commit the conflicted files with their markers in.
+//
+// `gateRed` makes the first implemented phase commit GATE_RED, which turns the scratch gate's
+// `marker` step red; `closeRed` makes the close commit it instead. A `repair` session removes it and
+// commits, or, with `repairFails` or no GATE_RED to remove, commits `repair-<n>.txt` and leaves the
+// red where it is. `repairParks` makes it park `plan_wrong` without a commit.
+//
+// A `readiness` session prints `ready`, or with `readiness: "plan_wrong"` parks naming Phase 1, or
+// with `readinessCommits` commits a file first, which it must never do.
 //
 // Every session appends `<mode>-start` and `<mode>-end` to FAKE_EVENTS with a timestamp.
 
@@ -117,6 +133,10 @@ export default async ({ args, cwd, vars, env }) => {
           git("add", "PROBE_RED");
         }
         if (existsSync(join(cwd, "LIMIT_WIP"))) git("add", "LIMIT_WIP");
+        if (ps.gateRed && commits.length === 0 && !existsSync(join(cwd, "GATE_RED"))) {
+          writeFileSync(join(cwd, "GATE_RED"), "a defect the gate finds\n");
+          git("add", "GATE_RED");
+        }
         // A real commit subject is where the non-ASCII actually comes from: this repository's own log
         // carries em dashes, and a preset name can carry a curly quote. The run terminal is a Windows
         // console, so `ascii()` has to transform this before it is printed (backlog 0235).
@@ -135,6 +155,45 @@ export default async ({ args, cwd, vars, env }) => {
       return { text: block({ kind: "phases_done", plan, through, commits: claimed }), costUsd: ps.implementCost ?? 1, numTurns: ps.numTurns, stream: ps.stream };
     }
 
+    if (mode === "readiness") {
+      if (ps.readiness === "plan_wrong") {
+        return { text: block({ kind: "parked", plan, phase: "1", reason: "plan_wrong", detail: "Phase 1's What and Done when name different stages" }), costUsd: 0.3 };
+      }
+      if (ps.readinessCommits) {
+        writeFileSync(join(cwd, "readiness-notes.txt"), "a readiness check that writes\n");
+        git("add", "readiness-notes.txt");
+        git("commit", "-q", "-m", "docs: a readiness check that commits");
+      }
+      return { text: block({ kind: "ready", plan }), costUsd: 0.3 };
+    }
+
+    if (mode === "repair") {
+      if (ps.repairParks) return { text: block({ kind: "parked", plan, reason: "plan_wrong", detail: "the test asserts the old behaviour" }), costUsd: 0.5 };
+      if (existsSync(join(cwd, "GATE_RED")) && !ps.repairFails) {
+        git("rm", "-q", "GATE_RED");
+        git("commit", "-q", "-m", `fix: plan ${plan} repairs the red at ${vars.stage}`);
+      } else {
+        const n = readdirSync(cwd).filter((f) => f.startsWith("repair-")).length + 1;
+        writeFileSync(join(cwd, `repair-${n}.txt`), `repair ${n} at ${vars.stage}\n`);
+        git("add", `repair-${n}.txt`);
+        git("commit", "-q", "-m", `fix: plan ${plan} tries a repair at ${vars.stage}`);
+      }
+      return { text: block({ kind: "repaired", plan, commits: [git("rev-parse", "--short", "HEAD")] }), costUsd: 0.5 };
+    }
+
+    if (mode === "merge") {
+      if (ps.mergeParks) return { text: block({ kind: "parked", plan, reason: "merge_conflict", detail: "the two sides contradict each other" }), costUsd: 0.5 };
+      try {
+        git("merge", "--no-edit", "main");
+      } catch {}
+      for (const p of (vars.conflicted ?? "").split(", ").filter(Boolean)) {
+        if (!ps.mergeMarker) writeFileSync(join(cwd, p), "resolved by the merge session\n");
+        git("add", p);
+      }
+      git("commit", "-q", "--no-edit");
+      return { text: block({ kind: "merged", plan, commit: git("rev-parse", "--short", "HEAD") }), costUsd: 0.5 };
+    }
+
     if (mode === "fix") {
       const round = Number(vars.round);
       writeFileSync(join(cwd, `fix-${plan}-${round}.txt`), `fix round ${round}\n`);
@@ -144,11 +203,9 @@ export default async ({ args, cwd, vars, env }) => {
       return { text: block({ kind: "fixed", plan, round, commits: [sha], resolved: [{ finding: 0, commit: sha }] }), costUsd: 0.5 };
     }
 
-    if (mode === "review") {
-      const round = Number(vars.round);
-      const reviewPath = vars["review-path"];
-      const kind = ps.reviews?.[round - 1] ?? "clean";
-      mkdirSync(join(reviewPath, ".."), { recursive: true });
+    // The findings a round carries, the same whichever session asks: the review reports them, and
+    // the close that follows reads the same review and marks what it repaired.
+    const findingsFor = (round, kind) => {
       const findings =
         kind === "clean"
           ? Array.from({ length: ps.minors ?? 0 }, (_, i) => ({ severity: "minor", file: `phase-${plan}-1.txt`, line: i + 1, what: `minor finding ${i + 1}` }))
@@ -159,19 +216,40 @@ export default async ({ args, cwd, vars, env }) => {
           { severity: "minor", file: `phase-${plan}-1.txt`, line: 2, what: "a duplicated constant, left open" },
         );
       }
+      return findings;
+    };
+    const verdictOf = (round, reviewPath, findings) => ({
+      round,
+      blockers: findings.filter((f) => f.severity === "blocker").length,
+      majors: findings.filter((f) => f.severity === "major").length,
+      minors: findings.filter((f) => f.severity === "minor").length,
+      review_path: reviewPath,
+      findings,
+    });
+
+    if (mode === "review") {
+      const round = Number(vars.round);
+      const reviewPath = vars["review-path"];
+      const kind = ps.reviews?.[round - 1] ?? "clean";
+      mkdirSync(join(reviewPath, ".."), { recursive: true });
+      const findings = findingsFor(round, kind);
       // Mode 4's full suite, through the wrapper as the architect skill's conductor mode says.
       if (ps.ledgerFlow) await suite();
       writeFileSync(reviewPath, `# Review of ${plan}, round ${round}\n\n${findings.map((f) => `- ${f.severity}: ${f.what}`).join("\n")}\n`);
-      const verdict = {
-        round,
-        blockers: findings.filter((f) => f.severity === "blocker").length,
-        majors: findings.filter((f) => f.severity === "major").length,
-        minors: findings.filter((f) => f.severity === "minor").length,
-        review_path: reviewPath,
-        findings,
-      };
-      if (kind !== "clean") return { text: block({ kind: "verdict", plan, ...verdict }), costUsd: 2 };
+      if (ps.reviewCommits) {
+        writeFileSync(join(cwd, "review-notes.txt"), "a review that commits\n");
+        git("add", "review-notes.txt");
+        git("commit", "-q", "-m", "docs: a review that commits");
+      }
+      return { text: block({ kind: "verdict", plan, ...verdictOf(round, reviewPath, findings) }), costUsd: 2 };
+    }
 
+    if (mode === "close") {
+      const round = Number(vars.round);
+      const reviewPath = vars["review-path"];
+      const findings = findingsFor(round, "clean");
+      const verdict = verdictOf(round, reviewPath, findings);
+      const eventsSoFar = readFileSync(env.FAKE_EVENTS, "utf8").split("\n").filter((l) => l.includes(`"plan":"${plan}"`) && l.includes('"close-start"')).length;
       // The close's order: repairs, merge main, bookkeeping and bump, the whole gate, the tag.
       if (ps.closeRepair) {
         const repaired = findings.find((f) => f.what === "a comment the plan made false");
@@ -185,7 +263,16 @@ export default async ({ args, cwd, vars, env }) => {
           repaired.fixed_in = git("rev-parse", "--short=7", "HEAD");
         }
       }
-      git("merge", "-q", "--no-edit", "main");
+      try {
+        git("merge", "-q", "--no-edit", "main");
+      } catch {
+        // A code conflict is not the close's to resolve (ADR-0248): abort and hand it back.
+        git("merge", "--abort");
+        return { text: block({ kind: "parked", plan, reason: "merge_conflict", detail: "main conflicts in code" }), costUsd: 1 };
+      }
+      if (ps.closeParksOnce && eventsSoFar <= 1) {
+        return { text: block({ kind: "parked", plan, reason: "check_red", detail: `${ps.closeParksOnce} red at the close` }), costUsd: 1 };
+      }
       mkdirSync(join(plansDir, "done"), { recursive: true });
       git("mv", `docs/plans/${planName}`, `docs/plans/done/${planName}`);
       const donePath = join(plansDir, "done", planName);
@@ -207,11 +294,15 @@ export default async ({ args, cwd, vars, env }) => {
         git("add", "VERSION", `docs/plans/done/${planName}`);
       }
       if (existsSync(join(cwd, "PROBE_RED")) && !ps.probeStaysRed) git("rm", "-q", "PROBE_RED");
+      if (ps.closeRed) {
+        writeFileSync(join(cwd, "GATE_RED"), "a defect the close brought in\n");
+        git("add", "GATE_RED");
+      }
       git("commit", "-q", "-m", `chore: Release ${version}`);
       if (ps.ledgerFlow) await suite();
       if (ps.lightweightTag) git("tag", `v${version}`);
       else git("tag", "-a", `v${version}`, "-m", `chore: Release v${version}`);
-      if (ps.loseOutcome === "review") {
+      if (ps.loseOutcome === "close") {
         if (ps.dirtyClose) writeFileSync(join(cwd, "suite-output.log"), "still compiling\n");
         return { text: "Still compiling; I'll be notified when the suite exits.", costUsd: 3 };
       }

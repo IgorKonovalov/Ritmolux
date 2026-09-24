@@ -83,7 +83,11 @@ struct AudioState {
 /// Ivar wrapper. Safety: SCK invokes the output callback on the single
 /// serial dispatch queue passed to addStreamOutput, so access is exclusive
 /// without a lock (NFR section 5 forbids locking here anyway).
-struct OutputIvars(UnsafeCell<AudioState>);
+///
+/// `define_class!` emits `impl DefinedClass for StreamOutput { type Ivars =
+/// OutputIvars; }`, an interface as visible as `StreamOutput` itself, so this
+/// type must be at least `pub(super)` too or the build fails with E0446.
+pub(super) struct OutputIvars(UnsafeCell<AudioState>);
 unsafe impl Send for OutputIvars {}
 unsafe impl Sync for OutputIvars {}
 

@@ -16,10 +16,14 @@
 //   it is instead of as a broken link on 137 pages.
 //
 //   And a split route is only worth having while it stays small. ADR-0166 picks
-//   40 KB and 20 KB from a measured distribution and asserts a worst case of
-//   about 27 KB; 30,000 bytes is the ceiling that says the arithmetic still
-//   holds. A route over it means the distribution moved and ADR-0166 needs
-//   redoing -- NOT that this constant needs raising.
+//   40 KB and 20 KB from a measured distribution, and ADR-0247 applies the
+//   second recursively, so an oversized section splits at the next heading
+//   level at any depth. That leaves one way over the 30,000-byte ceiling: a
+//   route with no heading one level down to cut at. The ceiling is therefore
+//   an assertion about the corpus, not about the splitter -- `## Checklist` in
+//   docs/on-device-validation.md is the standing instance -- and a route over it
+//   is repaired editorially, with headings in the source, NOT by raising this
+//   constant.
 //
 // Usage:  node scripts/check-site-routes.mjs [dist]
 // Exit 0 = every property below holds. Exit 1 = the violations are listed.
@@ -108,8 +112,9 @@ function sidebarRoutes(pageFile) {
  * itself and is deliberately not measured here: at 40,000 bytes it stays one
  * route by decision, so holding it to the 30,000-byte ceiling would make the
  * two constants contradict each other. The ceiling is an assertion about the
- * splitter's output -- that cutting at `##` and then at `###` actually produced
- * pages a reader can hold -- not a size limit on documents.
+ * splitter's output -- that cutting at each heading level an oversized section
+ * offers actually produced pages a reader can hold -- not a size limit on
+ * documents.
  */
 function publishedRoutes() {
   const routes = new Set();
@@ -197,9 +202,9 @@ if (oversized.length > 0) {
   console.error(`\nA route's source exceeds ${ROUTE_SOURCE_CEILING} bytes (${oversized.length}):`);
   for (const [route, size] of oversized) console.error(`  ${size} B  ${route}`);
   console.error(
-    "\nThe repair is new arithmetic in ADR-0166, not a raised constant: the thresholds were\n" +
-      "picked from a measured distribution, and a route over the ceiling means the distribution\n" +
-      "moved.",
+    "\nThe repair is editorial, not a raised constant: the split already cuts an oversized\n" +
+      "section at every heading level it has (ADR-0247), so a route over the ceiling has no\n" +
+      "heading one level down to cut at. Add headings to that part of the source document.",
   );
 }
 process.exit(1);

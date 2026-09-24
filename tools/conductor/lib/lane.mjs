@@ -2,26 +2,40 @@
 //
 //   open the lane (installing the studio's dependencies when the plan declares files under studio/,
 //   since the gate's three studio checks are guarded on a directory no worktree is born with)
+//   -> before the first implement session: one read-only readiness session (ADR-0248)
 //   -> for each same-owner run not done: one implement session, then verify its claim
-//   -> a `human` phase parks -> conductor gate -> take the close lock -> review session
-//   -> blockers/majors: release the lock, fix session, verify, gate, re-review (two fix rounds max)
-//   -> closed: verify the close -> gate the close tip -> fast-forward main (one automatic re-merge)
+//   -> a `human` phase parks, unless it is marked `Blocks merge: no`, when its row is committed
+//      `owed` and the plan runs on without it (ADR-0249)
+//   -> merge main into the lane, a conflict handed to one merge session (ADR-0248)
+//   -> conductor gate -> review session, no lock held, ending on a verdict
+//      (every gate red gets one repair session and one re-run before it parks `gate_red`, ADR-0248)
+//   -> blockers/majors: fix session, verify, gate, re-review (two fix rounds max)
+//   -> clean: take the close lock -> read origin/main's CI and report it, never refusing on it
+//      (ADR-0251) -> close session -> verify the close -> gate the close tip
+//      -> fast-forward main (one automatic re-merge)
 //   -> release the lock
 //   -> remove the lane.
 //
 // Every judgement the loop cannot make parks the plan: the plan keeps its worktree and branch, the
 // inbox gains an entry, and the lane moves to the next queued plan whose `after` list has merged.
 // The repository, not the session, is the evidence at every step (close.mjs).
+//
+// A resident run (ADR-0250) never ends on an empty lane: the lane looks again every IDLE_POLL_MS,
+// re-reading the queue, and on every look clears the parks of a closed list whose condition the tree
+// now shows settled. The worktree cap is a wait. `pause`, a spent `run_budget_usd` or a refused CLI
+// version ends it the way ADR-0219's pause does: the plan in flight finishes and no other starts.
 
 import { spawnSync } from "node:child_process";
-import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { adoptedClose, verifyClose, verifyFix, verifyImplement } from "./close.mjs";
+import { describe as describeUpstream, readUpstream, redSubject } from "../../../scripts/check-upstream-ci.mjs";
+
+import { adoptedClose, verifyClose, verifyFix, verifyImplement, verifyMerge, verifyRepair } from "./close.mjs";
 import { removeLane, laneNames, openLane } from "./cleanup.mjs";
-import { defaultGate, gateForStage, runGate } from "./gate.mjs";
-import { git, head, resolveCommit } from "./git.mjs";
-import { appendCleanupFailure, appendPark, dirtyWorktree } from "./inbox.mjs";
+import { AFTER_CLOSE_STAGES, defaultGate, gateForStage, runGate } from "./gate.mjs";
+import { currentBranch, git, head, isAncestor, isClean, resolveCommit } from "./git.mjs";
+import { appendCleanupFailure, appendPark, appendSelfResume, dirtyText, dirtyWorktree } from "./inbox.mjs";
 import { servedNotice } from "./ledger.mjs";
 import {
   gateReader,
@@ -33,13 +47,19 @@ import {
   streamReader,
 } from "./live.mjs";
 import { CLOSE, take } from "./locks.mjs";
-import { fastForwardMain } from "./merge.mjs";
-import { CLAUDE_DIR, STUDIO_INSTALL } from "./outcome.mjs";
-import { donePhases, findPlan, nextStep, rangeLabel, readPlanFile } from "./plan.mjs";
-import { endStep, planRecord, saveState, startStep, statePaths } from "./state.mjs";
+import { fastForwardMain, mergeMainInto } from "./merge.mjs";
+import { CLAUDE_DIR, CLI_CONTRACT, STUDIO_INSTALL } from "./outcome.mjs";
+import { donePhases, findPlan, nextStep, nonBlocking, owedPhases, rangeLabel, readPlanFile } from "./plan.mjs";
+import { adoptClose, clearPark, endStep, planContractHash, planRecord, saveState, spendSince, startStep, statePaths, takeResumeAsks } from "./state.mjs";
 import { USAGE_LIMIT, renderPromptFile, runStep } from "./step.mjs";
 
 export const MAX_FIX_ROUNDS = 2;
+
+/** Repair sessions one plan may run in all; a red after that parks with no session (ADR-0248). */
+export const MAX_REPAIRS = 3;
+
+/** Close restarts one runPlan call makes after a close parks a conflict back to the conductor. */
+export const MAX_CLOSE_MERGES = 2;
 
 // A session the usage limit ends is continued once the window reopens, rather than parked. A reset
 // further off than MAX_USAGE_WAIT_MS (the seven-day window's) parks `usage_limit` instead, as does a
@@ -51,6 +71,19 @@ const USAGE_MARGIN_MS = 2 * 60 * 1000;
 const RESUME_PROMPT =
   "The usage limit that ended this session has reset. Carry on exactly where you stopped, with the same " +
   "scope and the same rules, and finish by printing the rlx-outcome block.";
+
+/** How often a resident run's idle or capped lane looks again (ADR-0250). */
+export const IDLE_POLL_MS = 60 * 1000;
+
+/**
+ * The parks a run clears by itself once the tree shows them settled (ADR-0250). Every other reason
+ * is the owner's: none of them can be read as settled from the tree.
+ */
+export const SELF_RESUME_REASONS = new Set(["human_phase", CLAUDE_DIR, USAGE_LIMIT, "main_dirty", STUDIO_INSTALL]);
+
+/** A failed studio install is retried this long after its park, at most STUDIO_RETRIES times per plan. */
+export const STUDIO_RETRY_MS = 60 * 60 * 1000;
+export const STUDIO_RETRIES = 3;
 
 const now = () => new Date().toISOString();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -69,6 +102,84 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 export function laneOpen(rec) {
   return Boolean(rec?.worktree) && existsSync(rec.worktree);
+}
+
+/**
+ * How the log settles owner phase `id` of `plan`: `done`, `owed` when its row reads owed and the
+ * phase is a human one marked `Blocks merge: no`, or null while it is neither.
+ */
+function settledAs(plan, id) {
+  if (donePhases(plan).has(id)) return "done";
+  if (owedPhases(plan).has(id) && nonBlocking(plan.phases.find((p) => p.id === id))) return "owed";
+  return null;
+}
+
+/**
+ * Why a park still holds, or null when the tree shows it settled. `resume` asks this before it
+ * clears a park, and a self-resume asks it first, so the two never disagree on the conditions they
+ * share. Only `human_phase`, `claude_dir` and `main_dirty` have a condition here; every other reason
+ * is the owner's to judge, and `resume` takes their word for it.
+ */
+export function parkStillTrue(rec, repo) {
+  const { reason, phase } = rec.park;
+  // Whatever the reason, no new session starts on a tree the last one left dirty.
+  const dirty = dirtyWorktree(rec.worktree);
+  if (dirty) return `the worktree ${rec.worktree} has uncommitted changes: ${dirtyText(dirty)}; commit them, or \`git restore\` them there, first`;
+  // Both of these park on a phase only the owner can do — one the plan tagged `human`, one whose
+  // files the CLI will not let a session touch (ADR-0210). Either way the lane moves on when the
+  // plan's own log says the phase is done, which is the same evidence for both — or owed, for a
+  // human phase the plan marks `Blocks merge: no` (ADR-0249). nextStep reads donePhases AND
+  // owedPhases, so a guard reading only the first would refuse a resume the loop it protects would
+  // take. The marker is read from the phase itself: a bare `owed` row on a blocking phase settles
+  // nothing, or one word in the log would skip a phase the plan says the merge waits for.
+  if (reason === "human_phase" || reason === CLAUDE_DIR) {
+    const where = laneOpen(rec) ? rec.worktree : repo;
+    const found = findPlan(where, rec.plan);
+    if (!found) return `plan ${rec.plan} is not in ${where}`;
+    if (!settledAs(readPlanFile(found.path), phase)) {
+      const rel = relative(where, found.path).replace(/\\/g, "/");
+      return `Phase ${phase} is still not marked done in the ## Implementation log of ${rel} in ${where}; commit the row there first`;
+    }
+  }
+  if (reason === "main_dirty" && (currentBranch(repo) !== "main" || !isClean(repo))) {
+    return `the main checkout is still dirty or not on main`;
+  }
+  return null;
+}
+
+/**
+ * The condition that has settled `rec`'s park, as a phrase, or null while it holds or is not the
+ * run's to clear. Only SELF_RESUME_REASONS qualify, and never over a dirty worktree (parkStillTrue).
+ * A `usage_limit` park qualifies once the reset it recorded has passed, and not at all when the CLI
+ * reported none; a `studio_install` park is retried STUDIO_RETRY_MS after it parked, and only
+ * STUDIO_RETRIES times, which is what keeps an install that always fails from looping.
+ */
+export function selfResumeWhy(rec, repo, nowMs = Date.now()) {
+  const reason = rec.park?.reason;
+  if (!SELF_RESUME_REASONS.has(reason)) return null;
+  if (parkStillTrue(rec, repo)) return null;
+  switch (reason) {
+    case "human_phase":
+    case CLAUDE_DIR: {
+      const found = findPlan(laneOpen(rec) ? rec.worktree : repo, rec.plan);
+      return `Phase ${rec.park.phase} reads ${settledAs(readPlanFile(found.path), rec.park.phase)} in the plan's ## Implementation log`;
+    }
+    case "main_dirty":
+      return "the main checkout is on main and clean";
+    case USAGE_LIMIT: {
+      if (typeof rec.park.resetsAt !== "number") return null;
+      const open = rec.park.resetsAt * 1000 + USAGE_MARGIN_MS;
+      return nowMs >= open ? `the usage window reopened at ${new Date(rec.park.resetsAt * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC` : null;
+    }
+    case STUDIO_INSTALL: {
+      const tries = (rec.selfResumes ?? []).filter((r) => r.reason === STUDIO_INSTALL).length;
+      if (tries >= STUDIO_RETRIES) return null;
+      if (nowMs - Date.parse(rec.park.at) < STUDIO_RETRY_MS) return null;
+      return `the install is retried an hour after it failed (retry ${tries + 1} of ${STUDIO_RETRIES})`;
+    }
+    default:
+      return null;
+  }
 }
 
 /** The suite ledger (ADR-0207): the gate reads and writes it, and every session's wrapper is handed it. */
@@ -259,7 +370,7 @@ export async function runLanes(ctx) {
   const lanes = ctx.lanes ?? Object.keys(ctx.queue.lanes);
   ctx.held ??= new Map();
   // `cli` is preflight's reading of `claude --version`, carrying its warning for an unverified patch.
-  const run = { started: now(), ended: null, lanes, ...(ctx.cli ? { cli: ctx.cli } : {}) };
+  const run = { started: now(), ended: null, lanes, ...(ctx.resident && !ctx.once ? { resident: true } : {}), ...(ctx.cli ? { cli: ctx.cli } : {}) };
   ctx.state.runs.push(run);
   ctx.run = run;
   save(ctx);
@@ -293,32 +404,122 @@ function recordNotStarted(ctx, lane, stopped) {
 
 /**
  * Records that `lane` stopped because the run was paused (ADR-0219), so the run's own record tells a
- * pause apart from `--once` and from a queue that simply ran out.
+ * pause apart from `--once` and from a queue that simply ran out. `reason` is what paused it: `asked`
+ * for the owner's `pause`, `run_budget` for a spent `run_budget_usd`, `cli_version` for a CLI the run
+ * refused between sessions (ADR-0250).
  */
-function recordPaused(ctx, lane) {
-  ctx.run.paused ??= { at: now(), lanes: [] };
+function recordPaused(ctx, lane, reason = "asked") {
+  ctx.run.paused ??= { at: now(), lanes: [], reason };
   ctx.run.paused.lanes.push(lane);
   recordNotStarted(ctx, lane, "paused");
   save(ctx);
 }
 
+/** What this run has spent, against `run_budget_usd`; a missing budget never pauses. */
+function runBudgetSpent(ctx) {
+  const cap = ctx.local.run_budget_usd;
+  if (typeof cap !== "number") return false;
+  return spendSince(ctx.state, ctx.run.started) >= cap;
+}
+
+/** Sets a lane's record between plans, saving only when it changed. Returns true when it did. */
+function setLane(ctx, lane, extra) {
+  const next = { plan: null, step: null, ...extra };
+  if (JSON.stringify(ctx.state.lanes[lane] ?? null) === JSON.stringify(next)) return false;
+  ctx.state.lanes[lane] = next;
+  save(ctx);
+  return true;
+}
+
+/**
+ * Re-reads queue.json from the main checkout. A queue that no longer validates is not taken: the
+ * lane keeps the one it had and says so once per distinct error, since a half-edited queue is the
+ * owner mid-change rather than a new instruction.
+ */
+function refreshQueue(ctx) {
+  if (!ctx.reloadQueue) return;
+  const q = ctx.reloadQueue();
+  if (q.errors?.length) {
+    const text = q.errors.join("; ");
+    if (ctx.queueError !== text) live(ctx, "queue", `  lane   queue.json does not validate, the run keeps the queue it had: ${text}`);
+    ctx.queueError = text;
+    return;
+  }
+  ctx.queueError = null;
+  ctx.queue = q;
+}
+
+/**
+ * Takes every `resume` the owner asked for while the run is live and clears the ones whose park no
+ * longer holds, re-checked here since the tree may have moved since the command checked it.
+ */
+function takeAsks(ctx) {
+  for (const ask of takeResumeAsks(ctx.stateDir)) {
+    const rec = ctx.state.plans[ask.plan];
+    if (rec?.status !== "parked" || !rec.park) continue;
+    const still = parkStillTrue(rec, ctx.repo);
+    if (still) {
+      live(ctx, rec.plan, `  lane   resume asked, refused: ${still}`);
+      continue;
+    }
+    const reason = clearPark(rec);
+    live(ctx, rec.plan, `  lane   resumed by the owner from ${reason}`);
+    event(ctx, "resumed", { plan: rec.plan, reason });
+    save(ctx);
+  }
+}
+
+/** Clears every park in `lane`'s queue whose condition the tree now shows settled (ADR-0250). */
+function selfResume(ctx, lane) {
+  const nowMs = Date.now();
+  for (const plan of ctx.queue.lanes[lane] ?? []) {
+    const rec = ctx.state.plans[plan];
+    if (rec?.status !== "parked" || !rec.park) continue;
+    const why = selfResumeWhy(rec, ctx.repo, nowMs);
+    if (!why) continue;
+    const reason = clearPark(rec);
+    (rec.selfResumes ??= []).push({ reason, why, at: now() });
+    appendSelfResume(statePaths(ctx.stateDir).inbox, { plan, reason, why });
+    live(ctx, plan, `  lane   resumed itself from ${reason}: ${why}`);
+    event(ctx, "self-resume", { plan, reason, why });
+    save(ctx);
+  }
+}
+
 async function laneLoop(ctx, lane) {
+  // `--once` runs one plan and ends, resident or not: a lane with nothing to start ends it at once.
+  const resident = Boolean(ctx.resident) && !ctx.once;
+  const idlePoll = ctx.idlePollMs ?? IDLE_POLL_MS;
   for (;;) {
     if (ctx.stopRequested?.()) return recordNotStarted(ctx, lane, "stopped");
     // The pause ask is read here, beside the stop request, and nowhere else: the plan in flight has
     // already finished by the time the loop is back at the top, which is what makes the granularity
-    // the plan rather than the step.
-    if (ctx.paused?.()) return recordPaused(ctx, lane);
+    // the plan rather than the step. A spent run budget and a refused CLI pause the same way.
+    if (ctx.paused?.()) return recordPaused(ctx, lane, "asked");
+    if (ctx.cliRefused) return recordPaused(ctx, lane, "cli_version");
+    if (runBudgetSpent(ctx)) return recordPaused(ctx, lane, "run_budget");
+    takeAsks(ctx);
+    selfResume(ctx, lane);
     const pick = pickNext(ctx, lane);
     if (pick.plan) {
       const rec = ctx.state.plans[pick.plan];
       if (!laneOpen(rec) && openWorktreeCount(ctx.state) >= ctx.local.max_open_worktrees) {
-        // The cap is the disk bound (ADR-0205), so the lane stops rather than waiting; the stop is a
-        // fact in the run record, for the digest and the run's output.
         const holding = Object.values(ctx.state.plans)
           .filter(laneOpen)
           .map((r) => r.plan)
           .sort();
+        // The cap is the disk bound (ADR-0205). A slot can free up while a holder is in flight in
+        // this run, so the lane waits for it; a resident run waits whatever holds the slots, since a
+        // parked holder may resume itself or be removed by hand. Otherwise the lane stops, and the
+        // stop is a fact in the run record, for the digest and the run's output.
+        const inFlight = holding.some((plan) => Object.values(ctx.state.lanes).some((l) => l?.plan === plan));
+        if (resident || inFlight) {
+          const cap = { plan: pick.plan, holding, max: ctx.local.max_open_worktrees };
+          if (setLane(ctx, lane, { cap })) event(ctx, "worktree-wait", { lane, ...cap });
+          await sleep(inFlight ? (ctx.pollMs ?? 5000) : idlePoll);
+          refreshQueue(ctx);
+          continue;
+        }
         const stop = { lane, reason: "worktree_cap", plan: pick.plan, holding, max: ctx.local.max_open_worktrees, at: now() };
         ctx.run.stops ??= [];
         ctx.run.stops.push(stop);
@@ -335,13 +536,22 @@ async function laneLoop(ctx, lane) {
       await sleep(ctx.pollMs ?? 5000);
       continue;
     }
+    if (resident) {
+      if (setLane(ctx, lane, { watching: true })) event(ctx, "idle", { lane });
+      ctx.onIdleLook?.(lane);
+      await sleep(idlePoll);
+      refreshQueue(ctx);
+      continue;
+    }
     return recordNotStarted(ctx, lane, "stopped");
   }
 }
 
-function park(ctx, rec, { reason, detail, phase = null, read = null }) {
+function park(ctx, rec, { reason, detail, phase = null, read = null, resetsAt = null }) {
   rec.status = "parked";
   rec.park = { reason, detail, phase, read, worktree: rec.worktree, at: now() };
+  // The reset a usage limit reported, which is what lets the park clear itself once it passes.
+  if (reason === USAGE_LIMIT && typeof resetsAt === "number") rec.park.resetsAt = resetsAt;
   // No session is trusted to have left the tree clean. The paths are recorded and never reverted:
   // they may be the evidence the owner needs.
   const dirty = dirtyWorktree(rec.worktree);
@@ -355,12 +565,149 @@ function park(ctx, rec, { reason, detail, phase = null, read = null }) {
   return rec;
 }
 
+/**
+ * Records `phases` owed (ADR-0249): their log rows read `owed` in the lane's plan, committed by the
+ * conductor itself, and the record lists them. Returns a park detail, or null. The row is the
+ * record the close and the digest read; the state's copy is for the history.
+ */
+function markOwed(ctx, rec, file, phases) {
+  const wt = rec.worktree;
+  let text = readFileSync(file.path, "utf8");
+  for (const id of phases) {
+    const row = new RegExp(`^(\\|\\s*${id} [—–-] [^|]*\\|[^|]*\\|)[^|]*(\\|[^|]*\\|\\s*)$`, "m");
+    if (!row.test(text)) return `Phase ${id} is marked Blocks merge: no, but ${file.rel} has no ## Implementation log row for it to mark owed`;
+    text = text.replace(row, "$1 owed $2");
+  }
+  writeFileSync(file.path, text);
+  const range = rangeLabel(phases);
+  const add = git(["add", "--", file.rel], wt);
+  const commit = add.code === 0 ? git(["commit", "-q", "-m", `docs(plans): ${rec.plan} Phase ${range} is owed after the merge`, "--", file.rel], wt) : add;
+  if (commit.code !== 0) return `could not commit Phase ${range} owed in ${file.rel}: ${commit.stderr}`;
+  const sha = head(wt);
+  rec.owed ??= [];
+  for (const phase of phases) rec.owed.push({ phase, commit: sha, at: now() });
+  live(ctx, rec.plan, `  lane   Phase ${range} is owed after the merge (Blocks merge: no), row committed in ${sha.slice(0, 7)}`);
+  event(ctx, "owed", { plan: rec.plan, phases });
+  save(ctx);
+  return null;
+}
+
+/**
+ * One merge session for a conflict the conductor hit merging `main` at `where` (ADR-0248): `dev`, or
+ * `studio-builder` when every conflicted path is under `studio/`. It is handed the paths, redoes the
+ * merge and commits it; the conductor verifies the commit against `git`. Returns a park, or null once
+ * the lane carries a verified merge. One session per conflict: a second conflict later in the plan
+ * gets its own.
+ */
+async function mergeSession(ctx, rec, { where, paths }) {
+  const wt = rec.worktree;
+  const owner = paths.length > 0 && paths.every((p) => p.startsWith("studio/")) ? "studio-builder" : "dev";
+  const mainTip = resolveCommit("main", wt);
+  const before = head(wt);
+  const file = planFileIn(wt, rec.plan);
+  const r = await session(ctx, rec, "merge", {
+    owner,
+    prompt: `/${owner} conductor merge plan ${rec.plan} at ${where}`,
+    vars: {
+      plan: rec.plan,
+      lane: wt,
+      branch: rec.branch,
+      with_lock: ctx.withLockPath,
+      plan_file: file?.rel ?? "(missing)",
+      where,
+      main_tip: mainTip,
+      conflicted: paths.join(", "),
+    },
+    budget: ctx.local.budget_usd.merge,
+    info: { where, paths },
+  });
+  if (r.status === "parked") return { reason: r.reason, detail: r.detail, read: r.transcript, resetsAt: r.resetsAt };
+  const problems = verifyMerge({ cwd: wt, before, mainTip, paths, outcome: r.outcome });
+  if (problems.length) return { reason: "disagreement", detail: `merge session at ${where}: ${problems.join("; ")}`, read: r.transcript };
+  const commit = resolveCommit(r.outcome.commit, wt);
+  (rec.merges ??= []).push({ where, paths, commit, main: mainTip, session: true, at: now() });
+  recordSessionCommits(rec, "merge", commitsFirstParent(before, wt));
+  save(ctx);
+  return null;
+}
+
+/**
+ * Merges `main` into the lane at `where`, and hands a conflict to one merge session. Returns a park,
+ * or null once `main` is in the lane.
+ */
+async function mergeMain(ctx, rec, where) {
+  const m = mergeMainInto(rec.worktree);
+  if (m.ok) {
+    if (m.merged) {
+      (rec.merges ??= []).push({ where, commit: head(rec.worktree), session: false, at: now() });
+      live(ctx, rec.plan, `  lane   merged main at ${where}, ${head(rec.worktree).slice(0, 7)}`);
+      save(ctx);
+    }
+    return null;
+  }
+  live(ctx, rec.plan, `  lane   main conflicts at ${where} in ${m.paths.join(", ")}; starting a merge session`);
+  return mergeSession(ctx, rec, { where, paths: m.paths });
+}
+
+/**
+ * The readiness check (ADR-0248): a read-only architect session that reads the plan against itself
+ * and the tree before any implementation spend, and ends `ready` or parks `plan_wrong`. It runs before
+ * the plan's first implement session, and again only when the plan's contract (planContractHash) has
+ * changed since a `ready`: a park is never remembered as passing, so a plan resumed after one is read
+ * again. A plan with implement steps and no readiness record predates the check and is not stopped
+ * for it. Returns a park, or null.
+ */
+async function readiness(ctx, rec, file) {
+  const hash = planContractHash(readFileSync(file.path, "utf8"));
+  if (rec.readiness?.hash === hash) return null;
+  if (!rec.readiness && rec.steps.some((s) => s.kind === "implement")) return null;
+  const wt = rec.worktree;
+  const before = head(wt);
+  const r = await session(ctx, rec, "readiness", {
+    owner: "architect",
+    prompt: `/architect conductor readiness plan ${rec.plan}`,
+    vars: { plan: rec.plan, plan_file: file.rel, lane: wt, branch: rec.branch, settings: ctx.settingsFile },
+    budget: ctx.local.budget_usd.readiness,
+  });
+  if (r.status === "parked") return { reason: r.reason, detail: r.detail, phase: r.outcome?.phase ?? null, read: r.transcript, resetsAt: r.resetsAt };
+  if (r.outcome.kind !== "ready") return { reason: "disagreement", detail: `readiness returned a ${r.outcome.kind} outcome`, read: r.transcript };
+  if (head(wt) !== before || !isClean(wt)) {
+    return { reason: "disagreement", detail: "the readiness session changed the lane; it reads and changes nothing", read: r.transcript };
+  }
+  rec.readiness = { hash, at: now() };
+  save(ctx);
+  return null;
+}
+
 function planFileIn(cwd, plan) {
   const found = findPlan(cwd, plan);
   return found ? { ...found, rel: relative(cwd, found.path).replace(/\\/g, "/") } : null;
 }
 
+/**
+ * Reads `claude --version` again before a session (ADR-0250): an update installed while a resident
+ * run is up would otherwise run sessions on a version the run never judged. Returns a park result for
+ * a refused version, and records it so the run pauses; a patch above a verified one runs with its
+ * warning, printed once per version.
+ */
+function cliRefusal(ctx, rec) {
+  const verdict = ctx.checkCli?.();
+  if (!verdict) return null;
+  if (verdict.error) {
+    ctx.cliRefused = verdict.error;
+    return { status: "parked", reason: CLI_CONTRACT, detail: `no session started, and the run pauses: ${verdict.error}` };
+  }
+  if (verdict.version && ctx.run.cli?.version !== verdict.version) {
+    ctx.run.cli = { version: verdict.version, warning: verdict.warning ?? null };
+    if (verdict.warning) live(ctx, rec.plan, `  lane   warning: ${verdict.warning}`);
+    save(ctx);
+  }
+  return null;
+}
+
 async function session(ctx, rec, kind, { owner, prompt, vars, budget, addDirs = [], info = {} }) {
+  const refused = cliRefusal(ctx, rec);
+  if (refused) return refused;
   const paths = statePaths(ctx.stateDir);
   const label = `${rec.plan}-${String(rec.steps.length + 1).padStart(2, "0")}-${kind}`;
   const appendPromptFile = renderPromptFile(join(ctx.promptsDir, `${kind}.md`), vars, join(paths.prompts, `${label}.md`));
@@ -442,7 +789,11 @@ export function usageWaitRefusal(result, resumes, nowMs) {
   return null;
 }
 
-async function gate(ctx, rec, label) {
+/**
+ * One conductor gate run at stage `label`. `logSuffix` keeps a re-run's logs beside the first run's
+ * rather than over them: the repair session was handed the first, and the park names the second.
+ */
+async function gate(ctx, rec, label, { logSuffix = "" } = {}) {
   const lines = gateReader({ stage: label });
   const show = (bodies) => bodies.forEach((b) => live(ctx, rec.plan, b));
   const t0 = Date.now();
@@ -450,7 +801,7 @@ async function gate(ctx, rec, label) {
     cwd: rec.worktree,
     commands: gateForStage(label, ctx.gate ?? defaultGate()),
     logDir: join(ctx.stateDir, "gates"),
-    label: `${rec.plan}-${label}`,
+    label: `${rec.plan}-${label}${logSuffix}`,
     lockDir: ctx.lockDir,
     lockPollMs: ctx.lockPollMs,
     onLockWait: (name, ms) => recordWait(rec, name, ms),
@@ -470,6 +821,117 @@ async function gate(ctx, rec, label) {
   if (g.ok) rec.gatedHead = head(rec.worktree);
   save(ctx);
   return g;
+}
+
+/**
+ * The gate at `stage`, with one repair session for a red (ADR-0248): `studio-builder` when the failing
+ * command is one of the studio's checks, `dev` otherwise. The stage's gate runs again after it, and a
+ * second red parks. Returns { g } for green, or { g, park } — `g` the last gate run. A plan that has
+ * already run MAX_REPAIRS repairs parks on its next red with no session.
+ */
+async function gateOrRepair(ctx, rec, stage) {
+  const g = await gate(ctx, rec, stage);
+  if (g.ok) return { g };
+  const repairs = rec.repairs ?? [];
+  if (repairs.length >= MAX_REPAIRS) {
+    return { g, park: { reason: "gate_red", detail: `${gateDetail(g)}; no repair session, the plan has run ${MAX_REPAIRS} already`, read: g.failed.log } };
+  }
+  const failed = gateForStage(stage, ctx.gate ?? defaultGate()).find((c) => c.name === g.failed.name);
+  const owner = /^studio /.test(g.failed.name) ? "studio-builder" : "dev";
+  const wt = rec.worktree;
+  const before = head(wt);
+  const file = planFileIn(wt, rec.plan);
+  const r = await session(ctx, rec, "repair", {
+    owner,
+    prompt: `/${owner} conductor repair plan ${rec.plan} at ${stage}`,
+    vars: {
+      plan: rec.plan,
+      lane: wt,
+      branch: rec.branch,
+      with_lock: ctx.withLockPath,
+      plan_file: file?.rel ?? "(missing)",
+      stage,
+      failing: `${g.failed.name} (${(failed?.cmd ?? []).join(" ")}) exited ${g.failed.code}${g.failed.tests?.length ? `, failing ${g.failed.tests.join(", ")}` : ""}`,
+      gate_log: g.failed.log,
+    },
+    budget: ctx.local.budget_usd.repair,
+    info: { stage },
+  });
+  if (r.status === "parked") return { g, park: { reason: r.reason, detail: r.detail, read: r.transcript, resetsAt: r.resetsAt } };
+  const problems = verifyRepair({ cwd: wt, before, outcome: r.outcome });
+  if (problems.length) return { g, park: { reason: "disagreement", detail: `repair at ${stage}: ${problems.join("; ")}`, read: r.transcript } };
+  // A repair on a tip a close produced reaches main without a review; the digest names it by SHA.
+  repairs.push({ stage, commits: r.outcome.commits.map((c) => resolveCommit(c, wt)), unreviewed: AFTER_CLOSE_STAGES.has(stage), at: now() });
+  rec.repairs = repairs;
+  recordSessionCommits(rec, "repair", commitsFirstParent(before, wt));
+  save(ctx);
+  const g2 = await gate(ctx, rec, stage, { logSuffix: `-after-repair-${repairs.length}` });
+  if (g2.ok) return { g: g2 };
+  return { g: g2, park: { reason: "gate_red", detail: `${gateDetail(g2)}; still red after one repair session at ${stage}`, read: g2.failed.log } };
+}
+
+/** The commits `before..HEAD` along the lane's first-parent chain, oldest first: what the lane made. */
+function commitsFirstParent(before, wt) {
+  const r = git(["rev-list", "--reverse", "--first-parent", `${before}..HEAD`], wt);
+  return r.code === 0 && r.stdout ? r.stdout.split("\n") : [];
+}
+
+/** Records commits a close, merge or repair session made, which a clean verdict may be reused over. */
+function recordSessionCommits(rec, kind, shas) {
+  rec.sessionCommits ??= [];
+  for (const sha of shas) rec.sessionCommits.push({ sha, kind });
+}
+
+/**
+ * The last verdict, when it is clean and still grades the lane (ADR-0248): every commit on the lane's
+ * first-parent chain after the tip it graded is a merge whose second parent is on `main`, or a commit
+ * the record says a close, merge or repair session made. Anything else — an owner's hand fix, most of
+ * all — is new code nothing has reviewed, and the caller runs a fresh round. Null otherwise.
+ */
+export function reusableVerdict(rec) {
+  const v = rec.verdicts.at(-1);
+  if (!v || v.blockers > 0 || v.majors > 0 || !v.graded) return null;
+  const wt = rec.worktree;
+  if (!isAncestor(v.graded, "HEAD", wt)) return null;
+  const known = new Set((rec.sessionCommits ?? []).map((c) => c.sha));
+  for (const sha of commitsFirstParent(v.graded, wt)) {
+    if (known.has(sha)) continue;
+    const parents = git(["rev-list", "--parents", "-n", "1", sha], wt).stdout.split(" ").slice(1);
+    if (parents.length === 2 && isAncestor(parents[1], "main", wt)) continue;
+    return null;
+  }
+  return v;
+}
+
+/**
+ * Reads the `CI` workflow's newest conclusion for `origin/main` before a close merges onto it, and
+ * reports it (ADR-0251). The reading never parks or delays the close, whatever it says: the
+ * conductor never pushes, so `origin/main` moves only by hand and a close waiting on it would wait
+ * on a step no session can take. There is deliberately no park reason for a red reading — one
+ * existed briefly and was withdrawn for exactly that deadlock.
+ *
+ * Every reading is kept on the record as `rec.upstream`, which the digest's `Needs you` reads; a red
+ * one also prints a live line naming the failing jobs, and an unread one prints its notice, so a
+ * close that went ahead unread never looks like one that read green. `ctx.upstreamEnv` is the
+ * environment `gh` runs under, which is how the suite hands it a fake.
+ */
+function readUpstreamBeforeClose(ctx, rec) {
+  const r = readUpstream({ cwd: ctx.repo, env: ctx.upstreamEnv ?? process.env });
+  (rec.upstream ??= []).push({
+    state: r.state,
+    run: r.run ?? null,
+    sha: r.sha ?? null,
+    url: r.url ?? null,
+    jobs: r.jobs ?? null,
+    case: r.case ?? null,
+    at: now(),
+  });
+  save(ctx);
+  const line =
+    r.state === "red"
+      ? `upstream CI: RED - run ${r.run} at ${String(r.sha).slice(0, 7)} concluded ${r.conclusion}, failing ${redSubject(r)}; closing anyway (ADR-0251)`
+      : describeUpstream(r).text.split("\n")[0];
+  live(ctx, rec.plan, `  lane   ${line}`);
 }
 
 function gateDetail(g) {
@@ -502,6 +964,7 @@ export async function runPlan(ctx, lane, plan) {
   rec.park = null;
   rec.started ??= now();
   rec.ended = null;
+  ctx.state.lanes[lane] = { plan, step: null };
   save(ctx);
   const budgets = ctx.local.budget_usd;
   const paths = statePaths(ctx.stateDir);
@@ -539,8 +1002,7 @@ export async function runPlan(ctx, lane, plan) {
       if (problems.length) {
         return park(ctx, rec, { reason: "disagreement", detail: `close found on the branch: ${problems.join("; ")}`, read: adopted.verdict.review_path });
       }
-      rec.verdicts.push({ ...adopted.verdict });
-      rec.closed = { version: adopted.version, tag: adopted.tag, head: head(wt), at: now(), adopted: true };
+      adoptClose(rec, adopted, head(wt));
       event(ctx, "closed", { plan, tag: adopted.tag });
       save(ctx);
     }
@@ -572,6 +1034,14 @@ export async function runPlan(ctx, lane, plan) {
         });
       }
       if (next.kind === "review") break;
+      if (next.kind === "owed") {
+        const problem = markOwed(ctx, rec, file, next.phases);
+        if (problem) return park(ctx, rec, { reason: "disagreement", phase: next.phases[0], detail: problem, read: `${file.rel} Phase ${next.phases[0]}` });
+        continue;
+      }
+
+      const ready = await readiness(ctx, rec, file);
+      if (ready) return park(ctx, rec, ready);
 
       const range = rangeLabel(next.phases);
       const before = head(wt);
@@ -583,7 +1053,7 @@ export async function runPlan(ctx, lane, plan) {
         info: { phases: next.phases },
       });
       if (r.status === "parked") {
-        return park(ctx, rec, { reason: r.reason, detail: r.detail, phase: r.outcome?.phase ?? null, read: r.transcript });
+        return park(ctx, rec, { reason: r.reason, detail: r.detail, phase: r.outcome?.phase ?? null, read: r.transcript, resetsAt: r.resetsAt });
       }
       const problems = verifyImplement({ cwd: wt, plan, phases: next.phases, before, outcome: r.outcome });
       if (problems.length) {
@@ -591,89 +1061,125 @@ export async function runPlan(ctx, lane, plan) {
       }
     }
 
-    const g = await gate(ctx, rec, "pre-review");
-    if (!g.ok) return park(ctx, rec, { reason: "gate_red", detail: gateDetail(g), read: g.failed.log });
+    // The gate and the review see the tree that will merge, and a conflict surfaces while the plan is
+    // still an implementer's (ADR-0248).
+    const early = await mergeMain(ctx, rec, "pre-review");
+    if (early) return park(ctx, rec, early);
 
+    const pre = await gateOrRepair(ctx, rec, "pre-review");
+    if (pre.park) return park(ctx, rec, pre.park);
+
+    // Review rounds, with no lock held: a review ends on a verdict, and blockers or majors go to a fix
+    // round. A clean verdict the record still holds from before a close-time park is reused, unless
+    // the lane gained a commit nothing has reviewed since (ADR-0248).
     for (;;) {
-      const lock = await take(CLOSE, {
-        dir: ctx.lockDir,
-        pollMs: ctx.lockPollMs,
-        what: `review ${plan}`,
-        onWaited: (ms) => recordWait(rec, CLOSE, ms),
-      });
+      if (reusableVerdict(rec)) break;
       const round = rec.verdicts.length + 1;
       const file = planFileIn(wt, plan);
       const reviewPath = join(paths.reviews, `${plan}-round-${round}.md`);
+      const graded = head(wt);
       event(ctx, "review-start", { plan, round });
       const r = await session(ctx, rec, "review", {
         owner: "architect",
-        prompt: `/architect conductor review plan ${plan} round ${round}`,
-        vars: { ...common, plan_file: file.rel, round, review_path: reviewPath, prior_rounds: priorRounds(rec) },
+        prompt: `/architect conductor review plan ${plan} round ${round} at ${graded}`,
+        vars: { ...common, plan_file: file.rel, round, review_path: reviewPath, prior_rounds: priorRounds(rec), tip: graded },
         budget: budgets.review,
         addDirs: [paths.reviews],
         info: { round },
       });
-      if (r.status === "parked") {
-        lock.release();
-        return park(ctx, rec, { reason: r.reason, detail: r.detail, read: r.transcript });
-      }
+      if (r.status === "parked") return park(ctx, rec, { reason: r.reason, detail: r.detail, read: r.transcript, resetsAt: r.resetsAt });
       const o = r.outcome;
-      if (o.kind === "verdict") {
-        rec.verdicts.push({ round, blockers: o.blockers, majors: o.majors, minors: o.minors, review_path: o.review_path, findings: o.findings });
+      if (o.kind !== "verdict") return park(ctx, rec, { reason: "disagreement", detail: `review returned a ${o.kind} outcome; a review ends on its verdict`, read: r.transcript });
+      if (head(wt) !== graded || !isClean(wt)) {
+        return park(ctx, rec, { reason: "disagreement", detail: `round ${round} review changed the lane; a review commits nothing and leaves the tree clean`, read: r.transcript });
+      }
+      rec.verdicts.push({ round, blockers: o.blockers, majors: o.majors, minors: o.minors, review_path: o.review_path, findings: o.findings, graded });
+      save(ctx);
+      if (o.blockers === 0 && o.majors === 0) break;
+      if (rec.fixRounds >= MAX_FIX_ROUNDS) {
+        return park(ctx, rec, {
+          reason: "review_failed",
+          detail: `round ${round} still carries ${o.blockers} blockers and ${o.majors} majors after ${MAX_FIX_ROUNDS} fix rounds`,
+          read: o.review_path,
+        });
+      }
+      const serious = o.findings.filter((f) => f.severity === "blocker" || f.severity === "major");
+      const owner = serious.every((f) => f.file.replace(/\\/g, "/").startsWith("studio/")) ? "studio-builder" : "dev";
+      const before = head(wt);
+      const f = await session(ctx, rec, "fix", {
+        owner,
+        prompt: `/${owner} conductor fix plan ${plan} round ${round}`,
+        vars: { ...common, plan_file: file.rel, round, review_path: o.review_path, findings: findingsText(o.findings) },
+        budget: budgets.fix,
+        addDirs: [paths.reviews],
+        info: { round },
+      });
+      if (f.status === "parked") return park(ctx, rec, { reason: f.reason, detail: f.detail, read: f.transcript, resetsAt: f.resetsAt });
+      const problems = verifyFix({ cwd: wt, before, outcome: f.outcome, findingCount: o.findings.length });
+      if (problems.length) {
+        return park(ctx, rec, { reason: "disagreement", detail: `fix round ${round}: ${problems.join("; ")}`, read: f.transcript });
+      }
+      rec.fixRounds += 1;
+      rec.fixes.push({
+        round,
+        commits: f.outcome.commits.map((c) => resolveCommit(c, wt)),
+        resolved: f.outcome.resolved.map((x) => ({ finding: x.finding, commit: resolveCommit(x.commit, wt) })),
+      });
+      save(ctx);
+      const fixGate = await gateOrRepair(ctx, rec, `fix-${round}`);
+      if (fixGate.park) return park(ctx, rec, fixGate.park);
+    }
+
+    // The close: its own session, under the close lock, which is held from here until main has
+    // fast-forwarded so the version it bumps lands on the main it was computed against. A close that
+    // meets a code conflict parks it back here; the conductor runs the merge session and starts the
+    // close again, at most MAX_CLOSE_MERGES times in one call.
+    const verdict = rec.verdicts.at(-1);
+    let merges = 0;
+    for (;;) {
+      const lock = await take(CLOSE, { dir: ctx.lockDir, pollMs: ctx.lockPollMs, what: `close ${plan}`, onWaited: (ms) => recordWait(rec, CLOSE, ms) });
+      // Read under the lock, so a close that waited on another reads main as it is now. The reading
+      // is reported and never refuses the close.
+      readUpstreamBeforeClose(ctx, rec);
+      const file = planFileIn(wt, plan);
+      const before = head(wt);
+      event(ctx, "close-start", { plan, round: verdict.round });
+      const r = await session(ctx, rec, "close", {
+        owner: "architect",
+        prompt: `/architect conductor close plan ${plan} round ${verdict.round}`,
+        vars: { ...common, plan_file: file?.rel ?? "(missing)", round: verdict.round, review_path: verdict.review_path, prior_rounds: priorRounds(rec), tip: verdict.graded ?? before },
+        budget: budgets.close,
+        addDirs: [paths.reviews],
+        info: { round: verdict.round },
+      });
+      // Whatever it ends on, what it committed is the close's, for a later resume's verdict reuse.
+      recordSessionCommits(rec, "close", commitsFirstParent(before, wt));
+      save(ctx);
+      if (r.status === "parked" && r.reason === "merge_conflict" && merges < MAX_CLOSE_MERGES) {
         lock.release();
-        save(ctx);
-        if (o.blockers === 0 && o.majors === 0) {
-          return park(ctx, rec, { reason: "disagreement", detail: `round ${round} verdict has no blockers or majors but the plan did not close`, read: o.review_path });
-        }
-        if (rec.fixRounds >= MAX_FIX_ROUNDS) {
-          return park(ctx, rec, {
-            reason: "review_failed",
-            detail: `round ${round} still carries ${o.blockers} blockers and ${o.majors} majors after ${MAX_FIX_ROUNDS} fix rounds`,
-            read: o.review_path,
-          });
-        }
-        const serious = o.findings.filter((f) => f.severity === "blocker" || f.severity === "major");
-        const owner = serious.every((f) => f.file.replace(/\\/g, "/").startsWith("studio/")) ? "studio-builder" : "dev";
-        const before = head(wt);
-        const f = await session(ctx, rec, "fix", {
-          owner,
-          prompt: `/${owner} conductor fix plan ${plan} round ${round}`,
-          vars: { ...common, plan_file: file.rel, round, review_path: o.review_path, findings: findingsText(o.findings) },
-          budget: budgets.fix,
-          addDirs: [paths.reviews],
-          info: { round },
-        });
-        if (f.status === "parked") return park(ctx, rec, { reason: f.reason, detail: f.detail, read: f.transcript });
-        const problems = verifyFix({ cwd: wt, before, outcome: f.outcome, findingCount: o.findings.length });
-        if (problems.length) {
-          return park(ctx, rec, { reason: "disagreement", detail: `fix round ${round}: ${problems.join("; ")}`, read: f.transcript });
-        }
-        rec.fixRounds += 1;
-        rec.fixes.push({
-          round,
-          commits: f.outcome.commits.map((c) => resolveCommit(c, wt)),
-          resolved: f.outcome.resolved.map((x) => ({ finding: x.finding, commit: resolveCommit(x.commit, wt) })),
-        });
-        save(ctx);
-        const g2 = await gate(ctx, rec, `fix-${round}`);
-        if (!g2.ok) return park(ctx, rec, { reason: "gate_red", detail: gateDetail(g2), read: g2.failed.log });
+        if (!isClean(wt)) return park(ctx, rec, { reason: "disagreement", detail: "the close parked merge_conflict and left the tree dirty", read: r.transcript });
+        merges += 1;
+        const m = await mergeMain(ctx, rec, "close");
+        if (m) return park(ctx, rec, m);
         continue;
       }
-      if (o.kind === "closed") {
-        const problems = verifyClose({ cwd: wt, plan, outcome: o });
-        if (problems.length) {
-          lock.release();
-          return park(ctx, rec, { reason: "disagreement", detail: `close: ${problems.join("; ")}`, read: r.transcript });
-        }
-        rec.verdicts.push({ ...o.verdict, round });
-        rec.closed = { version: o.version, tag: o.tag, head: head(wt), at: now() };
-        ctx.held.set(plan, lock);
-        event(ctx, "closed", { plan, tag: o.tag });
-        save(ctx);
-        break;
+      if (r.status === "parked") {
+        lock.release();
+        return park(ctx, rec, { reason: r.reason, detail: r.detail, read: r.transcript, resetsAt: r.resetsAt });
       }
-      lock.release();
-      return park(ctx, rec, { reason: "disagreement", detail: `review returned a ${o.kind} outcome`, read: r.transcript });
+      const o = r.outcome;
+      const problems = o.kind === "closed" ? verifyClose({ cwd: wt, plan, outcome: o }) : [`the close returned a ${o.kind} outcome`];
+      if (problems.length) {
+        lock.release();
+        return park(ctx, rec, { reason: "disagreement", detail: `close: ${problems.join("; ")}`, read: r.transcript });
+      }
+      // The close's verdict is the review's, with `fixed_in` on what the close repaired.
+      rec.verdicts[rec.verdicts.length - 1] = { ...verdict, ...o.verdict, round: verdict.round, graded: verdict.graded };
+      rec.closed = { version: o.version, tag: o.tag, head: head(wt), at: now() };
+      ctx.held.set(plan, lock);
+      event(ctx, "closed", { plan, tag: o.tag });
+      save(ctx);
+      break;
     }
   }
 
@@ -688,13 +1194,17 @@ export async function runPlan(ctx, lane, plan) {
       branch: rec.branch,
       tag: rec.closed.tag,
       gatedHead: rec.gatedHead ?? null,
-      runGate: (label) => gate(ctx, rec, label),
+      runGate: async (label) => {
+        const r = await gateOrRepair(ctx, rec, label);
+        return r.park ? { ...r.g, ok: false, park: r.park } : r.g;
+      },
       onGated: (sha) => {
         rec.gatedHead = sha;
         save(ctx);
       },
+      resolveConflict: (paths) => mergeSession(ctx, rec, { where: "remerge", paths }).then((p) => (p ? { ok: false, ...p } : null)),
     });
-    if (!m.ok) return park(ctx, rec, { reason: m.reason, detail: m.detail, read: m.gate?.failed?.log ?? null });
+    if (!m.ok) return park(ctx, rec, { reason: m.reason, detail: m.detail, read: m.read ?? m.gate?.failed?.log ?? null, resetsAt: m.resetsAt });
     rec.merge = { head: m.head, remerged: m.remerged, at: now() };
     event(ctx, "ff", { plan, head: m.head });
   } finally {

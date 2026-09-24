@@ -56,7 +56,7 @@ export function parsePlan(raw) {
   for (const line of phases?.lines ?? []) {
     const h = line.match(/^### Phase (\d+[a-z]?) [—–-] (.+)$/);
     if (h) {
-      current = { id: h[1], title: h[2].trim(), owner: null, stopCondition: null, filesText: "" };
+      current = { id: h[1], title: h[2].trim(), owner: null, stopCondition: null, blocksMerge: null, filesText: "" };
       plan.phases.push(current);
       collecting = false;
       continue;
@@ -82,9 +82,17 @@ export function parsePlan(raw) {
     }
     const stop = line.match(/^- \*\*Stop condition:\*\*\s*(.+)$/);
     if (stop) current.stopCondition = stop[1].trim();
+    const blocks = line.match(/^- \*\*Blocks merge:\*\*\s*`?([\w-]+)`?\s*$/);
+    if (blocks) current.blocksMerge = blocks[1].toLowerCase();
   }
   for (const p of plan.phases) {
     if (!OWNERS.has(p.owner)) plan.errors.push(`Phase ${p.id} has no valid owner tag (${p.owner})`);
+    // ADR-0249: only a human phase can be owed after the merge; an implementer phase is the merge.
+    if (p.blocksMerge !== null && p.owner !== "human") {
+      plan.errors.push(`Phase ${p.id} carries Blocks merge, which only a human phase may (it is ${p.owner})`);
+    } else if (p.blocksMerge !== null && p.blocksMerge !== "no" && p.blocksMerge !== "yes") {
+      plan.errors.push(`Phase ${p.id} carries Blocks merge "${p.blocksMerge}"; it is no or yes`);
+    }
   }
 
   const log = section(text, "## Implementation log");
@@ -119,6 +127,23 @@ export function donePhases(plan) {
   return new Set(plan.log.rows.filter(rowIsDone).map((r) => r.id));
 }
 
+/**
+ * A log row reads `owed` when the conductor merged its plan without that phase: a human phase marked
+ * `Blocks merge: no` (ADR-0249). It stays owed until the owner marks it done on `main`.
+ */
+export function rowIsOwed(row) {
+  return /^owed\b/i.test(row.state);
+}
+
+export function owedPhases(plan) {
+  return new Set(plan.log.rows.filter(rowIsOwed).map((r) => r.id));
+}
+
+/** True for a human phase whose plan lets it be owed after the merge rather than waited for. */
+export function nonBlocking(phase) {
+  return phase?.owner === "human" && phase.blocksMerge === "no";
+}
+
 /** Contiguous runs of same-owner phases, in plan order. */
 export function runs(plan) {
   const out = [];
@@ -141,9 +166,10 @@ export function claudePaths(phase) {
 }
 
 /**
- * The next thing the plan needs, from the first run holding a phase the log does not mark done:
- * `implement` over that run's pending phases, `human` to park at, `claude_dir` for a phase no
- * headless session can do, or `review` once every phase is done. `lastRun` is true when no
+ * The next thing the plan needs, from the first run holding a phase the log marks neither done nor
+ * owed: `implement` over that run's pending phases, `human` to park at, `owed` for the leading
+ * pending phases of a human run marked `Blocks merge: no` (ADR-0249), `claude_dir` for a phase no
+ * headless session can do, or `review` once every phase is done or owed. `lastRun` is true when no
  * implementer run follows it.
  *
  * A `.claude/` phase stops the run **in front of** itself: the pending phases before it are still a
@@ -152,12 +178,17 @@ export function claudePaths(phase) {
  */
 export function nextStep(plan) {
   const done = donePhases(plan);
+  const owed = owedPhases(plan);
   const all = runs(plan);
   const byId = new Map(plan.phases.map((p) => [p.id, p]));
   for (const [i, run] of all.entries()) {
-    const pending = run.phases.filter((id) => !done.has(id));
+    const pending = run.phases.filter((id) => !done.has(id) && !owed.has(id));
     if (pending.length === 0) continue;
-    if (run.owner === "human") return { kind: "human", owner: "human", phases: pending };
+    if (run.owner === "human") {
+      const blockingAt = pending.findIndex((id) => !nonBlocking(byId.get(id)));
+      if (blockingAt !== 0) return { kind: "owed", owner: "human", phases: blockingAt < 0 ? pending : pending.slice(0, blockingAt) };
+      return { kind: "human", owner: "human", phases: pending };
+    }
     const lastRun = !all.slice(i + 1).some((r) => IMPLEMENTERS.has(r.owner));
     const blockedAt = pending.findIndex((id) => claudePaths(byId.get(id)).length > 0);
     if (blockedAt === 0) {

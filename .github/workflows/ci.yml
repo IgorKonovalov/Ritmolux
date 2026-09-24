@@ -1,8 +1,9 @@
 # NFR section 7: build, test, doctests, clippy, fmt on Windows, macOS and Linux
 # for every push, plus the single-runner gates - the `spout` feature compile
-# (ADR-0181), the doc-link and roster checks, the studio's own suite, cargo-deny
-# and the npm audit (supply chain), the rlx-core coverage ratchet (ADR-0033), and
-# Miri over rlx-ring's unsafe.
+# (ADR-0181), the foobar2000 component compile (ADR-0251), the doc-link and
+# roster checks, the studio's own suite, cargo-deny and the npm audit (supply
+# chain), the rlx-core coverage ratchet (ADR-0033), and Miri over rlx-ring's
+# unsafe.
 #
 # Live audio is out of CI scope. GPU rendering partly is not: on Windows the DX12
 # WARP software adapter makes headless rendering deterministic, which the golden
@@ -199,6 +200,42 @@ jobs:
         shell: pwsh
         run: ./packaging/spout/fetch-sdk.ps1
       - run: cargo check -p standalone --features spout
+
+  # The foobar2000 component: the C++ shim under plugin-foobar/, compiled
+  # against the pinned SDK and linked to rlx-core-cabi's staticlib. No cargo
+  # command reaches it, since it is not Rust, and it needs an SDK that is
+  # third-party and gitignored - so, like the `spout` feature above, the default
+  # gate cannot see it by construction. This job is what compiles it before a
+  # tag is pushed (ADR-0251's roster). A C ABI change that the shim was not
+  # updated for, a renamed header, or an SDK pin bump that breaks the build now
+  # names `foobar` on the push that caused it, instead of surfacing as a missing
+  # artifact from release.yml's `foobar` job.
+  #
+  # release.yml's `foobar` job REMAINS THE LAST LINE: it runs
+  # packaging/foobar/build-component.ps1, which packages the component and
+  # verifies the archive, the PE machine type, the export and the stamped
+  # version. This job compiles and links and does none of that.
+  #
+  # Its own job, concurrent, for the reasons given for `spout`: a step on
+  # `check (windows-latest)` would serialize an SDK fetch and a release-profile
+  # core build into the critical path, and would name `check` as the subject
+  # when this breaks (ADR-0181 Alternative A). It pays the pinned-SDK fetch on
+  # every push, which ADR-0251 accepts on the same terms ADR-0181 did.
+  foobar:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      # The same two scripts release.yml's `foobar` job uses, in the same order:
+      # fetch-sdk.ps1 stages the pinned SDK at plugin-foobar/sdk/ and checks its
+      # SHA-256, and build.ps1 builds the core's staticlib, the SDK's static
+      # libraries and the shim, and links foo_ritmolux.dll.
+      - name: Stage the pinned foobar2000 SDK
+        shell: pwsh
+        run: ./packaging/foobar/fetch-sdk.ps1
+      - name: Compile and link the component
+        shell: pwsh
+        run: ./plugin-foobar/build.ps1
 
   # Doc-link gate (Plan 0061 Phase 2c). Every relative markdown link in the repo
   # must resolve - across docs/, README.md and .claude/skills/**.

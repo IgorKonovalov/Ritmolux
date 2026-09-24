@@ -170,7 +170,9 @@ For **each phase in order**:
    worktree path, or `main` directly), then set this phase's row in the `phase | owner | state |
    commit` table. The row for the phase you are committing right now reads `committed with this
    row`; backfill the real SHA into the previous phase's row as you go, so every landed row but the
-   one in flight carries one. **The edit rides inside this phase's own commit** — never a separate
+   one in flight carries one. A row may also read **`owed`**: the conductor wrote it for a `human`
+   phase marked `Blocks merge: no` that the plan merges without (ADR-0249). Leave it as it is; it turns
+   `done` only when the owner does the phase. **The edit rides inside this phase's own commit** — never a separate
    commit — and is staged by explicit path alongside the phase's files. If the plan predates this
    convention and has no `## Implementation log` section, **create it** from the skeleton in
    `.claude/skills/architect/references/templates/plan.md`; a missing skeleton is not a reason to
@@ -281,9 +283,10 @@ escalation.
 
 ## Conductor mode
 
-**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: implement` or
-`RLX-CONDUCTOR-MODE: fix`.** That line is written by `tools/conductor/` (ADR-0205), which starts this
-session headless, as a separate process, with the worktree as its cwd. Nothing a user types enters
+**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: implement`, `fix`, `merge` or
+`repair`.**
+That line is written by `tools/conductor/` (ADR-0205), which starts this session headless, as a
+separate process, with the worktree as its cwd. Nothing a user types enters
 this mode — a person saying "conductor mode" in a normal session gets the four-step workflow above,
 restate-and-wait included. Where this section and the rest of the skill disagree, this section wins,
 and only for the session the conductor started.
@@ -332,9 +335,32 @@ implementer run.
   and the commit. Nothing else in the plan moves.
 - A finding you think is wrong is not yours to overrule: park with `plan_wrong` and name it.
 
+**`merge`** — the prompt names the plan, where the conductor merged `main` (`pre-review`, `close` or
+`remerge`), `main`'s tip and the paths that conflicted (ADR-0248). The conductor aborted its merge, so
+the tree is clean.
+
+- Redo `git merge --no-edit main`, resolve every conflicted path, and commit the merge with
+  `git commit --no-edit`. Keep both sides' intent; where they cannot both hold, keep `main`'s behaviour
+  and adapt the plan's side. Nothing beyond the resolution: no refactor, no plan edit, no log row.
+- Run what the resolved files need to build, through the suite lock as above.
+- A conflict that needs the owner's decision, or a file under `.claude/`, parks `merge_conflict`,
+  after `git merge --abort`.
+- The conductor checks that the commit is a merge whose second parent is `main`, that the tree is
+  clean, and that no handed path still carries a conflict marker.
+
+**`repair`** — the prompt names the plan, the gate stage that went red, the failing command and the
+gate log holding its output (ADR-0248).
+
+- Reproduce the failure with that command, fix its cause in the code, one `fix(...)` commit per cause,
+  and run the command again. Nothing beyond the fix: no plan edit, no log row, no refactor.
+- **Never change an assertion, a golden, an expected value or a test's inputs to make it pass, and
+  never skip or delete a test.** A test you judge wrong parks `plan_wrong`, naming it.
+- A repair on a closed tip reaches `main` unreviewed, and the owner reads it by its SHA: keep it small.
+
 **The outcome block is the last thing you print** — exactly one fenced block tagged `rlx-outcome`
-holding one JSON object, in the shapes the prompt shows: `phases_done`, `fixed` or `parked` (reasons
-`human_phase`, `stop_condition`, `plan_wrong`, `question`, `check_red`). It is a claim, and the
+holding one JSON object, in the shapes the prompt shows: `phases_done`, `fixed`, `merged`, `repaired` or `parked`
+(reasons `human_phase`, `stop_condition`, `plan_wrong`, `question`, `check_red`, and `merge_conflict`
+from a merge session). It is a claim, and the
 conductor checks it against `git` — commits that do not exist, log rows that do not match, or a dirty
 tree park the plan as a disagreement.
 

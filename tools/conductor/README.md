@@ -2,15 +2,23 @@
 
 A Node program that takes approved plans off a queue and runs them to a merged `main` with no owner
 action in between, in up to two git worktree lanes. For each plan it opens a lane, starts one fresh
-headless `claude -p` session per contiguous same-owner run of phases, checks each session's claim
-against `git`, runs its own gate, starts a fresh headless `architect` session that reviews and closes
-the plan on the branch, fast-forwards `main`, and removes the lane.
+headless `claude -p` session per contiguous same-owner run of phases, after a read-only readiness
+check of the plan, checks each session's claim
+against `git`, merges `main` into the lane and runs its own gate, starts a fresh headless `architect`
+session that reviews the plan and a second one that closes it on the branch, fast-forwards `main`, and
+removes the lane.
 
 **It never pushes.** Everything it does stays on this machine until you read what happened and push.
 
 **Anything it cannot decide parks the plan**, and the lane moves on to the next plan. That covers a
-`human` phase, a plan's own stop condition, a red gate, a review still failing after two fix rounds,
+`human` phase, a plan's own stop condition, a gate still red after its one repair session, a review
+still failing after two fix rounds,
 a spend cap, a usage limit too far off to wait for, or a session whose claim `git` does not bear out.
+
+**`run` stays up until you pause it** (ADR-0250). A lane with nothing to start looks again every
+minute, re-reading `queue.json`, and a park whose condition the tree now shows settled resumes itself
+(`## Acting on a park` lists which). One `run` per working period is the intended use;
+`run --until-idle` ends once no lane can move, as every run used to.
 
 The decision and its rejected alternatives are ADR-0205. The plan that built it is Plan 0187.
 
@@ -21,9 +29,11 @@ The decision and its rejected alternatives are ADR-0205. The plan that built it 
    spend.
 
    ```json
-   { "budget_usd": { "implement": 8, "fix": 4, "review": 6 }, "max_open_worktrees": 3 }
+   { "budget_usd": { "readiness": 2, "implement": 8, "fix": 4, "review": 6, "close": 5, "merge": 3, "repair": 4 }, "run_budget_usd": 150, "max_open_worktrees": 3 }
    ```
 
+   `run_budget_usd` is the ceiling on one run's total spend. A resident run spends while nobody is
+   looking, so reaching it pauses the run: the plans in flight finish and no other starts.
    Every session gets its step's figure as `--max-budget-usd`. **The cap is checked between turns**,
    so a step can overrun it by one turn's cost (see `spike/README.md`). Optionally,
    `"model": { "implement": "opus", "fix": "opus", "review": "opus" }` picks the model per step. When
@@ -55,10 +65,10 @@ All of them run from the main checkout.
 
 | Command | What it does |
 |---|---|
-| `run [--lane a\|b] [--once]` | Runs the queue: both lanes, or one. `--once` stops a lane after one plan. A second conductor is refused while one runs. |
+| `run [--lane a\|b] [--once \| --until-idle]` | Runs the queue: both lanes, or one, until `pause`, `abort` or Ctrl+C. `--until-idle` ends the run once no lane can move; `--once` stops a lane after one plan. A second conductor is refused while one runs. |
 | `status` | Per lane: the plan, the step, the time in it, the spend so far. Then every parked plan with its reason, and whether the repository has already settled it. Regenerates the digest and ends with its path. |
 | `digest [--history]` | Rewrites `digest.md`. `--history` writes the per-run account to `digest-history.md` instead, and is the only thing that ever writes that file. |
-| `resume NNNN` | Queues a parked plan again. Refused while the park's reason still holds, e.g. a `human` phase the plan's log does not yet mark done. |
+| `resume NNNN` | Queues a parked plan again. Refused while the park's reason still holds, e.g. a `human` phase the plan's log does not yet mark done. While a run is live, it leaves the resume for that run, which takes it on its next look. |
 | `park NNNN` | Parks a plan that has not merged, with an inbox entry. |
 | `finding NNNN [<ref> --done\|--wontfix\|--filed <reason>]` | With no verb, lists that plan's closing verdict with an index per finding. With one, records your disposition against the finding `<ref>` names, and the digest stops carrying it. |
 | `adopt-close NNNN` | Records the close a lane already carries, when a session committed one and then lost its outcome. Verifies the branch first and writes nothing unless it passes. |
@@ -77,7 +87,8 @@ has just started. `pause` prints the plan and step each lane is on and how long 
 that wait is legible before you decide to `abort` instead. **A pause does not outlive its run:** it is
 cleared when the run ends, a `run` that finds one left behind by a dead conductor clears it and says
 so, and there is therefore no way to say "start nothing tomorrow" — the answer to that is not to start
-a run. A paused lane records `paused` against every plan it did not start, which the history page's
+a run. **A pause is also how a resident run ordinarily ends**, and a spent `run_budget_usd` or a
+refused CLI version pauses it the same way; the run record names which. A paused lane records `paused` against every plan it did not start, which the history page's
 **Not started** section reads apart from `--once` and from a queue that ran out.
 
 `run` prints one line per milestone as it happens, each one `HH:MM NNNN <what>`. A line indented
@@ -114,11 +125,20 @@ The same lines go to `state/live.log`, under one header per run. They are a disp
 CLI's stream: an event kind the reader does not know prints nothing, so a missing line is never
 evidence that something did not happen.
 
-**A lane stops when opening its next plan would exceed `max_open_worktrees`**, and says so, naming the
-plans that hold the worktrees. That cap is the disk bound, not a queue: the lane does not wait for a
-slot. Remove a finished lane or settle a parked one, then `run` again. **The cap counts worktree
-directories that exist on disk**, so a lane you removed with `git worktree remove` stops counting at
-once, whatever `state/conductor.json` says.
+**A lane waits when opening its next plan would exceed `max_open_worktrees`**, and the digest's **Now**
+names the plan it waits to start and the plans that hold the worktrees. A slot frees when a holder
+merges, resumes itself to a merge, or when you remove a parked plan's lane by hand. Under
+`--until-idle` the lane waits only while a holder is in flight in the run, and otherwise stops and
+says so, as before. **The cap counts worktree directories that exist on disk**, so a lane you removed
+with `git worktree remove` stops counting at once, whatever `state/conductor.json` says.
+
+**An idle lane watches.** With nothing to start, a lane of a resident run sleeps a minute and looks
+again: `queue.json` from the main checkout, the plan files, and any `resume` you asked for meanwhile.
+A plan approved and queued while the run is up starts within the minute. A `queue.json` that no longer
+validates is not taken; the run keeps the queue it had and prints why once. **`claude --version` is
+read again before every session**, so an update installed mid-run is judged before it runs anything:
+a patch above a verified version runs with the warning, and any other unverified version parks the
+plan about to start `cli_contract` and pauses the run.
 
 ## What to read afterwards
 
@@ -181,27 +201,92 @@ once, whatever `state/conductor.json` says.
   did not watch.
 - **`## Close review` in each closed plan** holds the review itself, committed with the close.
 - **`state/inbox.md`** gets one entry per park: the reason, the file to read, the worktree it holds,
-  and the resume command.
+  and the resume command. A park the run cleared itself gets an entry too, naming the condition that
+  settled it, so the inbox is a log as well as a worklist; the digest is the page to read first.
 - **`state/`** holds everything else: `conductor.json` (the runtime record), `transcripts/` (every
   session's stream), `prompts/`, `reviews/`, `gates/` (each gate command's output), `locks.jsonl`
   and `live.log`.
 
 ## Acting on a park
 
+**Five reasons resume themselves** inside a live run, once the tree shows them settled (ADR-0250):
+`human_phase` and `claude_dir` once the phase's log row reads `done`, or `owed` on a human phase
+marked `Blocks merge: no` (in the lane, or on `main` when the lane is gone), `usage_limit` once the reset it recorded has passed, `main_dirty` once the main
+checkout is on `main` and clean, and `studio_install` an hour after it failed, three times at most.
+**None of them resumes over a dirty worktree.** Each self-resume prints a line and writes an inbox
+entry. Every other reason is yours: `resume` it once you have acted.
+
 | Reason | What to do before `resume` |
 |---|---|
-| `human_phase` | Do the phase. Mark its row `done` in the plan's `## Implementation log` **in the lane** (`WORK/rlx-plan-NNNN`) and commit it there. `resume` checks the row. |
+| `human_phase` | Do the phase. Mark its row `done` in the plan's `## Implementation log` **in the lane** (`WORK/rlx-plan-NNNN`) and commit it there. `resume` checks the row, and a live run resumes it by itself. A phase marked `Blocks merge: no` settles with an `owed` row and does not need `done`; the conductor writes that row itself when it reaches the phase, so only a park from before the marker was added needs it written by hand: see below. |
 | `claude_dir` | The same, and for the same reason: the phase declares a file under `.claude/`, which the CLI will not let a session write (ADR-0210). **Nothing was run** — the park comes before the phase. The detail names the paths. Do the phase in the lane, mark its row `done`, commit; `resume` checks the row. |
 | `studio_install` | The plan declares files under `studio/` and `npm --prefix studio ci` failed, so the gate's three studio checks could not run (ADR-0218). The detail carries the install's tail; the usual cause is no network. **Nothing was run** — the park comes before the first session. Install by hand in the lane, or wait and `resume`, which installs again: the trigger is a missing `studio/node_modules`, so the open lane the park left behind is installed into rather than skipped. |
-| `stop_condition`, `plan_wrong`, `question` | Read the transcript the inbox names. Settle it in a human-started `/architect` session. |
-| `gate_red` | Read the gate log. Fix the defect in the lane. The conductor never retries a red. |
+| `stop_condition`, `plan_wrong`, `question` | Read the transcript the inbox names. Settle it in a human-started `/architect` session. A `plan_wrong` from the readiness check names the phase and the contradiction, and nothing was implemented: edit the plan, or resume to overrule it. |
+| `gate_red` | The gate was red, a repair session ran, and the re-run was red too; or the plan had already run its three repairs. The park reads the second run's log. Fix the defect in the lane. |
 | `review_failed` | Read the last review under `state/reviews/`. Resuming grants two fresh fix rounds. |
 | `disagreement` | A session's claim and `git` differ. Read the detail and the transcript before trusting the lane. |
 | `cli_contract` | The CLI ran a session without the project hooks, or without loading the skill it invoked. Read the detail and the transcript, then verify the CLI version before resuming (`## When the CLI updates`). |
 | `lost_background` | The session started a command in the background and ended with it unfinished, so that work was killed with the session. Its commits are still in the lane. Read the detail for the command, check what the lane actually contains, then resume: the step runs again from what the plan log and `git` show. |
 | `usage_limit` | The account's usage limit ended a session, and the conductor did not wait it out, because the reset was more than 6 h away (the seven-day window), the CLI reported none, or the step had already been continued three times. The detail says which. The session's half-done work is still in the lane, uncommitted, so `resume` refuses it until you commit or `git restore` it. Resuming then re-runs the step from what the plan log and `git` show. |
 | `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or read the transcript. Resuming re-runs the step from what the plan log and `git` show. |
-| `merge_conflict`, `merge_failed`, `main_dirty` | Resolve it in the lane, or clean the main checkout. A resumed plan goes straight back to the fast-forward. |
+| `merge_conflict` | A merge session could not resolve a conflict and parked it, or the close hit one in code. Resolve it in the lane and commit the merge; a resumed plan goes straight back to where it stopped. |
+| `merge_failed`, `main_dirty` | Clean the main checkout, or clear what refused the fast-forward. `main_dirty` resumes itself once the main checkout is on `main` and clean. |
+
+**A readiness check reads the plan before any spend** (ADR-0248). Before a plan's first implement
+session, a fresh read-only `architect` session checks that each phase's *What*, *Files touched* and
+*Done when* agree with each other and with the tree, that every done-when is runnable under the
+allowlist, and that no phase reads a `Blocks merge: no` phase's output. It ends `ready`, or parks
+`plan_wrong` naming the phase before any implementer runs. The conductor checks it left `HEAD` and the
+tree untouched. A `ready` is recorded against a hash of the plan's text above `## Implementation log`,
+so it runs again on resume only when a phase changed; a readiness park is never recorded as passing,
+so resuming one runs it again. The budget is `budget_usd.readiness`, required.
+
+**A red gate gets one repair session, not a park** (ADR-0248). At any stage, a red starts a fresh
+`dev` session, or a `studio-builder` one when the failing command is a studio check, handed the
+failing command and its gate log. It commits a fix, and the stage's gate runs again; a second red at
+that stage parks `gate_red`, reading the second run's log. A plan runs three repairs at most, and a
+red after that parks with no session. The repair prompt forbids changing an assertion, a golden or a
+test's inputs to make it pass: a test the session thinks is wrong parks `plan_wrong`. **A repair at
+`post-close` or `remerge` reaches `main` without a review**, since the close already graded the plan:
+the conductor moves the annotated tag onto the repaired tip, and the digest's **Needs you** names each
+such commit by SHA until `origin/main` holds it. Read those before you push. The budget is
+`budget_usd.repair`, required.
+
+**A red `origin/main` is reported at every close and never stops one** (ADR-0251). With the close lock
+held and before the close session starts, the lane runs `scripts/check-upstream-ci.mjs`'s reader
+against the main checkout's `origin`: the newest completed run of the `CI` workflow on `main`, through
+`gh`. `Pages` and `Release` runs are never read, and a cancelled run is passed over. Whatever it reads,
+the close goes ahead. The conductor never pushes, so `origin/main` moves only when you push, and a
+close that waited on it would wait on a step no session can take; there is no park reason for it.
+
+- **Red:** the live log gets one line, `upstream CI: RED - run <id> at <sha> concluded failure, failing
+  <jobs>; closing anyway`, and the digest's **Needs you** carries a line naming the run and the
+  failing jobs. That line stays until a later close reads `origin/main` green; an unread reading in
+  between does not clear it. Repair `main` and push.
+- **Unread**, because there is no `origin`, no `gh`, an unauthenticated `gh` or no network: the live
+  log gets `upstream CI: skipped: not read (<case>)`. A machine without `gh auth login` therefore
+  closes as before, and the live log shows that nothing was read.
+
+Every reading, green, red or unread, is kept on the plan's record as `upstream`.
+
+**A merge that conflicts gets one merge session, not a park** (ADR-0248). The lane merges `main` itself
+before the `pre-review` gate, so the gate and the review see the tree that will reach `main`, and it
+merges again before the fast-forward when `main` moved meanwhile. A conflict at either point is
+aborted and handed to a fresh `dev` session, or a `studio-builder` one when every conflicted path is
+under `studio/`, which redoes the merge, resolves it and commits. The conductor then checks the
+result: a merge commit whose second parent is `main`, a clean tree, and no conflict marker in the
+paths it handed over. The gate runs next as usual. Each conflict gets its own session, and a merge
+session that cannot resolve one parks `merge_conflict`. Its budget is `budget_usd.merge` in
+`local.json`, which is required.
+
+**A `human` phase marked `Blocks merge: no` is owed, not waited for** (ADR-0249). The conductor
+commits its log row as `owed` in the lane, runs the phases after it, reviews, closes and merges as
+though it were not there. The digest's **Needs you** then carries one line per owed phase, read from
+every plan under `docs/plans/done/` in the main checkout, so it survives a wiped `state/`. Do the phase
+when you can, mark its row `done` in the closed plan **on `main`**, and commit: the line leaves with
+the commit, and no command records it. A phase that finds a problem does not reopen its plan; the
+finding becomes a backlog entry or a new plan. The field on a `dev` or `studio-builder` phase is a
+plan error `check` reports.
 
 **A usage limit is waited out, not parked.** When the account's limit ends a session (a 429 with a
 `rejected` rate-limit reading), the lane sleeps until the window reopens, plus two minutes, and then
@@ -230,7 +315,17 @@ repository's common git directory, whichever worktree it was invoked from. A rep
 checkout cannot be derived — a bare clone, or a `.git` relocated away from its tree — records beside
 the invoked script as before, and says so in one line on stderr.
 
-**A close that landed without an outcome is adopted, never reviewed a second time.** A review session
+**The review and the close are two sessions, and a clean verdict outlives a park** (ADR-0248). The
+review ends on its verdict and commits nothing, with no lock held, so two lanes' reviews run at once.
+A clean verdict is recorded with the tip it graded; the conductor then takes the close lock and starts
+the close, handed the review's path. A close that parks — a red gate, a wrong plan — keeps that
+verdict: `resume` starts a close again, not a review, as long as every commit the lane gained since the
+graded tip is a merge of `main` or a commit a close, merge or repair session made. **Any other commit,
+your own hand fix included, runs a fresh review round**, because nothing has reviewed it. A close that
+meets a conflict in code parks it back to the conductor, which runs a merge session and starts the
+close again. The close's budget is `budget_usd.close`, required.
+
+**A close that landed without an outcome is adopted, never closed a second time.** A close session
 commits its repairs, its `done/` move, its version bump and its tag before it prints anything, so a
 session that dies after that leaves the branch closed and the record open. Before a run reviews
 anything it asks the **branch**: a plan under `done/` with `Status: done` and a `## Close review` is a
@@ -354,8 +449,9 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   served step's own line naming the tier and the tree it leaned on, and the history's Totals counts
   served runs apart from full ones.
 - **The locks.** `with-lock.mjs` holds two machine-wide locks. The **suite** lock stops two lanes
-  running the GPU suites at once. The **close** lock runs from before a review until `main` has
+  running the GPU suites at once. The **close** lock runs from before the close session until `main` has
   fast-forwarded, so a version bump and its tag always land on the `main` they were computed against.
+  It is never held over a review (ADR-0248).
 - **The checks.** The conductor believes the repository, not the session. A claimed commit must
   exist and be new, the plan's log rows must match, the tree must be clean, and a close must leave
   the plan under `done/` with a `## Close review` and an annotated tag on the branch tip. A finding
@@ -369,7 +465,8 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
 The conductor runs its own gate in the worktree and ignores any session's claim that the checks
 passed. **What runs at each stage is `gateForStage` in `lib/gate.mjs`, and nowhere else**: read it
 there rather than from a copy here, which would drift. The commands run in order and stop at the
-first red. The gate runs at four stages: `pre-review` after the last implementer run, `fix-N` after
+first red. The gate runs at four stages: `pre-review` after the last implementer run and the lane's
+merge of `main`, `fix-N` after
 each fix round, `post-close` on the tip a close produced before `main` moves, and `remerge` after the
 automatic re-merge of a moved `main`. Only the last two run a step marked `afterClose`. **A full
 workspace suite the conductor saw pass is not run again on the same tree** (ADR-0207), and **a tree

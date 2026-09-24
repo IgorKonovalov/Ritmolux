@@ -9,6 +9,16 @@
 > entries rather than the two it named. Both were found by hitting this on the Arch box: see the
 > Decision's second paragraph and Alternative D.
 
+> **Amended again 2026-09-24, after Plan 0220 Phase 1 landed and parked.** The Context below says
+> npm 11's blocked `postinstall` is why `npm ci` left no Electron. On this box that is **half the
+> cause**. With the field in place the script runs, and Electron 32's `install.js` then extracts
+> with `extract-zip` 2.0.1 (yauzl 2.10.0), which on Node 26 writes a single entry and lets the
+> process exit 0 with its promise neither resolved nor rejected — reproduced directly against the
+> cached `electron-v32.1.2-linux-x64.zip`. Electron 44.4.3 depends on
+> `@electron-internal/extract-zip` instead. **So this ADR's gate stands, and the binary it promises
+> a fresh clone arrives with the electron bump, not with the field.** Plan 0220 carries the check
+> in Phase 4 for that reason.
+
 ## Context
 
 The repository has three dependency graphs, and only one of them is watched. `Cargo.lock` has
