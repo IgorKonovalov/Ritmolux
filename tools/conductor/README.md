@@ -411,7 +411,7 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   takes no lock even when wrapped. `.claude/hooks/conductor-no-background.js` denies
   `run_in_background` on a shell call.
 - **No session writes under `.claude/`, and nothing pretends otherwise.** The CLI denies a headless
-  session an `Edit` or a `Write` there whatever the allowlist says — measured on 2.1.273 (Windows) and 2.1.278 (Linux) under both
+  session an `Edit` or a `Write` there whatever the allowlist says — measured on 2.1.273 (Windows) and 2.1.278 and 2.1.280 (Linux) under both
   `settings.conductor.json` and settings naming `.claude/` paths explicitly, while a read is allowed
   and a write elsewhere in the same worktree succeeds (`spike/README.md`). So **a phase whose
   `Files touched` names such a path parks the plan before the phase runs**, `claude_dir`, with the
@@ -506,7 +506,7 @@ probe before the review is not a defect yet. `post-close` still parks a close th
 
 `VERIFIED_CLI` in `conductor.mjs` lists the `claude --version`s the evidence in `spike/README.md` was
 produced on (ADR-0208). The readings through 2.1.273 were taken on Windows 10 with Node 22. The 2.1.278
-reading was taken on Arch Linux with Node 26, and it is the only one that covers Linux. A version
+and 2.1.280 readings were taken on Arch Linux with Node 26, and they are the only ones that cover Linux. A version
 verified on one platform only has not been checked on the other, so re-run the probe on the platform
 the conductor will run on.
 
