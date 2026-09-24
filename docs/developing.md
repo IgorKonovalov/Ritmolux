@@ -397,7 +397,7 @@ Bypass once with `git push --no-verify`.
 Three parts of the tree compile only on a platform or with an SDK that the everyday loop does not
 have. **Nothing local compiles any of them**: not `cargo build`, not `clippy --all-targets`, not
 `nextest`, and not the pre-push hook. Each one is compiled before a tag by a CI job that names it
-([ADR-0251](adrs/0251-a-gated-compile-path-has-a-named-job-and-a-red-upstream-stops-the-next-close.md)):
+([ADR-0251](adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)):
 
 | Gated path | Why the local loop cannot see it | Compiled before a tag by |
 |---|---|---|
@@ -410,13 +410,13 @@ fails. So a break in one of them is read **by name, on the push that caused it**
 above. If nobody reads it, the only sign is an artifact missing from a release. The macOS build was
 red for two releases that way.
 
-**A red job on `main` stops the next close.** Before a close merges, it reads the newest `CI` run for
-`origin/main` with `node scripts/check-upstream-ci.mjs`. A red run refuses the close and names the
-failing job; `Pages` and `Release` runs are never read. The reading needs `gh auth login` on the
-machine doing the close. Without it, or without a network, the script prints
-`upstream CI: skipped: not read (<case>)` and exits 0, so the close goes ahead and the output says it
-was not checked. [Releasing](releasing.md#a-close-refuses-over-a-red-main) says how to clear a
-refusal.
+**A red job on `main` is named at the next close, which still goes ahead.** Before a close merges,
+it reads the newest `CI` run for `origin/main` with `node scripts/check-upstream-ci.mjs`. A red run
+is reported with the failing job named; `Pages` and `Release` runs are never read. The reading needs
+`gh auth login` on the machine doing the close. Without it, or without a network, the script prints
+`upstream CI: skipped: not read (<case>)` and exits 0, so the output says nothing was checked.
+[Releasing](releasing.md#a-close-reports-a-red-main-and-never-blocks-on-it) says where the reading
+appears and why it never blocks.
 
 ## Disk
 

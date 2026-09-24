@@ -206,9 +206,9 @@ flowchart LR
 |---|---|---|---|
 | 1 — The macOS build compiles again | dev | done | 646ca642 |
 | 2 — A reader for origin's CI | dev | done | 1e7e4857 |
-| 3 — The close reports it and never blocks on it | dev | done | committed with this row |
+| 3 — The close reports it and never blocks on it | dev | done | 1fc58a95 |
 | 4 — The foobar component joins the push | dev | done | 0c0ac09b |
-| 5 — The documents say what a machine needs | dev | not started | |
+| 5 — The documents say what a machine needs | dev | done | committed with this row |
 | 6 — The close ceremony gains the step | human | owed | |
 | 7 — The reading that only a push can produce | human | owed | |
 
@@ -237,6 +237,12 @@ flowchart LR
 - Phase 5: `check-reader-prose.mjs` does not read `README.md`, `docs/developing.md` or
   `docs/releasing.md`. The last two are in its Contribute group, which keeps bare citations. It
   exits 0, and the new lines in all three were checked by hand for bare citations: none.
+- Phase 5, reopened: the section `## A close refuses over a red main` in `docs/releasing.md` is
+  renamed `## A close reports a red main and never blocks on it`, and `docs/developing.md`'s link
+  to its anchor follows. ADR-0251's file was renamed on `main`, so every link to it in the three
+  files moved too. Outside this phase's list: the same rename left one link in
+  `scripts/fixtures/README.md` broken, which kept `check-doc-links.mjs` red; it is corrected in
+  this phase's commit.
 
 ### Close triggers
 

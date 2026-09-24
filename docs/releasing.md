@@ -20,10 +20,11 @@ the operational summary.
 - **No push:** `cargo-release` stages the version edit and writes the `vX.Y.Z` tag but does
   not push; the user pushes (project no-auto-push rule).
 
-## A close refuses over a red main
+## A close reports a red main and never blocks on it
 
-**The close reads `origin/main`'s CI before it merges, and a red run stops it**
-([ADR-0251](adrs/0251-a-gated-compile-path-has-a-named-job-and-a-red-upstream-stops-the-next-close.md)).
+**The close reads `origin/main`'s CI before it merges, reports what it read, and merges whatever
+it read**
+([ADR-0251](adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)).
 The tag a close writes has no CI result yet, since CI runs after the push. What the close can read
 is the tip it merges onto:
 
@@ -32,20 +33,20 @@ node scripts/check-upstream-ci.mjs     # exit 0 green or not read, exit 1 red
 ```
 
 It reads the newest completed run of the `CI` workflow on `main`, passing over a cancelled one, and
-never a `Pages` or `Release` run. Its three outcomes are spelled differently:
+never a `Pages` or `Release` run. Its three outcomes are spelled differently, and the script's exit
+code is for a person reading it by hand; no close stops on it:
 
-| Output | Exit | What the close does |
+| Output | Exit | Where the close reports it |
 |---|---|---|
-| `upstream CI: OK - run <id> ...` | 0 | proceeds |
-| `upstream CI: RED - run <id> ...; failing job(s): check (macos-latest)` | 1 | **refuses**. Under the conductor the plan parks `upstream_red`, before any close session, with nothing merged, bumped or tagged |
-| `upstream CI: skipped: not read (<case>) - ...` | 0 | proceeds, and the line records that nothing was checked. The cases are no `origin`, `gh` absent, `gh` unauthenticated, no network, and no completed run |
+| `upstream CI: OK - run <id> ...` | 0 | the conductor's live log |
+| `upstream CI: RED - run <id> ...; failing job(s): check (macos-latest)` | 1 | the live log, as one line naming the failing jobs, and a line in `tools/conductor/digest.md`'s **Needs you** that stays until a later close reads `main` green |
+| `upstream CI: skipped: not read (<case>) - ...` | 0 | the live log, recording that nothing was checked. The cases are no `origin`, `gh` absent, `gh` unauthenticated, no network, and no completed run |
 
-**To clear a refusal**, repair the failing job on `main`, not in the plan's lane, since the refusal is
-about `main`. Push, wait for that push's `CI` run to go green, and close again. Under the conductor,
-`node tools/conductor/conductor.mjs resume <plan>` reads it again at the close. There is no
-override flag. A red arm stops every close, including the closes of plans that did not touch it, and
-[ADR-0251](adrs/0251-a-gated-compile-path-has-a-named-job-and-a-red-upstream-stops-the-next-close.md)
-accepts that as the cost.
+**Why it never blocks:** the conductor never pushes, so `origin/main` moves only when you push. A
+close that waited on a green `origin/main` would wait on a step no session can take, and a queue of
+approved plans would stop behind it. Local closes also run ahead of `origin`, so the reading describes
+an older tree than the one being closed. The reading is a report, and acting on it is yours:
+**repair the failing job on `main`**, not in the plan's lane, and push.
 
 The reading needs `gh auth login` on the machine doing the close, once. A machine without it closes
 as before, and prints the not-read line each time.

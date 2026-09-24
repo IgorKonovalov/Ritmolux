@@ -555,7 +555,7 @@ node scripts/check-upstream-ci.mjs --self-test    # expects exit 0, 13 of 13
 through `RLX_GH`, and each `.json` beside it is one scenario, named through `RLX_FAKE_GH`. The
 self-test runs the script against a throwaway repository with a GitHub `origin`, so nothing here
 touches the network. Nothing runs it on a push either: the script is kept off the gate roster
-because its real answer needs the network ([ADR-0251](../../docs/adrs/0251-a-gated-compile-path-has-a-named-job-and-a-red-upstream-stops-the-next-close.md)).
+because its real answer needs the network ([ADR-0251](../../docs/adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)).
 
 | Scenario | Case | Expected |
 |----------|------|----------|
