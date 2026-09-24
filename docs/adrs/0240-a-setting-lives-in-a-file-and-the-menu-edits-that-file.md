@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-09-20
-> **Related plan(s):** [0217](../plans/0217-every-setting-has-a-file-and-a-gate-says-so.md)
+> **Related plan(s):** [0217](../plans/done/0217-every-setting-has-a-file-and-a-gate-says-so.md)
 
 ## Context
 

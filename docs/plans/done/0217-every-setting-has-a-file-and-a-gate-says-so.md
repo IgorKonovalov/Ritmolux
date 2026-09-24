@@ -1,13 +1,13 @@
 # 0217 — Every setting has a file, and a gate says so
 
-> **Status:** in-progress
+> **Status:** done. Phases 14ae5f69, 776b946f, e3184783, 1eb144fa, and close repairs 80bf58cb. The conductor-run Mode 4 review (round 1) found no blockers and no majors. It raised three minors and one nit, and the two that prose could fix were fixed. Verified: the full suite green in the ledger, plus fmt, clippy, rustdoc and the new gate over its fixtures.
 > **Created:** 2026-09-20
 > **Owner skill(s):** dev, studio-builder
-> **Related ADRs:** [0240](../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md)
+> **Related ADRs:** [0240](../../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md)
 
 ## TL;DR
 
-[ADR-0240](../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md) makes a file the
+[ADR-0240](../../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md) makes a file the
 definition of every setting and the in-app menu an editor of that file. This plan makes that true
 and keeps it true: the one live violation — the diagnostics overlay, which the settings menu and
 `F3` both toggle and nothing persists — gets a `[hud] diagnostics` key, and two checks make a
@@ -40,7 +40,7 @@ What is missing is the part that makes it a rule rather than a habit:
 
 Repair the violation, then build the two checks the rule needs, each in the place that can actually
 see its half: a **Rust test** for the standalone, because the row-to-key property needs the types;
-a **Node gate** on the roster ([ADR-0217](../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md))
+a **Node gate** on the roster ([ADR-0217](../../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md))
 for the cross-language halves, because one carrier beats two and that roster already runs in the
 hook, in CI and under the conductor; and a **vitest test** inside the studio for its own third
 copy. We rejected a single universal gate (it would have to parse Rust types out of source text to
@@ -277,6 +277,74 @@ impl SettingsRow {
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
 - **Full suite:**
 - **Outstanding `human` phases:**
+
+## Close review
+
+Conductor-run, round 1 (2026-09-24), in a fresh session. No earlier round, so no findings resolved
+by a fix round.
+
+**Verdict:** Plan 0217 landed cleanly. No blockers and no majors. There are three minors and one nit,
+and the close fixed the two that prose could fix, in `80bf58cb`.
+
+### Evidence
+
+- **Full suite:** the lock wrapper printed `with-lock: skipped cargo nextest run --workspace: tree
+  6dd9cca is green in the suite ledger, run by gate 0217-pre-review at 2026-09-24T05:19:21.481Z:
+  1801 tests run: 1801 passed (5 slow), 7 skipped`. That ledger record is this review's full-suite
+  evidence (ADR-0207).
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -D warnings` and
+  `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` all passed.
+- `node scripts/check-settings-have-files.mjs` passes on the real tree: 95 studio sources and 5 plugin
+  sources, with 1 declaration, and it is claimed. Against `scripts/fixtures/settings-files` it exits 1
+  with 5 findings, 4 under `studio/` (including the reasonless marker) and 1 under `plugin-foobar/`.
+  Each finding prints its file:line.
+- `node scripts/check-gate-carriers.mjs` passed, with hook 17/17 and ci 17/17.
+  `npm --prefix studio test -- electron/settings.doc.test.ts` passed 3 of 3.
+  `check-backlog-claims.mjs` held 46/46 reductions.
+
+### Lenses
+
+- **Alignment.** Each phase did what its done-when asks.
+  - Phase 1: F3 and the menu row both route through `toggle_diagnostics`, which writes
+    `config.hud.diagnostics` and saves. `AppState::new` seeds the overlay from the key. The config
+    test asserts three things: off by default, an old `[hud]` section still parses, and `true`
+    round-trips.
+  - Phase 2: `config_path` is an exhaustive match, and `edit` derives read-only from it. The three
+    unit tests cover this. The path walk uses a serialisation with every Option key populated, which
+    is the plan's Risks item.
+  - Phase 3: the gate sits in manifest order in all three carriers. The allowlist is an inline
+    `settings-allow:` marker, and the log argues this from the plan's own pointer at `hygiene-allow:`.
+    A missing reason is seeded and bites.
+  - Phase 4: the vitest test diffs both directions and guards against an empty parse.
+  - Every phase is tagged, and no ADR was reversed.
+- **Layering and real-time safety.** The change is shell-only. `core/`, the C ABI and the control
+  protocol are untouched. The save on F3 runs on the event-loop thread, like every sibling toggle.
+- **Docs.** `docs/running.md` and `docs/configuration.md` were swept. The version is owed at
+  **minor**, because the plan adds a feature: a new config key and a new gate.
+- **Correctness.** There are no new numeric assertions.
+- **Design.** Read-only is a property of the declaration, so the declaration and `edit` cannot
+  disagree. The gate names its own holes.
+
+### Findings
+
+- **minor, fixed in `80bf58cb`:** `docs/running.ru.md:45` still said that every settings change
+  except diagnostics is written to `config.toml` ("(кроме диагностики)"), against Phase 1's "no
+  sentence anywhere". The close dropped the parenthetical and left the stamp alone, because the rest
+  of the row is stale for other reasons.
+- **minor, open:** the `### Close triggers` block above is unfilled. The ledger record stands in for
+  `Full suite`. The other answers are: shipped a feature; operator docs touched were running.md and
+  configuration.md; backlog probes 46/46 green; no `presets/` changes; no `human` phases.
+- **minor, open:** the Implementation log (about 85 lines) is longer than `## Implementation phases`
+  (about 58 lines).
+- **nit, fixed in `80bf58cb`:** `CLAUDE.md`'s `scripts/` block did not describe
+  `check-settings-have-files.mjs`.
+
+### Close notes
+
+- Presets were not touched, so there was no curation. The plan closes no backlog entry.
+- Translation advisory: `docs/how-it-works.ru.md`, `docs/running.ru.md` and
+  `packaging/foobar/READ-ME-FIRST.ru.md` have moved past their stamps. Only `running.ru.md` was moved
+  by this plan, and its one false sentence was removed. The rest of that row is still content work.
 
 ## Followups (after this lands)
 

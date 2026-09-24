@@ -50,7 +50,6 @@ place. The plan file carries the real link.
 | [0209](0209-a-system-joins-the-instruments-by-existing.md) | A system joins the instruments by existing | approved | dev, human | ADR-0234 (proposed): distinctness derives its roster from SystemKind; the catalogue declares an entry per system. Phases 4-5 edit .claude/, so NOT queued. Closes 0258, takes 0256's half. |
 | [0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) | The diffused frame's resolution is measured before it is designed | approved | dev, human | No ADR yet: the quality profile has never run on a track, so Phase 1 renders the pair and Phase 2 may close the plan. Takes backlog 0125. |
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
-| [0217](0217-every-setting-has-a-file-and-a-gate-says-so.md) | Every setting has a file, and a gate says so | approved | dev, studio-builder | ADR-0240: a file defines every setting and the menu edits it. Repairs the one violation - the F3 overlay persists nowhere - then a Rust test and a Node gate hold all three. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
 | [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
@@ -310,6 +309,8 @@ makes it the safe parallel rather than a second editor of the same files.
 - **[0218] is approved 2026-09-24 and deliberately not queued.** It is a fourth case of the
   arithmetic above, and the earliest: its `human` phase is **Phase 1**, so a lane would park before
   running anything. The readings are owed into its own log first, and [0214] has still to close.
+- **[0217] closed 2026-09-24**, last of the three and the end of lane a's serial run. All three
+  are now closed, and lane a is free.
 
 [0202]: 0202-the-three-mechanisms-get-their-gate.md
 [0206]: 0206-the-browser-shows-the-look.md
@@ -318,7 +319,7 @@ makes it the safe parallel rather than a second editor of the same files.
 [0212]: 0212-the-diffused-render-gains-a-timeline.md
 [0215]: done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md
 [0216]: done/0216-the-operator-owns-the-order.md
-[0217]: 0217-every-setting-has-a-file-and-a-gate-says-so.md
+[0217]: done/0217-every-setting-has-a-file-and-a-gate-says-so.md
 [0220]: 0220-the-dependencies-catch-up-and-npm-gets-its-gate.md
 [0218]: 0218-the-reference-machine-becomes-arch.md
 [0214]: 0214-the-linux-arm-reports-back.md
@@ -1042,6 +1043,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0217 - Every setting has a file, and a gate says so](done/0217-every-setting-has-a-file-and-a-gate-says-so.md) - closed 2026-09-24. Review: **no blockers, no majors, three minors, one nit (two fixed).** Version: **0.147.0**. ADR-0240 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0215 - The wide seams narrow, and a guard holds them](done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md) - closed 2026-09-23. Review: **no blockers, no majors, three minors, two nits (two fixed).** Version: **0.146.1**. ADR-0238 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0224 - The adapter becomes a setting](done/0224-the-adapter-becomes-a-setting.md) - closed 2026-09-23. Review: **no blockers, no majors, two minors, one nit (all three fixed).** Version: **0.146.0**. ADR-0246 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0207 - The commitments get their instruments](done/0207-the-commitments-get-their-instruments.md) - closed 2026-09-23. Review: **no blockers, no majors, six minors, two nits (five fixed).** Version: **0.145.0**. ADR-0231 + 0232 accepted, each with an Outcome. Closed 0257. [Write-up](README-archive.md).

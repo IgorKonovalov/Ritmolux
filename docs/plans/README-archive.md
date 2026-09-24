@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0217 - Every setting has a file, and a gate says so](#0217---every-setting-has-a-file-and-a-gate-says-so)
   - [0215 - The wide seams narrow, and a guard holds them](#0215---the-wide-seams-narrow-and-a-guard-holds-them)
   - [0224 - The adapter becomes a setting](#0224---the-adapter-becomes-a-setting)
   - [0207 - The commitments get their instruments](#0207---the-commitments-get-their-instruments)
@@ -254,6 +255,25 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0217 - Every setting has a file, and a gate says so](done/0217-every-setting-has-a-file-and-a-gate-says-so.md)
+
+- closed 2026-09-24, conductor-run lane `plan-0217-every-setting-has-a-file-and-a-gate-says-so`.
+Phase 1 `14ae5f69`, Phase 2 `776b946f`, Phase 3 `e3184783`, Phase 4 `1eb144fa`, and the close's two
+prose repairs `80bf58cb`. Round 1 found **no blockers, no majors, three minors and one nit**. The
+close fixed the two it is allowed to fix. Version **0.147.0** (minor: a new config key and a new
+gate). ADR-0240 was already accepted, and this close adds no `Outcome`. Closes no backlog entry. The
+full review is the plan's own `## Close review` section.
+- **What landed.** `[hud] diagnostics` persists the F3 overlay, and both F3 and the settings row write
+  it back. `SettingsRow::config_path` is an exhaustive match from a menu row to a `config.toml` key,
+  and unit tests hold each declared path to the serialised config and to `docs/configuration.md`.
+  `scripts/check-settings-have-files.mjs` joins the gate roster and refuses two things: browser
+  storage under `studio/`, and any `plugin-foobar/` `cfg_*` declaration the configuration page does
+  not name. `studio/electron/settings.doc.test.ts` diffs `StudioSettings` against `studio/README.md`'s
+  table in both directions.
+- **Left open.** Two minors belong to `dev`'s record and the close did not rewrite them: the
+  Implementation log's close-triggers block is blank, and the log is longer than the phases it reports
+  on. The review records the answers the blank block owed.
 
 ### [0215 - The wide seams narrow, and a guard holds them](done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md)
 
