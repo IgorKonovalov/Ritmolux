@@ -1,6 +1,7 @@
 # 0217 — Every setting has a file, and a gate says so
 
-> **Status:** done. Phases 14ae5f69, 776b946f, e3184783, 1eb144fa, and close repairs 80bf58cb. The conductor-run Mode 4 review (round 1) found no blockers and no majors. It raised three minors and one nit, and the two that prose could fix were fixed. Verified: the full suite green in the ledger, plus fmt, clippy, rustdoc and the new gate over its fixtures.
+> **Status:** done — closed 2026-09-24 under the conductor (ADR-0205). Phases 14ae5f69,
+> 776b946f, e3184783, 1eb144fa, and close repairs 80bf58cb. The conductor-run Mode 4 review (round 1) found no blockers and no majors. It raised three minors and one nit, and the two that prose could fix were fixed. Verified: the full suite green in the ledger, plus fmt, clippy, rustdoc and the new gate over its fixtures.
 > **Created:** 2026-09-20
 > **Owner skill(s):** dev, studio-builder
 > **Related ADRs:** [0240](../../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md)
