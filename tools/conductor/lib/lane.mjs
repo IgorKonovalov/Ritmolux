@@ -10,7 +10,8 @@
 //   -> conductor gate -> review session, no lock held, ending on a verdict
 //      (every gate red gets one repair session and one re-run before it parks `gate_red`, ADR-0248)
 //   -> blockers/majors: fix session, verify, gate, re-review (two fix rounds max)
-//   -> clean: take the close lock -> close session -> verify the close -> gate the close tip
+//   -> clean: take the close lock -> read origin/main's CI, a red one parking `upstream_red`
+//      (ADR-0251) -> close session -> verify the close -> gate the close tip
 //      -> fast-forward main (one automatic re-merge)
 //   -> release the lock
 //   -> remove the lane.
@@ -27,6 +28,8 @@
 import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
+
+import { describe as describeUpstream, readUpstream, redSubject } from "../../../scripts/check-upstream-ci.mjs";
 
 import { adoptedClose, verifyClose, verifyFix, verifyImplement, verifyMerge, verifyRepair } from "./close.mjs";
 import { removeLane, laneNames, openLane } from "./cleanup.mjs";
@@ -884,6 +887,31 @@ export function reusableVerdict(rec) {
   return v;
 }
 
+/** The park reason for a close refused over a red `origin/main` (ADR-0251). */
+export const UPSTREAM_RED = "upstream_red";
+
+/**
+ * Reads the `CI` workflow's newest conclusion for `origin/main` before a close merges onto it
+ * (ADR-0251). Returns a park for a red reading, naming the failing jobs, and null otherwise. A
+ * reading that could not be taken proceeds, with its notice printed as a live line and kept on the
+ * record, so a close that went ahead unread says so rather than looking like one that read green.
+ * `ctx.upstreamEnv` is the environment `gh` runs under, which is how the suite hands it a fake.
+ */
+function upstreamPark(ctx, rec) {
+  const r = readUpstream({ cwd: ctx.repo, env: ctx.upstreamEnv ?? process.env });
+  (rec.upstream ??= []).push({ state: r.state, run: r.run ?? null, jobs: r.jobs ?? null, case: r.case ?? null, at: now() });
+  save(ctx);
+  live(ctx, rec.plan, `  lane   ${describeUpstream(r).text.split("\n")[0]}`);
+  if (r.state !== "red") return null;
+  return {
+    reason: UPSTREAM_RED,
+    detail:
+      `origin/main is red before the close: CI run ${r.run} at ${String(r.sha).slice(0, 7)} concluded ${r.conclusion}, ` +
+      `failing ${redSubject(r)}. Repair main and push; resume once CI on main is green. Nothing was closed.`,
+    read: r.url ?? null,
+  };
+}
+
 function gateDetail(g) {
   const tests = g.failed.tests.length ? ` - failing: ${g.failed.tests.join(", ")}` : "";
   return `${g.failed.name} exited ${g.failed.code}${tests}`;
@@ -1088,6 +1116,12 @@ export async function runPlan(ctx, lane, plan) {
     let merges = 0;
     for (;;) {
       const lock = await take(CLOSE, { dir: ctx.lockDir, pollMs: ctx.lockPollMs, what: `close ${plan}`, onWaited: (ms) => recordWait(rec, CLOSE, ms) });
+      // Read under the lock, so a close that waited on another reads main as it is now.
+      const upstream = upstreamPark(ctx, rec);
+      if (upstream) {
+        lock.release();
+        return park(ctx, rec, upstream);
+      }
       const file = planFileIn(wt, plan);
       const before = head(wt);
       event(ctx, "close-start", { plan, round: verdict.round });

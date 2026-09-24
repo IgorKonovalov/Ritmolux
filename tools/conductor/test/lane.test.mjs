@@ -15,7 +15,7 @@ import { readLedger } from "../lib/ledger.mjs";
 import { findPlan, readPlanFile } from "../lib/plan.mjs";
 import { validateQueue } from "../lib/queue.mjs";
 import { askResume, loadState, planRecord, statePaths } from "../lib/state.mjs";
-import { FAKE, TEST_DIR, TOOL_DIR, tmp, writePlan } from "./helpers.mjs";
+import { FAKE, REPO, TEST_DIR, TOOL_DIR, tmp, writePlan } from "./helpers.mjs";
 
 const SCENARIO = join(TEST_DIR, "lane-scenario.mjs");
 
@@ -467,6 +467,67 @@ test("a gate still red on the close tip after its one repair parks, and main doe
   assert.deepEqual(kinds(rec), ["readiness:architect", "implement:dev", "review:architect", "close:architect", "repair:dev"]);
   assert.equal(resolveCommit("main", repo), mainBefore, "main did not move");
   assert.ok(existsSync(rec.worktree), "the parked plan keeps its worktree");
+});
+
+// ADR-0251: the close reads origin/main's CI through `gh` before it merges. The scratch repository
+// gains a GitHub `origin`, and `gh` is the fake the script's own self-test uses, answering from one of
+// its scenarios — so these read exactly what `node scripts/check-upstream-ci.mjs` would print.
+const UPSTREAM_FIXTURES = join(REPO, "scripts", "fixtures", "upstream-ci");
+
+function withUpstream(ctx, repo, scenario) {
+  sh(["remote", "add", "origin", "https://github.com/example/ritmolux.git"], repo);
+  ctx.upstreamEnv = { ...process.env, RLX_GH: join(UPSTREAM_FIXTURES, "fake-gh.mjs"), RLX_FAKE_GH: join(UPSTREAM_FIXTURES, `${scenario}.json`) };
+}
+
+test("a red origin/main parks the close before its session, naming the failing job, and main does not move", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  withUpstream(ctx, repo, "red");
+  const mainBefore = resolveCommit("main", repo);
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "upstream_red");
+  assert.match(rec.park.detail, /CI run 2001 at 2222222 concluded failure, failing check \(macos-latest\)\./);
+  assert.equal(rec.park.read, "https://github.com/example/ritmolux/actions/runs/2001");
+  assert.deepEqual(kinds(rec), ["readiness:architect", "implement:dev", "review:architect"], "no close session started");
+  assert.equal(resolveCommit("main", repo), mainBefore, "main did not move");
+  assert.equal(tagObjectType("v0.1.1", repo), null, "no tag was written");
+  assert.match(readFileSync(statePaths(ctx.stateDir).inbox, "utf8"), /plan 0101 parked: upstream_red/);
+});
+
+test("a green origin/main lets the close run, and the reading is recorded", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  withUpstream(ctx, repo, "green");
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(rec.upstream.map((u) => [u.state, u.run]), [["green", 1001]]);
+});
+
+test("an origin/main that cannot be read proceeds to the merge, and never parks upstream_red", async () => {
+  for (const [scenario, why] of [
+    ["offline", "no network"],
+    ["unauthenticated", "gh unauthenticated"],
+  ]) {
+    const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+    withUpstream(ctx, repo, scenario);
+    const lines = [];
+    ctx.live = (line) => lines.push(line);
+    await runLanes(ctx);
+    const rec = loadState(ctx.stateDir).plans["0101"];
+    assert.equal(rec.status, "merged", `${scenario}: ${JSON.stringify(rec.park)}`);
+    assert.ok(!rec.parks.some((p) => p.reason === "upstream_red"), scenario);
+    assert.deepEqual(rec.upstream.map((u) => [u.state, u.case]), [["unread", why]]);
+    assert.ok(lines.some((l) => l.includes(`upstream CI: skipped: not read (${why})`)), `${scenario}: the notice is printed`);
+  }
+  // `gh` absent, and no origin at all: the scratch repository as every other test here builds it.
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  ctx.upstreamEnv = { ...process.env, RLX_GH: join(UPSTREAM_FIXTURES, "no-such-gh") };
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(rec.upstream.map((u) => u.case), ["no origin remote"]);
+  assert.ok(resolveCommit("v0.1.1", repo));
 });
 
 test("main advancing on a conflicting change between close and merge runs one merge session, and merges", async () => {
@@ -1067,7 +1128,8 @@ test("a lane for a plan that does not name studio/ installs nothing, and the ski
     ],
     "the gate's own record carries the skip rather than only a step count",
   );
-  const skipped = out.filter((l) => l.includes("skipped:"));
+  // Gate lines only: the close's upstream read prints its own `skipped: not read` notice here.
+  const skipped = out.filter((l) => / gate {3}.* skipped: /.test(l));
   assert.equal(skipped.length, 6, out.join("\n"));
   assert.match(skipped[0], /^\d\d:\d\d 0101   gate   studio typecheck skipped: no studio\/node_modules; run: npm --prefix studio ci$/);
 });

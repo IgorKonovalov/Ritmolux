@@ -189,8 +189,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The macOS build compiles again | dev | done | 646ca642 |
-| 2 — A reader for origin's CI | dev | done | committed with this row |
-| 3 — The close consults it | dev | not started | |
+| 2 — A reader for origin's CI | dev | done | 1e7e4857 |
+| 3 — The close consults it | dev | done | committed with this row |
 | 4 — The foobar component joins the push | dev | not started | |
 | 5 — The documents say what a machine needs | dev | not started | |
 | 6 — The close ceremony gains the step | human | not started | |
@@ -204,6 +204,11 @@ flowchart LR
   `scripts/fixtures/upstream-ci/`, with a section in `scripts/fixtures/README.md`), and exports
   `readUpstream` for Phase 3. A cancelled or skipped `CI` run is passed over for the next older one.
   Run for real on 2026-09-24 it exited 1 naming run 35972983139 and `check (macos-latest)`.
+- Phase 3: the seam is `lane.mjs`, and the read runs under the close lock before each close session.
+  The fake `gh` is the fixture from Phase 2, reached through `ctx.upstreamEnv`. The existing test
+  *a lane for a plan that does not name studio/ installs nothing* counted every live line containing
+  `skipped:`, and the unread notice added one. Its filter is narrowed to gate lines; its count of 6
+  is unchanged. `node --test tools/conductor/test/` passes.
 
 ### Close triggers
 
