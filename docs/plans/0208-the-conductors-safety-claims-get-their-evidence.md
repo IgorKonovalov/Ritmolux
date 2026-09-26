@@ -211,7 +211,7 @@ flowchart TB
 | 2 — the deny cases move onto the transcript | dev | done | 95d86c89 |
 | 3 — the deletion bound reaches an expanded path | dev | done | 3afa3de4 |
 | 4 — the prose stops promising more than the rules enforce | dev | done | 25eea723 |
-| 5 — an undeclared `.claude/` edit is a drafting error | dev | committed with this row | |
+| 5 — an undeclared `.claude/` edit is a drafting error | dev | done | 2d9af125 |
 
 ### Notes
 
@@ -235,13 +235,17 @@ flowchart TB
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** design-backlog 0236, 0237, 0241
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature (repository tooling: a matcher probe under `tools/conductor/spike/`,
+  deny rules in `tools/conductor/settings.conductor.json` and their test, and a new Node gate
+  `scripts/check-claude-declarations.mjs` on the roster). Nothing in a shipped artifact.
+- **Operator docs touched:** `tools/conductor/README.md`, `tools/conductor/spike/README.md`,
+  `tools/conductor/prompts/implement.md`, `scripts/fixtures/README.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0. 47 reductions hold across
+  23 live entries, 4 unprobeable.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
 
