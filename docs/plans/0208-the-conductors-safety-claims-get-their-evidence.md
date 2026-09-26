@@ -1,6 +1,6 @@
 # 0208 — The conductor's safety claims get their evidence
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user) — approved and deliberately NOT in `tools/conductor/queue.json`
 > **Owner skill(s):** dev
@@ -203,11 +203,11 @@ flowchart TB
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0208-the-conductors-safety-claims-get-their-evidence`, worktree `/home/igor/Work/rlx-plan-0208` (an interactive session, not the conductor)
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the matcher gets a transcript | dev | not started | |
+| 1 — the matcher gets a transcript | dev | committed with this row | |
 | 2 — the deny cases move onto the transcript | dev | not started | |
 | 3 — the deletion bound reaches an expanded path | dev | not started | |
 | 4 — the prose stops promising more than the rules enforce | dev | not started | |
