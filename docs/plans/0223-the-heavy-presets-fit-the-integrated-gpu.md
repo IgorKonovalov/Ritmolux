@@ -312,6 +312,56 @@ grid_scale = "auto"   # or 0.25..1.0
   draw+submit 1.03 ms, pipe write 0.65 ms`, with the per-pass table printing thirteen rows
   underneath it. That is a different preset at a different size and is **not** the reading the
   done-when asks for.
+- **Owner, 2026-09-26: Phase 2 regresses `--stream` on a GPU-bound adapter, found at the start of
+  Phase 6. For dev; nothing is repaired in this commit.** On the reference laptop (Arch, Mesa 26.2.2
+  RADV RENOIR, RTX 3080 Laptop, NVIDIA 610.57.04), release builds of this lane at `2b80500a` and of
+  main at `944e9572`, with `--stream --sink stdout --size 1920x1080 --fps 240 --frames 240`:
+
+  | build | adapter | preset | wall for 240 published frames |
+  |---|---|---|---|
+  | main | AMD iGPU | Nebula | 7.71 s |
+  | main | AMD iGPU | Leviathan | 8.21 s |
+  | lane | AMD iGPU | Nebula | 155.47 s |
+  | lane | AMD iGPU | Leviathan | 153.76 s (54.49 s on an earlier run at `--tier floor --grid-scale 0.5`) |
+  | lane | RTX 3080 | Nebula | 1.82 s |
+  | lane | RTX 3080 | Leviathan | 1.98 s |
+
+  The lane's figure should be at most main's: the phase removed a wait, it added no work. What the
+  exit lines show instead is that the loop **drew** 667 frames to **publish** 240 on the iGPU (the
+  `mean over N frames` of `draw+submit` against the `240 frames` of the summary), at about 1.5
+  published frames per second, and 437 to publish 240 on the 3080. The scene clock is wall time, so
+  each published frame on the iGPU jumps roughly 0.6 s of scene time from the one before it, and a
+  `--stream` consumer at any `--fps` sees a slideshow.
+
+  The mechanism, read from `045025be` and not instrumented. `render_tapped` now submits a whole
+  frame every call whether or not the tap can record, and nothing on the stream path waits for the
+  GPU any more. `FrameTap::consume`'s `PollType::Poll` is the one poll, and it retires only what has
+  already finished. On an adapter whose frame costs more GPU time than the loop's CPU time (Leviathan
+  at 1080p: `attractor-trail-pass` alone is 14.2 ms of GPU time at scale 1.0, against 7 ms of
+  `draw+submit`), the queue grows without bound. The one frame in flight's map lands only after every
+  draw submitted ahead of it, and every call in between draws a frame that is never copied. Before
+  this phase, `capture::read_back`'s `poll(Wait)` was the stream path's only backpressure. The window
+  has the swapchain for that, and this is why `preview_readback.rs`'s identical one-in-flight shape
+  never showed it there. `step_offscreen`'s own comment in `capture_api.rs` records the same
+  observation for memory: a headless loop submits far faster than the GPU drains, and a
+  non-blocking poll finds almost nothing to retire.
+
+  What this does to the rest of the plan:
+  - **The bench's `draw+submit` figure no longer measures a published frame** on any GPU-bound
+    adapter, so Phase 6's headless half (`bench-presets.sh AMD`) cannot be taken as written. The
+    per-pass GPU table is unaffected, because it times only recorded frames and GPU timestamps do not
+    see the queue. Leviathan's tables at each tier and scale were taken on this build and go into
+    Phase 6's results file.
+  - **The live window path is not affected**, so Phase 6's live half stands.
+  - The resident set did not grow over those runs (`growth +0.0 MB`), so what was measured is the
+    frame rate, not a leak. How deep the queue gets before the driver blocks a submit was not
+    measured.
+
+  What the repair must hold, for dev to choose how: at most one frame of GPU work queued beyond the
+  one in flight, so that on a GPU-bound adapter the published rate is the GPU's rate, as on main,
+  while a CPU-bound adapter keeps the overlap the phase bought. Either a call that finds the tap
+  still armed does not draw, or it waits on the frame in flight rather than submitting another. A
+  test of it wants a GPU-bound case. The existing two-frame sequence test passes at any queue depth.
 - **Phase 3, the step moved as well as the rounding.** `POST_GRID_STEP` and `TRAIL_GRID_STEP` are
   both 128 now, and `grid::MIN_AXIS` (256) is the floor that used to be implied by one step. The
   done-when's four values follow from that pair and are asserted directly in
