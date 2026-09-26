@@ -1927,13 +1927,16 @@ per labelled render or compute pass, in mean GPU milliseconds per frame,
 costliest first:
 
 ```
-stream: pass costs, mean per frame over 1800 frames
+stream: pass costs, mean per frame over 1800 frames, grid scale 1.00 (post grid 1920x1024, trail grid 1920x1024)
   attractor-draw-pass    19.840 ms
   bloom-blur-h            4.220 ms
   trails-pass             4.125 ms
   kaleido-pass            2.980 ms
-  (7 more)                1.640 ms
+  tonemap-pass            0.576 ms
+  background-pass         0.293 ms
 ```
+
+Every labelled pass gets a row, however cheap: the table never folds a tail.
 
 The label is the pass's own, so a row names something you can find in the
 engine, and a pass encoded several times a frame — the bloom pyramid's blur runs

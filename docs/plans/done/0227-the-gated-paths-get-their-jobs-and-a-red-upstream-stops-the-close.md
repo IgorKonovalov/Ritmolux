@@ -1,6 +1,6 @@
 # 0227 — The gated paths get their jobs, and a red upstream stops the close
 
-> **Status:** done - Phases 6 and 7 owed, ADR-0249. Phases 1-5 `646ca642`, `1e7e4857`,
+> **Status:** done - Phase 7 owed, ADR-0249 (Phase 6 done 2026-09-26). Phases 1-5 `646ca642`, `1e7e4857`,
 > `1fc58a95`, `0c0ac09b`, `417022b7`; round 1 major fixed in `f1bbf1b1`. Round 2 review: no
 > blockers, no majors, two minors (both fixed at the close). ADR-0251 accepted. Version 0.148.0.
 > **Created:** 2026-09-24
@@ -212,7 +212,7 @@ flowchart LR
 | 3 — The close reports it and never blocks on it | dev | done | 1fc58a95 |
 | 4 — The foobar component joins the push | dev | done | 0c0ac09b |
 | 5 — The documents say what a machine needs | dev | done | 417022b7 |
-| 6 — The close ceremony gains the step | human | owed | |
+| 6 — The close ceremony gains the step | human | done | committed with this row |
 | 7 — The reading that only a push can produce | human | owed | |
 
 ### Notes
