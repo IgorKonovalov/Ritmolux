@@ -182,7 +182,7 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the sidecar accepts a timeline | dev | done | e245ef72 |
-| 2 — the bar grid reaches the sidecar | dev | done | committed with this row |
+| 2 — the bar grid reaches the sidecar | dev | done | 87242235 |
 | 3 — a full track, judged | human | not started | |
 
 ### Notes
