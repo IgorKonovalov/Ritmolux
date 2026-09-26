@@ -182,7 +182,7 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the sidecar accepts a timeline | dev | done | e245ef72 |
-| 2 — the bar grid reaches the sidecar | dev | parked (plan_wrong) | |
+| 2 — the bar grid reaches the sidecar | dev | done | committed with this row |
 | 3 — a full track, judged | human | not started | |
 
 ### Notes
@@ -191,27 +191,32 @@ flowchart LR
   stage resolves a frame to its bar through `DiffusionStage.bar_of`, which nothing sets yet, so
   `main` refuses a `--timeline` render with exit 2 until a bar grid reaches the filter. The
   CUDA-side encode (`pipe.encode_prompt`, then `prompt_embeds=`) has not run on a GPU.
-- Phase 2 parked before any code: its `Files touched` has no carrier for the bars. The sidecar
-  reads only the Y4M stream on stdin, and the channels that exist are:
-  (a) in-band Y4M `X` tags on the header and `FRAME` lines, which the sidecar already forwards
-  verbatim and ffmpeg ignores, but which change ADR-0114's wire and fail the exact-header, marker
-  count and byte-length assertions in `standalone/tests/suite/shot_cli.rs`
-  (`a_render_is_byte_identical_across_runs_and_has_the_frame_count_its_length_implies`);
-  (b) a new `shot` flag writing the grid to a file the sidecar reads, parsed in
-  `standalone/examples/shot.rs`;
-  (c) an environment variable read inside `render.rs`, which is outside ADR-0240's pattern for one.
-  The done-when's offline test also needs `standalone/src/shot/render/tests.rs`. Picking the channel
-  and widening the file list is the architect's call.
+- Phase 2 parked once before any code (`plan_wrong`: its file list had no carrier for the bars);
+  the plan was amended to the file carrier in aff46742 and the phase landed against that.
+- Phase 2: `shot` computes the grid in a separate analyzer walk before the first frame
+  (`render::bar_grid`), not by recording it inside the render loop. The walk is the same
+  `FrameClock` type `render_frames` now draws its frames from.
+- Phase 2: the stream's byte identity with and without `--bar-grid` is asserted in
+  `test_sd_filter.py`'s end-to-end group, which needs a built release `shot` and skips without
+  one. It ran and passed in this lane with one built. No Rust suite asserts it.
+- Phase 2: a bar starts on every frame where `AnalysisFrame::bar_index` changes, so a skip or a
+  step back in that counter counts as one boundary. `docs/capturing.md` states this.
+- Followup, not acted on: `docs/diffusion-filter.md`, the sidecar's one page (ADR-0122), and
+  `tools/sd-filter/README.md` do not mention `--timeline` or `--bar-grid`. Neither file is in
+  either phase's file list.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** design-backlog 0126
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature, in dev tooling only: `shot --render --bar-grid <path>` (an example,
+  not in the release zip), plus `--timeline` and `--bar-grid` in `tools/sd-filter/`, which never ships
+- **Operator docs touched:** `docs/capturing.md` (the `--bar-grid` flag row and the section
+  "The bar grid: `--bar-grid`")
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0; 49 stated reductions hold
+  across 23 live entries, 4 unprobeable
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
+- **Outstanding `human` phases:** Phase 3 (a full track, judged)
 
 ## Followups (after this lands)
 

@@ -36,10 +36,13 @@ Progress goes to stderr. stdout carries frames and nothing else.
 time (ADR-0236): a JSON array of `{"at_bar": N, "prompt": "..."}` entries, bars
 counted from 1, whose text conditioning is interpolated linearly between
 adjacent entries. The seed and the preset are untouched by it - only what the
-model is asked for moves.
+model is asked for moves. The bars come from `--bar-grid grid.json`, the file
+`shot --render --bar-grid grid.json` writes beside the same stream: the frame
+stream carries no bar, and a timeline without a grid is refused.
 """
 
 import argparse
+import bisect
 import json
 import math
 import shlex
@@ -240,6 +243,84 @@ def conditioning_at(timeline, embeds, bar):
         return embeds[i]
     a, b = embeds[i], embeds[j]
     return a + (b - a) * t
+
+
+# -------------------------------------------------------------- the bar grid
+
+# What `shot --render --bar-grid` writes: the first frame of every bar, bar 1
+# at frame 0, and per bar whether its first frame sat on an estimated downbeat
+# (true) or on the analyzer's fallback counter (false).
+BarGrid = namedtuple("BarGrid", "fps frames starts locked")
+
+
+def parse_bar_grid(doc):
+    """A decoded `--bar-grid` document -> BarGrid, or ConfigError naming why."""
+    if not isinstance(doc, dict) or \
+            set(doc) != {"fps", "frames", "bar_starts", "bar_locked"}:
+        raise ConfigError("a bar grid is the object `shot --render --bar-grid` "
+                          "writes, with keys fps, frames, bar_starts, bar_locked")
+    frames, starts, locked = doc["frames"], doc["bar_starts"], doc["bar_locked"]
+
+    def whole(v):
+        return isinstance(v, int) and not isinstance(v, bool)
+
+    if not whole(frames) or frames < 1:
+        raise ConfigError("the bar grid's frames is not a positive whole number")
+    if not isinstance(starts, list) or not starts or \
+            not all(whole(s) for s in starts):
+        raise ConfigError("the bar grid's bar_starts is not a list of frame indices")
+    if starts[0] != 0:
+        raise ConfigError("the bar grid's first bar starts at frame %r, not 0"
+                          % starts[0])
+    for n in range(1, len(starts)):
+        if starts[n] <= starts[n - 1]:
+            raise ConfigError("the bar grid's bar %d starts at frame %r, not after "
+                              "bar %d's %r" % (n + 1, starts[n], n, starts[n - 1]))
+    if starts[-1] >= frames:
+        raise ConfigError("the bar grid's last bar starts at frame %r, past its %d "
+                          "frames" % (starts[-1], frames))
+    if not isinstance(locked, list) or len(locked) != len(starts) or \
+            not all(isinstance(v, bool) for v in locked):
+        raise ConfigError("the bar grid's bar_locked is not one true/false per bar")
+    return BarGrid(doc["fps"], frames, tuple(starts), tuple(locked))
+
+
+def load_bar_grid(path):
+    """Read and validate a `--bar-grid` file."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            doc = json.load(f)
+    except OSError as e:
+        raise ConfigError("--bar-grid %s: %s" % (path, e))
+    except ValueError as e:
+        raise ConfigError("--bar-grid %s is not valid JSON: %s" % (path, e))
+    try:
+        return parse_bar_grid(doc)
+    except ConfigError as e:
+        raise ConfigError("--bar-grid %s: %s" % (path, e))
+
+
+def bar_position(grid, frame):
+    """The 1-based bar position of `frame`, fractional across its bar.
+
+    Bar k (1-based) runs from `starts[k-1]` up to the next bar's start, the
+    last one up to `frames`; a frame a fraction f of the way through bar k is
+    at `k + f`. A frame past the grid is placed on the grid's last frame.
+    """
+    frame = min(max(frame, 0), grid.frames - 1)
+    k = bisect.bisect_right(grid.starts, frame) - 1
+    start = grid.starts[k]
+    end = grid.starts[k + 1] if k + 1 < len(grid.starts) else grid.frames
+    return k + 1 + (frame - start) / float(end - start)
+
+
+def bar_grid_echo(grid):
+    """The grid in one stderr line: its size, and how much of it is estimated."""
+    estimated = sum(1 for v in grid.locked if v)
+    return ("bar grid of %d bars over %d frames at %s, %d of them on an estimated "
+            "downbeat and %d on the fallback counter"
+            % (len(grid.starts), grid.frames, grid.fps, estimated,
+               len(grid.starts) - estimated))
 
 
 # ------------------------------------------------------------------ the wire
@@ -841,12 +922,14 @@ FLAG_ORDER = [
     ("seed", "--seed"),
     ("prompt", "--prompt"),
     ("timeline", "--timeline"),
+    ("bar_grid", "--bar-grid"),
     ("negative", "--negative"),
 ]
 
 BASE = {
     "prompt": None,
     "timeline": None,
+    "bar_grid": None,
     "negative": DEFAULT_NEGATIVE,
     "model": "Lykon/dreamshaper-8",
     "controlnet": None,
@@ -880,6 +963,9 @@ def build_parser():
     p.add_argument("--timeline",
                    help="a JSON prompt timeline, [{\"at_bar\": N, \"prompt\": "
                         "\"...\"}, ...], in place of --prompt")
+    p.add_argument("--bar-grid", dest="bar_grid",
+                   help="the file `shot --render --bar-grid` wrote for this "
+                        "stream; places --timeline's bars on its frames")
     p.add_argument("--negative")
     p.add_argument("--model")
     p.add_argument("--controlnet", help="defaults to the net for --control")
@@ -988,15 +1074,24 @@ def main(argv):
         if not args.passthrough:
             cfg = resolve(args)
             timeline = load_timeline(cfg["timeline"]) if cfg["timeline"] else None
+            grid = load_bar_grid(cfg["bar_grid"]) if cfg["bar_grid"] else None
+            if timeline and grid:
+                check_timeline_fits(timeline, len(grid.starts))
             print("sd-filter: %s" % expansion(cfg), file=sys.stderr, flush=True)
             if timeline:
                 print("sd-filter: %s" % timeline_echo(timeline),
                       file=sys.stderr, flush=True)
+            if grid:
+                print("sd-filter: %s" % bar_grid_echo(grid),
+                      file=sys.stderr, flush=True)
             stage = DiffusionStage(cfg, timeline)
+            if grid:
+                stage.bar_of = lambda frame: bar_position(grid, frame)
             if timeline and stage.bar_of is None:
                 raise ConfigError(
                     "--timeline places its entries by bar, and no bar grid "
-                    "reached this filter to resolve a frame to its bar"
+                    "reached this filter to resolve a frame to its bar: pass "
+                    "--bar-grid with the file `shot --render --bar-grid` wrote"
                 )
         run(sys.stdin.buffer, sys.stdout.buffer, log=sys.stderr, stage=stage)
     except ConfigError as e:

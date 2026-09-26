@@ -143,6 +143,7 @@ Flags:
 | `--fps <n\|num/den>` | the render mode's frame rate (default 60). A decimal is rejected: write `30000/1001`, not `29.97` |
 | `--ffmpeg <path>` | spawn this encoder and wire the pipe, so one command produces a file. Needs `--out <file>`. No encoder ships and there is no fallback |
 | `--crf <0-51>` | the encoder's rate-quality setting (default 18, archival). Higher is smaller; `+6` is about half the size. Needs `--ffmpeg` — [the one argument you may move](#the-one-canonical-ffmpeg-invocation) |
+| `--bar-grid <path>` | also write the render's bar starts, in frames, as JSON — [the file a filter stage places a timeline on](#the-bar-grid---bar-grid). The frame stream is unchanged. Needs `--render` |
 | `--help`, `-h` | print the usage text and exit 0 |
 
 Bad arguments and unknown presets exit non-zero with a message.
@@ -530,6 +531,57 @@ the `ffmpeg` invocation above never learns a rate that has to agree with a flag 
 another process. There is no `-r` to keep in sync and no way to desynchronize the
 audio silently — which is why the encoder half of that pipe is unchanged,
 character for character, whether or not a stage is in it.
+
+#### The bar grid: `--bar-grid`
+
+The frame stream carries pictures and no music, so a stage that wants to change
+something **on a bar** — the diffusion filter's prompt timeline
+([ADR-0236](adrs/0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md))
+— cannot find one in it. `--bar-grid <path>` writes the render's bars to a file
+beside the stream, and the stage reads that file with a flag of its own:
+
+```bash
+cargo run -p standalone --release --example shot -- --preset "Leviathan" \
+  --render track.wav --bar-grid track.bars.json \
+  | python tools/sd-filter/sd_filter.py --profile quality \
+      --timeline track.timeline.json --bar-grid track.bars.json \
+  | ffmpeg ...
+```
+
+The file is written before the first frame, and **the stream is byte-identical
+with and without the flag**. It is one JSON object:
+
+```json
+{"fps":"60:1","frames":14400,"bar_starts":[0,131,247,...],"bar_locked":[false,false,...]}
+```
+
+`bar_starts` is the first frame of each bar, and `frames` is where the last one
+ends. It is taken from the same analyzer walk the frames are drawn from, so it is
+the bar the picture was on and not a second estimate of it.
+
+**Bar 1 starts at the first frame, frame 0** — not at the first downbeat the
+estimator locks. Every later bar starts on a frame where the analyzer's bar
+counter (`bar_index`, the variable a preset binds) differs from the frame before.
+A timeline entry `at_bar: 9` is therefore reached at `bar_starts[8]`. The
+counter can repeat or skip a bar where the estimator locks or moves its
+alignment; each change is one boundary here either way, so bar numbers in the
+file only ever go up.
+
+**Most of a grid is fallback, and the file says so.** The downbeat estimator
+locks on about 3 % of audible time (backlog 0042), and while it is not locked the
+bar counter is the analyzer's own count — onset detections during warm-up, then
+the tempo grid's beats — in fours from wherever it started. That grid is
+regular but not necessarily aligned to the music's downbeats. `bar_locked` is,
+per bar, whether its first frame sat on an estimated downbeat, and both `shot`
+and the filter print the split on stderr, in a line of this shape (the counts
+here are illustrative):
+
+```text
+render: bar grid of 112 bars over 14400 frames, 3 of them started on an estimated downbeat and 109 on the fallback counter [track.bars.json]
+```
+
+Read that line before judging where a timeline's changes landed: a transition
+on the wrong beat of a fallback grid is the grid, not the blend.
 
 ### The three calibration traps
 

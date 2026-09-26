@@ -54,7 +54,10 @@
 //!   --crf <0-51>             the encoder's rate-quality setting (default 18,
 //!                            archival). Higher is smaller; +6 is about half the
 //!                            size. Needs --ffmpeg
-//!   --help, -h               print the usage text and exit 0
+//!   --bar-grid <path>        also write the render's bar starts, in frames, as
+//!                            JSON for the diffusion filter's --timeline. The
+//!                            frame stream is unchanged. Needs --render
+//!   --help, -h              print the usage text and exit 0
 //!
 //! Which preset library is used, highest precedence first: `--preset-file`,
 //! `--presets`, the `RLX_PRESET_DIR` override, the per-user preset directory,
@@ -179,6 +182,9 @@ struct Args {
     /// [`render::DEFAULT_CRF`]. An `Option` rather than an eager default so
     /// "passed without an encoder to pass it to" is an exact question.
     crf: Option<u8>,
+    /// `--bar-grid <path>`: write the render's bar starts, in frames, to this
+    /// file — see [`render::BarGrid`].
+    bar_grid: Option<PathBuf>,
 }
 
 impl Default for Args {
@@ -211,6 +217,7 @@ impl Default for Args {
             fps: render::DEFAULT_FPS,
             ffmpeg: None,
             crf: None,
+            bar_grid: None,
         }
     }
 }
@@ -279,6 +286,9 @@ fn parse_args() -> Result<Args, String> {
             "--fps" => args.fps = parse_fps(&next_value(&mut it, "--fps")?)?,
             "--ffmpeg" => args.ffmpeg = Some(PathBuf::from(next_value(&mut it, "--ffmpeg")?)),
             "--crf" => args.crf = Some(render::parse_crf(&next_value(&mut it, "--crf")?)?),
+            "--bar-grid" => {
+                args.bar_grid = Some(PathBuf::from(next_value(&mut it, "--bar-grid")?));
+            }
             "--at" => args.at = Some(parse_hops(&next_value(&mut it, "--at")?)?),
             "--frame-at" => {
                 let value = next_value(&mut it, "--frame-at")?;
@@ -396,6 +406,9 @@ fn parse_args() -> Result<Args, String> {
         if args.crf.is_some() {
             return Err("--crf only applies to --render <clip.wav>".to_string());
         }
+        if args.bar_grid.is_some() {
+            return Err("--bar-grid only applies to --render <clip.wav>".to_string());
+        }
     }
     Ok(args)
 }
@@ -464,7 +477,10 @@ fn print_usage() {
          --crf <0-51>               encoder rate-quality (default 18, archival).\n\
                                     Higher is smaller; +6 about halves it.\n\
                                     Needs --ffmpeg\n\
-         --help, -h                 print this usage and exit"
+         --bar-grid <path>          also write the render's bar starts, in\n\
+                                    frames, as JSON (for sd-filter --timeline).\n\
+                                    The stream is unchanged. Needs --render\n\
+         --help, -h                print this usage and exit"
     );
 }
 
@@ -609,6 +625,7 @@ fn offline_render(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), 
             height: args.height,
             tier: args.tier,
             encoder,
+            bar_grid: args.bar_grid.clone(),
         },
         &pcm,
         format,

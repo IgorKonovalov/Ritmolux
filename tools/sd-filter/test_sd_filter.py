@@ -610,8 +610,89 @@ with tempfile.TemporaryDirectory() as td:
     finally:
         sys.stderr = real_err
     check("a timeline with no bar grid exits 2 before loading anything",
-          code == 2 and "bar grid" in err.getvalue(),
+          code == 2 and "bar grid" in err.getvalue()
+          and "--bar-grid" in err.getvalue(),
           "exit %r, stderr %r" % (code, err.getvalue()[-200:]))
+
+print()
+print("a bar grid file resolves a frame to its bar:")
+
+# The shape `shot --render --bar-grid` writes (asserted verbatim on the Rust
+# side in `the_bar_grid_file_is_one_json_object_in_a_fixed_order`). Bars of
+# uneven length on purpose: a grid is where the analyzer put the bars, not a
+# fixed count of frames each.
+GRID_DOC = {"fps": "60:1", "frames": 300, "bar_starts": [0, 100, 180, 260],
+            "bar_locked": [False, False, True, True]}
+
+with tempfile.TemporaryDirectory() as td:
+    gpath = os.path.join(td, "grid.json")
+    with open(gpath, "w", encoding="utf-8") as f:
+        f.write(json.dumps(GRID_DOC, separators=(",", ":")) + "\n")
+    grid = sd_filter.load_bar_grid(gpath)
+    check("the file loads to the bars it holds",
+          grid.starts == (0, 100, 180, 260) and grid.frames == 300, "%r" % (grid,))
+    for frame, want in [(0, 1.0), (50, 1.5), (99, 1.99), (100, 2.0), (140, 2.5),
+                        (180, 3.0), (260, 4.0), (280, 4.5), (299, 4.975),
+                        (900, 4.975)]:
+        got = sd_filter.bar_position(grid, frame)
+        check("frame %d is at bar %g" % (frame, want), abs(got - want) < 1e-9,
+              "got %r" % (got,))
+    check("the echo says how much of the grid is estimated",
+          "4 bars" in sd_filter.bar_grid_echo(grid)
+          and "2 of them on an estimated downbeat" in sd_filter.bar_grid_echo(grid)
+          and "2 on the fallback counter" in sd_filter.bar_grid_echo(grid),
+          sd_filter.bar_grid_echo(grid))
+
+    # Through the stage: a frame's conditioning follows the grid's bars, so a
+    # timeline entry at bar 3 is reached at frame 180 and not at a frame count
+    # anybody assumed.
+    tl = sd_filter.parse_timeline([{"at_bar": 1, "prompt": "a"},
+                                   {"at_bar": 3, "prompt": "b"}], bars=4)
+    gstage = sd_filter.DiffusionStage(cell(timeline="t.json"), tl)
+    gstage.embeds, gstage.negative_embeds = [0.0, 80.0], -1.0
+    gstage.bar_of = lambda frame: sd_filter.bar_position(grid, frame)
+    for frame, want in [(0, 0.0), (100, 40.0), (140, 60.0), (180, 80.0)]:
+        got = gstage._conditioning(frame)["prompt_embeds"]
+        check("through the grid, frame %d is conditioned on %.0f" % (frame, want),
+              abs(got - want) < 1e-9, "got %r" % (got,))
+
+    for bad, why in [
+        (dict(GRID_DOC, bar_starts=[5, 100]), "a first bar not at frame 0"),
+        (dict(GRID_DOC, bar_starts=[0, 180, 100, 260]), "bars out of order"),
+        (dict(GRID_DOC, bar_starts=[0, 300], bar_locked=[False, True]),
+         "a bar starting past the last frame"),
+        (dict(GRID_DOC, bar_locked=[True]), "one locked flag for four bars"),
+        (dict(GRID_DOC, frames=0), "no frames"),
+        ([0, 100], "a bare list"),
+    ]:
+        try:
+            sd_filter.parse_bar_grid(bad)
+            check("refused grid: %s" % why, False, "did not raise")
+        except sd_filter.ConfigError:
+            check("refused grid: %s" % why, True)
+
+    # Past the track, now that the track's length is known: the 4-bar grid
+    # refuses an entry at bar 5 before any model is built.
+    tpath = os.path.join(td, "timeline.json")
+    with open(tpath, "w", encoding="utf-8") as f:
+        json.dump([{"at_bar": 1, "prompt": "a"}, {"at_bar": 5, "prompt": "b"}], f)
+    err = io.StringIO()
+    real_err, sys.stderr = sys.stderr, err
+    try:
+        code = sd_filter.main(["sd_filter.py", "--timeline", tpath,
+                               "--bar-grid", gpath])
+    finally:
+        sys.stderr = real_err
+    check("an entry past the grid's last bar exits 2, naming it",
+          code == 2 and "timeline entry 2" in err.getvalue()
+          and "bar 4" in err.getvalue(),
+          "exit %r, stderr %r" % (code, err.getvalue()[-200:]))
+
+    tcfg = sd_filter.resolve(parser.parse_args(
+        ["--profile", "quality", "--timeline", tpath, "--bar-grid", gpath]))
+    techo = sd_filter.expansion(tcfg)
+    check("--bar-grid round-trips through its expansion",
+          sd_filter.resolve(parser.parse_args(shlex.split(techo))) == tcfg, techo)
 
 print()
 print("end to end, as a subprocess (Phase 3's done-when as written):")
@@ -644,6 +725,26 @@ else:
               "%d vs %d bytes" % (len(filtered.stdout), len(direct.stdout)))
         check("the stream was not empty", len(direct.stdout) > 1000,
               "%d bytes" % len(direct.stdout))
+
+        # --bar-grid writes a file beside the stream and nothing into it.
+        gpath = os.path.join(td, "grid.json")
+        gridded = subprocess.run(args + ["--bar-grid", gpath],
+                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        check("shot --bar-grid exits 0", gridded.returncode == 0)
+        check("the stream is byte-identical with and without --bar-grid",
+              gridded.stdout == direct.stdout,
+              "%d vs %d bytes" % (len(gridded.stdout), len(direct.stdout)))
+        try:
+            written = sd_filter.load_bar_grid(gpath)
+            header = direct.stdout.index(NL) + 1
+            frames = (len(direct.stdout) - header) // (len(b"FRAME" + NL) + 256 * 144 * 3)
+            check("the grid it writes loads, spanning the stream's %d frames"
+                  % frames, written.frames == frames and written.starts[0] == 0,
+                  "%r" % (written,))
+            check("  ... and resolves the first frame to bar 1",
+                  sd_filter.bar_position(written, 0) == 1.0)
+        except sd_filter.ConfigError as e:
+            check("the grid it writes loads", False, str(e))
 
     # Asking for a render without saying what to render is a configuration
     # error and exits 2, distinct from a malformed stream's 1 - and it must not
