@@ -6,14 +6,15 @@
 > the typical working range of each param (distilled from the shipped set, not an engine limit),
 > and which audio input it naturally rides. Where the two disagree, the code wins.
 
-> **Not every system has a section below.** `warp_mesh`, `shape_collage`, `analytic_field` and
-> `cellular` have none, and their absence here says nothing about them — all are shipped, curated
-> and gated exactly like the rest. Their params, defaults and ranges are in `presets/README.md`
+> **Four systems have a placeholder section below, not guidance.** `warp_mesh`, `shape_collage`,
+> `analytic_field` and `cellular` each have a section naming the system and its family, and nothing
+> more yet. That says nothing about them — all are shipped, curated and gated exactly like the rest. Their params, defaults and ranges are in `presets/README.md`
 > like every other system's, and `docs/preset-guide.md` has a picture of each. What is missing is
 > only this file's own layer: what the scene is for, the working range distilled from the shipped
 > set, and which audio input it rides. Until that is written, read those two pages and the shipped
 > presets that use one — `grep -l 'system = "cellular"' presets/*.toml` — which are the distilled
-> working ranges, undistilled. [Backlog 0258](../../../../docs/design-backlog.md) tracks the gap.
+> working ranges, undistilled. Plan 0209 Phase 5 writes the guidance
+> ([backlog 0258](../../../../docs/design-backlog-archive.md) was the ask).
 
 **Naming:** `system = "…"` is the underscore name; it differs from the scene's display name
 (`system = "lsystem"` → display "l-system").
@@ -366,6 +367,30 @@ rather than fading out — the retirement margin is what usually puts that off-f
 inside-frame `source_y` undoes; a fade-*out* to match `spawn_fade` does not exist yet.
 
 Full parameter roster and defaults: [`presets/README.md`](../../../../presets/README.md).
+
+## `warp_mesh` — the past frame, resampled through a per-vertex grid
+*Family `warp`* (preset files `warp_*.toml`). **No authoring guidance is written for this system
+yet.** Its params, defaults and ranges are the generated `` ### System: `warp_mesh` `` section of
+[`presets/README.md`](../../../../presets/README.md); the shipped `warp_*` presets are the working
+ranges until this section is filled.
+
+## `shape_collage` — flat opaque elements on their own paper
+*Family `collage`* (preset files `collage_*.toml`). **No authoring guidance is written for this system
+yet.** Its params, defaults and ranges are the generated `` ### System: `shape_collage` `` section of
+[`presets/README.md`](../../../../presets/README.md); the shipped `collage_*` presets are the working
+ranges until this section is filled.
+
+## `analytic_field` — one fullscreen pass, a closed-form function of position
+*Family `analytic`* (preset files `analytic_*.toml`). **No authoring guidance is written for this system
+yet.** Its params, defaults and ranges are the generated `` ### System: `analytic_field` `` section of
+[`presets/README.md`](../../../../presets/README.md); the shipped `analytic_*` presets are the working
+ranges until this section is filled.
+
+## `cellular` — a discrete cellular automaton on a ping-pong grid
+*Family `cellular`* (preset files `cellular_*.toml`). **No authoring guidance is written for this system
+yet.** Its params, defaults and ranges are the generated `` ### System: `cellular` `` section of
+[`presets/README.md`](../../../../presets/README.md); the shipped `cellular_*` presets are the working
+ranges until this section is filled.
 
 ---
 

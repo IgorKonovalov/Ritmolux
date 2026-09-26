@@ -189,8 +189,8 @@ flowchart LR
 |---|---|---|---|
 | 1 — the similarity roster derives from the enum | dev | done | 17961a15 |
 | 2 — the report is read, and the thresholds are judged | dev | done | 52c66c06 |
-| 3 — the stale prose carriers stop naming a list | dev | done | committed with this row |
-| 4 — the catalogue declares an entry per system | dev | not started | |
+| 3 — the stale prose carriers stop naming a list | dev | done | ba62c093 |
+| 4 — the catalogue declares an entry per system | dev | done | committed with this row |
 | 5 — the four sections get their guidance | human | not started | |
 
 ### Notes
@@ -222,6 +222,13 @@ flowchart LR
 - Phase 3: the doc comment above the roster that named the absent families left with the array in
   Phase 1 (17961a15), so this phase's edit to `core/tests/distinctness.rs` is the module header's
   dated cost note only, *"from six to all nine"* to *"from six families to nine"*.
+
+- Phase 4 ran in an owner-started session, not under the conductor, because the CLI refuses a
+  headless session an edit under `.claude/` (ADR-0210). Two things beyond the placeholder the phase
+  names: each heading carries a short description taken from the scene module's own `//!` opening,
+  as every other section's heading does, and the file's opening note, which said the four systems
+  had no section, now says they have placeholders and points at Phase 5 and the archived backlog
+  0258 instead of the live backlog.
 
 ### Close triggers
 
