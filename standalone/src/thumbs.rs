@@ -406,7 +406,7 @@ impl Pass {
     /// A pass whose walks render what `survey` returns, with `exe` standing in
     /// for the player — the render loop without the library or the cache
     /// behind it.
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     fn start_with(
         exe: PathBuf,
         survey: impl FnMut() -> (Vec<Job>, usize) + Send + 'static,
@@ -1058,6 +1058,7 @@ mod tests {
         path
     }
 
+    #[cfg(unix)]
     fn jobs(names: &[&str]) -> Vec<Job> {
         names
             .iter()
@@ -1068,12 +1069,14 @@ mod tests {
             .collect()
     }
 
+    #[cfg(unix)]
     /// A survey that finds `names` stale on every walk.
     fn names(names: &[&str]) -> impl FnMut() -> (Vec<Job>, usize) + Send + 'static {
         let jobs = jobs(names);
         move || (jobs.clone(), jobs.len())
     }
 
+    #[cfg(unix)]
     /// Let the worker run out on its own — no stop, only the end of rescans —
     /// and take what it said.
     fn finish(mut pass: Pass) -> Vec<PassEvent> {
@@ -1086,6 +1089,7 @@ mod tests {
         events
     }
 
+    #[cfg(unix)]
     fn notes(events: &[PassEvent]) -> Vec<&str> {
         events
             .iter()
@@ -1216,6 +1220,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    #[cfg(unix)]
     /// Drain `pass` into `events` until `walks` closing `done` lines have
     /// arrived in all.
     fn until_done(pass: &mut Pass, events: &mut Vec<PassEvent>, walks: usize) {
