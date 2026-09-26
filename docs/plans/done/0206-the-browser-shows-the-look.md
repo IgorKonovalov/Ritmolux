@@ -1,14 +1,16 @@
 # 0206 — The browser shows the look
 
-> **Status:** in-progress
+> **Status:** done - 2026-09-26. Phases 1-5 `7bd7fc9f`, `ab582b1b`, `9f710df5`, `4aeb28c8`,
+> `e93783d0`; conductor close review round 1 clean (no blockers, no majors, six minors, one nit;
+> four minors repaired at the close in `7418cd71`). Version 0.150.0. ADR-0230 accepted, Outcome.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev
-> **Related ADRs:** [0230](../adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md)
-> (proposed), [0011](../adrs/0011-image-crate-for-capture-tooling.md),
-> [0010](../adrs/0010-accept-gpu-driver-memory-floor.md),
-> [0014](../adrs/0014-preset-dir-override-for-dev-iteration.md),
-> [0228](../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)
+> **Related ADRs:** [0230](../../adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md)
+> (proposed), [0011](../../adrs/0011-image-crate-for-capture-tooling.md),
+> [0010](../../adrs/0010-accept-gpu-driver-memory-floor.md),
+> [0014](../../adrs/0014-preset-dir-override-for-dev-iteration.md),
+> [0228](../../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)
 
 ## TL;DR
 
@@ -20,21 +22,21 @@ behaviour is a preview pane that fills in as you walk the roster.
 
 ## Context & problem
 
-**[Plan 0205](done/0205-the-library-becomes-navigable.md) narrows the list; it does not make the list
+**[Plan 0205](0205-the-library-becomes-navigable.md) narrows the list; it does not make the list
 legible.** Family filters, favourites and marks all reduce 114 names to fewer names. Choosing still
 means recognising `analytic_echoplate` or opening it to find out, and that is the actual friction
 this plan exists to remove. 0205 recorded it as a followup for exactly this reason.
 
 **Three measurements decided the mechanism, and they are in
-[ADR-0230](../adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md).** On this
+[ADR-0230](../../adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md).** On this
 project's development box on 2026-09-19: the release exe is **10,971,648 B** against
-[NFR §4](../nfr.md#4-size-and-dependencies)'s **10,000,000 B** soft cap, so it is already 9.7 %
+[NFR §4](../../nfr.md#4-size-and-dependencies)'s **10,000,000 B** soft cap, so it is already 9.7 %
 over; a 160x90 still costs **42,994 B**, so the shipped set is ~4.9 MB of pictures; and one still
 costs **5.65 s** at 300 frames, so covering the library is ~10.7 minutes. Those three between them
 rule out embedding, rule out a shipped pack, and price the generation this plan performs.
 
 **A still is not a screenshot here.** Most of the families worth a picture accumulate, and
-[backlog 0254](../design-backlog.md) records that hop 300 is *before* an accumulating world
+[backlog 0254](../../design-backlog.md) records that hop 300 is *before* an accumulating world
 exists — so the frame count is part of what a thumbnail *is*, not an implementation detail.
 
 ## Decision
@@ -115,7 +117,7 @@ pictures there is a separate question with a separate protocol cost.
   length); the mode is not advertised in `--help`'s ordinary surface, because it exists for the
   parent process rather than for a person. A cache directory that cannot be created disables the
   feature and says so once in `diagnostics.log` — never a failure to start, per
-  [ADR-0228](../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)'s precedent
+  [ADR-0228](../../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)'s precedent
   that user state may be lost but may not prevent launch.
 
 ### Phase 2 — The renderer draws one image the shell hands it
@@ -168,7 +170,7 @@ pictures there is a separate question with a separate protocol cost.
 - **Done when:**
   - **The show's frame timing is unaffected while the pass runs**, measured as a frame-time
     comparison with the pass on and off in the same session on the same adapter. State the reading
-    with its machine, per [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md);
+    with its machine, per [ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md);
     this is a measurement, not a property, and it must not be asserted universally.
   - **At most one child runs at a time**, at low OS priority, and the pass stops when the library
     is covered. It resumes on the next launch for whatever is still missing.
@@ -187,7 +189,7 @@ pictures there is a separate question with a separate protocol cost.
 - **What:** Staleness, which is what makes this usable in the authoring loop.
 - **Files touched:** `standalone/src/thumbs.rs`, `standalone/src/overlay.rs`, `docs/running.md`.
 - **Done when:** editing a preset in a `RLX_PRESET_DIR` library — which already hot-reloads
-  ([ADR-0014](../adrs/0014-preset-dir-override-for-dev-iteration.md)) — invalidates its cached
+  ([ADR-0014](../../adrs/0014-preset-dir-override-for-dev-iteration.md)) — invalidates its cached
   image by the stamp and re-renders it, without a restart and without re-rendering anything else.
   While the new image is in flight the pane shows the old one rather than a placeholder, because a
   slightly stale picture is more useful than none. A preset whose file is edited *while* its child
@@ -445,6 +447,197 @@ question, not a claim this plan makes good.
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Phase 5 ran
   `cargo nextest run -p standalone -P fast`: exit 0, 489 passed, 0 skipped
 - **Outstanding `human` phases:** none
+
+## Close review
+
+Round 1 of the conductor's close review, reproduced in full. There were no earlier rounds, so no
+finding was resolved by a fix round. Minors 1, 3, 4 and 5 were repaired at the close in `7418cd71`
+(minors 3 and 5 by correcting the record and filing backlog 0260 and 0261). Minor 2 and nit 7 need
+code and stay open for `dev`. Minor 6 needs no repair. This log is longer than the phases it reports
+on, and most of the excess is the history of the park and the renumbering. The translation
+advisory lists `docs/running.ru.md` as stale against `docs/running.md`, which Phases 3-5 moved.
+It also lists `docs/how-it-works.ru.md` and `packaging/foobar/READ-ME-FIRST.ru.md`, which this plan
+did not move.
+
+### Plan 0206 — The browser shows the look — close review, round 1
+
+**Verdict: Plan 0206 landed as the amended plan describes it — no blockers, no majors, six minors
+and one nit.** The phases landed in order, all five are `dev`, and each done-when that can be tested
+is tested with an assertion that matches it. The findings are about what the plan did not ask for.
+Two players can run at once and share one cache. Staleness has no build component. Three records
+need correcting at the close: a doc paragraph Phase 5 made stale, the plan's line about the plugin
+build, and the AMD row of the frame-time reading.
+
+Graded at tip `b9cd010188df1796f048b2d868daf8a109a17962` on `plan-0206-the-browser-shows-the-look`
+(`main` already merged in by the conductor).
+
+#### Evidence run in this session
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed the ledger
+  record, which stands as lens 1's evidence (ADR-0207):
+  `with-lock: skipped cargo nextest run --workspace: tree 878fb51 is green in the suite ledger, run by gate 0206-pre-review at 2026-09-26T14:13:44.574Z: 1829 tests run: 1829 passed (3 slow), 7 skipped`.
+  The log's `Full suite:` bullet names this gate, so the bullet is correct.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: clean.
+- `cargo fmt --all -- --check`: clean. `cargo clippy --workspace --all-targets -- -D warnings`: clean.
+- `node scripts/check-comment-hygiene.mjs`: OK. `node scripts/check-doc-links.mjs`: OK.
+  `node scripts/check-settings-have-files.mjs`: OK.
+
+#### Lens 1 — alignment
+
+- **Phase 1** (`7bd7fc9f`). `--thumb` is in `cli::INTERNAL_FLAGS`, and
+  `an_internal_mode_is_claimed_and_never_advertised` shows it is accepted by the roster but absent
+  from `--help` and never offered by `nearest_flag`. `standalone/tests/suite/thumb_cli.rs` asserts
+  that the first run writes exactly one `.rlxthumb` of 160x90. It also asserts that the second run
+  leaves the same file list with an unchanged mtime and prints `up to date`. That is the done-when
+  word for word. The entry is keyed by name, with the name stored in the file and checked against a
+  hash collision, and it carries the stamp `(mtime_nanos, len)`. The `diagnostics.log` half of the
+  done-when landed in Phase 4: `walk()` notes `unavailable_note` once and returns, as the log says.
+- **Phase 2** (`ab582b1b`). `core/src/render/image_layer.rs` builds nothing until the first `set`,
+  and `a_renderer_that_sets_no_image_builds_none_of_the_layer` holds that even with a rectangle
+  queued. `only_a_queued_frame_draws_the_image` holds the baseline draw count with an image set and
+  not queued. `setting_an_image_is_the_only_upload` shows textures and uploads stay at (1,1) across
+  queue-only frames, the rectangle uniform is written once, and a new size is what reallocates.
+  `a_still_reads_back_as_it_was_set` reads the rectangle back within 1 level and checks the pixels
+  outside it byte for byte. The texture is `Rgba8UnormSrgb`, matching `HEADLESS_FORMAT`. The pragma
+  is present, and `render/` is in the directory-level hygiene scan. The log records the
+  `composite.rs` edit.
+- **Phase 3** (`9f710df5`). `overlay::pane` depends only on the surface size, and `layout` is not
+  changed. The `PaneSlot` tests cover one lookup per highlight change and a placeholder when there
+  is no picture. `docs/running.md` documents the pane, the placeholder and the case where it is
+  missing on the console.
+- **Phase 4** (`4aeb28c8`, reading `26312325`). The pass runs on its own thread, and the frame loop
+  only drains a channel. Three `#[cfg(unix)]` stub tests cover one child at a time, giving up after
+  three failures with each failure named once, and a stop that kills the child. The config key
+  `[thumbnails] enabled` and the settings row are both in place (ADR-0240). The owner took the
+  frame-time reading with the machine named, as ADR-0071 requires (see minor 5 for what it shows).
+- **Phase 5** (`e93783d0`). `bracketed` takes the stamp before and after the render, and
+  `an_edit_during_the_render_leaves_it_unsettled` holds the rule "newer stamp or no entry".
+  `a_walk_finds_only_the_presets_whose_stamp_moved` and
+  `a_rescan_renders_what_changed_and_does_not_retry_a_failure` hold "re-renders only that preset".
+  The pane keeps the old picture on screen because `cached_still` does not check the stamp and
+  `PaneSlot::landed` re-reads only for the preset it holds.
+- Every file touched outside a phase's list is named in the log. Each phase carries one in-vocabulary
+  `Owner skill:` tag.
+
+#### Lens 2 — layering, real-time
+
+The core gains no platform type. The image layer's device, queue and texture stay private, as the
+amended Decision requires. Neither the C ABI nor the control protocol changes, since
+`set_overlay_image` and `queue_image` are Rust `Renderer` methods only. Nothing touches the audio
+callback. Two things do file I/O on the render thread: `cached_still` (about 57.6 KB, only when the
+highlight changes) and `DiagLog::note`. The plan named the first in Phase 3's file list, and the
+second is an existing pattern. Neither is on the audio path.
+
+#### Lens 3 — docs and bookkeeping owed by the close
+
+- `docs/configuration.md` and `docs/running.md` are swept. There is no settings-row table elsewhere
+  to update. Two sentences in `configuration.md` are stale (minor 1).
+- **ADR-0230** is still `proposed`. The close accepts it, adding a dated `Outcome` if minor 4 is
+  recorded there.
+- **Version bump owed: minor.** The plan is a feature. The studio's two version copies must follow.
+- **Translation advisory:** `docs/running.md` moved, so `docs/running.ru.md` is expected to show as
+  stale in `check-translations.mjs`. List it in the close notes.
+- `presets/` is not touched, so there is no curation step. There is no `Closes:` header, so there is
+  no backlog archive step.
+
+#### Lens 4 — correctness and determinism
+
+- The thumbnail's analysis is driven by `synth_signal("dynamic:110")` at a fixed hop, so it is
+  deterministic.
+- `Entry::decode` is strict on length: a truncated file or trailing bytes read as no entry. Writes
+  go through a temp file and a rename.
+- The pane's rectangle is 320x180, the aspect of the 160x90 still, so nothing is stretched.
+- No numeric assertion is frozen to one machine. Phase 4's reading names its machine.
+
+#### Lens 5 — design integrity
+
+The image layer sits beside the text layer behind the same feature, on the reasoning of ADR-0009.
+The `Scene` trait does not grow. The shell reaches the renderer only through its API. No findings.
+
+#### Findings
+
+##### minor
+
+1. **`docs/configuration.md:485` and `:490` still describe the Phase 4 lifecycle.**
+   - *What they say:* the pass "stops when every preset has a current picture and starts again at
+     the next launch". A failed render "is not retried until the next launch".
+   - *What the code does:* after Phase 5, a covered pass parks and walks again when presets reload
+     (`thumbs::serve`). A failure is retried once its file's stamp moves. `docs/running.md` already
+     says this.
+   - *Fix (the close can repair this, it is Markdown prose):*
+     - Line 485: "It parks when every preset has a current picture, walks the library again when an
+       `RLX_PRESET_DIR` edit reloads it, and at the next launch picks up whatever is still missing."
+     - Line 490: "is not retried until its file changes or the app restarts".
+
+2. **Two players running at once share one cache and one temp name
+   (`standalone/src/thumbs.rs:298`, `:656`).**
+   - *Why two players run:* the studio's windowed player (`--preview stdout --events --control`,
+     `studio/electron/player/supervisor.ts:56`) goes through `AppState::new`, so it starts a pass of
+     its own. The standalone app open at the same time starts another. "At most one child at a time"
+     therefore holds per process, not per machine.
+   - *Failure scenario:*
+     1. Both passes walk in roster order, so with an empty cache they render the same preset at the
+        same moment.
+     2. Both children write `<entry>.rlxthumb-part`.
+     3. The first rename takes the file, so the second child's rename fails and it exits 1.
+     4. That pass logs `thumbnail failed: ...` and, three in a row, `gave up`. The log then blames
+        the machine for what was a collision.
+     5. On top of this, `discard_partials` at a pass's start deletes the other process's in-flight
+        temp file.
+   - *Also undocumented:* neither the plan nor `docs/` says that the studio's player now runs the
+     pass.
+   - *Fix:* make the temp name unique per process (a pid suffix) and have `discard_partials` remove
+     only stale partials. Alternatively, hold a lock file in `thumbnails/` so a second player's pass
+     stands down. Either way, say in `docs/configuration.md` that the studio's player runs the pass.
+     This needs code, so it stays open for `dev`.
+
+3. **Staleness has no build component (`standalone/src/thumbs.rs:95`).**
+   - *What happens:* `Stamp::EMBEDDED` is documented as "never stale, because nothing about it can
+     change without a new build". But a new build is exactly how a user receives a change, and the
+     cache outlives the build. The same applies to a seeded preset whose `.toml` did not change
+     while the engine's rendering of its family did.
+   - *Failure scenario:* after an upgrade, every such preset keeps its pre-upgrade picture forever.
+     Nothing prunes the cache and nothing re-stamps it.
+   - *Fix:* write the package version (or a render-affecting build id) into the header and treat a
+     mismatch as stale. That costs one re-render of the library per release. The plan defined the
+     stamp as mtime plus length, so the implementation follows the plan: route this as a backlog
+     entry and correct the doc comment's claim.
+
+4. **The plan says the plugin build does not enable `text`, but it does
+   (`docs/plans/0206-the-browser-shows-the-look.md:242`, and the Decision at :60-62).**
+   - *The evidence:* `core-cabi/Cargo.toml:46` depends on `rlx-core` with `features = ["text"]`, so
+     the plugin's cdylib compiles the image layer. It builds no GPU object there, because nothing in
+     the plugin calls `set_overlay_image`. `dev` recorded this in the Phase 2 notes.
+   - *Fix (the close can repair this):* the `## Close review` records it. ADR-0230 gets a dated
+     `Outcome` noting that the layer's exclusion is from the default build and the core suite, not
+     from the plugin. The plan's claim that it "keeps the layer out of the plugin build" should not
+     stand uncorrected.
+
+5. **On the iGPU, Phase 4's own reading does not show "unaffected"
+   (`docs/plans/0206-the-browser-shows-the-look.md:391`).**
+   - *The numbers:* on AMD RADV RENOIR the median holds (24.4 fps either way). The tail moves: the
+     worst p99 goes from 50.0 ms to 76.8 ms, and the lowest fps from 23.8 to 21.4.
+   - *Why it matters:* the children start without `--gpu`, and which adapter they drew on was not
+     read. On a hybrid laptop the pass and the show may be sharing, or competing for, one GPU.
+   - *Fix:* in the `## Close review`, state that the done-when holds on the RTX 3080 and holds at the
+     median but not in the tail on the AMD iGPU. Raise a backlog entry to pass the show's adapter
+     choice to the child, or to read which adapter the child used.
+
+6. **The Implementation log is longer than the plan's `## Implementation phases` section
+   (`docs/plans/0206-the-browser-shows-the-look.md:249`).**
+   - *The sizes:* about 190 lines of log against about 95 lines of phases. Mode 4 treats a report
+     that outweighs its contract as a minor. The parked-and-renumbered history is most of the
+     excess.
+   - *Fix:* none needed now. Note it in the close.
+
+##### nit
+
+7. **`standalone/src/overlay/tests.rs:778` pins `LIBRARY = 114`, but 116 presets ship now.**
+   - *Why it matters:* the pane-clearance claim still holds at 116. At 1920x1080 the fourth column
+     ends at 694 px, and the pane starts at 846 px. But at about 122 presets the last column reaches
+     the pane, and a pinned 114 will not notice the library growing.
+   - *Fix:* derive the count from `rlx_core::preset::default_presets().len()`. This is a test logic
+     change, so it is for `dev`.
 
 ## Followups (after this lands)
 

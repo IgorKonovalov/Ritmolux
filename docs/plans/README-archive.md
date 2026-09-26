@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0206 - The browser shows the look](#0206---the-browser-shows-the-look)
   - [0229 - The conductor reports itself honestly](#0229---the-conductor-reports-itself-honestly)
   - [0220 - The dependencies catch up, and npm gets its gate](#0220---the-dependencies-catch-up-and-npm-gets-its-gate)
   - [0228 - The resume guard accepts an owed phase](#0228---the-resume-guard-accepts-an-owed-phase)
@@ -261,6 +262,26 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0206 - The browser shows the look](done/0206-the-browser-shows-the-look.md)
+
+- closed 2026-09-26, conductor-run lane `plan-0206-the-browser-shows-the-look`. Phase 1 `7bd7fc9f`,
+Phase 2 `ab582b1b`, Phase 3 `9f710df5`, Phase 4 `4aeb28c8` (the owner's frame-time reading
+`26312325`), Phase 5 `e93783d0`. The plan parked at its old Phase 2 on 2026-09-24 and was amended
+with a core image layer, renumbering the phases. Round 1 review: **no blockers, no majors, six
+minors, one nit**; minors 1, 3, 4 and 5 were repaired at the close in `7418cd71`. Version
+**0.150.0** (minor: a feature). ADR-0230 accepted with an Outcome. Closes no backlog entry; filed
+backlog 0260 and 0261. The full review is the plan's own `## Close review` section.
+- **What landed.** A hidden `--thumb <name>` mode renders one 160x90 still into `thumbnails/` beside
+  `config.toml`, keyed by name and stamped by the file's mtime and length. `core` gains an image
+  layer behind the `text` feature that builds nothing until the first image is set. The browser
+  shows the highlighted preset's still in a bottom-right pane, or a placeholder. A background pass
+  renders what is missing or stale, one low-priority child at a time, gives up after three failures,
+  is switched off by `[thumbnails] enabled`, and walks again when an `RLX_PRESET_DIR` edit reloads
+  the library.
+- **Open.** Two players at once share one cache and one temp name (review minor 2). The stamp has
+  no build identity (backlog 0260). On the AMD iGPU the pass moved the frame-time tail, not the
+  median (backlog 0261). `standalone/src/overlay/tests.rs` pins a 114-preset library (nit 7).
 
 ### [0229 - The conductor reports itself honestly](done/0229-the-conductor-reports-itself-honestly.md)
 
@@ -10291,7 +10312,7 @@ plans' links are written for this file's depth:
 
 **Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster above.**
 It carries the three structural findings of that day's architecture sweep, and its position is
-deliberate rather than incidental: [0206](0206-the-browser-shows-the-look.md) adds a consumer to the
+deliberate rather than incidental: [0206](done/0206-the-browser-shows-the-look.md) adds a consumer to the
 preview surface its Phase 5 extracts, [0209](0209-a-system-joins-the-instruments-by-existing.md)
 derives a roster from the `SystemKind` its Phase 4 gates, and [0203] touches scene params. Run
 earlier it would refactor code three approved plans are about to rewrite. **The [0203] third of that
@@ -10303,7 +10324,7 @@ sixteen-plan queue without going stale.
 
 [0215]: done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md
 [0203]: done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md
-[0206]: 0206-the-browser-shows-the-look.md
+[0206]: done/0206-the-browser-shows-the-look.md
 
 ### Moved 2026-09-23 from `README.md` — the 0224-before-0223 note, spent
 

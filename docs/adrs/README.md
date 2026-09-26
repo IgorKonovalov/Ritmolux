@@ -251,7 +251,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0227](0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md) | A borrowed look is authored natively, and the reference never enters the repository | proposed |
 | [0228](0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md) | A preset mark is user state, keyed by name, in its own file | accepted 2026-09-20, Plan 0205 |
 | [0229](0229-the-studio-marks-a-preset-over-the-control-protocol.md) | The studio marks a preset over the control protocol, never by opening the file | accepted 2026-09-20, Plan 0205 |
-| [0230](0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md) | Thumbnails are rendered by a subprocess of the player itself | proposed |
+| [0230](0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md) | Thumbnails are rendered by a subprocess of the player itself | accepted 2026-09-26, Plan 0206, Outcome |
 | [0231](0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md) | The standalone's size cap is re-derived from what it carries, and the build reports it | accepted 2026-09-23, Plan 0207, amends NFR §4, Outcome |
 | [0232](0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md) | A preset's frame cost is measured and reported, never asserted | accepted 2026-09-23, Plan 0207, Outcome |
 | [0233](0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md) | A session-allowlist safety claim is asserted against a transcript, not a model | proposed |

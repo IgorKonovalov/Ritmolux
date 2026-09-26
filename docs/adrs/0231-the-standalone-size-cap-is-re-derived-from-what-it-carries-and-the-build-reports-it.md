@@ -19,7 +19,7 @@ never been measured against what the exe actually contains."*
 
 On 2026-09-19, on this project's development box (Windows 10, `cargo build --release`, default
 features), it was measured: **10,971,648 B**, or **9.7 % over**. The measurement was incidental —
-taken to price embedding thumbnails for [Plan 0206](../plans/0206-the-browser-shows-the-look.md) —
+taken to price embedding thumbnails for [Plan 0206](../plans/done/0206-the-browser-shows-the-look.md) —
 and is recorded as [backlog 0257](../design-backlog.md).
 
 **The asymmetry is what makes this a decision rather than a correction.** The foobar component has

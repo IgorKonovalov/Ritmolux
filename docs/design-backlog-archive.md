@@ -15720,7 +15720,7 @@ has never been measured against what the exe actually contains."*
 It has now. On 2026-09-19, on this project's development box (Windows 10, `cargo build --release`,
 default features), `target/release/ritmolux.exe` measured **10,971,648 B** — **971,648 B over,
 9.7 %**. The measurement was incidental: it was taken to price embedding thumbnails for
-[Plan 0206](plans/0206-the-browser-shows-the-look.md), and the cap turned out to be already
+[Plan 0206](plans/done/0206-the-browser-shows-the-look.md), and the cap turned out to be already
 breached before that plan proposed adding anything at all.
 
 **The asymmetry is the finding, not the number.** The foobar component has a carrier for exactly
@@ -15741,7 +15741,7 @@ names first.
    constraint. The component's recipe is the precedent and it is cheap — a printed length and a
    warning threshold, fatal to nothing.
 
-**What makes this live rather than tidy.** [Plan 0206](plans/0206-the-browser-shows-the-look.md)
+**What makes this live rather than tidy.** [Plan 0206](plans/done/0206-the-browser-shows-the-look.md)
 rejected embedding thumbnails partly on this measurement, and
 [ADR-0230](adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md) records the
 arithmetic. If the cap is re-derived upward, that rejection deserves re-reading — it would not

@@ -1,8 +1,8 @@
 # ADR-0230 — Thumbnails are rendered by a subprocess of the player itself
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-26 (Plan 0206), with an Outcome
 > **Date:** 2026-09-19
-> **Related plan(s):** [0206](../plans/0206-the-browser-shows-the-look.md)
+> **Related plan(s):** [0206](../plans/done/0206-the-browser-shows-the-look.md)
 > **Relates to:** [ADR-0011](0011-image-crate-for-capture-tooling.md) (`image` is a dev-dependency
 > only), [ADR-0010](0010-accept-gpu-driver-memory-floor.md) (the driver memory floor),
 > [ADR-0014](0014-preset-dir-override-for-dev-iteration.md) (`RLX_PRESET_DIR`),
@@ -136,3 +136,22 @@ Make the example a `[[bin]]` and ship it. **Rejected because it buys nothing ove
 executable that is already installed.** It would add a second artifact to five packaging recipes
 and to the READ-ME-FIRST files a tester reads, and make the release surface bigger in exchange for
 a spawn target the app already has in `current_exe()`.
+
+## Outcome (2026-09-26, Plan 0206's close)
+
+The decision was built as written, and four things it did not foresee are recorded here.
+
+- **The pixels needed a layer in `core`.** The shell had no way to draw an image, so Plan 0206 was
+  amended to add one beside the text layer, behind the `text` feature. That feature keeps the layer
+  out of the default build and the core suite, **not out of the foobar component**: `core-cabi`
+  enables `text` for the now-playing banner, so the component compiles the layer and builds no GPU
+  object of it, because nothing there calls it. This ADR's Neutral bullet still holds: the
+  component does not participate.
+- **The cache entry is a raw RGBA8 file, not a PNG**, for the reason Alternative B gives: the
+  shipped binary has no codec.
+- **The stamp has no build identity.** An embedded preset, or a seeded one whose file did not
+  change, keeps its picture across an upgrade that changes how it renders. Backlog 0260.
+- **"The show never waits" held on the reference laptop's RTX 3080 and held only at the median on
+  its AMD iGPU**, where the pass moved the worst p99 from 50.0 ms to 76.8 ms. The child takes the
+  default adapter, whichever the show uses. Backlog 0261. The studio's windowed player also starts a
+  pass, so two players at once share one cache, which the one-child-at-a-time rule does not cover.
