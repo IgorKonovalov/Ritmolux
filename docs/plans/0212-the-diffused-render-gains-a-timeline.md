@@ -88,10 +88,12 @@ flowchart LR
 - **What:** The sidecar takes a prompt timeline instead of only a single prompt, and interpolates the
   conditioning between adjacent entries; the seed stays fixed for the whole render.
 - **Files touched:** `tools/sd-filter/sd_filter.py`, `tools/sd-filter/test_sd_filter.py`.
-- **Done when:** a timeline of two entries produces a render whose conditioning at the first entry's bar
-  is the first prompt, at the second's is the second, and between them is a blend — demonstrated on a
-  short clip whose first and last frames differ in the way the two prompts describe while the geometry
-  tracks the same source. A single prompt with no timeline still works unchanged, so every existing
+- **Done when:** a timeline of two entries produces conditioning that is the first prompt's at the
+  first entry's bar, the second's at the second, and a blend between them, asserted on the
+  interpolation itself rather than on rendered frames. The rendered demonstration — a short clip whose
+  first and last frames differ in the way the two prompts describe while the geometry tracks the same
+  source — needs the CUDA `.venv` interpreter and `ffmpeg`, which a conductor session cannot run, so it
+  is taken at the start of Phase 3. A single prompt with no timeline still works unchanged, so every existing
   invocation and every figure in `docs/diffusion-filter.md` stays valid. A malformed timeline — a bar out
   of order, a bar past the track, an empty prompt — is refused with the offending entry named, rather than
   rendering for hours and producing something wrong. `python3 tools/sd-filter/test_sd_filter.py` covers
@@ -116,9 +118,12 @@ flowchart LR
 
 ### Phase 3 — a full track, judged
 - **Owner skill:** human
-- **What:** Render a full track with a timeline and say whether the variation reads as variety.
+- **What:** First, the short two-prompt clip Phase 1's done-when defers here: its first and last
+  frames differ in the way the two prompts describe while the geometry tracks the same source. Then
+  render a full track with a timeline and say whether the variation reads as variety.
 - **Files touched:** the plan's `## Implementation log`.
-- **Done when:** a recorded verdict against the 2026-08-25 render this ask came from: **the variation
+- **Done when:** the short clip is recorded as showing, or not showing, the two prompts' difference
+  over one geometry; and a recorded verdict against the 2026-08-25 render this ask came from: **the variation
   reads** — the plan closes; **it reads as a crossfade between two wrong images** — ADR-0236's named
   failure mode, recorded as an `Outcome` on the ADR, and the remaining levers are the two it declined;
   **it is too subtle to notice** — which says prompt motion is not enough authority over the picture, and

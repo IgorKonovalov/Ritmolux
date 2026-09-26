@@ -114,8 +114,9 @@ flowchart LR
 - **Files touched:** `docs/testing.md`, `core/tests/distinctness.rs` (the doc comment above the roster).
 - **Done when:** `docs/testing.md` no longer says *"nine of the twelve"* and no longer lists the absent
   families, describing instead what the report now covers and how it stays covered;
-  `node scripts/check-system-counts.mjs` exits 0, and `docs/testing.md` is in
-  `check-reader-prose.mjs`'s list so its Plan and ADR citations stay inside markdown links
+  and `node scripts/check-system-counts.mjs` exits 0. `docs/testing.md` stays out of
+  `check-reader-prose.mjs`'s list: it is a Contribute document, which keeps its bare Plan and ADR
+  citations by design
   ([ADR-0168](../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)).
 
 ### Phase 4 — the catalogue declares an entry per system

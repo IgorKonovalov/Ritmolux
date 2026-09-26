@@ -7,9 +7,9 @@
 > **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
 > (its third `Outcome` is this plan's brief),
 > [0199](../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)
-> (whose inference Phase 4 tests), [0019](../adrs/0019-eased-parameters.md) (the injected `dt` a
+> (whose inference Phase 5 tests), [0019](../adrs/0019-eased-parameters.md) (the injected `dt` a
 > per-second rate is converted against)
-> **Takes:** design-backlog 0108 (its re-census instruction, Phase 6) and 0109 (the evidence its
+> **Takes:** design-backlog 0108 (its re-census instruction, Phase 7) and 0109 (the evidence its
 > go/no-go waits on). **Neither entry is closed by this plan** — both stay live, each with a dated
 > bullet naming what this plan recorded.
 
@@ -102,20 +102,32 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
   changing the frame in the direction the source's own arithmetic says; and no preset without an
   echo binding changes at all, shown by the golden set staying green.
 
-### Phase 4 — The waveform scale is measured per mode
+### Phase 4 — The eight modes are captured on the rig
+- **Owner skill:** human
+- **What:** On the rig ADR-0199 names — `foo_vis_milk2` 0.2.0.0 (DX11) under foobar2000 — capture each
+  of the eight wave modes at unit `fWaveScale` from a stimulus whose sample value at the draw call is
+  known (a full-scale sine, as Plan 0127's mode-6 capture used), so the per-mode host factor Phase 5
+  fits has a measurement behind every mode. Modes 6 and 0 already have captures; re-take them in the
+  same session so all eight share one host version and one stimulus.
+- **Files touched:** the implementation log (one row per mode: host, version, mode, stimulus, date,
+  and the peak-to-peak reading), and the capture files wherever the owner keeps the corpus.
+- **Done when:** all eight modes have a recorded capture in the log with the five fields above, in
+  one session on one host version.
+
+### Phase 5 — The waveform scale is measured per mode
 - **Owner skill:** dev
 - **What:** ADR-0199 inferred that modes 0-5 share mode 6's `0.158` gap; the mode-0 capture reads
   `0.068`, a ratio of `0.43`. Measure the factor for each of the eight modes against the source's own
   construction and carry a per-mode value rather than one fitted constant.
 - **Files touched:** `core/src/render/scenes/warp_mesh/draw.rs`,
   `core/src/render/scenes/warp_mesh/tests.rs`, `docs/milkdrop-conversion.md`
-- **Done when:** each mode's factor is measured and recorded in the log with the capture it came
-  from; the draw carries the per-mode values; a test asserts each mode's drawn extent against its
+- **Done when:** each mode's factor is measured against its Phase 4 capture and recorded in the
+  log with that capture named; the draw carries the per-mode values; a test asserts each mode's drawn extent against its
   measured factor as a ratio of like quantities (ADR-0074), not as a pixel figure; and the plan's log
   states plainly that ADR-0199's inference was falsified on mode 0, which is what the close records
   as that ADR's `Outcome`.
 
-### Phase 5 — The fourth look gate
+### Phase 6 — The fourth look gate
 - **Owner skill:** human
 - **What:** the same seven pairs, the same rig — `foo_vis_milk2` 0.2.0.0 (DX11), both renderers fed
   one track through foobar2000, judged live — re-converted at this plan's tip, with the per-pair
@@ -126,7 +138,7 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
   wrong-on-structure as the previous three gates did; and the log says which of the three mechanisms
   each remaining bad pair is now attributed to, or that it is unattributed.
 
-### Phase 6 — The corpus census is present-day
+### Phase 7 — The corpus census is present-day
 - **Owner skill:** human
 - **What:** re-run `milkconv --report` and `milkconv --render` over `WORK/milkdrop-corpus` at this
   plan's tip, and record the conversion rate, the non-blank rate and the rejection ranking. Backlog
@@ -141,13 +153,14 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 ## Risks & open questions
 
 - **Phase 1 may falsify its own candidate**, and then two washed pairs have no named mechanism and
-  Phase 5's verdict will say so. That is the plan working, and it is why Phase 2 carries a
+  Phase 6's verdict will say so. That is the plan working, and it is why Phase 2 carries a
   do-not-run condition rather than an assumption.
 - **Phase 3 is the least-scoped phase here.** The reference's echo is a composite stage this engine
   approximates; if reading `d4c843a` shows it is a larger divergence than a binding that does not
   reach the composite, the phase should stop and report rather than grow.
-- **Phases 5 and 6 are `human` and both need the rig and the corpus**, which live outside this
-  checkout. Under the conductor the plan parks in front of Phase 5; that is expected and correct.
+- **Phases 4, 6 and 7 are `human` and all need the rig or the corpus**, which live outside this
+  checkout. Under the conductor the plan parks in front of Phase 4, after Phases 1-3, and again
+  in front of Phase 6; that is expected and correct.
 - **A fourth "not better" is a real possibility.** The plan's value does not depend on the verdict
   going the other way: three mechanisms settled and a present-day census are worth having whichever
   way the gate reads, and a fourth no-go with all three attributed is a much stronger statement than
@@ -157,7 +170,7 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 
 - It does not buy reach. Backlog 0109 wants an ADR and an interview and its trigger is the verdict
   this plan produces; writing that ADR now would be deciding against yesterday's evidence.
-- It does not lower HLSL arrays or hunt the blank-render list (backlog 0108's own work). Phase 6
+- It does not lower HLSL arrays or hunt the blank-render list (backlog 0108's own work). Phase 7
   re-measures both so whoever takes them is working from today's numbers.
 - It does not touch the disk-texture exclusion in `milkconv/src/shader/emit.rs`, which stays a named
   rejection class.
@@ -171,9 +184,10 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 | 1 — Settle the rate candidate | dev | not started | |
 | 2 — Repair what Phase 1 convicted | dev | not started | |
 | 3 — The echo nests | dev | not started | |
-| 4 — The waveform scale is measured per mode | dev | not started | |
-| 5 — The fourth look gate | human | not started | |
-| 6 — The corpus census is present-day | human | not started | |
+| 4 — The eight modes are captured on the rig | human | not started | |
+| 5 — The waveform scale is measured per mode | dev | not started | |
+| 6 — The fourth look gate | human | not started | |
+| 7 — The corpus census is present-day | human | not started | |
 
 ### Notes
 
@@ -189,5 +203,5 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 
 ## Followups (after this lands)
 
-- The reach decision (backlog 0109) — an interview and an ADR, triggered by Phase 5's verdict.
-- ADR-0199 gains an `Outcome` at this plan's close recording Phase 4's per-mode measurement.
+- The reach decision (backlog 0109) — an interview and an ADR, triggered by Phase 6's verdict.
+- ADR-0199 gains an `Outcome` at this plan's close recording Phase 5's per-mode measurement.
