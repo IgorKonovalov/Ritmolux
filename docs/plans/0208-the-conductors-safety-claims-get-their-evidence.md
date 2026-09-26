@@ -232,6 +232,12 @@ flowchart TB
   section or `settings.json` behind a definite determiner (*the*, *its*, *each*, ...). It is also
   convicted by a `.claude/hooks/` file name or by `PreToolUse`. Quoted text and a bare `.claude/`
   are not read. Without those two exclusions, this plan's own Phase 5 would have been convicted.
+- Review round 1, finding 0 (major): a recorded refusal now also asserts `decide()` refuses it, so a
+  deleted deny rule turns red; the stale comments of finding 3 went with it. c006772b. Checked by
+  deleting `Bash(rm *..*)`: two cases red, then `git restore`.
+- Review round 1, finding 1 (major): `Bash(rm * /*)` and `PowerShell(Remove-Item * /*)` with refused
+  cases, modelled and not probed; the README sentence of finding 2 was rewritten in the same commit.
+  6c53d90a.
 
 ### Close triggers
 
