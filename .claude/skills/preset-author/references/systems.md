@@ -6,16 +6,6 @@
 > the typical working range of each param (distilled from the shipped set, not an engine limit),
 > and which audio input it naturally rides. Where the two disagree, the code wins.
 
-> **Four systems have a placeholder section below, not guidance.** `warp_mesh`, `shape_collage`,
-> `analytic_field` and `cellular` each have a section naming the system and its family, and nothing
-> more yet. That says nothing about them — all are shipped, curated and gated exactly like the rest. Their params, defaults and ranges are in `presets/README.md`
-> like every other system's, and `docs/preset-guide.md` has a picture of each. What is missing is
-> only this file's own layer: what the scene is for, the working range distilled from the shipped
-> set, and which audio input it rides. Until that is written, read those two pages and the shipped
-> presets that use one — `grep -l 'system = "cellular"' presets/*.toml` — which are the distilled
-> working ranges, undistilled. Plan 0209 Phase 5 writes the guidance
-> ([backlog 0258](../../../../docs/design-backlog-archive.md) was the ask).
-
 **Naming:** `system = "…"` is the underscore name; it differs from the scene's display name
 (`system = "lsystem"` → display "l-system").
 
@@ -368,29 +358,199 @@ inside-frame `source_y` undoes; a fade-*out* to match `spawn_fade` does not exis
 
 Full parameter roster and defaults: [`presets/README.md`](../../../../presets/README.md).
 
+---
+
 ## `warp_mesh` — the past frame, resampled through a per-vertex grid
-*Family `warp`* (preset files `warp_*.toml`). **No authoring guidance is written for this system
-yet.** Its params, defaults and ranges are the generated `` ### System: `warp_mesh` `` section of
-[`presets/README.md`](../../../../presets/README.md); the shipped `warp_*` presets are the working
-ranges until this section is filled.
+*Tunnels, weather, smoke, op-art contour prints.* Family `warp` (`warp_*.toml`). **This scene draws
+nothing of its own.** It lays light into a feedback field (the **deposit**, a ring that can be
+broken into arms) and then **moves the field**. The motion is a grid of per-vertex transforms bound
+in `[per_vertex]` with `x y rad ang` in scope. So a world is authored as *motion over a seed*, not as
+a shape. Turn the deposit off and the frame is black within a second. The `[per_vertex]` and `[mesh]`
+tables are in `presets/README.md` under `warp_mesh`.
+
+It has two modes, split by `color_source`, and they want opposite settings for almost everything:
+
+- **Light** (`color_source = "0"`, the default; 5 of the 7 shipped: Wellhead, Millrace, Cauldron,
+  Sirocco, Smoke). The deposit is coloured by its own angle and the loop drags the colour around.
+  It glows and blooms like the other additive scenes.
+- **Print** (`color_source = "1"`; Ladder, Tracery). The field accumulates an uncoloured level, and
+  the present reads that level as the palette coordinate. A stepped palette then prints the loop's
+  **contour map** in flat inks (ADR-0197).
+
+| Param | Typical (light / print) | Controls / natural driver |
+|-------|-------------------------|---------------------------|
+| `decay` | `0.16 – 0.22` radial, `0.55 – 0.78` directional / `0.93 – 0.955` | The tail, and the structural decision. A zooming or turning world wants it short: Wellhead at 0.5 was one smooth blob, and at 0.16 its arms stay legible. A world whose tail *is* the figure wants it long, like Sirocco's bands and Smoke's climb. Print worlds run long because the level has to reach the frame edge. Bass, `+0.06 – 0.12`, smoothed 0.4 – 0.5 s. |
+| `deposit` | `1.5 – 3.2` base / `4.8 – 6.5` | Fuel. **The source is where audio shows.** Mid `+0.9 – 1.2`, onset `+0.4 – 0.5`, asymmetric smoothing (attack 0.04, release 0.5). Smoke puts bass there instead (`+4`). In print mode bass `+0.9` walks a contour ring outward. |
+| `deposit_arms` | `3 – 12` / `0` or `7` | **Arms are the texture the motion is legible against.** Cauldron and Smoke were first drafted without them and came back as featureless gradients: `warp` displaces the field and creates no structure. Every light world ships with arms. Fewer arms under a shearing `rot` (Millrace, 3), because shear stretches each one into a long spiral. |
+| `deposit_radius` / `_width` | `0.14 – 0.44` / `0.05 – 0.09` | A narrow ring (a wire) gives the field edges to smear. Ladder's print source is a blob (`0.06` / `0.28`), so its level is one hill and every rung is a closed contour. A ring would print a ripple in a pond. |
+| `deposit_twist` / `_spin` | `0.6 – 3.2` / `±0.25 – 0.45` | Twist leans the arms into spirals. It is a good mid lever (Smoke `+0.8`, Tracery `+0.34`, smoothed 0.2 – 0.8 s), and it *is* visible to `--report`. Spin integrates a phase, so treble `+0.3` is safe on it. Print worlds turn slowly (`0.045`). |
+| `zoom` (per-vertex) | `1.0 → 1.45` at the rim / `0.965 – 0.99` | Above 1 the past expands outward (Wellhead's tunnel, on `smoothstep(0, 1, rad)`). Just below 1 it creeps inward (Millrace, Ladder, Tracery). Sirocco holds it at exactly 1, because any zoom makes a directional world radial again. |
+| `rot` (per-vertex) | `0.05 – 0.6`, or signed across `rad` | A rate that changes with `rad` is **shear**. Millrace's `1.05 - rad * 1.3` changes sign partway out, which is the whole look. |
+| `dx` / `dy` (per-vertex) | `0.03 – 0.33` / `-0.09 – -0.59` | Drift in frame-heights per second. A `sin` over `y` gives Sirocco bands that shear against each other. `(1 - y)` factors give Smoke a buoyancy gradient (`y` is 0 at the **top**). |
+| `warp` / `warp_scale` / `warp_speed` | `0.085 – 0.16` print; up to `1.8` (Cauldron) and `5.9` (Smoke) where it is a gradient / `0.3 – 3.1` / `0.45 – 1.05` | The only non-affine output: a boil with no fixed point. It needs arms to stir. `warp_speed` integrates a phase (ADR-0132), so it is safe on treble or mid (Cauldron `+0.5`). |
+| `darken_center` | `0.06 – 0.15` | Stops a *zooming* loop saturating at its fixed point. Set it to `0` on a world with no fixed point (Sirocco), where it reads as a hole. |
+| `palette_steps` | match `deposit_arms` / `12 – 14` | In light mode, steps matched to the arm count (Wellhead 6/6, Millrace 3/3) give each arm one flat colour. That is the only crisp edge a scene made of gaussians can draw. `0` for a boil or smoke. In print mode the steps are load-bearing: quantizing the coordinate also quantizes the coverage, so Ladder goes from 851 distinct colours to 60. |
+| `color_span` | `0.8 – 0.9`, Smoke `0.12` / `0.085 – 0.13` | Light: how much of the palette the angle walks. Smoke is kept low with `saturation 0.22` so it stays smoke and not fire. Print: the **rung spacing**, because it scales the level. Treble crowds it by about a tenth (`+0.01`), eased 0.5 s. |
+| `color_center` | `time * 0.0045 – 0.007` / `time * 0.032 – 0.045` | Light: a slow colour walk. Print: **what makes the rungs march outward**, not the zoom. An onset push (`+0.13 – 0.15`, attack 0.08, release 0.55) jumps the ladder a notch. |
+| `brightness` / `exposure` | `0.5 – 0.86` (+mid ≤ `0.12`) / `0.72 – 0.8` (+bass `0.2`) | Light mode only. The swing is kept to about a seventh. **Print mode binds no luminance at all**: the present writes `ink * coverage`, so any brightness term writes values between the inks. |
+| `bloom_amount` | `0.22 – 0.3` (+onset `0.3 – 0.4`), threshold `0.9 – 0.95`, radius `1.3 – 1.6` / `0` | Light worlds bloom on the transient. Print worlds set bloom, `trails` and `echo_alpha` to 0, because each blurs the edges the runs exist to make. |
+| `echo_alpha` / `echo_orient` | `0.18` rest, onset `+0.45` / `1` | Only Cauldron uses it: a left-right mirror blend that snaps symmetric on a hit and relaxes. It blends toward the copy, so it cannot brighten, and it writes nothing back, so it cannot accumulate (ADR-0119). |
+
+**Four things to know before tuning one:**
+
+- **`[smoothing]` cannot ease a `[per_vertex]` binding.** A series has no single value, so the
+  engine warns and ignores the line. Keep audio inside `[per_vertex]` small, and prefer `bass`, the
+  smoothest band (`+0.025 – 0.15` on zoom, `+0.04` on `dx`). Smoke's onset, treble and mid terms
+  there are all multiplied by a height factor that is 0 at the source. Put the eased audio on the scalars.
+- **A field lever is statistically invisible and a source lever is not.** Smoke's mid on `warp`
+  and `warp_speed` alone read `0.000` on `--report`, because reshuffling wisps moves neither
+  coverage nor luminance. Binding `deposit_twist` fixed it. Its bass on `deposit` alone *failed* the
+  reactivity gate (0.014 against a floor of 0.02), because the deposit sits upstream of a slow
+  accumulator. Adding `deposit_radius` and a small `brightness` term, which land in the same frame,
+  passed. When a band column reads dead, give that band a source lever.
+- **Every world starts with an empty field.** A two-second still shows the warm-up (Smoke's single
+  finger, Sirocco's plume), not what runs on stage. The first horizon row is the fill, so read the
+  rows after it. All seven headers carry a horizon verdict; copy the shape.
+- **Write sharp features with `smoothstep`, not a comparison.** Interpolation between vertices is
+  linear, so `rad > 0.5` renders as a polygon of the mesh. Shipped grids run 32x24 to 48x48, inside
+  the Floor tier's 64x48 ceiling, so they render the same on every machine. A boil needs no more than
+  the default 32x24. `wrap = "1"` only suits a tunnel that should never run out of material
+  (Wellhead). On Sirocco it was measured to buy nothing, and on Cauldron it would show the pot's
+  opposite edge.
+
+---
 
 ## `shape_collage` — flat opaque elements on their own paper
-*Family `collage`* (preset files `collage_*.toml`). **No authoring guidance is written for this system
-yet.** Its params, defaults and ranges are the generated `` ### System: `shape_collage` `` section of
-[`presets/README.md`](../../../../presets/README.md); the shipped `collage_*` presets are the working
-ranges until this section is filled.
+*Posters, constructivist canvases, cut paper.* Family `collage` (`collage_*.toml`). **This is the
+one scene that draws a graphic instead of light.** A pixel starts at the paper colour and composites
+each element `over` it in array order, so one form genuinely sits in front of another and the array
+index is the depth. Nothing is additive, so the additive ceiling does not apply. The rule that
+replaces it is the palette's:
+
+**Keep every element colour under the tonemap's knee: linear 0.6, which is sRGB byte `0xcb` in the
+hex you write.** ADR-0046's curve is the identity below it, so a fill leaves the post chain unshaded.
+Bloom's threshold sits above it, so the edges stay hard. All four shipped canvases obey it; reach
+past it and the flat fill and the hard edge go together, silently. The paper is the one plateau
+allowed above the knee, and pure white is unreachable anyway (`f(1.0) = 0.800`), so it is always
+off-white or a dark ground (Nocturne's `#272930`).
+
+**The palette is eight plateaus, not a gradient.** A layout grammar gives each element one of eight
+band centres (`k/8 + 1/16`) and reserves the last for the ground. Stop pairs about 0.0002 apart are
+the hard transitions, and a smooth ramp would shade every element. All four shipped files pin
+`paper = "0.9375"`, the eighth centre, as a raw coordinate that `color_span` and `palette_shift`
+cannot move. Weight the colours by repeating plateaus: Collage Mono gives five black slots to two
+red, so the red arrives as an event.
+
+| Param | Typical | Controls / natural driver |
+|-------|---------|---------------------------|
+| `layout` | `0`, `1`, `2` | `0` is the authored fourteen-element canvas (Suprematist) and ignores the four rows below. `1` is anchor-and-satellites, where the picture has a subject (Nocturne). `2` is diagonal-axis, where it has a direction (On White, Collage Mono). **`3` (size-hierarchy) ships in no preset**, so there is no working range for it. |
+| `roster` | `0` or `1` | `1` is the Kandinsky vocabulary (bar, ring, segment, arc, checker, about one in four translucent) on top of the suprematist three. The two roster-1 canvases run 40 elements, and the two roster-0 ones run 14 and 17. |
+| `count` | `14 – 40` | **40 is the Floor tier's element cap** (`TierConfig::collage_elements`). A 41st element is dropped silently. Nocturne needed 40 because anchor-and-satellites leaves paper showing: at 26 it covered 0.169 of the frame, too little for any lever to register. |
+| `size_hierarchy` | `0.62 – 0.82` | Higher makes the leading forms dominate. It is what makes an anchor an anchor (Nocturne 0.82). Forty elements need at least ~0.6, or the canvas reads as gravel. |
+| `angle_bias` | `-24`, or `-18 ± 6`, on diagonal; `14 ± 9` on anchor | Degrees. It wraps, so `sin(time * 0.04 – 0.05) * 6 – 9` gives a slow lean that never snaps. |
+| `density` | `0.72 – 0.78` base, +mid `0.15 – 0.28` | Elements fade in and out over about half a second, in stable birth order, so a rise only ever adds. Mid is the natural driver; Nocturne adds onset `+0.3`. Smoothed 0.3 – 0.35 s. A denser canvas should start higher and travel less. |
+| `scale` | `1.0` ± a `0.04 – 0.045` breath, +bass `0.08 – 0.2` | The whole canvas leans in. **Smooth it about 0.5 s**: at 0.15 the bass term reads as a zoom. |
+| `pan_x` / `pan_y` | amplitude `0.06 – 0.15` / `0.04 – 0.10` | Rate chooses the character. `0.07 – 0.11` rad/s is a print not quite square to the wall (Mono, Suprematist). `0.52 – 0.77` is where Nocturne and On White get their idle motion. Use incommensurate x and y rates so the path does not repeat. |
+| `drift` / `spin` | `0.55 – 1.3` +bass `0.4 – 0.8` / `0.3 – 0.7` +mid `0.3 – 0.5` | Multipliers on each element's own seeded travel and turn, so elements move against each other. They do not move the canvas as a whole; that is `pan_*`. Smoothed 0.6 s, or they stutter on each hit. Slower for a denser canvas. |
+| `recompose` / `recompose_blend` | a `[latch]` / `0.45 – 0.9` | Edge-triggered on the rise past 0.5, so a latch with `hold = 0` is the right source. Three of four ship one armed in a window of a clock cycle and fired by an onset: 24 s on a dark ground, 100 – 130 s on paper, onset threshold 0.6 – 0.75. On White's older `hash(beat_index) > 0.93` gate has no period at all (ADR-0109), which is why the other three moved off it. A composition must stay still long enough to be read, so a slow cycle calls for a long blend. |
+| `pump_size` / `pump_alpha` | bass `0.12 – 0.15` or onset `0.3` / bass `0.2` or onset `0.35` | Per-element swells with a per-element phase, so the canvas never pulses as one sheet. Only the depth is authorable. `pump_alpha` pays off on roster 1, whose translucent elements' crossings breathe. Use attack 0.03 and release 0.45 when an onset drives it. |
+| `saturation` | `0.9 – 0.95` +treb `0.07 – 0.1` (Mono pins `1.0`) | **The treble goes on chroma, because there is no `brightness` param and nothing to blow out.** Rest the base under 1 so there is room to come up. |
+| `opacity` / `edge_softness` | `1` / `0` | All four sit there, and two pin it explicitly. The hard analytic edge is the look, not a quality knob. |
+
+**The family is onset-deaf by construction, and Nocturne is the fix.** A recompose that fires twice
+a set cannot show in a measurement, so Plan 0104 read onset at 0.000 on the first three canvases. To
+make a collage answer transients, put onset on a continuous lever (`density`, `pump_*`), not on the
+event. Set `bloom_amount` and `trails` to `"0"` explicitly: either would put light between the flat
+fills. A canvas covers every pixel, so the motion gate's mean takes the whole frame. Do not raise
+pan or drift rates just to pass a measurement; Suprematist's header records the gate being fixed
+instead.
+
+---
 
 ## `analytic_field` — one fullscreen pass, a closed-form function of position
-*Family `analytic`* (preset files `analytic_*.toml`). **No authoring guidance is written for this system
-yet.** Its params, defaults and ranges are the generated `` ### System: `analytic_field` `` section of
-[`presets/README.md`](../../../../presets/README.md); the shipped `analytic_*` presets are the working
-ranges until this section is filled.
+*Fractals and vibrating plates.* Family `analytic` (`analytic_*.toml`). The picture is a pure
+function of the pixel's position: no state, no accumulation, nothing to warm up. `[field] family`
+chooses between two different instruments that share a palette surface, and the params of the one
+not chosen are inert. The `[field]` table (`family`, `map`, `trap`) is in `docs/presets.md`.
+
+**`escape_time`: Julia and Mandelbrot sets** (9 shipped). Colouring is by smooth iteration count,
+or with `trap` by the orbit's closest approach to a circle, line, point or cross.
+
+| Param | Typical | Controls / natural driver |
+|-------|---------|---------------------------|
+| `c_re` / `c_im` | a region, then an audio swing of `0.01 – 0.06` | Choose the region first; it is the look. Shipped regions: the main cardioid's edge (Julia Circuit tours it), fixed dendrites (`-0.1 + 0.95i` Searchlight, `-0.8 + 0.156i` Pearl String), just past the cusp (`0.274`, Parabolic Dust), Seahorse Valley (`-0.762 + 0.085i`, Two-Band Julia), inside the cardioid (`-0.30 + 0.45i`, Stained Glass). **Keep the audio swing small and smoothed** (0.12 – 0.8 s). Near a boundary the set's size is very sensitive to `c`: Parabolic Dust's first 0.07 swing read as a chaotic zoom and shipped at 0.04. Bass is the natural driver. Two-Band Julia splits bass onto `c_re` and treble onto `c_im`. |
+| `iterations` | `20 – 64` | Cost: every pixel pays it. **The Floor tier caps it at 64**, so stay at or under 64 and both tiers draw the same picture. With a trap, fewer is better. Stained Glass needs 20, because with more every orbit eventually grazes the cross. Seahorse drives it from bass (40 → 160) as the structural lever on the Mandelbrot map, which carves the black back. That is a Rich-only picture, and 400 dropped the app to 15 fps. |
+| `interior` | `0`, `0.1 – 0.15`, or `1` | `0` is the textbook black set. `0.1 – 0.15` (+onset `0.12`) lifts it a touch. **Every trap preset sets `1`**, because a trap colours the interior too, and a black hole would punch out the filaments. |
+| `trap_radius` | `0 – 0.25` base, +bass `0.4 – 0.8` | **The trap presets' bass lever**, in all four. Moving the trap re-cuts every filament or pane at once, a structural change rather than a brightness one. Smoothed 0.12 – 0.2 s. |
+| `trap_rotate` | `time * 0.01 – 0.05` | A sweep (Searchlight's beam, Pearl String's sliding beads). Stained Glass adds a mid nudge (`+0.25`, eased 0.35 s). |
+| `power` | `2`, `3`, or whole `3 – 7` | A whole power `p` gives p-fold symmetry. Multibrot re-rolls it per bar, held by `[hold] power = "bar"`, and its `c` radius has to grow with the power (0.53 + 0.085 per step), or high powers go to dust. No shipped preset uses a fractional power. |
+| `escape_radius` | `24 – 64` | Larger smooths the band spacing. The shipped files that set it use 24 – 64; the rest leave the default 16. |
+| `zoom` | `0.72 – 0.9` whole set; `1.85`; `3.6`; `~220` | Most frame the whole Julia set just under 1. Stained Glass sits at 1.85 and Parabolic Dust about 3.7x in on one spiral arm (with `pan_*` aimed at it). Seahorse is ~220x into the Mandelbrot map with pan at the valley and `pow(2.2, noise - 0.5)` breathing; f32 holds there. A mid nudge of ≤ `0.07 – 0.2` on zoom, eased 0.3 – 1.2 s. |
+| `color_span` | `0.46 – 0.55` glow; `0.9 – 1.8` trap; `4` panes | Low for a continuous boundary glow (Julia Circuit, Parabolic Dust, Two-Band Julia). Higher for trap distances. 4 on Stained Glass only because its useful distances all sit under 0.1. |
+| `brightness` | `1.0 – 1.4` | Constant in every escape-time preset: the music goes into `c`, the trap, or `iterations`, not into light (only `interior` takes a small onset lift). Five of the nine bloom at `0.3 – 0.4`, threshold `0.8 – 0.9`. |
+
+**Palettes do the lighting.** A trap palette is bright only near distance 0 and near-black by
+0.3 – 0.6, so only the filaments light (Ring Orbit, Searchlight, Pearl String). The palette repeats
+past 1, so a trap's exterior shows as striped fringes and cannot be sent to one dark colour. Stained
+Glass records that as an engine gap.
+
+**`chladni`: the vibrating plate** (3 shipped). Nodal lines of two standing waves.
+
+| Param | Typical | Controls / natural driver |
+|-------|---------|---------------------------|
+| `mode_n` / `mode_m` | low `1 – 3 / 4 – 7`; mid `7 – 10 / 11 – 15`; top `12 – 13 / 14 – 16` | The figure. Low reads as a figure (Echo Plate), the middle as a dense contour map (Standing Wave), the top as a textile (Lace Grid). Pick each with `floor(clamp(band, 0, 0.99) * k)`, and **hold it with `[hold]`** on `bar` or `beat`. Re-taking the figure every beat under feedback read as chaos, so Echo Plate holds on the bar. **`mode_n == mode_m` is a blank plate**; every shipped file keeps the two ranges disjoint so they can never meet. |
+| `line_width` | `0.004 – 0.03` | Width of the lit nodal band in plate units. Lace Grid rides treble between 0.004 and 0.016, a hairline at 640x360. Judge the top mode range at 1280x720 too, because it sits near the pixel pitch and aliases at thumbnail size. |
+| `plate_mix` | `0`, `0.55`, `1` | `0` is sand on the nodal lines only. `0.55` is a sheen under the thread. `1` is the whole signed wave, where the nodal lines become the black seams. |
+| `palette_steps` / `palette_contour` | `6 – 11` / `0.55` | Standing Wave cuts the whole wave into terraces with a hairline at each edge, and rides the step count on mid, which changes structure rather than light. |
+| `zoom` | `0.9 – 1.12` | Bass breathes it `+0.12` (Standing Wave, eased 0.25 s). A slow `pan_*` sine (amplitude 0.09 – 0.35 at 0.037 – 0.05 rad/s) keeps a held plate moving in a quiet passage. |
+
+The plate draws no history; `trails` gives it one. Echo Plate runs `trails 0.955` with
+`fb_zoom 1.04` (+onset `0.015`, eased 0.8 s) and turns it into a stack of the figures the music
+played. On Lace Grid, bloom (`0.45`, threshold `0.9`) finds the crossings where two lines
+overlap.
+
+---
 
 ## `cellular` — a discrete cellular automaton on a ping-pong grid
-*Family `cellular`* (preset files `cellular_*.toml`). **No authoring guidance is written for this system
-yet.** Its params, defaults and ranges are the generated `` ### System: `cellular` `` section of
-[`presets/README.md`](../../../../presets/README.md); the shipped `cellular_*` presets are the working
-ranges until this section is filled.
+*Colonies, embers, mazes, spiral chemistry.* Family `cellular` (`cellular_*.toml`). A real
+automaton stepping on a grid of cells, and the one scene whose picture is the history of a rule.
+The `[cellular]` table chooses `family` (`life_like`, `larger_than_life` or `cyclic`), `grid` (cells
+per side) and `wrap`; it is in `docs/presets.md`. **`grid` is the stroke width.** Labyrinth's walls
+read as a maze you could trace at 40 and as texture at 130. The shipped files run 40 to 256; 180 –
+256 reads as a field.
+
+**Pick the rule by sweeping, and record the sweep in the header.** Every shipped rule was found
+that way, and the neighbouring settings fail in ways a still will not predict:
+
+- **`cyclic`**: `states 3 / threshold 3` organises noise into rotating spirals within seconds
+  (Spiral Bloom). `12 / 1` gives travelling wavefronts and a marbled damask (Wavefront). `8 / 3`
+  never organizes, and the higher state counts fold into blocky terraces. Wavefront takes those
+  terraces as its subject. Give a cyclic palette a **closed loop** (the last stop equals the
+  first) or the wrap shows a seam.
+- **`life_like`**: `birth` / `survive` are bitmasks over neighbour counts. `8 / 12` is Conway's
+  B3/S23 (Ember Life). `8 / 30` is mazectric B3/S1234, which runs long straight corridors, where
+  S12345 (`62`) only knots into short stubs (Labyrinth).
+- **`larger_than_life`**: `radius 5` with the default birth/survive windows grows crawling blobs
+  (Tide Bugs). The Floor tier caps `radius` at 6.
+
+| Param | Typical | Controls / natural driver |
+|-------|---------|---------------------------|
+| `step_rate` | `5 – 10` base, +band `8 – 14` → `5 – 24` gen/s | **The scene's main audio lever: tempo of life.** Mid in three presets (busy music runs the colony faster), bass in two (Wavefront, Tide Bugs, where the tide moves on the low end). Smoothed 0.3 – 0.35 s. |
+| `reseed` | `max(event, mod(time, T) < 0.2)` with `T = 5 – 15` s | **Every shipped preset has a clock floor, and the floor is not optional.** Left alone, Tide Bugs' rule froze into ~30 still rings within a minute (motion 0.000 from 60 s on), and Life settles into still-lifes. The event is either `onset > 0.75 – 0.8` or `beat * (hash(beat_index * k) > 0.4 – 0.66)`, a seeded fraction of detections. A rise past 0.5 drops one disc of soup per rise, so a sustained 1 does nothing extra. |
+| `trail` | `20 – 26` base, +bass `12` | How long a dead cell glows (`life_like`, `larger_than_life`). Bass holds the embers longer (Ember Life, Labyrinth). Smoothed 0.4 – 0.45 s. |
+| `age_tint` | `0.7 – 0.9` | How far along the palette a wake travels as it fades. **The palette runs from the live colour at 0 to char at the far end**, so a shipped ramp reads hot → cold. Labyrinth's white-origin palette is two-tone at rest because every wall is live. The warm bands only bloom where a reseed has bitten. |
+| `saturation` | `0.55 – 0.95`, +mid or treb `0.24 – 0.45` | A chroma lever that works here as on the collage. Wavefront's mid moves it from ashen to full magenta. |
+| `palette_mix` | `smoothstep(0.45, 0.8, treb)` or a slow noise | Wavefront throws the plate between two complementary loops on treble. **A mix parked halfway averages complementary loops to grey**, so the smoothstep sits between treble's typical level and its peak, which makes the plate snap rather than rest. |
+| `hue` | `time * 0.008 – 0.012`, or `noise(time * 0.025 – 0.03) * 0.05 – 0.06` | A cyclic loop can walk the whole ring. A life ramp only wanders a few percent, or the fire stops being fire. |
+| `brightness` | `0.8 – 1.0` | Constant in all five. |
+| `zoom` | `1.0 – 1.05` | Tide Bugs breathes it on bass (`+0.05`, eased 0.12 s). |
+| `palette_steps` / `palette_contour` | `4` / `0.5` +treb `0.3`, style `3` | Only Labyrinth uses them. The engraved edge sharpens on treble, and it shows only in a bitten region. |
+
+**The horizon is the check for this scene** (ADR-0099): a rule either breathes or settles, and
+half a second shows neither. Ember Life and Spiral Bloom record ten-minute verdicts, both alive. Run
+one on any new rule before trusting it. Tide Bugs' header says mid widens `birth_hi`, but the file
+binds it as a constant `"0.385"`. No shipped preset drives a birth/survive window, so there is no
+working range for that lever yet.
 
 ---
 

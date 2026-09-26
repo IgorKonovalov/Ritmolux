@@ -191,9 +191,19 @@ flowchart LR
 | 2 — the report is read, and the thresholds are judged | dev | done | 52c66c06 |
 | 3 — the stale prose carriers stop naming a list | dev | done | ba62c093 |
 | 4 — the catalogue declares an entry per system | dev | done | committed with this row |
-| 5 — the four sections get their guidance | human | not started | |
+| 5 — the four sections get their guidance | human | done | committed with this row |
 
 ### Notes
+
+- **Phase 5 readings.** Each of the four sections was distilled from every shipped preset of its
+  family, read in full on the lane at `8bf91ce1`, and each range in its table names the presets it
+  came from. The counts differ from the done-when's: `cellular` ships **five** presets, not three,
+  because Labyrinth and Wavefront landed after the plan was written (`a92857eb`). `analytic_field`
+  12, `warp_mesh` 7 and `shape_collage` 4 match. Where the shipped set gives no range, the section
+  says so: `shape_collage` `layout = 3` and a driven `larger_than_life` birth/survive window are
+  used by no shipped preset. One header drift was found and is recorded in the cellular section
+  rather than repaired, since it is content: `cellular_tide_bugs.toml` says mid widens `birth_hi`,
+  but the file binds it as the constant `"0.385"`.
 
 - Phase 1: the roster is not an iteration over `SystemKind::ALL`. nextest runs one named `#[test]`
   per family (ADR-0157), so `core/tests/distinctness.rs` names the fourteen in a `family_tests!`
