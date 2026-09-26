@@ -6,7 +6,9 @@
 // well-formed outcome that is not itself a park; every other ending is `parked` with a reason:
 //   cli_contract    a shell call with no hook log line, or an init not listing the invoked skill
 //   budget          the result event's subtype is error_max_budget_usd
-//   api             no result event, or an error result that is not the budget
+//   usage_limit     an error result the API refused with 429, or after a `rejected` rate-limit
+//                   reading; `resetsAt` (epoch seconds) is when the window reopens, when known
+//   api             no result event, or an error result that is neither of the above
 //   lost_background a background command started and still unfinished at the result
 //   no_outcome      a clean result with no rlx-outcome block
 //   bad_outcome     an rlx-outcome block that fails validation, or names another plan
@@ -56,7 +58,15 @@ export function renderPromptFile(templatePath, vars, outPath) {
   return outPath;
 }
 
-export function claudeArgs({ prompt, settingsFile, appendPromptFile, budgetUsd, model, addDirs = [] }) {
+/** The reason a session the usage limit ended parks with, when the lane does not wait it out. */
+export const USAGE_LIMIT = "usage_limit";
+
+/** True when an error result is the account's usage limit rather than a failure of the session. */
+export function usageLimited(r) {
+  return r.isError === true && (r.apiErrorStatus === 429 || r.rateLimit?.status === "rejected");
+}
+
+export function claudeArgs({ prompt, settingsFile, appendPromptFile, budgetUsd, model, addDirs = [], resume }) {
   const args = [
     "-p",
     prompt,
@@ -73,6 +83,9 @@ export function claudeArgs({ prompt, settingsFile, appendPromptFile, budgetUsd, 
     String(budgetUsd),
   ];
   if (model) args.push("--model", model);
+  // The same session, continued: its context and its session id carry over, and the result's
+  // total_cost_usd is the whole session's, not this invocation's.
+  if (resume) args.push("--resume", resume);
   for (const d of addDirs) args.push("--add-dir", d);
   return args;
 }
@@ -138,7 +151,8 @@ export function contractProblem(r, { skill, hookLog }) {
  * stream-json event as it arrives. `skill` and `hookLog` switch on the CLI contract check
  * (contractProblem), which parks `cli_contract` before any outcome is read. Resolves to:
  *   { status: "ok"|"parked", reason?, detail?, outcome?, spendUsd, sessionId, exitCode,
- *     subtype, terminalReason, transcript, rateLimit, rateLimitFirst, numTurns }
+ *     subtype, terminalReason, transcript, rateLimit, rateLimitFirst, numTurns, resetsAt? }
+ * `resume` names a session id to continue rather than start a new session.
  */
 export function runStep(opts) {
   const {
@@ -219,7 +233,12 @@ export function runStep(opts) {
       if (r.subtype === "error_max_budget_usd") {
         return park("budget", `spend cap hit: ${r.errors.join("; ") || "error_max_budget_usd"}`);
       }
-      if (r.isError) return park("api", `session ended in error (${r.subtype}): ${r.errors.join("; ")}`);
+      if (usageLimited(r)) {
+        const at = r.rateLimit?.resetsAt ?? null;
+        const when = at ? `, resets ${new Date(at * 1000).toISOString()}` : "";
+        return resolveStep({ ...base, status: "parked", reason: USAGE_LIMIT, detail: `usage limit reached${when}: ${r.text || r.errors.join("; ")}`, resetsAt: at });
+      }
+      if (r.isError) return park("api", `session ended in error (${r.subtype}): ${r.errors.join("; ") || r.text}`);
       // Before any outcome is read: a session that backgrounded a command and reached its result
       // without that command finishing lost the work, whatever it went on to claim.
       if (r.backgroundOutstanding.length > 0) {

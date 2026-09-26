@@ -20,6 +20,14 @@
 //!      it parses to is `Config::default()`. That is stronger than naming a
 //!      default in a table, because a table is prose and this is the value.
 //!
+//! **The fourth property is asserted next door, and cannot be asserted here.**
+//! ADR-0240 also runs the other way - every settings row edits a key, and that
+//! key is documented - and reaching it needs `SettingsRow`, which lives in the
+//! `ritmolux` binary rather than in the `standalone` library this integration
+//! test links. So it is a unit test in `standalone/src/settings/tests.rs`,
+//! which is the same reason property 1 above shells out to `--help` instead of
+//! reading the flag roster as a value.
+//!
 //! GPU-free: `--help` exits before a renderer exists (`help_cli.rs` is what
 //! proves that from outside the process), and nothing else here leaves the
 //! filesystem.

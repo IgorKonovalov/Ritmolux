@@ -191,8 +191,8 @@ need. If the answer would change an ADR, say so. End by asking whether to draft 
 
 ## Conductor mode
 
-**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: implement` or
-`RLX-CONDUCTOR-MODE: fix`.** That line is written by `tools/conductor/` (ADR-0205), which starts this
+**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: implement`, `fix`, `merge` or
+`repair`.** That line is written by `tools/conductor/` (ADR-0205), which starts this
 session headless, as a separate process, in the plan's worktree. Nothing a user types enters this
 mode. Where this section and the rest of the skill disagree, this section wins, for that session only.
 
@@ -224,9 +224,18 @@ mode. Where this section and the rest of the skill disagree, this section wins, 
   pre-review gate (ADR-0207)*. Then print the outcome instead of asking for a fresh `/architect`.
 - **`fix` mode**: fix every `blocker` and `major` the named review lists, one `fix(studio): …` commit
   per finding, one `### Notes` line each; park with `plan_wrong` on a finding you judge wrong.
+- **`merge` mode** (ADR-0248): the conductor merged `main` into the lane, every conflicted path is under
+  `studio/`, and it aborted that merge. Redo `git merge --no-edit main`, resolve each path the prompt
+  lists keeping both sides' intent (`main`'s behaviour where they cannot both hold), commit with
+  `git commit --no-edit`, and change nothing else. Run the studio's checks with `--prefix`. A conflict
+  that needs the owner parks `merge_conflict` after `git merge --abort`.
+- **`repair` mode** (ADR-0248): a studio check in the conductor's gate went red; the prompt names the
+  stage, the command and its log. Reproduce it, fix the cause in one `fix(studio): ...` commit per
+  cause, and run it again. **Never change an assertion, an expected value or a test's inputs, and
+  never skip a test, to make it pass**: a test you judge wrong parks `plan_wrong`.
 
 **The last thing you print is one fenced `rlx-outcome` block** holding one JSON object in the shape the
-prompt shows — `phases_done`, `fixed` or `parked`. The conductor verifies it against `git`, and a
+prompt shows — `phases_done`, `fixed`, `merged`, `repaired` or `parked`. The conductor verifies it against `git`, and a
 claim `git` does not bear out parks the plan.
 
 ## Quality bar — the non-negotiables

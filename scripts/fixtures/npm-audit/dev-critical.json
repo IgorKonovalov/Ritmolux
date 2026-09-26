@@ -1,0 +1,31 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "vitest": {
+      "name": "vitest",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 9000002,
+          "name": "vitest",
+          "dependency": "vitest",
+          "title": "Seeded critical advisory in a dev-only package",
+          "url": "https://github.com/advisories/GHSA-fxcr-fxcr-fxcr",
+          "severity": "critical",
+          "cwe": ["CWE-94"],
+          "cvss": { "score": 9.8, "vectorString": null },
+          "range": "<3.0.0"
+        }
+      ],
+      "effects": [],
+      "range": "<3.0.0",
+      "nodes": ["node_modules/vitest"],
+      "fixAvailable": true
+    }
+  },
+  "metadata": {
+    "vulnerabilities": { "info": 0, "low": 0, "moderate": 0, "high": 0, "critical": 1, "total": 1 },
+    "dependencies": { "prod": 10, "dev": 20, "optional": 0, "peer": 0, "peerOptional": 0, "total": 30 }
+  }
+}

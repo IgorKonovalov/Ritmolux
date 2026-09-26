@@ -182,8 +182,14 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   a built file, and that every off-site href is absolute https (ADR-0154);
                      #   check-site-routes.mjs asserts that every route the build serves is reachable
                      #   from the menu rather than only by search, and that no route the splitter
-                     #   produced exceeds 30,000 bytes of source (ADR-0166) - a route over that means
-                     #   ADR-0166's arithmetic needs redoing, never that the constant needs raising.
+                     #   produced exceeds 30,000 bytes of source (ADR-0166) - an assertion about the
+                     #   corpus, since the split already recurses at every heading level (ADR-0247),
+                     #   so a route over it wants headings in its source, never a raised constant.
+                     #   And EXCEPT check-npm-audit.mjs, CI-only like those two but for another
+                     #   reason: it asks the registry, so its answer moves without a commit, and it
+                     #   runs in ci.yml's own `npm-audit` job. It fails studio's shipped graph
+                     #   (--omit=dev) at high and every full npm graph at critical, excepting only
+                     #   what npm-audit.allow.json names by GHSA id with a reason (ADR-0244).
                      #   Six of them also run in the close ceremony - check-doc-links.mjs,
                      #   check-index-rows.mjs, check-backlog-claims.mjs, toc.mjs,
                      #   check-release-tag.mjs and check-translations.mjs - the first five because a
@@ -217,6 +223,10 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   dated records (plans, ADRs, the backlog), because a count goes stale whether
                      #   or not it is right today, and it reads .rs WHOLE since the instance that
                      #   survived two closes was an assertion message (ADR-0202);
+                     #   check-settings-have-files.mjs holds the two applications a Rust test
+                     #   cannot see to ADR-0240 - no browser storage under studio/, and every
+                     #   plugin-foobar/ `cfg_*` declaration named in docs/configuration.md, with
+                     #   `settings-allow: <why>` on the line as the escape;
                      #   check-gate-carriers.mjs asserts that .githooks/pre-push and the CI `links`
                      #   job each run the ordered roster held in scripts/gates.manifest.mjs, in that
                      #   order - the manifest being DATA rather than a gate, and the one the

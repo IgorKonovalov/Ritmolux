@@ -441,9 +441,9 @@ test("an empty worklist is one line, and says what it found nothing of", () => {
 // each of the two conditions has a case and so does the negative.
 
 /** A repo holding plan 0301 alone, with its phase rows and its directory as the caller asks. */
-function repoWithPlan({ status = "approved (2026-09-14)", rows, done = false }) {
+function repoWithPlan({ status = "approved (2026-09-14)", rows, done = false, blocksMerge }) {
   const repo = tmp("rlx-stale-repo-");
-  writePlan(repo, { number: "0301", title: "A park to judge", status, phases: [{ id: "1", owner: "dev" }, { id: "2", owner: "human" }], rows }, { done });
+  writePlan(repo, { number: "0301", title: "A park to judge", status, phases: [{ id: "1", owner: "dev" }, { id: "2", owner: "human", blocksMerge }], rows }, { done });
   return repo;
 }
 
@@ -471,6 +471,23 @@ test("a human_phase park whose log row now reads done is a record to clear, not 
       "Worktree removed; `resume` reopens it from branch `plan-0301-a-park-to-judge`.",
     "  Clear the record: `node tools/conductor/conductor.mjs resume 0301`",
   ]);
+});
+
+// ADR-0249: an `owed` row settles the park exactly where parkStillTrue says it does, and nowhere else.
+test("a human_phase park whose phase is marked Blocks merge: no and whose row reads owed is settled", () => {
+  const repo = repoWithPlan({ rows: { 1: { state: "done" }, 2: { state: "owed" } }, blocksMerge: "no" });
+  const state = parkedState("human_phase");
+  assert.equal(settledPark(state.plans["0301"], repo), "Phase 2 now reads `owed` in the plan's `## Implementation log`");
+  const text = renderDigest(state, { repo, stateDir: tmp(), now: NOW });
+  assert.match(text, /^1 already settled\.$/m);
+  assert.match(text, /^- \*\*0301\*\* \(`human_phase`\) at Phase 2 parked 2026-09-15 09:00: Phase 2 now reads `owed` in the plan's `## Implementation log`\. /m);
+
+  // A bare owed row on a phase the merge waits for settles nothing, marked or not.
+  for (const blocksMerge of [undefined, "yes"]) {
+    const blocking = repoWithPlan({ rows: { 1: { state: "done" }, 2: { state: "owed" } }, blocksMerge });
+    assert.equal(settledPark(state.plans["0301"], blocking), null, `Blocks merge: ${blocksMerge ?? "(unmarked)"}`);
+    assert.match(renderDigest(state, { repo: blocking, stateDir: tmp(), now: NOW }), /^1 park\.$/m);
+  }
 });
 
 test("a gate_red park whose plan is under done/ is a record to clear", () => {
@@ -595,4 +612,66 @@ test("durations", () => {
   assert.equal(duration(20_000), "< 1 min");
   assert.equal(duration(6 * 60000), "6 min");
   assert.equal(duration(112 * 60000), "1 h 52 min");
+});
+
+// ADR-0249: an owed phase is read from the closed plan on main, never from state/.
+test("a closed plan's owed row is one Needs you line, read from the tree with an empty state, and gone once the row reads done", () => {
+  const repo = tmp("rlx-owed-repo-");
+  const phases = [{ id: "1", owner: "dev" }, { id: "2", owner: "human", title: "Bench it on the device", blocksMerge: "no" }, { id: "3", owner: "dev" }];
+  const path = writePlan(repo, { number: "0301", status: "done - Phase 2 owed", phases, rows: { 1: { state: "done" }, 2: { state: "owed" }, 3: { state: "done" } } }, { done: true });
+  const empty = { version: 1, runs: [], lanes: {}, plans: {} };
+  const lines = renderDigest(empty, { repo, stateDir: tmp(), now: NOW }).split("\n");
+  assert.equal(lines[lines.indexOf("## Needs you") + 2], "1 owed phase.");
+  const owed = lines.filter((l) => l.includes(" owes Phase "));
+  assert.deepEqual(owed, [
+    "- **0301 owes Phase 2** (Bench it on the device): merged without it (`Blocks merge: no`). " +
+      "Do it, then mark its row `done` in `docs/plans/done/0301-fixture.md` on main and commit; the line leaves with the commit.",
+  ]);
+
+  writeFileSync(path, readFileSync(path, "utf8").replace("| human | owed |", "| human | done |"));
+  const after = renderDigest(empty, { repo, stateDir: tmp(), now: NOW });
+  assert.ok(!after.includes("owes Phase"), after);
+  assert.match(after, /^Nothing: no park, no lane stopped at the worktree cap, no open finding\.$/m);
+});
+
+// ADR-0248: a repair on a closed tip reaches main unreviewed, and the page names it until it is pushed.
+test("an unreviewed repair is listed by SHA until origin/main holds it; a reviewed one never is", () => {
+  const { repo, head } = repoWithTag();
+  const rec = {
+    plan: "0175", status: "merged", lane: "a", worktree: null, branch: "plan-0175-x", steps: [], park: null, parks: [], fixRounds: 0,
+    verdicts: [], fixes: [], gates: [], lockWaits: [], closed: { version: "0.124.0", tag: "v0.124.0", head }, merge: { head, remerged: false, at: "2026-09-15T11:00:00.000Z" },
+    repairs: [
+      { stage: "pre-review", commits: ["1111111111111111111111111111111111111111"], unreviewed: false, at: "2026-09-15T10:00:00.000Z" },
+      { stage: "post-close", commits: [head], unreviewed: true, at: "2026-09-15T10:50:00.000Z" },
+    ],
+  };
+  const state = { version: 1, runs: [{ started: "2026-09-15T10:00:00.000Z", ended: "2026-09-15T11:30:00.000Z", lanes: ["a"] }], lanes: {}, plans: { "0175": rec } };
+  const needs = (text) => text.split("\n").filter((l) => l.includes("unreviewed repair"));
+  assert.deepEqual(needs(renderDigest(state, { repo, stateDir: tmp(), now: NOW })), [
+    "1 unreviewed repair.",
+    `- **0175 reached main with an unreviewed repair**: \`${head.slice(0, 7)}\` at post-close. Read it before you push.`,
+  ]);
+  spawnSync("git", ["update-ref", "refs/remotes/origin/main", head], { cwd: repo });
+  assert.deepEqual(needs(renderDigest(state, { repo, stateDir: tmp(), now: NOW })), []);
+});
+
+// ADR-0251: a red origin/main never stops a close, so the worklist is where it stays visible.
+test("a red origin/main reading is one Needs you line that an unread reading keeps and a green one clears", () => {
+  const merged = (plan, upstream) => ({
+    plan, status: "merged", lane: "a", worktree: null, branch: `plan-${plan}-x`, steps: [], park: null, parks: [], fixRounds: 0,
+    verdicts: [], fixes: [], gates: [], lockWaits: [], merge: { head: "0".repeat(40), remerged: false, at: upstream.at }, upstream: [upstream],
+  });
+  const red = { state: "red", run: 2001, sha: "2222222222222222222222222222222222222222", url: "https://github.com/example/ritmolux/actions/runs/2001", jobs: ["check (macos-latest)"], case: null, at: "2026-09-15T10:00:00.000Z" };
+  const unread = { state: "unread", run: null, sha: null, url: null, jobs: null, case: "gh absent", at: "2026-09-15T10:30:00.000Z" };
+  const green = { state: "green", run: 2002, sha: "3333333333333333333333333333333333333333", url: null, jobs: null, case: null, at: "2026-09-15T11:00:00.000Z" };
+  const state = (plans) => ({ version: 1, runs: [{ started: "2026-09-15T09:00:00.000Z", ended: "2026-09-15T12:00:00.000Z", lanes: ["a"] }], lanes: {}, plans });
+  const needs = (s) => renderDigest(s, { repo: tmp(), stateDir: tmp(), now: NOW }).split("\n").filter((l) => l.includes("origin/main"));
+
+  assert.deepEqual(needs(state({ "0201": merged("0201", red) })), [
+    "origin/main red.",
+    "- **origin/main's CI is red**: run 2001 at `2222222`, failing check (macos-latest), read by 0201's close 2026-09-15 10:00. " +
+      "Repair main and push; https://github.com/example/ritmolux/actions/runs/2001. The line leaves when a later close reads it green.",
+  ]);
+  assert.equal(needs(state({ "0201": merged("0201", red), "0202": merged("0202", unread) })).length, 2, "an unread reading does not clear it");
+  assert.deepEqual(needs(state({ "0201": merged("0201", red), "0202": merged("0202", unread), "0203": merged("0203", green) })), []);
 });

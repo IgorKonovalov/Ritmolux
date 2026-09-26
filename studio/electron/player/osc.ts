@@ -18,9 +18,7 @@
 import { ctlAddress, type CtlAction } from '@shared/protocol'
 
 export type Arg =
-  | { tag: 'f'; value: number }
-  | { tag: 'i'; value: number }
-  | { tag: 's'; value: string }
+  { tag: 'f'; value: number } | { tag: 'i'; value: number } | { tag: 's'; value: string }
 
 /**
  * Bytes of NUL padding that take `len` up to the next multiple of 4, **at least

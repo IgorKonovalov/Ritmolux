@@ -18,6 +18,13 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0229 - The conductor reports itself honestly](#0229---the-conductor-reports-itself-honestly)
+  - [0220 - The dependencies catch up, and npm gets its gate](#0220---the-dependencies-catch-up-and-npm-gets-its-gate)
+  - [0228 - The resume guard accepts an owed phase](#0228---the-resume-guard-accepts-an-owed-phase)
+  - [0227 - The gated paths get their jobs](#0227---the-gated-paths-get-their-jobs)
+  - [0225 - The split goes one level deeper](#0225---the-split-goes-one-level-deeper)
+  - [0226 - The conductor stops waiting for the owner](#0226---the-conductor-stops-waiting-for-the-owner)
+  - [0217 - Every setting has a file, and a gate says so](#0217---every-setting-has-a-file-and-a-gate-says-so)
   - [0215 - The wide seams narrow, and a guard holds them](#0215---the-wide-seams-narrow-and-a-guard-holds-them)
   - [0224 - The adapter becomes a setting](#0224---the-adapter-becomes-a-setting)
   - [0207 - The commitments get their instruments](#0207---the-commitments-get-their-instruments)
@@ -254,6 +261,129 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0229 - The conductor reports itself honestly](done/0229-the-conductor-reports-itself-honestly.md)
+
+- closed 2026-09-24, conductor-run lane `plan-0229-the-conductor-reports-itself-honestly`. Phase 1
+`0b08037a`, Phase 2 `8bf46530`, Phase 3 `3f151a49`, Phase 4 `6d2d252a`. Round 1 review: **no
+blockers, one major, two minors**, all fixed by a `dev` round (`f1994976`, `53089d56`, `d63afa27`).
+Round 2 review: **clean**. Version **none** (conductor tooling, the 0191, 0226 and 0228 precedent).
+No ADR. Closes no backlog entry. The full review is the plan's own `## Close review` section.
+- **What landed.** A red suite record keeps the failing test names (`failed`, capped at 20, with
+  `failed_count`), parsed from a recorded nextest run, and a red gate's park names the first one.
+  `settledPhase` in `plan.mjs` is the one reader of a settled park, so the digest and `status` agree
+  with `resume` on an owed phase. A run whose `tools/conductor/` sources change on disk pauses and
+  says so, and `resume`, `park` and `status` print the same notice. The conductor allowlist admits
+  `ls`, `printenv`, `grep` and `sed -n`, and still refuses `cp`, `mv` and `gh`.
+- **Open.** The 2026-09-24 flake is still unidentified; the next occurrence names itself.
+
+### [0220 - The dependencies catch up, and npm gets its gate](done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md)
+
+- closed 2026-09-24, conductor-run lane `plan-0220-the-dependencies-catch-up-and-npm-gets-its-gate`.
+Phase 1 `f6852988`, Phase 2 `8f569b1d` + reformat `774b0a43`, Phase 3 `bf97b87f`, Phase 4 `d874e9a9`,
+Phase 5 `561a2541`, Phase 6 `b3ab5ecf`. **Phase 7 is owed** (`Blocks merge: no`, ADR-0249). Round 1
+review: **no blockers, no majors, three minors, one nit**. ADR-0244's Outcome was fixed at the close
+in `4b5c76f3` and the plan's TL;DR in `25661afd`. Version **0.149.0** (minor: the studio zip ships
+Electron 44.4.3, the player links wgpu 30.0.1). ADR-0244 accepted with an Outcome. Closes no backlog
+entry. The full review is the plan's own `## Close review` section.
+- **What landed.** Electron 44.4.3 and electron-builder 26.15.3, vite 8, vitest 5, jsdom 30 and the
+  rest of the studio tooling; eslint stays on 9.39.5 until `eslint-plugin-react` accepts 10. A pinned
+  `allowScripts` field. `wgpu` 30.0.1, `toml` 1.1.6, `cc` 1.4.7. `scripts/check-npm-audit.mjs` in its
+  own CI job, `npm-audit`, and every workflow on Node 24.
+- **Open.** The studio-builder skill's Electron half-install bullet is stale, under `.claude/`, with
+  its replacement text in the review. The gate's `npm-<n>` fallback id cannot be allowed (code). The
+  gate runs on push, not on a schedule, and whether it should is the owner's call.
+
+### [0228 - The resume guard accepts an owed phase](done/0228-the-resume-guard-accepts-an-owed-phase.md)
+
+- closed 2026-09-24, conductor-run lane `plan-0228-the-resume-guard-accepts-an-owed-phase`. Phase 1
+`0717f508`, Phase 2 `7bd1bc42`. Round 1 review: **no blockers, no majors, two minors, one nit**. The
+README minor was fixed at the close in `ea94a754`, and the nit in the plan's own `## Close review`.
+Version **none** (conductor tooling, the 0191 and 0226 precedent). No ADR. Closes no backlog entry.
+- **What landed.** `parkStillTrue` settles a `human_phase` or `claude_dir` park on an `owed` row, but
+  only when the phase is a human phase marked `Blocks merge: no`; a bare `owed` row still refuses.
+  The conductor README's park table and self-resume list say so. This is what lets Plan 0220 resume.
+- **Open.** `settledPark` in `tools/conductor/lib/digest.mjs` still reads `done` alone, so the digest
+  and `status` list an owed-settled park as live. That minor is code and is `dev`'s.
+
+### [0227 - The gated paths get their jobs](done/0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close.md)
+
+- closed 2026-09-24, conductor-run lane
+`plan-0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close`. Phase 1 `646ca642`,
+Phase 2 `1e7e4857`, Phase 3 `1fc58a95`, Phase 4 `0c0ac09b`, Phase 5 `417022b7`. **Phases 6 and 7 are
+owed** (`Blocks merge: no`, ADR-0249). Round 1 found one major, fixed in `f1bbf1b1`; round 2 found
+**no blockers, no majors, two minors**, both fixed at the close in `67681698`. Version **0.148.0**
+(minor: a new script, a conductor behaviour and a CI job). ADR-0251 accepted. Closes no backlog
+entry. The full review is the plan's own `## Close review` section.
+- **What landed.** `OutputIvars` in `standalone/src/capture_mac/rt.rs` is `pub(super)`, the one-word
+  repair of the macOS build. `scripts/check-upstream-ci.mjs` reads `origin/main`'s `CI` workflow
+  through `gh`, names the failing job on red and prints a notice on every unreadable case. The
+  conductor's close records that reading and a `Needs you` digest line, and never parks on it: the
+  first, blocking version was withdrawn mid-flight (ADR-0251 Alternative E). `ci.yml` gains a
+  concurrent `foobar` job.
+- **Owed.** Nothing has yet seen `check (macos-latest)` green, the next `Release` publish all six
+  artifacts, or the upstream read in the human-started close ceremony under `.claude/`.
+
+### [0225 - The split goes one level deeper](done/0225-the-split-goes-one-level-deeper.md)
+
+- closed 2026-09-24, conductor-run lane `plan-0225-the-split-goes-one-level-deeper`. Phase 1
+`b4e63064`, Phase 2 `98ca086d`, Phase 3 `779ba5fe`, log `f6a476f3`, and the close's prose repairs
+`e4fce8ab`. Round 1 found **no blockers, no majors, two minors and one nit**, all fixed at the close.
+Version **0.147.1** (patch: the red `Pages` workflow repaired). ADR-0247 accepted with an `Outcome`.
+Closes no backlog entry. The full review is the plan's own `## Close review` section.
+- **What landed.** `sectionsAt` in `site/src/plugins/split-document.mjs` builds the split
+  recursively: an oversized section cuts at the next heading level at any depth, and `chunksOf`,
+  `sidebarGroup` and the fragment map follow. 173 routes became 191, not the 182 the ADR counted:
+  two `presets/README.md` rosters split as well. The largest route is `## Checklist` in
+  `docs/on-device-validation.md` at 29,528 B.
+- **Left open.** That checklist has no internal headings, so the next edit to it can turn `Pages`
+  red with no splitter repair available; ADR-0247 records it as editorial debt.
+
+### [0226 - The conductor stops waiting for the owner](done/0226-the-conductor-stops-waiting-for-the-owner.md)
+
+- closed 2026-09-24, human-started lane `plan-0226-the-conductor-stops-waiting-for-the-owner`.
+Phase 1 `affd4859`, Phase 2 `6e0b3d2c`, Phase 3 `56061b8b`, Phase 4 `8f363852`, Phase 5 `362d0f02`,
+Phase 6 `0bec06ee`. **Phase 7, the pilot, is owed** (`Blocks merge: no`, added at the close): it is a
+run of the merged conductor, so it cannot come before the merge. Mode 4 found **one major and three
+minors, no blockers**. Version: none, because the plan changes the conductor, the skills and docs and
+nothing a release ships. ADR-0248, 0249 and 0250 accepted with no `Outcome`. Closes no backlog entry.
+- **What landed.** `run` is resident (`--until-idle` keeps the old shape). The worktree cap is a
+  wait, `run_budget_usd` pauses the run, and a closed list of parks clears itself once the tree shows
+  it settled. A `human` phase marked `Blocks merge: no` is committed `owed` and listed in the digest.
+  `main` merges into the lane before pre-review, and a conflict gets one `merge` session. A red gate
+  gets one `repair` session, at most three per plan, and a repair on a closed tip is listed unreviewed
+  by SHA. The review ends on its verdict, the close is its own session under the lock, and a clean
+  verdict is reused over merge, close and repair commits. A read-only `readiness` session runs before
+  the first implement session.
+- **The major.** Phase 4's files left out the implementer skills, so `dev` and `studio-builder`
+  admitted only `implement`, `fix` and `merge` in conductor mode, and a live repair session would have
+  been told to restate and wait. The fake-claude scenarios cannot see a skill. The close fixed it in
+  `ee17e357`.
+- **Left open (minors).** (1) `park` and `finding --verb` are still refused while a run is live, and a
+  resident run almost always is, so those two commands are effectively unavailable until the run is
+  paused. Only `resume` got an ask file (the log's own followup). (2) `reusableVerdict` accepts any
+  two-parent commit whose second parent is on `main`. An owner's hand-resolved merge can therefore
+  carry code no review read. (3) This machine's `local.json` lacks `run_budget_usd` and the four new
+  budgets, so `check` and `run` refuse it until Phase 7's first step.
+
+### [0217 - Every setting has a file, and a gate says so](done/0217-every-setting-has-a-file-and-a-gate-says-so.md)
+
+- closed 2026-09-24, conductor-run lane `plan-0217-every-setting-has-a-file-and-a-gate-says-so`.
+Phase 1 `14ae5f69`, Phase 2 `776b946f`, Phase 3 `e3184783`, Phase 4 `1eb144fa`, and the close's two
+prose repairs `80bf58cb`. Round 1 found **no blockers, no majors, three minors and one nit**. The
+close fixed the two it is allowed to fix. Version **0.147.0** (minor: a new config key and a new
+gate). ADR-0240 was already accepted, and this close adds no `Outcome`. Closes no backlog entry. The
+full review is the plan's own `## Close review` section.
+- **What landed.** `[hud] diagnostics` persists the F3 overlay, and both F3 and the settings row write
+  it back. `SettingsRow::config_path` is an exhaustive match from a menu row to a `config.toml` key,
+  and unit tests hold each declared path to the serialised config and to `docs/configuration.md`.
+  `scripts/check-settings-have-files.mjs` joins the gate roster and refuses two things: browser
+  storage under `studio/`, and any `plugin-foobar/` `cfg_*` declaration the configuration page does
+  not name. `studio/electron/settings.doc.test.ts` diffs `StudioSettings` against `studio/README.md`'s
+  table in both directions.
+- **Left open.** Two minors belong to `dev`'s record and the close did not rewrite them: the
+  Implementation log's close-triggers block is blank, and the log is longer than the phases it reports
+  on. The review records the answers the blank block owed.
 
 ### [0215 - The wide seams narrow, and a guard holds them](done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md)
 

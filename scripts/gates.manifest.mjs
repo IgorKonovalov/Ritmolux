@@ -60,6 +60,7 @@ export const GATES = [
   { script: "check-translations.mjs", args: [], carriers: CHECKOUT },
   { script: "check-translations.mjs", args: ["--self-test"], carriers: CHECKOUT },
   { script: "check-system-counts.mjs", args: [], carriers: CHECKOUT },
+  { script: "check-settings-have-files.mjs", args: [], carriers: CHECKOUT },
   // The roster's own gate, carried by all three: a carrier that stopped running it would stop
   // noticing everything else that left.
   { script: "check-gate-carriers.mjs", args: [], carriers: CHECKOUT },

@@ -1,8 +1,8 @@
 // The two machine-wide locks the conductor itself takes (ADR-0205). The mechanism is
 // tools/conductor/with-lock.mjs; this module names the locks and times the waits.
 //
-// `close` is held from before a review session starts until `main` has fast-forwarded, and
-// released early when a review returns blockers or majors. `suite` is taken around the gate's
+// `close` is held from before a close session starts until `main` has fast-forwarded, and never over
+// a review (ADR-0248). `suite` is taken around the gate's
 // nextest run; sessions take it themselves through the wrapper, which a hook enforces.
 
 import { acquire, holder, lockDir } from "../with-lock.mjs";

@@ -2,6 +2,7 @@
 // exactly `cargo nextest run --workspace` that conductor code observed, keyed by the tree it ran on.
 //
 //   { tree, cmd, exit, summary, by, at, ms }                     a run
+//   { ..., failed: [names], failed_count? }                      a red run that named its failures
 //   { tree, cmd, skip: true, by, at, green: { by, at } }         a skip, and the run it relied on
 //   { tree, cmd, served: true, exit, ..., green, diff }          a `-P fast` run a record served
 //
@@ -209,9 +210,33 @@ export function servingRecord(path, tree, cwd) {
   return null;
 }
 
-export function appendRecord(path, { tree, exit, summary, by, ms, at = new Date().toISOString() }) {
+/** How many failing test names a red record keeps; `failed_count` carries the total past it. */
+export const FAILED_CAP = 20;
+
+/**
+ * nextest's per-test failure lines, e.g. `        FAIL [   1.234s] (1804/1805) rlx-core::golden name`,
+ * each name once and in first-seen order. The `(n/total)` progress counter is run-specific and is
+ * dropped, so it never reaches a record or splits one failure into two names. nextest prints every
+ * failure twice — as it happens and again under its closing `Summary` — so the second sighting is
+ * dropped rather than counted.
+ *
+ * Trap: this is keyed to nextest's `FAIL [` shape. If that changes the list comes back empty and the
+ * record merely loses its names; the recorded fixture in test/helpers.mjs is what makes that visible.
+ */
+export function failingTests(output) {
+  const names = [...String(output ?? "").matchAll(/^\s*(?:FAIL|TIMEOUT|SIGSEGV|SIGABRT) \[[^\]]*\]\s+(?:\(\s*\d+\/\d+\)\s+)?(.+?)\s*$/gm)].map((m) => m[1]);
+  return [...new Set(names)];
+}
+
+/** The `failed` keys a red record carries: none for a green run or a red one that named no test. */
+function failedKeys(exit, failed) {
+  if (exit === 0 || !failed?.length) return {};
+  return failed.length > FAILED_CAP ? { failed: failed.slice(0, FAILED_CAP), failed_count: failed.length } : { failed: [...failed] };
+}
+
+export function appendRecord(path, { tree, exit, summary, failed, by, ms, at = new Date().toISOString() }) {
   mkdirSync(dirname(path), { recursive: true });
-  appendFileSync(path, JSON.stringify({ tree, cmd: SUITE_COMMAND, exit, summary: summary ?? null, by, at, ms }) + "\n");
+  appendFileSync(path, JSON.stringify({ tree, cmd: SUITE_COMMAND, exit, summary: summary ?? null, ...failedKeys(exit, failed), by, at, ms }) + "\n");
 }
 
 /**
@@ -219,7 +244,7 @@ export function appendRecord(path, { tree, exit, summary, by, ms, at = new Date(
  * and the diff that served. The line's `cmd` is `SERVED_COMMAND` and it carries `served: true`, so
  * neither `greenRecord` nor `servingRecord` can read it back: one `-P fast` never serves another.
  */
-export function appendServed(path, { tree, exit, summary, by, ms, green, paths, at = new Date().toISOString() }) {
+export function appendServed(path, { tree, exit, summary, failed, by, ms, green, paths, at = new Date().toISOString() }) {
   mkdirSync(dirname(path), { recursive: true });
   const line = {
     tree,
@@ -227,6 +252,7 @@ export function appendServed(path, { tree, exit, summary, by, ms, green, paths, 
     served: true,
     exit,
     summary: summary ?? null,
+    ...failedKeys(exit, failed),
     by,
     at,
     ms,
