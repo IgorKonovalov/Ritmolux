@@ -9,6 +9,21 @@
 //!
 //! Pure and platform-free, so its test runs on every CI arm rather than only on
 //! the one platform whose backend calls it.
+//!
+//! **It runs on the capture thread.** The Linux backend's real-time loop calls
+//! [`drain_whole_frames`] once per read, so this file carries the same
+//! panic-denial pragma as the `capture_*/` loops, and the hygiene guard lists it
+//! beside them.
+
+// Hot-path panic-denial pragma (Plan 0002 Phase 2). The audio callback and
+// ring must never panic in production; violations fail the build.
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::unreachable
+)]
 
 /// Bytes in one sample: the capture format is `f32`.
 pub(crate) const SAMPLE_BYTES: usize = std::mem::size_of::<f32>();
@@ -26,24 +41,39 @@ pub(crate) struct Drained {
 /// Decode every whole frame in `buf[..filled]` into `out`, then move the bytes
 /// of a trailing partial frame to the head of `buf`.
 ///
-/// `out` must hold at least `(filled / (channels * SAMPLE_BYTES)) * channels`
-/// samples, and `channels` must be non-zero; the caller sizes both once, before
-/// its read loop. Allocates nothing.
+/// The caller sizes `out` once, before its read loop, to hold every whole frame
+/// a read can produce: `(filled / (channels * SAMPLE_BYTES)) * channels`
+/// samples. Allocates nothing and
+/// **cannot panic**: a `filled` past the end of `buf` is clamped to it, an `out`
+/// too small for every whole frame decodes only the frames it holds and carries
+/// the rest, and zero `channels` decodes nothing and carries every byte. Each of
+/// those is a caller bug the caller then sees as a carry larger than a frame,
+/// never as an unwind through the capture thread.
 pub(crate) fn drain_whole_frames(
     buf: &mut [u8],
     filled: usize,
     channels: usize,
     out: &mut [f32],
 ) -> Drained {
-    let frame_bytes = channels * SAMPLE_BYTES;
-    let whole = filled - filled % frame_bytes;
+    let frame_bytes = channels.saturating_mul(SAMPLE_BYTES);
+    let filled = filled.min(buf.len());
+    // Whole frames `out` can take, in bytes; zero when `channels` is zero.
+    let room = out
+        .len()
+        .checked_div(channels)
+        .map_or(0, |frames| frames.saturating_mul(frame_bytes));
+    let whole = filled
+        .checked_rem(frame_bytes)
+        .map_or(0, |partial| filled - partial)
+        .min(room);
     let samples = whole / SAMPLE_BYTES;
-    for (dst, src) in out[..samples]
-        .iter_mut()
-        .zip(buf[..whole].chunks_exact(SAMPLE_BYTES))
-    {
-        *dst = f32::from_ne_bytes([src[0], src[1], src[2], src[3]]);
+    let src = buf.get(..whole).unwrap_or_default();
+    for (dst, bytes) in out.iter_mut().zip(src.chunks_exact(SAMPLE_BYTES)) {
+        if let Ok(sample) = bytes.try_into() {
+            *dst = f32::from_ne_bytes(sample);
+        }
     }
+    // In bounds by construction: `whole <= filled <= buf.len()`.
     buf.copy_within(whole..filled, 0);
     Drained {
         samples,
@@ -53,6 +83,10 @@ pub(crate) fn drain_whole_frames(
 
 #[cfg(test)]
 mod tests {
+    // Tests index fixed-size arrays and known-length buffers freely; the
+    // hot-path pragma above cascades here, so re-allow indexing for tests.
+    #![allow(clippy::indexing_slicing)]
+
     use super::*;
 
     fn bytes_of(samples: &[f32]) -> Vec<u8> {
@@ -129,5 +163,55 @@ mod tests {
         );
         assert_eq!(buf[..7], all[..7]);
         assert_eq!(out, [9.0, 9.0], "nothing was written");
+    }
+
+    /// The three caller bugs the contract names end in a carry, not a panic:
+    /// zero channels, an `out` too small for every whole frame, and a `filled`
+    /// past the end of `buf`.
+    #[test]
+    fn a_caller_bug_is_a_carry_and_never_a_panic() {
+        let all = bytes_of(&[1.0f32, -1.0, 0.5, -0.5]);
+
+        let mut buf = all.clone();
+        let mut out = [0.0f32; 4];
+        let d = drain_whole_frames(&mut buf, 16, 0, &mut out);
+        assert_eq!(
+            d,
+            Drained {
+                samples: 0,
+                carry: 16
+            },
+            "zero channels decode nothing"
+        );
+
+        let mut buf = all.clone();
+        let mut out = [0.0f32; 2];
+        let d = drain_whole_frames(&mut buf, 16, 2, &mut out);
+        assert_eq!(
+            d,
+            Drained {
+                samples: 2,
+                carry: 8
+            },
+            "only the frame `out` holds"
+        );
+        assert_eq!(out, [1.0, -1.0]);
+        assert_eq!(
+            buf[..8],
+            all[8..16],
+            "the frame that did not fit is carried"
+        );
+
+        let mut buf = all.clone();
+        let mut out = [0.0f32; 4];
+        let d = drain_whole_frames(&mut buf, 64, 2, &mut out);
+        assert_eq!(
+            d,
+            Drained {
+                samples: 4,
+                carry: 0
+            },
+            "`filled` clamps to `buf`"
+        );
     }
 }

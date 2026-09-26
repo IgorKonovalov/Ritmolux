@@ -45,7 +45,8 @@ use std::path::{Path, PathBuf};
 /// `src/` (the extracted SPSC ring, Plan 0005), or a `standalone/src/capture_*`
 /// backend's own directory — the whole directory, not only the `rt` module in
 /// it today, so a loop that grows a second module joins the guard by being put
-/// there (the shell's real-time capture loops):
+/// there (the shell's real-time capture loops), or `standalone/src/capture_frames.rs`,
+/// the framing one of those loops calls:
 ///
 /// ```ignore
 /// #![deny(
@@ -284,6 +285,13 @@ fn hot_path_modules_carry_the_panic_pragma() {
         capture_rt(&workspace_root(), "capture_win"),
         capture_rt(&workspace_root(), "capture_mac"),
         capture_rt(&workspace_root(), "capture_linux"),
+        // Outside the backend directories because it is platform-free and tested
+        // on every arm, but the Linux loop calls it once per read, so it is
+        // real-time code whichever directory holds it.
+        workspace_root()
+            .join("standalone")
+            .join("src")
+            .join("capture_frames.rs"),
     ];
 
     let mut files = Vec::new();

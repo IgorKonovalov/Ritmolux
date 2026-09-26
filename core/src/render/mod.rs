@@ -47,6 +47,10 @@ pub mod feedback;
 // glyphon out.
 pub(crate) mod gpu;
 pub(crate) mod grid;
+// One shell-supplied picture over the frame, drawn in the text pass before the
+// text. Behind the text feature with the layer it composites with.
+#[cfg(feature = "text")]
+pub mod image_layer;
 pub(crate) mod ink;
 pub(crate) mod kaleidoscope;
 pub mod preview;
@@ -91,6 +95,10 @@ pub use context::{
     AdapterChoice, AdapterDescription, RenderContext, RenderError, adapter_change_permitted,
     list_adapters,
 };
+#[cfg(feature = "text")]
+use image_layer::ImageLayer;
+#[cfg(feature = "text")]
+pub use image_layer::{ImageRect, OverlayImage, OverlayImageError};
 use ink::Ink;
 use now_playing::NowPlaying;
 use overlay::Overlay;
@@ -433,6 +441,11 @@ pub struct Renderer {
     /// `text` feature (ADR-0009); absent from the plugin/default build.
     #[cfg(feature = "text")]
     text_layer: TextLayer,
+    /// The one picture a shell may set and queue over the frame, drawn in the
+    /// text pass before the text. Holds no GPU object until the first image is
+    /// set, so a shell that never sets one pays an `Option` test per frame.
+    #[cfg(feature = "text")]
+    image_layer: ImageLayer,
     /// The secondary present target (ADR-0143), `None` until a shell attaches
     /// one and again the moment it detaches. Holds a swapchain and a text atlas,
     /// so the `None` case is the whole cost of the feature while unused.
@@ -581,6 +594,8 @@ impl Renderer {
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
         #[cfg(feature = "text")]
         let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
+        #[cfg(feature = "text")]
+        let surface_format = ctx.surface_format();
         let mut renderer = Self {
             ctx,
             budget,
@@ -598,6 +613,8 @@ impl Renderer {
             overlay,
             #[cfg(feature = "text")]
             text_layer,
+            #[cfg(feature = "text")]
+            image_layer: ImageLayer::new(surface_format),
             #[cfg(feature = "text")]
             aux: None,
             preview: preview::PreviewService::closed(),
@@ -938,6 +955,9 @@ impl Renderer {
         #[cfg(feature = "text")]
         {
             self.text_layer = text_layer;
+            // The picture's texture lived on the old device, so it goes with it;
+            // a shell reads `overlay_image_size` as `None` and sets it again.
+            self.image_layer = ImageLayer::new(self.ctx.surface_format());
         }
         // The preview follows at the output's size and the readback at its
         // own, so a consumer told the readback's geometry once is not told
@@ -1192,6 +1212,42 @@ impl Renderer {
     #[cfg(feature = "text")]
     pub fn queue_text(&mut self, runs: &[TextRun<'_>]) {
         self.text_layer.queue(runs);
+    }
+
+    /// Set the one picture the shell may draw over the frame, or clear it with
+    /// `None`. **The only upload**: the bytes are copied into a texture here
+    /// and every later frame reuses it; the texture is reallocated only when the
+    /// dimensions change. The first call is also what builds the layer's
+    /// pipeline — a renderer that never calls this holds none of it.
+    ///
+    /// The bytes are RGBA8 as a capture reads them back, sRGB-encoded, so a
+    /// still from `capture_*` draws unchanged. A refused image changes nothing.
+    ///
+    /// Not carried across [`set_adapter`](Self::set_adapter): the texture
+    /// belongs to the old device, and [`overlay_image_size`](Self::overlay_image_size)
+    /// answers `None` afterwards.
+    #[cfg(feature = "text")]
+    pub fn set_overlay_image(
+        &mut self,
+        image: Option<OverlayImage<'_>>,
+    ) -> Result<(), OverlayImageError> {
+        self.image_layer
+            .set(&self.ctx.device, &self.ctx.queue, image)
+    }
+
+    /// Draw the set picture into `rect` on the next rendered frame, under that
+    /// frame's text. The frame consumes it, as it does queued text, so a
+    /// picture wanted on screen is queued on every frame. A no-op with no
+    /// picture set. Writes no texture.
+    #[cfg(feature = "text")]
+    pub fn queue_image(&mut self, rect: ImageRect) {
+        self.image_layer.queue(rect);
+    }
+
+    /// The set picture's size, or `None` when none is set.
+    #[cfg(feature = "text")]
+    pub fn overlay_image_size(&self) -> Option<(u32, u32)> {
+        self.image_layer.size()
     }
 
     /// Announce the currently playing track (ADR-0110). The banner fades in,
@@ -1539,6 +1595,8 @@ impl Renderer {
             overlay,
             #[cfg(feature = "text")]
             text_layer,
+            #[cfg(feature = "text")]
+            image_layer,
             // Advanced and queued in `render`, before this is called — the banner
             // is a live-surface concern, so a headless capture never draws one.
             now_playing: _,
@@ -1714,6 +1772,8 @@ impl Renderer {
             OnCanvas {
                 #[cfg(feature = "text")]
                 text_layer,
+                #[cfg(feature = "text")]
+                image_layer,
                 diag,
                 overlay,
                 tier: tier.tier,

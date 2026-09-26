@@ -33,7 +33,7 @@ foobar component has had the opposite arrangement since
 [ADR-0159](../../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md): a cap
 derived from what it carries, and a recipe that prints its length every build and warns near it.
 The standalone has no equivalent, which is exactly why the breach was found by accident while
-pricing [Plan 0206](../0206-the-browser-shows-the-look.md).
+pricing [Plan 0206](0206-the-browser-shows-the-look.md).
 
 **The same shape holds for the thing the owner actually cares about.** The stated aim is that the
 app stay *"runnable on a mid range laptop"* whatever the preset.
@@ -187,7 +187,7 @@ correct one level up.
 - **It does not loosen NFR §2's baseline.** The 2015-era iGPU floor is stricter than the stated
   mid-range-laptop goal, so meeting it meets the goal; restating it downward was rejected.
 - **It does not make either cap fatal.** Both stay soft, per ADR-0159.
-- **It does not re-price [Plan 0206](../0206-the-browser-shows-the-look.md).** That plan rejected
+- **It does not re-price [Plan 0206](0206-the-browser-shows-the-look.md).** That plan rejected
   embedding thumbnails on the codec dependency as well as the byte count, so a raised cap does not
   reopen it.
 

@@ -44,6 +44,7 @@ use crate::run::{App, resolve_display};
 use crate::settings::{SettingsAction, SettingsState, SettingsView, TierState};
 use crate::show::Show;
 use crate::soak::SoakLog;
+use crate::thumbs;
 use standalone::config::{self, Config};
 
 /// How often the render loop wakes to keep DSP fed while hidden (NFR 1:
@@ -410,6 +411,11 @@ pub(crate) struct AppState {
     /// and refilled every frame the listener has traffic; see
     /// [`Show::take_control_transports`].
     pub(crate) control_transports: Vec<standalone::osc::decode::Transport>,
+
+    /// The background thumbnail pass (ADR-0230), `None` while `[thumbnails]
+    /// enabled` is off. Dropping it stops the pass and kills a running child,
+    /// so closing the app ends the render in flight.
+    pub(crate) thumbnail_pass: Option<thumbs::Pass>,
 }
 
 /// Capacity reserved for [`AppState::control_transports`], matching the
@@ -624,7 +630,14 @@ impl AppState {
             // Sized once for the listener's transport cap, so a frame carrying
             // verbs reuses this rather than growing it on the render thread.
             control_transports: Vec::with_capacity(TRANSPORT_SCRATCH),
+            thumbnail_pass: None,
         };
+        // From launch, whether or not the browser is ever opened (ADR-0230):
+        // the pass is slow enough that starting it on the first `Tab` would
+        // leave the pane empty for exactly the visit that wanted it.
+        if state.config.thumbnails.enabled {
+            state.thumbnail_pass = Some(thumbs::Pass::start());
+        }
         // **Which GPU is rendering the show**, once, at startup. Every
         // frame-time figure taken from this run is a property of that choice
         // (ADR-0071), so the line names the adapter and which carrier chose it
@@ -1000,6 +1013,47 @@ impl AppState {
         let names = self.roster_names();
         let rows = self.browse_rows(&names);
         self.hud.browse.on_roster_changed(&rows);
+        // An edited preset's stamp moved: the pass re-renders what is stale.
+        if let Some(pass) = &self.thumbnail_pass {
+            pass.rescan();
+        }
+    }
+
+    /// Take what the thumbnail pass reported since the last frame: its notes
+    /// go to `diagnostics.log`, and a picture that landed makes the pane look
+    /// that preset up again if it is the one it holds. Never waits — the pass
+    /// runs on its own thread.
+    pub(crate) fn poll_thumbnails(&mut self) {
+        let Some(pass) = self.thumbnail_pass.as_mut() else {
+            return;
+        };
+        let (log, pane) = (&mut self.diagnostics.diag_log, self.hud.browse.pane_slot());
+        pass.drain(|event| match event {
+            thumbs::PassEvent::Note(line) => log.note(&line),
+            thumbs::PassEvent::Landed(name) => pane.landed(&name),
+        });
+    }
+
+    /// Start or stop the thumbnail pass and persist the choice. Stopping kills
+    /// a running child; the pictures already cached stay and still show.
+    pub(crate) fn toggle_thumbnails(&mut self) {
+        self.config.thumbnails.enabled = !self.config.thumbnails.enabled;
+        if self.config.thumbnails.enabled {
+            if self.thumbnail_pass.is_none() {
+                self.thumbnail_pass = Some(thumbs::Pass::start());
+            }
+        } else if let Some(mut pass) = self.thumbnail_pass.take() {
+            pass.stop();
+            // What the worker said on its way out, then the reason it stopped.
+            let log = &mut self.diagnostics.diag_log;
+            pass.drain(|event| {
+                if let thumbs::PassEvent::Note(line) = event {
+                    log.note(&line);
+                }
+            });
+            log.note("thumbnail pass: turned off in settings");
+        }
+        self.save_config();
     }
 
     /// Open the windowed preview pipe, if `--preview stdout` asked for one.
@@ -1117,6 +1171,7 @@ impl AppState {
             return;
         }
         self.poll_presets();
+        self.poll_thumbnails();
         let frame = self.capture.analyzer.take_frame();
 
         // Per-beat downbeat decomposition (opt-in, Plan 0086 Phase 1). Absent
@@ -2008,6 +2063,7 @@ impl AppState {
             preset_name: self.config.hud.preset_name,
             now_playing: self.config.hud.now_playing,
             next_rotation: self.config.hud.next_rotation,
+            thumbnails: self.config.thumbnails.enabled,
             // Read off the cache, like the input roster. A running adapter the
             // roster does not hold reads as no roster at all: the row then
             // names what is running and goes inert, rather than walking from
@@ -2092,6 +2148,7 @@ impl AppState {
                 self.config.hud.next_rotation = !self.config.hud.next_rotation;
                 self.save_config();
             }
+            SettingsAction::ToggleThumbnails => self.toggle_thumbnails(),
         }
         self.window.request_redraw();
     }

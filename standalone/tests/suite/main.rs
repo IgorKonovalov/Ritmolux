@@ -19,3 +19,4 @@ mod preset_check;
 mod shot_cli;
 mod show_is_the_only_owner;
 mod stream_split;
+mod thumb_cli;

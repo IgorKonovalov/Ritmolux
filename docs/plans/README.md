@@ -44,7 +44,6 @@ place. The plan file carries the real link.
 | [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | approved | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four are `human`. Unblocked: 0120 closed 2026-09-22. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | approved | dev, human | ADR-0113's third Outcome is the brief: the rate candidate, the echo, the per-mode wave scale, then a fourth look gate. Phases 5-6 need the rig and the corpus, so the conductor parks. |
-| [0206](0206-the-browser-shows-the-look.md) | The browser shows the look | approved | dev | ADR-0230 (proposed): a low-priority subprocess of the player renders each still, cached by name + file stamp; a pane beside the list, never a grid. 0205 closed - shares the overlay. Exe is already over cap, backlog 0257. |
 | [0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md) | The library learns from the corpus it will not ship | approved | human | ADR-0227 (proposed): a borrowed look is authored natively and the reference stays outside. A judged 4-6 cohort of 21 picks, routed by look. After 0201's `zoom` fix. |
 | [0208](0208-the-conductors-safety-claims-get-their-evidence.md) | The conductor's safety claims get their evidence | approved | dev | ADR-0233 (proposed): the deny half is asserted against a probe transcript, not a model; Phase 1 can supersede it. Edits settings.conductor.json, so NOT queued. Closes 0236-0241. |
 | [0209](0209-a-system-joins-the-instruments-by-existing.md) | A system joins the instruments by existing | approved | dev, human | ADR-0234 (proposed): distinctness derives its roster from SystemKind; the catalogue declares an entry per system. Phases 4-5 edit .claude/, so NOT queued. Closes 0258, takes 0256's half. |
@@ -315,7 +314,7 @@ makes it the safe parallel rather than a second editor of the same files.
   the first note kept off the queue, [0202], [0211] and [0212] remain.
 
 [0202]: 0202-the-three-mechanisms-get-their-gate.md
-[0206]: 0206-the-browser-shows-the-look.md
+[0206]: done/0206-the-browser-shows-the-look.md
 [0207]: done/0207-the-commitments-get-their-instruments.md
 [0211]: 0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md
 [0212]: 0212-the-diffused-render-gains-a-timeline.md
@@ -346,9 +345,10 @@ unlisted plan's entry is inert. Re-queue 0207 and 0206 once 0219 Phase 5 closes.
 **Due 2026-09-22:** 0219 closed; the re-queue of 0207 and 0206 is the owner's to make before the next `run`.
 **Half spent 2026-09-23**, when 0207 was re-queued, ran and closed. What is left of the note is 0206:
 its `after: ["0207"]` is now satisfied, so nothing holds it but the re-queue itself.
+**Fully spent 2026-09-26**, when 0206 was re-queued, ran and closed.
 
 [0221]: done/0221-the-arch-block-names-the-studios-settings-file.md
-[0206]: 0206-the-browser-shows-the-look.md
+[0206]: done/0206-the-browser-shows-the-look.md
 
 ~~**Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster
 above.**~~ — **spent 2026-09-23**, when it closed. Moved verbatim to
@@ -1045,6 +1045,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0206 - The browser shows the look](done/0206-the-browser-shows-the-look.md) - closed 2026-09-26. Review: **no blockers, no majors, six minors (four fixed), one nit.** Version: **0.150.0**. ADR-0230 accepted, Outcome. Filed 0260, 0261. [Write-up](README-archive.md).
 - [0229 - The conductor reports itself honestly](done/0229-the-conductor-reports-itself-honestly.md) - closed 2026-09-24. Review: **no blockers, no majors, no minors** (round 1's major and two minors fixed). Version: none. Closes nothing. [Write-up](README-archive.md).
 - [0220 - The dependencies catch up, and npm gets its gate](done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) - closed 2026-09-24. Review: **no blockers, no majors, three minors (two fixed), one nit.** Version: **0.149.0**. ADR-0244 accepted, Outcome. [Write-up](README-archive.md).
 - [0228 - The resume guard accepts an owed phase](done/0228-the-resume-guard-accepts-an-owed-phase.md) - closed 2026-09-24. Review: **no blockers, no majors, two minors, one nit (two fixed).** Version: none. Closes nothing. [Write-up](README-archive.md).

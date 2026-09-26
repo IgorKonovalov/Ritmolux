@@ -42,7 +42,16 @@ mod settings;
 mod show;
 mod soak;
 mod stream;
+mod thumbs;
 
 fn main() {
+    // The thumbnail child (ADR-0230), before the launch path: this mode renders
+    // one preset's still into the cache and exits, and the process asking for it
+    // is the player itself rather than an operator. It opens no window, binds no
+    // socket and starts no capture client, so it must not travel through a path
+    // that does.
+    if let Some(code) = thumbs::child_mode() {
+        std::process::exit(code);
+    }
     run::run();
 }

@@ -117,6 +117,24 @@ presets back in. Each is independent of what you have typed, and the header abov
 every one that is on — so a short list is never a mystery. The typed query resets each time you
 open the browser; the three narrowings do not, because they are decisions rather than gestures.
 
+The bottom-right corner holds a **picture of the highlighted preset**: a still from its
+render on this machine, read from the thumbnail cache beside `config.toml` (see
+[the `thumbnails/` directory](configuration.md#the-third-thing-in-that-directory-thumbnails)). A
+preset with no picture yet shows its name and
+**no picture yet** in its place, which is the normal state on a first launch rather than a fault.
+The pictures are made in the background from the moment the app starts, one preset at a time, and
+the pane fills in as they land; covering the shipped library takes minutes rather than seconds, and
+the next launch picks up whatever the last one did not reach. Editing a preset in a
+[`RLX_PRESET_DIR`](configuration.md) library re-renders that preset's picture, and only that one,
+when the app reloads the file; until the new picture lands the pane keeps showing the previous one
+rather than a placeholder. A preset that fails to render is not tried again until its file changes.
+The settings menu's **Thumbnails** row
+turns that off (`[thumbnails] enabled`, see [Configuration](configuration.md#thumbnails)), which is
+what a machine on battery wants.
+The picture never moves the list: the columns are laid out as they would be without it, and the
+corner is the last place they reach. It is drawn on the main window only. With the operator console
+open, the browser moves to the console and has no picture.
+
 Both menus are modal and only one is open at a time: `S` opens settings when the
 browser is closed (while it's open, `s` is a filter character), and `Tab` from
 settings hands over to the browser.

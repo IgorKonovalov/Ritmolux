@@ -1207,6 +1207,8 @@ fn headless_view(
         now_playing: config.hud.now_playing,
         next_rotation: config.hud.next_rotation,
         console: false,
+        // No browser, so no thumbnail pass runs here whatever the key says.
+        thumbnails: false,
         // No roster and no switch on this path: a headless renderer keeps the
         // adapter it was built on for the life of the run, so the row that
         // would move it has nothing to move.
