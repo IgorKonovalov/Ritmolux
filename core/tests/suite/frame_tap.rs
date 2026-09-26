@@ -202,12 +202,14 @@ fn the_tap_hands_back_the_previous_frame() {
          keeping a frame in flight"
     );
 
-    // Frame 1 goes in and frame 0 comes out. The map is given the wait it
-    // needs through `drain_tap`, so this is an order assertion and not a race.
+    // Frame 1 goes in and frame 0 comes out, from the same call that draws
+    // frame 1. `render_tapped` waits for the map in flight before it submits
+    // the next frame, so this is an order assertion and not a race.
     set_backdrop(&mut renderer, HUES[1], BRIGHT);
     let published = renderer
-        .drain_tap(&mut tap)
-        .expect("frame 0 is the frame in flight");
+        .render_tapped(&mut tap, &frame, CAPTURE_FRAME_DT)
+        .expect("render_tapped on a headless renderer")
+        .expect("the call that draws frame 1 hands back frame 0");
     if let Some(diff) = first_difference(references.first().expect("two references"), &published) {
         panic!(
             "the frame the tap published is not frame 0: {diff}. It matches \
