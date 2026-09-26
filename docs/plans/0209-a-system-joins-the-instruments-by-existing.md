@@ -1,6 +1,6 @@
 # 0209 — A system joins the instruments by existing
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user) — approved and deliberately NOT in `tools/conductor/queue.json`
 > **Owner skill(s):** dev, human (Phase 5 is a `preset-author` session — see Risks)
@@ -183,17 +183,29 @@ flowchart LR
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0209-a-system-joins-the-instruments-by-existing`, worktree `/home/igor/Work/rlx-plan-0209`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the similarity roster derives from the enum | dev | not started | |
+| 1 — the similarity roster derives from the enum | dev | done | committed with this row |
 | 2 — the report is read, and the thresholds are judged | dev | not started | |
 | 3 — the stale prose carriers stop naming a list | dev | not started | |
 | 4 — the catalogue declares an entry per system | dev | not started | |
 | 5 — the four sections get their guidance | human | not started | |
 
 ### Notes
+
+- Phase 1: the roster is not an iteration over `SystemKind::ALL`. nextest runs one named `#[test]`
+  per family (ADR-0157), so `core/tests/distinctness.rs` names the fourteen in a `family_tests!`
+  macro that also emits an exhaustive `match` over the same variants; the label is read from
+  `SystemKind::as_str`. The hand-written `FAMILIES` array, its doc comment, the membership assert and
+  the `every_curated_family_has_its_own_test` count pin are gone. Nothing moved in
+  `core/src/preset/schema/system.rs`.
+- Phase 1 demonstration, two scratch edits, both reverted: a `ScratchProbe` variant in `SystemKind`
+  fails `cargo check -p rlx-core --tests` with E0004 at `SystemKind::row` (and four other lib
+  matches) before the test file compiles; deleting the `Cellular` line from `family_tests!` fails
+  `cargo check -p rlx-core --test distinctness` with E0004 *`SystemKind::Cellular` not covered* in
+  the test's own match.
 
 ### Close triggers
 

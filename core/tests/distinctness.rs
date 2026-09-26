@@ -49,43 +49,6 @@ fn print_matrix(
     }
 }
 
-/// The families this report covers, and the one place that list lives.
-///
-/// THIS LIST IS CURATED, NOT EXHAUSTIVE. It is a plain array rather than a
-/// match over `SystemKind`, so adding a scene does not force a decision here
-/// — which is exactly why the reasoning has to be written down instead of
-/// inferred from an absence.
-///
-/// **As of Plan 0067 Phase 1c it happens to cover all nine families that
-/// existed then**, and nothing about that is automatic: a new `SystemKind`
-/// will not appear here and nothing will fail. Three shipped families —
-/// `shape_field`, `warp_mesh` and `shape_collage` — are absent for exactly
-/// that reason. If a family is ever taken back out, the mechanical reason
-/// belongs in this comment.
-///
-/// The report's unit is a PAIRWISE matrix within a family, so a family needs
-/// at least two shipped presets before it can say anything at all. That —
-/// and only that — is why `attractor`, `reaction_diffusion` and `emitter`
-/// were absent from this list for so long. The premise had gone stale by a
-/// wide margin before anyone re-read it: at the time they were added,
-/// `attractor` had **eight** presets (28 pairs this report had never
-/// measured), `reaction_diffusion` six (15 pairs) and `emitter` two (1) —
-/// and `attractor` is the family with three plans of shape work behind it
-/// (0057, 0059, 0063) and therefore the most likely in the library to have
-/// converged. A count is a fine reason to leave a family out and a terrible
-/// one to leave written down, because it stops being true silently.
-const FAMILIES: [(SystemKind, &str); 9] = [
-    (SystemKind::FragmentField, "fragment_field"),
-    (SystemKind::Swarm, "swarm"),
-    (SystemKind::ParametricCurve, "parametric_curve"),
-    (SystemKind::LSystem, "lsystem"),
-    (SystemKind::StarPattern, "star_pattern"),
-    (SystemKind::Spectrum, "spectrum"),
-    (SystemKind::Attractor, "attractor"),
-    (SystemKind::ReactionDiffusion, "reaction_diffusion"),
-    (SystemKind::Emitter, "emitter"),
-];
-
 /// One family's pairwise report, as each `#[test]` below calls it.
 ///
 /// **This sweep splits per family and is never sampled** (ADR-0157). The claim
@@ -102,15 +65,10 @@ const FAMILIES: [(SystemKind, &str); 9] = [
 /// is re-derived from [`default_presets`] rather than from the loop that
 /// produced it.
 ///
-/// Each `#[test]` passes its family as a literal rather than by index into
-/// [`FAMILIES`], so reordering that array cannot leave a test running one family
-/// under another's name; membership in the curated list is then checked here.
-fn report_distinctness_within(system: SystemKind, label: &str) {
-    assert!(
-        FAMILIES.contains(&(system, label)),
-        "{label} is not in this report's curated list, so either the list lost an entry that \
-         still has a test or a test's (SystemKind, label) pair has drifted apart"
-    );
+/// The label is the system's canonical name, read from [`SystemKind::as_str`],
+/// so a test cannot report one family under another's name.
+fn report_distinctness_within(system: SystemKind) {
+    let label = system.as_str();
 
     let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
@@ -157,14 +115,13 @@ fn report_distinctness_within(system: SystemKind, label: &str) {
         println!("  (no near-duplicate geometry below shape {NEAR_DUP_STRUCT})");
     }
 
-    // A family in this list with fewer than two presets compares nothing and
-    // reports clean, which is the one way this advisory can go quiet without
-    // anyone noticing — the same staleness the list's own comment records.
+    // A family with fewer than two presets compares nothing and reports clean,
+    // which is the one way this advisory can go quiet without anyone noticing.
     let n = caps.len();
     assert!(
         n >= 2,
-        "{label} is in this report's curated list but ships {n} preset(s), so it has no pair to \
-         compare and the report says nothing about it"
+        "{label} ships {n} preset(s), so it has no pair to compare and the report says nothing \
+         about it"
     );
     // The pair count is checked against the LIBRARY's own membership, not
     // against the loop that just ran. `compared` is incremented once per
@@ -189,65 +146,41 @@ fn report_distinctness_within(system: SystemKind, label: &str) {
     );
 }
 
-#[test]
-fn distinctness_fragment_field() {
-    report_distinctness_within(SystemKind::FragmentField, "fragment_field");
-}
-
-#[test]
-fn distinctness_swarm() {
-    report_distinctness_within(SystemKind::Swarm, "swarm");
-}
-
-#[test]
-fn distinctness_parametric_curve() {
-    report_distinctness_within(SystemKind::ParametricCurve, "parametric_curve");
-}
-
-#[test]
-fn distinctness_lsystem() {
-    report_distinctness_within(SystemKind::LSystem, "lsystem");
-}
-
-#[test]
-fn distinctness_star_pattern() {
-    report_distinctness_within(SystemKind::StarPattern, "star_pattern");
-}
-
-#[test]
-fn distinctness_spectrum() {
-    report_distinctness_within(SystemKind::Spectrum, "spectrum");
-}
-
-#[test]
-fn distinctness_attractor() {
-    report_distinctness_within(SystemKind::Attractor, "attractor");
-}
-
-#[test]
-fn distinctness_reaction_diffusion() {
-    report_distinctness_within(SystemKind::ReactionDiffusion, "reaction_diffusion");
-}
-
-#[test]
-fn distinctness_emitter() {
-    report_distinctness_within(SystemKind::Emitter, "emitter");
-}
-
-/// **Growing [`FAMILIES`] must force a decision about a test to run it.**
+/// One `#[test]` per family, and an exhaustive match over the same list.
 ///
-/// The fan-out here is hand-written, one `#[test]` per curated family, so a
-/// tenth entry in that array would otherwise be measured by nothing and report
-/// nothing — the same silent-absence failure the array's own doc comment
-/// describes for a new `SystemKind`. This pins the count so the array and the
-/// roster of tests below it cannot drift apart unnoticed. Adding a family means
-/// adding its `#[test]` and moving this number, in one commit.
-#[test]
-fn every_curated_family_has_its_own_test() {
-    assert_eq!(
-        FAMILIES.len(),
-        9,
-        "the curated family list changed size; add or remove the matching #[test] below it, \
-         then move this number"
-    );
+/// The roster is every [`SystemKind`] — ADR-0234. nextest needs a named test per
+/// family to run them in parallel, so the names are written here, and the match
+/// the macro emits over the same variants is what keeps that list whole: a
+/// `SystemKind` variant with no line below is a non-exhaustive-match compile
+/// error naming the missing variant, never a family the report silently skips.
+macro_rules! family_tests {
+    ($($test:ident => $kind:ident),* $(,)?) => {
+        $(
+            #[test]
+            fn $test() {
+                report_distinctness_within(SystemKind::$kind);
+            }
+        )*
+
+        const _: fn(SystemKind) = |system| match system {
+            $(SystemKind::$kind => (),)*
+        };
+    };
+}
+
+family_tests! {
+    distinctness_fragment_field => FragmentField,
+    distinctness_swarm => Swarm,
+    distinctness_parametric_curve => ParametricCurve,
+    distinctness_lsystem => LSystem,
+    distinctness_star_pattern => StarPattern,
+    distinctness_reaction_diffusion => ReactionDiffusion,
+    distinctness_attractor => Attractor,
+    distinctness_spectrum => Spectrum,
+    distinctness_emitter => Emitter,
+    distinctness_shape_field => ShapeField,
+    distinctness_warp_mesh => WarpMesh,
+    distinctness_shape_collage => ShapeCollage,
+    distinctness_analytic_field => AnalyticField,
+    distinctness_cellular => Cellular,
 }
