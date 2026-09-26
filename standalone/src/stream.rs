@@ -388,12 +388,10 @@ impl StageCosts {
     }
 }
 
-/// How many pass rows a report prints. The tail below this is individually
-/// negligible and collectively noise; a reader chasing a frame time wants the
-/// handful of passes that could pay for moving.
-const PASS_ROWS: usize = 12;
-
 /// The per-pass GPU cost table, one row per labelled pass, costliest first.
+///
+/// **Every pass gets a row.** A cheap pass is still one a reader may be
+/// looking for by name, and a folded tail hides exactly those.
 ///
 /// `rows` is [`FrameTap::pass_costs`]'s own ordering and unit — **mean GPU
 /// milliseconds per frame** over `frames` frames — so this formats and does not
@@ -423,21 +421,9 @@ pub fn pass_table(
     );
     // The widest label printed, so the millisecond column lines up without a
     // fixed width that a longer label would blow past.
-    let width = rows
-        .iter()
-        .take(PASS_ROWS)
-        .map(|(label, _)| label.len())
-        .max()
-        .unwrap_or(0);
-    for (label, ms) in rows.iter().take(PASS_ROWS) {
+    let width = rows.iter().map(|(label, _)| label.len()).max().unwrap_or(0);
+    for (label, ms) in rows {
         out.push_str(&format!("\n  {label:<width$}  {ms:>7.3} ms"));
-    }
-    if let Some(rest) = rows.len().checked_sub(PASS_ROWS).filter(|n| *n > 0) {
-        let tail: f64 = rows.iter().skip(PASS_ROWS).map(|(_, ms)| *ms).sum();
-        out.push_str(&format!(
-            "\n  {:<width$}  {tail:>7.3} ms",
-            format!("({rest} more)")
-        ));
     }
     out
 }
@@ -1436,6 +1422,27 @@ mod tests {
         );
         assert!(table.contains("19.840 ms"), "{table}");
         assert!(table.contains("4.125 ms"), "{table}");
+    }
+
+    /// **Every labelled pass gets its own row**, however many there are and
+    /// however cheap the last one is: nothing folds into a summed tail.
+    #[test]
+    fn the_pass_table_prints_every_pass() {
+        let labels: Vec<String> = (0..20).map(|i| format!("pass-{i:02}")).collect();
+        let rows: Vec<(&str, f64)> = labels
+            .iter()
+            .enumerate()
+            .map(|(i, label)| (label.as_str(), 20.0 - i as f64 * 0.9))
+            .collect();
+        let table = pass_table(&rows, 60, GridScale::FULL, FULL_1080P);
+        for label in &labels {
+            assert!(
+                table.contains(label.as_str()),
+                "{label} has no row:\n{table}"
+            );
+        }
+        assert!(!table.contains("more)"), "a tail was folded:\n{table}");
+        assert_eq!(table.lines().count(), 1 + rows.len(), "{table}");
     }
 
     /// An empty window says so rather than printing a headed table with no

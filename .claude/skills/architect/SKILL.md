@@ -819,6 +819,19 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
 `git worktree list` and `git branch --show-current` recover both, and note the missing log as the
 `minor` lens 1 calls for.
 
+0. **Read `origin`'s CI before the merge** ([ADR-0251](../../../docs/adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)):
+
+   ```sh
+   node scripts/check-upstream-ci.mjs     # the newest CI run on origin/main
+   ```
+
+   It runs **before** step 1, because the tip it reads is the one this close is about to merge onto
+   and then tag on top of, and the conductor's own close reads it at the same point. **Red** (exit 1,
+   naming every failing job) means a job on `main` has been failing with nothing stopping the next
+   release: say so in the close notes and in the reply to the owner, then close anyway, because a
+   close never blocks on it. **Unread** (exit 0, a `skipped: not read (<case>)` line on stderr) means
+   no reading exists, whether `gh` is absent or unauthenticated or there is no network. That is not a
+   pass: record the case in one line and go on.
 1. **Merge `main` into the plan branch, from the worktree** (`git merge main`), and resolve there.
    Never update the main checkout's working tree from a lane — another session may be live in it.
 2. **Re-run the whole gate** (`fmt` + `clippy` + `nextest`) after that merge. It is the first moment
