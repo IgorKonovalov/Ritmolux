@@ -183,8 +183,8 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Settle the rate candidate | dev | done | 7027a97c |
-| 2 — Repair what Phase 1 convicted | dev | not run: Phase 1 falsified the candidate | committed with this row |
-| 3 — The echo nests | dev | not started | |
+| 2 — Repair what Phase 1 convicted | dev | not run: Phase 1 falsified the candidate | 09be6b65 |
+| 3 — The echo nests | dev | parked: the Risks section's stop-and-report condition; no code written | committed with this row |
 | 4 — The eight modes are captured on the rig | human | not started | |
 | 5 — The waveform scale is measured per mode | dev | not started | |
 | 6 — The fourth look gate | human | not started | |
@@ -217,6 +217,34 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
   at the rig's 165 fps. The candidate was judged on the deposit-only reading. The residual
   rate-dependence in the motion path (the warp, zoom and rot advection) is a followup and was not
   pursued.
+- **Phase 2 did not run**, per its own condition.
+- **Phase 3 stopped at its stop condition**, the "least-scoped phase" risk above. Reading `d4c843a`
+  (local clone `~/Work/milkdrop2-src`) contradicts the phase's premise; no code was written.
+  - *Songflower (Moss Posy)*
+    (`milkdrop-corpus/milkdrop-original/Milkdrop-Original/Aderrasi - Songflower (Moss Posy).milk`)
+    has no `PSVERSION` lines, so it has no comp shader. `CPlugin::RenderFrame`
+    (`milkdropfs.cpp` l.1160-1166) therefore takes `ShowToUser_NoShaders`.
+  - That path (l.4147-4233) reads the per-frame `echo_zoom`, `echo_alpha` and `echo_orient`. It
+    draws `m_lpVS[1]`, the current frame's warp plus its waves, at `1 - alpha`. It then adds a copy
+    zoomed about the centre by `1/echo_zoom` and flipped by orientation, at `alpha`. The result goes
+    to the back buffer only.
+  - The swap at l.1216-1219 hands the next frame `m_lpVS[1]` as it was before the composite. **The
+    echo never feeds back and does not composite the previous frame.**
+  - At *Songflower*'s header `fVideoEchoAlpha = 1.0`, the displayed frame is the one zoomed and
+    flipped copy alone. The reference's own echo cannot draw a nested weave for this preset.
+  - This engine's present pass (`shaders.rs`, `PRESENT_SHADER`) does the same `mix` about the same
+    centre, from the same per-frame outputs (`mod.rs` l.1087-1089 into `encode.rs` l.258-266). So
+    the binding does reach the composite.
+  - One divergence was found, and it cannot produce nesting. The reference takes the orientation as
+    `(int)v % 4`, a truncation; `echo_orientation` rounds. *Songflower*'s `echo_orient = 1 +
+    16*pfdy_r` sweeps about 0.76-1.24, so the reference flips x only while it is at or above 1, and
+    this engine always flips.
+  - For comparison, the shader path (`GenCompPShaderText`, `plugin.cpp` l.9594-9637) bakes the
+    header's echo values into the comp shader as literals at load. There a per-frame echo binding
+    is not read at all.
+  - Where the weave comes from is unattributed. It is not the echo, so it is outside this phase.
+    The candidates left are the field's own: `fDecay = 1`, `bTexWrap = 1`, and a per-pixel `zoom`
+    that falls below 1.
 
 ### Close triggers
 
