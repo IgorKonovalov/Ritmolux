@@ -317,7 +317,7 @@ pub(super) fn unpad_rows(padded: &[u8], width: u32, height: u32, padded_bpr: u32
 /// nothing at all.
 ///
 /// **The take waits when the previous map has not landed**
-/// ([`take_previous`](Self::take_previous)). That wait is the only backpressure
+/// (`take_previous`). That wait is the only backpressure
 /// a windowless loop has: the window is held to the GPU's pace by the
 /// swapchain, and nothing holds a tap to it but this. Without it, an adapter
 /// whose frame costs more GPU time than the caller's loop costs CPU time queues
