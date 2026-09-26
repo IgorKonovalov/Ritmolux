@@ -259,7 +259,7 @@ struct ThumbKey {
 | 2 — The renderer draws one image the shell hands it | dev | done | ab582b1b |
 | 3 — The pane shows what is cached | dev | done | 9f710df5 |
 | 4 — The pass fills the cache by itself | dev | done; frame-time reading taken by the owner 2026-09-26 | 4aeb28c8 |
-| 5 — A changed preset gets a new picture | dev | done | committed with this row |
+| 5 — A changed preset gets a new picture | dev | done | e93783d0 |
 
 ### Notes
 
