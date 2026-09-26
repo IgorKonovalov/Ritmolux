@@ -106,9 +106,10 @@ flowchart LR
   resolves to frames.
 - **Files touched:** `standalone/src/shot/render.rs`, `tools/sd-filter/sd_filter.py`,
   `docs/capturing.md`.
-- **Done when:** a timeline written in bars lands on the frames a listener would call those bars — checked
-  against the same track's `--downbeat-log` output rather than against the sidecar's own arithmetic, so
-  the two agree about where a bar is. Bar 1 is defined explicitly in `docs/capturing.md` (the first
+- **Done when:** the bar boundaries `shot --render` hands the sidecar are the analyzer's own bar grid
+  for the frames it renders, asserted offline by a test on the render path rather than by the sidecar's
+  arithmetic alone. Whether those bars are where a listener would put them is checked in Phase 3 against
+  the same track's `--downbeat-log`, which only the live windowed player writes. Bar 1 is defined explicitly in `docs/capturing.md` (the first
   downbeat the estimator locks, or the first frame — whichever the implementation does, said plainly),
   because an off-by-one bar is a silent quarter-track shift. **Backlog 0042 is live and load-bearing
   here:** the downbeat estimator locks on about 3 % of audible time, so on most tracks the bar grid is
@@ -123,7 +124,8 @@ flowchart LR
   render a full track with a timeline and say whether the variation reads as variety.
 - **Files touched:** the plan's `## Implementation log`.
 - **Done when:** the short clip is recorded as showing, or not showing, the two prompts' difference
-  over one geometry; and a recorded verdict against the 2026-08-25 render this ask came from: **the variation
+  over one geometry; a timeline's bars are checked against the same track's `--downbeat-log`, deferred
+  from Phase 2, and the log says whether they agree; and a recorded verdict against the 2026-08-25 render this ask came from: **the variation
   reads** — the plan closes; **it reads as a crossfade between two wrong images** — ADR-0236's named
   failure mode, recorded as an `Outcome` on the ADR, and the remaining levers are the two it declined;
   **it is too subtle to notice** — which says prompt motion is not enough authority over the picture, and
