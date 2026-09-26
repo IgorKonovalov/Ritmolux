@@ -412,7 +412,8 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   refusal above was observed on the real CLI (2.1.282, the table in `spike/README.md`, produced by
   `spike/matcher-probe.mjs`), except the PowerShell `Remove-Item` rules, which only a Windows run can
   ask. **Every rule has a case in `test/settings.test.mjs`**, which fails on a rule added without one;
-  a refusal the probe recorded is asserted against that table, and everything else against a model.
+  a refusal the probe recorded is asserted against that table and against a model of the file, so a
+  deny rule deleted since the probe turns it red, and everything else against the model alone.
 - **A command is admitted when the session already holds that capability through `Read`, `Glob`,
   `Grep` or `Write`, and refused otherwise.** Admitting such a command buys turns, not power: a
   session denied `ls` lists the directory with `Glob` on its next turn. So `ls`, `printenv`, `grep` and

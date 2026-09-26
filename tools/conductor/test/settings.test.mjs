@@ -8,15 +8,16 @@
 // THE TWO HALVES REST ON DIFFERENT THINGS (ADR-0233). A case that says a command is REFUSED and
 // names a `recorded` shape is asserted against what the real CLI did with that shape, read out of the
 // table in `tools/conductor/spike/README.md` that `spike/matcher-probe.mjs` produced; being wrong
-// about a refusal costs a directory, so it is not left to a model. Every other case — every allowed
+// about a refusal costs a directory, so it is not left to a model. It also goes through `decide`, so a
+// deny rule deleted after the probe turns it red. Every other case — every allowed
 // one, and a refusal the probe has not asked — goes through `decide` below, which models the CLI's
 // documented rule matching: a rule's text is matched against the whole command with `*` standing for
 // any run of characters, spaces included; a rule whose only wildcard is a trailing ` *` also matches
 // the bare command; a compound command is split at `&&`, `||`, `;`, `|`, `&` and newlines and every
 // part must be allowed on its own; and deny is consulted before allow. That half is a model of the
-// CLI, not the CLI: the probe has already caught it wrong in both directions — it allows the shell
-// expansions the CLI refuses, and it refuses a `| sed` the CLI runs — and a CLI that changed its
-// matcher would not turn it red. Being wrong about an allowed case costs a session one turn.
+// CLI, not the CLI: the probe has already caught it wrong — it refuses a `| sed` the CLI runs, and
+// before the `$` and backtick rules it allowed the shell expansions the CLI refuses — and a CLI that
+// changed its matcher would not turn it red. Being wrong about an allowed case costs a session one turn.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -262,9 +263,8 @@ const CASES = [
   { tool: "Bash", command: "rm -rf /etc/hosts", allowed: false, recorded: "rm -rf <absolute path>" },
   { tool: "Bash", command: "rm /tmp/x", allowed: false, recorded: "rm -rf <absolute path>" },
   { tool: "Bash", command: "rm -rf C:/Users/Someone/WORK", allowed: false, recorded: "rm -rf C:/canary-drive" },
-  // Paths the shell produces rather than a session writes. `decide` allows every one of these —
-  // `Bash(rm *)` covers them and no deny rule's text matches them — and the CLI refuses all four,
-  // so these rest on the transcript alone.
+  // Paths the shell produces rather than a session writes. `decide` refuses every one of these
+  // through the `$` and backtick rules, and the transcript is what shows the CLI agrees.
   { tool: "Bash", command: "rm -rf $HOME/.cargo", allowed: false, recorded: "rm -rf $HOME/.cargo" },
   { tool: "Bash", command: "rm -rf ${HOME}/.cargo", allowed: false, recorded: "rm -rf ${HOME}/canary-brace" },
   { tool: "Bash", command: 'rm -rf "$(git rev-parse --show-toplevel)/../rlx-plan-0180"', allowed: false, recorded: 'rm -rf "$(git rev-parse --show-toplevel)/.."' },
@@ -313,6 +313,10 @@ for (const c of CASES) {
       const verdict = recorded.verdicts.get(c.recorded);
       assert.ok(verdict, `spike/README.md records no verdict for \`${c.recorded}\``);
       assert.equal(verdict, "DENIED", `the CLI ${verdict} \`${c.recorded}\` on ${recorded.cli}`);
+      // The table is frozen at probe time, so it cannot see a rule deleted since. The model reads the
+      // file as it is now: the transcript says the CLI refused the shape, and this says the file still
+      // carries a rule that refuses it.
+      assert.equal(decide(c.tool, c.command).allowed, false, "settings.conductor.json no longer refuses a shape the CLI was recorded refusing");
     } else {
       assert.equal(decide(c.tool, c.command).allowed, c.allowed);
     }
