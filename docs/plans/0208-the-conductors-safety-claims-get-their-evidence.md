@@ -207,8 +207,8 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the matcher gets a transcript | dev | committed with this row | |
-| 2 — the deny cases move onto the transcript | dev | not started | |
+| 1 — the matcher gets a transcript | dev | done | 0075c675 |
+| 2 — the deny cases move onto the transcript | dev | committed with this row | |
 | 3 — the deletion bound reaches an expanded path | dev | not started | |
 | 4 — the prose stops promising more than the rules enforce | dev | not started | |
 | 5 — an undeclared `.claude/` edit is a drafting error | dev | not started | |
