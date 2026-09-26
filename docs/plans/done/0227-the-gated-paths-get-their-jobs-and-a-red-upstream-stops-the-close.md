@@ -1,6 +1,6 @@
 # 0227 — The gated paths get their jobs, and a red upstream stops the close
 
-> **Status:** done - Phase 7 owed, ADR-0249 (Phase 6 done 2026-09-26). Phases 1-5 `646ca642`, `1e7e4857`,
+> **Status:** done (Phase 6 done 2026-09-26, Phase 7 read 2026-09-26). Phases 1-5 `646ca642`, `1e7e4857`,
 > `1fc58a95`, `0c0ac09b`, `417022b7`; round 1 major fixed in `f1bbf1b1`. Round 2 review: no
 > blockers, no majors, two minors (both fixed at the close). ADR-0251 accepted. Version 0.148.0.
 > **Created:** 2026-09-24
