@@ -50,7 +50,6 @@ place. The plan file carries the real link.
 | [0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) | The diffused frame's resolution is measured before it is designed | approved | dev, human | No ADR yet: the quality profile has never run on a track, so Phase 1 renders the pair and Phase 2 may close the plan. Takes backlog 0125. |
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
-| [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -312,6 +311,8 @@ makes it the safe parallel rather than a second editor of the same files.
   is 29,528 B, and `Pages` goes green on the push that carries it.
 - **[0220] closed 2026-09-24** with its Phase 7 owed (ADR-0249), so it holds no lane. Of the four
   the first note kept off the queue, [0202], [0211] and [0212] remain.
+- **[0223] closed 2026-09-26**, and lane b is free again. The integrated Rich row is 0.75; at
+  2560x1440 no Rich scale holds, which keeps backlog 0259 live.
 
 [0202]: 0202-the-three-mechanisms-get-their-gate.md
 [0206]: done/0206-the-browser-shows-the-look.md
@@ -324,7 +325,7 @@ makes it the safe parallel rather than a second editor of the same files.
 [0220]: done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md
 [0218]: 0218-the-reference-machine-becomes-arch.md
 [0214]: 0214-the-linux-arm-reports-back.md
-[0223]: 0223-the-heavy-presets-fit-the-integrated-gpu.md
+[0223]: done/0223-the-heavy-presets-fit-the-integrated-gpu.md
 [0225]: done/0225-the-split-goes-one-level-deeper.md
 [0224]: done/0224-the-adapter-becomes-a-setting.md
 
@@ -705,18 +706,12 @@ new test can still be written by pasting. And `check-comment-hygiene.mjs` now wa
 as well as `.rs`, which puts `foo_ritmolux.cpp` under the gate for the first time; 0126's Phase on that
 file is the one that meets it.
 
-**Added 2026-09-22, from the heavy-preset analysis: [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md)
-runs after [0214](0214-the-linux-arm-reports-back.md) and beside [0218](0218-the-reference-machine-becomes-arch.md),
-not before them.** Its Phase 6 is a reading on the laptop's integrated adapter and 0218 Phase 2 is
-what moves the hardware tests onto the discrete one, so the two readings should name their adapters
-in the same vocabulary. Phases 1-2 (per-pass timings, the pipelined stream readback) change what
-`scripts/bench/` measures: every reading after them is a new dated file, and
-[0207](done/0207-the-commitments-get-their-instruments.md) Phase 2's frame-cost column should read
-the per-pass table rather than grow its own instrument. **Overtaken 2026-09-23**, when 0207 closed
-first and Phase 2 shipped a whole-frame reading of its own — the per-pass table did not exist to be
-read. The live question 0223 inherits is whether that table replaces this column or feeds it.
+~~**Added 2026-09-22, from the heavy-preset analysis: [0223](done/0223-the-heavy-presets-fit-the-integrated-gpu.md)
+runs after 0214 and beside 0218, not before them.**~~ — **spent 2026-09-26**, when 0223 closed. What
+it leaves is one open question: whether the per-pass table replaces 0207's frame-cost column or
+feeds it. The note is [in the archive](README-archive.md#prior-sequencing-notes-superseded).
 
-~~**Added 2026-09-22: 0224 runs before [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md).**~~
+~~**Added 2026-09-22: 0224 runs before [0223](done/0223-the-heavy-presets-fit-the-integrated-gpu.md).**~~
 — **spent 2026-09-23**, when [0224](done/0224-the-adapter-becomes-a-setting.md) closed. The flip is
 on `main`, so 0223 measures against the adapter an operator actually gets, which is all the note
 asked for. What it leaves 0223 is one live fact rather than an ordering: the integrated part stays
@@ -1045,6 +1040,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0223 - The heavy presets fit the integrated GPU](done/0223-the-heavy-presets-fit-the-integrated-gpu.md) - closed 2026-09-26. Review: **no blockers, no majors, three minors (two fixed).** Version: **0.151.0**. ADR-0245 accepted, Outcome. [Write-up](README-archive.md).
 - [0206 - The browser shows the look](done/0206-the-browser-shows-the-look.md) - closed 2026-09-26. Review: **no blockers, no majors, six minors (four fixed), one nit.** Version: **0.150.0**. ADR-0230 accepted, Outcome. Filed 0260, 0261. [Write-up](README-archive.md).
 - [0229 - The conductor reports itself honestly](done/0229-the-conductor-reports-itself-honestly.md) - closed 2026-09-24. Review: **no blockers, no majors, no minors** (round 1's major and two minors fixed). Version: none. Closes nothing. [Write-up](README-archive.md).
 - [0220 - The dependencies catch up, and npm gets its gate](done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) - closed 2026-09-24. Review: **no blockers, no majors, three minors (two fixed), one nit.** Version: **0.149.0**. ADR-0244 accepted, Outcome. [Write-up](README-archive.md).

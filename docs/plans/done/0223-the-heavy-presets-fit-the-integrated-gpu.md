@@ -1,12 +1,14 @@
 # 0223 — The heavy presets fit the integrated GPU
 
-> **Status:** in-progress 2026-09-22
+> **Status:** done 2026-09-26 - Phases 1-3, 5-7 landed, Phase 4 withdrawn; Phase 2's Meter Mono
+> reading owed. Round 2 review: no blockers, no majors, three minors (two fixed at the close).
+> Version 0.151.0.
 > **Created:** 2026-09-22
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0245](../adrs/0245-an-internal-grid-is-a-fraction-of-the-target-resolved-per-tier-and-adapter-class.md)
-> (proposed); supplements [ADR-0034](../adrs/0034-internal-resolution-follows-the-target.md),
-> [ADR-0140](../adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md),
-> [ADR-0232](../adrs/0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md)
+> **Related ADRs:** [ADR-0245](../../adrs/0245-an-internal-grid-is-a-fraction-of-the-target-resolved-per-tier-and-adapter-class.md)
+> (accepted, Outcome); supplements [ADR-0034](../../adrs/0034-internal-resolution-follows-the-target.md),
+> [ADR-0140](../../adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md),
+> [ADR-0232](../../adrs/0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md)
 > **Raises:** design-backlog 0259 (the attractor scatter, deferred)
 
 ## TL;DR
@@ -496,6 +498,109 @@ grid_scale = "auto"   # or 0.25..1.0
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207). `cargo nextest run
   --workspace -P fast` at Phase 7's tree: exit 0, 1745 passed, 86 skipped
 - **Outstanding `human` phases:** none
+
+## Close review
+
+Conductor-run close, 2026-09-26. **Owed:** Phase 2's Meter Mono before/after reading on the
+discrete adapter (round 2 minor 3). Its done-when is not met, and nothing has yet checked what the
+pipelined readback does to that preset's `draw+submit` figure on the RTX 3080.
+
+### Round 2 review, in full
+
+Graded at `92a5270971cdf7a7614f762e0002ff4b344ab894` (tree `95ee96a1`), lane
+`plan-0223-the-heavy-presets-fit-the-integrated-gpu` in `/home/igor/Work/rlx-plan-0223`.
+
+**Verdict: no blockers, no majors, three minors carried from round 1.** The round 1 major is fixed.
+The ordering test now draws frame 1 through `render_tapped` and asserts that the same call hands
+back frame 0. The fix round changed nothing else in code. The three round 1 minors are still open.
+Two of them are Markdown the close can repair. The third is code and stays open for the owner.
+
+#### What changed since round 1
+
+`git diff c6477910..92a52709` touches two files:
+
+- `core/tests/suite/frame_tap.rs` (8de01ee7): the ordering test's second step calls `render_tapped`
+  instead of `drain_tap`.
+- The plan's implementation log (92a52709): one bullet naming that fix.
+
+Round 1's lenses 2 to 5 graded code that has not moved, and those readings stand as written there.
+
+#### Evidence
+
+- **Full suite.** `node "/home/igor/Work/Ritmolux/tools/conductor/with-lock.mjs" suite -- cargo
+  nextest run --workspace` printed `with-lock: skipped cargo nextest run --workspace: tree 95ee96a
+  is green in the suite ledger, run by gate 0223-fix-1 at 2026-09-26T14:24:30.286Z: 1828 tests run:
+  1828 passed (11 slow), 7 skipped`. `git rev-parse --short HEAD^{tree}` is `95ee96a1`, so the
+  ledger record covers the graded tree. It is the lens-1 full-suite evidence.
+- **Rustdoc.** `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` finished clean.
+- **Node gates.** `check-comment-hygiene` passed (300 sources, 0 escapes). `check-doc-links` passed
+  (567 files).
+- **Tree.** `git status --short` was empty before and after the review.
+
+#### Round 1 major: resolved in 8de01ee7
+
+`core/tests/suite/frame_tap.rs:155` `the_tap_hands_back_the_previous_frame` now does four things:
+
+1. It renders two references, one per backdrop hue, through `capture_frame`, and asserts that they
+   differ.
+2. It makes a first `render_tapped` call and asserts `None`, so the first frame is one frame late.
+3. It sets frame 1's backdrop and makes a second `render_tapped` call. That call draws frame 1, and
+   the test requires `Some`.
+4. It asserts that the returned bytes equal `references[0]` and differ from `references[1]`.
+
+A tap that published the *current* frame now fails at step 4, which is Phase 2's done-when:
+"the stream publishes frame `N` during frame `N+1`". The references and the tapped renderer step the
+same clock, `FALLBACK_DT` against `CAPTURE_FRAME_DT`, and a comment higher in the same file holds
+that equality. So frame 0 in both is the same clock step, and the byte equality is a real
+comparison. The fix did not take up round 1's optional last step, a `drain_tap` asserting frame 1.
+It was offered as optional, so its absence is not a finding.
+
+#### Findings
+
+##### minor
+
+1. **`standalone/src/stream.rs:394` — `PASS_ROWS = 12` still truncates the table Phase 1 promised
+   in full.** This is round 1 minor 1, unrepaired. The done-when says "one row per labelled pass",
+   but `pass_table` prints twelve rows and folds the rest into `(N more)`. The fold already cost
+   Phase 6 its `post-chain-input-clear` row, which the withdrawn Phase 4's followup names. This is
+   code, so a close cannot repair it. **Fix (dev):** print every row, or keep the fold and never fold
+   a row the followup names. Either way, record the choice in the log.
+2. **`docs/adrs/0245-an-internal-grid-is-a-fraction-of-the-target-resolved-per-tier-and-adapter-class.md:83`
+   — ADR-0245 goes to `accepted` owing a dated Outcome.** This is round 1 minor 2, a close-repairable
+   Markdown edit. The Outcome states three things:
+   - the measured rows: Floor-integrated 1.0 and Rich-integrated 0.75 at 1080p, and no Rich scale
+     holding at 2560x1440;
+   - the fourth `Scene` widening, `set_grid_scale`, which passes ADR-0030's three conditions;
+   - that the budget counts `round(target_px * scale^2)` rather than the quantized grid's texels.
+3. **`docs/plans/0223-the-heavy-presets-fit-the-integrated-gpu.md:106` — Phase 2's Meter Mono
+   before/after reading on the discrete adapter was never taken.** This is round 1 minor 3. The
+   close's `## Close review` names the reading as owed rather than letting the done-when read as
+   met.
+
+#### Bookkeeping for the close (unchanged from round 1)
+
+- **Version bump owed: minor.** This is a feature plan.
+- ADR-0245 goes `proposed` to `accepted`, with the Outcome in minor 2.
+- **Translation advisory:** name `docs/running.ru.md` and `docs/how-it-works.ru.md` in the close
+  notes.
+- Only `presets/README.md` prose changed under `presets/`, so no `.toml` curation is triggered.
+  The header carries no `Closes:`. Backlog 0259 stays live.
+- `## Close review` records round 1 major 1 as resolved in 8de01ee7.
+
+### What the close did with it
+
+- Minor 1: **open**, code; for `dev`.
+- Minor 2: repaired in `0ff13379` (ADR-0245's dated Outcome); ADR-0245 accepted.
+- Minor 3: repaired in `0ff13379` (the log names the reading owed), and owed above.
+- Translation advisory: `docs/running.ru.md` and `docs/how-it-works.ru.md` trail their sources.
+- Preset curation: not triggered, no `.toml` moved.
+
+### Earlier rounds
+
+- Round 1, major 1 (`core/tests/suite/frame_tap.rs`: the ordering test drained frame 1 rather than
+  drawing it, so it could not tell a previous-frame tap from a current-frame one): resolved in
+  `8de01ee7`.
+- Round 1, minors 1-3: carried into round 2 unchanged, above.
 
 ## Followups (after this lands)
 

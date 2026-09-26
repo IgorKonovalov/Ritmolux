@@ -51,7 +51,7 @@ Three separate things make that the default rather than an accident:
   the live context for the *tier*.
 
 [ADR-0245](../../adrs/0245-an-internal-grid-is-a-fraction-of-the-target-resolved-per-tier-and-adapter-class.md)
-and [Plan 0223](../0223-the-heavy-presets-fit-the-integrated-gpu.md) attack the same complaint from the
+and [Plan 0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) attack the same complaint from the
 other end, by making the heavy presets affordable on the integrated part. **This plan runs first**,
 so 0223's tuning is measured against the adapter an operator actually gets.
 
@@ -303,7 +303,7 @@ renderer adapter: AMD Radeon Graphics (RADV RENOIR) ... (default: high performan
 - **It does not close backlog 0165.** The console's dual-GPU degrade branch may finally execute in
   Phase 5, which the log records; the entry's own remaining half is not this plan's deliverable.
 - **No preset tuning.** Making the heavy presets affordable on the integrated part is
-  [Plan 0223](../0223-the-heavy-presets-fit-the-integrated-gpu.md), which runs after this one.
+  [Plan 0223](0223-the-heavy-presets-fit-the-integrated-gpu.md), which runs after this one.
 
 ## Implementation log
 

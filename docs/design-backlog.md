@@ -1739,7 +1739,7 @@ decision rather than a repair:
 - **Every attractor golden re-blesses**, eyes-on per preset, and the continuous families' streak
   (ADR-0069) needs a line splat rather than a point.
 
-**Why it is deferred and not designed:** [Plan 0223](plans/0223-the-heavy-presets-fit-the-integrated-gpu.md)
+**Why it is deferred and not designed:** [Plan 0223](plans/done/0223-the-heavy-presets-fit-the-integrated-gpu.md)
 makes the internal grid a fraction of the target, which cuts the fill by the square of the fraction
 with no look change beyond softness. If Phase 6 finds a scale at which Rich holds 60 fps on the
 integrated GPU, this entry stays a note. If it finds none, this is the next ADR, and it will have

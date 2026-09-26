@@ -1,8 +1,8 @@
 # ADR-0245 — An internal grid is a fraction of the render target, resolved per tier and adapter class, and the sample budget counts against the grid
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-26 (Plan 0223), with an Outcome
 > **Date:** 2026-09-22
-> **Related plan(s):** [0223](../plans/0223-the-heavy-presets-fit-the-integrated-gpu.md)
+> **Related plan(s):** [0223](../plans/done/0223-the-heavy-presets-fit-the-integrated-gpu.md)
 > **Supplements:** [ADR-0034](0034-internal-resolution-follows-the-target.md) (the grids follow the
 > target, capped), [ADR-0037](0037-internal-grid-is-a-resolution-not-a-shape.md) (a grid is a
 > resolution), [ADR-0045](0045-quality-tiers-floor-and-rich.md) (the two tiers and the governor),

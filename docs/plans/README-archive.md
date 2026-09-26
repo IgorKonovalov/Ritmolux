@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0223 - The heavy presets fit the integrated GPU](#0223---the-heavy-presets-fit-the-integrated-gpu)
   - [0206 - The browser shows the look](#0206---the-browser-shows-the-look)
   - [0229 - The conductor reports itself honestly](#0229---the-conductor-reports-itself-honestly)
   - [0220 - The dependencies catch up, and npm gets its gate](#0220---the-dependencies-catch-up-and-npm-gets-its-gate)
@@ -230,6 +231,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-26 from `README.md` — the 0223-after-0214 note, spent](#moved-2026-09-26-from-readmemd--the-0223-after-0214-note-spent)
   - [Moved 2026-09-23 from `README.md` — the 0215-runs-last note, spent](#moved-2026-09-23-from-readmemd--the-0215-runs-last-note-spent)
   - [Moved 2026-09-23 from `README.md` — the 0224-before-0223 note, spent](#moved-2026-09-23-from-readmemd--the-0224-before-0223-note-spent)
   - [Moved 2026-09-18 from `README.md` — item 5 of the 2026-08-18 sequence, 0103 goes last, spent](#moved-2026-09-18-from-readmemd--item-5-of-the-2026-08-18-sequence-0103-goes-last-spent)
@@ -262,6 +264,25 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0223 - The heavy presets fit the integrated GPU](done/0223-the-heavy-presets-fit-the-integrated-gpu.md)
+
+- closed 2026-09-26, conductor-run lane `plan-0223-the-heavy-presets-fit-the-integrated-gpu`.
+Phase 1 `29e1b900`, Phase 2 `045025be` (repaired in `7c43ecc3`), Phase 3 `bd73f508`, Phase 4
+withdrawn 2026-09-24, Phase 5 `2b80500a`, Phase 6 `82414fb2` (the owner's reading), Phase 7
+`01e70558`. Round 1 review: **no blockers, one major, three minors**; the major was fixed by a `dev`
+round in `8de01ee7`. Round 2 review: **no blockers, no majors, three minors**; minors 2 and 3 were
+repaired at the close in `0ff13379`, minor 1 (`PASS_ROWS = 12` folds the pass table) is code and
+stays open. Version **0.151.0** (minor: a feature). ADR-0245 accepted with an Outcome. Closes no
+backlog entry; backlog 0259 stays live. The full review is the plan's own `## Close review` section.
+- **What landed.** Per-pass GPU timestamps under `--stream`, printed as a cost table. The stream
+  readback keeps one frame in flight and waits on it rather than queueing. Internal grids round to
+  the nearest 128 texels with a 256 floor. `[quality] grid_scale`, with `--grid-scale`,
+  `RLX_GRID_SCALE`, a settings row and the overlay, resolves per tier and adapter class; the
+  Rich-integrated row is 0.75, every other row 1.0.
+- **Open.** Phase 2's Meter Mono before/after reading on the discrete adapter was never taken. At
+  2560x1440 no Rich scale holds on the integrated GPU (backlog 0259). The pass table folds past
+  twelve rows, which hid `post-chain-input-clear` from Phase 6's reading (review minor 1).
 
 ### [0206 - The browser shows the look](done/0206-the-browser-shows-the-look.md)
 
@@ -10301,6 +10322,24 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-09-26 from `README.md` — the 0223-after-0214 note, spent
+
+Spent when [Plan 0223](done/0223-the-heavy-presets-fit-the-integrated-gpu.md) closed on 2026-09-26.
+It ran after 0214 was queued and beside 0218 rather than after either closed, and Phase 6's reading
+names its adapter (AMD RADV RENOIR) in full. Kept verbatim, except that the links are written for
+this file's depth:
+
+**Added 2026-09-22, from the heavy-preset analysis: [0223](done/0223-the-heavy-presets-fit-the-integrated-gpu.md)
+runs after [0214](0214-the-linux-arm-reports-back.md) and beside [0218](0218-the-reference-machine-becomes-arch.md),
+not before them.** Its Phase 6 is a reading on the laptop's integrated adapter and 0218 Phase 2 is
+what moves the hardware tests onto the discrete one, so the two readings should name their adapters
+in the same vocabulary. Phases 1-2 (per-pass timings, the pipelined stream readback) change what
+`scripts/bench/` measures: every reading after them is a new dated file, and
+[0207](done/0207-the-commitments-get-their-instruments.md) Phase 2's frame-cost column should read
+the per-pass table rather than grow its own instrument. **Overtaken 2026-09-23**, when 0207 closed
+first and Phase 2 shipped a whole-frame reading of its own — the per-pass table did not exist to be
+read. The live question 0223 inherits is whether that table replaces this column or feeds it.
+
 ### Moved 2026-09-23 from `README.md` — the 0215-runs-last note, spent
 
 Spent when [Plan 0215](done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md) closed on
@@ -10334,7 +10373,7 @@ exactly what the note asked for. Kept verbatim, except that the moved plan's lin
 file's depth:
 
 **Added 2026-09-22: [0224](done/0224-the-adapter-becomes-a-setting.md) runs before
-[0223](0223-the-heavy-presets-fit-the-integrated-gpu.md).** 0224 flips what an unflagged window asks
+[0223](done/0223-the-heavy-presets-fit-the-integrated-gpu.md).** 0224 flips what an unflagged window asks
 for, from the power-saving adapter to the high-performance one (ADR-0246), so it changes the machine
 0223 is tuning against. Measured on the Arch box on 2026-09-22, one preset and one tier: 25 fps with
 a 79 ms p99 on the integrated part against 164.9 fps and 6.5 ms on the discrete one. Running 0223
