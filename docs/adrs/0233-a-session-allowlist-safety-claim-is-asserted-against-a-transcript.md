@@ -1,8 +1,8 @@
 # ADR-0233 — A session-allowlist safety claim is asserted against a transcript, not a model
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-27, Plan 0208 (see `Outcome`)
 > **Date:** 2026-09-19
-> **Related plan(s):** [0208](../plans/0208-the-conductors-safety-claims-get-their-evidence.md)
+> **Related plan(s):** [0208](../plans/done/0208-the-conductors-safety-claims-get-their-evidence.md)
 
 ## Context
 
@@ -106,3 +106,21 @@ holds. Deciding the shape is Phase 3's job precisely because Phase 1 is what ear
 
 The falsifying transcript is `0191-01-implement`, 2026-09-16, the first unattended two-lane run.
 Backlog 0237 carries the escaping shapes; 0241 carries the compound finding and the two consequences.
+
+## Outcome (2026-09-27, Plan 0208)
+
+The decision held: the deny cases in `settings.test.mjs` rest on the probe transcript in
+`tools/conductor/spike/README.md`, and the allow cases stay a model. The bound that shipped is not
+Alternative D as written:
+
+- **Added:** `` Bash(rm *`*) ``, because the probe showed the backtick substitution needed its own rule.
+- **Dropped:** `rm *%*`. `%VAR%` is `cmd.exe` syntax, and neither shell tool expands it.
+- **Added, modelled only:** a leading `/` in any argument position (`rm * /*`) and a quoted absolute
+  path (`rm *"/*`, `rm *'/*`), with their `Remove-Item` twins. These came from the close review, not
+  from the probe.
+- **Owed:** the whole `Remove-Item` half is modelled, not observed. The PowerShell tool exists only on
+  Windows and the probe ran on Linux, so Phase 3's `Remove-Item -Recurse $env:USERPROFILE\WORK` case is
+  owed to a Windows probe run.
+
+The Negative section's staleness cost is live: the transcript names CLI 2.1.282, and nothing triggers
+a re-run of the probe when the CLI version moves.

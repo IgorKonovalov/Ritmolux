@@ -1,15 +1,17 @@
 # 0208 — The conductor's safety claims get their evidence
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-27 by a conductor-run close. Phases 1-5 in 0075c675, 95d86c89,
+> 3afa3de4, 25eea723, 2d9af125; three review rounds, round 3 clean with one minor (the `Remove-Item`
+> half is modelled, owed to a Windows probe run) and one nit (fixed). Version: none (repository
+> tooling). ADR-0233 accepted with an `Outcome`.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user) — approved and deliberately NOT in `tools/conductor/queue.json`.
-> Superseded 2026-09-27: Phase 5 and all three review rounds ran under the conductor, once the
-> lanes it would have disturbed had drained.
+> Superseded 2026-09-27: Phase 5 and all three review rounds ran under the conductor.
 > **Owner skill(s):** dev
-> **Related ADRs:** [0233](../adrs/0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md)
-> (proposed), [0208](../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md),
-> [0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md),
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+> **Related ADRs:** [0233](../../adrs/0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md)
+> (accepted), [0208](../../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md),
+> [0210](../../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md),
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > **Closes:** design-backlog 0236, 0237, 0241
 
 ## TL;DR
@@ -24,7 +26,7 @@ park. The first visible behaviour is a committed table saying what the CLI actua
 
 ## Context & problem
 
-**The unbounded rule.** [Plan 0190](done/0190-the-conductor-survives-a-run-nobody-is-watching.md)
+**The unbounded rule.** [Plan 0190](0190-the-conductor-survives-a-run-nobody-is-watching.md)
 Phase 2 allowed `Bash(rm *)` and `PowerShell(Remove-Item *)` and bounded them with deny rules for the
 four ways a *written* path leaves the worktree: `..`, `~`, a leading `/`, a drive letter. A path the
 shell *produces* matches none of them, so all three of these are allowed today (backlog 0237):
@@ -48,7 +50,7 @@ costs a directory rather than a turn — are asserted against a model already fa
 states outright.
 
 **And the one park that exists to fail early can still fail late.**
-[ADR-0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
+[ADR-0210](../../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
 parks a plan in front of a phase whose files include a `.claude/` path, because the CLI refuses a
 headless session an `Edit` there. `claudePaths` reads the phase's `**Files touched:**` bullet for a
 literal path, so the guarantee is only as strong as a plan's prose — and the plan that built the
@@ -62,7 +64,7 @@ against something other than the harness.
 
 ## Decision
 
-Per [ADR-0233](../adrs/0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md),
+Per [ADR-0233](../../adrs/0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md),
 **a claim that the allowlist refuses something is asserted against a recorded transcript of the real
 CLI, and a claim that it permits something may stay a model** — because being wrong about an allow case
 costs one visible turn and being wrong about a deny case is unbounded and silent. `spike/probe.mjs`
@@ -261,6 +263,123 @@ flowchart TB
   23 live entries, 4 unprobeable.
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
 - **Outstanding `human` phases:** none
+
+## Close review
+
+### Round 3 (the clean verdict this close ran on)
+
+**Graded at:** `0366c9443297b86a4d311652e3a4d4f387bd021e` (tree `a0867fb6`), lane
+`/home/igor/Work/rlx-plan-0208`, branch `plan-0208-the-conductors-safety-claims-get-their-evidence`
+(already carries `main`).
+
+**Verdict:** the round-2 major and both round-2 code/prose minors are resolved correctly. **No
+blockers, no majors, 1 minor, 1 nit.** Both remaining items are carried over from round 2, and both
+are things the close records rather than code. The plan is ready to close.
+
+#### Evidence
+
+- **Full suite (lens 1):** served from the ledger, not re-run. The wrapper printed
+  `with-lock: skipped cargo nextest run --workspace: tree a0867fb is green in the suite ledger, run by
+  gate 0208-fix-2 at 2026-09-26T22:30:23.986Z: 1858 tests run: 1858 passed (5 slow), 7 skipped`.
+  `git rev-parse --short HEAD^{tree}` is `a0867fb6`, so the record covers the tip graded here.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: green.
+- `node --test tools/conductor/test/`: 469 tests, 467 pass, 0 fail, 2 skipped (Windows-only).
+- `node scripts/check-claude-declarations.mjs --self-test`: 12 of 12.
+- `node scripts/check-claude-declarations.mjs`: OK over 229 plans. The advisory lists 14 phases in
+  closed plans, Plan 0190 Phase 9 among them, and no exit code.
+- `node scripts/check-gate-carriers.mjs`: OK, 22 rostered, hook 19/19, ci 19/19.
+- `node scripts/check-doc-links.mjs` (568 files), `check-index-rows.mjs`, `toc.mjs --check`,
+  `check-system-counts.mjs`: all OK.
+- `node scripts/check-backlog-claims.mjs`: exit 0, 47 reductions across 23 live entries, 4
+  unprobeable.
+- `git status --short` is empty at the end. The tree is as I found it.
+
+#### Round-2 findings, re-graded
+
+| round 2 | resolved in | verdict |
+|---|---|---|
+| major 1: a quoted absolute path passes the deletion bound | aa55b438 | **Resolved.** `settings.conductor.json:82-83,93-94` add `Bash(rm *"/*)`, `Bash(rm *'/*)` and the two `Remove-Item` twins. Under `ruleRegex` (`settings.test.mjs:74`), `*` matches the empty string, so a quoted first argument (`rm "/etc"`) is covered as well as `rm -rf "/etc"`. The refused cases at `settings.test.mjs:268-269,286-287` say `not probed`, and `rm -rf "target/debug"` is an allowed case at 270, which shows the rules do not refuse a quoted relative path. `README.md:402-403,416-417` name the shape and list it as modelled. |
+| minor 1: `declared` accepts a bare `.claude/` | 5d86abb5 | **Resolved.** `check-claude-declarations.mjs:156` uses `/\.claude\/[\w*][\w.*/-]*/`. Its character class is a subset of `claudePaths()`'s (`tools/conductor/lib/plan.mjs:179`), so every phase the gate treats as declared is a phase the conductor parks in front of. The disagreement the finding named is gone. Fixture Phase 10 covers the bare form, and the self-test asserts it by count. |
+| minor 2: `docs/developing.md` and `CLAUDE.md` omit the gate | 410db891 | **Resolved.** `docs/developing.md:218-219` add the two rows in hook order, and `CLAUDE.md`'s `scripts/` block carries the clause. |
+| minor 3: the `Remove-Item` half of Phase 3 is unprobed | — | **Open by nature.** Carried as minor 1 below. |
+| nit 1: the stale `Approved:` line | — | **Open.** Carried as nit 1 below. |
+
+#### Lens 1 — alignment
+
+The phase mapping is unchanged: phases 1 to 5 map to 0075c675, 95d86c89, 3afa3de4, 25eea723 and
+2d9af125. Each phase has one `Owner skill: dev`. The log adds three round-2 notes, each naming its
+commit, and it is still shorter than the phases section. Each done-when was graded in rounds 1 and 2.
+The fix round changed only the deletion rules, the gate's `declared` test and prose, and none of them
+reopens a done-when.
+
+#### Findings
+
+##### minor
+
+1. **`tools/conductor/test/settings.test.mjs:285`: the `Remove-Item` half of Phase 3's done-when is
+   modelled, not observed.**
+   - **What:** Phase 3 requires `Remove-Item -Recurse $env:USERPROFILE\WORK` to be refused "under the
+     real CLI". The PowerShell tool exists only on Windows, and the probe ran on Linux.
+   - **Status:** the README, the log and the cases all say so openly. The four new quoted
+     `Remove-Item` rules are in the same position.
+   - **Repair (close):** record it in `## Close review` as owed to a Windows probe run, and in
+     ADR-0233's `Outcome`.
+
+##### nit
+
+1. **`docs/plans/0208-the-conductors-safety-claims-get-their-evidence.md:5`: the `Approved:` line
+   still says "deliberately NOT in `tools/conductor/queue.json`".** Phase 5 and all three review
+   rounds ran under the conductor, and the log's notes say so.
+   - **Repair (close):** add a dated note when `Status:` flips.
+
+#### Lenses 2, 4 and 5
+
+The fix round changed no Rust, C++ or `core/` code. It made no audio-path, C ABI or control-protocol
+change, and it added no numeric assertion. The new deny rules belong to the existing `rm` and
+`Remove-Item` families, and the roster test requires each rule to have a case. They also refuse a
+command whose quoted relative segment is followed by `/`, such as `rm -rf "build"/x`. That is
+over-refusal, which the plan's Risks section accepts as the recoverable direction.
+
+#### Bookkeeping owed at the close
+
+- **ADR-0233:** flip from `proposed` to `accepted` with a dated `Outcome`. The bound that shipped
+  differs from Alternative D:
+  - it adds `` Bash(rm *`*) ``;
+  - it drops `rm *%*`;
+  - it adds the any-position and quoted absolute-path rules, which are modelled.
+
+  `Remove-Item` is modelled only, and nothing triggers a probe re-run when the CLI version moves.
+- **Backlog 0236, 0237 and 0241:** append `CLOSED` and move each from `### Promoted` to `### Closed`.
+  0237's gap (the quoted form included) is now bounded.
+- **`## Close review` section:** add it with this review and one line per earlier finding:
+  - round 1: 0 and 3 in c006772, 1 and 2 in 6c53d90;
+  - round 2: 0 in aa55b43, 1 in 5d86abb, 2 in 410db89.
+- **Version bump:** this is repository tooling, and no shipped artifact changed. Choose none or patch
+  deliberately.
+- **Translation advisory:** re-read it at the close.
+
+### What the close did with round 3
+
+- **Minor 1 stays open**, owed to a Windows probe run: the `Remove-Item` rules, including the quoted
+  twins, are modelled and not observed. It is recorded in ADR-0233's `Outcome` and in backlog 0237's
+  `CLOSED` marker. It changes no file the close may repair.
+- **Nit 1 fixed** in 2d3df840: the `Approved:` line carries a dated note.
+- **Version: none.** The plan changed the conductor's settings and tests and added a Node gate. No
+  shipped artifact moved, which is the same call Plans 0226 and 0229 made for conductor tooling.
+- **Upstream CI** read green at the close (run 36272565363 on `main` at 3e476de).
+- **Translation advisory:** `docs/how-it-works.ru.md`, `docs/running.ru.md` and
+  `packaging/foobar/READ-ME-FIRST.ru.md` have sources that moved past their stamps. This plan moved
+  none of those sources.
+
+### Earlier rounds, resolved by fix rounds
+
+- Round 1, finding 0 (major, a deleted deny rule stayed green): fixed in c006772.
+- Round 1, finding 1 (major, a leading `/` in a later argument passed the bound): fixed in 6c53d90.
+- Round 1, finding 2 (minor, the README sentence overstated the bound): fixed in 6c53d90.
+- Round 1, finding 3 (minor, stale comments in `settings.test.mjs`): fixed in c006772.
+- Round 2, finding 0 (major, a quoted absolute path passed the deletion bound): fixed in aa55b43.
+- Round 2, finding 1 (minor, `declared` accepted a bare `.claude/`): fixed in 5d86abb.
+- Round 2, finding 2 (minor, `docs/developing.md` and `CLAUDE.md` omitted the gate): fixed in 410db89.
 
 ## Followups (after this lands)
 

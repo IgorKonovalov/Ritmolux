@@ -329,9 +329,6 @@ live entry citing this one.
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
 | 0126 | A render is one prompt, one seed and one preset from first frame to last | [Plan 0212](plans/0212-the-diffused-render-gains-a-timeline.md). **Promoted** |
-| 0236 | The `.claude/` park reads a phase's declared `Files touched`, and prose escapes it | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
-| 0237 | The allowlist bounds a deletion by literal path shapes, so an expansion escapes the lane | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
-| 0241 | The allowlist is asserted against a model of the CLI's matcher, which one run falsified | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -632,6 +629,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0254 | Every gallery card is captured at hop 300, before an accumulating world exists | [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phases 2-4 + ADR-0235. Six families at hop 2754/2828 over a 30 s clip. **Closed 2026-09-22** |
 | 0257 | The standalone exe is 9.7 % over NFR §4's cap, and only the component would have noticed | [Plan 0207](plans/done/0207-the-commitments-get-their-instruments.md) Phase 1 + ADR-0231. Re-derived to 16,777,216 B; both recipes measure and warn. **Closed 2026-09-23** |
 | 0258 | The content lane's scene catalogue covers ten of fourteen systems | [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md) Phases 4-5 + ADR-0234. The sweep row is the owner's. **Closed 2026-09-26** |
+| 0236 | The `.claude/` park reads a phase's declared `Files touched`, and prose escapes it | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 5. A drafting gate; closed plans are an advisory. **Closed 2026-09-27** |
+| 0237 | The allowlist bounds a deletion by literal path shapes, so an expansion escapes the lane | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 3 + ADR-0233. `$` and backtick probed; `Remove-Item` modelled. **Closed 2026-09-27** |
+| 0241 | The allowlist is asserted against a model of the CLI's matcher, which one run falsified | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phases 1-2 + ADR-0233. Deny cases rest on a transcript. **Closed 2026-09-27** |
 <!-- roster:end -->
 
 ---
@@ -15877,9 +15877,18 @@ Shapes, none decided:
 one — and the conductor is stood down. It matters the first time a conductor-run plan touches a skill
 file without naming it, which is a normal thing for a plan to do.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-27 by [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 5 — the first shape, a gate at drafting time
+
+**CLOSED.** `scripts/check-claude-declarations.mjs` refuses an active plan phase that names a skill, a
+hook, `settings.json` or a conductor-mode section without a `.claude/` path in `Files touched`. It
+fails on a fixture in Plan 0190 Phase 9's shape and passes once the paths are declared. Closed plans
+are read as an advisory only: 14 phases across 11 of them, Plan 0190 Phase 9 among them, and none was
+edited. The declaration pattern is a subset of `claudePaths()`'s, so a phase the gate calls declared is
+one the conductor parks in front of.
 
 ---
 
@@ -15927,9 +15936,18 @@ Shapes, none decided:
 in that file whose stated bound — *"a path that leaves the lane is refused, whatever it is for"* — is
 not the bound the rules actually enforce, and the README repeats the claim.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-27 by [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 3 — the first shape, widened by what the probe showed
+
+**CLOSED.** The expansion syntax is denied: `Bash(rm *$*)` and `` Bash(rm *`*) ``, the second because
+the probe showed a backtick substitution was needed. The rules also deny a leading `/` in any argument
+position and a quoted absolute path. `rm *%*` was left out, because neither shell tool expands
+`%VAR%`. `rm -rf $HOME/.cargo` reads DENIED under the real CLI, and `rm -rf target/debug` still runs.
+**The `Remove-Item` half is modelled, not observed.** The PowerShell tool exists only on Windows and
+the probe ran on Linux, so it is owed to a Windows probe run (ADR-0233's `Outcome`).
 
 ---
 
@@ -16009,9 +16027,18 @@ cost turns, the sessions recovered, all three phases of 0191 committed. It is fi
 negative cases are the ones worth being right about, and the run just demonstrated that the thing
 asserting them can be wrong about a case it states outright.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-27 by [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phases 1-2 and 4 — probed, and the prompt rule kept with its reason
+
+**CLOSED.** `tools/conductor/spike/` probes the matcher and records a RAN/DENIED table beside the CLI
+version. On 2.1.282 a `cd` to the session's own lane never reached the matcher, and every other `cd`
+was refused. `settings.test.mjs` asserts every probed deny case against the recorded outcome, and also
+asserts `decide()` refuses it, so a deleted deny rule goes red. The allow cases stay a model. The
+prompt's `No cd` stays, with the reason: a refused `cd` costs a turn. Nothing yet re-runs the probe
+when the CLI version moves.
 
 ---
 

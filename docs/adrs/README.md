@@ -254,7 +254,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0230](0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md) | Thumbnails are rendered by a subprocess of the player itself | accepted 2026-09-26, Plan 0206, Outcome |
 | [0231](0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md) | The standalone's size cap is re-derived from what it carries, and the build reports it | accepted 2026-09-23, Plan 0207, amends NFR §4, Outcome |
 | [0232](0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md) | A preset's frame cost is measured and reported, never asserted | accepted 2026-09-23, Plan 0207, Outcome |
-| [0233](0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md) | A session-allowlist safety claim is asserted against a transcript, not a model | proposed |
+| [0233](0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md) | A session-allowlist safety claim is asserted against a transcript, not a model | accepted 2026-09-27, Plan 0208, Outcome |
 | [0234](0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md) | An instrument's system roster is derived from the enum the engine reads | accepted 2026-09-26 (Plan 0209) |
 | [0235](0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md) | A gallery card's hop is chosen per family, and the signal outlasts it | accepted 2026-09-22 (Plan 0210) |
 | [0236](0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md) | A diffused render varies by prompt on bar boundaries, and the seed stays fixed | proposed |

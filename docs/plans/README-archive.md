@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0208 - The conductor's safety claims get their evidence](#0208---the-conductors-safety-claims-get-their-evidence)
   - [0209 - A system joins the instruments by existing](#0209---a-system-joins-the-instruments-by-existing)
   - [0223 - The heavy presets fit the integrated GPU](#0223---the-heavy-presets-fit-the-integrated-gpu)
   - [0206 - The browser shows the look](#0206---the-browser-shows-the-look)
@@ -265,6 +266,25 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0208 - The conductor's safety claims get their evidence](done/0208-the-conductors-safety-claims-get-their-evidence.md)
+
+- closed 2026-09-27, conductor-run close of lane `plan-0208-the-conductors-safety-claims-get-their-evidence`.
+Phase 1 `0075c675`, Phase 2 `95d86c89`, Phase 3 `3afa3de4`, Phase 4 `25eea723`, Phase 5 `2d9af125`.
+Three review rounds: round 1 two majors and five minors, round 2 one major and three minors, both
+rounds' majors fixed; round 3 **no blockers, no majors, one minor, one nit**, the nit repaired at the
+close in `2d3df840`. Version: **none** (repository tooling: the conductor's settings, its tests and a
+new Node gate; no shipped artifact changes). ADR-0233 accepted with an `Outcome`. Closes backlog 0236,
+0237 and 0241. Upstream CI read green at the close. The full review is the plan's own `## Close review`
+section.
+- **What landed.** A matcher probe under `tools/conductor/spike/` and its RAN/DENIED table on a named
+  CLI version; `settings.test.mjs` asserts every probed deny case against that table; deny rules for a
+  shell expansion (`$`, backtick), a leading `/` in any argument and a quoted absolute path;
+  `scripts/check-claude-declarations.mjs` on the gate roster.
+- **Open.** The `Remove-Item` half of the bound is modelled, not observed, and is owed to a Windows
+  probe run (review minor 1). Nothing re-runs the probe when the CLI version moves. Translation
+  advisory at the close: `how-it-works.ru.md`, `running.ru.md` and the foobar `READ-ME-FIRST.ru.md`
+  have moved sources; this plan moved none of them.
 
 ### [0209 - A system joins the instruments by existing](done/0209-a-system-joins-the-instruments-by-existing.md)
 
