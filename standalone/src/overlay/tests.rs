@@ -871,6 +871,36 @@ fn the_pane_looks_a_preset_up_once_and_shows_only_what_it_found() {
     );
 }
 
+/// **A new picture replaces only its own preset's.** Another preset landing
+/// leaves the held picture on screen and unread; the held preset landing makes
+/// the pane look it up again, whether it was showing a picture or the
+/// placeholder.
+#[test]
+fn a_landed_picture_is_looked_up_only_for_the_preset_it_is_of() {
+    let mut slot = PaneSlot::default();
+    slot.loaded("Echo Plate", true);
+
+    slot.landed("Lace Grid");
+    assert!(
+        slot.shows("Echo Plate"),
+        "another preset's picture displaced the held one"
+    );
+    assert!(!slot.needs_load("Echo Plate"));
+
+    slot.landed("Echo Plate");
+    assert!(
+        slot.needs_load("Echo Plate"),
+        "the held preset's new picture is not read"
+    );
+
+    slot.loaded("Seahorse", false);
+    slot.landed("Seahorse");
+    assert!(
+        slot.needs_load("Seahorse"),
+        "a placeholder is not replaced by the picture that landed"
+    );
+}
+
 /// **The placeholder reads as "not yet"** and sits inside the rectangle the
 /// picture will occupy, so the pane is the same shape before and after.
 #[test]

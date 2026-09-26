@@ -259,7 +259,7 @@ struct ThumbKey {
 | 2 — The renderer draws one image the shell hands it | dev | done | ab582b1b |
 | 3 — The pane shows what is cached | dev | done | 9f710df5 |
 | 4 — The pass fills the cache by itself | dev | done; frame-time reading taken by the owner 2026-09-26 | 4aeb28c8 |
-| 5 — A changed preset gets a new picture | dev | not started | |
+| 5 — A changed preset gets a new picture | dev | done | committed with this row |
 
 ### Notes
 
@@ -402,15 +402,39 @@ reference laptop (Arch, kernel 7.2.5, Hyprland 0.56.2, music playing, Rich pinne
 - An earlier AMD session on the same day is not used: the session's idle lock fell in its pass
   window and froze the rows.
 
+**Phase 5 — two files beyond the list, and a pass that no longer ends when covered.**
+
+- `standalone/src/app_state.rs` is edited and is not in `Files touched`. The show's reload is seen
+  only there, in `poll_presets`, so that is where the pass is told to walk again
+  (`thumbs::Pass::rescan`). `poll_thumbnails` there now hands a landed name to
+  `overlay::PaneSlot::landed`, which re-reads the pane only when the landed picture is the preset it
+  holds. `standalone/src/overlay/tests.rs` carries that method's test and is not listed either.
+- Phase 4's *"the pass stops when the library is covered"* now reads differently. A covered pass
+  starts no child, but its worker thread stays alive, blocked in a receive with no timer, and wakes
+  on a reload to walk the library again and render only what the stamps say is stale. A pass that
+  gave up, was stopped or could not start a child stays ended for the launch.
+- A preset that failed is not retried at the stamp it failed at. A walk after an edit to that
+  preset's file does retry it.
+- The child takes the stamp **before** it reads the library and again after the render, and writes
+  nothing when the two differ (`thumbs::bracketed`). That run exits 0 with a line saying why, so
+  the pass counts it in the `rendered` figure of its `done` line.
+- The "stale picture while the new one renders" half needed no new code: `thumbs::cached_still`
+  was already not held to the stamp, and an entry is replaced by a rename.
+- The edit-then-re-render path was not exercised end to end in a running window. The tests drive
+  the walk loop with a stub for the player, the stale-list selection against a scratch cache, and
+  the stamp bracket with an edit made during a stand-in render.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature
+- **Operator docs touched:** `docs/configuration.md`, `docs/running.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 46 reductions across 21
+  live entries hold (4 unprobeable), 30 advisory moved-path rows
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Phase 5 ran
+  `cargo nextest run -p standalone -P fast`: exit 0, 489 passed, 0 skipped
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
 

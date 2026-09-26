@@ -991,11 +991,16 @@ impl AppState {
         let names = self.roster_names();
         let rows = self.browse_rows(&names);
         self.hud.browse.on_roster_changed(&rows);
+        // An edited preset's stamp moved: the pass re-renders what is stale.
+        if let Some(pass) = &self.thumbnail_pass {
+            pass.rescan();
+        }
     }
 
     /// Take what the thumbnail pass reported since the last frame: its notes
     /// go to `diagnostics.log`, and a picture that landed makes the pane look
-    /// its preset up again. Never waits — the pass runs on its own thread.
+    /// that preset up again if it is the one it holds. Never waits — the pass
+    /// runs on its own thread.
     pub(crate) fn poll_thumbnails(&mut self) {
         let Some(pass) = self.thumbnail_pass.as_mut() else {
             return;
@@ -1003,9 +1008,7 @@ impl AppState {
         let (log, pane) = (&mut self.diagnostics.diag_log, self.hud.browse.pane_slot());
         pass.drain(|event| match event {
             thumbs::PassEvent::Note(line) => log.note(&line),
-            // Whichever preset landed: the pane re-reads the one it is on,
-            // which is one small file per landed picture.
-            thumbs::PassEvent::Landed(_) => pane.forget(),
+            thumbs::PassEvent::Landed(name) => pane.landed(&name),
         });
     }
 

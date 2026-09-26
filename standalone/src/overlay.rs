@@ -191,6 +191,19 @@ impl PaneSlot {
     pub fn forget(&mut self) {
         self.loaded = None;
     }
+
+    /// A new picture of `name` was written: look it up again if it is the one
+    /// held, found or not, and leave any other preset's picture alone.
+    ///
+    /// **The held picture stays on screen until the lookup replaces it.** The
+    /// lookup happens on the next frame the pane is drawn, and the cache's
+    /// reader is not held to the stamp, so a preset whose new picture is still
+    /// being rendered keeps showing its previous one rather than a placeholder.
+    pub fn landed(&mut self, name: &str) {
+        if self.loaded.as_ref().is_some_and(|(held, _)| held == name) {
+            self.loaded = None;
+        }
+    }
 }
 
 /// The F3 overlay's audio line, built from the **same** startup token the

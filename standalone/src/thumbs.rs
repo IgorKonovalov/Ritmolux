@@ -380,9 +380,18 @@ pub(crate) enum PassEvent {
 /// dropping the pass raises the stop flag, the worker kills a running child at
 /// its next poll, and the join waits for that. A child killed mid-write leaves
 /// a temporary file no reader looks for, and the next pass discards it.
+///
+/// **A covered library parks the worker rather than ending it.** It sleeps in a
+/// blocking receive, with no child and no timer, until [`rescan`](Self::rescan)
+/// says the roster was reloaded; it then walks again and renders only what the
+/// stamps say is stale. A pass that gave up, was stopped, or could not start a
+/// child has ended for the launch, and a rescan of it does nothing.
 pub(crate) struct Pass {
     stop: Arc<AtomicBool>,
     events: Receiver<PassEvent>,
+    /// Dropped by [`stop`](Self::stop), which is what wakes a parked worker to
+    /// leave.
+    rescans: Option<Sender<()>>,
     worker: Option<JoinHandle<()>>,
 }
 
@@ -393,20 +402,27 @@ impl Pass {
         Pass::spawn(walk)
     }
 
-    /// A pass that renders exactly `names` with `exe` standing in for the
-    /// player — the render loop without the library or the cache behind it.
+    /// A pass whose walks render what `survey` returns, with `exe` standing in
+    /// for the player — the render loop without the library or the cache
+    /// behind it.
     #[cfg(test)]
-    fn start_with(exe: PathBuf, names: Vec<String>) -> Pass {
-        Pass::spawn(move |stop, tx| render_all(&exe, &names, stop, tx))
+    fn start_with(
+        exe: PathBuf,
+        survey: impl FnMut() -> (Vec<Job>, usize) + Send + 'static,
+    ) -> Pass {
+        Pass::spawn(move |stop, tx, rescans| serve(&exe, stop, tx, rescans, survey))
     }
 
-    fn spawn(work: impl FnOnce(&AtomicBool, &Sender<PassEvent>) + Send + 'static) -> Pass {
+    fn spawn(
+        work: impl FnOnce(&AtomicBool, &Sender<PassEvent>, &Receiver<()>) + Send + 'static,
+    ) -> Pass {
         let stop = Arc::new(AtomicBool::new(false));
         let (tx, events) = mpsc::channel();
+        let (rescans, rescan_rx) = mpsc::channel();
         let flag = Arc::clone(&stop);
         let worker = std::thread::Builder::new()
             .name("rlx-thumbnails".to_owned())
-            .spawn(move || work(&flag, &tx));
+            .spawn(move || work(&flag, &tx, &rescan_rx));
         let worker = match worker {
             Ok(handle) => Some(handle),
             Err(err) => {
@@ -417,6 +433,7 @@ impl Pass {
                 return Pass {
                     stop,
                     events: rx,
+                    rescans: None,
                     worker: None,
                 };
             }
@@ -424,6 +441,7 @@ impl Pass {
         Pass {
             stop,
             events,
+            rescans: Some(rescans),
             worker,
         }
     }
@@ -436,10 +454,19 @@ impl Pass {
         }
     }
 
+    /// The roster was reloaded: walk the library again once the current walk,
+    /// if any, is done. Never waits, and a burst of reloads is one walk.
+    pub(crate) fn rescan(&self) {
+        if let Some(rescans) = &self.rescans {
+            let _ = rescans.send(());
+        }
+    }
+
     /// Stop the pass: kill a running child and wait for the worker to leave.
     /// Idempotent.
     pub(crate) fn stop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
+        self.rescans = None;
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();
         }
@@ -462,9 +489,26 @@ enum Render {
     Unstartable(String),
 }
 
-/// The worker: resolve the cache and the library, then render what is missing
-/// in roster order, reporting through `tx`.
-fn walk(stop: &AtomicBool, tx: &Sender<PassEvent>) {
+/// One preset a walk found stale: its name, and the stamp its source carried
+/// when the walk looked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Job {
+    pub(crate) name: String,
+    pub(crate) stamp: Stamp,
+}
+
+/// How one walk over the stale list ended.
+enum Walk {
+    /// Every job was tried; the worker parks until the next rescan.
+    Covered,
+    /// Stopped, given up, or unable to start a child: the pass is over for this
+    /// launch.
+    Ended,
+}
+
+/// The worker: resolve the cache and the executable once, then serve walks of
+/// the library for as long as the pass lives.
+fn walk(stop: &AtomicBool, tx: &Sender<PassEvent>, rescans: &Receiver<()>) {
     let note = |line: String| {
         let _ = tx.send(PassEvent::Note(line));
     };
@@ -481,40 +525,81 @@ fn walk(stop: &AtomicBool, tx: &Sender<PassEvent>) {
             ));
         }
     };
-
-    let presets = library();
-    let total = presets.len();
-    let missing: Vec<String> = presets
-        .iter()
-        .filter(|preset| {
-            !is_current(
-                &dir,
-                &preset.name,
-                Stamp::for_source(preset.source.as_deref()),
-            )
-        })
-        .map(|preset| preset.name.clone())
-        .collect();
-    drop(presets);
-    if missing.is_empty() {
-        return;
-    }
-    note(format!(
-        "thumbnail pass: start, {} of {total} presets to render",
-        missing.len()
-    ));
-    render_all(&exe, &missing, stop, tx);
+    serve(&exe, stop, tx, rescans, || {
+        let presets = library();
+        let total = presets.len();
+        let library = presets.into_iter().map(|preset| {
+            let stamp = Stamp::for_source(preset.source.as_deref());
+            (preset.name, stamp)
+        });
+        (stale(&dir, library), total)
+    });
 }
 
-/// Render each of `missing` in turn, one child at a time, until the list is
-/// done, the pass is stopped, or it gives up.
-fn render_all(exe: &Path, missing: &[String], stop: &AtomicBool, tx: &Sender<PassEvent>) {
+/// The presets of `library` whose cached picture is missing or does not match
+/// their stamp, in roster order. A preset whose picture is current is not
+/// rendered again, which is what keeps one edit to one render.
+fn stale(dir: &Path, library: impl Iterator<Item = (String, Stamp)>) -> Vec<Job> {
+    library
+        .filter(|(name, stamp)| !is_current(dir, name, *stamp))
+        .map(|(name, stamp)| Job { name, stamp })
+        .collect()
+}
+
+/// Walk what `survey` finds stale, then park until a rescan, and again, until
+/// the pass is stopped or a walk ends it.
+///
+/// `survey` returns the stale jobs and the library's size. A job that failed
+/// this launch is not tried again at the **same** stamp — a rescan is not a
+/// retry — but an edit that moves its stamp makes it a new job.
+fn serve(
+    exe: &Path,
+    stop: &AtomicBool,
+    tx: &Sender<PassEvent>,
+    rescans: &Receiver<()>,
+    mut survey: impl FnMut() -> (Vec<Job>, usize),
+) {
+    let mut failed: Vec<Job> = Vec::new();
+    loop {
+        let (jobs, total) = survey();
+        let jobs: Vec<Job> = jobs
+            .into_iter()
+            .filter(|job| !failed.contains(job))
+            .collect();
+        if !jobs.is_empty() {
+            let _ = tx.send(PassEvent::Note(format!(
+                "thumbnail pass: start, {} of {total} presets to render",
+                jobs.len()
+            )));
+            if let Walk::Ended = render_all(exe, &jobs, stop, tx, &mut failed) {
+                return;
+            }
+        }
+        // Parked: no child, no timer. A dropped sender is the stop.
+        if rescans.recv().is_err() || stop.load(Ordering::Relaxed) {
+            return;
+        }
+        while rescans.try_recv().is_ok() {}
+    }
+}
+
+/// Render each of `jobs` in turn, one child at a time, until the list is done,
+/// the pass is stopped, or it gives up. Each job that fails is added to
+/// `failed`.
+fn render_all(
+    exe: &Path,
+    jobs: &[Job],
+    stop: &AtomicBool,
+    tx: &Sender<PassEvent>,
+    failed: &mut Vec<Job>,
+) -> Walk {
     let note = |line: String| {
         let _ = tx.send(PassEvent::Note(line));
     };
-    let (mut rendered, mut failed, mut streak) = (0usize, 0usize, 0u32);
+    let (mut rendered, mut failures, mut streak) = (0usize, 0usize, 0u32);
     let mut plain_priority = false;
-    for name in missing {
+    for job in jobs {
+        let name = &job.name;
         if stop.load(Ordering::Relaxed) {
             break;
         }
@@ -525,30 +610,38 @@ fn render_all(exe: &Path, missing: &[String], stop: &AtomicBool, tx: &Sender<Pas
                 let _ = tx.send(PassEvent::Landed(name.clone()));
             }
             Render::Failed(reason) => {
-                failed += 1;
+                failures += 1;
                 streak += 1;
+                failed.push(job.clone());
                 note(format!("thumbnail failed: {name}: {reason}"));
                 if streak >= GIVE_UP_AFTER {
-                    return note(format!(
+                    note(format!(
                         "thumbnail pass: gave up after {streak} failures in a row; \
                          {rendered} rendered this launch, the rest wait for the next"
                     ));
+                    return Walk::Ended;
                 }
             }
             Render::Stopped => {
-                return note(format!(
+                note(format!(
                     "thumbnail pass: stopped, {rendered} rendered, {} left for the next launch",
-                    missing.len() - rendered - failed
+                    jobs.len() - rendered - failures
                 ));
+                return Walk::Ended;
             }
             Render::Unstartable(reason) => {
-                return note(format!("thumbnails off: cannot start a render ({reason})"));
+                note(format!("thumbnails off: cannot start a render ({reason})"));
+                return Walk::Ended;
             }
         }
     }
+    if stop.load(Ordering::Relaxed) {
+        return Walk::Ended;
+    }
     note(format!(
-        "thumbnail pass: done, {rendered} rendered, {failed} failed"
+        "thumbnail pass: done, {rendered} rendered, {failures} failed"
     ));
+    Walk::Covered
 }
 
 /// Remove the temporary files a killed child left behind, so a half-written
@@ -701,51 +794,43 @@ fn render_one(name: &str) -> i32 {
         }
     };
 
-    let presets = library();
-    let Some(preset) = presets.iter().find(|preset| preset.name == name) else {
+    let Some(source) = library()
+        .into_iter()
+        .find(|preset| preset.name == name)
+        .map(|preset| preset.source)
+    else {
         eprintln!("--thumb `{name}`: no preset by that name in this library");
         return 2;
     };
-    let stamp = Stamp::for_source(preset.source.as_deref());
 
-    // The no-op arm, and it **says why**: the pass re-invokes this once per
-    // preset on every launch, so "nothing happened" has to be distinguishable
-    // from "the render failed silently" by whoever is reading the output.
-    if is_current(&dir, name, stamp) {
+    let (stamp, image, settled) = bracketed(source.as_deref(), |stamp| {
+        // The no-op arm, and it **says why**: the pass re-invokes this once
+        // per preset on every launch, so "nothing happened" has to be
+        // distinguishable from "the render failed silently" by whoever is
+        // reading the output.
+        if is_current(&dir, name, stamp) {
+            eprintln!(
+                "up to date: {} ({name} has not changed since it was rendered)",
+                entry_path(&dir, name).display()
+            );
+            return Err(0);
+        }
+        render_still(name)
+    });
+    let image = match image {
+        Ok(image) => image,
+        Err(code) => return code,
+    };
+    if !settled {
+        // Labelled with either stamp, the picture could claim a version it
+        // does not show; the entry already there stays, and the next walk
+        // sees the source as stale.
         eprintln!(
-            "up to date: {} ({name} has not changed since it was rendered)",
-            entry_path(&dir, name).display()
+            "--thumb `{name}`: the preset's file changed while it was rendered; \
+             nothing written, the next pass renders the new version"
         );
         return 0;
     }
-
-    let (pcm, format) = match shot::args::synth_signal(THUMB_SIGNAL) {
-        Ok(clip) => clip,
-        Err(message) => {
-            eprintln!("--thumb `{name}`: {message}");
-            return 1;
-        }
-    };
-    // The floor tier, pinned. At 160x90 the rich tier's raised budgets are not
-    // visible and the pass is running beside a show that wants the GPU.
-    let mut renderer = match shot::renderer(THUMB_W, THUMB_H, presets, Tier::Floor) {
-        Ok(renderer) => renderer,
-        Err(message) => {
-            eprintln!("--thumb `{name}`: {message}");
-            return 1;
-        }
-    };
-    let frames = match renderer.capture_audio(name, &pcm, format, &[THUMB_HOP]) {
-        Ok(frames) => frames,
-        Err(err) => {
-            eprintln!("--thumb `{name}`: capture: {err}");
-            return 1;
-        }
-    };
-    let Some(image) = frames.into_iter().next() else {
-        eprintln!("--thumb `{name}`: hop {THUMB_HOP} produced no frame");
-        return 1;
-    };
 
     let entry = Entry {
         name: name.to_owned(),
@@ -765,6 +850,59 @@ fn render_one(name: &str) -> i32 {
         entry.height
     );
     0
+}
+
+/// Run `work` between two readings of `source`'s stamp, handing it the first.
+/// Returns that stamp, what `work` produced, and whether the second reading
+/// agreed with it.
+///
+/// **This is what keeps a picture from being labelled newer than it is.**
+/// Anything `work` reads from `source` is read after the first stamp, so an
+/// edit before that read moved the stamp before it was taken, and an edit
+/// after it moves the second reading. Only when the two agree is the content
+/// `work` saw the content the stamp names.
+fn bracketed<T>(source: Option<&Path>, work: impl FnOnce(Stamp) -> T) -> (Stamp, T, bool) {
+    let before = Stamp::for_source(source);
+    let out = work(before);
+    let settled = Stamp::for_source(source) == before;
+    (before, out, settled)
+}
+
+/// Load the library — after the caller's stamp — and render `name`'s still,
+/// or the exit code of the reason it could not be.
+fn render_still(name: &str) -> Result<rlx_core::render::CaptureImage, i32> {
+    let presets = library();
+    if !presets.iter().any(|preset| preset.name == name) {
+        eprintln!("--thumb `{name}`: no preset by that name in this library");
+        return Err(2);
+    }
+    let (pcm, format) = match shot::args::synth_signal(THUMB_SIGNAL) {
+        Ok(clip) => clip,
+        Err(message) => {
+            eprintln!("--thumb `{name}`: {message}");
+            return Err(1);
+        }
+    };
+    // The floor tier, pinned. At 160x90 the rich tier's raised budgets are not
+    // visible and the pass is running beside a show that wants the GPU.
+    let mut renderer = match shot::renderer(THUMB_W, THUMB_H, presets, Tier::Floor) {
+        Ok(renderer) => renderer,
+        Err(message) => {
+            eprintln!("--thumb `{name}`: {message}");
+            return Err(1);
+        }
+    };
+    let frames = match renderer.capture_audio(name, &pcm, format, &[THUMB_HOP]) {
+        Ok(frames) => frames,
+        Err(err) => {
+            eprintln!("--thumb `{name}`: capture: {err}");
+            return Err(1);
+        }
+    };
+    frames.into_iter().next().ok_or_else(|| {
+        eprintln!("--thumb `{name}`: hop {THUMB_HOP} produced no frame");
+        1
+    })
 }
 
 #[cfg(test)]
@@ -919,12 +1057,26 @@ mod tests {
         path
     }
 
-    fn names(names: &[&str]) -> Vec<String> {
-        names.iter().map(|name| (*name).to_owned()).collect()
+    fn jobs(names: &[&str]) -> Vec<Job> {
+        names
+            .iter()
+            .map(|name| Job {
+                name: (*name).to_owned(),
+                stamp: Stamp::EMBEDDED,
+            })
+            .collect()
     }
 
-    /// Let the worker run out on its own — no stop — and take what it said.
+    /// A survey that finds `names` stale on every walk.
+    fn names(names: &[&str]) -> impl FnMut() -> (Vec<Job>, usize) + Send + 'static {
+        let jobs = jobs(names);
+        move || (jobs.clone(), jobs.len())
+    }
+
+    /// Let the worker run out on its own — no stop, only the end of rescans —
+    /// and take what it said.
     fn finish(mut pass: Pass) -> Vec<PassEvent> {
+        pass.rescans = None;
         if let Some(worker) = pass.worker.take() {
             worker.join().expect("the worker does not panic");
         }
@@ -1060,6 +1212,173 @@ mod tests {
             !Path::new(&format!("/proc/{child}")).exists() || !cfg!(target_os = "linux"),
             "child {child} outlived the pass"
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Drain `pass` into `events` until `walks` closing `done` lines have
+    /// arrived in all.
+    fn until_done(pass: &mut Pass, events: &mut Vec<PassEvent>, walks: usize) {
+        for _ in 0..400 {
+            pass.drain(|event| events.push(event));
+            let done = notes(events)
+                .iter()
+                .filter(|line| line.starts_with("thumbnail pass: done"))
+                .count();
+            if done >= walks {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        panic!("walk {walks} never finished: {:?}", notes(events));
+    }
+
+    /// **An edit re-renders that preset, and nothing else.** A covered pass
+    /// parks; each rescan walks again and renders exactly what the survey found
+    /// stale. A preset that failed is not retried at the stamp it failed at —
+    /// a rescan is not a retry — but an edit that moves its stamp is a new
+    /// attempt. A parked pass stops without waiting for anything.
+    #[cfg(unix)]
+    #[test]
+    fn a_rescan_renders_what_changed_and_does_not_retry_a_failure() {
+        let dir = scratch("rescan");
+        let log = dir.join("log");
+        let exe = stub(
+            &dir,
+            &format!(
+                "echo \"$2\" >> '{log}'\n[ \"$2\" = A ] && exit 3\nexit 0",
+                log = log.display()
+            ),
+        );
+        let at = |name: &str, mtime_nanos: u64| Job {
+            name: name.to_owned(),
+            stamp: Stamp {
+                mtime_nanos,
+                len: 1,
+            },
+        };
+        let mut walks = std::collections::VecDeque::from([
+            vec![at("A", 1), at("B", 1)],
+            // A is still stale at the stamp it failed at; C was edited.
+            vec![at("A", 1), at("C", 1)],
+            // A was edited.
+            vec![at("A", 2)],
+        ]);
+        let mut pass = Pass::start_with(exe, move || {
+            let jobs = walks.pop_front().unwrap_or_default();
+            let total = jobs.len();
+            (jobs, total)
+        });
+
+        let mut events = Vec::new();
+        until_done(&mut pass, &mut events, 1);
+        pass.rescan();
+        until_done(&mut pass, &mut events, 2);
+        pass.rescan();
+        until_done(&mut pass, &mut events, 3);
+
+        let rendered = std::fs::read_to_string(&log).expect("the stub ran");
+        assert_eq!(
+            rendered.lines().collect::<Vec<_>>(),
+            ["A", "B", "C", "A"],
+            "notes: {:?}",
+            notes(&events)
+        );
+        let landed: Vec<&str> = events
+            .iter()
+            .filter_map(|event| match event {
+                PassEvent::Landed(name) => Some(name.as_str()),
+                PassEvent::Note(_) => None,
+            })
+            .collect();
+        assert_eq!(landed, ["B", "C"]);
+
+        // Parked, with no child: stopping it wakes the worker and it leaves.
+        let (done_tx, done_rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            pass.stop();
+            let _ = done_tx.send(());
+        });
+        done_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("stopping a parked pass did not return");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// **A walk renders what is stale and only that**: a preset whose entry
+    /// matches its stamp is left alone, an edited one and a new one are jobs,
+    /// each carrying the stamp the walk saw.
+    #[test]
+    fn a_walk_finds_only_the_presets_whose_stamp_moved() {
+        let dir = scratch("survey");
+        let old = Stamp {
+            mtime_nanos: 10,
+            len: 100,
+        };
+        let new = Stamp {
+            mtime_nanos: 11,
+            len: 100,
+        };
+        for name in ["Gyre", "Lace Grid"] {
+            let mut entry = sample(name, old);
+            entry.width = THUMB_W;
+            entry.height = THUMB_H;
+            entry.rgba = vec![7; (THUMB_W * THUMB_H * 4) as usize];
+            write_entry(&dir, &entry).expect("write the entry");
+        }
+        let library = [("Gyre", old), ("Lace Grid", new), ("Seahorse", old)]
+            .into_iter()
+            .map(|(name, stamp)| (name.to_owned(), stamp));
+        assert_eq!(
+            stale(&dir, library),
+            [
+                Job {
+                    name: "Lace Grid".to_owned(),
+                    stamp: new
+                },
+                Job {
+                    name: "Seahorse".to_owned(),
+                    stamp: old
+                },
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// **A picture is never labelled newer than it is.** A render during which
+    /// the preset's file is edited is reported unsettled, so nothing is
+    /// written; one during which it is not is settled, under the stamp the file
+    /// carried before the render read it.
+    #[test]
+    fn an_edit_during_the_render_leaves_it_unsettled() {
+        let dir = scratch("bracket");
+        let file = dir.join("one.toml");
+        std::fs::write(&file, "name = \"One\"\n").expect("write a preset file");
+        let before = Stamp::of(&file).expect("stamp the file");
+
+        let (stamp, seen, settled) = bracketed(Some(&file), |stamp| {
+            std::fs::read_to_string(&file).map(|_| stamp)
+        });
+        assert!(settled, "an untouched file must settle");
+        assert_eq!(stamp, before);
+        assert_eq!(
+            seen.ok(),
+            Some(before),
+            "the render is handed the first stamp"
+        );
+
+        let (stamp, (), settled) = bracketed(Some(&file), |_| {
+            std::fs::write(&file, "name = \"One\"\nsize = 2\n").expect("edit mid-render");
+        });
+        assert!(!settled, "an edit during the render must not settle");
+        assert_eq!(
+            stamp, before,
+            "the stamp is the one taken before the render"
+        );
+
+        // No file at all is the embedded case, which cannot move.
+        let (stamp, (), settled) = bracketed(None, |_| ());
+        assert!(settled);
+        assert_eq!(stamp, Stamp::EMBEDDED);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

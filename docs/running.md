@@ -124,7 +124,11 @@ preset with no picture yet shows its name and
 **no picture yet** in its place, which is the normal state on a first launch rather than a fault.
 The pictures are made in the background from the moment the app starts, one preset at a time, and
 the pane fills in as they land; covering the shipped library takes minutes rather than seconds, and
-the next launch picks up whatever the last one did not reach. The settings menu's **Thumbnails** row
+the next launch picks up whatever the last one did not reach. Editing a preset in a
+[`RLX_PRESET_DIR`](configuration.md) library re-renders that preset's picture, and only that one,
+when the app reloads the file; until the new picture lands the pane keeps showing the previous one
+rather than a placeholder. A preset that fails to render is not tried again until its file changes.
+The settings menu's **Thumbnails** row
 turns that off (`[thumbnails] enabled`, see [Configuration](configuration.md#thumbnails)), which is
 what a machine on battery wants.
 The picture never moves the list: the columns are laid out as they would be without it, and the
