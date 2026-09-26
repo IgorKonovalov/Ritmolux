@@ -9,7 +9,7 @@
 //! Run with: `cargo test -p rlx-core --test distinctness -- --nocapture`
 //!
 //! **Cost, measured at Plan 0067 Phase 1c** when the family list went from six
-//! to all nine: 25 captures -> 41, and the wall clock **22 s -> 41 s**
+//! families to nine: 25 captures -> 41, and the wall clock **22 s -> 41 s**
 //! (interleaved runs on one machine, software adapter). That is +82 % for +64 %
 //! more presets, because the two families added are the expensive ones —
 //! `attractor` is a compute-particle scene and `reaction_diffusion` a

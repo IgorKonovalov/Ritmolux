@@ -188,8 +188,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the similarity roster derives from the enum | dev | done | 17961a15 |
-| 2 — the report is read, and the thresholds are judged | dev | done | committed with this row |
-| 3 — the stale prose carriers stop naming a list | dev | not started | |
+| 2 — the report is read, and the thresholds are judged | dev | done | 52c66c06 |
+| 3 — the stale prose carriers stop naming a list | dev | done | committed with this row |
 | 4 — the catalogue declares an entry per system | dev | not started | |
 | 5 — the four sections get their guidance | human | not started | |
 
@@ -219,6 +219,9 @@ flowchart LR
 - The only flags in the run are in `attractor`, a family already covered before this plan: six pairs
   among Lorenz Gallery, Valentine, Butterfly to Knot and Rho Walk, `struct_diff` 0.036 to 0.071.
   Recorded, not labelled; they are outside the five this phase reads.
+- Phase 3: the doc comment above the roster that named the absent families left with the array in
+  Phase 1 (17961a15), so this phase's edit to `core/tests/distinctness.rs` is the module header's
+  dated cost note only, *"from six to all nine"* to *"from six families to nine"*.
 
 ### Close triggers
 
