@@ -210,8 +210,8 @@ flowchart TB
 | 1 — the matcher gets a transcript | dev | done | 0075c675 |
 | 2 — the deny cases move onto the transcript | dev | done | 95d86c89 |
 | 3 — the deletion bound reaches an expanded path | dev | done | 3afa3de4 |
-| 4 — the prose stops promising more than the rules enforce | dev | committed with this row | |
-| 5 — an undeclared `.claude/` edit is a drafting error | dev | not started | |
+| 4 — the prose stops promising more than the rules enforce | dev | done | 25eea723 |
+| 5 — an undeclared `.claude/` edit is a drafting error | dev | committed with this row | |
 
 ### Notes
 
@@ -223,6 +223,15 @@ flowchart TB
   session's own lane never reached the matcher, and every other `cd` was refused, which costs a turn.
   The same sentence without the reason is also in `prompts/fix.md`, `review.md` and `merge.md`, which
   are outside this phase's file list and were left alone.
+- Phase 5 ran under the conductor, not in an interactive session as the header and the `Lane:` line say.
+- Phase 5's gate reads only the plans in `docs/plans/` for its exit code. A plan in `docs/plans/done/`
+  is listed as an advisory. Read that way, the repository run exits 0 and the advisory holds 14
+  phases across 11 closed plans, Plan 0190 Phase 9 among them. `node scripts/check-claude-declarations.mjs`
+  prints the list. No plan was edited.
+- A phase is convicted by a path under `.claude/`, by `SKILL.md`, or by a skill, a conductor-mode
+  section or `settings.json` behind a definite determiner (*the*, *its*, *each*, ...). It is also
+  convicted by a `.claude/hooks/` file name or by `PreToolUse`. Quoted text and a bare `.claude/`
+  are not read. Without those two exclusions, this plan's own Phase 5 would have been convicted.
 
 ### Close triggers
 
