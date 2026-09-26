@@ -481,13 +481,14 @@ pictures are what the browser's pane is for.
 
 The pass starts when the app does, whether or not the browser is ever opened, and renders one
 preset at a time by starting the app's own executable with `--thumb`, at low priority (`nice` on
-Linux and macOS, below-normal priority on Windows). It stops when every preset has a current
-picture and starts again at the next launch for whatever is still missing. It never waits in the
+Linux and macOS, below-normal priority on Windows). It parks when every preset has a current
+picture, walks the library again when an `RLX_PRESET_DIR` edit reloads it, and at the next launch
+picks up whatever is still missing. It never waits in the
 show's frame loop, and closing the app kills a render in flight; the half-written file that leaves
 is discarded by the next pass.
 
 **It gives up rather than retrying.** A render that fails is named once in `diagnostics.log` with the
-reason the child printed, and is not retried until the next launch; three failures in a row stop the
+reason the child printed, and is not retried until its file changes or the app restarts; three failures in a row stop the
 pass for the rest of the run. That is where a machine with no room for a second graphics context, or
 security software that blocks an app from starting copies of itself, shows up. Every pass writes a
 `thumbnail pass:` line to the same log when it starts and when it ends, which splits the log's

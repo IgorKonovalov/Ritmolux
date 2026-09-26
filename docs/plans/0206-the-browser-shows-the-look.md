@@ -59,7 +59,9 @@ screen. `Renderer::queue_text` is the only drawing call it has, and the device, 
 surface stay private inside `core`, per ADR-0001 and ADR-0009. We will add an image layer in `core`,
 next to the text layer and behind the same `text` feature. That is the same reasoning ADR-0009
 applied to text: the device lives in `core`, and a feature flag, not a crate boundary, keeps the
-layer out of the plugin build. Two alternatives were rejected. Handing the shell the device and
+layer out of the default build and the core suite. (It does not keep it out of the plugin build:
+`core-cabi` enables `text` for the now-playing banner, so the plugin compiles the layer and builds
+no GPU object of it, because nothing there calls it. Corrected at the close, 2026-09-26.) Two alternatives were rejected. Handing the shell the device and
 queue would widen exactly the boundary ADR-0001 draws. A text-only pane, a name plus a palette
 swatch, would not show the look, and showing the look is what this plan is for. The owner set the
 one condition this layer has to meet: it must not cost the app anything. A frame with no image
@@ -238,7 +240,8 @@ struct ThumbKey {
 - **It does not ship any picture.** Nothing enters the binary, the zip or `presets/`.
 - **It does not touch the C ABI or the control protocol**, so neither the foobar component nor the
   studio gains thumbnails. It does touch `core` once, in Phase 2: an image layer behind the `text`
-  feature, which the component's build does not enable. That line originally read "does not touch
+  feature. The component's build does enable that feature, for its now-playing banner, so it
+  compiles the layer and never builds a GPU object of it (corrected at the close, 2026-09-26). That line originally read "does not touch
   `core`", and it was amended on 2026-09-24. The studio's own preset list is a separate question and would
   cost a protocol widening.
 - **It does not re-derive NFR §4's size cap**, though this plan is what discovered the cap is
@@ -401,6 +404,13 @@ reference laptop (Arch, kernel 7.2.5, Hyprland 0.56.2, music playing, Rich pinne
   pass. Leviathan at Rich is GPU-bound at 24 fps on this adapter either way.
 - An earlier AMD session on the same day is not used: the session's idle lock fell in its pass
   window and froze the rows.
+
+**Architect, 2026-09-26 (close): what this reading shows.** The done-when *"the show's frame timing
+is unaffected while the pass runs"* holds on the RTX 3080. On the AMD RADV RENOIR iGPU it holds at
+the median and not in the tail: the worst p99 moves from 50.0 ms to 76.8 ms and the lowest second
+from 23.8 fps to 21.4. The children start without `--gpu` and their adapter was not read, so on this
+hybrid laptop the pass and an AMD-pinned show may be competing for one GPU. That is a standing open
+question, not a claim this plan makes good.
 
 **Phase 5 — two files beyond the list, and a pass that no longer ends when covered.**
 

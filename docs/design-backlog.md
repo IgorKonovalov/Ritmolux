@@ -41,6 +41,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0248 — nothing in this repo asks whether a groundless luminous field is a composition or a fill, and four shipped presets are the open cases](#0248--nothing-in-this-repo-asks-whether-a-groundless-luminous-field-is-a-composition-or-a-fill-and-four-shipped-presets-are-the-open-cases)
 - [0256 — the only report that asks whether two presets look alike covers nine of fourteen families, and both places naming the absent ones are stale](#0256--the-only-report-that-asks-whether-two-presets-look-alike-covers-nine-of-fourteen-families-and-both-places-naming-the-absent-ones-are-stale)
 - [0259 — the attractor rasterizes 600 000 sprites a frame, and a compute scatter would cut that term tenfold at the price of the look](#0259--the-attractor-rasterizes-600-000-sprites-a-frame-and-a-compute-scatter-would-cut-that-term-tenfold-at-the-price-of-the-look)
+- [0260 — a thumbnail's stamp carries no build identity, so an upgrade never re-renders a picture the engine now draws differently](#0260--a-thumbnails-stamp-carries-no-build-identity-so-an-upgrade-never-re-renders-a-picture-the-engine-now-draws-differently)
+- [0261 — the thumbnail child picks its own GPU, and on a hybrid laptop the pass moved the show's frame-time tail](#0261--the-thumbnail-child-picks-its-own-gpu-and-on-a-hybrid-laptop-the-pass-moved-the-shows-frame-time-tail)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1751,3 +1753,42 @@ Phase 1's per-pass timings to argue from.
   `present: dst_factor: wgpu::BlendFactor::One in: core/src/render/scenes/particles/resources.rs`
 - **Verified 2026-09-22** — no compute scatter exists anywhere in the scene:
   `absent: atomicAdd in: core/src/render/scenes/particles/shaders.rs`
+
+## 0260 — a thumbnail's stamp carries no build identity, so an upgrade never re-renders a picture the engine now draws differently
+
+The browser's thumbnail cache (`standalone/src/thumbs.rs`) judges an entry stale by the preset
+file's modification time and length, and an embedded preset carries the fixed `Stamp::EMBEDDED`.
+Nothing in the stamp names the build that rendered the picture. A new release is exactly how a user
+receives a changed preset or a changed rendering of its family, and the cache outlives the release,
+so after an upgrade every embedded preset, and every seeded preset whose `.toml` did not change,
+keeps its pre-upgrade picture for good. Nothing prunes the cache and nothing re-stamps it.
+
+**The candidate repair:** write the package version, or a render-affecting build id, into the entry
+header and treat a mismatch as stale, at the cost of one re-render of the library per release.
+[Plan 0206](plans/done/0206-the-browser-shows-the-look.md) defined the stamp as mtime plus length and
+the implementation follows it, which is why this is an entry and not a finding against that plan.
+
+- **Raised:** 2026-09-26 by `architect`, from Plan 0206's close review (round 1, minor 3).
+  **Owner if taken:** `architect` for the stamp's definition; `dev` for the header change.
+- **Verified 2026-09-26** — the embedded stamp is a fixed value:
+  `present: const EMBEDDED: Stamp in: standalone/src/thumbs.rs`
+- **Verified 2026-09-26** — the cache names no build:
+  `absent: CARGO_PKG_VERSION in: standalone/src/thumbs.rs`
+
+## 0261 — the thumbnail child picks its own GPU, and on a hybrid laptop the pass moved the show's frame-time tail
+
+The thumbnail pass starts each child as `--thumb <name>` with no `--gpu`, so the child takes the
+default adapter whatever the show was pinned to, and which adapter it drew on is not read. Plan
+0206 Phase 4's reading on the reference laptop: beside a show on the RTX 3080 nothing moved; beside
+a show pinned to the AMD RADV RENOIR iGPU the median held at 24.4 fps and the tail did not, the worst
+p99 going from 50.0 ms to 76.8 ms and the lowest second from 23.8 fps to 21.4. The table is in
+[Plan 0206](plans/done/0206-the-browser-shows-the-look.md)'s implementation log.
+
+**Two candidate moves:** pass the show's adapter choice to the child, or read and log which adapter
+the child used, so the next reading can say whether the two were competing for one GPU. Neither is
+designed; the first is the cheaper question to answer.
+
+- **Raised:** 2026-09-26 by `architect`, from Plan 0206's close review (round 1, minor 5).
+  **Owner if taken:** `dev`, after `architect` picks the move.
+- **Verified 2026-09-26** — the child command carries no adapter flag:
+  `absent: --gpu in: standalone/src/thumbs.rs`

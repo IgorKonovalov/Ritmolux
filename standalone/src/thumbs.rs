@@ -90,8 +90,9 @@ impl Stamp {
     /// which a launch holds when no directory yielded anything.
     ///
     /// A distinguished value rather than an `Option`, so the cache entry's
-    /// layout is one shape: an embedded preset's picture is never stale, because
-    /// nothing about it can change without a new build.
+    /// layout is one shape. The stamp carries no build identity, so an embedded
+    /// preset's picture is never judged stale, even after a new build changes
+    /// the preset or the engine's rendering of it: the cache outlives the build.
     pub(crate) const EMBEDDED: Stamp = Stamp {
         mtime_nanos: 0,
         len: 0,
