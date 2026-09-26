@@ -227,6 +227,11 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   cannot see to ADR-0240 - no browser storage under studio/, and every
                      #   plugin-foobar/ `cfg_*` declaration named in docs/configuration.md, with
                      #   `settings-allow: <why>` on the line as the escape;
+                     #   check-claude-declarations.mjs refuses an active plan phase that names a
+                     #   `.claude/` artefact - a skill, a hook, settings.json - without writing its
+                     #   path into `Files touched`, the one place the conductor reads to park in
+                     #   front of an edit a headless session cannot make (ADR-0210), with
+                     #   `claude-allow: <why>` as the escape and a closed plan an advisory only;
                      #   check-gate-carriers.mjs asserts that .githooks/pre-push and the CI `links`
                      #   job each run the ordered roster held in scripts/gates.manifest.mjs, in that
                      #   order - the manifest being DATA rather than a gate, and the one the
