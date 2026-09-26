@@ -202,7 +202,7 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 |---|---|---|---|
 | 1 — Settle the rate candidate | dev | done | 7027a97c |
 | 2 — Repair what Phase 1 convicted | dev | not run: Phase 1 falsified the candidate | 09be6b65 |
-| 3 — The echo nests | dev | parked: the Risks section's stop-and-report condition; no code written | committed with this row |
+| 3 — The echo's orientation truncates like the reference | dev | done (first run parked at ece8b14c, phase amended) | committed with this row |
 | 4 — The eight modes are captured on the rig | human | not started | |
 | 5 — The waveform scale is measured per mode | dev | not started | |
 | 6 — The fourth look gate | human | not started | |
@@ -263,6 +263,19 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
   - Where the weave comes from is unattributed. It is not the echo, so it is outside this phase.
     The candidates left are the field's own: `fDecay = 1`, `bTexWrap = 1`, and a per-pixel `zoom`
     that falls below 1.
+- **Phase 3 (amended), the negative case.** Read at `d4c843a` `vis_milk2/milkdropfs.cpp` l.4149
+  (`(int) v % 4`) and l.4195-4198 (x flips on `n % 2`, y on `n >= 2`): -1 and -3 flip x only,
+  -2 flips nothing, and no negative flips y. The earlier rule read -1 as 3 (both flips).
+- **Phase 3 goldens: the GPU suites the fast profile skips were not run.** The per-phase
+  `-P fast` run was green (1775 passed, 86 skipped). A filtered run of the warp-mesh and
+  `milk_wash` tests waited on the suite lock, held by another lane's full workspace run, until the
+  session timeout, and was stopped before it started. No preset or fixture binds an `echo_orient`
+  whose reading changes: every whole non-negative value maps as before, the three fixtures carry
+  0 or 1 in their headers with no per-frame assignment, and `warp_cauldron` binds `"1"`. No
+  baseline was re-blessed.
+- **Stale prose outside the phase's files, not edited:** `core/tests/suite/preset.rs` l.2444
+  (a comment saying `echo_orientation` "rounds") and `presets/README.md` l.2277 (the hand-written
+  echo table: "Rounded to the nearest of the four").
 
 ### Close triggers
 
