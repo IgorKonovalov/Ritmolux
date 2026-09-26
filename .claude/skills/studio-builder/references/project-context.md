@@ -77,8 +77,10 @@ Hyprland, as observed on 2026-09-22, with these particulars:
 - **`npm run dev` outlives Electron.** `concurrently` has no `--kill-others`, so closing the studio
   window leaves Vite and the esbuild watchers running until the terminal stops them. The player
   itself does exit with the studio.
-- **Under Node 26, `npm ci` can leave Electron half-installed**, with only `dist/locales/` and no
-  `path.txt`. `docs/developing.md`'s Arch block has the hand extraction.
+- **Electron has no install script.** It downloads its binary the first time it is required, so a
+  fresh `npm --prefix studio ci` is followed by one download on the first `npm test` or `npm run dev`
+  (`npx --prefix studio electron --version` triggers it on its own). `allowScripts` in
+  `studio/package.json` names every install script that may run, pinned as `pkg@version` (ADR-0244).
 - **`windowless.test.ts` asserts the no-window half through `hyprctl clients -j`** when
   `HYPRLAND_INSTANCE_SIGNATURE` is set. On any other Wayland desktop it skips with a notice,
   because a Wayland client cannot list other clients' windows.
