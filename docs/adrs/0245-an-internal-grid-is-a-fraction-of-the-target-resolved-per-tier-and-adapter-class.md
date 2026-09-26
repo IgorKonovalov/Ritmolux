@@ -168,6 +168,29 @@ scale 1.0 fit an integrated GPU. **Deferred, not rejected**: it changes the look
 perspective magnification becomes a uniform post-blur), re-blesses every attractor golden, and is
 not needed if the fraction alone reaches the floor. Recorded as design-backlog 0259.
 
+## Outcome (2026-09-26)
+
+Plan 0223 built the mechanism and measured the two integrated rows. Three things differ from the
+Decision above, and the body stands as it was written.
+
+- **The integrated rows are not 1.0.** On the reference laptop (AMD RADV RENOIR, Mesa 26.2.2), the
+  largest scale holding a 60 fps median with no one-second sample under 60 across the ten bench
+  presets at 1080p windowed is **1.0 at Floor** and **0.75 at Rich**, and the table carries those
+  two values. At the panel's native 2560x1440, Floor holds at 1.0 and **no Rich scale holds**:
+  Nebula reads 58.7 fps at 0.5. That result changes no row, and it is recorded in `tier.rs`'s table
+  docstring and NFR §1. The discrete and software rows stay 1.0.
+- **The scale reaches the attractor through a fourth `Scene` widening,** `Scene::set_grid_scale`,
+  a default no-op that `composite.rs` calls every frame. The target `set_target_size` receives is
+  already a post stage's grid when a stage is active, so scaling there too would square the scale.
+  The hook carries only the part the target does not already hold. The close review graded it
+  against ADR-0030's three conditions and found it meets them: the value is not reachable through an
+  existing channel, the attractor compares before it acts, and every other scene takes the default
+  no-op.
+- **The sample budget counts `round(target_px * scale^2)`, not the quantized grid's texels.**
+  Counting the quantized grid would move Rich's budget at 640x360 from 150 000 to 160 000, because
+  that target's grid is 640x384, and the plan required every budget at scale 1.0 to stay where it
+  was. The count is exact at 1.0, and quantization stays uncounted, as it was before this ADR.
+
 ## Notes
 
 - The variant readings above are reproducible from the shipped `attractor_leviathan.toml` with the

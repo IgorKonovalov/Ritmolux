@@ -312,6 +312,8 @@ grid_scale = "auto"   # or 0.25..1.0
   draw+submit 1.03 ms, pipe write 0.65 ms`, with the per-pass table printing thirteen rows
   underneath it. That is a different preset at a different size and is **not** the reading the
   done-when asks for.
+- **Close, 2026-09-26: the Meter Mono before/after reading is still owed.** Phase 2's done-when on
+  it is not met; the close records it as owed in `## Close review` rather than as a pass.
 - **Owner, 2026-09-26: Phase 2 regresses `--stream` on a GPU-bound adapter, found at the start of
   Phase 6. For dev; nothing is repaired in this commit.** On the reference laptop (Arch, Mesa 26.2.2
   RADV RENOIR, RTX 3080 Laptop, NVIDIA 610.57.04), release builds of this lane at `2b80500a` and of
