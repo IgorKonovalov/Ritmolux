@@ -151,7 +151,9 @@ export function phasesOf(raw) {
     id: p.id,
     line: p.line,
     body: p.lines.join("\n"),
-    declared: /\.claude\//.test(p.files),
+    // The path rule's pattern, so a bare `.claude/` declares nothing here either: claudePaths() finds
+    // no path in it, and the conductor would not park in front of the phase.
+    declared: /\.claude\/[\w*][\w.*/-]*/.test(p.files),
   }));
 }
 
@@ -223,8 +225,8 @@ function selfTest() {
   const red = runGate(join(fixtures, "undeclared"));
   const redRows = (red.out.match(/^ {2}docs\/plans\/\d{4}-\S+:\d+ {2}Phase /gm) ?? []).length;
   record(
-    "undeclared: two convicted phases, exit 1",
-    red.status === 1 && redRows === 2,
+    "undeclared: three convicted phases, exit 1",
+    red.status === 1 && redRows === 3,
     `exit ${red.status}, ${redRows} finding(s)`,
     red.out,
   );
@@ -240,6 +242,12 @@ function selfTest() {
     "undeclared: a claude-allow with no reason is itself a finding",
     /Phase 3 names claude-allow with no reason given/.test(red.out),
     "expected Phase 3's bare marker",
+    red.out,
+  );
+  record(
+    "undeclared: a Files touched of a bare .claude/ declares nothing",
+    /0001-the-routing-lands\.md:\d+ {2}Phase 10 names a skill/.test(red.out),
+    "expected Phase 10 convicted despite its bare .claude/",
     red.out,
   );
   record(
@@ -286,7 +294,7 @@ function selfTest() {
   console.log(`claude declarations self-test: ${passed} of ${results.length}`);
   // The count is asserted, not merely printed: a case deleted along with the rule it pinned would
   // otherwise leave this run green and shorter.
-  process.exit(passed === results.length && results.length === 11 ? 0 : 1);
+  process.exit(passed === results.length && results.length === 12 ? 0 : 1);
 }
 
 // --- main --------------------------------------------------------------------

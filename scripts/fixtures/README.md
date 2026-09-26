@@ -488,9 +488,9 @@ root goes vacuously green, and staging the files is what stops it.
 ## `claude-declarations/` — for `check-claude-declarations.mjs`
 
 ```
-node scripts/check-claude-declarations.mjs scripts/fixtures/claude-declarations/undeclared   # exit 1, two findings, one advisory
+node scripts/check-claude-declarations.mjs scripts/fixtures/claude-declarations/undeclared   # exit 1, three findings, one advisory
 node scripts/check-claude-declarations.mjs scripts/fixtures/claude-declarations/declared     # exit 0
-node scripts/check-claude-declarations.mjs --self-test                                       # expects exit 0, 11 of 11
+node scripts/check-claude-declarations.mjs --self-test                                       # expects exit 0, 12 of 12
 ```
 
 **Two roots, one phase.** Each root holds a `docs/plans/` because that is the only directory the
@@ -503,6 +503,7 @@ red on the first, green on the second.
 |------|------:|------|----------|
 | `undeclared/` | 9 | Plan 0190 Phase 9, the conductor-mode sections named across a line wrap | reported |
 | `undeclared/` | 3 | `<!-- claude-allow: -->`, a marker with no reason | reported in the match's place |
+| `undeclared/` | 10 | `Files touched` of a bare `` `.claude/` ``, which the conductor's `claudePaths()` reads as no path | reported |
 | `undeclared/` | done/0002 | the same shape in a plan under `done/` | an **advisory** row, and never the exit code |
 | `declared/` | 9 | the same phase with its paths declared | exit 0 |
 

@@ -3,7 +3,7 @@
 > **Status:** approved
 
 A seeded plan for `check-claude-declarations.mjs`. Phase 9 is Plan 0190 Phase 9 as it was drafted;
-Phase 3 is a bare escape. Every other phase is a shape the gate must stay silent on. See
+Phase 3 is a bare escape; Phase 10 declares only the bare directory. Every other phase is a shape the gate must stay silent on. See
 `scripts/fixtures/README.md`.
 
 ## Implementation phases
@@ -71,5 +71,11 @@ Phase 3 is a bare escape. Every other phase is a shape the gate must stay silent
   conductor-mode sections.
 - **Done when:**
   - A fake session that needs a `.claude/` edit reaches the outcome Phase 8 chose.
+
+### Phase 10 — a bare directory is not a declaration
+- **Owner skill:** dev
+- **What:** The dev skill's close block names the new outcome kind.
+- **Files touched:** `.claude/`.
+- **Done when:** the block names it.
 
 ## Implementation log
