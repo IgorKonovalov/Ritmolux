@@ -258,7 +258,7 @@ struct ThumbKey {
 | 1 — One thumbnail, on demand, in a cache | dev | done | 7bd7fc9f |
 | 2 — The renderer draws one image the shell hands it | dev | done | ab582b1b |
 | 3 — The pane shows what is cached | dev | done | 9f710df5 |
-| 4 — The pass fills the cache by itself | dev | committed, frame-time reading owed | committed with this row |
+| 4 — The pass fills the cache by itself | dev | done; frame-time reading taken by the owner 2026-09-26 | 4aeb28c8 |
 | 5 — A changed preset gets a new picture | dev | not started | |
 
 ### Notes
@@ -376,6 +376,31 @@ Where the notes above say "Phase 2", "Phase 3" or "Phase 4", they use the old nu
   `#[cfg(unix)]`, because the stand-in for the player is a shell script.
 - A picture that lands makes the pane look its highlighted preset up again, whichever preset
   landed: one small file read per landed picture.
+
+**Phase 4 — the owner's frame-time reading, 2026-09-26.** Build 4aeb28c8 in release, on the
+reference laptop (Arch, kernel 7.2.5, Hyprland 0.56.2, music playing, Rich pinned by
+`config.toml`). Shipped Leviathan, fullscreen at 2560x1440 on the 165 Hz panel, with an empty
+`thumbnails/`, so one session covers the whole 116-preset library. Rows come from
+`diagnostics.log`, split by the pass's own `start` and `done` lines, with the first 6 rows after
+`start` dropped as startup. Each session ran 120 s past `done`.
+
+| adapter | pass | length | fps median | fps min | p99 ms median | p99 ms max | rows < 60 fps |
+|---|---|---|---|---|---|---|---|
+| RTX 3080 (unflagged default) | on | 59 s | 164.9 | 164.7 | 7.53 | 8.72 | 0 |
+| RTX 3080 (unflagged default) | off | 120 s | 164.9 | 163.5 | 6.40 | 8.27 | 0 |
+| AMD RADV RENOIR (`--gpu AMD`) | on | 1634 s | 24.4 | 21.4 | 49.58 | 76.77 | 1513 of 1607 |
+| AMD RADV RENOIR (`--gpu AMD`) | off | 122 s | 24.4 | 23.8 | 49.53 | 49.95 | 121 of 121 |
+
+- Both passes ended `done, 116 rendered, 0 failed`. On the 3080 the pass took about 60 s, about
+  0.5 s a preset. Beside an AMD-pinned show it took about 27 minutes, about 14 s a preset. The
+  children are started without `--gpu`, and which adapter they drew on was not read.
+- On AMD the median holds and the worst second does not. The pass-on window's max p99 is 76.8 ms,
+  against 50.0 ms off, and its minimum is 21.4 fps, against 23.8. Its mean frame time is *lower*
+  than the pass-off window's (37.8 ms against 41.1). That comes from two stretches of the music,
+  rows 365-383 and 1294-1368 of the pass, where Leviathan itself ran at 60-98 fps, not from the
+  pass. Leviathan at Rich is GPU-bound at 24 fps on this adapter either way.
+- An earlier AMD session on the same day is not used: the session's idle lock fell in its pass
+  window and froze the rows.
 
 ### Close triggers
 
