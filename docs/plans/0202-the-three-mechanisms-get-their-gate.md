@@ -201,7 +201,7 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Settle the rate candidate | dev | done | 7027a97c |
-| 2 — Repair what Phase 1 convicted | dev | not run: Phase 1 falsified the candidate | 09be6b65 |
+| 2 — Repair what Phase 1 convicted | dev | done - not run: Phase 1 falsified the candidate | 09be6b65 |
 | 3 — The echo's orientation truncates like the reference | dev | done (first run parked at ece8b14c, phase amended) | committed with this row |
 | 4 — The eight modes are captured on the rig | human | not started | |
 | 5 — The waveform scale is measured per mode | dev | not started | |
