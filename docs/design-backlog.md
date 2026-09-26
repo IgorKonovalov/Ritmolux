@@ -1687,14 +1687,14 @@ the interesting half of the question has no statistic.
 - **Raised:** 2026-09-19 by `architect`, asked by the owner (*"do we have a plan to cut curated
   presets that are too similar to each other or lame?"*). **Owner if taken:** `human` for step 2,
   then `architect` for the ADR and plan.
-- **Verified 2026-09-19** — the roster is a hand-written array of nine:
-  `present: const FAMILIES: \[\(SystemKind, &str\); 9\] in: core/tests/distinctness.rs`
-- **Verified 2026-09-19** — the third-largest shipped family is named nowhere in it:
-  `absent: analytic_field in: core/tests/distinctness.rs`
-- **Verified 2026-09-19** — nor is `cellular`:
-  `absent: cellular in: core/tests/distinctness.rs`
-- **Verified 2026-09-19** — and the doc still reports the pre-`analytic_field` denominator:
-  `present: nine of the twelve in: docs/testing.md`
+- **Verified 2026-09-26** — the instrument half is discharged by
+  [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md) (closed 2026-09-26): the
+  similarity roster is every `SystemKind`, held to the enum by `family_tests!`'s exhaustive match, and
+  `docs/testing.md` names no count. The heading's "nine of fourteen" describes the state this entry was
+  raised against, not the tree. The four 2026-09-19 probes that recorded the gap went red on delivery
+  and are replaced by these:
+  `present: family_tests! in: core/tests/distinctness.rs`
+  `absent: nine of the twelve in: docs/testing.md`
 - **Verified 2026-09-19** — the quality half has no instrument, which is an absence no probe can
   assert:
   `unprobeable: whether a shipped preset is worth shipping is a look judgement; this repository has

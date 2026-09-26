@@ -190,8 +190,8 @@ flowchart LR
 | 1 — the similarity roster derives from the enum | dev | done | 17961a15 |
 | 2 — the report is read, and the thresholds are judged | dev | done | 52c66c06 |
 | 3 — the stale prose carriers stop naming a list | dev | done | ba62c093 |
-| 4 — the catalogue declares an entry per system | dev | done | committed with this row |
-| 5 — the four sections get their guidance | human | done | committed with this row |
+| 4 — the catalogue declares an entry per system | dev | done | 8bf91ce1 |
+| 5 — the four sections get their guidance | human | done | c46abfa2 |
 
 ### Notes
 
@@ -242,13 +242,15 @@ flowchart LR
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** design-backlog 0258; **Takes:** 0256's instrument half
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** an integration test and docs/skill material; no shipped artifact changes
+- **Operator docs touched:** `docs/testing.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** 0256's four instrument-half probes
+  went red on delivery; repaired at the close
+- **Full suite:** the conductor's suite ledger record for tree 349a8f5, gate 0209-pre-review,
+  2026-09-26: 1858 tests run, 1858 passed, 7 skipped
+- **Outstanding `human` phases:** none (Phase 5 done, `c46abfa2`)
 
 ## Followups (after this lands)
 
