@@ -115,6 +115,32 @@ reads the lane from `git` after any park, so nothing in it depends on the old be
 read-before-write rule, not a permission refusal. On 2.1.278 the model read the file first, and
 this time it did not. Session C's control write is the reading that counts.
 
+## Re-verified on 2.1.282, on Linux
+
+- **Date:** 2026-09-26
+- **CLI:** `claude --version` -> `2.1.282 (Claude Code)`
+- **Machine:** Arch Linux (Omarchy, Hyprland), Node v26.8.2, worktree at `~/Work/rlx-probe-0187`
+- **Run:** `node tools/conductor/spike/probe.mjs --model haiku`, all four sessions: $0.093 (A) +
+  $0.058 (B) + $0.069 (C) + $0.062 (D). Raw output under `target/conductor-spike/<stamp>/`.
+
+Every row holds, with nothing moved since 2.1.280. Session A: the `dev` skill loads, six
+`PreToolUse:Bash` hooks per Bash call (24 `hook_started` for four calls), the `git add -A` denial
+comes back as the readable hook error, `cargo --version` runs, the `node -e` call is denied without a
+stall, and `Write` then `Edit` land (`probe-out.txt` reads back `beta`). The result is
+`result/success` after 7 turns in 29.7 s. Session B ends exit 1, `error_max_budget_usd`, after 2
+turns, with the `Read` its one model turn asked for run before the stop, as on 2.1.280. `git worktree
+remove` exits 0 with empty stderr and leaves no directory. **The `result` event's key set is
+identical to 2.1.278's and 2.1.280's**, compared against the raw output of both runs: 25 keys on a
+success and 20 on the budget stop. Every field `lib/outcome.mjs` reads is present.
+
+**`.claude/` is still write-denied to a headless session.** Session D, under settings naming `.claude/`
+paths, read `NOTES.md`, and was refused `Edit` and `Write` there with the don't-ask-mode denial. Its
+control `Write` outside `.claude/` succeeded. Session C, under `settings.conductor.json`, was refused
+the `Write` the same way, and its control write succeeded. **C's `Edit` is not a reading:** the model
+wrote the path with a backslash, so the tool answered *"File does not exist"* rather than ruling on
+the permission. Its first `Read` failed on the same path, and its relative-path `Read` succeeded.
+D is the reading that counts for `Edit`, as C was for the control write on 2.1.280.
+
 ## What the probe does
 
 Four sessions. Two of them, A and B, are `claude -p "/dev implement plan 9999"` with the worktree as cwd, and with
