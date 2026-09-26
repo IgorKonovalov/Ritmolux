@@ -16,10 +16,12 @@ Each script runs `ritmolux --stream --sink stdout` once per preset, three times,
 1440 frames, and reads the `draw+submit N ms` line the stream mode prints at exit
 ([capturing.md, "What it costs"](../../docs/capturing.md#what-it-costs-and-what-those-numbers-mean)).
 That path has **no window, no swapchain and no vsync**, so the number is not capped at the panel's
-refresh rate the way the window's `F3` fps is. It is the **CPU** cost of producing a frame —
-encoding it, submitting it, and taking the previous frame's readback on the way past without
-waiting — and it excludes presenting to a display. **This is the test that can say which OS is
-faster**, since the live test saturates at the refresh rate on a fast GPU.
+refresh rate the way the window's `F3` fps is. It is the cost of producing a frame — taking the
+previous frame's readback, encoding this one and submitting it — and it excludes presenting to a
+display. The readback waits only when the GPU is behind, so on an adapter that keeps up the figure
+is **CPU** time alone, and on one that does not it carries that wait and reads as the GPU's pace.
+**This is the test that can say which OS is faster**, since the live test saturates at the refresh
+rate on a fast GPU.
 
 **Every `results/` file older than this line was taken against a different figure.** The stream's
 readback used to block, so the number then carried the GPU's own execution time as well as the

@@ -1885,12 +1885,15 @@ render: resident set 277 MB, growth +0.2 MB across 5400 frames ...
 stream: 36000 frames, 600.00 s wall, 599.99 s scene clock, on NVIDIA GeForce RTX 3080 ...
 ```
 
-**Two stages, not three.** `draw+submit` is the CPU cost of producing a frame:
-encoding the passes, submitting them, and taking the *previous* frame's readback
-on the way past. **Nothing on this path waits for the GPU** — the tap keeps one
-frame in flight and polls without blocking, so a frame is published while the
-next one is being drawn. What the GPU itself spent is the per-pass table below,
-which needs timestamp queries rather than a clock on this side. The second stage
+**Two stages, not three.** `draw+submit` is the cost of producing a frame:
+taking the *previous* frame's readback, encoding the passes and submitting them.
+The tap keeps one frame in flight, so a frame is published while the next one is
+being drawn, and **it waits for the GPU only when the GPU is behind**. On an
+adapter that keeps up, the figure is CPU time alone. On one that does not, it
+carries the wait as well, and the run is held to the GPU's rate rather than
+queueing frames it would never publish. What the GPU itself spent is the
+per-pass table below, which needs timestamp queries rather than a clock on this
+side. The second stage
 is the sink's own, and it is **named for the sink** — `spout send` is the upload
 into the sender's device, `pipe write` is the blocking write to standard output —
 so a figure copied out of a log says which one produced it. The split answers the
@@ -1903,8 +1906,9 @@ is one frame behind the scene clock. `--frames N` still puts exactly `N` frames
 on the sink.
 
 **A figure taken before this is not comparable to one taken after it.** The
-readback used to block, so the first stage carried the GPU's execution time as
-well as the CPU's. The reading in the next paragraph is one of those, kept as the
+readback used to block on every frame, so the first stage always carried the
+GPU's execution time as well as the CPU's; now it carries a wait only on an
+adapter that is behind. The reading in the next paragraph is one of those, kept as the
 record of what the old figure was rather than as something to compare against a
 new run.
 

@@ -224,6 +224,53 @@ fn the_tap_hands_back_the_previous_frame() {
     );
 }
 
+/// **Every call after the first hands back a frame**, whatever the adapter's
+/// speed: `N` calls publish `N - 1` frames.
+///
+/// This is the bound on the GPU queue, stated as the one thing a caller can see
+/// of it. A tap that submitted a new frame while the previous map was still in
+/// flight would answer `None` on every call the GPU had not caught up with, and
+/// on an adapter slower than the caller's loop that is nearly every call. The
+/// back-to-back calls here give the GPU no time to catch up between them, which
+/// is the case the assertion is about.
+#[test]
+fn every_call_after_the_first_hands_back_a_frame() {
+    /// Enough calls that a tap letting the GPU fall behind would miss some.
+    const CALLS: usize = 24;
+
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let mut tap = renderer.open_tap();
+    let frame = AnalysisFrame::default();
+
+    let answers: Vec<bool> = (0..CALLS)
+        .map(|_| {
+            renderer
+                .render_tapped(&mut tap, &frame, CAPTURE_FRAME_DT)
+                .expect("render_tapped on a headless renderer")
+                .is_some()
+        })
+        .collect();
+
+    assert_eq!(
+        answers.first(),
+        Some(&false),
+        "the first call published a frame; the tap is not keeping one in flight"
+    );
+    let missed: Vec<usize> = answers
+        .iter()
+        .enumerate()
+        .skip(1)
+        .filter_map(|(i, published)| (!published).then_some(i))
+        .collect();
+    assert!(
+        missed.is_empty(),
+        "calls {missed:?} of {CALLS} published nothing: the tap submitted a new \
+         frame before the one in flight came back, so the GPU queue is unbounded"
+    );
+}
+
 /// Hold a backdrop colour on the active preset, whatever it binds.
 fn set_backdrop(renderer: &mut rlx_core::render::Renderer, hue: f32, bright: f32) {
     renderer

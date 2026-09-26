@@ -694,19 +694,19 @@ impl Renderer {
     ///
     /// # One frame in flight, and `Ok(None)` is the ordinary first answer
     ///
-    /// **Nothing here waits.** This frame's submission carries the copy out of
-    /// the tap's texture, the *previous* frame's map is taken on the way past
-    /// with a non-blocking poll, and the caller sees frame `N` while frame
-    /// `N+1` is being drawn. So the first call after
-    /// [`open_tap`](Self::open_tap) yields `Ok(None)`, and a call whose
-    /// predecessor's map has not landed yet yields `Ok(None)` too — the frame
-    /// was still drawn and the clock still moved, it simply produced no bytes.
-    /// [`FrameTap`] carries the cycle.
+    /// This frame's submission carries the copy out of the tap's texture, the
+    /// *previous* frame's map is taken before it is drawn, and the caller sees
+    /// frame `N` while frame `N+1` is on the GPU. So the first call after
+    /// [`open_tap`](Self::open_tap) yields `Ok(None)`, and **every later call
+    /// yields a frame**.
     ///
-    /// **A long run's memory is bounded by the map rather than by a wait**: the
-    /// tap's one buffer cannot be recorded into again until its map has landed
-    /// and been taken, so at most one frame is ever outstanding and the
-    /// retention Plan 0099 measured stays per-frame (Plan 0223 Phase 2).
+    /// **It waits only when the GPU is behind.** A previous map that has landed
+    /// is taken without blocking; one that has not is waited for before this
+    /// frame is submitted, so at most one frame is ever queued and a caller
+    /// that outruns the GPU is held to the GPU's rate. [`FrameTap`] carries the
+    /// cycle and says why the wait is the loop's only backpressure. The same
+    /// bound keeps a long run's memory per-frame, the retention Plan 0099
+    /// measured.
     ///
     /// A `dt` that is not finite and positive is replaced by one nominal step
     /// before the clock sees it (`sanitize_frame_dt`, ADR-0191).
@@ -732,12 +732,11 @@ impl Renderer {
         let dt = super::sanitize_frame_dt(dt);
         let (width, height) = (tap.width, tap.height);
         self.time += dt;
-        // Consumed first: the buffer cannot be recorded into while it is
-        // mapped, so this frame's copy is only possible once the previous one
-        // has been taken. This also collects the previous frame's pass timings,
-        // while the timer still holds that frame's labels.
-        let image = tap.consume(&self.ctx.device);
-        let recording = tap.ready_to_record();
+        // Taken first: the buffer cannot be recorded into while it is mapped,
+        // and this is also where a caller ahead of the GPU waits for it. It
+        // collects the previous frame's pass timings too, while the timer
+        // still holds that frame's labels.
+        let image = tap.take_previous(&self.ctx.device);
 
         let mut encoder = self
             .ctx
@@ -746,12 +745,8 @@ impl Renderer {
                 label: Some("rlx-frame-tap"),
             });
         // Armed for the whole encode and taken back before the submit, so no
-        // pass encoded outside this window can write into the query set. Left
-        // unarmed on a frame that cannot record, because its resolve would
-        // write into a readback buffer that is still mapped.
-        if recording {
-            gpu::arm_pass_timer(tap.timer.take());
-        }
+        // pass encoded outside this window can write into the query set.
+        gpu::arm_pass_timer(tap.timer.take());
         capture::record_clear(&mut encoder, &tap.view);
         let draw_calls = self.draw_frame(
             frame,
@@ -761,23 +756,19 @@ impl Renderer {
             dt,
             SaltMode::Live,
         );
-        if recording {
-            capture::record_copy(
-                &mut encoder,
-                &tap.texture,
-                &tap.buffer,
-                tap.padded_bpr,
-                width,
-                height,
-            );
-            tap.timer = gpu::disarm_pass_timer(&mut encoder);
-        }
+        capture::record_copy(
+            &mut encoder,
+            &tap.texture,
+            &tap.buffer,
+            tap.padded_bpr,
+            width,
+            height,
+        );
+        tap.timer = gpu::disarm_pass_timer(&mut encoder);
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
-        if recording {
-            tap.arm();
-            if let Some(timer) = tap.timer.as_mut() {
-                timer.map();
-            }
+        tap.arm();
+        if let Some(timer) = tap.timer.as_mut() {
+            timer.map();
         }
 
         #[cfg(feature = "text")]
@@ -799,8 +790,8 @@ impl Renderer {
     /// `None` when nothing is in flight — an unused tap, or one already
     /// drained.
     ///
-    /// **A live loop must not call this.** It is the wait `render_tapped` no
-    /// longer pays, and paying it per frame puts the stall back.
+    /// A live loop has no use for it: `render_tapped` already waits when the
+    /// GPU is behind, and calling this per frame would wait even when it is not.
     pub fn drain_tap(&mut self, tap: &mut FrameTap) -> Option<CaptureImage> {
         tap.drain(&self.ctx.device)
     }

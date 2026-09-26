@@ -341,17 +341,18 @@ pub const REPORT_EVERY: u64 = 1800;
 /// report.
 ///
 /// **Two stages, because the engine/sink boundary is the only one a caller-side
-/// clock can see.** `render_tapped` encodes the draw, submits it and takes the
-/// *previous* frame's map on the way past without waiting, so what this measures
-/// is the CPU cost of producing a frame and not the GPU's cost of drawing it —
-/// that one is the per-pass table, which needs timestamp queries rather than a
-/// clock out here. The split that *is* available is the one that says whether
+/// clock can see.** `render_tapped` takes the *previous* frame's map, encodes the
+/// draw and submits it. The take waits only when the GPU is behind, so on an
+/// adapter that keeps up this measures the CPU cost of producing a frame, and on
+/// one that does not it carries the wait for the GPU as well. Neither is the
+/// GPU's cost of drawing it — that one is the per-pass table, which needs
+/// timestamp queries rather than a clock out here. The split that *is* available is the one that says whether
 /// the sink limits the rate, which is the question the readback-versus-zero-copy
 /// decision turns on (ADR-0125).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct StageCosts {
-    /// Time inside `render_tapped`: the non-blocking consume of the previous
-    /// frame, this frame's encode, and the submit.
+    /// Time inside `render_tapped`: taking the previous frame, including any
+    /// wait for a GPU that is behind, this frame's encode, and the submit.
     pub render: Duration,
     /// Time inside the sink's send: the upload into a Spout sender's own
     /// device, or the blocking write into the pipe.

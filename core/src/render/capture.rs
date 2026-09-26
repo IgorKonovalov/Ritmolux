@@ -308,19 +308,27 @@ pub(super) fn unpad_rows(padded: &[u8], width: u32, height: u32, padded_bpr: u32
 /// of one fixed-`dt`, one-preset run it drives itself; this type hands that
 /// reuse to a caller who owns the loop.
 ///
-/// # One frame in flight, and nothing waits
+/// # One frame in flight, and a wait only when the GPU is behind
 ///
 /// The cycle is the preview readback's, three steps across two frames:
-/// **consume** the previous submission's map with a non-blocking poll,
-/// **record** this frame's copy into the freed buffer, and **arm** the map
-/// after the submission. So a caller sees frame *N* while frame *N+1* is being
-/// drawn, and the very first call yields nothing at all.
+/// **take** the previous submission's map, **record** this frame's copy into the
+/// freed buffer, and **arm** the map after the submission. So a caller sees
+/// frame *N* while frame *N+1* is being drawn, and the very first call yields
+/// nothing at all.
+///
+/// **The take waits when the previous map has not landed**
+/// ([`take_previous`](Self::take_previous)). That wait is the only backpressure
+/// a windowless loop has: the window is held to the GPU's pace by the
+/// swapchain, and nothing holds a tap to it but this. Without it, an adapter
+/// whose frame costs more GPU time than the caller's loop costs CPU time queues
+/// submissions without bound, the one map in flight lands only behind all of
+/// them, and nearly every frame drawn meanwhile is never copied out. On an
+/// adapter that keeps up, the map has landed by the next call and nothing
+/// waits.
 ///
 /// **The buffer cannot be re-recorded while it is mapped**, which is why the
-/// consume step comes first and why a map that has not landed skips the record:
-/// a second copy into a mapped buffer is a validation error, not a dropped
-/// frame. A frame whose copy was skipped is still *drawn* — the scene advances
-/// and the clock moves — it simply produces no bytes.
+/// take comes before the record: a second copy into a mapped buffer is a
+/// validation error, not a dropped frame.
 ///
 /// **Sized at construction and never resized.** `record_copy`'s extent, the
 /// buffer's length and `padded_bpr` are all fixed against `width`×`height`, so a
@@ -402,9 +410,9 @@ impl FrameTap {
         use std::sync::mpsc::TryRecvError;
 
         let armed = self.armed.as_ref()?;
-        // The one poll on this path, and it is the non-blocking kind: an
-        // indefinite wait here would put the GPU's whole execution time inside
-        // the caller's own frame cost (Plan 0223 Phase 2).
+        // Non-blocking: a map that has landed is taken without paying for
+        // whatever else the GPU has queued. The wait, where one is owed, is
+        // `take_previous`'s.
         let _ = device.poll(wgpu::PollType::Poll);
         match armed.try_recv() {
             Ok(Ok(())) => {}
@@ -437,21 +445,28 @@ impl FrameTap {
         image
     }
 
-    /// Whether the buffer is free to be copied into this frame.
-    pub(crate) fn ready_to_record(&self) -> bool {
-        self.armed.is_none()
+    /// Take the frame the previous submission carried, **waiting for it only if
+    /// its map has not landed**, so that on return the buffer is always free to
+    /// record into.
+    ///
+    /// This is what bounds the GPU queue to the frame about to be drawn: every
+    /// call after the first returns a frame, on any adapter, and a caller that
+    /// outruns the GPU is held to its rate instead of queueing draws it will
+    /// never read. `None` on the first call and after a map that failed.
+    pub(crate) fn take_previous(&mut self, device: &wgpu::Device) -> Option<CaptureImage> {
+        let image = self.consume(device);
+        if image.is_some() || self.armed.is_none() {
+            return image;
+        }
+        self.drain(device)
     }
 
     /// **Wait** for the frame still in flight and take it, drawing nothing.
     ///
-    /// The blocking counterpart of [`consume`](Self::consume), for a caller
-    /// that has stopped asking for frames and wants the one the pipeline is
-    /// still holding — a bounded run's last frame, and the way a test takes one
-    /// frame per call deterministically. `None` when nothing is in flight.
-    ///
-    /// **A live loop must not call this.** It is exactly the wait the pipeline
-    /// exists to remove, and this file is one of the two the indefinite-wait
-    /// allowlist admits for that reason.
+    /// The blocking counterpart of [`consume`](Self::consume): a bounded run's
+    /// last frame, and the half of [`take_previous`](Self::take_previous) that
+    /// runs when the GPU is behind. `None` when nothing is in flight. This file
+    /// is one of the two the indefinite-wait allowlist admits, for this wait.
     pub(crate) fn drain(&mut self, device: &wgpu::Device) -> Option<CaptureImage> {
         self.armed.as_ref()?;
         // The map was asked for on a submission that has already been made, so

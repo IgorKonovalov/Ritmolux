@@ -362,6 +362,16 @@ grid_scale = "auto"   # or 0.25..1.0
   while a CPU-bound adapter keeps the overlap the phase bought. Either a call that finds the tap
   still armed does not draw, or it waits on the frame in flight rather than submitting another. A
   test of it wants a GPU-bound case. The existing two-frame sequence test passes at any queue depth.
+- **Phase 2 repair, the owner note above: committed with this line, as a fix under Phase 2 by the
+  owner's choice rather than as a new phase.** `FrameTap::take_previous` waits on the frame in
+  flight when its map has not landed, so `render_tapped` always records and every call after the
+  first returns a frame. `frame_tap::every_call_after_the_first_hands_back_a_frame` asserts that
+  (24 back-to-back calls on the software adapter), and it fails with the two source files at
+  `517e74d0`. Same invocation as the note's table, on this fix: AMD Nebula 6.33 s, Leviathan 6.06 s
+  (241 drawn for 240 published); RTX 3080 Nebula 1.11 s, Leviathan 1.21 s. `draw+submit` now
+  carries the wait on the iGPU (about 25 ms), and `docs/capturing.md` and `scripts/bench/README.md`
+  say so. `scripts/bench/README.md` and `core/tests/suite/frame_tap.rs` are not in Phase 2's
+  `Files touched`.
 - **Phase 3, the step moved as well as the rounding.** `POST_GRID_STEP` and `TRAIL_GRID_STEP` are
   both 128 now, and `grid::MIN_AXIS` (256) is the floor that used to be implied by one step. The
   done-when's four values follow from that pair and are asserted directly in
