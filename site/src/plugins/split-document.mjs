@@ -7,18 +7,31 @@ import { stripProvenanceText } from './strip-provenance.mjs';
  * (ADR-0166).
  *
  * The thresholds are the whole decision, and they are measured rather than
- * chosen: 40 KB selects the documents a reader cannot navigate, 20 KB selects
- * the sections that stay unnavigable after a flat split, and the split stops at
- * `###` because a third level shatters coherent small sections into pages with
- * nothing on them. `ROUTE_SOURCE_CEILING` is not a lever - it is the assertion
- * that the two above did their job, and a route over it means the arithmetic in
- * ADR-0166 needs redoing, not that the constant needs raising.
+ * chosen: 40 KB selects the documents a reader cannot navigate, and 20 KB
+ * selects the sections that stay unnavigable after a flat split. The second is
+ * applied recursively (ADR-0247): a section over it splits at the next heading
+ * level, and so does each of its pieces, until every piece is under it or has
+ * no heading one level down. The condition is what keeps coherent small
+ * sections whole - an unconditional deeper cut would shatter them into pages
+ * with nothing on them - so no terminal depth is needed.
  *
  * Nothing under `docs/` or `presets/` is edited to make this work: the split
  * reads the source text and emits chunks of it (ADR-0154).
  */
 export const DOCUMENT_SPLIT_BYTES = 40_000;
 export const SECTION_SPLIT_BYTES = 20_000;
+
+/**
+ * The largest route source `scripts/check-site-routes.mjs` accepts.
+ *
+ * Not a lever, and an assertion about the corpus rather than about this
+ * algorithm (ADR-0247): the recursion guarantees only that a route over
+ * `SECTION_SPLIT_BYTES` has no heading one level down to cut at, so a long run
+ * of prose with no heading inside can exceed this and nothing here repairs it.
+ * `## Checklist` in `docs/on-device-validation.md` is the standing instance.
+ * The repair for a route over it is editorial - headings in the source - never
+ * a raised constant.
+ */
 export const ROUTE_SOURCE_CEILING = 30_000;
 
 /**
@@ -120,6 +133,52 @@ export function plainHeading(text) {
 const bytes = (text) => Buffer.byteLength(text, 'utf8');
 
 /**
+ * The chunks for the headings at `depth` starting at `starts`, the last one
+ * running to `end`, each split again at `depth + 1` when it is oversized.
+ *
+ * A chunk is measured WITH its heading line, which is how ADR-0166's
+ * distribution was summed; its own heading becomes its page title rather than
+ * page content, so it is not in `body`. An oversized chunk keeps the prose
+ * before its first child as its own body and hands the rest to its children,
+ * so `from`/`to` of every chunk in the tree are disjoint and cover the source
+ * once. Only the next level down is searched: a section over the threshold
+ * with no heading one level below it stays whole, however deep its other
+ * headings go.
+ *
+ * Slugs are unique among siblings only - each parent's children get their own
+ * slugger - because the parent's route already disambiguates them.
+ */
+function sectionsAt(lines, fenced, depth, starts, end, parentRoute) {
+  const slugger = new Slugger();
+  return starts.map((start, k) => {
+    const to = k + 1 < starts.length ? starts[k + 1] : end;
+    const sourceHeading = lines[start].slice(depth + 1).trim();
+    const title = plainHeading(stripProvenanceText(sourceHeading));
+    const route = `${parentRoute}/${slugger.slug(title)}`;
+    const chunk = {
+      kind: depth === 2 ? 'section' : 'subsection',
+      route,
+      title,
+      sourceHeading,
+      headingLine: start,
+      from: start,
+      to,
+      body: lines.slice(start + 1, to).join('\n'),
+      children: [],
+    };
+    if (depth < 6 && bytes(lines.slice(start, to).join('\n')) > SECTION_SPLIT_BYTES) {
+      const childStarts = headingStarts(lines, fenced, depth + 1, start + 1, to);
+      if (childStarts.length > 0) {
+        chunk.body = lines.slice(start + 1, childStarts[0]).join('\n');
+        chunk.to = childStarts[0];
+        chunk.children = sectionsAt(lines, fenced, depth + 1, childStarts, to, route);
+      }
+    }
+    return chunk;
+  });
+}
+
+/**
  * The routes one document contributes, or `null` when it is small enough to
  * stay a single page.
  *
@@ -142,55 +201,7 @@ export function splitDocument(source, baseRoute, title) {
   const starts = headingStarts(lines, fenced, 2, 0, lines.length);
   if (starts.length === 0) return null;
 
-  const slugger = new Slugger();
-  const sections = [];
-
-  starts.forEach((start, k) => {
-    const end = k + 1 < starts.length ? starts[k + 1] : lines.length;
-    const sourceHeading = lines[start].slice(3).trim();
-    const sectionTitle = plainHeading(stripProvenanceText(sourceHeading));
-    const route = `${baseRoute}/${slugger.slug(sectionTitle)}`;
-    const section = {
-      kind: 'section',
-      route,
-      title: sectionTitle,
-      sourceHeading,
-      headingLine: start,
-      from: start,
-      to: end,
-      body: lines.slice(start + 1, end).join('\n'),
-      children: [],
-    };
-
-    // The section is measured WITH its heading line, which is how ADR-0166's
-    // distribution was summed; a chunk's own heading becomes its page title
-    // rather than page content, so it is not in `body`.
-    if (bytes(lines.slice(start, end).join('\n')) > SECTION_SPLIT_BYTES) {
-      const subStarts = headingStarts(lines, fenced, 3, start + 1, end);
-      if (subStarts.length > 0) {
-        const subSlugger = new Slugger();
-        section.body = lines.slice(start + 1, subStarts[0]).join('\n');
-        section.to = subStarts[0];
-        subStarts.forEach((subStart, j) => {
-          const subEnd = j + 1 < subStarts.length ? subStarts[j + 1] : end;
-          const subSource = lines[subStart].slice(4).trim();
-          const subTitle = plainHeading(stripProvenanceText(subSource));
-          section.children.push({
-            kind: 'subsection',
-            route: `${route}/${subSlugger.slug(subTitle)}`,
-            title: subTitle,
-            sourceHeading: subSource,
-            headingLine: subStart,
-            from: subStart,
-            to: subEnd,
-            body: lines.slice(subStart + 1, subEnd).join('\n'),
-            children: [],
-          });
-        });
-      }
-    }
-    sections.push(section);
-  });
+  const sections = sectionsAt(lines, fenced, 2, starts, lines.length, baseRoute);
 
   return {
     index: {
@@ -210,13 +221,14 @@ export function splitDocument(source, baseRoute, title) {
   };
 }
 
-/** Every chunk of a split document, index first, in reading order. */
+/** Every chunk of a split document, index first, in reading order, at any depth. */
 export function chunksOf(split) {
-  const out = [split.index];
-  for (const section of split.sections) {
-    out.push(section);
-    out.push(...section.children);
-  }
+  const out = [];
+  const walk = (chunk) => {
+    out.push(chunk);
+    chunk.children.forEach(walk);
+  };
+  walk(split.index);
   return out;
 }
 
@@ -240,7 +252,8 @@ export function contentsList(chunk, base, heading) {
  * Generated rather than hand-listed: 46 entries written out by hand is the
  * shape of roster that has rotted repeatedly in this repository, and a heading
  * rename would silently orphan a route. A section that split again nests its
- * subsections under itself, so the menu is never a flat list of 45 siblings.
+ * subsections under itself, at whatever depth the split reached, so the menu is
+ * never a flat list of 45 siblings.
  *
  * The group's own label is the document's DECLARED title, not a second string
  * passed in beside it: the menu entry and the page `<h1>` are one fact
@@ -254,23 +267,17 @@ export function sidebarGroup(source, { route, title: label }) {
   const split = splitDocument(readFileSync(fileURL, 'utf8'), route, label);
   if (!split) return { label, slug: route };
 
-  const leaf = (chunk) => ({ label: chunk.title, slug: chunk.route });
-  return {
-    label,
-    collapsed: true,
-    items: [
-      { label: 'Overview', slug: route },
-      ...split.sections.map((section) =>
-        section.children.length === 0
-          ? leaf(section)
-          : {
-              label: section.title,
-              collapsed: true,
-              items: [{ label: 'Overview', slug: section.route }, ...section.children.map(leaf)],
-            },
-      ),
-    ],
-  };
+  // A chunk with children is a collapsed group whose first entry is the chunk's
+  // own route, so the parent page stays in the menu at every depth.
+  const item = (chunk, groupLabel) =>
+    chunk.children.length === 0
+      ? { label: chunk.title, slug: chunk.route }
+      : {
+          label: groupLabel,
+          collapsed: true,
+          items: [{ label: 'Overview', slug: chunk.route }, ...chunk.children.map((c) => item(c, c.title))],
+        };
+  return item(split.index, label);
 }
 
 /**

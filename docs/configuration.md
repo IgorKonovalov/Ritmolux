@@ -408,6 +408,7 @@ The furniture the shell paints over the show. Separate from `[output]` because i
 | `preset_name` | `true` | Draw the active preset's name in the top-left corner. Even when on, the name yields to a menu and to the `F3` panel — this is "never show it", not "show it always" |
 | `now_playing` | `true` | Announce the current track in the lower-left corner when it changes. Off means no track ever reaches the visualizer, not a banner drawn transparent |
 | `next_rotation` | `true` | Count down to the next auto-rotate, under the preset name. Nothing is drawn while auto-rotate is off, so this key only decides whether the line appears when there *is* a countdown |
+| `diagnostics` | `false` | Paint the diagnostics overlay — the panel `F3` and the settings menu's **Diagnostics** row toggle. Set it to `true` to come up with the panel already open on a machine you are measuring |
 
 ### `[osc]`
 
@@ -530,6 +531,7 @@ tier = "auto"
 preset_name = true
 now_playing = true
 next_rotation = true
+diagnostics = false
 
 [osc]
 enabled = false
@@ -572,6 +574,29 @@ running app *for that session*.
 themselves into `config.toml`; the file is the persistent form. There is no environment variable for
 the input selection or the adapter, because both are properties of a rig and already persist to the
 config.
+
+## What the other two applications keep
+
+Every setting on this page belongs to the standalone player. The other two applications keep their
+own choices in their own files, on the same rule: a setting is a key in a file you can edit, and a
+menu or a panel is an editor of that file.
+
+**The studio** persists through a `settings.json` beside its own data, written by
+`studio/electron/settings.ts`. Nothing it shows is kept in browser storage — `localStorage`,
+`sessionStorage` and `indexedDB` all keep a choice where no file can be edited and no other process
+can read it, and `scripts/check-settings-have-files.mjs` is what holds that to being a property
+rather than a habit.
+
+**The foobar2000 component has no settings and no file**, and the one thing it stores host-side is
+not one. `g_cfg_preset` is a `cfg_string` holding the **name** of the preset that was last on
+screen, so a session reopens on the look it closed with. That is **resume state, not a setting**:
+nothing about it is chosen, an empty value or a name whose file is gone simply means "whatever the
+roster opens on", and forgetting it costs a user nothing but the preset they were watching. The
+same gate holds every `cfg_*` declaration in that shim to being named here — which is the only way
+resume state can be told apart from a setting nobody gave a file.
+
+The day the component grows a real setting, it belongs in `config.toml` beside the player's, not in
+foobar's own store.
 
 ## OSC addresses
 

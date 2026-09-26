@@ -10,6 +10,7 @@ import { test } from "node:test";
 
 import { adoptedClose, closeOnBranch, verifyClose } from "../lib/close.mjs";
 import { findPlan } from "../lib/plan.mjs";
+import { adoptClose } from "../lib/state.mjs";
 import { planText, tmp, writePlan } from "./helpers.mjs";
 
 function sh(args, cwd) {
@@ -206,4 +207,20 @@ test("a fixed_in commit that does not change the file, under any of its paths, i
   assert.equal(problems.length, 1, problems.join("\n"));
   assert.match(problems[0], /^finding 0 is fixed_in [0-9a-f]+, which does not change docs\/plans\/done\/0101-fixture\.md/);
   assert.match(problems[0], /docs\/plans\/0101-fixture\.md/, "the path the rename was followed to is named too");
+});
+
+// ADR-0248: the review records its verdict before the close runs, so an adopted close keeps it.
+test("adopting a close keeps the clean verdict the review recorded, and records the adopted one only when there is none", () => {
+  const adopted = adoptedClose({ cwd: lane(), plan: "0101", round: 2 });
+  const clean = { round: 1, blockers: 0, majors: 0, minors: 1, review_path: "r1.md", findings: [{ severity: "minor", file: "a.md", line: 1, what: "left open" }], graded: "abc1234" };
+  const rec = { verdicts: [clean], closed: null };
+  adoptClose(rec, adopted, "f".repeat(40));
+  assert.deepEqual(rec.verdicts, [clean], "the review's findings survive the adoption");
+  assert.equal(rec.closed.adopted, true);
+  assert.equal(rec.closed.tag, "v0.1.1");
+
+  const bare = { verdicts: [{ round: 1, blockers: 0, majors: 1, minors: 0, review_path: "r1.md", findings: [] }], closed: null };
+  adoptClose(bare, adopted, "f".repeat(40));
+  assert.equal(bare.verdicts.length, 2, "a verdict with a major is not the closing one");
+  assert.equal(bare.verdicts[1].review_path, adopted.verdict.review_path);
 });

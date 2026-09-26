@@ -1,7 +1,9 @@
 # NFR section 7: build, test, doctests, clippy, fmt on Windows, macOS and Linux
-# for every push, plus five single-runner gates - the `spout` feature compile
-# (ADR-0181), the doc-link and roster checks, cargo-deny (supply chain), the rlx-core
-# coverage ratchet (ADR-0033), and Miri over rlx-ring's unsafe.
+# for every push, plus the single-runner gates - the `spout` feature compile
+# (ADR-0181), the foobar2000 component compile (ADR-0251), the doc-link and
+# roster checks, the studio's own suite, cargo-deny and the npm audit (supply
+# chain), the rlx-core coverage ratchet (ADR-0033), and Miri over rlx-ring's
+# unsafe.
 #
 # Live audio is out of CI scope. GPU rendering partly is not: on Windows the DX12
 # WARP software adapter makes headless rendering deterministic, which the golden
@@ -199,6 +201,42 @@ jobs:
         run: ./packaging/spout/fetch-sdk.ps1
       - run: cargo check -p standalone --features spout
 
+  # The foobar2000 component: the C++ shim under plugin-foobar/, compiled
+  # against the pinned SDK and linked to rlx-core-cabi's staticlib. No cargo
+  # command reaches it, since it is not Rust, and it needs an SDK that is
+  # third-party and gitignored - so, like the `spout` feature above, the default
+  # gate cannot see it by construction. This job is what compiles it before a
+  # tag is pushed (ADR-0251's roster). A C ABI change that the shim was not
+  # updated for, a renamed header, or an SDK pin bump that breaks the build now
+  # names `foobar` on the push that caused it, instead of surfacing as a missing
+  # artifact from release.yml's `foobar` job.
+  #
+  # release.yml's `foobar` job REMAINS THE LAST LINE: it runs
+  # packaging/foobar/build-component.ps1, which packages the component and
+  # verifies the archive, the PE machine type, the export and the stamped
+  # version. This job compiles and links and does none of that.
+  #
+  # Its own job, concurrent, for the reasons given for `spout`: a step on
+  # `check (windows-latest)` would serialize an SDK fetch and a release-profile
+  # core build into the critical path, and would name `check` as the subject
+  # when this breaks (ADR-0181 Alternative A). It pays the pinned-SDK fetch on
+  # every push, which ADR-0251 accepts on the same terms ADR-0181 did.
+  foobar:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      # The same two scripts release.yml's `foobar` job uses, in the same order:
+      # fetch-sdk.ps1 stages the pinned SDK at plugin-foobar/sdk/ and checks its
+      # SHA-256, and build.ps1 builds the core's staticlib, the SDK's static
+      # libraries and the shim, and links foo_ritmolux.dll.
+      - name: Stage the pinned foobar2000 SDK
+        shell: pwsh
+        run: ./packaging/foobar/fetch-sdk.ps1
+      - name: Compile and link the component
+        shell: pwsh
+        run: ./plugin-foobar/build.ps1
+
   # Doc-link gate (Plan 0061 Phase 2c). Every relative markdown link in the repo
   # must resolve - across docs/, README.md and .claude/skills/**.
   #
@@ -322,6 +360,20 @@ jobs:
       # on the line is the escape, and a marker with no reason is itself a
       # finding.
       - run: node scripts/check-system-counts.mjs
+      # And the settings-file gate (ADR-0240): the two applications a Rust test
+      # cannot see keep every setting in a file. The standalone's half is carried
+      # by types - `SettingsRow::config_path` is an exhaustive match from a menu
+      # row to a `config.toml` key - and neither of the other two has anything
+      # like it: nothing here compiles `plugin-foobar/` at all. So this reads
+      # source text for two properties. No `localStorage`, `sessionStorage` or
+      # `indexedDB` under `studio/`, because all three keep a choice where no
+      # file can be edited and no other process can read it; and every `cfg_*`
+      # declaration under `plugin-foobar/` named in docs/configuration.md,
+      # because foobar's store is host-side and a document is the only thing
+      # that can tell resume state from an unclaimed setting. It greps rather
+      # than parses, so `settings-allow: <why>` on the line is the escape and a
+      # marker with no reason is itself a finding.
+      - run: node scripts/check-settings-have-files.mjs
       # And the roster's own gate (ADR-0217): every `node scripts/...` invocation
       # above is the projection of scripts/gates.manifest.mjs for this job, in that
       # order, and `.githooks/pre-push`'s are its projection for the hook. How many
@@ -341,11 +393,11 @@ jobs:
       # commands, the two PreToolUse hooks' bite checks and the machine-wide lock.
       # It belongs here for the reason the gates above do - cheap, platform-free,
       # no GPU - and because a fake CLI stands in for claude, it spends nothing and
-      # needs no network. A glob, not a directory: `node --test <dir>` is not a
-      # test-file pattern on Node 22.
+      # needs no network. A glob, not a directory: `node --test <dir>` is not
+      # read as a test-file pattern on every Node release.
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
       - run: node --test "tools/conductor/test/*.test.mjs"
       # And the diffusion filter's own suite (Plan 0106 Phase 7c). It belongs in
       # this job rather than in the `check` matrix for the same reasons the three
@@ -385,6 +437,11 @@ jobs:
   # npm ci rather than npm install: it installs the committed lockfile exactly
   # and fails if package.json and the lockfile disagree, which is the only
   # reason the lockfile is committed at all.
+  #
+  # Node 24 ships npm 11, which runs a dependency's install script only when
+  # `allowScripts` in studio/package.json names it, pinned to its version
+  # (ADR-0244). A bump that strands an entry still installs cleanly here; the
+  # package's script is simply skipped.
   studio:
     runs-on: ubuntu-latest
     defaults:
@@ -394,7 +451,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: studio/package-lock.json
       - run: npm ci
@@ -411,6 +468,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@cargo-deny
       - run: cargo deny check
+
+  # The npm graphs' supply-chain gate (ADR-0244), the counterpart of `deny`
+  # above for studio/ and site/. It fails at `high` in the studio's shipped graph
+  # (`--omit=dev`, what the studio zip carries) and at `critical` in every full
+  # graph, and npm-audit.allow.json holds its exceptions as a GHSA id and a
+  # reason. `npm audit` reads the committed lockfiles, so no install step.
+  #
+  # Its own job rather than a step in `links`: it needs the registry, and its
+  # answer changes without a commit, so a red here says an advisory was
+  # published rather than that a push broke something. For the same reason it
+  # is on neither the pre-push hook nor scripts/gates.manifest.mjs. A registry
+  # outage fails it; the gate never reads a failed request as a pass.
+  # --self-test carries the assertions, since the live run has nothing seeded.
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node scripts/check-npm-audit.mjs --self-test
+      - run: node scripts/check-npm-audit.mjs
 
   # Coverage ratchet (Plan 0032 Phase 4, ADR-0033). Gates `rlx-core` only:
   # `standalone/` is a winit event loop plus two platform capture backends that

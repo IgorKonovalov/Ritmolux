@@ -81,7 +81,7 @@ use crate::render::tier::attractor_budget;
 use ifs::{FitLut, IfsFigure, IfsPacked, IfsTable, Levers};
 
 use super::common;
-use super::{Phase, Scene, SeededRng};
+use super::{FeedbackSink, Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::{self, FeedbackConfig, PingPongField};
 use crate::render::palette::{self, Palette};
@@ -654,7 +654,7 @@ pub struct AttractorScene {
     /// [`budget`](Self::budget) can resolve to.
     anchor: u32,
     /// Whether a target size has reached this scene yet, so
-    /// [`sample_budget`](Scene::sample_budget) can tell "the anchor, because the
+    /// [`sample_budget`](Self::sample_budget) can tell "the anchor, because the
     /// target is small" from "the anchor, because nothing has asked yet".
     targeted: bool,
     /// This target's resolved sample budget:
@@ -991,6 +991,37 @@ impl AttractorScene {
             reseed: 0.0,
             prev_reseed: 0.0,
         }
+    }
+
+    /// The budget the density law resolved for the target this scene was last
+    /// given (ADR-0140) — `None` until [`set_target_size`](Scene::set_target_size)
+    /// has been called, which is the first frame.
+    ///
+    /// The **budget**, not `active_count`: a preset's `[particles] density`
+    /// narrows what is drawn out of it (ADR-0069), and that is a look choice
+    /// rather than a property of the target.
+    ///
+    /// **Inherent and `#[cfg(test)]`, not a `Scene` method** (ADR-0238): only a
+    /// test asks, and only of this scene. It is not the reporting path either —
+    /// `shot --render` prints its budget from
+    /// [`TierConfig::attractor_budget_offline`](crate::render::TierConfig::attractor_budget_offline)
+    /// instead, because the header is written before the renderer exists and
+    /// this would answer `None` there.
+    #[cfg(test)]
+    pub(crate) fn sample_budget(&self) -> Option<u32> {
+        self.targeted.then_some(self.budget)
+    }
+
+    /// What `density` resolved to out of that budget — `None` until a target
+    /// size has reached the scene, so the two answer together.
+    ///
+    /// Distinct from [`sample_budget`](Self::sample_budget) for the reason that
+    /// method's doc gives: the budget is a property of the target, and this is
+    /// the look choice taken out of it. Both are needed to state that a density
+    /// change moved the drawn count and left the allocation alone.
+    #[cfg(test)]
+    pub(crate) fn active_sample_count(&self) -> Option<u32> {
+        self.targeted.then_some(self.active_count)
     }
 
     /// Build the GPU resources on the first frame, and re-allocate the
@@ -1586,9 +1617,21 @@ pub const PARAMS: &[ParamSpec] = &[
     },
 ];
 
+impl FeedbackSink for AttractorScene {
+    /// The scene's own internal trail field is the second sink of the preset's
+    /// `[feedback]` table; the engine trails stage is the first.
+    fn set_feedback(&mut self, cfg: FeedbackConfig) {
+        self.feedback = cfg;
+    }
+}
+
 impl Scene for AttractorScene {
     fn name(&self) -> &'static str {
         "attractor"
+    }
+
+    fn as_feedback_sink(&mut self) -> Option<&mut dyn FeedbackSink> {
+        Some(self)
     }
 
     fn set_occlude(&mut self, occlude: f32) {
@@ -1634,25 +1677,6 @@ impl Scene for AttractorScene {
     // No `set_time`. The display rotation was this scene's only reader of the
     // shared clock, and since ADR-0076 it is an integrated phase instead — so
     // the trait's no-op default is the honest implementation.
-
-    /// The budget the density law resolved for the target this scene was last
-    /// given (ADR-0140) — `None` until [`set_target_size`](Self::set_target_size)
-    /// has been called, which is the first frame.
-    ///
-    /// The **budget**, not `active_count`: a preset's `[particles] density`
-    /// narrows what is drawn out of it (ADR-0069), and that is a look choice
-    /// rather than a property of the target.
-    #[cfg(test)]
-    fn sample_budget(&self) -> Option<u32> {
-        self.targeted.then_some(self.budget)
-    }
-
-    /// What `density` resolved to out of that budget — `None` until a target
-    /// size has reached the scene, so the two hooks answer together.
-    #[cfg(test)]
-    fn active_sample_count(&self) -> Option<u32> {
-        self.targeted.then_some(self.active_count)
-    }
 
     fn set_palette(&mut self, palette: &Palette) {
         // Uploaded to the draw LUT textures in `render` (deferred — resources build
@@ -1737,13 +1761,6 @@ impl Scene for AttractorScene {
                 self.feedback_transform.set_param(name, value);
             }
         }
-    }
-
-    /// Take the active preset's `[feedback]` table (ADR-0048). **Once at preset
-    /// load, off the hot path**, exactly like [`configure`](Scene::configure) —
-    /// a warp kind is a shader path, not a scalar.
-    fn set_feedback(&mut self, cfg: FeedbackConfig) {
-        self.feedback = cfg;
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {

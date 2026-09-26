@@ -3,7 +3,7 @@
 // disagreement with the problems as its detail. The session's word is never the evidence.
 
 import { commitsBetween, git, head, isAncestor, isClean, resolveCommit, tagObjectType } from "./git.mjs";
-import { donePhases, findPlan, readPlanFile } from "./plan.mjs";
+import { donePhases, findPlan, nonBlocking, readPlanFile, rowIsOwed } from "./plan.mjs";
 
 /**
  * The close a session already committed on this branch, or null: the plan under `done/` with
@@ -87,6 +87,17 @@ export function verifyImplement({ cwd, plan, phases, before, outcome }) {
   return problems;
 }
 
+/** A repair step (ADR-0248): its commits exist and were made here, and the tree is clean. */
+export function verifyRepair({ cwd, before, outcome }) {
+  if (outcome.kind !== "repaired") return [`expected a repaired outcome, got ${outcome.kind}`];
+  const problems = [];
+  const made = commitsBetween(before, head(cwd), cwd);
+  if (made.length === 0) problems.push("the repair step made no commit");
+  claimedCommits(outcome.commits, made, cwd, problems);
+  if (!isClean(cwd)) problems.push("the worktree is not clean");
+  return problems;
+}
+
 /** A fix step: its commits exist and were made here, each resolution names one of them, clean tree. */
 export function verifyFix({ cwd, before, outcome, findingCount }) {
   const problems = [];
@@ -100,6 +111,41 @@ export function verifyFix({ cwd, before, outcome, findingCount }) {
     if (!full || !made.includes(full)) problems.push(`finding ${r.finding} is resolved in ${r.commit}, not a commit this step made`);
   }
   if (!isClean(cwd)) problems.push("the worktree is not clean");
+  return problems;
+}
+
+/** The lines of `paths` in `cwd`'s working tree that still carry a conflict marker, as `path:line`. */
+function markerLines(paths, cwd) {
+  if (paths.length === 0) return [];
+  const r = git(["grep", "-n", "-I", "-E", "^(<{7}|>{7})( |$)", "--", ...paths], cwd);
+  return r.code === 0 && r.stdout ? r.stdout.split("\n").map((l) => l.split(":").slice(0, 2).join(":")) : [];
+}
+
+/**
+ * A merge session (ADR-0248): its commit exists, was made by this step, is on the branch tip's
+ * history, is a merge whose second parent is `main` as the conductor saw it when it handed the
+ * conflict over (or a later main tip, when main moved again meanwhile), the tree is clean, and no
+ * path it was handed still carries a conflict marker. `git grep` reads the working tree, which the
+ * clean-tree check makes the committed one.
+ */
+export function verifyMerge({ cwd, before, mainTip, paths, outcome }) {
+  if (outcome.kind !== "merged") return [`expected a merged outcome, got ${outcome.kind}`];
+  const problems = [];
+  const made = commitsBetween(before, head(cwd), cwd);
+  const full = resolveCommit(outcome.commit, cwd);
+  if (!full) problems.push(`claimed merge commit ${outcome.commit} does not exist`);
+  else if (!made.includes(full)) problems.push(`claimed merge commit ${outcome.commit} was not made by this step`);
+  else {
+    const parents = git(["rev-list", "--parents", "-n", "1", full], cwd).stdout.split(" ").slice(1);
+    const second = parents[1];
+    if (parents.length !== 2) problems.push(`${outcome.commit} is not a two-parent merge commit`);
+    else if (second !== mainTip && !(isAncestor(mainTip, second, cwd) && isAncestor(second, "main", cwd))) {
+      problems.push(`${outcome.commit}'s second parent ${second.slice(0, 7)} is not main's tip ${mainTip.slice(0, 7)}`);
+    }
+  }
+  if (!isClean(cwd)) problems.push("the worktree is not clean");
+  const markers = markerLines(paths, cwd);
+  if (markers.length) problems.push(`conflict markers left in ${markers.join(", ")}`);
   return problems;
 }
 
@@ -161,9 +207,20 @@ function repairProblems(outcome, cwd, plan) {
 }
 
 /**
- * A close: the plan moved to done/ with Status done and a ## Close review section, a clean tree,
- * every repaired finding's commit on the branch and touching its file, and — when a version
- * moved — an annotated tag on the branch tip.
+ * An `owed` row is a close's to leave only on a human phase the plan marks `Blocks merge: no`
+ * (ADR-0249); on any other phase it is a phase the plan closed without.
+ */
+function owedProblems(doc, plan) {
+  const byId = new Map(doc.phases.map((p) => [p.id, p]));
+  return doc.log.rows
+    .filter((row) => rowIsOwed(row) && byId.has(row.id) && !nonBlocking(byId.get(row.id)))
+    .map((row) => `plan ${plan} Phase ${row.id} reads owed, but only a human phase marked Blocks merge: no may be owed`);
+}
+
+/**
+ * A close: the plan moved to done/ with Status done and a ## Close review section, no row owed that
+ * may not be, a clean tree, every repaired finding's commit on the branch and
+ * touching its file, and — when a version moved — an annotated tag on the branch tip.
  */
 export function verifyClose({ cwd, plan, outcome }) {
   const problems = [];
@@ -174,6 +231,7 @@ export function verifyClose({ cwd, plan, outcome }) {
     const doc = readPlanFile(found.path);
     if (doc.statusWord !== "done") problems.push(`plan ${plan} Status is "${doc.status}", not done`);
     if (!doc.hasCloseReview) problems.push(`plan ${plan} has no ## Close review section`);
+    problems.push(...owedProblems(doc, plan));
   }
   if (!isClean(cwd)) problems.push("the worktree is not clean");
   problems.push(...repairProblems(outcome, cwd, plan));

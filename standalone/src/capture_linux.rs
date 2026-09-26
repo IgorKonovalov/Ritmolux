@@ -11,8 +11,14 @@
 //! on. The read loop allocates nothing, takes no lock, opens no file and logs
 //! nothing (NFR section 5): both buffers are sized once before it starts.
 //!
+//! This file is the setup half — connecting, format negotiation, the handle and
+//! its shutdown. The loop itself lives in [`rt`], which carries the panic-denial
+//! pragma the hygiene guard checks for.
+//!
 //! The simple API cannot enumerate sources, so there is no device selection
 //! here; `[input] device` is inert on Linux.
+
+mod rt;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -25,9 +31,9 @@ use libpulse_binding::error::{Code, PAErr};
 use libpulse_binding::sample::{Format, Spec};
 use libpulse_binding::stream::Direction;
 use libpulse_simple_binding::Simple;
-use rlx_core::audio::{AudioFormat, SampleConsumer, SampleProducer, intake};
+use rlx_core::audio::{AudioFormat, SampleConsumer, intake};
 
-use crate::capture_frames::{SAMPLE_BYTES, drain_whole_frames};
+use crate::capture_frames::SAMPLE_BYTES;
 
 /// Same headroom as the other two backends (~340 ms @ 48 kHz stereo).
 const RING_CAPACITY_FRAMES: usize = 16_384;
@@ -169,7 +175,7 @@ pub fn start() -> Result<(CaptureHandle, SampleConsumer), CaptureError> {
         .spawn(move || match open_stream() {
             Ok(stream) => {
                 let _ = setup_tx.send(Ok(()));
-                read_loop(&stream, producer, &thread_stop, &thread_lost);
+                rt::read_loop(&stream, producer, &thread_stop, &thread_lost);
             }
             Err(e) => {
                 let _ = setup_tx.send(Err(e));
@@ -228,23 +234,4 @@ fn open_stream() -> Result<Simple, CaptureError> {
         Some(&attr),
     )
     .map_err(CaptureError::from_open)
-}
-
-/// The real-time path: block in a read, frame it, push it. Everything it
-/// touches was allocated before the loop.
-fn read_loop(stream: &Simple, mut producer: SampleProducer, stop: &AtomicBool, lost: &AtomicBool) {
-    // One frame of headroom past a read, for a carried partial frame.
-    let mut bytes = vec![0u8; READ_BYTES + FRAME_BYTES].into_boxed_slice();
-    let mut samples = vec![0.0f32; (READ_FRAMES + 1) * CHANNELS as usize].into_boxed_slice();
-    let mut carry = 0;
-    while !stop.load(Ordering::Acquire) {
-        let filled = carry + READ_BYTES;
-        if stream.read(&mut bytes[carry..filled]).is_err() {
-            lost.store(true, Ordering::Relaxed);
-            return;
-        }
-        let drained = drain_whole_frames(&mut bytes, filled, CHANNELS as usize, &mut samples);
-        producer.push_samples(&samples[..drained.samples]);
-        carry = drained.carry;
-    }
 }

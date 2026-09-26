@@ -85,6 +85,36 @@ beside the Windows one. Two things are new:
 the project's `PreToolUse:Bash` hooks run in a Linux headless session. No live `run_in_background`
 call was made.
 
+## Re-verified on 2.1.280, on Linux
+
+- **Date:** 2026-09-24
+- **CLI:** `claude --version` -> `2.1.280 (Claude Code)`
+- **Machine:** Arch Linux (Omarchy, Hyprland), Node v26.8.2, worktree at `~/Work/rlx-probe-0187`
+- **Run:** `node tools/conductor/spike/probe.mjs --model haiku`, all four sessions: $0.090 (A) +
+  $0.060 (B) + $0.067 (C) + $0.052 (D). Raw output under `target/conductor-spike/<stamp>/`.
+
+Every row holds. Session A: the `dev` skill loads, six `PreToolUse:Bash` hooks per Bash call (24
+`hook_started` for four calls), the `git add -A` denial comes back as the readable hook error, `cargo
+--version` runs, the `node -e` call is denied without a stall, `Write` then `Edit` land.
+`result/success`, `terminal_reason: "completed"`, `apiKeySource: "none"`, two `Bash` entries in
+`permission_denials`. Session C refuses `Edit` and `Write` under `.claude/`, allows the `Read`, and
+the control `Write` outside `.claude/` succeeds. `git worktree remove` exits 0. **The `result` event
+carries the same 20 keys as 2.1.278**, none gained and none lost.
+
+**One thing moved: the budget stop lets the tool call already requested run first.** Session B still
+ends exit 1, `error_max_budget_usd`, `terminal_reason: "budget_exhausted"`, `stop_reason:
+"tool_use"`, one model message. On 2.1.278 the stream went from that message's `tool_use` straight
+to `result`. On 2.1.280 a `user` event carrying the `Read`'s `tool_result` comes between them, and
+`num_turns` reads 2 rather than 1. So the overrun the budget row describes is still one model turn,
+and the tool call that turn asked for now runs before the stop. A step stopped by its budget can
+therefore leave that tool call's effect in the lane, a commit included. The conductor already
+reads the lane from `git` after any park, so nothing in it depends on the old behaviour.
+
+**Session D's control step is not a regression.** Its `Write` to `probe-control.txt` failed with
+*"File has not been read yet"*, because session C had created that file. That is the tool's
+read-before-write rule, not a permission refusal. On 2.1.278 the model read the file first, and
+this time it did not. Session C's control write is the reading that counts.
+
 ## What the probe does
 
 Four sessions. Two of them, A and B, are `claude -p "/dev implement plan 9999"` with the worktree as cwd, and with
@@ -167,7 +197,21 @@ file. Give `.claude/` paths absolute when it matters.
 
 - **Usage limits are visible in the stream before they bite.** `rate_limit_event` carries
   `rate_limit_info.status` (`"allowed_warning"` here), `rateLimitType`, `utilization` and `resetsAt`
-  per window. The conductor records these; it does not act on them.
+  per window. The conductor records the readings as they arrive, and acts only on the one that
+  ends a session.
+- **A session the usage limit ends has a shape of its own** (plan 0215's first implement session,
+  2.1.278, Linux). The last `rate_limit_event` reads `"status":"rejected"` with `resetsAt` in epoch
+  seconds. The result event is `"subtype":"success"` with `"is_error":true`,
+  `"terminal_reason":"api_error"`, `"api_error_status":429`, and `result` holding the message:
+  *"You've hit your session limit · resets 9:50pm (Europe/Belgrade)"*. `errors` is absent. The
+  conductor waits for that reset and then continues the session.
+- **`-p --resume <session_id>` continues a headless session** (2.1.280, Linux, `--model haiku`,
+  2026-09-24). A second invocation answered from the first one's context (the word it had been
+  asked to remember) under the **same** `session_id`, and it emitted a fresh `system/init` whose
+  `skills` list was complete. Its `total_cost_usd` was **cumulative**: $0.0233 against the first
+  invocation's $0.0201, where the second invocation's own tokens price at about $0.003. `num_turns`
+  counted that invocation only (1). So a continued step's spend is the last result's figure, and its
+  turns are the sum.
 - **User-level settings apply to `-p` sessions**: the user's own `PreToolUse` hook ran, and
   `~/.claude/settings.json`'s model was overridden by `--model`.
 - **The budget stop can land mid-turn.** Session B's `stop_reason` was `"tool_use"`: the turn had

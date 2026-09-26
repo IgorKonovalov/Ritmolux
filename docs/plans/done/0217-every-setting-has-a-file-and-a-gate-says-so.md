@@ -1,13 +1,14 @@
 # 0217 — Every setting has a file, and a gate says so
 
-> **Status:** approved
+> **Status:** done — closed 2026-09-24 under the conductor (ADR-0205). Phases 14ae5f69,
+> 776b946f, e3184783, 1eb144fa, and close repairs 80bf58cb. The conductor-run Mode 4 review (round 1) found no blockers and no majors. It raised three minors and one nit, and the two that prose could fix were fixed. Verified: the full suite green in the ledger, plus fmt, clippy, rustdoc and the new gate over its fixtures.
 > **Created:** 2026-09-20
 > **Owner skill(s):** dev, studio-builder
-> **Related ADRs:** [0240](../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md)
+> **Related ADRs:** [0240](../../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md)
 
 ## TL;DR
 
-[ADR-0240](../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md) makes a file the
+[ADR-0240](../../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md) makes a file the
 definition of every setting and the in-app menu an editor of that file. This plan makes that true
 and keeps it true: the one live violation — the diagnostics overlay, which the settings menu and
 `F3` both toggle and nothing persists — gets a `[hud] diagnostics` key, and two checks make a
@@ -40,7 +41,7 @@ What is missing is the part that makes it a rule rather than a habit:
 
 Repair the violation, then build the two checks the rule needs, each in the place that can actually
 see its half: a **Rust test** for the standalone, because the row-to-key property needs the types;
-a **Node gate** on the roster ([ADR-0217](../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md))
+a **Node gate** on the roster ([ADR-0217](../../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md))
 for the cross-language halves, because one carrier beats two and that roster already runs in the
 hook, in CI and under the conductor; and a **vitest test** inside the studio for its own third
 copy. We rejected a single universal gate (it would have to parse Rust types out of source text to
@@ -197,16 +198,76 @@ impl SettingsRow {
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by the implementer)_
+**Lane:** `plan-0217-every-setting-has-a-file-and-a-gate-says-so` in `/home/igor/Work/rlx-plan-0217`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The diagnostics overlay gets a key | dev | not started | |
-| 2 — Every settings row declares the key it edits | dev | not started | |
-| 3 — A gate for the two applications a Rust test cannot see | dev | not started | |
-| 4 — The studio's own third copy | studio-builder | not started | |
+| 1 — The diagnostics overlay gets a key | dev | done | 14ae5f69 |
+| 2 — Every settings row declares the key it edits | dev | done | 776b946f |
+| 3 — A gate for the two applications a Rust test cannot see | dev | done | committed with this row |
+| 4 — The studio's own third copy | studio-builder | done | committed with this row |
 
 ### Notes
+
+- **Phase 1's first done-when is asserted by construction rather than by a launched window.**
+  Nothing in the suite builds an `AppState` — it needs a winit window — so "a `config.toml`
+  carrying `diagnostics = true` starts with the overlay painted" is carried by
+  `AppState::new` calling the same `renderer.set_overlay` that `toggle_diagnostics` calls, seeded
+  from `config.hud.diagnostics`. The round trip through the file is asserted in
+  `config.rs`'s `the_diagnostics_overlay_defaults_off_and_round_trips`.
+- **Phase 2's two menu-side tests are unit tests in `standalone/src/settings/tests.rs`, not in
+  `standalone/tests/suite/configuration_doc.rs`.** `SettingsRow` lives in the `ritmolux` binary
+  rather than in the `standalone` library, so an integration test cannot reach it — the same wall
+  that makes `configuration_doc.rs` shell out to `--help` for the flag roster. The listed file gets
+  a paragraph in its module doc naming where the fourth property lives and why.
+- **Phase 2's first done-when was verified by mutating the declared path, not by removing the
+  `Config` field.** Removing `hud.diagnostics` from `Config` is a compile error at the two
+  production reads in `app_state.rs` before any test runs. Spelling the path
+  `hud.diagnostics_MUTANT` instead fails both new tests with
+  `["Diagnostics -> hud.diagnostics_MUTANT"]`, which is the message the criterion asks for.
+- `SettingsRow::edit` now returns `None` for any row whose `config_path` is empty, so "read-only"
+  is the declaration rather than a second hand-written arm. The `Presets` arm stays for
+  exhaustiveness.
+- **Phase 3's allowlist is the inline `settings-allow: <reason>` marker, not a list of paths in the
+  script.** The plan's Risks section points at `check-comment-hygiene.mjs`'s `hygiene-allow:` for
+  the shape, and that shape is a marker on the line; a path list would also have had nothing to
+  exclude today (`studio/` has zero browser-storage hits), so its reason-is-required half would
+  have been unexercised in both the repository and the fixture. A marker with no reason after the
+  colon is itself a finding, and the fixture seeds that.
+- Fixture counts: `node scripts/check-settings-have-files.mjs scripts/fixtures/settings-files`
+  exits 1 with five breaks across two files, and the real tree is green. The fixtures must stay
+  **tracked** — the gate enumerates from `git ls-files`, so an untracked copy of that tree reports
+  zero sources scanned and exits 0.
+- **Noticed and not acted on:** `README.md`'s `scripts/` block names a selection of the Node gates
+  in prose and does not name this one. It is outside Phase 3's `Files touched`, and the block is a
+  selection rather than a roster, so nothing was changed there.
+- **Phase 4's check is a sibling file, `studio/electron/settings.doc.test.ts`,** rather than an
+  addition to `settings.test.ts`. That file holds the *behaviour* of reading and writing the
+  settings file; this one holds a declaration to a document, reads no settings and asserts no
+  degradation path, and the plan's `Files touched` allows the sibling.
+- **It reads `StudioSettings` as source text, because a TypeScript interface is erased before
+  anything runs.** There is no `Config::default()` on this side to serialise and walk, so the
+  choices were a parse of the declaration or a hand-maintained runtime roster with a type-level
+  exhaustiveness guard. The parse was taken: it leaves nothing to keep in sync, so the declaration a
+  developer edits is the one the test reads. Both parsers throw on an empty read, and a third test
+  asserts a known key from each side, so the two diffs cannot pass by finding nothing.
+- **Both done-when mutations were run.** Adding `mutantKey?: string` to `StudioSettings` fails with
+  `expected [ 'mutantKey' ] to deeply equal []`; adding a `mutantRow` row to the README table fails
+  the reverse test the same way. Both were reverted.
+- **The new section names browser storage in `studio/README.md`, which the Phase 3 gate does not
+  read** — `.md` is outside its `STUDIO_EXTENSIONS`, so the prose needs no `settings-allow:` marker.
+  The new `.ts` file is in scope and deliberately names none of the three APIs.
+- **The phase's second done-when is NOT green on this machine, for a reason that predates the phase
+  and is outside it.** `npm --prefix studio test` reports `2 failed | 30 passed (32)` test files
+  with `280 passed (280)` tests: `electron/window.csp.test.ts` and
+  `electron/ipc/presetHandlers.test.ts` fail to **collect** at `import 'electron'` with *"Electron
+  failed to install correctly"*. `studio/node_modules/electron/` has no `path.txt` and an almost
+  empty `dist/`, because npm's `allowScripts` policy on this machine has never approved
+  `electron@32.1.2`'s `postinstall` (`npm --prefix studio install-scripts ls` lists it beside the
+  two `esbuild` builds). `npm rebuild electron` does not download it for the same reason. Approving
+  an install script and fetching the binary is a supply-chain decision and writes outside the
+  phase's `Files touched`, so this session did neither. Everything the phase owns is green:
+  typecheck (all four projects), lint, and every test that collects, including the three new ones.
 
 ### Close triggers
 
@@ -217,6 +278,74 @@ impl SettingsRow {
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
 - **Full suite:**
 - **Outstanding `human` phases:**
+
+## Close review
+
+Conductor-run, round 1 (2026-09-24), in a fresh session. No earlier round, so no findings resolved
+by a fix round.
+
+**Verdict:** Plan 0217 landed cleanly. No blockers and no majors. There are three minors and one nit,
+and the close fixed the two that prose could fix, in `80bf58cb`.
+
+### Evidence
+
+- **Full suite:** the lock wrapper printed `with-lock: skipped cargo nextest run --workspace: tree
+  6dd9cca is green in the suite ledger, run by gate 0217-pre-review at 2026-09-24T05:19:21.481Z:
+  1801 tests run: 1801 passed (5 slow), 7 skipped`. That ledger record is this review's full-suite
+  evidence (ADR-0207).
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -D warnings` and
+  `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` all passed.
+- `node scripts/check-settings-have-files.mjs` passes on the real tree: 95 studio sources and 5 plugin
+  sources, with 1 declaration, and it is claimed. Against `scripts/fixtures/settings-files` it exits 1
+  with 5 findings, 4 under `studio/` (including the reasonless marker) and 1 under `plugin-foobar/`.
+  Each finding prints its file:line.
+- `node scripts/check-gate-carriers.mjs` passed, with hook 17/17 and ci 17/17.
+  `npm --prefix studio test -- electron/settings.doc.test.ts` passed 3 of 3.
+  `check-backlog-claims.mjs` held 46/46 reductions.
+
+### Lenses
+
+- **Alignment.** Each phase did what its done-when asks.
+  - Phase 1: F3 and the menu row both route through `toggle_diagnostics`, which writes
+    `config.hud.diagnostics` and saves. `AppState::new` seeds the overlay from the key. The config
+    test asserts three things: off by default, an old `[hud]` section still parses, and `true`
+    round-trips.
+  - Phase 2: `config_path` is an exhaustive match, and `edit` derives read-only from it. The three
+    unit tests cover this. The path walk uses a serialisation with every Option key populated, which
+    is the plan's Risks item.
+  - Phase 3: the gate sits in manifest order in all three carriers. The allowlist is an inline
+    `settings-allow:` marker, and the log argues this from the plan's own pointer at `hygiene-allow:`.
+    A missing reason is seeded and bites.
+  - Phase 4: the vitest test diffs both directions and guards against an empty parse.
+  - Every phase is tagged, and no ADR was reversed.
+- **Layering and real-time safety.** The change is shell-only. `core/`, the C ABI and the control
+  protocol are untouched. The save on F3 runs on the event-loop thread, like every sibling toggle.
+- **Docs.** `docs/running.md` and `docs/configuration.md` were swept. The version is owed at
+  **minor**, because the plan adds a feature: a new config key and a new gate.
+- **Correctness.** There are no new numeric assertions.
+- **Design.** Read-only is a property of the declaration, so the declaration and `edit` cannot
+  disagree. The gate names its own holes.
+
+### Findings
+
+- **minor, fixed in `80bf58cb`:** `docs/running.ru.md:45` still said that every settings change
+  except diagnostics is written to `config.toml` ("(кроме диагностики)"), against Phase 1's "no
+  sentence anywhere". The close dropped the parenthetical and left the stamp alone, because the rest
+  of the row is stale for other reasons.
+- **minor, open:** the `### Close triggers` block above is unfilled. The ledger record stands in for
+  `Full suite`. The other answers are: shipped a feature; operator docs touched were running.md and
+  configuration.md; backlog probes 46/46 green; no `presets/` changes; no `human` phases.
+- **minor, open:** the Implementation log (about 85 lines) is longer than `## Implementation phases`
+  (about 58 lines).
+- **nit, fixed in `80bf58cb`:** `CLAUDE.md`'s `scripts/` block did not describe
+  `check-settings-have-files.mjs`.
+
+### Close notes
+
+- Presets were not touched, so there was no curation. The plan closes no backlog entry.
+- Translation advisory: `docs/how-it-works.ru.md`, `docs/running.ru.md` and
+  `packaging/foobar/READ-ME-FIRST.ru.md` have moved past their stamps. Only `running.ru.md` was moved
+  by this plan, and its one false sentence was removed. The rest of that row is still content work.
 
 ## Followups (after this lands)
 

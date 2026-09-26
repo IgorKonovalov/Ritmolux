@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0225** (ADRs are a separate sequence — next free there is **0247**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0230** (ADRs are a separate sequence — next free there is **0252**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -40,7 +40,7 @@ place. The plan file carries the real link.
 <!-- roster:begin cap=320 -->
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | approved | human | 0103's Phases 5-6 plus the release they stand on. Push ONE tag: the pipeline has published nothing since v0.126.0, two runs red on the foobar job and three tags with no run. |
+| [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | approved | human | 0103's Phases 5-6 plus the release they stand on. v0.143.0-v0.146.0 each shipped six artifacts, `foobar` green; v0.146.1 and v0.147.x lost the macOS pair to ADR-0251's break, repaired in 0227. |
 | [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | approved | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four are `human`. Unblocked: 0120 closed 2026-09-22. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | approved | dev, human | ADR-0113's third Outcome is the brief: the rate candidate, the echo, the per-mode wave scale, then a fourth look gate. Phases 5-6 need the rig and the corpus, so the conductor parks. |
@@ -50,10 +50,7 @@ place. The plan file carries the real link.
 | [0209](0209-a-system-joins-the-instruments-by-existing.md) | A system joins the instruments by existing | approved | dev, human | ADR-0234 (proposed): distinctness derives its roster from SystemKind; the catalogue declares an entry per system. Phases 4-5 edit .claude/, so NOT queued. Closes 0258, takes 0256's half. |
 | [0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) | The diffused frame's resolution is measured before it is designed | approved | dev, human | No ADR yet: the quality profile has never run on a track, so Phase 1 renders the pair and Phase 2 may close the plan. Takes backlog 0125. |
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
-| [0215](0215-the-wide-seams-narrow-and-a-guard-holds-them.md) | The wide seams narrow, and a guard holds them | approved | dev | ADR-0238 (proposed): a scene declares a capability, not the engine enumerating kinds. Sweep 2026-09-20: capture pragma, Scene seam, preview owner - each gated. Lists are dated evidence. |
-| [0217](0217-every-setting-has-a-file-and-a-gate-says-so.md) | Every setting has a file, and a gate says so | approved | dev, studio-builder | ADR-0240: a file defines every setting and the menu edits it. Repairs the one violation - the F3 overlay persists nowhere - then a Rust test and a Node gate hold all three. |
-| [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | draft | dev, human | Unblocked 2026-09-22 (0219 closed); runs after 0214. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). Phase 3 can stop the plan. |
-| [0220](0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) | The dependencies catch up, and npm gets its gate | approved | studio-builder, dev, human | ADR-0244 (proposed). Electron 44 and the studio toolchain, Rust patch pins, an npm audit gate, CI on Node 24. 0120 closed 2026-09-22. |
+| [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0223](0223-the-heavy-presets-fit-the-integrated-gpu.md) | The heavy presets fit the integrated GPU | approved | dev, human | ADR-0245 (proposed): an internal grid is a fraction of the target per tier and adapter class. Per-pass GPU timings and a pipelined stream readback first; Phase 6 is a reading on the laptop. |
 <!-- roster:end -->
 
@@ -301,16 +298,35 @@ makes it the safe parallel rather than a second editor of the same files.
   taken on the owner's box and the plan ran to a close, so it no longer holds a worktree and the
   third `max_open_worktrees` slot is free. The reason [0202], [0211], [0212] and [0220] stay off the
   queue is unchanged — each still parks at a human phase mid-plan.
+- **[0215] closed 2026-09-23**, second of the three and the whole of lane b's parallel. What is left
+  of the note is [0217] on lane a, and a free lane beside it.
+- **[0225] takes lane b 2026-09-24, ahead of [0223].** The `Pages` workflow is red and the site has
+  not deployed since 2026-09-23, so the plan that repairs it goes first. It is the same shape as the
+  three above — every phase belongs to `dev`, so it runs to a close instead of parking — and it edits
+  only `site/` and `scripts/`, which is what makes it safe beside anything on lane a.
+- **[0218] is approved 2026-09-24 and deliberately not queued.** It is a fourth case of the
+  arithmetic above, and the earliest: its `human` phase is **Phase 1**, so a lane would park before
+  running anything. The readings are owed into its own log first, and [0214] has still to close.
+- **[0217] closed 2026-09-24**, last of the three and the end of lane a's serial run. All three
+  are now closed, and lane a is free.
+- **[0225] closed 2026-09-24**, and lane b is free for [0223]. The split recurses, the largest route
+  is 29,528 B, and `Pages` goes green on the push that carries it.
+- **[0220] closed 2026-09-24** with its Phase 7 owed (ADR-0249), so it holds no lane. Of the four
+  the first note kept off the queue, [0202], [0211] and [0212] remain.
 
 [0202]: 0202-the-three-mechanisms-get-their-gate.md
 [0206]: 0206-the-browser-shows-the-look.md
 [0207]: done/0207-the-commitments-get-their-instruments.md
 [0211]: 0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md
 [0212]: 0212-the-diffused-render-gains-a-timeline.md
-[0215]: 0215-the-wide-seams-narrow-and-a-guard-holds-them.md
+[0215]: done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md
 [0216]: done/0216-the-operator-owns-the-order.md
-[0217]: 0217-every-setting-has-a-file-and-a-gate-says-so.md
-[0220]: 0220-the-dependencies-catch-up-and-npm-gets-its-gate.md
+[0217]: done/0217-every-setting-has-a-file-and-a-gate-says-so.md
+[0220]: done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md
+[0218]: 0218-the-reference-machine-becomes-arch.md
+[0214]: 0214-the-linux-arm-reports-back.md
+[0223]: 0223-the-heavy-presets-fit-the-integrated-gpu.md
+[0225]: done/0225-the-split-goes-one-level-deeper.md
 [0224]: done/0224-the-adapter-becomes-a-setting.md
 
 **Spent 2026-09-22, when [0222] closed behind [0221].** The note as written:
@@ -334,19 +350,13 @@ its `after: ["0207"]` is now satisfied, so nothing holds it but the re-queue its
 [0221]: done/0221-the-arch-block-names-the-studios-settings-file.md
 [0206]: 0206-the-browser-shows-the-look.md
 
-**Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster above.**
-It carries the three structural findings of that day's architecture sweep, and its position is
-deliberate rather than incidental: [0206](0206-the-browser-shows-the-look.md) adds a consumer to the
-preview surface its Phase 5 extracts, [0209](0209-a-system-joins-the-instruments-by-existing.md)
-derives a roster from the `SystemKind` its Phase 4 gates, and [0203] touches scene params. Run
-earlier it would refactor code three approved plans are about to rewrite. **The [0203] third of that
-is spent 2026-09-20**, when it closed having added six scene params and changed a seventh's meaning;
-the other two stand. Every count and file list
-inside it is stamped with the date it was read, and `dev` re-derives each at the phase it needs it
-rather than restoring a shape this plan recorded - which is what lets it sit at the back of a
-sixteen-plan queue without going stale.
+~~**Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster
+above.**~~ — **spent 2026-09-23**, when it closed. Moved verbatim to
+[README-archive.md](README-archive.md)'s `## Prior sequencing notes (superseded)`, which also
+records what the ordering was and was not worth: 0215 ran ahead of [0206] and [0209] rather than
+behind them, and the dated-evidence rule inside it is why that cost nothing.
 
-[0215]: 0215-the-wide-seams-narrow-and-a-guard-holds-them.md
+[0215]: done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md
 
 
 **Added 2026-09-19 - [0204] is approved, it sits behind [0201], and it is not a conductor plan.**
@@ -1035,6 +1045,14 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0229 - The conductor reports itself honestly](done/0229-the-conductor-reports-itself-honestly.md) - closed 2026-09-24. Review: **no blockers, no majors, no minors** (round 1's major and two minors fixed). Version: none. Closes nothing. [Write-up](README-archive.md).
+- [0220 - The dependencies catch up, and npm gets its gate](done/0220-the-dependencies-catch-up-and-npm-gets-its-gate.md) - closed 2026-09-24. Review: **no blockers, no majors, three minors (two fixed), one nit.** Version: **0.149.0**. ADR-0244 accepted, Outcome. [Write-up](README-archive.md).
+- [0228 - The resume guard accepts an owed phase](done/0228-the-resume-guard-accepts-an-owed-phase.md) - closed 2026-09-24. Review: **no blockers, no majors, two minors, one nit (two fixed).** Version: none. Closes nothing. [Write-up](README-archive.md).
+- [0227 - The gated paths get their jobs](done/0227-the-gated-paths-get-their-jobs-and-a-red-upstream-stops-the-close.md) - closed 2026-09-24, Phases 6-7 owed. Review: **no blockers, one major (fixed), two minors (fixed).** Version: **0.148.0**. ADR-0251 accepted. Closes nothing. [Write-up](README-archive.md).
+- [0225 - The split goes one level deeper](done/0225-the-split-goes-one-level-deeper.md) - closed 2026-09-24. Review: **no blockers, no majors, two minors, one nit (all fixed).** Version: **0.147.1**. ADR-0247 accepted, Outcome. Closes nothing. [Write-up](README-archive.md).
+- [0226 - The conductor stops waiting for the owner](done/0226-the-conductor-stops-waiting-for-the-owner.md) - closed 2026-09-24, Phase 7 owed. Review: **one major (fixed), three minors.** Version: none. ADR-0248 + 0249 + 0250 accepted. Closes nothing. [Write-up](README-archive.md).
+- [0217 - Every setting has a file, and a gate says so](done/0217-every-setting-has-a-file-and-a-gate-says-so.md) - closed 2026-09-24. Review: **no blockers, no majors, three minors, one nit (two fixed).** Version: **0.147.0**. ADR-0240 accepted. Closes nothing. [Write-up](README-archive.md).
+- [0215 - The wide seams narrow, and a guard holds them](done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md) - closed 2026-09-23. Review: **no blockers, no majors, three minors, two nits (two fixed).** Version: **0.146.1**. ADR-0238 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0224 - The adapter becomes a setting](done/0224-the-adapter-becomes-a-setting.md) - closed 2026-09-23. Review: **no blockers, no majors, two minors, one nit (all three fixed).** Version: **0.146.0**. ADR-0246 accepted. Closes nothing. [Write-up](README-archive.md).
 - [0207 - The commitments get their instruments](done/0207-the-commitments-get-their-instruments.md) - closed 2026-09-23. Review: **no blockers, no majors, six minors, two nits (five fixed).** Version: **0.145.0**. ADR-0231 + 0232 accepted, each with an Outcome. Closed 0257. [Write-up](README-archive.md).
 - [0216 - The operator owns the order](done/0216-the-operator-owns-the-order.md) - closed 2026-09-23. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.144.0**. ADR-0239 accepted. Closes nothing. [Write-up](README-archive.md).

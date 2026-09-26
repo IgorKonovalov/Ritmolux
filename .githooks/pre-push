@@ -259,6 +259,21 @@ echo "pre-push: running the fast subset (doc links, backlog claims, comment hygi
 # scan of each. `count-allow: <why>` on the line is the escape, and the reason is
 # required.
 #
+# The settings-file gate (ADR-0240) is the one whose subject is two OTHER
+# applications. A setting is a key in a user-editable file and a menu is an
+# editor of that file; the standalone carries that in types, since
+# `SettingsRow::config_path` is an exhaustive match from a menu row to a
+# `config.toml` key and a Rust test holds every declared path to the schema. The
+# studio and the foobar component have no such reading available - nothing
+# anywhere compiles `plugin-foobar/` - so this one reads source text for two
+# properties: no `localStorage`, `sessionStorage` or `indexedDB` under `studio/`,
+# and every `cfg_*` declaration under `plugin-foobar/` named in
+# docs/configuration.md. The second is a CLAIM rather than a judgement - foobar's
+# store is host-side, so a document is the only thing that can say whether a
+# declaration is resume state or a setting nobody gave a file. Same cost class as
+# the gates beside it. It greps rather than parses, so `settings-allow: <why>` on
+# the line is the escape and a marker with no reason is itself a finding.
+#
 # The roster's own gate closes the block (ADR-0217), and its subject is this file
 # rather than a document: the list above is one of THREE copies - the hook, CI's
 # `links` job and the conductor's `defaultGate()` - and nothing held them equal,
@@ -287,10 +302,11 @@ if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-translations.mjs" node scripts/check-translations.mjs
     run_step "node scripts/check-translations.mjs --self-test" node scripts/check-translations.mjs --self-test
     run_step "node scripts/check-system-counts.mjs" node scripts/check-system-counts.mjs
+    run_step "node scripts/check-settings-have-files.mjs" node scripts/check-settings-have-files.mjs
     run_step "node scripts/check-gate-carriers.mjs" node scripts/check-gate-carriers.mjs
     run_step "node scripts/check-gate-carriers.mjs --self-test" node scripts/check-gate-carriers.mjs --self-test
 else
-    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure, comment-hygiene, reader-prose, contents-block, release-tag, translation, system-count and gate-roster checks (no node on PATH)"
+    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure, comment-hygiene, reader-prose, contents-block, release-tag, translation, system-count, settings-file and gate-roster checks (no node on PATH)"
 fi
 
 # The diffusion filter's own suite (Plan 0106 Phase 7c) rides the same guard, in

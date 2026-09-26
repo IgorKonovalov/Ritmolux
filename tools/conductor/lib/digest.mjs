@@ -19,16 +19,16 @@
 // else; neither page summarizes review prose. An event (a step, a park, a merge) belongs to the
 // latest run that had started by the event's timestamp.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { tagObjectType } from "./git.mjs";
+import { isAncestor, resolveCommit, tagObjectType } from "./git.mjs";
 import { dirtyText, resumeCommand } from "./inbox.mjs";
 import { laneOpen } from "./lane.mjs";
 import { readLedger } from "./ledger.mjs";
 import { usageReading } from "./live.mjs";
 import { CLAUDE_DIR } from "./outcome.mjs";
-import { donePhases, findPlan, readPlanFile } from "./plan.mjs";
+import { findPlan, parsePlan, readPlanFile, rowIsOwed, settledPhase } from "./plan.mjs";
 import { findingWhere, statePaths, totalSpend, writeAtomic } from "./state.mjs";
 
 const HUMAN_REASONS = new Set(["human_phase", "stop_condition", "question", "plan_wrong"]);
@@ -179,8 +179,10 @@ function closedFindings(rec) {
  * - the plan is under `docs/plans/done/` **in the main checkout** with `Status: done` — a close that
  *   landed outside the conductor, which never touches state/conductor.json;
  * - a park on a phase only the owner can do (`human_phase`, `claude_dir`) sits on a phase the plan's
- *   own `## Implementation log` now marks done. That row is read in the lane when the worktree is
- *   still there and in the main checkout otherwise, so a lane removed by hand is not a missing plan.
+ *   own `## Implementation log` now marks done, or owed on a phase marked `Blocks merge: no`
+ *   (`settledPhase`, the same reader `parkStillTrue` asks). That row is read in the lane when the
+ *   worktree is still there and in the main checkout otherwise, so a lane removed by hand is not a
+ *   missing plan.
  *
  * A branch's own `done/` copy is deliberately not enough: a close committed in a lane that has not
  * merged is unfinished work, and a wrong "already settled" tells the owner the opposite. Nothing else
@@ -196,8 +198,60 @@ export function settledPark(rec, repo) {
   if ((reason !== "human_phase" && reason !== CLAUDE_DIR) || !phase) return null;
   const where = rec.worktree && existsSync(rec.worktree) ? rec.worktree : repo;
   const found = findPlan(where, rec.plan);
-  if (!found || !donePhases(readPlanFile(found.path)).has(phase)) return null;
-  return `Phase ${phase} now reads \`done\` in the plan's \`## Implementation log\``;
+  const how = found ? settledPhase(readPlanFile(found.path), phase) : null;
+  if (!how) return null;
+  return `Phase ${phase} now reads \`${how}\` in the plan's \`## Implementation log\``;
+}
+
+/**
+ * Every phase a closed plan still owes (ADR-0249): the `owed` rows of each plan under
+ * `docs/plans/done/` in `repo`, the main checkout. Read from the tree and never from `state/`, so a
+ * wiped state directory and a close that happened outside the conductor both still show it, and
+ * the owner's commit marking the row done is the whole of settling it.
+ */
+export function owedPhasesInDone(repo) {
+  const dir = join(repo, "docs", "plans", "done");
+  if (!existsSync(dir)) return [];
+  const out = [];
+  for (const file of readdirSync(dir).filter((f) => /^\d{4}-.*\.md$/.test(f)).sort()) {
+    const text = readFileSync(join(dir, file), "utf8");
+    if (!/\|\s*owed\b/i.test(text)) continue;
+    const doc = parsePlan(text);
+    for (const row of doc.log.rows.filter(rowIsOwed)) {
+      out.push({ plan: doc.number ?? file.slice(0, 4), phase: row.id, title: row.title, rel: `docs/plans/done/${file}` });
+    }
+  }
+  return out;
+}
+
+/**
+ * The repair commits a merged plan's closed tip carries that no review read (ADR-0248): a repair at
+ * `post-close` or `remerge`. Each stays on the page until `origin/main` holds it, since the owner's
+ * reading before the push is the whole of what checks it; with no `origin/main` it stays.
+ */
+function unreviewedRepairs(rec, repo) {
+  const pushed = repo && resolveCommit("refs/remotes/origin/main", repo);
+  return (rec.repairs ?? [])
+    .filter((r) => r.unreviewed)
+    .flatMap((r) => r.commits.map((sha) => ({ sha, stage: r.stage })))
+    .filter(({ sha }) => !(pushed && isAncestor(sha, "refs/remotes/origin/main", repo)));
+}
+
+/**
+ * The newest reading of `origin/main`'s CI any close took (ADR-0251), across every plan's record, that
+ * actually read something. An unread reading is skipped rather than returned: it says nothing about
+ * main, so a red reading stays on the page until a later close reads green, and never leaves because
+ * a machine without `gh` closed after it. Null when no close ever read one.
+ */
+export function latestUpstream(plans) {
+  let best = null;
+  for (const rec of plans) {
+    for (const u of rec.upstream ?? []) {
+      if (u.state !== "green" && u.state !== "red") continue;
+      if (!best || u.at > best.at) best = { ...u, plan: rec.plan };
+    }
+  }
+  return best;
 }
 
 /**
@@ -225,6 +279,8 @@ export function readDigestState(state, { repo, stateDir, now = Date.now() }) {
     merged: plans.filter((r) => r.status === "merged"),
     stops: latest?.stops ?? [],
     cli: latest?.cli ?? null,
+    owed: repo ? owedPhasesInDone(repo) : [],
+    upstream: latestUpstream(plans),
   };
 }
 
@@ -261,14 +317,32 @@ function standingParkLines(view, rec) {
 /** The current page's first section: everything waiting on the owner, and nothing else. */
 function needsYou(view) {
   const lines = [];
-  const counts = { parked: 0, stops: 0, findings: 0, lanes: 0 };
+  const counts = { parked: 0, stops: 0, findings: 0, lanes: 0, owed: 0, repairs: 0, upstream: 0 };
   // The run carries its own CLI reading, so the line stops appearing on the first run whose version is listed.
   if (view.cli?.warning) {
     lines.push(`- **claude ${view.cli.version} is not a verified CLI version** - the last run went ahead with a warning (ADR-0208): ${view.cli.warning}.`);
   }
+  // A red origin/main never stopped the close that read it (ADR-0251); this line is where it costs
+  // something, and it leaves only when a later close reads green.
+  const u = view.upstream;
+  if (u?.state === "red") {
+    counts.upstream = 1;
+    const jobs = u.jobs?.length ? u.jobs.join(", ") : `run ${u.run}`;
+    lines.push(
+      `- **origin/main's CI is red**: run ${u.run}${u.sha ? ` at \`${short(u.sha)}\`` : ""}, failing ${jobs}, read by ${u.plan}'s close ${stamp(u.at)}. ` +
+        `Repair main and push${u.url ? `; ${u.url}` : ""}. The line leaves when a later close reads it green.`,
+    );
+  }
   for (const rec of view.parked) {
     counts.parked += 1;
     lines.push(...standingParkLines(view, rec));
+  }
+  for (const o of view.owed) {
+    counts.owed += 1;
+    lines.push(
+      `- **${o.plan} owes Phase ${o.phase}** (${o.title}): merged without it (\`Blocks merge: no\`). ` +
+        `Do it, then mark its row \`done\` in \`${o.rel}\` on main and commit; the line leaves with the commit.`,
+    );
   }
   for (const s of view.stops) {
     counts.stops += 1;
@@ -283,6 +357,10 @@ function needsYou(view) {
     if (rec.cleanup && !rec.cleanup.ok && laneOpen(rec)) {
       counts.lanes += 1;
       lines.push(`- **${rec.plan} merged, lane not removed**: ${rec.cleanup.detail}. Holds \`${rec.worktree}\`.`);
+    }
+    for (const r of unreviewedRepairs(rec, view.repo)) {
+      counts.repairs += 1;
+      lines.push(`- **${rec.plan} reached main with an unreviewed repair**: \`${short(r.sha)}\` at ${r.stage}. Read it before you push.`);
     }
     closed += closedCount(rec);
     const open = openFindings(rec);
@@ -312,8 +390,11 @@ function needsYou(view) {
     );
   }
   const parts = [];
+  if (counts.upstream) parts.push("origin/main red");
   if (counts.parked) parts.push(plural(counts.parked, "park"));
   if (view.settled.length) parts.push(`${view.settled.length} already settled`);
+  if (counts.owed) parts.push(`${plural(counts.owed, "owed phase")}`);
+  if (counts.repairs) parts.push(`${plural(counts.repairs, "unreviewed repair")}`);
   if (counts.stops) parts.push(`${plural(counts.stops, "lane")} stopped at the worktree cap`);
   if (counts.findings) parts.push(`${plural(counts.findings, "merge")} with open findings`);
   if (counts.lanes) parts.push(`${plural(counts.lanes, "lane")} still on disk after a merge`);
@@ -338,13 +419,18 @@ function nowSection(view) {
   const lanes = view.latest.lanes?.length ? view.latest.lanes : Object.keys(view.laneStates).sort();
   for (const lane of lanes) {
     const l = view.laneStates[lane];
+    if (l?.cap) {
+      out.push(`- lane ${lane}: waiting at the worktree cap (\`max_open_worktrees\` ${l.cap.max}) to start ${l.cap.plan}; the slots are held by ${l.cap.holding.join(", ")}.`);
+      continue;
+    }
     if (!l?.plan) {
-      out.push(`- lane ${lane}: idle.`);
+      out.push(l?.watching ? `- lane ${lane}: idle, watching the queue.` : `- lane ${lane}: idle.`);
       continue;
     }
     const rec = view.plans.find((r) => r.plan === l.plan);
     const where = l.step ? `step \`${l.step}\` for ${duration(view.now - Date.parse(l.stepStarted))}` : "between steps";
-    out.push(`- lane ${lane}: ${l.plan}, ${where}, ${usd(rec ? totalSpend(rec) : 0)} spent so far.`);
+    const waiting = l.waitingUntil ? `, waiting out the usage limit until ${stamp(l.waitingUntil)}` : "";
+    out.push(`- lane ${lane}: ${l.plan}, ${where}${waiting}, ${usd(rec ? totalSpend(rec) : 0)} spent so far.`);
   }
   out.push(`- run started ${stamp(view.latest.started)}, ${duration(view.now - Date.parse(view.latest.started))} ago.`, "");
   return out;

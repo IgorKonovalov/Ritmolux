@@ -5,7 +5,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { claudePaths, donePhases, findPlan, nextStep, parsePlan, rangeLabel, readPlanFile, runs } from "../lib/plan.mjs";
-import { REPO, planText } from "./helpers.mjs";
+import { validateQueue } from "../lib/queue.mjs";
+import { REPO, planText, tmp, writePlan } from "./helpers.mjs";
 
 test("Plan 0187 reads as six dev phases, 4b included, then a human pilot", () => {
   const found = findPlan(REPO, "0187");
@@ -36,6 +37,19 @@ test("closed Plan 0172 reads as a dev run then a studio-builder run, every row d
   assert.deepEqual([...donePhases(plan)], ["1", "2", "3", "4"]);
   assert.deepEqual(plan.log.rows.map((r) => r.commit), ["c303c1f", "6ce0594", "db0df8e", "fc4c9ee"]);
   assert.deepEqual(nextStep(plan), { kind: "review" });
+});
+
+test("the status word is the leading word, whatever punctuation follows it", () => {
+  const word = (status) => parsePlan(planText({ number: "0101", status, phases: [{ id: "1", owner: "dev" }] })).statusWord;
+  // The first is the shape a conductor close writes: the word, a full stop, then the evidence.
+  assert.equal(word("done. Phases 14ae5f69, 776b946f, and close repairs 80bf58cb."), "done");
+  assert.equal(word("done, closed by the conductor"), "done");
+  assert.equal(word("done — 2026-09-24"), "done");
+  assert.equal(word("done"), "done");
+  assert.equal(word("approved (2026-09-14)"), "approved");
+  assert.equal(word("in-progress; phase 2 of 4"), "in-progress");
+  assert.equal(word("Draft"), "draft");
+  assert.equal(word("`done`"), null);
 });
 
 const MIXED = {
@@ -128,4 +142,29 @@ test("the lane stops in front of a `.claude/` phase, and the phases before it in
   // Once the owner has done it and marked the row, the rest of the run is an ordinary step again.
   const afterClaude = parsePlan(planText({ ...CLAUDE_PLAN, rows: { 1: { state: "done" }, 2: { state: "done" } } }));
   assert.deepEqual(nextStep(afterClaude), { kind: "implement", owner: "dev", phases: ["3"], lastRun: true });
+});
+
+// ADR-0249.
+test("Blocks merge: no makes a human phase owed rather than parked, and only a human phase may carry it", async () => {
+  const phases = [{ id: "1", owner: "dev" }, { id: "2", owner: "human", blocksMerge: "no" }, { id: "3", owner: "dev" }];
+  const plan = parsePlan(planText({ number: "0101", phases, rows: { 1: { state: "done" } } }));
+  assert.deepEqual(plan.errors, []);
+  assert.equal(plan.phases[1].blocksMerge, "no");
+  assert.deepEqual(nextStep(plan), { kind: "owed", owner: "human", phases: ["2"] });
+
+  const owed = parsePlan(planText({ number: "0101", phases, rows: { 1: { state: "done" }, 2: { state: "owed" } } }));
+  assert.deepEqual(nextStep(owed), { kind: "implement", owner: "dev", phases: ["3"], lastRun: true });
+  const finished = parsePlan(planText({ number: "0101", phases, rows: { 1: { state: "done" }, 2: { state: "owed" }, 3: { state: "done" } } }));
+  assert.deepEqual(nextStep(finished), { kind: "review" });
+
+  // Without the field, as today.
+  const blocking = parsePlan(planText({ number: "0101", phases: [phases[0], { id: "2", owner: "human" }, phases[2]], rows: { 1: { state: "done" } } }));
+  assert.deepEqual(nextStep(blocking), { kind: "human", owner: "human", phases: ["2"] });
+
+  // On an implementer phase it is an error, and `check` reports every plan error through the queue.
+  const wrong = [{ id: "1", owner: "dev", blocksMerge: "no" }];
+  assert.deepEqual(parsePlan(planText({ number: "0101", phases: wrong })).errors, ["Phase 1 carries Blocks merge, which only a human phase may (it is dev)"]);
+  const repo = tmp("rlx-owed-check-");
+  writePlan(repo, { number: "0101", phases: wrong });
+  assert.deepEqual(validateQueue({ lanes: { a: ["0101"] } }, repo).errors, ["plan 0101: Phase 1 carries Blocks merge, which only a human phase may (it is dev)"]);
 });

@@ -97,8 +97,7 @@ interface Write {
 }
 
 type ReadResult =
-  | { ok: false; reason: string }
-  | { ok: true; value: { path: string; text: string } }
+  { ok: false; reason: string } | { ok: true; value: { path: string; text: string } }
 
 interface Fake {
   files: Map<string, string>

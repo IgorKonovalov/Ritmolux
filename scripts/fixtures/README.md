@@ -450,6 +450,41 @@ occurs in this repository:
   script's own header. It is seeded so that the hole is a decision anyone can re-run rather than a
   sentence in a comment.
 
+## `settings-files/` — for `check-settings-have-files.mjs`
+
+```
+node scripts/check-settings-have-files.mjs scripts/fixtures/settings-files
+```
+
+Expect **exit 1 and exactly five breaks, across two files**. Note the root: like the two gates
+above this checker is pointed at its own subdirectory rather than at `scripts/fixtures`, because
+it needs a `docs/configuration.md` at the root it is given — the document is what makes a plugin
+declaration a claim, and there can only be one of it per tree.
+
+| File | Line | Case | Expected |
+|------|-----:|------|----------|
+| `plugin-foobar/seeded.cpp` | 17 | a `cfg_int` no document names | reported — a declaration nobody has claimed is indistinguishable from a setting with no file |
+| `studio/renderer/seeded.ts` | 6 | `localStorage.setItem` | reported |
+| `studio/renderer/seeded.ts` | 10 | `window.sessionStorage` | reported — the second branch of the alternation |
+| `studio/renderer/seeded.ts` | 14 | `indexedDB.open` | reported — the third |
+| `studio/renderer/seeded.ts` | 22 | a `settings-allow:` marker with nothing after the colon | reported in the match's place, so the escape cannot become an off switch |
+
+**The silences are what decide whether the gate is usable**, because this one greps rather than
+parses and would otherwise convict its own documentation:
+
+| Case | Seeded in | Expected |
+|------|-----------|----------|
+| a `cfg_string` the document names in backticks | `plugin-foobar/seeded.cpp` — `g_cfg_documented` | not reported — naming it *is* the claim the gate asks for |
+| the store's own accessor | `plugin-foobar/seeded.cpp` — `g_cfg_seeded.get()` | not reported — the word boundary before `cfg_` fails inside an identifier, which is what separates a declaration from a use |
+| a `localStorage` line carrying `settings-allow:` **with** a reason | `studio/renderer/seeded.ts` | not reported |
+| an identifier that merely starts with one of the three names | `studio/renderer/seeded.ts` — `localStorageShim` | not reported — the match is whole-word |
+| the same three names in the document's own prose | `docs/configuration.md` | not scanned at all — the browser-storage half reads source under `studio/` and nothing else |
+
+**The file set comes from `git ls-files`**, like the two gates above, so these fixtures have to be
+**tracked** for the counts to hold. An untracked copy of this tree reports `0 studio source(s) and
+0 plugin source(s)` and exits 0, which reads exactly like a clean tree — that is the one way this
+root goes vacuously green, and staging the files is what stops it.
+
 ## `gate-carriers/` — for `check-gate-carriers.mjs`
 
 ```
@@ -509,6 +544,34 @@ is what the `[root]` form alone must report.
 stopped matching reports an empty list against a roster that is not empty, which is the loudest
 possible exit 1. The self-test is here for the reporting path and the three drift shapes, not to
 rescue an exit code that could be a silence.
+
+## `upstream-ci/` — for `check-upstream-ci.mjs`
+
+```
+node scripts/check-upstream-ci.mjs --self-test    # expects exit 0, 13 of 13
+```
+
+**Not a tree the checker walks but a set of answers `gh` gives.** `fake-gh.mjs` stands in for `gh`
+through `RLX_GH`, and each `.json` beside it is one scenario, named through `RLX_FAKE_GH`. The
+self-test runs the script against a throwaway repository with a GitHub `origin`, so nothing here
+touches the network. Nothing runs it on a push either: the script is kept off the gate roster
+because its real answer needs the network ([ADR-0251](../../docs/adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)).
+
+| Scenario | Case | Expected |
+|----------|------|----------|
+| `green.json` | the newest completed `CI` run on `main` succeeded | exit 0, `upstream CI: OK - run 1001` |
+| `red.json` | it failed, with one failing job among passing and skipped ones | exit 1, naming `check (macos-latest)` and no other job |
+| `pages-red.json` | a `Release` and a `Pages` run, both red and both newer than a green `CI` run | exit 0 on the `CI` run. This is the case the obvious "latest run" reading gets wrong |
+| `cancelled-newest.json` | an in-progress run, then a cancelled one, then a red one | exit 1 on the red one: a cancelled run is passed over |
+| `unauthenticated.json` | `gh` exits 4 with its login prompt | exit 0, `skipped: not read (gh unauthenticated)` |
+| `offline.json` | `gh` cannot reach the API | exit 0, `skipped: not read (no network)` |
+| `no-runs.json` | no `CI` run at all, only a `Pages` one | exit 0, `skipped: not read (no completed CI run)` |
+
+Two unread cases need no scenario: `gh` absent (an `RLX_GH` that does not exist) and no `origin`
+remote (a second throwaway repository without one). **Every unread case also asserts what the output
+does not say**: it must not contain `OK` or `RED`, so a notice that reads like a pass fails the test.
+The last four assertions cover `githubSlug` on the HTTPS, SSH and suffix-less spellings of a
+GitHub remote, and one remote that is not GitHub.
 
 ## `site-links/` — for `check-site-links.mjs`
 

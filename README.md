@@ -352,6 +352,15 @@ clone** — `git config core.hooksPath .githooks` — and an uninstalled clone h
 **[Developing](https://igorkonovalov.github.io/Ritmolux/contribute/developing/)** has the build
 commands and every step the hook runs.
 
+A plan's close also reads `origin/main`'s CI through the GitHub CLI and reports it, without ever
+refusing to merge
+([ADR-0251](docs/adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)).
+That reading is **opt-in per machine** — `gh auth login` — in the same way the hook is opt-in per
+clone. What it buys: a failing job on `main`, such as the macOS build, is named at the next close
+instead of going unnoticed across two releases. A machine without it still builds and still closes. It prints
+`upstream CI: skipped: not read (...)` rather than passing silently, so a close that went ahead
+unread says so.
+
 Approved plans can also run unattended, under [the conductor](tools/conductor/README.md).
 
 

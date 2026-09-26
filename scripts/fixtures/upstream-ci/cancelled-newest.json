@@ -1,0 +1,13 @@
+{
+  "runs": [
+    { "databaseId": 4003, "workflowName": "CI", "workflowFile": "ci.yml", "headBranch": "main", "status": "in_progress", "conclusion": "", "headSha": "4444443ddddddddddddddddddddddddddddddddd", "url": "https://github.com/example/ritmolux/actions/runs/4003" },
+    { "databaseId": 4002, "workflowName": "CI", "workflowFile": "ci.yml", "headBranch": "main", "status": "completed", "conclusion": "cancelled", "headSha": "4444442ddddddddddddddddddddddddddddddddd", "url": "https://github.com/example/ritmolux/actions/runs/4002" },
+    { "databaseId": 4001, "workflowName": "CI", "workflowFile": "ci.yml", "headBranch": "main", "status": "completed", "conclusion": "failure", "headSha": "4444441ddddddddddddddddddddddddddddddddd", "url": "https://github.com/example/ritmolux/actions/runs/4001" }
+  ],
+  "jobs": {
+    "4001": [
+      { "name": "check (ubuntu-latest)", "conclusion": "failure" },
+      { "name": "check (macos-latest)", "conclusion": "success" }
+    ]
+  }
+}

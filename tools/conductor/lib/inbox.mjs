@@ -1,4 +1,4 @@
-// state/inbox.md: one entry per park or per cleanup failure, appended, never rewritten. Each entry
+// state/inbox.md: one entry per park, per self-resume or per cleanup failure, appended, never rewritten. Each entry
 // names the plan, the reason, the file to read, the worktree it holds and the command that resumes
 // it — the whole of what an owner needs to act without opening state/conductor.json. A park that left
 // its worktree dirty also names the dirty paths, capped at DIRTY_PATHS_SHOWN.
@@ -47,7 +47,7 @@ export function resumeCommand(plan) {
 function header(path) {
   if (existsSync(path)) return;
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, "# Conductor inbox\n\nOne entry per park or cleanup failure, newest last.\n");
+  writeFileSync(path, "# Conductor inbox\n\nOne entry per park, self-resume or cleanup failure, newest last.\n");
 }
 
 export function appendPark(path, { plan, reason, detail, read, worktree, dirty = null, at = new Date() }) {
@@ -64,6 +64,19 @@ export function appendPark(path, { plan, reason, detail, read, worktree, dirty =
     "",
   ];
   appendFileSync(path, lines.join("\n"));
+}
+
+/**
+ * A park the run cleared itself, because the tree now shows its condition settled (ADR-0250). It is
+ * a record of something already acted on, which is why the digest, not the inbox, is the page to
+ * read first.
+ */
+export function appendSelfResume(path, { plan, reason, why, at = new Date() }) {
+  header(path);
+  appendFileSync(
+    path,
+    ["", `## ${at.toISOString().slice(0, 16).replace("T", " ")} — plan ${plan} resumed itself from ${reason}`, "", `- **Settled:** ${why}`, ""].join("\n"),
+  );
 }
 
 export function appendCleanupFailure(path, { plan, worktree, branch, detail, at = new Date() }) {

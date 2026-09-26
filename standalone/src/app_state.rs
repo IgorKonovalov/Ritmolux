@@ -525,8 +525,12 @@ impl AppState {
         }
 
         // Collect rolling frame-time stats from the first frame so the title
-        // shows live fps/p99 (the overlay itself stays off until F3 — Plan 0011).
+        // shows live fps/p99. Whether the *panel* is painted is `[hud]
+        // diagnostics`, so a machine being measured comes up with it already up
+        // and every other machine comes up clean.
         renderer.enable_diagnostics(true);
+        let overlay_on = config.hud.diagnostics;
+        renderer.set_overlay(overlay_on);
 
         let capture = start_capture(&input);
         let capture_format = capture.format;
@@ -595,7 +599,7 @@ impl AppState {
             },
             diagnostics: Diagnostics {
                 title_tick: 0,
-                overlay_on: false,
+                overlay_on,
                 diag_log: DiagLog::new(resolve_log_path()),
                 soak: soak_path.map(SoakLog::new),
                 downbeat_log: downbeat_log_path.map(DownbeatLog::new),
@@ -1942,12 +1946,16 @@ impl AppState {
 
     /// Toggle the diagnostics overlay (`F3` and the settings row).
     ///
-    /// **Deliberately not persisted.** It is a debugging state, and a live show
-    /// that comes up with the overlay painted because someone pressed `F3` last
-    /// week is a worse default than pressing `F3` again.
+    /// **Persisted, like every other choice either surface offers**
+    /// (ADR-0240): the live flag and `[hud] diagnostics` move together, so the
+    /// panel comes back up where it was left and a machine that wants it from
+    /// the start sets one key rather than pressing a function key at every
+    /// launch.
     pub(crate) fn toggle_diagnostics(&mut self) {
         self.diagnostics.overlay_on = !self.diagnostics.overlay_on;
+        self.config.hud.diagnostics = self.diagnostics.overlay_on;
         self.renderer.set_overlay(self.diagnostics.overlay_on);
+        self.save_config();
         self.window.request_redraw();
     }
 
@@ -2070,8 +2078,8 @@ impl AppState {
             SettingsAction::ToggleDiagnostics => self.toggle_diagnostics(),
             SettingsAction::SetInputMode(mode) => self.set_input_mode(mode),
             SettingsAction::CycleInputDevice => self.cycle_input_device(),
-            // Persisted, unlike diagnostics: a clean canvas is a staging choice,
-            // not a debugging state, so it should survive the restart.
+            // Persisted, like every sibling row: a clean canvas is a staging
+            // choice, so it should survive the restart.
             SettingsAction::TogglePresetName => {
                 self.config.hud.preset_name = !self.config.hud.preset_name;
                 self.save_config();

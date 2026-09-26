@@ -38,7 +38,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { git } from "./lib/git.mjs";
-import { appendRecord, appendSkip, cleanTree, greenRecord, isFullSuite, skipNotice, summaryLine } from "./lib/ledger.mjs";
+import { appendRecord, appendSkip, cleanTree, failingTests, greenRecord, isFullSuite, skipNotice, summaryLine } from "./lib/ledger.mjs";
 
 const GUARD_STALE_MS = 10_000;
 const SELF_DIR = dirname(fileURLToPath(import.meta.url));
@@ -354,7 +354,7 @@ export async function runWrapped(argv, { env = process.env, cwd = process.cwd(),
   lock.release();
   const heldMs = Date.now() - lock.acquiredAt;
   if (suite && startTree && cleanTree(cwd) === startTree) {
-    appendRecord(ledger.path, { tree: startTree, exit: code, summary: summaryLine(output), by: ledger.by, ms: heldMs });
+    appendRecord(ledger.path, { tree: startTree, exit: code, summary: summaryLine(output), failed: failingTests(output), by: ledger.by, ms: heldMs });
   }
   // Read back by the run terminal's stream reader (lib/live.mjs lockTimes); keep the shape.
   process.stderr.write(`with-lock: "${name}" waited ${(lock.waitedMs / 1000).toFixed(1)}s, held ${(heldMs / 1000).toFixed(1)}s\n`);
