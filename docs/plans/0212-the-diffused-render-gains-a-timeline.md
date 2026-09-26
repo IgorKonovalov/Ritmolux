@@ -173,8 +173,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the sidecar accepts a timeline | dev | done | committed with this row |
-| 2 — the bar grid reaches the sidecar | dev | not started | |
+| 1 — the sidecar accepts a timeline | dev | done | e245ef72 |
+| 2 — the bar grid reaches the sidecar | dev | parked (plan_wrong) | |
 | 3 — a full track, judged | human | not started | |
 
 ### Notes
@@ -183,6 +183,17 @@ flowchart LR
   stage resolves a frame to its bar through `DiffusionStage.bar_of`, which nothing sets yet, so
   `main` refuses a `--timeline` render with exit 2 until a bar grid reaches the filter. The
   CUDA-side encode (`pipe.encode_prompt`, then `prompt_embeds=`) has not run on a GPU.
+- Phase 2 parked before any code: its `Files touched` has no carrier for the bars. The sidecar
+  reads only the Y4M stream on stdin, and the channels that exist are:
+  (a) in-band Y4M `X` tags on the header and `FRAME` lines, which the sidecar already forwards
+  verbatim and ffmpeg ignores, but which change ADR-0114's wire and fail the exact-header, marker
+  count and byte-length assertions in `standalone/tests/suite/shot_cli.rs`
+  (`a_render_is_byte_identical_across_runs_and_has_the_frame_count_its_length_implies`);
+  (b) a new `shot` flag writing the grid to a file the sidecar reads, parsed in
+  `standalone/examples/shot.rs`;
+  (c) an environment variable read inside `render.rs`, which is outside ADR-0240's pattern for one.
+  The done-when's offline test also needs `standalone/src/shot/render/tests.rs`. Picking the channel
+  and widening the file list is the architect's call.
 
 ### Close triggers
 
