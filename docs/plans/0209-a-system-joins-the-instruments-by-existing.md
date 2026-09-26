@@ -132,8 +132,8 @@ flowchart LR
   — and it is declared here with its literal path for exactly that reason.
 
 ### Phase 5 — the four sections get their guidance
-- **Owner skill:** human (a `preset-author` session)
-- **What:** Replace each placeholder with real authoring guidance: what the scene is for, the working
+- **Owner skill:** human
+- **What:** In a `preset-author` session, replace each placeholder with real authoring guidance: what the scene is for, the working
   range of each param distilled from the shipped presets, and which audio input it naturally rides.
 - **Files touched:** `.claude/skills/preset-author/references/systems.md`.
 - **Done when:** each of the four sections carries the same three things the existing ten do, and each
