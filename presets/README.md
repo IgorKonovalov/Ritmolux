@@ -43,7 +43,11 @@ No expression, param or structural field changes meaning, and nothing in the
 grammar can read the tier. The one edge worth knowing is the segment cap — it is a
 tier value, so geometry that overflows and truncates at the floor's 20 000 may fit
 at rich. Compose so the floor's cap is the one you tuned for, and treat the extra
-headroom as headroom.
+headroom as headroom. `Rich` on an integrated GPU also draws its internal grids —
+trails, kaleidoscope, bloom, the attractor's field — at three quarters of the
+window, so a fine trail there is softer than your capture; judge a preset that
+lives on thin detail in a window at `--grid-scale 0.75` as well (`shot` has no
+such flag and always draws at the full scale).
 
 > **The `attractor` family needs one extra step to hold that promise, and it has it**
 > ([ADR-0065](../docs/adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md)).

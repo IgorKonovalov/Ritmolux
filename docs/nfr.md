@@ -55,8 +55,26 @@ the decision that moved it is linked.
   walk that would produce the reading is specified in
   [On-device validation](on-device-validation.md), gated on §9's iGPU box being in hand. Read the
   bullet as a commitment this project holds itself to, not as a measurement it has taken.
+  **The nearest reading, on a newer integrated part than the baseline names** (2026-09-26, the
+  reference laptop's AMD Radeon RADV RENOIR, Mesa 26.2.2, Linux, 1920x1080 windowed, music playing,
+  ten heaviest presets, grid scale 1.0): `Floor` held a 60 fps median with **no one-second sample
+  under 60** on every preset, worst sample 106.1 fps (Leviathan), and held at the panel's native
+  2560x1440 too, worst 94.0 fps. A 2020 integrated GPU is not a ~2015 one, so this does not
+  discharge the bullet; it bounds it from above. Files:
+  `scripts/bench/results/linux-2026-09-26-live-amd-*.tsv`.
 - **Rich:** calibrated against a midrange discrete GPU (RTX 3060 / RX 6600 class) **on device**,
   not asserted from a multiplier — [Plan 0044](plans/done/0044-quality-tiers.md) Phase 4.
+- **A tier's frame-time figure names its grid scale.** Since
+  [ADR-0245](adrs/0245-an-internal-grid-is-a-fraction-of-the-target-resolved-per-tier-and-adapter-class.md)
+  every internal grid is a fraction of the target, resolved in a window from the tier and the
+  adapter's class: `Rich` on an integrated GPU draws its grids at **0.75**, and every other
+  combination at 1.0, discrete and software by decision. A headless capture takes 1.0 whatever the
+  adapter unless `--grid-scale` pins it. The 0.75 is the measured row: on the laptop above, `Rich` at
+  1.0 missed at 1080p (41.5–50.1 fps median on Nebula, Leviathan and Clifford), and 0.75 is the
+  largest scale that held — worst sample exactly 60.0 fps, Nebula, none under. **At 2560x1440 no
+  `Rich` scale held** (Nebula 58.7 fps at 0.5), so on that machine at that size the governor's
+  demotion to `Floor` is the answer. A figure quoted for a tier without its scale predates this
+  bullet and was taken at 1.0.
 - **Background cost:** when the window is minimized or fully occluded, rendering throttles to
   near-zero GPU; DSP may keep running so visuals resume in sync.
 - **`frame_ms_p99` spikes on a GPU resource rebuild, and a governor reading it bare would demote

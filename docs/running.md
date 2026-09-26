@@ -242,8 +242,10 @@ attractor's trail field. A heavy preset spends most of its frame filling those g
 is its cost, and a smaller fraction trades sharpness for frame time — `0.50` draws a quarter of the
 texels. The picture's shape does not change, only how finely it is resolved.
 
-Out of the box it is `auto`, which lets the engine pick a fraction for the tier and the kind of GPU;
-today that is `1.00` everywhere, and the row reads `1.00 (auto)`. Left and right walk it through
+Out of the box it is `auto`, which lets the engine pick a fraction for the tier and the kind of GPU:
+`0.75` for `rich` on an integrated GPU and `1.00` everywhere else (the table is in
+[Configuration](configuration.md#quality)), and the row reads, say, `0.75 (auto)`. A demotion to
+`floor` takes the scale back to `1.00` with it. Left and right walk it through
 `0.25`, `0.50`, `0.75`, `1.00` and back to `auto`, stopping at both ends, and write the choice to
 `config.toml` as `[quality] grid_scale`, where it reads `(pinned)`. Each change rebuilds the grids,
 with the same brief re-accumulation of trails a tier change costs. `--grid-scale` and
@@ -256,7 +258,8 @@ On a machine with one GPU there is nothing to choose. On a hybrid laptop there a
 between them is the largest single frame-cost fact about the show: the same preset at the same
 tier runs several times faster on the discrete part than on the integrated one. Unflagged, the
 window asks for the **high-performance** adapter, and the startup line in `diagnostics.log` names
-which one it got and why (`renderer adapter: … (default: high performance)`).
+which one it got and why, and the tier and grid scale it resolved there
+(`renderer adapter: … (default: high performance); tier rich, grid scale 0.75`).
 
 The settings menu's **Adapter** row, beside **Quality**, lists every adapter the machine
 enumerates; left and right walk the list and the switch happens at once, without a restart. The

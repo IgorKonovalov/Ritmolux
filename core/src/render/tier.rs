@@ -148,9 +148,12 @@ impl GridScale {
     pub const MIN: f32 = 0.25;
     /// The largest: the target's own resolution. A grid is never drawn above it.
     pub const MAX: f32 = 1.0;
-    /// The whole target — every row of the table until it is measured, and what
-    /// a headless renderer resolves unless it is told otherwise.
+    /// The whole target — every row of the table but Rich on an integrated
+    /// adapter, and what a headless renderer resolves unless it is told
+    /// otherwise.
     pub const FULL: Self = Self(1.0);
+    /// Rich on an integrated adapter: the measured row of `grid_scale_for`.
+    pub(crate) const RICH_INTEGRATED: Self = Self(0.75);
 
     /// `value` as a scale, or `None` when it is outside `MIN..=MAX` or not a
     /// number.
@@ -215,9 +218,12 @@ impl std::fmt::Display for GridScale {
 /// **The grid-scale table**: the fraction a tier draws its internal grids at on
 /// an adapter of `class` (ADR-0245).
 ///
-/// The two integrated rows are unmeasured and held at 1.0; their values are a
-/// reading taken on the reference laptop (Plan 0223 Phase 6), not a choice made
-/// here. The discrete, software and other rows are 1.0 **by decision** rather
+/// The two integrated rows are a reading, not a choice made here: the largest
+/// scale whose live 1080p window held a 60 fps median with no one-second sample
+/// under 60 across the ten bench presets on the reference laptop's integrated
+/// GPU (Plan 0223 Phase 6). Floor holds at 1.0; Rich needs 0.75. Neither is a
+/// promise above 1080p — at 2560x1440 no Rich scale held. The discrete,
+/// software and other rows are 1.0 **by decision** rather
 /// than by measurement: a discrete GPU holds the display rate
 /// at full resolution, and every golden baseline is taken on a software
 /// rasterizer, so a fraction there would move a picture no measurement asked to
@@ -225,7 +231,7 @@ impl std::fmt::Display for GridScale {
 pub(crate) fn grid_scale_for(tier: Tier, class: AdapterClass) -> GridScale {
     match (tier, class) {
         (Tier::Floor, AdapterClass::Integrated) => GridScale::FULL,
-        (Tier::Rich, AdapterClass::Integrated) => GridScale::FULL,
+        (Tier::Rich, AdapterClass::Integrated) => GridScale::RICH_INTEGRATED,
         (_, AdapterClass::Discrete | AdapterClass::Software | AdapterClass::Other) => {
             GridScale::FULL
         }

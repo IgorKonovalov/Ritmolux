@@ -267,8 +267,8 @@ grid_scale = "auto"   # or 0.25..1.0
 | 3 — The grid rounds to nearest | dev | done | bd73f508 |
 | 4 — The post chain stops copying and clearing | dev | withdrawn 2026-09-24 (architect) | |
 | 5 — The grid scale exists, at 1.0 everywhere | dev | done | 2b80500a |
-| 6 — The two integrated rows are measured | human | done | committed with this row |
-| 7 — The table takes the measured rows | dev | not started | |
+| 6 — The two integrated rows are measured | human | done | 82414fb2 |
+| 7 — The table takes the measured rows | dev | done | committed with this row |
 
 ### Notes
 
@@ -458,6 +458,23 @@ grid_scale = "auto"   # or 0.25..1.0
   `live-presets.sh` that places each window by address on workspace 9 in both a 1920x1080 floating
   window and fullscreen, with `[quality] tier` and `grid_scale` set per run, not from the committed
   script. A first attempt was lost to the session's idle lock and was discarded.
+- **Phase 7, the table is Floor-integrated 1.0 and Rich-integrated 0.75**, from Phase 6's 1080p
+  reading. The 1440p result (no Rich scale holds) is written into `tier.rs`'s table docstring and
+  NFR §1, and changes no row.
+- **Phase 7's `# renderer adapter` line did not carry the scale; it does now, from
+  `standalone/src/app_state.rs`, which the phase does not list.** The done-when asks for the scale in
+  that line, so both writers of it (startup and the settings menu's adapter switch) append
+  `; tier <tier>, grid scale <scale>`. The bench scripts match the line's prefix only.
+- **Phase 7 reached two more files outside its list:** `core/src/render/tier/tests.rs` (the
+  all-1.0 test became `the_grid_scale_table_scales_only_rich_on_an_integrated_adapter`, which also
+  asserts an unpinned window resolves each row) and `docs/running.md` (it said `1.00` everywhere).
+- **Phase 7's done-when on the overlay and the log line is asserted, not observed.** No window was
+  opened on the integrated adapter from this session; the table and the windowed resolution are
+  unit-tested, and the overlay already printed `renderer.grid_scale()`.
+- **`presets/README.md` points the content lane at a window's `--grid-scale 0.75`**, because `shot`
+  has no grid-scale flag.
+- **ADR-0245 still says every row is 1.0 until Plan 0223 measures the integrated rows.** Its
+  wording is architect's; not edited.
 
 ### Close triggers
 

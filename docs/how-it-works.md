@@ -168,10 +168,12 @@ Vulkan on Linux. Nothing in a scene knows which; that is the point of writing to
 
 ## Quality tiers
 
-The engine renders at one of two tiers. `rich` is the full chain at full internal resolution;
-`floor` is the same chain sized for an integrated GPU. Unpinned, the app starts on `rich` and a
-frame-time governor demotes it **once** if the display's frame budget is not being held; a tier you
-pin is never demoted. What each tier is held to numerically is in
+The engine renders at one of two tiers. `rich` is the full chain at its larger capacities; `floor`
+is the same chain sized for an integrated GPU. Unpinned, the app starts on `rich` and a frame-time
+governor demotes it **once** if the display's frame budget is not being held; a tier you pin is
+never demoted. Beside the tier, a **grid scale** sets the fraction of the window the internal grids
+are drawn at: `rich` on an integrated GPU draws them at three quarters of the window, every other
+combination at the window's own size. What each tier is held to numerically is in
 [Non-functional requirements](nfr.md#1-performance--adaptive-quality), and how to pin one is in
 [Configuration](configuration.md#quality).
 

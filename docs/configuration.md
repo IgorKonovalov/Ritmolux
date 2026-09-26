@@ -245,7 +245,8 @@ moves while the app is running — see [Quality tiers](running.md#quality-tiers)
 the post stages' grid (trails, kaleidoscope, bloom) and the attractor's trail field. Those grids are
 where a heavy preset spends its frame, and their cost follows their area, so `0.5` draws a quarter of
 the texels at a visible loss of sharpness and nothing else: the picture's shape does not move. `auto`
-lets the engine pick one for the tier and the kind of GPU — today that is `1` everywhere. Under
+lets the engine pick one for the tier and the kind of GPU from the table under
+[`[quality]`](#quality): `0.75` for `rich` on an integrated GPU, `1` everywhere else. Under
 `--stream` it is the only way to draw at less than full size: a headless run takes `1` on any GPU,
 so two machines of different kinds capture the same grids, and neither `[quality] grid_scale` nor
 `RLX_GRID_SCALE` reaches it. A value outside `0.25`–`1` is a usage error naming the range, and the
@@ -377,7 +378,21 @@ rotates before 20 s. An energy drop can land a change early, but only well past 
 | Key | Default | What it means |
 |---|---|---|
 | `tier` | `"auto"` | `"auto"` lets the engine resolve `rich` and demote it if the frame time says so; `"floor"` and `"rich"` pin it |
-| `grid_scale` | `"auto"` | The fraction of the window the internal grids are drawn at: a number from `0.25` to `1`, or `"auto"` to let the engine pick one for the tier and the kind of GPU (`1` everywhere today). A number outside the range makes the file fail to parse, which the app reports before starting on the defaults |
+| `grid_scale` | `"auto"` | The fraction of the window the internal grids are drawn at: a number from `0.25` to `1`, or `"auto"` to let the engine pick one for the tier and the kind of GPU from the table below. A number outside the range makes the file fail to parse, which the app reports before starting on the defaults |
+
+What `"auto"` resolves to in a window, by tier and the kind of GPU the adapter reports:
+
+| Tier | Integrated GPU | Discrete GPU | Software rasterizer, other |
+|---|---|---|---|
+| `floor` | `1` | `1` | `1` |
+| `rich` | `0.75` | `1` | `1` |
+
+The integrated row is a measurement: the largest scale at which the reference laptop's integrated
+GPU held 60 fps at 1080p across the ten heaviest presets
+([ADR-0245](adrs/0245-an-internal-grid-is-a-fraction-of-the-target-resolved-per-tier-and-adapter-class.md)). It is not a promise above
+1080p, where no `rich` scale held on that machine. The other rows are `1` by decision. A tier change
+re-resolves the scale, so a `rich` window the governor demotes to `floor` goes back to `1`. A
+headless run (`shot`, `--stream`) takes `1` whatever the GPU unless `--grid-scale` says otherwise.
 
 Precedence, highest first, for both keys alike:
 

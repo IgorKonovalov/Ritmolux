@@ -398,7 +398,8 @@ not run at the plan's close, so the rich tier currently ships numbers nobody has
       overlay on (`F3`), across the heaviest preset of each family: an `attractor_*`, a dense line
       preset with mirror + fold (`fragment_kaleido`), `swarm_dense`, a `reaction_*`, and a
       `spectrum_*`. Report per preset **(a)** whether frame time holds the display's refresh rate
-      and **(b)** the p99.
+      and **(b)** the p99, with the grid scale `F3` prints after the tier as a column beside them
+      (`1.00` on a discrete GPU unless `--grid-scale` pins another).
       **Escalation:** a miss is not a failure, it is the measurement — record which preset missed
       and by how much, and the specific `TierConfig::RICH` field that caused it comes down to the
       measured value. Route to `dev` with the numbers. The five fields and their provisional
@@ -849,10 +850,14 @@ which is exactly why the window's `F3` overlay is the cross-check here and not a
 - [ ] **Cross-check the flagged presets in the window.** `ritmolux.exe --tier floor` at 1080p with
       audio playing, `F3` on, and read `fps` and `frame_ms` p99 for each preset the report flagged,
       plus two it did not. Record both numbers side by side — the headless cost and what the screen
-      actually did. Divergence between them is itself the finding, because it is the gap the report's
-      own caveat predicts and nothing in this repository has ever measured.
-- [ ] **Write the reading into NFR §1's Floor line**, dated and naming the machine, replacing the
-      undated assertion. **A miss is a result, not a failure**: if a shipped preset cannot hold
+      actually did — with a **scale** column beside them: the number `F3` prints after the tier
+      (`FLOOR 1.00`). An integrated GPU resolves `auto` from its own row of the grid-scale table, so
+      a reading without the scale cannot be compared with one taken on another class of GPU or at
+      another pin ([Configuration](configuration.md#quality)). Divergence between the two numbers is
+      itself the finding, because it is the gap the report's own caveat predicts and nothing in this
+      repository has ever measured.
+- [ ] **Write the reading into NFR §1's Floor line**, dated and naming the machine and the grid
+      scale, beside the newer integrated part's reading already there. **A miss is a result, not a failure**: if a shipped preset cannot hold
       ≥ 60 fps at `Floor` on baseline hardware, that is the first real evidence this project has had
       on the question. It belongs here and in a backlog entry — never in a silent retune, and never in
       a hard gate written before the evidence it would be designed against.
@@ -871,7 +876,9 @@ cargo build -p standalone --release --bin ritmolux
 `Rich` with a governor that may demote partway through a run — which would land a tier change,
 a full GPU-resource rebuild, and a one-frame trails blink inside the sample window. The pin also
 survives a stall the governor would otherwise read as a verdict. (Use `--tier rich` for the `Rich`
-calibration section instead.)
+calibration section instead.) The tier pin does not pin the grid scale: on an integrated GPU,
+`--tier rich` draws its grids at `0.75` of the window unless `--grid-scale` says otherwise, and the
+`# renderer adapter` line of `diagnostics.log` names the tier and scale the run resolved.
 
 Play any audio (loopback capture feeds the visuals). Then, in the window:
 

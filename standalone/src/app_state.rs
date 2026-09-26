@@ -625,10 +625,13 @@ impl AppState {
         // frame-time figure taken from this run is a property of that choice
         // (ADR-0071), so the line names the adapter and which carrier chose it
         // — the flag, the file, or the default — and, after a fall-back, what
-        // the file asked for that was not taken.
+        // the file asked for that was not taken — and the tier and grid scale
+        // that adapter resolved, since the scale is a function of its class
+        // (ADR-0245).
         state.diagnostics.diag_log.note(&format!(
-            "renderer adapter: {}{adapter_note}",
-            state.renderer.adapter_description()
+            "renderer adapter: {}{adapter_note}; {}",
+            state.renderer.adapter_description(),
+            grid_note(&state.renderer)
         ));
         state
     }
@@ -1443,8 +1446,9 @@ impl AppState {
                 self.note_soak_switch();
                 let msg = format!(
                     "renderer adapter: {} (from the settings menu, written to config.toml \
-                     [output] gpu)",
-                    self.renderer.adapter_description()
+                     [output] gpu); {}",
+                    self.renderer.adapter_description(),
+                    grid_note(&self.renderer)
                 );
                 eprintln!("{msg}");
                 self.diagnostics.diag_log.note(&msg);
@@ -2124,6 +2128,16 @@ impl AppState {
     pub(crate) fn roster_names(&self) -> Vec<String> {
         self.renderer.preset_names().map(str::to_owned).collect()
     }
+}
+
+/// The tail of the `renderer adapter:` line: the tier and the grid scale this
+/// renderer resolved, in the overlay's form (`tier rich, grid scale 0.75`).
+fn grid_note(renderer: &Renderer) -> String {
+    format!(
+        "tier {}, grid scale {}",
+        renderer.tier().as_str(),
+        renderer.grid_scale()
+    )
 }
 
 /// Build the window's renderer on the adapter `source` named, and the suffix

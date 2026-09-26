@@ -13,17 +13,29 @@ const CLASSES: [AdapterClass; 4] = [
     AdapterClass::Other,
 ];
 
-/// **Every row of the grid-scale table is 1.0** (ADR-0245) until the two
-/// integrated rows are measured — and the constants carry it too, so a
+/// **The grid-scale table holds the measured integrated rows and 1.0 everywhere
+/// else** (ADR-0245): Rich on an integrated adapter is 0.75, Floor there is 1.0,
+/// and the discrete, software and other rows are 1.0 by decision, which is what
+/// keeps every golden baseline where it is. The constants carry 1.0 too, so a
 /// `TierConfig` nobody resolved draws its grids at the target's own size.
 #[test]
-fn every_grid_scale_row_is_full_until_measured() {
+fn the_grid_scale_table_scales_only_rich_on_an_integrated_adapter() {
+    let three_quarters = GridScale::new(0.75).expect("in range");
     for tier in [Tier::Floor, Tier::Rich] {
         for class in CLASSES {
+            let expected = match (tier, class) {
+                (Tier::Rich, AdapterClass::Integrated) => three_quarters,
+                _ => GridScale::FULL,
+            };
             assert_eq!(
                 grid_scale_for(tier, class),
-                GridScale::FULL,
-                "{tier:?} on {class:?} is not 1.0"
+                expected,
+                "{tier:?} on {class:?} is not the measured row"
+            );
+            assert_eq!(
+                resolve_grid_scale(None, tier, class, true),
+                expected,
+                "an unpinned window on {class:?} at {tier:?} does not resolve the row"
             );
         }
     }
@@ -34,11 +46,9 @@ fn every_grid_scale_row_is_full_until_measured() {
 /// **A headless renderer resolves 1.0 on every adapter unless a pin says
 /// otherwise; a pin wins everywhere; a window takes the table** (ADR-0245).
 ///
-/// All three arms, because the one that matters most is the one a wrong
-/// implementation passes most easily: with every table row at 1.0 today, a
-/// resolver that ignored `has_surface` would also answer 1.0 headless. So the
-/// headless arm is asserted against a pin, too — the pin is honoured there and
-/// nothing else is.
+/// All three arms. The headless arm is asserted on every class, the integrated
+/// one included, whose Rich row is not 1.0 — and against a pin, too: the pin is
+/// honoured there and nothing else is.
 #[test]
 fn a_headless_renderer_resolves_full_unless_pinned() {
     let half = GridScale::new(0.5).expect("in range");
