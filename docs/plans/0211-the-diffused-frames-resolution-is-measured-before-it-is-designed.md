@@ -1,6 +1,6 @@
 # 0211 — The diffused frame's resolution is measured before it is designed
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user) — approved and deliberately NOT in `tools/conductor/queue.json`
 > **Owner skill(s):** dev, human
@@ -158,15 +158,36 @@ flowchart TB
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `main` directly (an interactive session; the sidecar needs the CUDA `.venv`, which a conductor session cannot run)
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the pair nobody has rendered | dev | not started | |
+| 1 — the pair nobody has rendered | dev | committed with this row | |
 | 2 — the verdict | human | not started | |
 | 3 — the uncosted route gets a number | dev | not started | |
 
 ### Notes
+
+- **Phase 1 readings, 2026-09-27.** The clip is 24 s of *Yes, I Know* (0:30-0:54, the owner's
+  choice of track), 48 kHz, 720 frames at `--fps 30 --size 1920x1080 --tier rich`, preset
+  `presets/star_rosewindow.toml`, prompt *"a stained glass cathedral rose window"*, seed 1234.
+  Both runs used one `shot` release build (the 0212 lane's, at `c1fe3eae`), the root `.venv`
+  (torch `2.6.0+cu124`), and one machine: the Arch box, RTX 3080 Laptop 8 GB, driver 610.57.04.
+  They ran back to back, `fast` from 23:38 and `quality` from 23:45, and nothing else used the GPU.
+  Figures are the sidecar's own wall-clock line, which includes model load and colour conversion.
+
+  | profile | diffused at | stride | feedback | s per emitted frame | diffusion call | peak VRAM | 4-min track (7 200 frames) |
+  |---|---|---|---|---|---|---|---|
+  | `fast` | 680x384 (261 120 px) | 3 | 0.4 | 0.554 | 1.252 s | 3.81 GiB | about 66 min |
+  | `quality` | 1024x576 (589 824 px) | 1 | 0.6 | 3.065 | 2.854 s | 4.88 GiB | about 6.1 h |
+
+  **The two profiles differ in stride and feedback as well as in pixels**, so the pair is not a
+  pure resolution comparison: `quality` diffuses every frame where `fast` diffuses every third, and
+  the two compose the same moment differently. Everything else in the expanded flag line is the same.
+  `quality` ran end to end with no crash and no VRAM ceiling. Stills are under
+  `target/p0211/` (uncommitted): `pair_t{4,12,20}.png` put the two whole frames side by side,
+  `crop_t{4,12,20}.png` put 640x540 centre crops at 1:1 side by side, `fast` on the left. The clips
+  are `fast.mp4` and `quality.mp4` beside them.
 
 ### Close triggers
 
