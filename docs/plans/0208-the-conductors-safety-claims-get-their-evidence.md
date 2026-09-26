@@ -238,6 +238,13 @@ flowchart TB
 - Review round 1, finding 1 (major): `Bash(rm * /*)` and `PowerShell(Remove-Item * /*)` with refused
   cases, modelled and not probed; the README sentence of finding 2 was rewritten in the same commit.
   6c53d90a.
+- Review round 2, finding 0 (major): quoted absolute-path deny rules for `rm` and `Remove-Item`
+  (`*"/*`, `*'/*`), refused cases marked not probed, an allowed `rm -rf "target/debug"`, and the
+  README names the shape as modelled. aa55b438. The test run was `node --test tools/conductor/test/`.
+- Review round 2, finding 1 (minor): `declared` uses the path rule's pattern, with a bare-`.claude/`
+  fixture phase; self-test 12 of 12. 5d86abb5.
+- Review round 2, finding 2 (minor): `docs/developing.md` gains the two gate rows, `CLAUDE.md` the
+  gate's clause. 410db891.
 
 ### Close triggers
 
