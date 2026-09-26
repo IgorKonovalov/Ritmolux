@@ -1,6 +1,6 @@
 # 0202 — The three mechanisms get their gate
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev, human
@@ -177,11 +177,12 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 
 ## Implementation log
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** branch `plan-0202-the-three-mechanisms-get-their-gate`, worktree
+`/home/igor/Work/rlx-plan-0202` (conductor run)
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Settle the rate candidate | dev | not started | |
+| 1 — Settle the rate candidate | dev | done | committed with this row |
 | 2 — Repair what Phase 1 convicted | dev | not started | |
 | 3 — The echo nests | dev | not started | |
 | 4 — The eight modes are captured on the rig | human | not started | |
@@ -190,6 +191,32 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 | 7 — The corpus census is present-day | human | not started | |
 
 ### Notes
+
+- **Phase 1 readings.** Preset `core/tests/fixtures/milk_wash_fog_tunnel.toml` (*Geiss - Fog
+  Tunnel*). Command: `shot --preset-file core/tests/fixtures/milk_wash_fog_tunnel.toml --render
+  <silent 48 kHz mono WAV, 30 s> --fps <30|60|165> --size 128x96` (release build of the `shot`
+  example, tier floor), its Y4M stdout read by a scratch Node script that spawned the binary,
+  because the conductor allowlist refuses a shell redirect. Statistic: full-range luma `Y/255` averaged
+  over the whole frame, sampled on one time-matched 10 Hz grid over `t` in 5-30 s at every rate.
+  Machine: the Arch Linux dev box, hardware adapter, cargo 1.97.1. Tree: `7f8c3607`.
+
+  | subject | 30 fps | 60 fps | 165 fps |
+  |---|---|---|---|
+  | Fog Tunnel as converted | 0.27006 | 0.28744 | 0.24706 |
+  | the same, every motion term zeroed | 0.02045 | 0.02063 | 0.02033 |
+
+  "Every motion term zeroed" is a scratch copy of the fixture with `zoom = 1`, `rot`, `dy` and
+  `warp` at 0, and the four sine amplitudes on `rot`, `cx`, `cy` and `warp` at 0. That leaves
+  only the deposit (the waveform, through `Exposure`) and the decay.
+- **Phase 1 finding: the rate candidate is falsified.** The deposit and decay equilibrium agrees
+  across 30, 60 and 165 fps to within 0.0003, which is far inside the 0.02 drift floor, so no
+  deposit path bypasses `Exposure` on this preset. **This departs from the done-when as written.**
+  The whole preset read at 30 and 165 fps differs by 0.023, just over the floor. That difference is
+  non-monotone in rate: 60 fps is the brightest and 165 fps the darkest. It vanishes when the
+  motion terms are zeroed. It is therefore not a deposit path, and it runs the wrong way for a wash
+  at the rig's 165 fps. The candidate was judged on the deposit-only reading. The residual
+  rate-dependence in the motion path (the warp, zoom and rot advection) is a followup and was not
+  pursued.
 
 ### Close triggers
 
