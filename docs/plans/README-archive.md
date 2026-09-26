@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0209 - A system joins the instruments by existing](#0209---a-system-joins-the-instruments-by-existing)
   - [0223 - The heavy presets fit the integrated GPU](#0223---the-heavy-presets-fit-the-integrated-gpu)
   - [0206 - The browser shows the look](#0206---the-browser-shows-the-look)
   - [0229 - The conductor reports itself honestly](#0229---the-conductor-reports-itself-honestly)
@@ -264,6 +265,26 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0209 - A system joins the instruments by existing](done/0209-a-system-joins-the-instruments-by-existing.md)
+
+- closed 2026-09-26, conductor-run close of lane `plan-0209-a-system-joins-the-instruments-by-existing`.
+Phase 1 `17961a15`, Phase 2 `52c66c06` (a recorded reading), Phase 3 `ba62c093`, Phase 4 `8bf91ce1`
+and Phase 5 `c46abfa2` (both owner-started sessions, since each edits `.claude/`). Round 1 review:
+**no blockers, no majors, three minors, one nit**; minors 1 and 3 and the nit were repaired at the
+close in `166909f9`, minor 2 (the architect sweep row for `systems.md`) is under `.claude/` and is
+the owner's. Version: **none** (docs/chore-only: an integration test and docs/skill material, no
+shipped artifact changes). ADR-0234 accepted. Closes backlog 0258; takes backlog 0256's instrument
+half, and 0256 stays live for the curation half. The full review is the plan's own `## Close review`
+section.
+- **What landed.** `core/tests/distinctness.rs` declares one test per family through `family_tests!`,
+  which also emits an exhaustive `match` over `SystemKind`, so the report covers all fourteen families
+  and a new variant with no test is a compile error. `docs/testing.md` names no count. The content
+  lane's `systems.md` has a section for every system, the four new ones distilled from the shipped
+  presets.
+- **Open.** The close-ceremony sweep row that would keep `systems.md` current (review minor 2, owner).
+  None of the five arriving families raised a near-duplicate flag; six `attractor` pairs flag and stay
+  unlabelled, input to backlog 0256.
 
 ### [0223 - The heavy presets fit the integrated GPU](done/0223-the-heavy-presets-fit-the-integrated-gpu.md)
 
@@ -10352,7 +10373,7 @@ plans' links are written for this file's depth:
 **Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster above.**
 It carries the three structural findings of that day's architecture sweep, and its position is
 deliberate rather than incidental: [0206](done/0206-the-browser-shows-the-look.md) adds a consumer to the
-preview surface its Phase 5 extracts, [0209](0209-a-system-joins-the-instruments-by-existing.md)
+preview surface its Phase 5 extracts, [0209](done/0209-a-system-joins-the-instruments-by-existing.md)
 derives a roster from the `SystemKind` its Phase 4 gates, and [0203] touches scene params. Run
 earlier it would refactor code three approved plans are about to rewrite. **The [0203] third of that
 is spent 2026-09-20**, when it closed having added six scene params and changed a seventh's meaning;

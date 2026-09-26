@@ -1,8 +1,8 @@
 # ADR-0234 — An instrument's system roster is derived from the enum the engine reads
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-26 (Plan 0209)
 > **Date:** 2026-09-19
-> **Related plan(s):** [0209](../plans/0209-a-system-joins-the-instruments-by-existing.md)
+> **Related plan(s):** [0209](../plans/done/0209-a-system-joins-the-instruments-by-existing.md)
 
 ## Context
 

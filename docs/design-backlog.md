@@ -1688,7 +1688,7 @@ the interesting half of the question has no statistic.
   presets that are too similar to each other or lame?"*). **Owner if taken:** `human` for step 2,
   then `architect` for the ADR and plan.
 - **Verified 2026-09-26** — the instrument half is discharged by
-  [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md) (closed 2026-09-26): the
+  [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md) (closed 2026-09-26): the
   similarity roster is every `SystemKind`, held to the enum by `family_tests!`'s exhaustive match, and
   `docs/testing.md` names no count. The heading's "nine of fourteen" describes the state this entry was
   raised against, not the tree. The four 2026-09-19 probes that recorded the gap went red on delivery
@@ -1699,7 +1699,7 @@ the interesting half of the question has no statistic.
   assert:
   `unprobeable: whether a shipped preset is worth shipping is a look judgement; this repository has
   no statistic for it, which is the finding rather than a gap in the probe`
-- **PARTLY PROMOTED 2026-09-19 -> [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md)**,
+- **PARTLY PROMOTED 2026-09-19 -> [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md)**,
   which takes the **instrument half** only: the roster derives from `SystemKind` so all fourteen
   families are reported and a new variant fails the build, and the two stale prose carriers stop naming
   a list ([ADR-0234](adrs/0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md)).

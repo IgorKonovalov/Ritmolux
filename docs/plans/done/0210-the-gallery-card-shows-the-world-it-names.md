@@ -199,7 +199,7 @@ flowchart TB
 - **Nothing will notice this decaying again.** `every_shipped_preset_has_a_gallery_card` stays an
   existence check, so a family added later with no hop entry inherits the default silently. ADR-0235's
   Negative says so and this plan does not fix it;
-  [Plan 0209](../0209-a-system-joins-the-instruments-by-existing.md)'s derived-roster shape is what would.
+  [Plan 0209](0209-a-system-joins-the-instruments-by-existing.md)'s derived-roster shape is what would.
 
 ## What this plan does NOT do
 

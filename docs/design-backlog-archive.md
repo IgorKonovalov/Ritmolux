@@ -332,7 +332,6 @@ live entry citing this one.
 | 0236 | The `.claude/` park reads a phase's declared `Files touched`, and prose escapes it | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
 | 0237 | The allowlist bounds a deletion by literal path shapes, so an expansion escapes the lane | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
 | 0241 | The allowlist is asserted against a model of the CLI's matcher, which one run falsified | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
-| 0258 | The content lane's scene catalogue covers ten of fourteen systems | [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -632,6 +631,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0255 | `docs-shots.mjs` renders all or nothing, so adding one card is done by hand | [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phase 1. A name filter, exact match, unknown name exits 1. **Closed 2026-09-22** |
 | 0254 | Every gallery card is captured at hop 300, before an accumulating world exists | [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phases 2-4 + ADR-0235. Six families at hop 2754/2828 over a 30 s clip. **Closed 2026-09-22** |
 | 0257 | The standalone exe is 9.7 % over NFR §4's cap, and only the component would have noticed | [Plan 0207](plans/done/0207-the-commitments-get-their-instruments.md) Phase 1 + ADR-0231. Re-derived to 16,777,216 B; both recipes measure and warn. **Closed 2026-09-23** |
+| 0258 | The content lane's scene catalogue covers ten of fourteen systems | [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md) Phases 4-5 + ADR-0234. The sweep row is the owner's. **Closed 2026-09-26** |
 <!-- roster:end -->
 
 ---
@@ -16211,6 +16211,13 @@ see a quarter of the surface it composes over, which reads as "these systems hav
 writing" rather than as a missing page. It rises with every system landed, and the four sections are
 an evening's work for someone who has the app open.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+**CLOSED 2026-09-26** — [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md)
+Phases 4 and 5 + [ADR-0234](adrs/0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md).
+`systems.md` has a `## ` section for every `SystemKind`, and the four this entry named carry guidance
+distilled from the shipped presets. The architect sweep row asked for above is **not** added: the
+close cannot edit `.claude/`, so it is the owner's (Plan 0209's close review, minor 2), and until it
+lands the mechanism this entry named is still missing.
