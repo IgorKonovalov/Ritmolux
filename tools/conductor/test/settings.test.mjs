@@ -31,29 +31,34 @@ const settings = JSON.parse(readFileSync(join(TOOL_DIR, "settings.conductor.json
 // drift apart turn a case below red rather than send a session into a denial.
 const promptedRustdoc = readFileSync(join(TOOL_DIR, "prompts", "review.md"), "utf8").match(/`(RUSTDOCFLAGS=[^`]+)`/)?.[1];
 // The recorded half: the probe's verdict table, keyed by the shape exactly as the table spells it.
-// The column read is the latest verdict the table carries; a re-run adds a column rather than
-// overwriting one, and moving this name is what moves the assertions onto it.
-const VERDICT_COLUMN = "Verdict";
+// A re-run adds a `Verdict ...` column beside the earlier ones rather than overwriting them, so each
+// row's verdict is the rightmost one it carries, and `refusedBy` is the column beside that verdict.
 const recorded = readRecorded(readFileSync(join(TOOL_DIR, "spike", "README.md"), "utf8"));
 
-/** { cli, verdicts: Map<shape, "DENIED" | "RAN" | ...> } from the allowlist section of spike/README.md. */
+/** { cli, verdicts: Map<shape, verdict>, refusedBy: Map<shape, text> } from spike/README.md. */
 function readRecorded(md) {
   const heading = md.match(/^## What does the allowlist refuse\? Observed on (\S+)$/m);
   assert.ok(heading, "spike/README.md carries no allowlist verdict table");
   const section = md.slice(heading.index).split(/\n## /)[0];
   const lines = section.split("\n").filter((l) => l.startsWith("|"));
   const cells = (l) => l.slice(1, -1).split(/(?<!\\)\|/).map((c) => c.trim());
-  const header = cells(lines[0]);
-  const col = header.indexOf(VERDICT_COLUMN);
-  assert.ok(col > 0, `the verdict table has no "${VERDICT_COLUMN}" column`);
+  const verdictCols = cells(lines[0]).flatMap((h, i) => (h.startsWith("Verdict") ? [i] : []));
+  assert.ok(verdictCols.length, "the verdict table has no Verdict column");
   const verdicts = new Map();
+  const refusedBy = new Map();
   for (const l of lines.slice(2)) {
     const row = cells(l);
     const shape = row[0].match(/^(`+)\s?(.*?)\s?\1/)?.[2]?.replace(/\\\|/g, "|");
-    const verdict = row[col].match(/\*\*(.+?)\*\*/)?.[1];
-    if (shape && verdict) verdicts.set(shape, verdict);
+    for (const col of [...verdictCols].reverse()) {
+      const verdict = row[col]?.match(/\*\*(.+?)\*\*/)?.[1];
+      if (shape && verdict) {
+        verdicts.set(shape, verdict);
+        refusedBy.set(shape, row[col + 1] ?? "");
+        break;
+      }
+    }
   }
-  return { cli: heading[1], verdicts };
+  return { cli: heading[1], verdicts, refusedBy };
 }
 
 const allow = settings.permissions.allow;
@@ -265,6 +270,8 @@ const CASES = [
   { tool: "Bash", command: 'rm -rf "$(git rev-parse --show-toplevel)/../rlx-plan-0180"', allowed: false, recorded: 'rm -rf "$(git rev-parse --show-toplevel)/.."' },
   { tool: "Bash", command: 'rm -rf "$(dirname "$PWD")"/rlx-plan-0180', allowed: false, recorded: 'rm -rf "$(dirname "$PWD")"/canary-subst' },
   { tool: "Bash", command: "rm -rf `dirname $PWD`/rlx-plan-0180", allowed: false, recorded: "rm -rf `dirname $PWD`/canary-tick" },
+  { tool: "Bash", command: 'rm -rf "$SCRATCH"', allowed: false, why: "the bound's price: any expansion in a deletion is refused, a legitimate one too" },
+  { tool: "PowerShell", command: "Remove-Item -Recurse $env:USERPROFILE\\WORK", allowed: false, why: "not probed: the PowerShell tool exists only on Windows" },
   { tool: "Bash", command: "rm -rf C:\\Users\\Someone\\WORK", allowed: false },
   { tool: "PowerShell", command: "Remove-Item -Recurse ../rlx-plan-0175", allowed: false },
   { tool: "PowerShell", command: "Remove-Item ~/.cargo/config.toml", allowed: false },
@@ -311,6 +318,19 @@ for (const c of CASES) {
     }
   });
 }
+
+test("a deletion through a shell expansion is refused by the file, not only by the CLI", () => {
+  // Without a rule of its own, `${HOME}`, `$(...)` and backticks were refused only because dontAsk
+  // does not auto-allow them - behaviour of one CLI version, not a claim this file makes.
+  for (const shape of ["rm -rf $HOME/.cargo", "rm -rf ${HOME}/canary-brace", 'rm -rf "$(dirname "$PWD")"/canary-subst', "rm -rf `dirname $PWD`/canary-tick"]) {
+    assert.equal(recorded.verdicts.get(shape), "DENIED", shape);
+    assert.match(recorded.refusedBy.get(shape), /deny rule/, `${shape} is refused by ${recorded.refusedBy.get(shape)}`);
+  }
+});
+
+test("a literal in-lane deletion still runs, so the bound did not buy safety by refusing work", () => {
+  assert.equal(recorded.verdicts.get("rm -rf target/debug"), "RAN");
+});
 
 test("the verdict table's literal-escape controls are refused, or the run proved nothing", () => {
   // The four shapes the deny rules were written for. If any of them ran, the settings file was not

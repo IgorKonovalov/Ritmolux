@@ -208,12 +208,17 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the matcher gets a transcript | dev | done | 0075c675 |
-| 2 — the deny cases move onto the transcript | dev | committed with this row | |
-| 3 — the deletion bound reaches an expanded path | dev | not started | |
+| 2 — the deny cases move onto the transcript | dev | done | 95d86c89 |
+| 3 — the deletion bound reaches an expanded path | dev | committed with this row | |
 | 4 — the prose stops promising more than the rules enforce | dev | not started | |
 | 5 — an undeclared `.claude/` edit is a drafting error | dev | not started | |
 
 ### Notes
+
+- Phase 3 shipped ADR-0233 Alternative D's `$` rules (`Bash(rm *$*)`, `PowerShell(Remove-Item *$*)`)
+  plus `` Bash(rm *`*) ``, which the probe showed was needed for the backtick shape. It left out
+  D's `rm *%*`: `%VAR%` is `cmd.exe` syntax, and neither tool expands it. The PowerShell rule is not
+  probed, because the tool exists only on Windows.
 
 ### Close triggers
 

@@ -80,12 +80,15 @@
       "Bash(rm -* /*)",
       "Bash(rm *:/*)",
       "Bash(rm *:\\*)",
+      "Bash(rm *$*)",
+      "Bash(rm *`*)",
       "PowerShell(Remove-Item *..*)",
       "PowerShell(Remove-Item *~*)",
       "PowerShell(Remove-Item /*)",
       "PowerShell(Remove-Item -* /*)",
       "PowerShell(Remove-Item *:/*)",
       "PowerShell(Remove-Item *:\\*)",
+      "PowerShell(Remove-Item *$*)",
       "WebFetch",
       "WebSearch"
     ]
