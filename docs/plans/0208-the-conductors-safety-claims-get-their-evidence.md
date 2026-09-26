@@ -209,8 +209,8 @@ flowchart TB
 |---|---|---|---|
 | 1 — the matcher gets a transcript | dev | done | 0075c675 |
 | 2 — the deny cases move onto the transcript | dev | done | 95d86c89 |
-| 3 — the deletion bound reaches an expanded path | dev | committed with this row | |
-| 4 — the prose stops promising more than the rules enforce | dev | not started | |
+| 3 — the deletion bound reaches an expanded path | dev | done | 3afa3de4 |
+| 4 — the prose stops promising more than the rules enforce | dev | committed with this row | |
 | 5 — an undeclared `.claude/` edit is a drafting error | dev | not started | |
 
 ### Notes
@@ -219,6 +219,10 @@ flowchart TB
   plus `` Bash(rm *`*) ``, which the probe showed was needed for the backtick shape. It left out
   D's `rm *%*`: `%VAR%` is `cmd.exe` syntax, and neither tool expands it. The PowerShell rule is not
   probed, because the tool exists only on Windows.
+- Phase 4 kept the prompt's `No cd` with its reason rather than dropping it. On 2.1.282 a `cd` to the
+  session's own lane never reached the matcher, and every other `cd` was refused, which costs a turn.
+  The same sentence without the reason is also in `prompts/fix.md`, `review.md` and `merge.md`, which
+  are outside this phase's file list and were left alone.
 
 ### Close triggers
 

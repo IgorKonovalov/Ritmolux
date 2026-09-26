@@ -396,15 +396,23 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   `settings.conductor.json`, with `RLX_CONDUCTOR=1` in its environment. It gets one of the
   `prompts/` templates as its appended system prompt, and that prompt is the only thing that puts a
   skill into its `## Conductor mode`.
-- **The allowlist covers a phase's own scratch work, and the lane is its bound.** Making and removing
-  a file or directory, `cat` / `Get-Content`, and `git clean` / `git checkout` of a path named after
-  `--` all run; a deletion whose path leaves the worktree — `..`, `~`, a leading `/` or a drive
-  letter — is denied, and a `git clean` with no path matches nothing. `git checkout` reaches nothing
-  but a path, because a rule without the `--` would let a session move the lane's branch, and
-  `git stash` is refused outright: that stack is shared by every worktree on the machine. The CLI
-  reads each command of a compound call on its own, so `cd studio; npm run typecheck` is refused for
-  its `cd` — the prompts tell a session to run one command per call and pass `--prefix` instead.
-  **Every rule has a case in `test/settings.test.mjs`**, which fails on a rule added without one.
+- **The allowlist covers a phase's own scratch work, and the bound on a deletion is the text of its
+  path.** Making and removing a file or directory, `cat` / `Get-Content`, and `git clean` /
+  `git checkout` of a path named after `--` all run. An `rm` or `Remove-Item` is denied when its
+  command carries `..`, `~`, a leading `/`, a drive letter, a `$` or a backtick. That covers a path a
+  session writes out and a path the shell would expand (`$HOME`, `${HOME}`, `$(...)`, a backtick).
+  What runs is a deletion spelled as a plain relative path, such as `rm -rf target/debug`.
+  **The bound reads text, not the filesystem**: a relative path through a symlink inside the lane is
+  not seen, and a legitimate `rm -rf "$SCRATCH"` is refused along with the rest. A `git clean` with no
+  path matches nothing. `git checkout` reaches nothing but a path, because a rule without the `--`
+  would let a session move the lane's branch, and `git stash` is refused outright: that stack is
+  shared by every worktree on the machine. A `cd` is covered by no allow rule, so
+  `cd studio; npm run typecheck` is refused for its `cd`, and the prompts tell a session to run one
+  command per call and pass `--prefix` instead. **What is measured and what is modelled:** every
+  refusal above was observed on the real CLI (2.1.282, the table in `spike/README.md`, produced by
+  `spike/matcher-probe.mjs`), except the PowerShell `Remove-Item` rules, which only a Windows run can
+  ask. **Every rule has a case in `test/settings.test.mjs`**, which fails on a rule added without one;
+  a refusal the probe recorded is asserted against that table, and everything else against a model.
 - **A command is admitted when the session already holds that capability through `Read`, `Glob`,
   `Grep` or `Write`, and refused otherwise.** Admitting such a command buys turns, not power: a
   session denied `ls` lists the directory with `Glob` on its next turn. So `ls`, `printenv`, `grep` and

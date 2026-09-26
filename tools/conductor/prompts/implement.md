@@ -21,8 +21,9 @@ follow it; where it and the rest of the skill disagree, conductor mode wins.
   session's own timeout is what bounds it. A hook denies `run_in_background`, the settings deny
   `Monitor`, and a background command left unfinished at the end parks the plan whatever you claim.
 - **Shell calls run one command per call**, because the allowlist reads each one on its own. No `cd`:
-  run the tool from the lane root and give the path — `npm --prefix studio run typecheck`, not
-  `cd studio; npm run typecheck`. Git runs in the lane this session was started in and never takes
+  no allow rule covers it, so a `cd` anywhere but the lane you are already in is refused and costs a
+  turn (tools/conductor/spike/README.md). Run the tool from the lane root and give the path —
+  `npm --prefix studio run typecheck`, not `cd studio; npm run typecheck`. Git runs in the lane this session was started in and never takes
   `-C`. The only environment prefixes are the exact forms the allowlist names,
   `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`, and `RLX_UPDATE_PRESET_SCHEMA=1` or
   `RLX_UPDATE_PARAM_REFERENCE=1` ahead of `cargo` or `node`; `env`, `export` and `$env:` are refused
