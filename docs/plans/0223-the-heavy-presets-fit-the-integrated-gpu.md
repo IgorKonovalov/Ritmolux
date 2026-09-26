@@ -268,7 +268,7 @@ grid_scale = "auto"   # or 0.25..1.0
 | 4 — The post chain stops copying and clearing | dev | withdrawn 2026-09-24 (architect) | |
 | 5 — The grid scale exists, at 1.0 everywhere | dev | done | 2b80500a |
 | 6 — The two integrated rows are measured | human | done | 82414fb2 |
-| 7 — The table takes the measured rows | dev | done | committed with this row |
+| 7 — The table takes the measured rows | dev | done | 01e70558 |
 
 ### Notes
 
@@ -478,13 +478,19 @@ grid_scale = "auto"   # or 0.25..1.0
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** yes, `presets/README.md` only (one prose paragraph, Phase 7); no `.toml`
 - **Plan header `Closes:`** none; **raises** design-backlog 0259
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature (per-pass GPU timings under `--stream`, `[quality] grid_scale` with its
+  flag, variable, settings row and overlay, the Rich-integrated row at 0.75) plus fixes (the
+  pipelined stream readback and its repair 7c43ecc3, round-to-nearest grids)
+- **Operator docs touched:** `docs/capturing.md`, `docs/configuration.md`, `docs/running.md`,
+  `docs/nfr.md`, `docs/on-device-validation.md`, `docs/how-it-works.md`,
+  `scripts/bench/README.md`, `presets/README.md`; `docs/images/` regenerated (Phase 3)
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 46 reductions hold across
+  21 live entries, 4 unprobeable
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). `cargo nextest run
+  --workspace -P fast` at Phase 7's tree: exit 0, 1745 passed, 86 skipped
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
 
