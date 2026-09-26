@@ -2,7 +2,9 @@
 
 > **Status:** in-progress
 > **Created:** 2026-09-19
-> **Approved:** 2026-09-19 (user) — approved and deliberately NOT in `tools/conductor/queue.json`
+> **Approved:** 2026-09-19 (user) — approved and deliberately NOT in `tools/conductor/queue.json`.
+> Superseded 2026-09-27: Phase 5 and all three review rounds ran under the conductor, once the
+> lanes it would have disturbed had drained.
 > **Owner skill(s):** dev
 > **Related ADRs:** [0233](../adrs/0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md)
 > (proposed), [0208](../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md),
