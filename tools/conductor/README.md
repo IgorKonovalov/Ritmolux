@@ -399,7 +399,8 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
 - **The allowlist covers a phase's own scratch work, and the bound on a deletion is the text of its
   path.** Making and removing a file or directory, `cat` / `Get-Content`, and `git clean` /
   `git checkout` of a path named after `--` all run. An `rm` or `Remove-Item` is denied when its
-  command carries `..`, `~`, an argument starting with `/` in any position, a drive letter or a `$`,
+  command carries `..`, `~`, an argument starting with `/` in any position, quoted or not, a drive
+  letter or a `$`,
   and an `rm` also when it carries a backtick. That covers a path a session writes out and a path the
   shell would expand (`$HOME`, `${HOME}`, `$(...)`, a backtick).
   What runs is a deletion spelled as a plain relative path, such as `rm -rf target/debug`.
@@ -412,7 +413,8 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   command per call and pass `--prefix` instead. **What is measured and what is modelled:** the `rm`
   literal escapes (`..`, `~`, a leading `/`, a drive letter), the `rm` expansion shapes and the `cd`
   were observed on the real CLI (2.1.282, the table in `spike/README.md`, produced by
-  `spike/matcher-probe.mjs`). The rest is modelled: an absolute path after the first argument, the
+  `spike/matcher-probe.mjs`). The rest is modelled: an absolute path after the first argument, a
+  quoted absolute path, the
   `git stash`, `git checkout` and `git clean` refusals, and the PowerShell `Remove-Item` rules, which
   only a Windows run can ask. **Every rule has a case in `test/settings.test.mjs`**, which fails on a rule added without one;
   a refusal the probe recorded is asserted against that table and against a model of the file, so a

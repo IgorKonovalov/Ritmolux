@@ -265,6 +265,9 @@ const CASES = [
   { tool: "Bash", command: "rm -rf C:/Users/Someone/WORK", allowed: false, recorded: "rm -rf C:/canary-drive" },
   { tool: "Bash", command: "rm target/x /home/someone/.ssh", allowed: false, why: "an absolute path after the first argument; not probed" },
   { tool: "Bash", command: "rm -rf target/x /etc", allowed: false },
+  { tool: "Bash", command: 'rm -rf "/etc"', allowed: false, why: "a quoted absolute path; not probed" },
+  { tool: "Bash", command: "rm -rf '/home/someone/.ssh'", allowed: false, why: "a quoted absolute path; not probed" },
+  { tool: "Bash", command: 'rm -rf "target/debug"', allowed: true, why: "a quoted relative path still runs" },
   // Paths the shell produces rather than a session writes. `decide` refuses every one of these
   // through the `$` and backtick rules, and the transcript is what shows the CLI agrees.
   { tool: "Bash", command: "rm -rf $HOME/.cargo", allowed: false, recorded: "rm -rf $HOME/.cargo" },
@@ -280,6 +283,8 @@ const CASES = [
   { tool: "PowerShell", command: "Remove-Item /etc/hosts", allowed: false },
   { tool: "PowerShell", command: "Remove-Item -Recurse /var/log", allowed: false },
   { tool: "PowerShell", command: "Remove-Item target/x /home/someone/.ssh", allowed: false, why: "an absolute path after the first argument" },
+  { tool: "PowerShell", command: 'Remove-Item "/etc"', allowed: false, why: "a quoted absolute path; not probed" },
+  { tool: "PowerShell", command: "Remove-Item -Recurse '/var/log'", allowed: false, why: "a quoted absolute path; not probed" },
   { tool: "PowerShell", command: "Remove-Item C:/Users/Someone/WORK", allowed: false },
   { tool: "PowerShell", command: "Remove-Item -Recurse C:\\Users\\Someone\\WORK", allowed: false },
 
