@@ -187,8 +187,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the similarity roster derives from the enum | dev | done | committed with this row |
-| 2 — the report is read, and the thresholds are judged | dev | not started | |
+| 1 — the similarity roster derives from the enum | dev | done | 17961a15 |
+| 2 — the report is read, and the thresholds are judged | dev | done | committed with this row |
 | 3 — the stale prose carriers stop naming a list | dev | not started | |
 | 4 — the catalogue declares an entry per system | dev | not started | |
 | 5 — the four sections get their guidance | human | not started | |
@@ -206,6 +206,19 @@ flowchart LR
   matches) before the test file compiles; deleting the `Cellular` line from `family_tests!` fails
   `cargo check -p rlx-core --test distinctness` with E0004 *`SystemKind::Cellular` not covered* in
   the test's own match.
+- Phase 2 reading. Command: `cargo nextest run -p rlx-core --test distinctness --no-capture`, at
+  17961a15, on the Arch Linux box (x86_64, Linux 7.2.5), on the software adapter `common::headless`
+  selects; the test prints no adapter description, so none is quoted. 14 tests run, 14 passed, 0
+  skipped, 98.8 s. `NEAR_DUP_STRUCT` is 0.08, unchanged.
+- **The five arriving families raise no near-duplicate flag.** Lowest off-diagonal `struct_diff` per
+  family: `analytic_field` (12 presets) 0.162, Parabolic ~ Seahorse; `shape_field` (9) 0.186,
+  Path Lion ~ Path Map; `warp_mesh` (7) 0.177, Sirocco ~ Smoke and Sirocco ~ Wellhead;
+  `shape_collage` (4) 0.211, Nocturne ~ Suprematist; `cellular` (5, not the 3 the plan counts) 0.183,
+  Ember ~ Labyrinth. With no flag there is nothing to label *convincing*, *a threshold artefact* or
+  *undecided*. The shipped set counts 116 presets across the fourteen families, not 114.
+- The only flags in the run are in `attractor`, a family already covered before this plan: six pairs
+  among Lorenz Gallery, Valentine, Butterfly to Knot and Rho Walk, `struct_diff` 0.036 to 0.071.
+  Recorded, not labelled; they are outside the five this phase reads.
 
 ### Close triggers
 
