@@ -475,6 +475,9 @@ grid_scale = "auto"   # or 0.25..1.0
   has no grid-scale flag.
 - **ADR-0245 still says every row is 1.0 until Plan 0223 measures the integrated rows.** Its
   wording is architect's; not edited.
+- **Close review round 1, finding 0 (major):** `the_tap_hands_back_the_previous_frame` now draws
+  frame 1 through `render_tapped` and asserts that call returns frame 0, in place of the drain
+  (8de01ee7).
 
 ### Close triggers
 
