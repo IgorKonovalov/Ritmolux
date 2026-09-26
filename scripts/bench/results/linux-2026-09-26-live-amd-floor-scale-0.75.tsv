@@ -1,0 +1,25 @@
+# linux 2026-09-26, Arch kernel 7.2.5-3-omarchy, Hyprland 0.56.2, build 2b80500a (lane plan-0223), tier floor and grid_scale 0.75 set by [quality] in config.toml
+# renderer adapter: AMD Radeon Graphics (RADV RENOIR) (Vulkan, IntegratedGpu), driver radv Mesa 26.2.2-arch1.1 (pinned by --gpu)
+# live, 32 s per preset, first 6 samples dropped, music playing; live-presets.sh's loop with each window placed by address on workspace 9
+# window 1536x864 fl = floating at 1920x1080 physical (Hyprland logical at scale 1.25); 2048x1152 fs2 = fullscreen at the panel's native 2560x1440
+gpu	preset	window	samples	fps_med	fps_min	avg_ms_med	p99_ms_med	p99_ms_max	dropped	samples_under_60
+AMD	Nebula	1536x864 fs0 fltrue	23	164.2	159.6	6.09	6.90	12.33	0	0
+AMD	Leviathan	1536x864 fs0 fltrue	23	142.8	140.8	7.00	12.51	12.72	0	0
+AMD	Clifford	1536x864 fs0 fltrue	23	164.9	155.8	6.07	6.63	12.62	0	0
+AMD	Volute	1536x864 fs0 fltrue	23	164.9	164.8	6.06	6.39	6.61	0	0
+AMD	Dragon	1536x864 fs0 fltrue	23	164.9	164.2	6.06	6.45	7.57	0	0
+AMD	Ink on Paper	1536x864 fs0 fltrue	23	164.9	164.9	6.07	6.29	6.43	0	0
+AMD	Barnsley Fern	1536x864 fs0 fltrue	23	164.9	164.9	6.06	6.44	6.77	0	0
+AMD	Braid	1536x864 fs0 fltrue	23	164.9	164.8	6.06	6.51	6.77	0	0
+AMD	Murmuration	1536x864 fs0 fltrue	23	164.9	164.8	6.06	6.51	6.76	0	0
+AMD	Shatter	1536x864 fs0 fltrue	23	164.9	164.8	6.07	6.59	6.92	0	0
+AMD	Nebula	2048x1152 fs2 flfalse	23	108.4	107.2	9.22	12.82	13.00	0	0
+AMD	Leviathan	2048x1152 fs2 flfalse	23	95.9	95.2	10.43	11.82	12.07	0	0
+AMD	Clifford	2048x1152 fs2 flfalse	23	107.2	103.3	9.32	12.90	13.44	0	0
+AMD	Volute	2048x1152 fs2 flfalse	23	164.9	160.9	6.07	6.47	12.24	0	0
+AMD	Dragon	2048x1152 fs2 flfalse	23	164.9	147.1	6.07	6.59	12.43	0	0
+AMD	Ink on Paper	2048x1152 fs2 flfalse	23	164.9	164.9	6.07	6.30	6.44	0	0
+AMD	Barnsley Fern	2048x1152 fs2 flfalse	23	164.9	164.9	6.06	6.46	6.80	0	0
+AMD	Braid	2048x1152 fs2 flfalse	23	162.8	151.1	6.14	11.63	12.35	0	0
+AMD	Murmuration	2048x1152 fs2 flfalse	23	148.2	141.9	6.75	12.28	12.59	0	0
+AMD	Shatter	2048x1152 fs2 flfalse	23	164.9	164.8	6.07	6.46	6.61	0	0

@@ -1,0 +1,26 @@
+# linux 2026-09-26, Arch kernel 7.2.5-3-omarchy, Hyprland 0.56.2, build 2b80500a (lane plan-0223), tier floor and grid_scale 1.0 set by [quality] in config.toml
+# renderer adapter: AMD Radeon Graphics (RADV RENOIR) (Vulkan, IntegratedGpu), driver radv Mesa 26.2.2-arch1.1 (pinned by --gpu)
+# live, 32 s per preset, first 6 samples dropped, music playing; live-presets.sh's loop with each window placed by address on workspace 9
+# window 1536x864 fl = floating at 1920x1080 physical (Hyprland logical at scale 1.25); 2048x1152 fs2 = fullscreen at the panel's native 2560x1440
+# floor 1.0 win Volute re-taken alone after the sweep: its first run logged no rows
+gpu	preset	window	samples	fps_med	fps_min	avg_ms_med	p99_ms_med	p99_ms_max	dropped	samples_under_60
+AMD	Nebula	1536x864 fs0 fltrue	23	118.5	117.1	8.44	12.75	13.11	0	0
+AMD	Leviathan	1536x864 fs0 fltrue	23	107.0	106.1	9.35	12.84	13.04	0	0
+AMD	Clifford	1536x864 fs0 fltrue	23	119.9	115.7	8.34	12.79	13.12	0	0
+AMD	Volute	1536x864 fs0 fltrue	23	164.9	164.9	6.06	6.54	6.83	0	0
+AMD	Dragon	1536x864 fs0 fltrue	23	164.9	164.9	6.07	6.49	6.85	0	0
+AMD	Ink on Paper	1536x864 fs0 fltrue	23	164.9	164.8	6.07	6.30	6.48	0	0
+AMD	Barnsley Fern	1536x864 fs0 fltrue	23	164.9	164.8	6.06	6.51	6.73	0	0
+AMD	Braid	1536x864 fs0 fltrue	23	164.9	164.8	6.07	6.56	7.05	0	0
+AMD	Murmuration	1536x864 fs0 fltrue	23	164.9	159.6	6.07	6.66	12.14	0	0
+AMD	Shatter	1536x864 fs0 fltrue	23	164.9	164.8	6.06	6.51	6.62	0	0
+AMD	Nebula	2048x1152 fs2 flfalse	23	110.9	110.5	9.02	12.71	12.89	0	0
+AMD	Leviathan	2048x1152 fs2 flfalse	23	94.7	94.0	10.56	12.81	13.30	0	0
+AMD	Clifford	2048x1152 fs2 flfalse	23	113.7	104.7	8.79	12.71	12.99	0	0
+AMD	Volute	2048x1152 fs2 flfalse	23	164.9	159.6	6.07	6.50	12.38	0	0
+AMD	Dragon	2048x1152 fs2 flfalse	23	164.9	147.1	6.06	6.58	12.45	0	0
+AMD	Ink on Paper	2048x1152 fs2 flfalse	23	164.9	164.9	6.06	6.29	6.36	0	0
+AMD	Barnsley Fern	2048x1152 fs2 flfalse	23	164.9	164.9	6.06	6.51	6.62	0	0
+AMD	Braid	2048x1152 fs2 flfalse	23	156.4	149.4	6.39	12.15	12.85	0	0
+AMD	Murmuration	2048x1152 fs2 flfalse	23	147.7	140.4	6.77	12.28	12.69	0	0
+AMD	Shatter	2048x1152 fs2 flfalse	23	164.9	164.9	6.06	6.48	6.67	0	0

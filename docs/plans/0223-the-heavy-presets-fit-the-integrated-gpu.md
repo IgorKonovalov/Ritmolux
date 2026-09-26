@@ -266,8 +266,8 @@ grid_scale = "auto"   # or 0.25..1.0
 | 2 — The stream readback stops waiting | dev | done | 045025be |
 | 3 — The grid rounds to nearest | dev | done | bd73f508 |
 | 4 — The post chain stops copying and clearing | dev | withdrawn 2026-09-24 (architect) | |
-| 5 — The grid scale exists, at 1.0 everywhere | dev | done | committed with this row |
-| 6 — The two integrated rows are measured | human | not started | |
+| 5 — The grid scale exists, at 1.0 everywhere | dev | done | 2b80500a |
+| 6 — The two integrated rows are measured | human | done | committed with this row |
 | 7 — The table takes the measured rows | dev | not started | |
 
 ### Notes
@@ -362,7 +362,7 @@ grid_scale = "auto"   # or 0.25..1.0
   while a CPU-bound adapter keeps the overlap the phase bought. Either a call that finds the tap
   still armed does not draw, or it waits on the frame in flight rather than submitting another. A
   test of it wants a GPU-bound case. The existing two-frame sequence test passes at any queue depth.
-- **Phase 2 repair, the owner note above: committed with this line, as a fix under Phase 2 by the
+- **Phase 2 repair, the owner note above: 7c43ecc3, as a fix under Phase 2 by the
   owner's choice rather than as a new phase.** `FrameTap::take_previous` waits on the frame in
   flight when its map has not landed, so `render_tapped` always records and every call after the
   first returns a frame. `frame_tap::every_call_after_the_first_hands_back_a_frame` asserts that
@@ -441,6 +441,23 @@ grid_scale = "auto"   # or 0.25..1.0
   (`render::tests::a_headless_renderer_resolves_full_scale_on_any_adapter_unless_pinned`, on both
   the software and the hardware adapter), and `stream::tests::the_pass_table_header_names_the_scale_and_both_grids`
   checks the header's format.
+- **Phase 6, the reading (2026-09-26, reference laptop, AMD Radeon RADV RENOIR, Mesa 26.2.2, build
+  2b80500a).** Largest scale holding a 60 fps median with no one-second sample under 60 across the
+  ten presets at 1080p windowed: **Floor 1.0** (worst sample 106.1 fps) and **Rich 0.75** (worst
+  sample 60.0, Nebula, with none under). Rich at 1.0 fails on Nebula, Leviathan and Clifford
+  (41.5-50.1 fps median). At the panel's native 2560x1440 fullscreen, Floor holds at 1.0 and **no
+  Rich scale holds**: Nebula is at 58.7 fps at 0.5. Files: `scripts/bench/results/linux-2026-09-26-*`.
+- **Phase 6, the owner's look verdict: "0.75 holds, 0.5 fine but soft".** Judged side by side at
+  1.0, 0.75 and 0.5 in 1080p windows. The look windows ran on the RTX 3080, because three on the
+  iGPU share it at about 15 fps each. The grids a scale resolves do not depend on the adapter.
+- **Phase 6, three departures from the phase as written.** The headless half is not a
+  `bench-presets.sh AMD` sweep: it was taken on 2b80500a, where `draw+submit` did not measure a
+  published frame, so only the per-pass tables (Leviathan, both tiers, each scale) were kept. Those
+  tables print twelve rows and fold the rest into `(N more)`, so `post-chain-input-clear` has no
+  row of its own; `trails-present-pass` and the bloom passes do. The live sweep ran from a copy of
+  `live-presets.sh` that places each window by address on workspace 9 in both a 1920x1080 floating
+  window and fullscreen, with `[quality] tier` and `grid_scale` set per run, not from the committed
+  script. A first attempt was lost to the session's idle lock and was discarded.
 
 ### Close triggers
 

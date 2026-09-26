@@ -1,0 +1,104 @@
+# linux 2026-09-26, Arch kernel 7.2.5-3-omarchy, build 2b80500a (lane plan-0223), headless --stream --sink stdout --gpu AMD --size 1920x1080 --fps 240 --frames 120 --preset Leviathan, music playing
+# per run, the pass-cost table covering the most frames, GPU ms per frame. draw+submit is NOT reported: on build 2b80500a it did not measure a published frame on this adapter (the owner note of 2026-09-26; repaired in 7c43ecc3)
+
+## tier floor, grid scale 1.0
+grids    : scale 1.00, post 1920x1024, trail 1920x1024
+stream: pass costs, mean per frame over 56 frames, grid scale 1.00 (post grid 1920x1024, trail grid 1920x1024)
+  attractor-trail-pass     13.952 ms
+  attractor-step-pass       1.809 ms
+  trails-pass               0.980 ms
+  bloom-mix-pass            0.915 ms
+  trails-present-pass       0.636 ms
+  attractor-present-pass    0.633 ms
+  tonemap-pass              0.555 ms
+  kaleido-pass              0.479 ms
+  bloom-bright-pass         0.315 ms
+  background-pass           0.294 ms
+  bloom-blur-v              0.247 ms
+  bloom-blur-h              0.239 ms
+  (9 more)                  0.322 ms
+
+## tier floor, grid scale 0.75
+grids    : scale 0.75, post 1408x768, trail 1408x768
+stream: pass costs, mean per frame over 56 frames, grid scale 0.75 (post grid 1408x768, trail grid 1408x768)
+  attractor-trail-pass      9.587 ms
+  attractor-step-pass       1.356 ms
+  bloom-mix-pass            0.748 ms
+  trails-pass               0.535 ms
+  tonemap-pass              0.531 ms
+  background-pass           0.425 ms
+  trails-present-pass       0.356 ms
+  attractor-present-pass    0.349 ms
+  kaleido-pass              0.246 ms
+  bloom-bright-pass         0.177 ms
+  bloom-blur-v              0.138 ms
+  bloom-blur-h              0.129 ms
+  (9 more)                  0.300 ms
+
+## tier floor, grid scale 0.5
+grids    : scale 0.50, post 1024x512, trail 1024x512
+stream: pass costs, mean per frame over 57 frames, grid scale 0.50 (post grid 1024x512, trail grid 1024x512)
+  attractor-trail-pass      3.280 ms
+  bloom-mix-pass            0.698 ms
+  tonemap-pass              0.534 ms
+  attractor-step-pass       0.377 ms
+  background-pass           0.282 ms
+  trails-pass               0.269 ms
+  trails-present-pass       0.176 ms
+  attractor-present-pass    0.175 ms
+  bloom-bright-pass         0.153 ms
+  kaleido-pass              0.119 ms
+  bloom-blur-h              0.117 ms
+  blend-pass                0.101 ms
+  (9 more)                  0.281 ms
+
+## tier rich, grid scale 1.0
+grids    : scale 1.00, post 1920x1024, trail 1920x1024
+stream: pass costs, mean per frame over 56 frames, grid scale 1.00 (post grid 1920x1024, trail grid 1920x1024)
+  attractor-trail-pass     13.356 ms
+  attractor-step-pass       1.898 ms
+  trails-pass               0.979 ms
+  bloom-mix-pass            0.876 ms
+  trails-present-pass       0.643 ms
+  attractor-present-pass    0.632 ms
+  tonemap-pass              0.555 ms
+  kaleido-pass              0.484 ms
+  background-pass           0.424 ms
+  bloom-bright-pass         0.318 ms
+  bloom-blur-v              0.251 ms
+  bloom-blur-h              0.239 ms
+  (9 more)                  0.339 ms
+
+## tier rich, grid scale 0.75
+grids    : scale 0.75, post 1408x768, trail 1408x768
+stream: pass costs, mean per frame over 56 frames, grid scale 0.75 (post grid 1408x768, trail grid 1408x768)
+  attractor-trail-pass      9.078 ms
+  attractor-step-pass       1.396 ms
+  bloom-mix-pass            0.732 ms
+  trails-pass               0.534 ms
+  tonemap-pass              0.531 ms
+  trails-present-pass       0.355 ms
+  attractor-present-pass    0.344 ms
+  background-pass           0.302 ms
+  kaleido-pass              0.244 ms
+  bloom-bright-pass         0.184 ms
+  attractor-jitter-pass     0.151 ms
+  bloom-blur-v              0.137 ms
+  (9 more)                  0.325 ms
+
+## tier rich, grid scale 0.5
+grids    : scale 0.50, post 1024x512, trail 1024x512
+stream: pass costs, mean per frame over 57 frames, grid scale 0.50 (post grid 1024x512, trail grid 1024x512)
+  attractor-trail-pass      3.355 ms
+  bloom-mix-pass            0.692 ms
+  tonemap-pass              0.537 ms
+  background-pass           0.421 ms
+  attractor-step-pass       0.372 ms
+  trails-pass               0.260 ms
+  trails-present-pass       0.173 ms
+  attractor-present-pass    0.167 ms
+  bloom-bright-pass         0.151 ms
+  bloom-blur-h              0.116 ms
+  kaleido-pass              0.114 ms
+  bloom-blur-v              0.099 ms
+  (9 more)                  0.259 ms

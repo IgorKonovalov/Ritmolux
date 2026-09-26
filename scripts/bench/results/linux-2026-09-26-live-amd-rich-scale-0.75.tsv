@@ -1,0 +1,25 @@
+# linux 2026-09-26, Arch kernel 7.2.5-3-omarchy, Hyprland 0.56.2, build 2b80500a (lane plan-0223), tier rich and grid_scale 0.75 set by [quality] in config.toml
+# renderer adapter: AMD Radeon Graphics (RADV RENOIR) (Vulkan, IntegratedGpu), driver radv Mesa 26.2.2-arch1.1 (pinned by --gpu)
+# live, 32 s per preset, first 6 samples dropped, music playing; live-presets.sh's loop with each window placed by address on workspace 9
+# window 1536x864 fl = floating at 1920x1080 physical (Hyprland logical at scale 1.25); 2048x1152 fs2 = fullscreen at the panel's native 2560x1440
+gpu	preset	window	samples	fps_med	fps_min	avg_ms_med	p99_ms_med	p99_ms_max	dropped	samples_under_60
+AMD	Nebula	1536x864 fs0 fltrue	23	60.5	60.0	16.52	18.58	19.43	0	0
+AMD	Leviathan	1536x864 fs0 fltrue	23	62.9	62.2	15.89	19.00	19.48	0	0
+AMD	Clifford	1536x864 fs0 fltrue	23	70.0	68.8	14.29	16.25	16.56	0	0
+AMD	Volute	1536x864 fs0 fltrue	23	110.9	79.9	9.02	13.34	18.98	0	0
+AMD	Dragon	1536x864 fs0 fltrue	23	91.6	83.9	10.92	13.26	14.27	0	0
+AMD	Ink on Paper	1536x864 fs0 fltrue	23	94.7	87.7	10.56	13.62	14.46	0	0
+AMD	Barnsley Fern	1536x864 fs0 fltrue	23	102.8	93.8	9.73	13.16	18.33	0	0
+AMD	Braid	1536x864 fs0 fltrue	23	141.3	136.5	7.08	12.84	13.06	0	0
+AMD	Murmuration	1536x864 fs0 fltrue	23	164.9	164.8	6.06	6.73	7.23	0	0
+AMD	Shatter	1536x864 fs0 fltrue	23	164.9	164.8	6.06	6.62	6.72	0	0
+AMD	Nebula	2048x1152 fs2 flfalse	23	40.3	40.1	24.82	28.05	28.47	0	23
+AMD	Leviathan	2048x1152 fs2 flfalse	23	41.1	40.9	24.33	28.24	28.95	0	23
+AMD	Clifford	2048x1152 fs2 flfalse	23	48.3	45.6	20.70	24.67	25.65	0	23
+AMD	Volute	2048x1152 fs2 flfalse	23	74.5	54.5	13.42	18.71	21.48	0	5
+AMD	Dragon	2048x1152 fs2 flfalse	23	63.4	61.3	15.77	18.33	18.98	0	0
+AMD	Ink on Paper	2048x1152 fs2 flfalse	23	64.9	62.8	15.41	19.19	19.62	0	0
+AMD	Barnsley Fern	2048x1152 fs2 flfalse	23	75.9	69.1	13.17	15.37	17.07	0	0
+AMD	Braid	2048x1152 fs2 flfalse	23	109.9	107.8	9.10	13.35	15.58	0	0
+AMD	Murmuration	2048x1152 fs2 flfalse	23	114.3	110.3	8.75	13.03	13.39	0	0
+AMD	Shatter	2048x1152 fs2 flfalse	23	123.3	115.8	8.11	12.98	13.38	0	0

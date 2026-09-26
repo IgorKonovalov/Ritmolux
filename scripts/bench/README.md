@@ -71,6 +71,26 @@ an unflagged row ran on is readable only from that run's own `# renderer adapter
 reading that does not name its adapter is not comparable (ADR-0071, ADR-0243). The pseudo-name
 `default` in place of a GPU name is how an unflagged run is read.
 
+## Reading a scaled row
+
+A row taken at a grid scale below 1.0 is **not** the same preset drawn more cheaply. It is the same
+preset at a lower internal resolution, so its fps and its look move together (ADR-0245). Three
+things make it readable:
+
+- **The scale and the tier are in the file's name and its first `#` line**, set by `[quality] tier`
+  and `[quality] grid_scale` in `config.toml` for a live run, or by `--tier` and `--grid-scale` for a
+  headless one. Compare a scaled row only with a row of the same tier, window size and adapter.
+- **The `window` column names the size the frame was drawn at**, in Hyprland's logical pixels. On
+  the reference panel (scale 1.25), `1536x864 fl` is a floating 1920x1080 window and `2048x1152 fs2`
+  is fullscreen at the native 2560x1440. A scale's grid is a fraction of that size, so the same
+  scale costs more fullscreen than windowed.
+- **A pass-cost table (`*-passes-*.txt`) is GPU time only.** It shows where a scale's saving comes
+  from. It is not a frame rate, and it is not bounded by vsync, so its sum is not the live row's
+  `avg_ms`.
+
+A row at 60 fps is read against the panel's refresh as well as the budget. On the 165 Hz reference
+panel, 164.9 is the vsync ceiling, and a row that sits there says nothing about headroom.
+
 ## Memo for an agent running this on Windows
 
 1. Pull, then build release: `cargo build -p standalone --release --bin ritmolux`.
