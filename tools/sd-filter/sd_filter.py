@@ -31,9 +31,16 @@ Three contracts this file exists to keep, all from ADR-0121:
     without knowing which version of a profile was current when it ran.
 
 Progress goes to stderr. stdout carries frames and nothing else.
+
+`--timeline plan.json` replaces the one prompt with a prompt timeline in musical
+time (ADR-0236): a JSON array of `{"at_bar": N, "prompt": "..."}` entries, bars
+counted from 1, whose text conditioning is interpolated linearly between
+adjacent entries. The seed and the preset are untouched by it - only what the
+model is asked for moves.
 """
 
 import argparse
+import json
 import math
 import shlex
 import sys
@@ -121,6 +128,118 @@ class StreamError(Exception):
 
 class ConfigError(Exception):
     """The arguments do not describe a render this filter can perform."""
+
+
+# -------------------------------------------------------------- the timeline
+
+TimelineEntry = namedtuple("TimelineEntry", "at_bar prompt")
+
+
+def _describe(n, raw):
+    """How a refusal names the entry it refuses: its 1-based place, and itself."""
+    return "timeline entry %d (%s)" % (n, json.dumps(raw)[:120])
+
+
+def parse_timeline(doc, bars=None):
+    """A decoded timeline document -> a tuple of TimelineEntry, or ConfigError.
+
+    Every refusal names the offending entry. A malformed timeline found here
+    costs nothing; the same mistake found by watching the output costs a render
+    that runs for hours.
+
+    `bars` is the track's length in bars when it is known. Bar positions run
+    from 1 up to, not including, `bars + 1`, so an entry at or past that is past
+    the track and could never be reached.
+    """
+    if not isinstance(doc, list) or not doc:
+        raise ConfigError(
+            "a timeline is a non-empty JSON array of {\"at_bar\": N, \"prompt\": "
+            "\"...\"} entries, got %s" % json.dumps(doc)[:120]
+        )
+    out = []
+    for n, raw in enumerate(doc, 1):
+        where = _describe(n, raw)
+        if not isinstance(raw, dict) or set(raw) != {"at_bar", "prompt"}:
+            raise ConfigError(
+                "%s: an entry has exactly the keys at_bar and prompt" % where
+            )
+        bar, prompt = raw["at_bar"], raw["prompt"]
+        # bool is an int subclass in Python; `true` is not a bar number.
+        if isinstance(bar, bool) or not isinstance(bar, (int, float)) \
+                or not math.isfinite(bar):
+            raise ConfigError("%s: at_bar is not a number" % where)
+        if bar < 1:
+            raise ConfigError("%s: bars count from 1, at_bar %r is before the "
+                              "first bar" % (where, bar))
+        if not isinstance(prompt, str) or not prompt.strip():
+            raise ConfigError("%s: the prompt is empty" % where)
+        if out and bar <= out[-1].at_bar:
+            raise ConfigError(
+                "%s: at_bar %r is not after the previous entry's %r - entries run "
+                "in bar order, each strictly later than the one before"
+                % (where, bar, out[-1].at_bar)
+            )
+        out.append(TimelineEntry(bar, prompt))
+    timeline = tuple(out)
+    if bars is not None:
+        check_timeline_fits(timeline, bars)
+    return timeline
+
+
+def check_timeline_fits(timeline, bars):
+    """Refuse an entry the track ends before. See `parse_timeline` for `bars`."""
+    for n, e in enumerate(timeline, 1):
+        if e.at_bar >= bars + 1:
+            raise ConfigError(
+                "%s: at_bar %r is past the track, whose last bar is bar %d"
+                % (_describe(n, e._asdict()), e.at_bar, bars)
+            )
+
+
+def load_timeline(path):
+    """Read and validate a `--timeline` file."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            doc = json.load(f)
+    except OSError as e:
+        raise ConfigError("--timeline %s: %s" % (path, e))
+    except ValueError as e:
+        raise ConfigError("--timeline %s is not valid JSON: %s" % (path, e))
+    return parse_timeline(doc)
+
+
+def timeline_position(timeline, bar):
+    """Where `bar` falls in the timeline, as `(i, j, t)`.
+
+    The conditioning at `bar` is entry i's blended toward entry j's by `t` in
+    [0, 1). Exactly on an entry's bar it is that entry's alone (t = 0). Before
+    the first entry the first holds, and after the last the last holds, so
+    `i == j` there and `t` is 0.
+    """
+    if bar <= timeline[0].at_bar:
+        return 0, 0, 0.0
+    for k in range(1, len(timeline)):
+        if bar < timeline[k].at_bar:
+            a, b = timeline[k - 1].at_bar, timeline[k].at_bar
+            return k - 1, k, (bar - a) / float(b - a)
+    last = len(timeline) - 1
+    return last, last, 0.0
+
+
+def conditioning_at(timeline, embeds, bar):
+    """The conditioning at `bar`: `embeds[i]` linearly toward `embeds[j]`.
+
+    `embeds` holds one encoded prompt per entry, in the timeline's order. The
+    arithmetic is `a + (b - a) * t`, which is the same expression on a float
+    and on a tensor - the test drives it with floats, the stage with the text
+    encoder's output - and which returns `embeds[i]` itself, not a copy
+    computed from it, wherever `t` is 0.
+    """
+    i, j, t = timeline_position(timeline, bar)
+    if i == j or t == 0.0:
+        return embeds[i]
+    a, b = embeds[i], embeds[j]
+    return a + (b - a) * t
 
 
 # ------------------------------------------------------------------ the wire
@@ -361,10 +480,20 @@ class DiffusionStage:
     carries the *previous* output blended in, so material persists. One fixed
     seed for the whole render - the frame-to-frame difference is then the
     render's, not the sampler's.
+
+    With a timeline the one thing that varies is the text conditioning: each
+    entry's prompt is encoded once at load, and every diffused frame is handed
+    the blend `conditioning_at` computes for its bar. `bar_of` maps a frame
+    index to its 1-based bar position; the stage has no clock of its own to
+    derive one from.
     """
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, timeline=None):
         self.cfg = cfg
+        self.timeline = timeline
+        self.embeds = None           # one encoded prompt per timeline entry
+        self.negative_embeds = None  # the negative prompt, encoded once
+        self.bar_of = None           # frame index -> 1-based bar position
         self.pipe = None
         self.detector = None
         self.fmt = None
@@ -469,6 +598,31 @@ class DiffusionStage:
         pipe.to("cuda")
         net.to("cuda")
         self.pipe = pipe
+        if self.timeline:
+            self._encode_timeline()
+
+    def _encode_timeline(self):
+        """Encode every entry's prompt once, before the first frame.
+
+        Per frame this would re-run the text encoder for a result that only
+        ever takes len(timeline) values. Classifier-free guidance is on exactly
+        when the pipeline itself turns it on, at a guidance scale above 1;
+        below that there is no negative branch to condition.
+        """
+        import torch
+
+        guided = self.cfg["cfg"] > 1.0
+        embeds = []
+        negative = None
+        with torch.no_grad():
+            for e in self.timeline:
+                pos, negative = self.pipe.encode_prompt(
+                    e.prompt, "cuda", 1, guided,
+                    negative_prompt=self.cfg["negative"],
+                )
+                embeds.append(pos)
+        self.embeds = embeds
+        self.negative_embeds = negative
 
     # -- the control map
 
@@ -498,6 +652,22 @@ class DiffusionStage:
 
     # -- one diffused frame
 
+    def _conditioning(self, frame):
+        """The pipeline's text arguments for stream frame `frame`.
+
+        Without a timeline this is the one prompt as text, exactly the call a
+        single-prompt render has always made. With one it is the encoded blend
+        for the frame's bar, and the negative encoded alongside it.
+        """
+        if not self.timeline:
+            return {"prompt": self.cfg["prompt"],
+                    "negative_prompt": self.cfg["negative"]}
+        bar = self.bar_of(frame)
+        return {
+            "prompt_embeds": conditioning_at(self.timeline, self.embeds, bar),
+            "negative_prompt_embeds": self.negative_embeds,
+        }
+
     def _diffuse(self, src):
         import time
 
@@ -506,10 +676,11 @@ class DiffusionStage:
 
         cfg = self.cfg
         base = src if self.prev is None else Image.blend(src, self.prev, cfg["feedback"])
+        # `push` has already advanced the index past the frame being diffused.
+        text = self._conditioning(self.index - 1)
         started = time.perf_counter()
         out = self.pipe(
-            prompt=cfg["prompt"],
-            negative_prompt=cfg["negative"],
+            **text,
             image=base,
             control_image=self._control(src),
             strength=cfg["strength"],
@@ -669,11 +840,13 @@ FLAG_ORDER = [
     ("size", "--size"),
     ("seed", "--seed"),
     ("prompt", "--prompt"),
+    ("timeline", "--timeline"),
     ("negative", "--negative"),
 ]
 
 BASE = {
     "prompt": None,
+    "timeline": None,
     "negative": DEFAULT_NEGATIVE,
     "model": "Lykon/dreamshaper-8",
     "controlnet": None,
@@ -704,6 +877,9 @@ def build_parser():
                    help="a known-good combination of the flags below; any flag "
                         "passed explicitly overrides it")
     p.add_argument("--prompt")
+    p.add_argument("--timeline",
+                   help="a JSON prompt timeline, [{\"at_bar\": N, \"prompt\": "
+                        "\"...\"}, ...], in place of --prompt")
     p.add_argument("--negative")
     p.add_argument("--model")
     p.add_argument("--controlnet", help="defaults to the net for --control")
@@ -736,10 +912,16 @@ def resolve(args):
         if got is not None:
             cfg[key] = got
 
-    if not cfg["prompt"]:
+    if cfg["prompt"] and cfg["timeline"]:
         raise ConfigError(
-            "--prompt is required (the image is the whole signal, so there is no "
-            "default worth having). Pass --passthrough for the no-model stage."
+            "--prompt and --timeline both name what to draw; pass one. A timeline "
+            "of one entry is a single prompt."
+        )
+    if not (cfg["prompt"] or cfg["timeline"]):
+        raise ConfigError(
+            "--prompt or --timeline is required (the image is the whole signal, so "
+            "there is no default worth having). Pass --passthrough for the "
+            "no-model stage."
         )
     if cfg["control"] not in CONTROLNETS:
         raise ConfigError("--control %r is not one of %s"
@@ -763,13 +945,28 @@ def expansion(cfg):
     Quoted so `shlex.split` returns the argv that produced this render. A
     profile name whose meaning has since moved is not a configuration; this is
     the difference between the two, and the reason the echo is not optional.
+
+    `--prompt` and `--timeline` are exclusive, so whichever is unset is left
+    out rather than echoed as the string "None". A timeline is echoed as its
+    path; `timeline_echo` prints what that file held.
     """
     out = []
     for key, flag in FLAG_ORDER:
+        if cfg[key] is None:
+            continue
         out += [flag, shlex.quote(str(cfg[key]))]
     if cfg["scheduler"] == "lcm":
         out += ["--lcm-lora", shlex.quote(str(cfg["lcm_lora"]))]
     return " ".join(out)
+
+
+def timeline_echo(timeline):
+    """The timeline's content, for the stderr echo.
+
+    The flag echo names the file; a file edited after the render no longer
+    says what that render drew, so its entries are echoed as well.
+    """
+    return "timeline " + json.dumps([e._asdict() for e in timeline])
 
 
 def main(argv):
@@ -790,8 +987,17 @@ def main(argv):
         stage = None
         if not args.passthrough:
             cfg = resolve(args)
+            timeline = load_timeline(cfg["timeline"]) if cfg["timeline"] else None
             print("sd-filter: %s" % expansion(cfg), file=sys.stderr, flush=True)
-            stage = DiffusionStage(cfg)
+            if timeline:
+                print("sd-filter: %s" % timeline_echo(timeline),
+                      file=sys.stderr, flush=True)
+            stage = DiffusionStage(cfg, timeline)
+            if timeline and stage.bar_of is None:
+                raise ConfigError(
+                    "--timeline places its entries by bar, and no bar grid "
+                    "reached this filter to resolve a frame to its bar"
+                )
         run(sys.stdin.buffer, sys.stdout.buffer, log=sys.stderr, stage=stage)
     except ConfigError as e:
         print("sd-filter: %s" % e, file=sys.stderr)

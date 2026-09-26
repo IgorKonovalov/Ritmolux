@@ -1,6 +1,6 @@
 # 0212 — The diffused render gains a timeline
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user) — approved and deliberately NOT in `tools/conductor/queue.json`
 > **Owner skill(s):** dev, human
@@ -169,15 +169,20 @@ flowchart LR
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0212-the-diffused-render-gains-a-timeline`, worktree `/home/igor/Work/rlx-plan-0212`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the sidecar accepts a timeline | dev | not started | |
+| 1 — the sidecar accepts a timeline | dev | done | committed with this row |
 | 2 — the bar grid reaches the sidecar | dev | not started | |
 | 3 — a full track, judged | human | not started | |
 
 ### Notes
+
+- Phase 1: the timeline is a JSON file passed as `--timeline`, exclusive with `--prompt`. The
+  stage resolves a frame to its bar through `DiffusionStage.bar_of`, which nothing sets yet, so
+  `main` refuses a `--timeline` render with exit 2 until a bar grid reaches the filter. The
+  CUDA-side encode (`pipe.encode_prompt`, then `prompt_embeds=`) has not run on a GPU.
 
 ### Close triggers
 

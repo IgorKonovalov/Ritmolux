@@ -24,6 +24,7 @@ geometry arithmetic, and the reproducibility of a configuration from its echo.
 """
 
 import io
+import json
 import math
 import os
 import shlex
@@ -416,10 +417,13 @@ for name in sorted(sd_filter.PROFILES):
     again = sd_filter.resolve(parser.parse_args(shlex.split(echoed)))
     check("--profile %s round-trips through its expansion" % name, again == cfg,
           "%r" % ({k: (cfg[k], again[k]) for k in cfg if cfg[k] != again[k]},))
+    # Every flag the cell sets. The unset one of --prompt / --timeline is
+    # absent by design: echoing it as "None" would round-trip as a prompt.
     check("  ... the echo names every flag the cell has",
           all(("--" + k.replace("_", "-")) in echoed
-              for k in cfg if k not in ("lcm_lora",)),
+              for k in cfg if k not in ("lcm_lora",) and cfg[k] is not None),
           echoed)
+    check("  ... and nothing it does not", "None" not in echoed, echoed)
 
 # An explicit flag beats the profile it was passed alongside - the reason the
 # profile is a preset and not a mode.
@@ -448,6 +452,166 @@ for bad, why in [
         check("refused: %s" % why, False, "did not raise")
     except sd_filter.ConfigError:
         check("refused: %s" % why, True)
+
+print()
+print("a prompt timeline interpolates the conditioning between its entries:")
+
+# Plan 0212 Phase 1 and ADR-0236. Asserted on the interpolation itself, because
+# the rendered frames are the one thing here that is not reproducible. Floats
+# stand in for the encoded prompts: `conditioning_at` is the same `a + (b - a)
+# * t` on a float as on the text encoder's tensor.
+TL = sd_filter.parse_timeline([
+    {"at_bar": 1, "prompt": "a vast canyon of luminous glowing rock strata"},
+    {"at_bar": 9, "prompt": "a frozen sea under aurora"},
+])
+EMB = [0.0, 80.0]
+
+check("two entries parse, in order",
+      TL == (sd_filter.TimelineEntry(1, "a vast canyon of luminous glowing rock strata"),
+             sd_filter.TimelineEntry(9, "a frozen sea under aurora")), "%r" % (TL,))
+check("at the first entry's bar: the first prompt's conditioning",
+      sd_filter.conditioning_at(TL, EMB, 1) == 0.0)
+check("at the second entry's bar: the second prompt's conditioning",
+      sd_filter.conditioning_at(TL, EMB, 9) == 80.0)
+for bar, want in [(3, 20.0), (5, 40.0), (8.5, 75.0)]:
+    got = sd_filter.conditioning_at(TL, EMB, bar)
+    check("between them, bar %s: the blend %.0f" % (bar, want),
+          abs(got - want) < 1e-9, "got %r" % (got,))
+check("before the first entry the first holds",
+      sd_filter.timeline_position(TL, 0.5) == (0, 0, 0.0))
+check("after the last entry the last holds",
+      sd_filter.conditioning_at(TL, EMB, 40) == 80.0
+      and sd_filter.timeline_position(TL, 40) == (1, 1, 0.0))
+
+# Exactly on an entry the blend is that entry's own value, not one computed
+# from its neighbours - the object itself, so a tensor is not recomputed.
+marker = object()
+check("on an entry's bar the entry's own conditioning is returned",
+      sd_filter.conditioning_at(TL, [marker, 1.0], 1) is marker)
+
+# Three entries: each span interpolates only between its own two neighbours.
+TL3 = sd_filter.parse_timeline([
+    {"at_bar": 1, "prompt": "a"}, {"at_bar": 5, "prompt": "b"},
+    {"at_bar": 6.5, "prompt": "c"},
+])
+for bar, want in [(3, (0, 1, 0.5)), (5, (1, 2, 0.0)), (5.75, (1, 2, 0.5)),
+                  (6.5, (2, 2, 0.0))]:
+    got = sd_filter.timeline_position(TL3, bar)
+    check("three entries, bar %s -> %r" % (bar, want), got == want, "got %r" % (got,))
+
+print()
+print("the stage hands each frame the conditioning for its bar:")
+
+# `_conditioning` as it ships; only the encoder's output is replaced, by floats.
+tcell = cell(timeline="t.json")
+tcell["prompt"] = None
+stage = sd_filter.DiffusionStage(tcell, TL)
+stage.embeds = EMB
+stage.negative_embeds = -1.0
+stage.bar_of = lambda frame: 1 + frame / 4.0   # four frames a bar, bar 1 at frame 0
+for frame, want in [(0, 0.0), (8, 20.0), (16, 40.0), (32, 80.0), (60, 80.0)]:
+    got = stage._conditioning(frame)
+    check("frame %d (bar %g) is conditioned on %.0f" % (frame, 1 + frame / 4.0, want),
+          got == {"prompt_embeds": want, "negative_prompt_embeds": -1.0}, "got %r" % (got,))
+
+# A single prompt, with no timeline, is the call it always was: text, not
+# embeddings - which is what keeps every existing figure valid.
+single = sd_filter.DiffusionStage(cell(negative="n"))
+check("with no timeline the call is the one prompt, as text",
+      single._conditioning(0) == {"prompt": "x", "negative_prompt": "n"},
+      "got %r" % (single._conditioning(0),))
+
+print()
+print("a malformed timeline is refused, naming the entry:")
+
+for doc, why, names in [
+    ([], "empty", None),
+    ({"at_bar": 1, "prompt": "a"}, "not an array", None),
+    ([{"at_bar": 1, "prompt": "a"}, {"at_bar": 5, "prompt": "b"},
+      {"at_bar": 3, "prompt": "c"}], "a bar out of order", "entry 3"),
+    ([{"at_bar": 1, "prompt": "a"}, {"at_bar": 1, "prompt": "b"}],
+     "two entries on one bar", "entry 2"),
+    ([{"at_bar": 1, "prompt": "a"}, {"at_bar": 4, "prompt": "   "}],
+     "an empty prompt", "entry 2"),
+    ([{"at_bar": 1, "prompt": ""}], "a zero-length prompt", "entry 1"),
+    ([{"at_bar": 0, "prompt": "a"}], "a bar before bar 1", "entry 1"),
+    ([{"at_bar": "5", "prompt": "a"}], "a bar that is a string", "entry 1"),
+    ([{"at_bar": True, "prompt": "a"}], "a bar that is a boolean", "entry 1"),
+    ([{"at_bar": 1, "prompt": 7}], "a prompt that is not text", "entry 1"),
+    ([{"bar": 1, "prompt": "a"}], "a misspelt key", "entry 1"),
+    ([{"at_bar": 1, "prompt": "a", "seed": 9}], "a key the timeline has not got",
+     "entry 1"),
+]:
+    try:
+        sd_filter.parse_timeline(doc)
+        check("refused: %s" % why, False, "did not raise")
+    except sd_filter.ConfigError as e:
+        check("refused: %s" % why, names is None or ("timeline " + names) in str(e),
+              "message does not name %s: %s" % (names, e))
+
+# Past the track: a bar the render never reaches. With 16 bars the positions
+# run from 1 up to, not including, 17.
+fits = [{"at_bar": 1, "prompt": "a"}, {"at_bar": 16.5, "prompt": "b"}]
+check("an entry inside the last bar is accepted",
+      len(sd_filter.parse_timeline(fits, bars=16)) == 2)
+for at in [17, 40]:
+    try:
+        sd_filter.parse_timeline([{"at_bar": 1, "prompt": "a"},
+                                  {"at_bar": at, "prompt": "b"}], bars=16)
+        check("refused: bar %d past a 16-bar track" % at, False, "did not raise")
+    except sd_filter.ConfigError as e:
+        check("refused: bar %d past a 16-bar track" % at,
+              "timeline entry 2" in str(e) and "bar 16" in str(e), str(e))
+
+print()
+print("a timeline is a flag like any other:")
+
+with tempfile.TemporaryDirectory() as td:
+    path = os.path.join(td, "timeline.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump([{"at_bar": 1, "prompt": "a canyon"},
+                   {"at_bar": 9, "prompt": "a frozen sea"}], f)
+    tcfg = sd_filter.resolve(parser.parse_args(
+        ["--profile", "quality", "--timeline", path]))
+    techo = sd_filter.expansion(tcfg)
+    check("--timeline round-trips through its expansion",
+          sd_filter.resolve(parser.parse_args(shlex.split(techo))) == tcfg, techo)
+    check("  ... and the echo carries no --prompt", "--prompt" not in techo, techo)
+    check("the file loads to the entries it holds",
+          sd_filter.load_timeline(path) == (sd_filter.TimelineEntry(1, "a canyon"),
+                                            sd_filter.TimelineEntry(9, "a frozen sea")))
+    check("its content is echoed, not only its path",
+          '"prompt": "a frozen sea"' in sd_filter.timeline_echo(
+              sd_filter.load_timeline(path)))
+
+    bad = os.path.join(td, "bad.json")
+    with open(bad, "w", encoding="utf-8") as f:
+        f.write("[{\"at_bar\": 1, \"prompt\": \"a\"},")
+    for p, why in [(bad, "a file that is not JSON"),
+                   (os.path.join(td, "absent.json"), "a file that is not there")]:
+        try:
+            sd_filter.load_timeline(p)
+            check("refused: %s" % why, False, "did not raise")
+        except sd_filter.ConfigError:
+            check("refused: %s" % why, True)
+
+    try:
+        sd_filter.resolve(parser.parse_args(["--prompt", "p", "--timeline", path]))
+        check("refused: --prompt and --timeline together", False, "did not raise")
+    except sd_filter.ConfigError:
+        check("refused: --prompt and --timeline together", True)
+
+    # A timeline with nothing to place its bars on exits 2 before any model is
+    # built, rather than failing at the first frame after the load.
+    err = io.StringIO()
+    real_err, sys.stderr = sys.stderr, err
+    try:
+        code = sd_filter.main(["sd_filter.py", "--timeline", path])
+    finally:
+        sys.stderr = real_err
+    check("a timeline with no bar grid exits 2 before loading anything",
+          code == 2 and "bar grid" in err.getvalue(),
+          "exit %r, stderr %r" % (code, err.getvalue()[-200:]))
 
 print()
 print("end to end, as a subprocess (Phase 3's done-when as written):")
