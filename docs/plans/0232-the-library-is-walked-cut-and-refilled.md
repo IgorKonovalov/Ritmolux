@@ -1,0 +1,342 @@
+# 0232 — The library is walked, cut and refilled
+
+> **Status:** approved
+> **Created:** 2026-09-27
+> **Approved:** 2026-09-27 (user)
+> **Owner skill(s):** human (the `preset-author` lane and the owner), dev
+> **Related ADRs:** [0253](../adrs/0253-a-retirement-may-land-ahead-of-its-replacement-when-a-walk-convicts-it.md)
+> (proposed), [0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md),
+> [0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md),
+> [0227](../adrs/0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md),
+> [0228](../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)
+> **Takes:** step 2 of design-backlog 0256 (the quality half). It does not close the entry:
+> Phase 7 decides whether step 3 is owed. Takes the six standing sittings in
+> [`docs/content-brief.md`](../content-brief.md).
+> **Sequenced with:** [Plan 0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md)
+> (see Decision).
+
+## TL;DR
+
+This plan reviews the whole shipped preset library once, in this order: a machine-made candidate
+sheet, then the owner's walk of the running app, then a cull, then retunes, then a gap brief, then a
+first refill cohort. The owner's eye decides every cut. The reports only point at candidates. A cut
+may land without a replacement (ADR-0253), as long as no family drops below two presets and two
+representatives. The first thing a user sees change is a smaller library with no near-twins in it.
+The plan also absorbs the six content sittings that have been open since 2026-08-13, and it hands
+Plan 0204's MilkDrop cohort a list of gaps to fill instead of a pile to add to.
+
+## Context & problem
+
+The owner asked for a comprehensive review of the presets: remove duplicates, review what ships,
+create more, add MilkDrop looks. Most of that already has an owner somewhere. What nothing owns is
+**the review itself**, or the order those pieces run in.
+
+- **The library grew by addition alone.** It has 121 presets on 2026-09-27, against the 41 that
+  ADR-0089 was written over. `attractor_*` is 20 of them and `fragment_*` is 14. No preset has left
+  under ADR-0089's cohort rule, because that rule only lets one leave once a replacement exists.
+- **Backlog 0256 holds the owner's own order**: (1) record the gap, done; (2) **the owner walks the
+  shipped library in the app and marks what reads as lame or duplicate**; (3) only then design any
+  mechanism. Plan 0209 finished the instrument half, so `distinctness` now reports every system.
+  Plan 0205 built the marks the walk records into. **Step 2 has never happened.** The owner's
+  `marks.toml` holds one hidden preset and no favourites.
+- **Six standing sittings** in `docs/content-brief.md` have been open since 2026-08-13 with nothing
+  moved to `Done`: the sky family (1a-1c), the ink re-judge on `ink_gamma`, the attractor binding
+  `tuple`, the `occlude` retune with backlog 0038, two families that photograph badly, and the
+  figure at frame scale. Each one is a question about a family this walk will look at anyway.
+- **Backlog 0248** names four `fragment_field` presets (`Sumi`, `Whorl`, `Supernova`,
+  `Neon Tunnel`) where no statistic can tell a composition from a fill. An eye can.
+- **Plan 0204** (approved, not started) turns MilkDrop picks into native presets, one cohort at a
+  time. Run before a cull, it adds four to six presets to a set nobody has pruned. Run after the
+  cull, it can fill a named gap. Shipping converted `.milk` output stays closed. Plan 0100 Phase 8
+  still owns that question, and this plan does not reopen it.
+
+Retiring a preset is not a content-only edit here. `core/tests/suite/hygiene.rs` holds every
+shipped preset equal to a gallery card in `scripts/docs-shots.mjs` and a committed PNG.
+`every_family_carries_at_least_two_representatives` holds the `representative = true` keys. 26
+presets are also named in `.rs` files (tests, fixtures, `standalone/src`), with `attractor_leviathan`
+in the most. Outside Rust, preset names are carried by about twenty reader docs, scripts and skill
+references. So the cut itself is a `dev` phase, executed from the verdicts the walk records.
+
+**"Family" in this plan means a `SystemKind`**, which is how both floor-holding tests group the set.
+The filename prefix nearly always matches it, but the test is the authority.
+
+## Decision
+
+We will run the review as **report, then walk, then cut, then retune, then refill**, with the owner's
+marks as the only thing that convicts a preset, and retirements allowed ahead of any replacement
+under ADR-0253.
+
+The interview settled four choices, and each one rejected an alternative:
+
+- **Shrink, then refill**, rather than holding the count by pairing every cut, or growing and
+  cutting only obvious twins. The owner's aim is "ship less but better" (backlog 0256). ADR-0253
+  records why strict pairing gets in its way.
+- **A report first, then the owner's walk**, rather than a blind walk or the content lane deciding
+  with the owner's veto. The report finds duplicates cheaply. Quality has no statistic, so the owner's
+  marks decide. The risk this carries is that the shortlist biases the walk; Risks covers it.
+- **Plan 0204 is kept and sequenced, not folded in and not widened.** Its Phases 1-2 (references and
+  routing, both outside the repo or in its own table) may run at any time. Its **Phase 2 cohort is
+  chosen against this plan's Phase 5 gap table**, and its **Phase 3 lands after this plan's
+  Phase 3**, so a MilkDrop-inspired preset is never judged against a twin that is about to be cut.
+- **The six standing sittings are absorbed.** Each one becomes a row in the walk, where it is
+  answered or retired with a reason. `content-brief.md` empties into `Done`.
+
+## Architecture diagram
+
+```mermaid
+flowchart LR
+    subgraph machine["evidence (Phase 1)"]
+        report["shot --report<br/>+ distinctness per family"]
+        sheet["ledger in this plan<br/>one row per preset"]
+    end
+    subgraph owner["judgement (Phase 2)"]
+        walk["the running app<br/>family by family"]
+        marks["marks.toml<br/>hidden / favourite"]
+    end
+    subgraph repo["the shipped set"]
+        cut["Phase 3 (dev)<br/>retire + re-point"]
+        tune["Phase 4<br/>retunes + sittings"]
+        gaps["Phase 5<br/>gap table"]
+        refill["Phase 6<br/>refill cohort"]
+    end
+    p0204["Plan 0204<br/>MilkDrop cohort"]
+
+    report --> sheet --> walk --> marks --> sheet
+    sheet --> cut --> tune --> gaps --> refill
+    gaps --> p0204
+```
+
+## Implementation phases
+
+Six of the seven phases are `human`, meaning the `preset-author` lane working with the owner, as
+in Plan 0204 and `content-brief.md`. A conductor run parks at Phase 1, which is correct.
+
+**This plan's `human` phases may write to the `## The ledger` and `## Gaps` sections below.** This
+is the same scoped exception Plan 0204 made for its routing table: the ledger is this plan's
+working surface, and nowhere else fits it better.
+
+### Phase 1 — The candidate sheet
+
+- **Owner skill:** human
+- **What:** Produce the evidence the walk reads: one ledger row per shipped preset, carrying every
+  machine flag and no verdict.
+- **Files touched:** this plan (`## The ledger`). Contact sheets and report output go under
+  `target/`, uncommitted.
+- **Done when:**
+  - `## The ledger` has exactly one row per file `ls presets/*.toml` lists at the start of the phase.
+  - Each row carries, **copied from the tools and not judged**:
+    - its family;
+    - any near-duplicate flag and the partner it names, from
+      `cargo run -p standalone --example shot -- --presets presets --report` and from
+      `cargo nextest run -p rlx-core --test distinctness --no-capture` (the per-family matrices);
+    - the report's reactivity reading;
+    - the `anim` and `drive` readings as the report prints them;
+    - a frame cost over budget, if the report marks one;
+    - the `sanity` NOTE, if the preset is one of backlog 0248's four;
+    - any header naming an ADR, plan or backlog entry it works around, from the close-ceremony
+      step 3b grep run over **all** presets and read in full.
+  - Each of the six content-brief sittings is attached to the family whose walk will answer it.
+
+### Phase 2 — The walk
+
+- **Owner skill:** human
+- **What:** The owner walks the running app one family at a time, with the ledger open, and marks
+  each preset. This is backlog 0256 step 2.
+- **Files touched:** this plan (`## The ledger`). The owner's `marks.toml` is outside the repo.
+- **Done when:**
+  - Every ledger row carries a verdict: `keep`, `cut` or `retune`. `merge` is written as a `cut`
+    that names its survivor.
+  - Every `cut` carries one sentence of reason ("near-twin of X, X kept for Y", or "reads as a
+    wash at every level, no figure").
+  - Every row whose preset is named in a Rust test or in `standalone/src` also names the survivor
+    those references move to.
+  - For every family, the rows left after the cuts number at least two, and at least two of them
+    are marked as its representatives, with any new representative named.
+  - Each absorbed sitting carries its answer, or `retired: <reason>`.
+  - Backlog 0248's four presets each carry an explicit `composition` or `fill` reading.
+  - The walk happened **in the app, with music playing**, not from stills.
+
+### Phase 3 — The cull
+
+- **Owner skill:** dev
+- **What:** Retire every `cut` row exactly as the ledger says: delete the `.toml`, drop its entry
+  from `CARDS` in `scripts/docs-shots.mjs`, delete its gallery PNG, move `representative = true` to
+  the ledger's named survivor, and re-point every test, fixture and `standalone/src` reference to
+  that survivor.
+- **Files touched:** wherever a cut name appears, and it is **the grep that decides the list**, not
+  this bullet. On 2026-09-27 the carriers are:
+  - `presets/*.toml` (deletions, plus `representative` edits on the survivors);
+  - `scripts/docs-shots.mjs` (`CARDS`) and `docs/images/gallery/presets/*.png` (deletions);
+  - `core/tests/**`, including `core/tests/fixtures/`, and `standalone/src/**`,
+    `standalone/tests/**`;
+  - the reader docs `presets/README.md` (the hand-written tables; the generated params block is
+    regenerated, never edited), `docs/preset-guide.md`, `docs/capturing.md`,
+    `docs/preset-palettes.md`, `docs/presets.md`, `docs/on-device-validation.md`, `docs/nfr.md`,
+    `docs/testing.md`, `docs/configuration.md`, `docs/diffusion-filter.md` and
+    `docs/content-brief.md`;
+  - `scripts/softness-sheets.mjs`, `scripts/docs-clip.mjs` and `tools/sd-filter/test_sd_filter.py`;
+  - `presets/pending/README.md`;
+  - `.claude/skills/preset-author/references/systems.md` and the other preset-author references
+    that list what ships. A headless session cannot write under `.claude/` (ADR-0210), so `dev`
+    lists these hits in the log with the replacement text and the owner applies them. A skill line
+    that cites a preset as a **historical example**, such as the architect skill's step 3b, is a
+    record and stays as written.
+- **Done when:**
+  - Each family's cuts land as **one commit per family**, and the message lists the ledger rows it
+    executes.
+  - For every cut name, `git grep -n -w <name>` hits only records and measurements:
+    `docs/plans/**`, `docs/adrs/**`, `docs/design-backlog*.md`, `presets/proposed/ROSTER.md`,
+    `scripts/bench/results/**` (a dated sweep names what it measured), and the `.claude/` lines the
+    log hands to the owner.
+  - `cargo nextest run --workspace` is green, **the full run and not `-P fast`**, because the
+    gallery-card hygiene test, the representative floor and the distinctness pair counts all live in
+    different binaries.
+  - No golden baseline moved. Goldens render frozen fixtures, not shipped presets (ADR-0023), so a
+    moved golden is a finding to report, not something to re-bless.
+  - A test whose meaning depended on a **specific** cut preset (not just any preset of that family)
+    is disclosed in the log with the survivor chosen. `dev` does not weaken an assertion to make the
+    survivor pass. That goes back to the owner.
+
+### Phase 4 — The retunes and the sittings
+
+- **Owner skill:** human
+- **What:** The content lane retunes every `retune` row, including the sittings that are authoring
+  rather than judging (the `tuple` binding, and the `occlude` retune with backlog 0038). Each lands
+  through the ADR-0081 route.
+- **Files touched:** `presets/*.toml`, their gallery PNGs where the look moved,
+  `docs/content-brief.md` (each sitting moves to `Done` with its date and a one-line verdict).
+- **Done when:**
+  - Every `retune` row names its landing commit, or reads `abandoned: <reason>`.
+  - Each retuned preset was rendered and looked at in the running app before it was committed.
+  - `docs/content-brief.md` has no item left above `## Done`.
+  - Presets whose headers work around a fixed defect (the Phase 1 grep) are retuned or carry a
+    sentence saying why the workaround stays.
+
+### Phase 5 — The gap brief
+
+- **Owner skill:** human
+- **What:** Read the culled and retuned set and name what it lacks. This is the brief the refill,
+  and Plan 0204's cohort, author against.
+- **Files touched:** this plan (`## Gaps`); Plan 0204's routing table only as far as its own
+  Phase 2 allows.
+- **Done when:**
+  - `## Gaps` lists each gap as a system, a look and one sentence on why the set needs it: a family
+    thinned to its floor, a tempo or mood the walk found missing, a palette range nobody covers.
+  - Each gap reads `0204` (one of 0204's 21 picks can fill it) or `native` (Phase 6 authors it).
+  - A gap that no system can express is a backlog entry with a probe, not a row here, per ADR-0017.
+
+### Phase 6 — The first refill cohort
+
+- **Owner skill:** human
+- **What:** Author the `native` gaps as one cohort of four to six new presets under ADR-0089's
+  fresh-slate rule, spanning at least two systems. Drafts go through `presets/proposed/` and its
+  `ROSTER.md` first, which is that directory's existing route for work awaiting the owner's verdict.
+  Only the keeps move into `presets/`.
+- **Files touched:** `presets/proposed/` (drafts and roster rows), `presets/*.toml` (the keeps),
+  `scripts/docs-shots.mjs` (`CARDS`), and `docs/images/gallery/presets/*.png` (new cards).
+- **Done when:**
+  - Each new preset passes `cargo nextest run --workspace` (`standalone`'s tests read the shipped set
+    too) and carries a gallery card.
+  - Each was judged in the running app against the gap it fills.
+  - The distinctness report shows **no new near-duplicate flag** pairing a new preset with a
+    survivor, or the ledger records that the owner accepted that flag and why.
+
+### Phase 7 — The verdict
+
+- **Owner skill:** human
+- **Blocks merge:** no
+- **What:** The owner walks the result once more (the refill cohort and the families that lost the
+  most) and answers backlog 0256 step 3: **does "ship less, better" need a mechanism**, or was a
+  dated walk enough, and how often should it repeat?
+- **Files touched:** this plan (the verdict, under `## The ledger`).
+- **Done when:** the verdict is written as one of three: a mechanism is owed (then `architect`
+  drafts the ADR and plan 0256 step 3 asks for); a periodic walk at a stated cadence is enough (then
+  the cadence goes into `content-brief.md` at close); or neither, with the reason. Each part is
+  backed by what this walk actually convicted.
+
+## The ledger
+
+_(Filled by Phase 1; verdicts by Phase 2; commits by Phases 3-4. Columns: preset, family, machine
+flags, verdict, reason, survivor/representative, commit.)_
+
+**Decided before the walk (owner, 2026-09-27):** `attractor_leviathan` and `fragment_tiledmono`
+are `keep`. Phase 1 still gives them rows and flags, and Phase 2 does not re-judge them. A retune
+proposal for either goes back to the owner rather than into Phase 4 on its own.
+
+## Gaps
+
+_(Filled by Phase 5.)_
+
+## Data shapes
+
+None. No types, parameters or engine surface. A look that needs one is a backlog note to `architect`.
+
+## Risks & open questions
+
+- **The shortlist biases the walk.** A preset the report flags is looked at harder, and a weak one
+  it does not flag goes unnoticed. Mitigation: Phase 2 gives **every** row a verdict, not only the
+  flagged ones, and a flag is evidence, never a charge.
+- **The walk is long.** One evening per family cluster is realistic, not one evening in total.
+  Phase 2 may land in family-sized slices. Phase 3 may start a family once that family's rows are
+  all judged, provided the lane state records which families are finished.
+- **A cut preset anchors a test's meaning.** Re-pointing a test to a survivor can make it pass
+  for a different reason. The two heaviest anchors, `attractor_leviathan` (named in 10 files) and
+  `fragment_tiledmono` (`boundary_floor`'s anchor in `docs/testing.md`), are pre-decided keeps, so
+  they are out of this risk. For any other anchor, Phase 3's last done-when bullet sends the case
+  back to the owner, and keeping the anchor preset is a legitimate `keep` with the reason written
+  down.
+- **An operator loses a favourite on upgrade.** ADR-0253 accepts this. The mark stays in the file
+  and does nothing (ADR-0228), so there is no crash and no warning. The release notes for the
+  version that closes this plan should list what was retired.
+- **Plan 0218 re-blesses goldens and moves hardware tests.** If the two plans run concurrently,
+  Phase 3's test re-pointing and 0218's re-bless touch neighbouring files. Phase 3 should not share
+  a lane window with 0218 Phase 2.
+- **Open:** whether a family that ends at exactly its floor of two should also ship at all. That is
+  a question about the system, left to Phase 7 and `architect`, not a cut this plan may make.
+
+## What this plan does NOT do
+
+- **It does not ship converted MilkDrop output** or answer Plan 0100 Phase 8. Plan 0204 remains the
+  MilkDrop route, re-authored natively under ADR-0227.
+- **It does not build a quality instrument or a similarity threshold.** Phase 7 decides whether one
+  is owed. Designing it is a later ADR and plan.
+- **It does not retire a system**, and it cuts no family below two presets and two representatives.
+- **It does not touch engine Rust** beyond re-pointing references to cut presets. A look the walk
+  wants that the surface cannot express goes to the backlog.
+- **It does not author Plan 0204's picks.** Phase 5 only tells 0204 which gaps its picks fill.
+
+## Implementation log
+
+> Written by the lane — one row per phase as that phase's commit lands, and the close block after
+> the last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** _(to be filled)_
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The candidate sheet | human | not started | |
+| 2 — The walk | human | not started | |
+| 3 — The cull | dev | not started | |
+| 4 — The retunes and the sittings | human | not started | |
+| 5 — The gap brief | human | not started | |
+| 6 — The first refill cohort | human | not started | |
+| 7 — The verdict | human | not started | |
+
+### Notes
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`** none (takes backlog 0256 step 2)
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Full suite:**
+- **Outstanding `human` phases:**
+
+## Followups (after this lands)
+
+- Plan 0204 Phases 3-4, now authoring against `## Gaps`.
+- Backlog 0256 step 3, if Phase 7 says a mechanism is owed.
+- Backlog 0248, updated with the four `composition`/`fill` readings as evidence. The entry stays live,
+  because it asks for a statistic.

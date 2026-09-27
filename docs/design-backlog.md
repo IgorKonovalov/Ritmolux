@@ -1641,6 +1641,9 @@ the interesting half of the question has no statistic.
 - **Raised:** 2026-09-19 by `architect`, asked by the owner (*"do we have a plan to cut curated
   presets that are too similar to each other or lame?"*). **Owner if taken:** `human` for step 2,
   then `architect` for the ADR and plan.
+- **PARTLY PROMOTED 2026-09-27 -> [Plan 0232](plans/0232-the-library-is-walked-cut-and-refilled.md)**,
+  which takes **step 2** (the owner's walk, and the cull it convicts under ADR-0253). Step 3, whether a
+  mechanism is owed, stays here until that plan's Phase 7 verdict answers it.
 - **Verified 2026-09-26** — the instrument half is discharged by
   [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md) (closed 2026-09-26): the
   similarity roster is every `SystemKind`, held to the enum by `family_tests!`'s exhaustive match, and
