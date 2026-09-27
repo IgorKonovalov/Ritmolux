@@ -69,8 +69,9 @@ similarity is the half that can be measured. A threshold would retire the wrong 
 and treat a number as a curation verdict.
 
 ### Alternative C — Retire into a `presets/retired/` directory instead of deleting
-This keeps the file one `git mv` from shipping again. It lost because `presets/pending/` already
-means "approved, held back by an engine gap". A second held-out directory would hold content
-nobody intends to ship, and it would rot beside the one that holds content somebody does. `git log`
+This keeps the file one `git mv` from shipping again. It lost because two held-out directories
+already exist and each has one meaning: `presets/pending/` is "approved, held back by an engine
+gap", and `presets/proposed/` is "authored, awaiting the owner's verdict". A third would hold
+content nobody intends to ship, and it would rot beside two that hold content somebody does. `git log`
 already keeps every retired header's measured knowledge findable, which ADR-0089 counted as a
 positive.

@@ -52,9 +52,13 @@ create more, add MilkDrop looks. Most of that already has an owner somewhere. Wh
 
 Retiring a preset is not a content-only edit here. `core/tests/suite/hygiene.rs` holds every
 shipped preset equal to a gallery card in `scripts/docs-shots.mjs` and a committed PNG.
-`every_family_carries_at_least_two_representatives` holds the `representative = true` keys. About
-40 presets are also named in Rust tests or in `standalone/src`, with `attractor_leviathan` alone in
-10 files. So the cut itself is a `dev` phase, executed from the verdicts the walk records.
+`every_family_carries_at_least_two_representatives` holds the `representative = true` keys. 26
+presets are also named in `.rs` files (tests, fixtures, `standalone/src`), with `attractor_leviathan`
+in the most. Outside Rust, preset names are carried by about twenty reader docs, scripts and skill
+references. So the cut itself is a `dev` phase, executed from the verdicts the walk records.
+
+**"Family" in this plan means a `SystemKind`**, which is how both floor-holding tests group the set.
+The filename prefix nearly always matches it, but the test is the authority.
 
 ## Decision
 
@@ -124,9 +128,9 @@ working surface, and nowhere else fits it better.
     - its family;
     - any near-duplicate flag and the partner it names, from
       `cargo run -p standalone --example shot -- --presets presets --report` and from
-      `cargo nextest run -p rlx-core --test distinctness --no-capture`;
+      `cargo nextest run -p rlx-core --test distinctness --no-capture` (the per-family matrices);
     - the report's reactivity reading;
-    - the `anim` column, noting where the pass came only from the driven branch;
+    - the `anim` and `drive` readings as the report prints them;
     - a frame cost over budget, if the report marks one;
     - the `sanity` NOTE, if the preset is one of backlog 0248's four;
     - any header naming an ADR, plan or backlog entry it works around, from the close-ceremony
@@ -159,20 +163,35 @@ working surface, and nowhere else fits it better.
   from `CARDS` in `scripts/docs-shots.mjs`, delete its gallery PNG, move `representative = true` to
   the ledger's named survivor, and re-point every test, fixture and `standalone/src` reference to
   that survivor.
-- **Files touched:** `presets/*.toml` (deletions, plus `representative` edits on the survivors);
-  `scripts/docs-shots.mjs`; `docs/images/gallery/presets/*.png` (deletions); `core/tests/**`,
-  `standalone/src/**` and `standalone/tests/**` wherever a cut name appears; and reader docs under
-  `docs/` that name a cut preset in prose (`docs/preset-guide.md`,
-  `docs/preset-tuning-walkthrough.md`, `presets/README.md`), repointed to the survivor or reworded.
+- **Files touched:** wherever a cut name appears, and it is **the grep that decides the list**, not
+  this bullet. On 2026-09-27 the carriers are:
+  - `presets/*.toml` (deletions, plus `representative` edits on the survivors);
+  - `scripts/docs-shots.mjs` (`CARDS`) and `docs/images/gallery/presets/*.png` (deletions);
+  - `core/tests/**`, including `core/tests/fixtures/`, and `standalone/src/**`,
+    `standalone/tests/**`;
+  - the reader docs `presets/README.md` (the hand-written tables; the generated params block is
+    regenerated, never edited), `docs/preset-guide.md`, `docs/capturing.md`,
+    `docs/preset-palettes.md`, `docs/presets.md`, `docs/on-device-validation.md`, `docs/nfr.md`,
+    `docs/testing.md`, `docs/configuration.md`, `docs/diffusion-filter.md` and
+    `docs/content-brief.md`;
+  - `scripts/softness-sheets.mjs`, `scripts/docs-clip.mjs` and `tools/sd-filter/test_sd_filter.py`;
+  - `presets/pending/README.md`;
+  - `.claude/skills/preset-author/references/systems.md` and the other preset-author references
+    that list what ships. A headless session cannot write under `.claude/` (ADR-0210), so `dev`
+    lists these hits in the log with the replacement text and the owner applies them. A skill line
+    that cites a preset as a **historical example**, such as the architect skill's step 3b, is a
+    record and stays as written.
 - **Done when:**
   - Each family's cuts land as **one commit per family**, and the message lists the ledger rows it
     executes.
-  - For every cut name, `git grep -n -w <name>` hits only dated records: `docs/plans/**`,
-    `docs/adrs/**`, `docs/design-backlog*.md` and `docs/plans/README-archive.md`.
+  - For every cut name, `git grep -n -w <name>` hits only records and measurements:
+    `docs/plans/**`, `docs/adrs/**`, `docs/design-backlog*.md`, `presets/proposed/ROSTER.md`,
+    `scripts/bench/results/**` (a dated sweep names what it measured), and the `.claude/` lines the
+    log hands to the owner.
   - `cargo nextest run --workspace` is green, **the full run and not `-P fast`**, because the
     gallery-card hygiene test, the representative floor and the distinctness pair counts all live in
     different binaries.
-  - No golden baseline moved. Goldens are decoupled from shipped content (ADR-0022, ADR-0023), so a
+  - No golden baseline moved. Goldens render frozen fixtures, not shipped presets (ADR-0023), so a
     moved golden is a finding to report, not something to re-bless.
   - A test whose meaning depended on a **specific** cut preset (not just any preset of that family)
     is disclosed in the log with the survivor chosen. `dev` does not weaken an assertion to make the
@@ -210,12 +229,14 @@ working surface, and nowhere else fits it better.
 
 - **Owner skill:** human
 - **What:** Author the `native` gaps as one cohort of four to six new presets under ADR-0089's
-  fresh-slate rule, spanning at least two systems.
-- **Files touched:** `presets/*.toml` (new), `scripts/docs-shots.mjs` (`CARDS`), and
-  `docs/images/gallery/presets/*.png` (new cards).
+  fresh-slate rule, spanning at least two systems. Drafts go through `presets/proposed/` and its
+  `ROSTER.md` first, which is that directory's existing route for work awaiting the owner's verdict.
+  Only the keeps move into `presets/`.
+- **Files touched:** `presets/proposed/` (drafts and roster rows), `presets/*.toml` (the keeps),
+  `scripts/docs-shots.mjs` (`CARDS`), and `docs/images/gallery/presets/*.png` (new cards).
 - **Done when:**
-  - Each new preset passes `cargo nextest run -p rlx-core` (the whole package, not a narrowed
-    selection) and carries a gallery card.
+  - Each new preset passes `cargo nextest run --workspace` (`standalone`'s tests read the shipped set
+    too) and carries a gallery card.
   - Each was judged in the running app against the gap it fills.
   - The distinctness report shows **no new near-duplicate flag** pairing a new preset with a
     survivor, or the ledger records that the owner accepted that flag and why.
