@@ -20,7 +20,7 @@
 The studio ships Electron 32 inside its release zip, twelve majors behind, and `npm audit` finds 2
 critical and 14 high advisories in its graph. The cause is that nothing watches the npm graphs, while
 `cargo deny` has watched the Rust one from the start. This plan brings the studio's toolchain and
-runtime current: Electron 44, electron-builder 26, vite 8, vitest 5, eslint 10 with a matching
+runtime current: Electron 44, electron-builder 26, vite 8, vitest 5, eslint 10 (landed on 9.39.5 under the fallback Phase 2 pre-authorised) with a matching
 typescript-eslint (eslint stays on 9.39.5 until `eslint-plugin-react` accepts 10; see the log), and
 the rest of the build and test tooling. It lets npm 11 install Electron's
 binary by naming it. It takes the three Rust pins that trail by a patch or a minor. And it adds the
