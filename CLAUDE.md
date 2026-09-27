@@ -77,6 +77,9 @@ presets/             # The curated preset library (*.toml) — build.rs globs an
     ├── pending/     #   Authored, approved, NOT shipped — held back by a known engine or harness
     │                #   gap, not by the look. build.rs's read_dir is non-recursive (ADR-0022), so
     │                #   a subdirectory is skipped by construction. See its own README.
+    ├── proposed/    #   Authored, NOT judged — drafts awaiting the owner's keep / tune / bin, with
+    │                #   ROSTER.md as the record. The opposite of pending/: that waits on the
+    │                #   engine, this waits on the owner. Skipped by build.rs the same way.
     └── schema/      #   GENERATED editor JSON Schemas, one per system, beside the generic
                      #   preset.schema.json; the root .taplo.toml (also generated) picks one by
                      #   filename family (ADR-0190). Never hand-edited: core/tests/suite/preset_schema.rs
