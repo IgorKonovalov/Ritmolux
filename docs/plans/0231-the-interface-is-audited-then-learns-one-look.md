@@ -1,6 +1,7 @@
 # 0231 — The interface is audited, then learns one look
 
-> **Status:** draft
+> **Status:** approved
+> **Approved:** 2026-09-27 (user) - not in `tools/conductor/queue.json`; Phase 3 is a `human` audit that re-scopes Phases 8, 9 and 11
 > **Created:** 2026-09-27
 > **Owner skill(s):** dev, studio-builder, human
 > **Related ADRs:** [0252](../adrs/0252-the-interfaces-look-is-declared-once-in-the-core-and-the-studios-stylesheet-is-generated-from-it.md) (proposed),

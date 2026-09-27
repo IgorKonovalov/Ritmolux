@@ -49,7 +49,7 @@ place. The plan file carries the real link.
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0230](0230-the-russian-slice-becomes-findable.md) | The Russian slice becomes findable | draft | dev, human | ADR-0213 (proposed): a header `LanguageSelect` override, a `ru` entrance page, `lang="ru"` + hreflang via route middleware (splits Pagefind by language), landing links. Every dev phase builds the site. |
-| [0231](0231-the-interface-is-audited-then-learns-one-look.md) | The interface is audited, then learns one look | draft | dev, studio-builder, human | ADR-0252 (proposed): one theme table in the core, studio CSS generated. Phases 1-2 build captures; Phase 3 audit re-scopes 8, 9, 11. |
+| [0231](0231-the-interface-is-audited-then-learns-one-look.md) | The interface is audited, then learns one look | approved | dev, studio-builder, human | ADR-0252 (proposed): one theme table in the core, studio CSS generated. Phases 1-2 build captures; Phase 3 audit re-scopes 8, 9, 11. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
