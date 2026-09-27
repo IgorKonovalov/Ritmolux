@@ -237,6 +237,10 @@ working surface, and nowhere else fits it better.
 _(Filled by Phase 1; verdicts by Phase 2; commits by Phases 3-4. Columns: preset, family, machine
 flags, verdict, reason, survivor/representative, commit.)_
 
+**Decided before the walk (owner, 2026-09-27):** `attractor_leviathan` and `fragment_tiledmono`
+are `keep`. Phase 1 still gives them rows and flags, and Phase 2 does not re-judge them. A retune
+proposal for either goes back to the owner rather than into Phase 4 on its own.
+
 ## Gaps
 
 _(Filled by Phase 5.)_
@@ -253,11 +257,12 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 - **The walk is long.** One evening per family cluster is realistic, not one evening in total.
   Phase 2 may land in family-sized slices. Phase 3 may start a family once that family's rows are
   all judged, provided the lane state records which families are finished.
-- **A cut preset anchors a test's meaning.** For example, `attractor_leviathan`'s fold-disc history,
-  or `fragment_tiledmono`'s role as a `boundary_floor` anchor in `docs/testing.md`. Re-pointing to a
-  survivor can make a test pass for a different reason. Phase 3's last done-when bullet sends that
-  case back to the owner. The fallback is to keep the anchor preset, which is a legitimate `keep`
-  with the reason written down.
+- **A cut preset anchors a test's meaning.** Re-pointing a test to a survivor can make it pass
+  for a different reason. The two heaviest anchors, `attractor_leviathan` (named in 10 files) and
+  `fragment_tiledmono` (`boundary_floor`'s anchor in `docs/testing.md`), are pre-decided keeps, so
+  they are out of this risk. For any other anchor, Phase 3's last done-when bullet sends the case
+  back to the owner, and keeping the anchor preset is a legitimate `keep` with the reason written
+  down.
 - **An operator loses a favourite on upgrade.** ADR-0253 accepts this. The mark stays in the file
   and does nothing (ADR-0228), so there is no crash and no warning. The release notes for the
   version that closes this plan should list what was retired.
