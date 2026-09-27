@@ -205,6 +205,25 @@ flowchart LR
   `tools/sd-filter/README.md` do not mention `--timeline` or `--bar-grid`. Neither file is in
   either phase's file list.
 
+- **Phase 3, the short clip, 2026-09-27** (rendered by a session at the owner's request; the verdict
+  is the owner's). 24 s of *Yes, I Know* (0:30-0:54), 48 kHz, `star_rosewindow`,
+  `--fps 30 --size 1920x1080 --tier rich`, `--profile fast`, seed 1234, the timeline
+  `at_bar 2` *"a stained glass cathedral rose window"* -> `at_bar 13` *"a frozen crystal ice cave,
+  pale blue translucent ice"*. The grid had 14 bars over 720 frames, 2 locked and 12 on the fallback
+  counter, with spacing from 23 to 77 frames. 0.511 s per emitted frame and 3.83 GiB peak on the RTX
+  3080 Laptop. **The first and last frames show the two prompts' difference over one geometry**: a red
+  and violet leaded rose window, then a pale blue ice cave, on the same star. **Mid-blend (frames 180
+  and 360) the frame is neither**: dark grey vaulting in neither prompt's palette. Whether that reads
+  as a transition or as ADR-0236's "crossfade between two wrong images" is for the owner's verdict.
+  Stills are `target/p0212/first_last.png` and `strip.png` in the main checkout, uncommitted.
+- **Finding, the documented pipeline races on a fresh grid path.** With `docs/capturing.md`'s
+  command, `sd_filter.py --bar-grid` starts at the same moment as `shot` in the pipe and reads the
+  file at startup. `shot` writes it only after its analyzer walk, so the first run exits with
+  *"--bar-grid ...: No such file or directory"* and ffmpeg sees no stream. The same command succeeds
+  once a previous run has left the file. It is reproducible on any path that does not exist yet. The
+  fix is on the sidecar's side (read the grid after the first frame arrives, or wait for the file) or
+  a documented two-step, and it is not repaired here.
+
 ### Close triggers
 
 - **`presets/` touched:** no
