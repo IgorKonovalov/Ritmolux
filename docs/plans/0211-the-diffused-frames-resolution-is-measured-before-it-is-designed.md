@@ -162,9 +162,9 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the pair nobody has rendered | dev | committed with this row | |
-| 2 — the verdict | human | not started | |
-| 3 — the uncosted route gets a number | dev | not started | |
+| 1 — the pair nobody has rendered | dev | done | 2be319f4 |
+| 2 — the verdict | human | done | committed with this row |
+| 3 — the uncosted route gets a number | dev | done - not run: Phase 2 closed the plan | committed with this row |
 
 ### Notes
 
@@ -189,15 +189,20 @@ flowchart TB
   `crop_t{4,12,20}.png` put 640x540 centre crops at 1:1 side by side, `fast` on the left. The clips
   are `fast.mp4` and `quality.mp4` beside them.
 
+- **Phase 2 verdict, 2026-09-27 (owner):** *"quality are fine"*: **`quality` answers it.** Per the
+  phase's own done-when the plan closes here and Phase 3 does not run. What stays open is the
+  followup below: which profile `docs/diffusion-filter.md` documents as the default, given that
+  `quality` measured about 5.5x `fast`'s time per frame on this clip.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** none — see `**Takes:**`; backlog 0125 stays live until Phase 2's verdict
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** docs-chore-only: a measurement and a verdict, no code
+- **Operator docs touched:** none
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0; 47 stated reductions hold across 23 live entries, 4 unprobeable
+- **Full suite:** not run: no code, test or preset changed. Owed to the conductor's pre-review gate if it runs one
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
 
