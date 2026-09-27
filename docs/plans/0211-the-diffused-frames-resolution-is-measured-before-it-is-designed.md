@@ -1,6 +1,6 @@
 # 0211 — The diffused frame's resolution is measured before it is designed
 
-> **Status:** in-progress
+> **Status:** approved
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user) — approved and deliberately NOT in `tools/conductor/queue.json`
 > **Owner skill(s):** dev, human
