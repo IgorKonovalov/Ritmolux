@@ -43,6 +43,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0260 — a thumbnail's stamp carries no build identity, so an upgrade never re-renders a picture the engine now draws differently](#0260--a-thumbnails-stamp-carries-no-build-identity-so-an-upgrade-never-re-renders-a-picture-the-engine-now-draws-differently)
 - [0261 — the thumbnail child picks its own GPU, and on a hybrid laptop the pass moved the show's frame-time tail](#0261--the-thumbnail-child-picks-its-own-gpu-and-on-a-hybrid-laptop-the-pass-moved-the-shows-frame-time-tail)
 - [0262 — the diffusion filter's cost page reads 2.5x what `quality` measured on Linux, and nothing says which profile a reader should start from](#0262--the-diffusion-filters-cost-page-reads-25x-what-quality-measured-on-linux-and-nothing-says-which-profile-a-reader-should-start-from)
+- [0263 — the conductor reads a `not run` log row as unfinished, so a phase whose done-when was not to run parks its plan as a disagreement](#0263--the-conductor-reads-a-not-run-log-row-as-unfinished-so-a-phase-whose-done-when-was-not-to-run-parks-its-plan-as-a-disagreement)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1775,3 +1776,30 @@ are documentation:
   `present: rendering .attractor_leviathan. at 1920x1080 in: docs/diffusion-filter.md`
 - **Verified 2026-09-27** — the page leads with `quality` by example:
   `present: --profile quality --prompt in: docs/diffusion-filter.md`
+
+## 0263 — the conductor reads a `not run` log row as unfinished, so a phase whose done-when was not to run parks its plan as a disagreement
+
+In [Plan 0226](plans/done/0226-the-conductor-stops-waiting-for-the-owner.md)'s pilot run (started
+2026-09-26 16:50 UTC), 0202 parked `disagreement` after its amended Phase 3 landed:
+*"implement 2-3: the log does not mark Phase 2 done; log row for Phase 2 names 09be6b65, not a commit
+this step made"*. Phase 2's done-when said the phase does not run if Phase 1 falsified its candidate.
+Phase 1 had falsified it, and the log row honestly read `not run: Phase 1 falsified the candidate`.
+`rowIsDone` in `tools/conductor/lib/plan.mjs` accepts only a state beginning `done`, or
+`committed with this row`. So on resume the conductor handed the session "2-3", re-verified Phase 2
+against that step's commits, and parked. The owner reworded the row to `done - not run: ...`
+(`941941be`) and resumed.
+
+That is the only park of the pilot's ten that the pipeline should have absorbed. The other nine were
+judgements it could not make (two `plan_wrong`, a `stop_condition`, three `human_phase`), an edit
+under `.claude/` (`claude_dir`), a dirty main (`main_dirty`), and a red close gate (`check_red`) that
+the gate refuses to retry by design, the flake itself being backlog 0219. The shape recurs: closed
+plans already carry `not run` rows written by hand. So the next plan with a conditional phase parks
+the same way unless its implementer happens to spell the row `done - ...`.
+
+- **Raised:** 2026-09-27 by `architect`, recording Plan 0226 Phase 7's pilot readings. **Owner if
+  taken:** `dev` for `rowIsDone`, or `architect` if the answer is instead a rule that a skipped phase
+  writes `done - not run`.
+- **Verified 2026-09-27** — `rowIsDone` has no case for a skipped phase:
+  `absent: not run in: tools/conductor/lib/plan.mjs`
+- **Verified 2026-09-27** — the predicate is where the entry says:
+  `present: export function rowIsDone in: tools/conductor/lib/plan.mjs`
