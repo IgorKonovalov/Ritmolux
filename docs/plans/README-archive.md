@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0211 - The diffused frame's resolution is measured before it is designed](#0211---the-diffused-frames-resolution-is-measured-before-it-is-designed)
   - [0208 - The conductor's safety claims get their evidence](#0208---the-conductors-safety-claims-get-their-evidence)
   - [0209 - A system joins the instruments by existing](#0209---a-system-joins-the-instruments-by-existing)
   - [0223 - The heavy presets fit the integrated GPU](#0223---the-heavy-presets-fit-the-integrated-gpu)
@@ -266,6 +267,25 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0211 - The diffused frame's resolution is measured before it is designed](done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)
+
+- closed 2026-09-27, conductor-run close of lane `plan-0211-the-diffused-frames-resolution-is-measured-before-it-is-designed`.
+Phase 1 `2be319f4` (the readings) and Phase 2 `06e20dec` (the owner's verdict) ran interactively on
+`main`, because the sidecar needs the CUDA `.venv`. Phase 3 did not run, by the plan's own terms.
+Round 1 review: **no blockers, no majors, three minors**. Minors 1 and 2 were repaired at the close in
+`7af1efc5`, and minor 3 (the log outweighs the phases) needs no repair. Version: **none**
+(docs/chore-only: a measurement and a verdict, no code). No ADR was written or owed, and ADR-0121
+stands unreopened. Closes backlog 0125 and files its residue as backlog 0262. Upstream CI read green
+at the close. The full review is the plan's own `## Close review` section.
+- **What landed.** A matched pair of the same 24 s clip of `star_rosewindow`, rendered at both
+  profiles on one build and one machine: `fast` at 0.554 s and `quality` at 3.065 s per emitted frame,
+  about 5.5x. The owner's verdict was *"quality are fine"*, so the resolution ask was a profile
+  default and not a wall.
+- **Open.** Backlog 0262 covers two things. The first is which profile `docs/diffusion-filter.md`
+  leads with. The second is that the page's cost table was measured on Windows with another preset
+  and reads about 2.5x this box's `quality` figure. Translation advisory: see the close's
+  `check-translations.mjs` run; this plan moved no English source.
 
 ### [0208 - The conductor's safety claims get their evidence](done/0208-the-conductors-safety-claims-get-their-evidence.md)
 

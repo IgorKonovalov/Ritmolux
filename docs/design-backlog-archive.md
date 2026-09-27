@@ -16291,7 +16291,7 @@ its price against inferred detail. This verdict does not obviously overturn that
 *more* detail, and an upscaler infers rather than generates — but it does mean the rejection was
 made before anyone had watched five minutes of output. A tiled or multi-pass approach that
 *generates* at higher resolution is the option neither the ADR nor the plan has costed.
-- **PARTLY TAKEN 2026-09-19 -> [Plan 0211](plans/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)**,
+- **PARTLY TAKEN 2026-09-19 -> [Plan 0211](plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)**,
   which takes the *measurement* this entry asks for before any design: a matched pair of the same clip
   at both budgets, then the owner's verdict. **This entry stays live because the verdict is what
   decides whether anything is owed** — if `quality` answers the ask, what was filed as a wall was a

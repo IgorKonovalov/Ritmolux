@@ -161,7 +161,7 @@ flowchart LR
 ## What this plan does NOT do
 
 - **It does not raise the resolution.** That is backlog 0125 and
-  [Plan 0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md). Backlog 0126
+  [Plan 0211](done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md). Backlog 0126
   forbids folding them: *"one is a pixel budget against a VRAM wall, the other is a timeline the pipeline
   does not have."*
 - **It does not unfix or step the seed**, and it does not drive denoise from the onset envelope — that

@@ -1,12 +1,12 @@
 # 0211 — The diffused frame's resolution is measured before it is designed
 
-> **Status:** approved
+> **Status:** done - closed 2026-09-27 by a conductor-run close. Phase 1 `2be319f4`, Phase 2 `06e20dec` (the owner's verdict: `quality` answers it), Phase 3 not run by the plan's own terms. Round 1 review: no blockers, no majors, three minors (two fixed at the close). Version: none. Backlog 0125 archived; its residue is backlog 0262.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user) — phases 1-2 run interactively on main; queued in tools/conductor/queue.json 2026-09-27 for its review and close only
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md),
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md),
-> [0122](../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)
+> **Related ADRs:** [0121](../../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md),
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md),
+> [0122](../../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)
 > **Takes:** design-backlog 0125. The entry stays live until Phase 2's verdict, which is what decides
 > whether anything further is owed.
 
@@ -21,7 +21,7 @@ costed. The first deliverable is a pair of pictures, not a design.
 
 ## Context & problem
 
-**The ask.** At [Plan 0106](done/0106-the-frame-stream-passes-through-a-diffusion-model.md)'s Phase 6 human gate on
+**The ask.** At [Plan 0106](0106-the-frame-stream-passes-through-a-diffusion-model.md)'s Phase 6 human gate on
 2026-08-25, on a full-track render of `star_rosewindow`: *"it would obviously be great if resolution
 would be higher"* (backlog 0125).
 
@@ -43,7 +43,7 @@ is worth writing until that share is known.
   correction Plan 0106 Phase 7d applies to that figure.
 
 **And there is a decision in the way.**
-[ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)'s
+[ADR-0121](../../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)'s
 Alternative C is *diffuse at a smaller budget and upscale*, measured as the cheaper route and **rejected
 by you in that design interview**, on the ground that generated detail is worth its price against
 inferred detail. This verdict does not obviously overturn that — the ask is for *more* detail and an
@@ -91,7 +91,7 @@ flowchart TB
 - **Done when:** a matched pair exists at 262,144 px and 589,824 px from **one build, one machine, one
   seed, one prompt and one preset**, minutes apart, so the two are comparable to each other rather than
   to a cross-build figure — the discipline
-  [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) and
+  [ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) and
   Plan 0147 Phase 6 both apply. The measured s/frame at each budget is recorded beside the machine and
   GPU that produced it, and the log states the extrapolated cost of a 4-minute track at each. Use
   `star_rosewindow`, the preset the verdict was given on. A clip long enough to judge and short enough to
@@ -142,7 +142,7 @@ flowchart TB
 ## What this plan does NOT do
 
 - **It does not add variety across a track.** That is backlog 0126 and
-  [Plan 0212](0212-the-diffused-render-gains-a-timeline.md), and 0126 says why they must not be folded
+  [Plan 0212](../0212-the-diffused-render-gains-a-timeline.md), and 0126 says why they must not be folded
   together: *"one is a pixel budget against a VRAM wall, the other is a timeline the pipeline does not
   have."*
 - **It does not reopen ADR-0121's Alternative C.** It produces the evidence that decision needs. The ADR
@@ -204,9 +204,121 @@ flowchart TB
 - **Full suite:** not run: no code, test or preset changed. Owed to the conductor's pre-review gate if it runs one
 - **Outstanding `human` phases:** none
 
+## Close review
+
+The conductor-run review of round 1 follows in full, as written to its review path, with its
+headings moved down two levels to sit under this one. No earlier round exists, so no finding was
+resolved by a fix round.
+
+**At the close (2026-09-27):** minors 1 and 2 were repaired in `7af1efc5`. Backlog 0125 moved to the
+archive with a `CLOSED` marker and a `### Closed` ledger row, and its residue was filed live as
+backlog 0262, which also carries the cost-table disagreement the review noted. The `Approved:` line now
+names the queue entry. Minor 3 (the log outweighs the phases) needs no repair and has none. The
+upstream CI read green: run 36297464014 on `main` at `4ffed87`. Version: none. The plan is
+docs/chore-only, a measurement and a verdict with no code.
+
+### Plan 0211 — Mode 4 review, round 1
+
+Graded at tip `55e414057be238aef44532cf862e4f77409d647b` on branch
+`plan-0211-the-diffused-frames-resolution-is-measured-before-it-is-designed`.
+
+**Verdict: Plan 0211 landed cleanly. No blockers, no majors, three minors.** The plan did what it
+said it would: it measured the pair before designing anything, and the owner's Phase 2 verdict
+(*"quality are fine"*) ended it by the plan's own terms, so Phase 3 correctly never ran.
+
+#### What was checked
+
+- **Commits.** The lane carries nothing beyond `main`. The plan's work is four commits already on
+  `main`: `2be319f4` (Phase 1 readings), `06e20dec` (Phase 2 verdict + close block), `4ffed870`
+  (queue entry) and `55e41405` (status line). Every one touches only the plan or
+  `tools/conductor/queue.json`. No code, test, preset, schema or operator doc changed.
+- **Owner tags.** All three phases carry one in-vocabulary `**Owner skill:**` (`dev`, `human`, `dev`).
+  No `Blocks merge:` field anywhere.
+- **Phase 1 done-when, against the log.** One `shot` build (`c1fe3eae`), one machine (the Arch box, an
+  RTX 3080 Laptop 8 GB, driver 610.57.04), one `.venv`/torch, seed 1234, one prompt, preset
+  `star_rosewindow`. The runs went back to back (23:38 and 23:45). The clip length is named (24 s,
+  720 frames). s/frame is recorded at both budgets beside the machine, and so is the 4-minute
+  extrapolation. I checked the arithmetic: 0.554 x 7200 = 3,989 s, about 66 min; 3.065 x 7200 =
+  22,068 s, about 6.1 h; the ratio is 5.53x, which the log rounds to "about 5.5x". The `fast` row
+  reports 261,120 px, which is what the 262,144 budget actually yields at 680x384. That is correct and
+  better than repeating the budget. The log also discloses that the two profiles differ in stride and
+  feedback as well as pixels, so the pair is not a pure resolution comparison. That is honest, and the
+  profile table in `docs/diffusion-filter.md:109-116` confirms it (`--stride 1/3`, `--feedback 0.6/0.4`).
+- **Phase 2.** The log records one of the three allowed verdicts, verbatim and dated: *`quality`
+  answers it*.
+- **Phase 3.** It was not run and says why. That is the plan's designed outcome ("This phase may end
+  the plan, and that is a success").
+- **ADR discipline.** No ADR was written and none is owed. The plan says the ADR reopening ADR-0121
+  Alternative C comes only after Phase 3, and Phase 3 did not run. ADR-0121 stands unreopened.
+- **Figures discipline (ADR-0122, `check-filter-figures.mjs`).** The new figures live only in the
+  plan log. That file is a dated record, which the gate deliberately exempts
+  (`scripts/check-filter-figures.mjs:110`). No second copy appeared in a reader doc.
+- **Lenses 2, 4 and 5** (layering, real-time safety, determinism, seams) have nothing to grade,
+  because no source changed.
+- **Full suite.** Run in this session through the lock wrapper, as exactly
+  `node ".../with-lock.mjs" suite -- cargo nextest run --workspace`. It ran rather than skipping:
+  `Summary [ 538.853s] 1858 tests run: 1858 passed (14 slow), 7 skipped`;
+  `with-lock: "suite" waited 0.0s, held 539.4s`. The log's `Full suite:` bullet deferred this run to
+  the conductor, which is correct in conductor mode.
+- **Rustdoc.** `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` passed with no warnings.
+- **Tree.** Clean before and after. Nothing was committed.
+
+#### Findings
+
+##### minor
+
+1. **`docs/design-backlog.md:1161` — backlog 0125 is live with a bullet the verdict has now
+   answered.** The entry's `PARTLY TAKEN` bullet says it *"stays live because the verdict is what
+   decides whether anything is owed"*. The verdict is in: `quality` answers it, so what was filed as a
+   wall was a profile default. The close block's `Closes: none` could let the close ceremony skip
+   step 3c. Left as it is, the live file keeps an entry whose question is settled, and the one real
+   residue has no live carrier once the plan moves to `done/`: which profile
+   `docs/diffusion-filter.md` documents as the default, given the measured 5.5x cost. **Fix at close
+   (Markdown, close-repairable):**
+   - Append a dated `CLOSED 2026-09-27 by Plan 0211's Phase 2 verdict` bullet to 0125.
+   - Move the body verbatim to `docs/design-backlog-archive.md` with a `### Closed` row.
+   - Remove its contents row, and re-run `toc.mjs` and `check-backlog-claims.mjs`.
+   - File the residue as a new live entry, or state in the close notes that the plan's
+     `## Followups` is its only carrier.
+
+   One thing worth putting into that residue: the canonical page's `What it costs` table
+   (`docs/diffusion-filter.md:138-139`) was measured on Windows with `attractor_leviathan` and reads
+   7.781 s per emitted frame at `quality`. This plan measured 3.065 s on the same GPU model on Linux
+   with `star_rosewindow`. Both are honest, machine-named measurements, but a reader choosing a
+   default from that page sees roughly 2.5x the cost this box just measured.
+2. **`docs/plans/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md:5` — the
+   header's `Approved:` line is stale.** It reads *"approved and deliberately NOT in
+   `tools/conductor/queue.json`"*, but `4ffed870` queued the plan there for this review and close.
+   **Fix at close (close-repairable):** replace the line with
+   `> **Approved:** 2026-09-19 (user) — phases 1-2 run interactively on main; queued in tools/conductor/queue.json 2026-09-27 for its review and close only`.
+3. **The `## Implementation log` outweighs `## Implementation phases`: 3,180 bytes against 2,900
+   bytes.** Lens 1 makes this a minor. It is mitigated: Phase 1's `Files touched` names the log as
+   the phase's output, and most of the excess is the measurement table that the done-when asks for.
+   **No repair is expected.** This entry records it rather than excusing it.
+
+#### Bookkeeping owed at the close
+
+- **Version bump: none.** The plan is docs/chore-only (a measurement and a verdict, no code), and
+  ADR-0005's "none" is the deliberate call here.
+- **No paired ADR** to accept.
+- **Operator docs:** no sweep owed. Nothing a user observes changed, and moving the default profile
+  is explicitly out of scope.
+- **`presets/` not touched:** step 3b is not triggered.
+- **Steps 1-1e, 3, 3d as usual:**
+  - Flip `Status:` to `done` and `git mv` the plan to `docs/plans/done/`.
+  - Re-point the inbound link at `docs/design-backlog.md:1161` (or at its archived copy) and the
+    plan's outbound `../adrs/` and `done/` links. Also its sibling link to Plan 0212, which becomes
+    `../0212-...` if 0212 is still active.
+  - Run `check-doc-links.mjs`, `check-backlog-claims.mjs`, `check-index-rows.mjs`,
+    `check-translations.mjs` and `toc.mjs`.
+  - Refresh `docs/plans/README.md`, with the archive write-up first.
+- **Close review section:** this review goes into the plan's `## Close review`. No earlier rounds
+  exist.
+
 ## Followups (after this lands)
 
 - If Phase 2 says `quality` answers the ask, which profile is the documented default — and what
-  `docs/diffusion-filter.md` says the cost of that default is — is the remaining question.
+  `docs/diffusion-filter.md` says the cost of that default is — is the remaining question. It did,
+  and the question is live as backlog 0262.
 - If Phase 3 shows tiling is affordable, whether the picture survives the seams is the next rendered
   pair, and the ADR reopening ADR-0121 Alternative C follows it.
