@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0253.** *(0120 was reserved for
+**Next free number: 0254.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -109,7 +109,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0086](0086-the-backdrop-colours-through-the-preset-palette.md) | The backdrop colours through the preset's palette | accepted (Outcome) |
 | [0087](0087-the-ifs-particle-carries-its-age-and-its-last-map.md) | The IFS particle carries its age and its last map, and respawns onto the attractor | accepted 2026-08-06 (Plan 0073; Outcome) |
 | [0088](0088-the-ifs-colours-by-distance-from-its-own-skeleton.md) | The IFS colours by distance from its own skeleton, and the age channel is retired | accepted 2026-08-08 (Plan 0074; Outcome) |
-| [0089](0089-the-library-renews-by-replacement-cohorts.md) | 0089 — The library renews by replacement cohorts, never by a delete-all reset | accepted 2026-08-09 |
+| [0089](0089-the-library-renews-by-replacement-cohorts.md) | 0089 — The library renews by replacement cohorts, never by a delete-all reset | accepted 2026-08-09; amended by 0253 (proposed) |
 | [0090](0090-a-preset-composes-two-scene-layers.md) | 0090 — A preset composes two scene layers: a per-preset join point, linear-light blend at the `over` join, per-layer scene instances | accepted 2026-08-09 |
 | [0091](0091-the-animation-gate-scores-motion-against-the-figures-footprint.md) | The animation gate scores motion against the figure's own footprint | accepted 2026-08-11 (Plan 0077; Outcome) |
 | [0092](0092-the-ink-remap-gains-a-contrast-exponent.md) | The ink remap gains a contrast exponent | accepted 2026-08-11 (Plan 0078; Outcome) |
@@ -274,4 +274,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0250](0250-the-conductor-stays-up-and-resumes-what-the-repository-shows-settled.md) | The conductor stays up, waits instead of stopping, and resumes what the repository shows settled | accepted 2026-09-24, Plan 0226; amends 0205, 0214, 0219 |
 | [0251](0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md) | A gated compile path has a named job, and the upstream reading is advisory | accepted 2026-09-24, Plan 0227; generalises 0181 |
 | [0252](0252-the-interfaces-look-is-declared-once-in-the-core-and-the-studios-stylesheet-is-generated-from-it.md) | The interface's look is declared once in the core, and the studio's stylesheet is generated from it | proposed 2026-09-27, Plan 0231 |
+| [0253](0253-a-retirement-may-land-ahead-of-its-replacement-when-a-walk-convicts-it.md) | A retirement may land ahead of its replacement when a walk convicts it | proposed 2026-09-27, Plan 0232; amends 0089 |
 <!-- roster:end -->
