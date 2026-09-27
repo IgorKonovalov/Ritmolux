@@ -1,7 +1,8 @@
 # 0232 — The library is walked, cut and refilled
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-27
+> **Approved:** 2026-09-27 (user)
 > **Owner skill(s):** human (the `preset-author` lane and the owner), dev
 > **Related ADRs:** [0253](../adrs/0253-a-retirement-may-land-ahead-of-its-replacement-when-a-walk-convicts-it.md)
 > (proposed), [0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md),

@@ -3,6 +3,9 @@
 > **Maintained by:** `architect`. **Read by:** `preset-author`.
 > **Last consolidated:** 2026-08-13, from five `human` phases spread across five closed plans.
 
+**Taken by [Plan 0232](plans/0232-the-library-is-walked-cut-and-refilled.md) (approved 2026-09-27):**
+every item below is answered in its walk (Phase 2) or its retunes (Phase 4), and leaves for `Done` there.
+
 This is the **one** copy. [`docs/plans/README.md`](plans/README.md)'s `Standing` section points here
 rather than restating, because a duty recorded in two places drifts in one of them — which is the
 failure this file exists to stop.
