@@ -300,6 +300,7 @@ accepted cost" are different documents and only one of them is honest.
 - [0254 — every gallery card is captured at hop 300, which is before an accumulating world exists](#0254--every-gallery-card-is-captured-at-hop-300-which-is-before-an-accumulating-world-exists)
 - [0255 — `docs-shots.mjs` renders all or nothing, so adding one card is done by hand-copying its manifest entry](#0255--docs-shotsmjs-renders-all-or-nothing-so-adding-one-card-is-done-by-hand-copying-its-manifest-entry)
 - [0258 — the content lane's scene catalogue covers ten of fourteen systems, and nothing makes it notice the four it skipped](#0258--the-content-lanes-scene-catalogue-covers-ten-of-fourteen-systems-and-nothing-makes-it-notice-the-four-it-skipped)
+- [0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution](#0125--every-diffused-frame-is-an-upscale-both-profiles-diffuse-well-below-the-streams-own-resolution)
 <!-- toc:end -->
 
 ## The ledger
@@ -632,6 +633,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0236 | The `.claude/` park reads a phase's declared `Files touched`, and prose escapes it | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 5. A drafting gate; closed plans are an advisory. **Closed 2026-09-27** |
 | 0237 | The allowlist bounds a deletion by literal path shapes, so an expansion escapes the lane | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 3 + ADR-0233. `$` and backtick probed; `Remove-Item` modelled. **Closed 2026-09-27** |
 | 0241 | The allowlist is asserted against a model of the CLI's matcher, which one run falsified | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phases 1-2 + ADR-0233. Deny cases rest on a transcript. **Closed 2026-09-27** |
+| 0125 | Every diffused frame is an upscale: both profiles diffuse well below the stream's resolution | [Plan 0211](plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) Phases 1-2. `quality` answers it; the residue is 0262. **Closed 2026-09-27** |
 <!-- roster:end -->
 
 ---
@@ -16248,3 +16250,59 @@ Phases 4 and 5 + [ADR-0234](adrs/0234-an-instruments-system-roster-is-derived-fr
 distilled from the shipped presets. The architect sweep row asked for above is **not** added: the
 close cannot edit `.claude/`, so it is the owner's (Plan 0209's close review, minor 2), and until it
 lands the mechanism this entry named is still missing.
+
+---
+
+## 0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution
+
+**Raised by:** the user, at Plan 0106's Phase 6 human gate (2026-08-25), on a full-track render of
+`star_rosewindow` — *"it would obviously be great if resolution would be higher"*. **Owner if
+taken:** `architect` — it reopens a clause ADR-0121 recorded as deliberately rejected, so it is an
+ADR question before it is a code one.
+
+- **Verified 2026-08-25** — the shipping `quality` profile diffuses at a 589,824 px budget, which is
+  28 % of a 1920x1080 frame, so every output pixel is resampled up:
+  `present: "size": "589824" in: tools/sd-filter/sd_filter.py`
+
+### The finding
+
+The clip that drew the verdict was rendered at **`fast`** — a 262,144 px budget, **680x384** at
+16:9 — and resampled to 1920x1080. `quality` is 1024x576, **2.25x the pixels**, and *has never been
+rendered on a real track*. So an unknown and possibly large share of this complaint is a profile
+choice rather than a wall, and **the cheap first move is a side-by-side still at both budgets**, not
+a design.
+
+What is genuinely walled, and why this is not simply "raise the budget":
+
+- **SD1.5 duplicates or mirrors content above roughly 768²** — its native-resolution artifact, named
+  in Plan 0106 Phase 1's traps. Raising the budget does not scale smoothly into it.
+- **SDXL plus ControlNet is ~7.5 GB against an 8 GB card**, and the spike already peaks at 5.68 GB
+  with two ControlNets loaded. Offloading fixes the memory and ruins the throughput over thousands
+  of frames, which Phase 1 also measured.
+- **Cost scales with pixels.** Phase 2b measured 2.721 s/frame at 589,824 px against roughly a third
+  of that at 262,144. A 4-minute track at `quality` already measures ~5.9 h *before* the 1.406x
+  scope correction Plan 0106 Phase 7d applies to that figure.
+
+**The tension worth surfacing before anyone designs.**
+[ADR-0121](adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)'s
+Alternative C is *diffuse at a smaller budget and upscale*, measured as the cheaper route and
+**rejected by this same user in the design interview**, on the ground that generated detail is worth
+its price against inferred detail. This verdict does not obviously overturn that — the ask is for
+*more* detail, and an upscaler infers rather than generates — but it does mean the rejection was
+made before anyone had watched five minutes of output. A tiled or multi-pass approach that
+*generates* at higher resolution is the option neither the ADR nor the plan has costed.
+- **PARTLY TAKEN 2026-09-19 -> [Plan 0211](plans/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)**,
+  which takes the *measurement* this entry asks for before any design: a matched pair of the same clip
+  at both budgets, then the owner's verdict. **This entry stays live because the verdict is what
+  decides whether anything is owed** — if `quality` answers the ask, what was filed as a wall was a
+  profile default and the residue is a documentation change; if it does not, the tiled route nobody has
+  costed is Phase 3 and an ADR reopening ADR-0121's Alternative C follows the plan rather than
+  preceding it.
+- **Moved to the archive 2026-09-27 at Plan 0211's close.** The entry was taken but never promoted,
+  so it left the live file when the plan closed rather than when it was approved.
+
+**CLOSED 2026-09-27 by Plan 0211's Phase 2 verdict.** The matched pair at both budgets was rendered on
+one machine. The owner's verdict was *"quality are fine"*: `quality` answers the ask, so what was
+filed as a wall was a profile default. Phase 3's tiled route was not run, and ADR-0121's Alternative
+C was not reopened. The residue is documentation: which profile `docs/diffusion-filter.md` leads
+with, and a cost table measured on another OS with another preset. It is live as backlog 0262.

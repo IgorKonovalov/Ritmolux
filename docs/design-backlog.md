@@ -31,7 +31,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0094 — the `frame_ms_p99` tail is not switch-correlated, so the steady-state column does not remove it](#0094--the-frame_ms_p99-tail-is-not-switch-correlated-so-the-steady-state-column-does-not-remove-it)
 - [0108 — the conversion tail: HLSL arrays (~71 files) and 218 MD2 presets that convert but render blank](#0108--the-conversion-tail-hlsl-arrays-71-files-and-218-md2-presets-that-convert-but-render-blank)
 - [0109 — disk textures are 88.7 % of every MilkDrop conversion failure, and the exclusion's trigger condition is already met](#0109--disk-textures-are-887--of-every-milkdrop-conversion-failure-and-the-exclusions-trigger-condition-is-already-met)
-- [0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution](#0125--every-diffused-frame-is-an-upscale-both-profiles-diffuse-well-below-the-streams-own-resolution)
 - [0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device](#0154--a-swap-spawns-a-thread-that-creates-a-com-object-and-one-activation-in-22-failed-with-regdb_e_classnotreg-where-the-retry-budget-cannot-tell-that-from-a-dead-device)
 - [0165 - the windowed app cannot ask for the discrete GPU, so every windowed frame-time figure this project has quoted is an integrated-GPU figure](#0165---the-windowed-app-cannot-ask-for-the-discrete-gpu-so-every-windowed-frame-time-figure-this-project-has-quoted-is-an-integrated-gpu-figure)
 - [0187 — two measurements of the same console on the same adapter class disagree by 2x, and nothing explains which one the machine actually does](#0187--two-measurements-of-the-same-console-on-the-same-adapter-class-disagree-by-2x-and-nothing-explains-which-one-the-machine-actually-does)
@@ -43,6 +42,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0259 — the attractor rasterizes 600 000 sprites a frame, and a compute scatter would cut that term tenfold at the price of the look](#0259--the-attractor-rasterizes-600-000-sprites-a-frame-and-a-compute-scatter-would-cut-that-term-tenfold-at-the-price-of-the-look)
 - [0260 — a thumbnail's stamp carries no build identity, so an upgrade never re-renders a picture the engine now draws differently](#0260--a-thumbnails-stamp-carries-no-build-identity-so-an-upgrade-never-re-renders-a-picture-the-engine-now-draws-differently)
 - [0261 — the thumbnail child picks its own GPU, and on a hybrid laptop the pass moved the show's frame-time tail](#0261--the-thumbnail-child-picks-its-own-gpu-and-on-a-hybrid-laptop-the-pass-moved-the-shows-frame-time-tail)
+- [0262 — the diffusion filter's cost page reads 2.5x what `quality` measured on Linux, and nothing says which profile a reader should start from](#0262--the-diffusion-filters-cost-page-reads-25x-what-quality-measured-on-linux-and-nothing-says-which-profile-a-reader-should-start-from)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1120,52 +1120,6 @@ interview rather than a phase.
 
 ---
 
-## 0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution
-
-**Raised by:** the user, at Plan 0106's Phase 6 human gate (2026-08-25), on a full-track render of
-`star_rosewindow` — *"it would obviously be great if resolution would be higher"*. **Owner if
-taken:** `architect` — it reopens a clause ADR-0121 recorded as deliberately rejected, so it is an
-ADR question before it is a code one.
-
-- **Verified 2026-08-25** — the shipping `quality` profile diffuses at a 589,824 px budget, which is
-  28 % of a 1920x1080 frame, so every output pixel is resampled up:
-  `present: "size": "589824" in: tools/sd-filter/sd_filter.py`
-
-### The finding
-
-The clip that drew the verdict was rendered at **`fast`** — a 262,144 px budget, **680x384** at
-16:9 — and resampled to 1920x1080. `quality` is 1024x576, **2.25x the pixels**, and *has never been
-rendered on a real track*. So an unknown and possibly large share of this complaint is a profile
-choice rather than a wall, and **the cheap first move is a side-by-side still at both budgets**, not
-a design.
-
-What is genuinely walled, and why this is not simply "raise the budget":
-
-- **SD1.5 duplicates or mirrors content above roughly 768²** — its native-resolution artifact, named
-  in Plan 0106 Phase 1's traps. Raising the budget does not scale smoothly into it.
-- **SDXL plus ControlNet is ~7.5 GB against an 8 GB card**, and the spike already peaks at 5.68 GB
-  with two ControlNets loaded. Offloading fixes the memory and ruins the throughput over thousands
-  of frames, which Phase 1 also measured.
-- **Cost scales with pixels.** Phase 2b measured 2.721 s/frame at 589,824 px against roughly a third
-  of that at 262,144. A 4-minute track at `quality` already measures ~5.9 h *before* the 1.406x
-  scope correction Plan 0106 Phase 7d applies to that figure.
-
-**The tension worth surfacing before anyone designs.**
-[ADR-0121](adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)'s
-Alternative C is *diffuse at a smaller budget and upscale*, measured as the cheaper route and
-**rejected by this same user in the design interview**, on the ground that generated detail is worth
-its price against inferred detail. This verdict does not obviously overturn that — the ask is for
-*more* detail, and an upscaler infers rather than generates — but it does mean the rejection was
-made before anyone had watched five minutes of output. A tiled or multi-pass approach that
-*generates* at higher resolution is the option neither the ADR nor the plan has costed.
-- **PARTLY TAKEN 2026-09-19 -> [Plan 0211](plans/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)**,
-  which takes the *measurement* this entry asks for before any design: a matched pair of the same clip
-  at both budgets, then the owner's verdict. **This entry stays live because the verdict is what
-  decides whether anything is owed** — if `quality` answers the ask, what was filed as a wall was a
-  profile default and the residue is a documentation change; if it does not, the tiled route nobody has
-  costed is Phase 3 and an ADR reopening ADR-0121's Alternative C follows the plan rather than
-  preceding it.
-
 ## 0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device
 
 > **Filed 2026-08-28** at the Plan 0130 Mode 4 review, from that plan's own Phase 5 log — an
@@ -1792,3 +1746,29 @@ designed; the first is the cheaper question to answer.
   **Owner if taken:** `dev`, after `architect` picks the move.
 - **Verified 2026-09-26** — the child command carries no adapter flag:
   `absent: --gpu in: standalone/src/thumbs.rs`
+
+## 0262 — the diffusion filter's cost page reads 2.5x what `quality` measured on Linux, and nothing says which profile a reader should start from
+
+[Plan 0211](plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)
+measured the pair backlog 0125 asked for, and the owner's verdict was that `quality` answers the ask
+for more resolution. What was filed as a wall was a profile choice. Two things are left, and both
+are documentation:
+
+- **Which profile the page leads with.** `docs/diffusion-filter.md`'s worked example passes
+  `--profile quality`, and the sidecar has no default profile. So the page makes the choice by
+  example, and it gives no cost argument. On Plan 0211's clip, `quality` cost about 5.5x `fast` per
+  emitted frame: 3.065 s against 0.554 s, or about 6.1 h against 66 min for a 4-minute track.
+- **Which machine the cost table describes.** The page's `What it costs` table was measured on
+  Windows with `attractor_leviathan` and reads 7.781 s per emitted frame at `quality`. Plan 0211
+  measured 3.065 s on the same GPU model on Linux with `star_rosewindow`. Both are honest
+  measurements that name their machine. But a reader choosing a profile from the page sees roughly
+  2.5x the cost this box measured, and nothing says whether the operating system or the preset is
+  responsible for the difference.
+
+- **Raised:** 2026-09-27 by `architect`, at Plan 0211's close (review round 1, minor 1), as the
+  residue of backlog 0125. **Owner if taken:** `architect` for what the page recommends; `dev` for
+  a re-measurement if the page's table is to be re-taken.
+- **Verified 2026-09-27** — the page's cost table was measured on Windows with a different preset:
+  `present: rendering .attractor_leviathan. at 1920x1080 in: docs/diffusion-filter.md`
+- **Verified 2026-09-27** — the page leads with `quality` by example:
+  `present: --profile quality --prompt in: docs/diffusion-filter.md`

@@ -2,7 +2,7 @@
 
 > **Status:** approved
 > **Created:** 2026-09-19
-> **Approved:** 2026-09-19 (user) — approved and deliberately NOT in `tools/conductor/queue.json`
+> **Approved:** 2026-09-19 (user) — phases 1-2 run interactively on main; queued in tools/conductor/queue.json 2026-09-27 for its review and close only
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md),
 > [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md),
