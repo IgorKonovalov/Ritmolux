@@ -383,3 +383,24 @@ GPU-touching tests that ran rather than skipped are all still unread. They arriv
 
 **Phase 2's done-when is met by the same run.** The arm is green on run 36297464014, 2026-09-27.
 Neither repair widened or loosened a platform gate; both passes above record what they changed.
+
+### Phase 3, the release dry run (2026-09-28, triggered and read by an architect session at the owner's request)
+
+**Run [36471874865](https://github.com/IgorKonovalov/Ritmolux/actions/runs/36471874865)**,
+`workflow_dispatch` on `main` at `4ffed870`, concluded **success**.
+
+- **Six build jobs green:** `macos`, `windows`, `linux`, `foobar`, `studio-macos`,
+  `studio-windows`.
+- **Six artifacts, named:** `macos-universal` (8.4 MB), `windows-x64` (4.9 MB), `linux-x64`
+  (5.6 MB), `foobar2000-component` (4.2 MB), `studio-macos-universal` (236.5 MB),
+  `studio-windows-x64` (168.1 MB).
+- **Nothing was published.** The `release` job reads `skipped`, and the newest GitHub Release is
+  still `v0.151.0`.
+- **The count guard was not exercised, and a dispatch cannot exercise it.** The assertion of
+  exactly 5 `.zip` and 1 `.tar.gz` is a step inside the `release` job, which is gated
+  `if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')`. So this done-when
+  clause can never be met by the dry run it names. The guard has run for real on every tag since
+  `v0.148.0`, each publishing six artifacts, which shows it passes a correct release. No run has
+  shown it would refuse one without the Linux tarball, which is the property the clause wanted. That
+  is an architect finding for this plan: reword the clause, or move the per-kind count into a step
+  the dispatch path also runs.
