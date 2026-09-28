@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0212 - The diffused render gains a timeline](#0212---the-diffused-render-gains-a-timeline)
   - [0211 - The diffused frame's resolution is measured before it is designed](#0211---the-diffused-frames-resolution-is-measured-before-it-is-designed)
   - [0208 - The conductor's safety claims get their evidence](#0208---the-conductors-safety-claims-get-their-evidence)
   - [0209 - A system joins the instruments by existing](#0209---a-system-joins-the-instruments-by-existing)
@@ -267,6 +268,25 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0212 - The diffused render gains a timeline](done/0212-the-diffused-render-gains-a-timeline.md)
+
+- closed 2026-09-28, conductor-run close of lane `plan-0212-the-diffused-render-gains-a-timeline`.
+Phase 1 `e245ef72` (the sidecar's `--timeline`), Phase 2 `87242235` (`shot --render --bar-grid` and
+the sidecar's reader), Phase 3 (human) recorded in the log. Two review rounds: round 1 one major and
+four minors, the major and three minors fixed in `68070a57`, `a56d7b21`, `6cb70cc7` and `b56153ec`;
+round 2 **no blockers, no majors, one minor**, repaired at the close in `a2f31c32`. Version:
+**0.152.0** (minor: a feature, in dev tooling only). ADR-0236 accepted, no `Outcome` - the verdict
+was the passing one. Closes backlog 0126. Upstream CI read green at the close. The full review is the
+plan's own `## Close review` section.
+- **What landed.** A prompt timeline of `{at_bar, prompt}` entries whose conditioning interpolates
+  between neighbours, the seed fixed; a bar grid `shot` writes from the analyzer's own walk over the
+  frames it renders, read by the sidecar once the Y4M header arrives and held to the stream's rate.
+  The owner judged the full-track render: *"it looks great, amazing really"*.
+- **Open.** The grid's bars are the right length and not reliably on the music's bar 1 - evidence
+  for backlog 0042, not against ADR-0236. Authoring a timeline has no tooling. Translation advisory
+  at the close: `how-it-works.ru.md`, `running.ru.md` and the foobar `READ-ME-FIRST.ru.md` have moved
+  sources; this plan moved none of them.
 
 ### [0211 - The diffused frame's resolution is measured before it is designed](done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)
 

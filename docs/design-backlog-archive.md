@@ -329,7 +329,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0126 | A render is one prompt, one seed and one preset from first frame to last | [Plan 0212](plans/0212-the-diffused-render-gains-a-timeline.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -634,6 +633,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0237 | The allowlist bounds a deletion by literal path shapes, so an expansion escapes the lane | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 3 + ADR-0233. `$` and backtick probed; `Remove-Item` modelled. **Closed 2026-09-27** |
 | 0241 | The allowlist is asserted against a model of the CLI's matcher, which one run falsified | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phases 1-2 + ADR-0233. Deny cases rest on a transcript. **Closed 2026-09-27** |
 | 0125 | Every diffused frame is an upscale: both profiles diffuse well below the stream's resolution | [Plan 0211](plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) Phases 1-2. `quality` answers it; the residue is 0262. **Closed 2026-09-27** |
+| 0126 | A render is one prompt, one seed and one preset from first frame to last | [Plan 0212](plans/done/0212-the-diffused-render-gains-a-timeline.md) + ADR-0236. A prompt timeline in bars; the owner judged it reads. **Closed 2026-09-28** |
 <!-- roster:end -->
 
 ---
@@ -15824,9 +15824,15 @@ in increasing order of what they disturb:
 **Do not fold this into a resolution plan.** It shares a verdict with backlog 0125 and nothing else:
 one is a pixel budget against a VRAM wall, the other is a timeline the pipeline does not have.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0212](plans/0212-the-diffused-render-gains-a-timeline.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0212](plans/done/0212-the-diffused-render-gains-a-timeline.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+- **CLOSED 2026-09-28** by [Plan 0212](plans/done/0212-the-diffused-render-gains-a-timeline.md) and
+  [ADR-0236](adrs/0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md).
+  The sidecar takes a `--timeline` of `{at_bar, prompt}` entries and interpolates the conditioning
+  between neighbours, the seed fixed; `shot --render --bar-grid` supplies the bars. The owner judged
+  the full-track render on 2026-09-28: *"it looks great, amazing really"*. The bar grid has the right
+  length but not reliably the music's bar 1 — that residue is backlog 0042's, not this entry's.
 
 ---
 

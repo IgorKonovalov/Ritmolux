@@ -1,12 +1,14 @@
 # 0212 — The diffused render gains a timeline
 
-> **Status:** in-progress
+> **Status:** done - closed 2026-09-28 by a conductor-run close. Phases 1-2 (`e245ef72`,
+> `87242235`) and Phase 3's human verdict, *"the variation reads"*. Two review rounds: round 1's major
+> and three minors fixed, round 2 no blockers, no majors, one minor repaired at the close. v0.152.0.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user) — approved and deliberately NOT in `tools/conductor/queue.json`
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0236](../adrs/0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md)
-> (proposed), [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md),
-> [0122](../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)
+> **Related ADRs:** [0236](../../adrs/0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md)
+> (proposed), [0121](../../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md),
+> [0122](../../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)
 > **Closes:** design-backlog 0126
 
 ## TL;DR
@@ -20,7 +22,7 @@ chose.
 
 ## Context & problem
 
-**The ask.** At [Plan 0106](done/0106-the-frame-stream-passes-through-a-diffusion-model.md)'s Phase 6 human gate on
+**The ask.** At [Plan 0106](0106-the-frame-stream-passes-through-a-diffusion-model.md)'s Phase 6 human gate on
 2026-08-25, on a 5:15 render: *"...and with more variety"* (backlog 0126).
 
 **It is not a defect.** It is Plan 0106's *What this plan does NOT do*, in as many words: *"No timeline,
@@ -38,7 +40,7 @@ boundaries"* — filed then as a nice-to-have and now an ask with a watched rend
 - **Prompt interpolation on bar or section boundaries.** The analyzer already supplies the boundaries.
   Keeps one seed and one preset; changes only the conditioning.
 - **Preset changes across a track.** A `shot` question before it is a filter question —
-  [Plan 0101](done/0101-the-engine-renders-a-music-video.md) renders one preset per render by design.
+  [Plan 0101](0101-the-engine-renders-a-music-video.md) renders one preset per render by design.
 - **Denoise strength driven by the onset envelope.** The one lever that reopens Plan 0106's deliberate
   choice to keep the filter seam image-only, and Phase 2 named it as the repair *if the music stopped
   reading through* — which it did not. Taking it now would be taking it for variety rather than for
@@ -46,7 +48,7 @@ boundaries"* — filed then as a nice-to-have and now an ask with a watched rend
 
 ## Decision
 
-Per [ADR-0236](../adrs/0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md),
+Per [ADR-0236](../../adrs/0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md),
 **the render accepts a prompt timeline — a list of `{at_bar, prompt}` entries — and interpolates the
 conditioning between adjacent entries, with the seed fixed and the preset single.** The timeline is
 expressed in musical time rather than frames or seconds, because the analyzer already computes bar
@@ -161,7 +163,7 @@ flowchart LR
 ## What this plan does NOT do
 
 - **It does not raise the resolution.** That is backlog 0125 and
-  [Plan 0211](done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md). Backlog 0126
+  [Plan 0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md). Backlog 0126
   forbids folding them: *"one is a pixel budget against a VRAM wall, the other is a timeline the pipeline
   does not have."*
 - **It does not unfix or step the seed**, and it does not drive denoise from the onset envelope — that
@@ -286,6 +288,119 @@ flowchart LR
   across 23 live entries, 4 unprobeable
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
 - **Outstanding `human` phases:** none - Phase 3 done 2026-09-28
+
+## Close review
+
+Round 2's review, in full, as the conductor's close was handed it. Its one minor was repaired at the
+close in `a2f31c32`.
+
+> **Tip graded:** `d8df282ecea45a103138d8ff1a820107ea7a5217` on `plan-0212-the-diffused-render-gains-a-timeline`
+> (lane `/home/igor/Work/rlx-plan-0212`, which already carries `main`).
+>
+> **Verdict:** Round 1's major and its three repairable minors are fixed, and each fix is tested.
+> Plan 0212 is clean: **no blockers, no majors, one minor** (the log's `### Close triggers` block
+> is stale in two places, and the close can repair it). It is ready for the close.
+>
+> #### Evidence
+>
+> - **Full suite.** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed this
+>   ledger record instead of running:
+>   `with-lock: skipped cargo nextest run --workspace: tree 966c207 is green in the suite ledger, run by gate 0212-fix-1 at 2026-09-28T19:41:27.219Z: 1860 tests run: 1860 passed (8 slow), 7 skipped`.
+>   `git rev-parse HEAD^{tree}` is `966c207c…`, so the record covers exactly the graded tip. It is
+>   lens 1's full-suite evidence (ADR-0207).
+> - **`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`**: clean.
+> - **`python3 tools/sd-filter/test_sd_filter.py`**: all checks passed. That includes the new
+>   subprocess check that starts the filter before the grid file exists, and the end-to-end group,
+>   which ran against a release `shot` built in this lane.
+> - **`node scripts/check-doc-links.mjs`**, **`check-filter-figures.mjs`** and
+>   **`check-reader-prose.mjs`**: all OK after the doc edits in the fix round.
+> - **Tree**: `git status` was clean at the start and is clean at the end. This review committed
+>   nothing.
+>
+> #### Round 1 findings, re-graded
+>
+> Round 1 numbered its findings 1 to 5, and the log numbers them 0 to 4. The mapping is by order.
+>
+> 1. **Major: the documented pipeline raced on a fresh grid path.** Fixed in `68070a57`. `main`
+>    no longer loads the grid. It only refuses `--timeline` without `--bar-grid`, which it can do
+>    before anything loads. `run` gained an `on_header` hook, called after the header is parsed and
+>    before `stage.begin`, and `attach_bar_grid` loads the grid, runs `check_timeline_fits` and sets
+>    `bar_of` from there. The ordering holds on the producer side as well:
+>    `standalone/src/shot/render.rs:891-896` writes the grid with `fs::write` before the encoder
+>    spawns and before the first byte reaches stdout, so a header on the pipe means the file exists
+>    and belongs to this render. The model still loads only in `stage.begin`, after the refusals.
+>    The new test runs `sd_filter.py` as a subprocess, confirms the grid file is absent once startup
+>    has echoed, then writes the file and sends the header. It asserts exit 2 naming
+>    `timeline entry 2` and no `No such file`. That is the race, reproduced and then shown fixed.
+>    `docs/capturing.md:551-553` now states the guarantee.
+> 2. **Minor: `docs/diffusion-filter.md` was stale.** Fixed in `a56d7b21`. The prose now reads
+>    `--prompt` or `--timeline`, the flag list gained `--timeline` and `--bar-grid`, and a link
+>    goes to capturing.md's bar-grid section. The fragment `#the-bar-grid---bar-grid` matches the
+>    heading's slug.
+> 3. **Minor: the `--help, -h` row was misaligned.** Fixed in `6cb70cc7`, in both the module doc
+>    comment and `print_usage`.
+> 4. **Minor: a grid was never checked against its stream.** Fixed in `b56153ec`. `parse_header`
+>    now carries the `F` tag. A grid at a different rate is refused, and the comparison uses
+>    `Fraction`, so `60:1` and `120:2` are equal. A stream longer than its grid warns once, at the
+>    first frame past it. The tests cover all three: the refusal naming both rates, an equal rate
+>    written differently being accepted, and exactly one warning at frame 300.
+> 5. **Minor: the log is longer than the phases.** No repair, as round 1 said. It still stands and
+>    is not re-raised.
+>
+> #### Lenses 1–5, on the fix round's delta
+>
+> - **Alignment.** The fix commits stay within the plan's file lists, plus `docs/diffusion-filter.md`,
+>   which round 1 asked for. Owner tags are unchanged: dev, dev, human. Phase 3's done-when
+>   record is unchanged.
+> - **Layering.** Nothing in `core/`. The C ABI and the control protocol are untouched. The
+>   Y4M wire is untouched: the filter now reads the `F` tag, and the pass-through still re-emits the
+>   header's own bytes.
+> - **Docs.** Covered under findings 2 and 4 above. The `Close triggers` block did not follow the
+>   fix round (see below).
+> - **Correctness.** `frame_rate` returns `None` on an unparseable rate, so a malformed `fps` in a
+>   grid is refused through the same message rather than crashing. The past-grid warning fires on the
+>   stream frame index that `bar_of` receives, which matches the index `_diffuse` uses.
+> - **Design.** `on_header` is a narrow hook on `run` and needs no knowledge of the stage. It
+>   leaves the pass-through path unchanged when no grid is named.
+>
+> #### Findings
+>
+> ##### minor
+>
+> 1. **`docs/plans/0212-the-diffused-render-gains-a-timeline.md:287`: the `### Close triggers` block
+>    is stale in two places.** `**Outstanding \`human\` phases:** Phase 3 (a full track, judged)`
+>    contradicts the phase table (`3 … | human | done`) and the recorded owner verdict. Also,
+>    `**Operator docs touched:**` (line 282) omits `docs/diffusion-filter.md`, which the fix round
+>    edited. *Why it matters:* the close reads this block for its triggers, and "Outstanding: Phase 3"
+>    could be taken as an ADR-0249 owed phase, which it is not. *Fix (plan prose, close-repairable):*
+>    replace line 287 with `- **Outstanding \`human\` phases:** none - Phase 3 done 2026-09-28`. Add
+>    `, \`docs/diffusion-filter.md\` (the flag list: \`--timeline\`, \`--bar-grid\`)` to the
+>    operator-docs bullet.
+>
+> #### Bookkeeping the close owes
+>
+> Unchanged from round 1. Flip ADR-0236 to accepted; it needs no `Outcome`, because the verdict was
+> the passing outcome. Move backlog 0126 from Promoted to Closed in the archive, with the `CLOSED`
+> marker. Flip `Status:` to `done`, `git mv` the plan to `done/`, and re-run the link checker.
+> Refresh both indexes. Add the `## Close review` section with the round-1 fix commits (`68070a57`,
+> `a56d7b21`, `6cb70cc7`, `b56153ec`). Bump the version: it is tooling only, a `shot` example flag
+> and the sidecar, so the level is the close's call. Sync the studio's two version copies and write
+> the annotated tag.
+
+### Earlier rounds
+
+- Round 1, major 1 (the filter read `--bar-grid` at startup, racing `shot` on a fresh path): fixed in
+  `68070a57`.
+- Round 1, minor 2 (`docs/diffusion-filter.md` omitted `--timeline` and `--bar-grid`): fixed in
+  `a56d7b21`.
+- Round 1, minor 3 (the `--help, -h` row of `shot`'s usage misaligned): fixed in `6cb70cc7`.
+- Round 1, minor 4 (a bar grid never checked against its stream): fixed in `b56153ec`.
+- Round 1, minor 5 (the log outweighs the phases): no repair, by the review's own terms.
+- Round 2, minor 1 (the `### Close triggers` block stale): repaired at the close in `a2f31c32`.
+
+Close notes: upstream CI read green at the close (run 36297464014 on `main` at `4ffed87`). Version
+**0.152.0**, minor: a feature, in dev tooling only. `presets/` untouched, so no curation verdict is
+owed.
 
 ## Followups (after this lands)
 

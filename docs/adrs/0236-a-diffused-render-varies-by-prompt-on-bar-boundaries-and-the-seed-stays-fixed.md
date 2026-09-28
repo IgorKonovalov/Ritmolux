@@ -1,8 +1,8 @@
 # ADR-0236 — A diffused render varies by prompt on bar boundaries, and the seed stays fixed
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-28 (Plan 0212)
 > **Date:** 2026-09-19
-> **Related plan(s):** [0212](../plans/0212-the-diffused-render-gains-a-timeline.md)
+> **Related plan(s):** [0212](../plans/done/0212-the-diffused-render-gains-a-timeline.md)
 
 ## Context
 
