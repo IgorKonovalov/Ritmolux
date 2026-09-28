@@ -48,6 +48,7 @@ import math
 import shlex
 import sys
 from collections import deque, namedtuple
+from fractions import Fraction
 
 MAGIC = b"YUV4MPEG2"
 
@@ -66,7 +67,8 @@ PLANE_RATIO = {
     b"mono": 1,
 }
 
-StreamFormat = namedtuple("StreamFormat", "width height frame_bytes colour")
+# `rate` is the F tag's `N:D` text, or None when the header carries none.
+StreamFormat = namedtuple("StreamFormat", "width height frame_bytes colour rate")
 
 CONTROLNETS = {
     "canny": "lllyasviel/control_v11p_sd15_canny",
@@ -331,14 +333,44 @@ def attach_bar_grid(stage, path, fmt, log=None):
     processes start together, and shot writes the file before the first byte of
     its stream - so the header arriving is what guarantees the file is there
     and is this render's rather than an earlier one's.
+
+    A grid counted at another frame rate than the stream's is refused: its
+    frame indices would place every bar at the wrong time. A stream longer
+    than the grid is not - its tail holds the last bar - but it is warned of
+    once, at the first frame past the grid.
     """
     grid = load_bar_grid(path)
+    if fmt.rate is not None and frame_rate(grid.fps) != frame_rate(fmt.rate):
+        raise ConfigError(
+            "--bar-grid %s was counted at %s fps and this stream is F%s: pass "
+            "the grid written beside this render" % (path, grid.fps, fmt.rate))
     if stage.timeline:
         check_timeline_fits(stage.timeline, len(grid.starts))
     if log:
         print("sd-filter: %s" % bar_grid_echo(grid), file=log, flush=True)
-    stage.bar_of = lambda frame: bar_position(grid, frame)
+    warned = []
+
+    def bar_of(frame):
+        if frame >= grid.frames and not warned:
+            warned.append(frame)
+            if log:
+                print("sd-filter: warning: frame %d is past the bar grid's %d "
+                      "frames; the rest of the stream holds bar %d"
+                      % (frame, grid.frames, len(grid.starts)),
+                      file=log, flush=True)
+        return bar_position(grid, frame)
+
+    stage.bar_of = bar_of
     return grid
+
+
+def frame_rate(text):
+    """A Y4M-style `N:D` rate -> Fraction, or None when it is not one."""
+    try:
+        n, d = str(text).split(":")
+        return Fraction(int(n), int(d))
+    except (ValueError, ZeroDivisionError):
+        return None
 
 
 # ------------------------------------------------------------------ the wire
@@ -369,7 +401,7 @@ def parse_header(line):
     if not fields or fields[0] != MAGIC:
         raise StreamError("not a Y4M stream: header begins %r" % line[:32])
 
-    width = height = None
+    width = height = rate = None
     colour = b"420"  # the Y4M default when no C tag is present
     for f in fields[1:]:
         if f[:1] == b"W":
@@ -378,6 +410,8 @@ def parse_header(line):
             height = int(f[1:])
         elif f[:1] == b"C":
             colour = f[1:]
+        elif f[:1] == b"F":
+            rate = f[1:].decode("ascii", "replace")
 
     if width is None or height is None:
         raise StreamError("header names no geometry: %r" % line)
@@ -389,7 +423,7 @@ def parse_header(line):
         )
 
     frame_bytes = int(width * height * PLANE_RATIO[colour])
-    return StreamFormat(width, height, frame_bytes, colour)
+    return StreamFormat(width, height, frame_bytes, colour, rate)
 
 
 def read_exactly(src, n):

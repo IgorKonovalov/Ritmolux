@@ -679,6 +679,31 @@ with tempfile.TemporaryDirectory() as td:
     check("an attached grid resolves frame 180 to bar 3",
           astage.bar_of is not None and astage.bar_of(180) == 3.0)
 
+    # The grid is paired with the stream it was written beside: another rate
+    # is refused, and a stream that outruns it is warned of once.
+    try:
+        sd_filter.attach_bar_grid(
+            sd_filter.DiffusionStage(cell(timeline="t.json"), tl), gpath,
+            sd_filter.parse_header(y4m.replace(b"F60:1", b"F30:1")))
+        check("refused: a 60:1 grid on an F30:1 stream", False, "did not raise")
+    except sd_filter.ConfigError as e:
+        check("refused: a 60:1 grid on an F30:1 stream",
+              "60:1" in str(e) and "F30:1" in str(e), str(e))
+    wlog = io.StringIO()
+    wstage = sd_filter.DiffusionStage(cell(timeline="t.json"), tl)
+    sd_filter.attach_bar_grid(
+        wstage, gpath, sd_filter.parse_header(y4m.replace(b"F60:1", b"F120:2")),
+        log=wlog)
+    quiet = "warning" not in wlog.getvalue()
+    for frame in (299, 300, 301, 400):
+        wstage.bar_of(frame)
+    check("an equal rate spelt differently is accepted, and frames inside the "
+          "grid warn of nothing", quiet, wlog.getvalue())
+    check("  ... and a stream past the grid warns once, at frame 300",
+          wlog.getvalue().count("warning") == 1
+          and "frame 300 is past the bar grid's 300 frames" in wlog.getvalue(),
+          wlog.getvalue())
+
     # Past the track, now that the track's length is known: the 4-bar grid
     # refuses an entry at bar 5 before any model is built.
     tpath = os.path.join(td, "timeline.json")
