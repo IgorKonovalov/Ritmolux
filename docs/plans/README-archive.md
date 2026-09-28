@@ -18,6 +18,9 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0211 - The diffused frame's resolution is measured before it is designed](#0211---the-diffused-frames-resolution-is-measured-before-it-is-designed)
+  - [0208 - The conductor's safety claims get their evidence](#0208---the-conductors-safety-claims-get-their-evidence)
+  - [0209 - A system joins the instruments by existing](#0209---a-system-joins-the-instruments-by-existing)
   - [0223 - The heavy presets fit the integrated GPU](#0223---the-heavy-presets-fit-the-integrated-gpu)
   - [0206 - The browser shows the look](#0206---the-browser-shows-the-look)
   - [0229 - The conductor reports itself honestly](#0229---the-conductor-reports-itself-honestly)
@@ -264,6 +267,64 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0211 - The diffused frame's resolution is measured before it is designed](done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)
+
+- closed 2026-09-27, conductor-run close of lane `plan-0211-the-diffused-frames-resolution-is-measured-before-it-is-designed`.
+Phase 1 `2be319f4` (the readings) and Phase 2 `06e20dec` (the owner's verdict) ran interactively on
+`main`, because the sidecar needs the CUDA `.venv`. Phase 3 did not run, by the plan's own terms.
+Round 1 review: **no blockers, no majors, three minors**. Minors 1 and 2 were repaired at the close in
+`7af1efc5`, and minor 3 (the log outweighs the phases) needs no repair. Version: **none**
+(docs/chore-only: a measurement and a verdict, no code). No ADR was written or owed, and ADR-0121
+stands unreopened. Closes backlog 0125 and files its residue as backlog 0262. Upstream CI read green
+at the close. The full review is the plan's own `## Close review` section.
+- **What landed.** A matched pair of the same 24 s clip of `star_rosewindow`, rendered at both
+  profiles on one build and one machine: `fast` at 0.554 s and `quality` at 3.065 s per emitted frame,
+  about 5.5x. The owner's verdict was *"quality are fine"*, so the resolution ask was a profile
+  default and not a wall.
+- **Open.** Backlog 0262 covers two things. The first is which profile `docs/diffusion-filter.md`
+  leads with. The second is that the page's cost table was measured on Windows with another preset
+  and reads about 2.5x this box's `quality` figure. Translation advisory: see the close's
+  `check-translations.mjs` run; this plan moved no English source.
+
+### [0208 - The conductor's safety claims get their evidence](done/0208-the-conductors-safety-claims-get-their-evidence.md)
+
+- closed 2026-09-27, conductor-run close of lane `plan-0208-the-conductors-safety-claims-get-their-evidence`.
+Phase 1 `0075c675`, Phase 2 `95d86c89`, Phase 3 `3afa3de4`, Phase 4 `25eea723`, Phase 5 `2d9af125`.
+Three review rounds: round 1 two majors and five minors, round 2 one major and three minors, both
+rounds' majors fixed; round 3 **no blockers, no majors, one minor, one nit**, the nit repaired at the
+close in `2d3df840`. Version: **none** (repository tooling: the conductor's settings, its tests and a
+new Node gate; no shipped artifact changes). ADR-0233 accepted with an `Outcome`. Closes backlog 0236,
+0237 and 0241. Upstream CI read green at the close. The full review is the plan's own `## Close review`
+section.
+- **What landed.** A matcher probe under `tools/conductor/spike/` and its RAN/DENIED table on a named
+  CLI version; `settings.test.mjs` asserts every probed deny case against that table; deny rules for a
+  shell expansion (`$`, backtick), a leading `/` in any argument and a quoted absolute path;
+  `scripts/check-claude-declarations.mjs` on the gate roster.
+- **Open.** The `Remove-Item` half of the bound is modelled, not observed, and is owed to a Windows
+  probe run (review minor 1). Nothing re-runs the probe when the CLI version moves. Translation
+  advisory at the close: `how-it-works.ru.md`, `running.ru.md` and the foobar `READ-ME-FIRST.ru.md`
+  have moved sources; this plan moved none of them.
+
+### [0209 - A system joins the instruments by existing](done/0209-a-system-joins-the-instruments-by-existing.md)
+
+- closed 2026-09-26, conductor-run close of lane `plan-0209-a-system-joins-the-instruments-by-existing`.
+Phase 1 `17961a15`, Phase 2 `52c66c06` (a recorded reading), Phase 3 `ba62c093`, Phase 4 `8bf91ce1`
+and Phase 5 `c46abfa2` (both owner-started sessions, since each edits `.claude/`). Round 1 review:
+**no blockers, no majors, three minors, one nit**; minors 1 and 3 and the nit were repaired at the
+close in `166909f9`, minor 2 (the architect sweep row for `systems.md`) is under `.claude/` and is
+the owner's. Version: **none** (docs/chore-only: an integration test and docs/skill material, no
+shipped artifact changes). ADR-0234 accepted. Closes backlog 0258; takes backlog 0256's instrument
+half, and 0256 stays live for the curation half. The full review is the plan's own `## Close review`
+section.
+- **What landed.** `core/tests/distinctness.rs` declares one test per family through `family_tests!`,
+  which also emits an exhaustive `match` over `SystemKind`, so the report covers all fourteen families
+  and a new variant with no test is a compile error. `docs/testing.md` names no count. The content
+  lane's `systems.md` has a section for every system, the four new ones distilled from the shipped
+  presets.
+- **Open.** The close-ceremony sweep row that would keep `systems.md` current (review minor 2, owner).
+  None of the five arriving families raised a near-duplicate flag; six `attractor` pairs flag and stay
+  unlabelled, input to backlog 0256.
 
 ### [0223 - The heavy presets fit the integrated GPU](done/0223-the-heavy-presets-fit-the-integrated-gpu.md)
 
@@ -10352,7 +10413,7 @@ plans' links are written for this file's depth:
 **Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster above.**
 It carries the three structural findings of that day's architecture sweep, and its position is
 deliberate rather than incidental: [0206](done/0206-the-browser-shows-the-look.md) adds a consumer to the
-preview surface its Phase 5 extracts, [0209](0209-a-system-joins-the-instruments-by-existing.md)
+preview surface its Phase 5 extracts, [0209](done/0209-a-system-joins-the-instruments-by-existing.md)
 derives a roster from the `SystemKind` its Phase 4 gates, and [0203] touches scene params. Run
 earlier it would refactor code three approved plans are about to rewrite. **The [0203] third of that
 is spent 2026-09-20**, when it closed having added six scene params and changed a seventh's meaning;

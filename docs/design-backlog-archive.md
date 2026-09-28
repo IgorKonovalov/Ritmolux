@@ -300,6 +300,7 @@ accepted cost" are different documents and only one of them is honest.
 - [0254 — every gallery card is captured at hop 300, which is before an accumulating world exists](#0254--every-gallery-card-is-captured-at-hop-300-which-is-before-an-accumulating-world-exists)
 - [0255 — `docs-shots.mjs` renders all or nothing, so adding one card is done by hand-copying its manifest entry](#0255--docs-shotsmjs-renders-all-or-nothing-so-adding-one-card-is-done-by-hand-copying-its-manifest-entry)
 - [0258 — the content lane's scene catalogue covers ten of fourteen systems, and nothing makes it notice the four it skipped](#0258--the-content-lanes-scene-catalogue-covers-ten-of-fourteen-systems-and-nothing-makes-it-notice-the-four-it-skipped)
+- [0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution](#0125--every-diffused-frame-is-an-upscale-both-profiles-diffuse-well-below-the-streams-own-resolution)
 <!-- toc:end -->
 
 ## The ledger
@@ -329,10 +330,6 @@ live entry citing this one.
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
 | 0126 | A render is one prompt, one seed and one preset from first frame to last | [Plan 0212](plans/0212-the-diffused-render-gains-a-timeline.md). **Promoted** |
-| 0236 | The `.claude/` park reads a phase's declared `Files touched`, and prose escapes it | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
-| 0237 | The allowlist bounds a deletion by literal path shapes, so an expansion escapes the lane | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
-| 0241 | The allowlist is asserted against a model of the CLI's matcher, which one run falsified | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
-| 0258 | The content lane's scene catalogue covers ten of fourteen systems | [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -632,6 +629,11 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0255 | `docs-shots.mjs` renders all or nothing, so adding one card is done by hand | [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phase 1. A name filter, exact match, unknown name exits 1. **Closed 2026-09-22** |
 | 0254 | Every gallery card is captured at hop 300, before an accumulating world exists | [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phases 2-4 + ADR-0235. Six families at hop 2754/2828 over a 30 s clip. **Closed 2026-09-22** |
 | 0257 | The standalone exe is 9.7 % over NFR §4's cap, and only the component would have noticed | [Plan 0207](plans/done/0207-the-commitments-get-their-instruments.md) Phase 1 + ADR-0231. Re-derived to 16,777,216 B; both recipes measure and warn. **Closed 2026-09-23** |
+| 0258 | The content lane's scene catalogue covers ten of fourteen systems | [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md) Phases 4-5 + ADR-0234. The sweep row is the owner's. **Closed 2026-09-26** |
+| 0236 | The `.claude/` park reads a phase's declared `Files touched`, and prose escapes it | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 5. A drafting gate; closed plans are an advisory. **Closed 2026-09-27** |
+| 0237 | The allowlist bounds a deletion by literal path shapes, so an expansion escapes the lane | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 3 + ADR-0233. `$` and backtick probed; `Remove-Item` modelled. **Closed 2026-09-27** |
+| 0241 | The allowlist is asserted against a model of the CLI's matcher, which one run falsified | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phases 1-2 + ADR-0233. Deny cases rest on a transcript. **Closed 2026-09-27** |
+| 0125 | Every diffused frame is an upscale: both profiles diffuse well below the stream's resolution | [Plan 0211](plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) Phases 1-2. `quality` answers it; the residue is 0262. **Closed 2026-09-27** |
 <!-- roster:end -->
 
 ---
@@ -15877,9 +15879,18 @@ Shapes, none decided:
 one — and the conductor is stood down. It matters the first time a conductor-run plan touches a skill
 file without naming it, which is a normal thing for a plan to do.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-27 by [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 5 — the first shape, a gate at drafting time
+
+**CLOSED.** `scripts/check-claude-declarations.mjs` refuses an active plan phase that names a skill, a
+hook, `settings.json` or a conductor-mode section without a `.claude/` path in `Files touched`. It
+fails on a fixture in Plan 0190 Phase 9's shape and passes once the paths are declared. Closed plans
+are read as an advisory only: 14 phases across 11 of them, Plan 0190 Phase 9 among them, and none was
+edited. The declaration pattern is a subset of `claudePaths()`'s, so a phase the gate calls declared is
+one the conductor parks in front of.
 
 ---
 
@@ -15927,9 +15938,18 @@ Shapes, none decided:
 in that file whose stated bound — *"a path that leaves the lane is refused, whatever it is for"* — is
 not the bound the rules actually enforce, and the README repeats the claim.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-27 by [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 3 — the first shape, widened by what the probe showed
+
+**CLOSED.** The expansion syntax is denied: `Bash(rm *$*)` and `` Bash(rm *`*) ``, the second because
+the probe showed a backtick substitution was needed. The rules also deny a leading `/` in any argument
+position and a quoted absolute path. `rm *%*` was left out, because neither shell tool expands
+`%VAR%`. `rm -rf $HOME/.cargo` reads DENIED under the real CLI, and `rm -rf target/debug` still runs.
+**The `Remove-Item` half is modelled, not observed.** The PowerShell tool exists only on Windows and
+the probe ran on Linux, so it is owed to a Windows probe run (ADR-0233's `Outcome`).
 
 ---
 
@@ -16009,9 +16029,18 @@ cost turns, the sessions recovered, all three phases of 0191 committed. It is fi
 negative cases are the ones worth being right about, and the run just demonstrated that the thing
 asserting them can be wrong about a case it states outright.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-27 by [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phases 1-2 and 4 — probed, and the prompt rule kept with its reason
+
+**CLOSED.** `tools/conductor/spike/` probes the matcher and records a RAN/DENIED table beside the CLI
+version. On 2.1.282 a `cd` to the session's own lane never reached the matcher, and every other `cd`
+was refused. `settings.test.mjs` asserts every probed deny case against the recorded outcome, and also
+asserts `decide()` refuses it, so a deleted deny rule goes red. The allow cases stay a model. The
+prompt's `No cd` stays, with the reason: a refused `cd` costs a turn. Nothing yet re-runs the probe
+when the CLI version moves.
 
 ---
 
@@ -16211,6 +16240,69 @@ see a quarter of the surface it composes over, which reads as "these systems hav
 writing" rather than as a missing page. It rises with every system landed, and the four sections are
 an evening's work for someone who has the app open.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+**CLOSED 2026-09-26** — [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md)
+Phases 4 and 5 + [ADR-0234](adrs/0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md).
+`systems.md` has a `## ` section for every `SystemKind`, and the four this entry named carry guidance
+distilled from the shipped presets. The architect sweep row asked for above is **not** added: the
+close cannot edit `.claude/`, so it is the owner's (Plan 0209's close review, minor 2), and until it
+lands the mechanism this entry named is still missing.
+
+---
+
+## 0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution
+
+**Raised by:** the user, at Plan 0106's Phase 6 human gate (2026-08-25), on a full-track render of
+`star_rosewindow` — *"it would obviously be great if resolution would be higher"*. **Owner if
+taken:** `architect` — it reopens a clause ADR-0121 recorded as deliberately rejected, so it is an
+ADR question before it is a code one.
+
+- **Verified 2026-08-25** — the shipping `quality` profile diffuses at a 589,824 px budget, which is
+  28 % of a 1920x1080 frame, so every output pixel is resampled up:
+  `present: "size": "589824" in: tools/sd-filter/sd_filter.py`
+
+### The finding
+
+The clip that drew the verdict was rendered at **`fast`** — a 262,144 px budget, **680x384** at
+16:9 — and resampled to 1920x1080. `quality` is 1024x576, **2.25x the pixels**, and *has never been
+rendered on a real track*. So an unknown and possibly large share of this complaint is a profile
+choice rather than a wall, and **the cheap first move is a side-by-side still at both budgets**, not
+a design.
+
+What is genuinely walled, and why this is not simply "raise the budget":
+
+- **SD1.5 duplicates or mirrors content above roughly 768²** — its native-resolution artifact, named
+  in Plan 0106 Phase 1's traps. Raising the budget does not scale smoothly into it.
+- **SDXL plus ControlNet is ~7.5 GB against an 8 GB card**, and the spike already peaks at 5.68 GB
+  with two ControlNets loaded. Offloading fixes the memory and ruins the throughput over thousands
+  of frames, which Phase 1 also measured.
+- **Cost scales with pixels.** Phase 2b measured 2.721 s/frame at 589,824 px against roughly a third
+  of that at 262,144. A 4-minute track at `quality` already measures ~5.9 h *before* the 1.406x
+  scope correction Plan 0106 Phase 7d applies to that figure.
+
+**The tension worth surfacing before anyone designs.**
+[ADR-0121](adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)'s
+Alternative C is *diffuse at a smaller budget and upscale*, measured as the cheaper route and
+**rejected by this same user in the design interview**, on the ground that generated detail is worth
+its price against inferred detail. This verdict does not obviously overturn that — the ask is for
+*more* detail, and an upscaler infers rather than generates — but it does mean the rejection was
+made before anyone had watched five minutes of output. A tiled or multi-pass approach that
+*generates* at higher resolution is the option neither the ADR nor the plan has costed.
+- **PARTLY TAKEN 2026-09-19 -> [Plan 0211](plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)**,
+  which takes the *measurement* this entry asks for before any design: a matched pair of the same clip
+  at both budgets, then the owner's verdict. **This entry stays live because the verdict is what
+  decides whether anything is owed** — if `quality` answers the ask, what was filed as a wall was a
+  profile default and the residue is a documentation change; if it does not, the tiled route nobody has
+  costed is Phase 3 and an ADR reopening ADR-0121's Alternative C follows the plan rather than
+  preceding it.
+- **Moved to the archive 2026-09-27 at Plan 0211's close.** The entry was taken but never promoted,
+  so it left the live file when the plan closed rather than when it was approved.
+
+**CLOSED 2026-09-27 by Plan 0211's Phase 2 verdict.** The matched pair at both budgets was rendered on
+one machine. The owner's verdict was *"quality are fine"*: `quality` answers the ask, so what was
+filed as a wall was a profile default. Phase 3's tiled route was not run, and ADR-0121's Alternative
+C was not reopened. The residue is documentation: which profile `docs/diffusion-filter.md` leads
+with, and a cost table measured on another OS with another preset. It is live as backlog 0262.

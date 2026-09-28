@@ -2,7 +2,7 @@
 
 > **Status:** proposed
 > **Date:** 2026-09-17
-> **Related plan(s):** none yet
+> **Related plan(s):** [0230](../plans/0230-the-russian-slice-becomes-findable.md)
 > **Amends:** [0185](0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)
 > (Alternative C, re-examined against the installed Starlight; the slice, the stamp and the
 > advisory are untouched)

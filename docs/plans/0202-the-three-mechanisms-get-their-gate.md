@@ -89,18 +89,36 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
   state) rather than as a frozen level; and every baseline the repair moved is re-blessed with the
   move named in the log.
 
-### Phase 3 — The echo nests
+### Phase 3 — The echo's orientation truncates like the reference
 - **Owner skill:** dev
-- **What:** make `fVideoEchoAlpha`, `echo_zoom` and `echo_orient` produce the reference's nesting —
-  the previous frame composited at the bound scale and orientation, at the bound alpha, as
-  `xeiraex/milkdrop2` `d4c843a` composites it. *Songflower (Moss Posy)* is the case that reads wrong
-  and the one to judge against.
-- **Files touched:** `core/src/render/scenes/warp_mesh/` (the composite path and its shaders),
-  `core/src/milk/outputs.rs` if the binding does not reach the composite, the scene's tests
-- **Done when:** a converted *Songflower* draws a nested weave rather than the bare grid; a test
-  asserts the echo composite reads its three bound parameters, each moved independently and each
-  changing the frame in the direction the source's own arithmetic says; and no preset without an
-  echo binding changes at all, shown by the golden set staying green.
+- **Amended 2026-09-26 (owner), after the phase stopped at its own stop condition.** Its first
+  premise, that the reference's echo nests the previous frame, is **falsified by `d4c843a`**. The
+  reading is in the implementation log's Notes. *Songflower* has no comp shader, so the reference
+  takes `ShowToUser_NoShaders`, whose echo composites the **current** frame with one zoomed and
+  flipped copy and never feeds back. At the preset's `fVideoEchoAlpha = 1.0` the reference cannot
+  draw a nested weave either, and our present pass already does the same `mix` from the same
+  per-frame outputs. What the reading did find is **one divergence**, and this phase repairs that and
+  nothing else. The weave stays **unattributed**. Phase 6 says so for its pair, and its three
+  remaining candidates are a followup below, not work here.
+- **What:** `echo_orientation` in `core/src/render/scenes/warp_mesh/mod.rs` **rounds** the bound
+  value, and the reference takes `(int)v % 4`, which **truncates**. *Songflower*'s
+  `echo_orient = 1 + 16*pfdy_r` sweeps about 0.76-1.24, so the reference flips x only while the value
+  is at or above 1, and this engine flips it the whole time. Make the quantizer truncate toward zero
+  as C's `(int)` cast does. For a negative value, do what the reference does with `(int)v % 4`'s
+  negative remainder: read it in `d4c843a`'s use of the orientation, not from C semantics alone, and
+  state the answer in the doc comment. Keep the function total on non-finite input. Correct the doc
+  comment at the neighbouring quantizer that cites `echo_orientation`'s rounding as its reason
+  (`mod.rs`, the comment beginning *"Rounded here for `echo_orientation`'s reason"*), so it does not
+  claim a rule this phase removes.
+- **Files touched:** `core/src/render/scenes/warp_mesh/mod.rs`,
+  `core/src/render/scenes/warp_mesh/tests.rs`, any golden baseline the change moves.
+- **Done when:** `the_echo_orientation_quantizes_to_four_states` (renamed to match if it no longer
+  describes the rule) asserts truncation at the boundary the reference draws: `0.99` reads 0, `1.0`
+  and `1.99` read 1, and the *Songflower* sweep's two ends (`0.76` and `1.24`) read 0 and 1. It also
+  asserts the negative case as the reference resolves it, with the `d4c843a` file and line it was read
+  from cited in the test's comment. Every golden stays green, or each baseline the change moved is
+  re-blessed with the move named in the log. A hand-written preset binding a whole-number
+  `echo_orient` (`warp_cauldron`'s `"1"`) cannot move.
 
 ### Phase 4 — The eight modes are captured on the rig
 - **Owner skill:** human
@@ -202,6 +220,11 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 - **Outstanding `human` phases:**
 
 ## Followups (after this lands)
+
+- **Where *Songflower (Moss Posy)*'s nested weave comes from is unattributed.** Phase 3's reading
+  took the echo off the list. The three candidates left are the field's own: `fDecay = 1`,
+  `bTexWrap = 1`, and a per-pixel `zoom` that falls below 1. Take them in a probe with a stop
+  condition, the way Phase 1 took the rate candidate, if Phase 6 still reads that pair as wrong.
 
 - The reach decision (backlog 0109) — an interview and an ADR, triggered by Phase 6's verdict.
 - ADR-0199 gains an `Outcome` at this plan's close recording Phase 5's per-mode measurement.

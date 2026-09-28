@@ -1,6 +1,6 @@
 # 0227 — The gated paths get their jobs, and a red upstream stops the close
 
-> **Status:** done - Phase 7 owed, ADR-0249 (Phase 6 done 2026-09-26). Phases 1-5 `646ca642`, `1e7e4857`,
+> **Status:** done (Phase 6 done 2026-09-26, Phase 7 read 2026-09-26). Phases 1-5 `646ca642`, `1e7e4857`,
 > `1fc58a95`, `0c0ac09b`, `417022b7`; round 1 major fixed in `f1bbf1b1`. Round 2 review: no
 > blockers, no majors, two minors (both fixed at the close). ADR-0251 accepted. Version 0.148.0.
 > **Created:** 2026-09-24
@@ -213,7 +213,7 @@ flowchart LR
 | 4 — The foobar component joins the push | dev | done | 0c0ac09b |
 | 5 — The documents say what a machine needs | dev | done | 417022b7 |
 | 6 — The close ceremony gains the step | human | done | committed with this row |
-| 7 — The reading that only a push can produce | human | owed | |
+| 7 — The reading that only a push can produce | human | done | committed with this row |
 
 ### Notes
 
@@ -249,6 +249,16 @@ flowchart LR
 - Review round 1, finding 0 (major): the script's red output and `redSubject`'s comment no longer
   name the withdrawn refusal, in `f1bbf1b1`. `--self-test` 13 of 13. Findings 1 and 2 (minor) sit
   in the Decision flowchart and the Followups, outside the log, and are left.
+
+- **Phase 7 reading, 2026-09-26** (recorded from `gh` by an architect session at the owner's
+  request). The push that carried this plan's close, `097397ae` with tag `v0.148.0`, ran CI
+  `35987903999`: `check (macos-latest)` **green**, and every other job green with it. The `Release`
+  run for that tag, `35987904035`, succeeded and published **all six** artifacts:
+  `ritmolux-v0.148.0-macos-universal.zip`, `-windows-x64.zip`, `-linux-x64.tar.gz`,
+  `-foobar2000-component.zip`, `ritmolux-studio-v0.148.0-macos-universal.zip` and
+  `-windows-x64.zip`. The next tag, `v0.149.0` (run `36013833264`), published the same six. No
+  finding. `check (macos-latest)` went red again later, on `5950956b` (run `36258195831`), from
+  Plan 0206's thumbnail test rather than from anything here. It was repaired on main in `3e476de5`.
 
 ### Close triggers
 

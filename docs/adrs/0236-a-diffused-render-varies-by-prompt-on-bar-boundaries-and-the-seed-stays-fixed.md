@@ -103,6 +103,6 @@ pipeline does not have."*
 ## Notes
 
 Both asks came from one sitting at Plan 0106's Phase 6 gate. The resolution half is
-[Plan 0211](../plans/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md), which
+[Plan 0211](../plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md), which
 measures before it designs; this half needs no measurement first because the mechanism is absent rather
 than mis-sized.

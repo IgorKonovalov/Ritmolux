@@ -31,7 +31,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0094 — the `frame_ms_p99` tail is not switch-correlated, so the steady-state column does not remove it](#0094--the-frame_ms_p99-tail-is-not-switch-correlated-so-the-steady-state-column-does-not-remove-it)
 - [0108 — the conversion tail: HLSL arrays (~71 files) and 218 MD2 presets that convert but render blank](#0108--the-conversion-tail-hlsl-arrays-71-files-and-218-md2-presets-that-convert-but-render-blank)
 - [0109 — disk textures are 88.7 % of every MilkDrop conversion failure, and the exclusion's trigger condition is already met](#0109--disk-textures-are-887--of-every-milkdrop-conversion-failure-and-the-exclusions-trigger-condition-is-already-met)
-- [0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution](#0125--every-diffused-frame-is-an-upscale-both-profiles-diffuse-well-below-the-streams-own-resolution)
 - [0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device](#0154--a-swap-spawns-a-thread-that-creates-a-com-object-and-one-activation-in-22-failed-with-regdb_e_classnotreg-where-the-retry-budget-cannot-tell-that-from-a-dead-device)
 - [0165 - the windowed app cannot ask for the discrete GPU, so every windowed frame-time figure this project has quoted is an integrated-GPU figure](#0165---the-windowed-app-cannot-ask-for-the-discrete-gpu-so-every-windowed-frame-time-figure-this-project-has-quoted-is-an-integrated-gpu-figure)
 - [0187 — two measurements of the same console on the same adapter class disagree by 2x, and nothing explains which one the machine actually does](#0187--two-measurements-of-the-same-console-on-the-same-adapter-class-disagree-by-2x-and-nothing-explains-which-one-the-machine-actually-does)
@@ -43,6 +42,17 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0259 — the attractor rasterizes 600 000 sprites a frame, and a compute scatter would cut that term tenfold at the price of the look](#0259--the-attractor-rasterizes-600-000-sprites-a-frame-and-a-compute-scatter-would-cut-that-term-tenfold-at-the-price-of-the-look)
 - [0260 — a thumbnail's stamp carries no build identity, so an upgrade never re-renders a picture the engine now draws differently](#0260--a-thumbnails-stamp-carries-no-build-identity-so-an-upgrade-never-re-renders-a-picture-the-engine-now-draws-differently)
 - [0261 — the thumbnail child picks its own GPU, and on a hybrid laptop the pass moved the show's frame-time tail](#0261--the-thumbnail-child-picks-its-own-gpu-and-on-a-hybrid-laptop-the-pass-moved-the-shows-frame-time-tail)
+- [0262 — the diffusion filter's cost page reads 2.5x what `quality` measured on Linux, and nothing says which profile a reader should start from](#0262--the-diffusion-filters-cost-page-reads-25x-what-quality-measured-on-linux-and-nothing-says-which-profile-a-reader-should-start-from)
+- [0263 — the conductor reads a `not run` log row as unfinished, so a phase whose done-when was not to run parks its plan as a disagreement](#0263--the-conductor-reads-a-not-run-log-row-as-unfinished-so-a-phase-whose-done-when-was-not-to-run-parks-its-plan-as-a-disagreement)
+- [0264 — two players at once run two thumbnail passes into one cache, and their temp files collide](#0264--two-players-at-once-run-two-thumbnail-passes-into-one-cache-and-their-temp-files-collide)
+- [0265 — the pane-clearance test pins the library at 114 presets while more ship](#0265--the-pane-clearance-test-pins-the-library-at-114-presets-while-more-ship)
+- [0266 — the exe's size cap is written in three places that nothing holds equal, and the Linux recipe measures nothing](#0266--the-exes-size-cap-is-written-in-three-places-that-nothing-holds-equal-and-the-linux-recipe-measures-nothing)
+- [0267 — the conductor's `Remove-Item` deletion bound was never asked of the real CLI](#0267--the-conductors-remove-item-deletion-bound-was-never-asked-of-the-real-cli)
+- [0268 — under `order = "sequential"`, Space after a browser pick does not continue from what is on screen](#0268--under-order--sequential-space-after-a-browser-pick-does-not-continue-from-what-is-on-screen)
+- [0269 — two unreachable divergences Plan 0215's review left: a capture loop's `lost`, and `Observed<T>`'s feedback](#0269--two-unreachable-divergences-plan-0215s-review-left-a-capture-loops-lost-and-observedts-feedback)
+- [0270 — an npm advisory with no GHSA url could only be cleared by a bump](#0270--an-npm-advisory-with-no-ghsa-url-could-only-be-cleared-by-a-bump)
+- [0271 — the studio's missing-player banner says to edit a settings file without saying where it is](#0271--the-studios-missing-player-banner-says-to-edit-a-settings-file-without-saying-where-it-is)
+- [0272 — `npm run dev` leaves Vite and the esbuild watchers running after the studio window closes](#0272--npm-run-dev-leaves-vite-and-the-esbuild-watchers-running-after-the-studio-window-closes)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1120,52 +1130,6 @@ interview rather than a phase.
 
 ---
 
-## 0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution
-
-**Raised by:** the user, at Plan 0106's Phase 6 human gate (2026-08-25), on a full-track render of
-`star_rosewindow` — *"it would obviously be great if resolution would be higher"*. **Owner if
-taken:** `architect` — it reopens a clause ADR-0121 recorded as deliberately rejected, so it is an
-ADR question before it is a code one.
-
-- **Verified 2026-08-25** — the shipping `quality` profile diffuses at a 589,824 px budget, which is
-  28 % of a 1920x1080 frame, so every output pixel is resampled up:
-  `present: "size": "589824" in: tools/sd-filter/sd_filter.py`
-
-### The finding
-
-The clip that drew the verdict was rendered at **`fast`** — a 262,144 px budget, **680x384** at
-16:9 — and resampled to 1920x1080. `quality` is 1024x576, **2.25x the pixels**, and *has never been
-rendered on a real track*. So an unknown and possibly large share of this complaint is a profile
-choice rather than a wall, and **the cheap first move is a side-by-side still at both budgets**, not
-a design.
-
-What is genuinely walled, and why this is not simply "raise the budget":
-
-- **SD1.5 duplicates or mirrors content above roughly 768²** — its native-resolution artifact, named
-  in Plan 0106 Phase 1's traps. Raising the budget does not scale smoothly into it.
-- **SDXL plus ControlNet is ~7.5 GB against an 8 GB card**, and the spike already peaks at 5.68 GB
-  with two ControlNets loaded. Offloading fixes the memory and ruins the throughput over thousands
-  of frames, which Phase 1 also measured.
-- **Cost scales with pixels.** Phase 2b measured 2.721 s/frame at 589,824 px against roughly a third
-  of that at 262,144. A 4-minute track at `quality` already measures ~5.9 h *before* the 1.406x
-  scope correction Plan 0106 Phase 7d applies to that figure.
-
-**The tension worth surfacing before anyone designs.**
-[ADR-0121](adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)'s
-Alternative C is *diffuse at a smaller budget and upscale*, measured as the cheaper route and
-**rejected by this same user in the design interview**, on the ground that generated detail is worth
-its price against inferred detail. This verdict does not obviously overturn that — the ask is for
-*more* detail, and an upscaler infers rather than generates — but it does mean the rejection was
-made before anyone had watched five minutes of output. A tiled or multi-pass approach that
-*generates* at higher resolution is the option neither the ADR nor the plan has costed.
-- **PARTLY TAKEN 2026-09-19 -> [Plan 0211](plans/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)**,
-  which takes the *measurement* this entry asks for before any design: a matched pair of the same clip
-  at both budgets, then the owner's verdict. **This entry stays live because the verdict is what
-  decides whether anything is owed** — if `quality` answers the ask, what was filed as a wall was a
-  profile default and the residue is a documentation change; if it does not, the tiled route nobody has
-  costed is Phase 3 and an ADR reopening ADR-0121's Alternative C follows the plan rather than
-  preceding it.
-
 ## 0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device
 
 > **Filed 2026-08-28** at the Plan 0130 Mode 4 review, from that plan's own Phase 5 log — an
@@ -1687,19 +1651,22 @@ the interesting half of the question has no statistic.
 - **Raised:** 2026-09-19 by `architect`, asked by the owner (*"do we have a plan to cut curated
   presets that are too similar to each other or lame?"*). **Owner if taken:** `human` for step 2,
   then `architect` for the ADR and plan.
-- **Verified 2026-09-19** — the roster is a hand-written array of nine:
-  `present: const FAMILIES: \[\(SystemKind, &str\); 9\] in: core/tests/distinctness.rs`
-- **Verified 2026-09-19** — the third-largest shipped family is named nowhere in it:
-  `absent: analytic_field in: core/tests/distinctness.rs`
-- **Verified 2026-09-19** — nor is `cellular`:
-  `absent: cellular in: core/tests/distinctness.rs`
-- **Verified 2026-09-19** — and the doc still reports the pre-`analytic_field` denominator:
-  `present: nine of the twelve in: docs/testing.md`
+- **PARTLY PROMOTED 2026-09-27 -> [Plan 0232](plans/0232-the-library-is-walked-cut-and-refilled.md)**,
+  which takes **step 2** (the owner's walk, and the cull it convicts under ADR-0253). Step 3, whether a
+  mechanism is owed, stays here until that plan's Phase 7 verdict answers it.
+- **Verified 2026-09-26** — the instrument half is discharged by
+  [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md) (closed 2026-09-26): the
+  similarity roster is every `SystemKind`, held to the enum by `family_tests!`'s exhaustive match, and
+  `docs/testing.md` names no count. The heading's "nine of fourteen" describes the state this entry was
+  raised against, not the tree. The four 2026-09-19 probes that recorded the gap went red on delivery
+  and are replaced by these:
+  `present: family_tests! in: core/tests/distinctness.rs`
+  `absent: nine of the twelve in: docs/testing.md`
 - **Verified 2026-09-19** — the quality half has no instrument, which is an absence no probe can
   assert:
   `unprobeable: whether a shipped preset is worth shipping is a look judgement; this repository has
   no statistic for it, which is the finding rather than a gap in the probe`
-- **PARTLY PROMOTED 2026-09-19 -> [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md)**,
+- **PARTLY PROMOTED 2026-09-19 -> [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md)**,
   which takes the **instrument half** only: the roster derives from `SystemKind` so all fourteen
   families are reported and a new variant fails the build, and the two stale prose carriers stop naming
   a list ([ADR-0234](adrs/0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md)).
@@ -1792,3 +1759,185 @@ designed; the first is the cheaper question to answer.
   **Owner if taken:** `dev`, after `architect` picks the move.
 - **Verified 2026-09-26** — the child command carries no adapter flag:
   `absent: --gpu in: standalone/src/thumbs.rs`
+
+## 0262 — the diffusion filter's cost page reads 2.5x what `quality` measured on Linux, and nothing says which profile a reader should start from
+
+[Plan 0211](plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)
+measured the pair backlog 0125 asked for, and the owner's verdict was that `quality` answers the ask
+for more resolution. What was filed as a wall was a profile choice. Two things are left, and both
+are documentation:
+
+- **Which profile the page leads with.** `docs/diffusion-filter.md`'s worked example passes
+  `--profile quality`, and the sidecar has no default profile. So the page makes the choice by
+  example, and it gives no cost argument. On Plan 0211's clip, `quality` cost about 5.5x `fast` per
+  emitted frame: 3.065 s against 0.554 s, or about 6.1 h against 66 min for a 4-minute track.
+- **Which machine the cost table describes.** The page's `What it costs` table was measured on
+  Windows with `attractor_leviathan` and reads 7.781 s per emitted frame at `quality`. Plan 0211
+  measured 3.065 s on the same GPU model on Linux with `star_rosewindow`. Both are honest
+  measurements that name their machine. But a reader choosing a profile from the page sees roughly
+  2.5x the cost this box measured, and nothing says whether the operating system or the preset is
+  responsible for the difference.
+
+- **Raised:** 2026-09-27 by `architect`, at Plan 0211's close (review round 1, minor 1), as the
+  residue of backlog 0125. **Owner if taken:** `architect` for what the page recommends; `dev` for
+  a re-measurement if the page's table is to be re-taken.
+- **Verified 2026-09-27** — the page's cost table was measured on Windows with a different preset:
+  `present: rendering .attractor_leviathan. at 1920x1080 in: docs/diffusion-filter.md`
+- **Verified 2026-09-27** — the page leads with `quality` by example:
+  `present: --profile quality --prompt in: docs/diffusion-filter.md`
+
+## 0263 — the conductor reads a `not run` log row as unfinished, so a phase whose done-when was not to run parks its plan as a disagreement
+
+In [Plan 0226](plans/done/0226-the-conductor-stops-waiting-for-the-owner.md)'s pilot run (started
+2026-09-26 16:50 UTC), 0202 parked `disagreement` after its amended Phase 3 landed:
+*"implement 2-3: the log does not mark Phase 2 done; log row for Phase 2 names 09be6b65, not a commit
+this step made"*. Phase 2's done-when said the phase does not run if Phase 1 falsified its candidate.
+Phase 1 had falsified it, and the log row honestly read `not run: Phase 1 falsified the candidate`.
+`rowIsDone` in `tools/conductor/lib/plan.mjs` accepts only a state beginning `done`, or
+`committed with this row`. So on resume the conductor handed the session "2-3", re-verified Phase 2
+against that step's commits, and parked. The owner reworded the row to `done - not run: ...`
+(`941941be`) and resumed.
+
+That is the only park of the pilot's ten that the pipeline should have absorbed. The other nine were
+judgements it could not make (two `plan_wrong`, a `stop_condition`, three `human_phase`), an edit
+under `.claude/` (`claude_dir`), a dirty main (`main_dirty`), and a red close gate (`check_red`) that
+the gate refuses to retry by design, the flake itself being backlog 0219. The shape recurs: closed
+plans already carry `not run` rows written by hand. So the next plan with a conditional phase parks
+the same way unless its implementer happens to spell the row `done - ...`.
+
+- **Raised:** 2026-09-27 by `architect`, recording Plan 0226 Phase 7's pilot readings. **Owner if
+  taken:** `dev` for `rowIsDone`, or `architect` if the answer is instead a rule that a skipped phase
+  writes `done - not run`.
+- **Verified 2026-09-27** — `rowIsDone` has no case for a skipped phase:
+  `absent: not run in: tools/conductor/lib/plan.mjs`
+- **Verified 2026-09-27** — the predicate is where the entry says:
+  `present: export function rowIsDone in: tools/conductor/lib/plan.mjs`
+
+## 0264 — two players at once run two thumbnail passes into one cache, and their temp files collide
+
+The studio's windowed player and the standalone app each start the thumbnail pass
+([Plan 0206](plans/done/0206-the-browser-shows-the-look.md)). Both write into the one per-user
+cache, and both name an in-flight entry `<entry>.rlxthumb-part`. So two children rendering the same
+preset collide. The loser logs the collision as a failure, which counts toward the pass giving up on
+that preset, and `discard_partials` in either process deletes the other's in-flight file. Nothing in
+the docs says the studio's player runs the pass at all.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0206's close review finding 1 (minor). **Owner
+  if taken:** `dev` (a per-process temp name or a lock file), plus a docs line in `docs/running.md`.
+- **Verified 2026-09-27** — the temp name carries no process identity:
+  `present: with_extension\("rlxthumb-part"\) in: standalone/src/thumbs.rs`
+
+## 0265 — the pane-clearance test pins the library at 114 presets while more ship
+
+`standalone/src/overlay/tests.rs` asserts that the browser's last column clears the pane with
+`LIBRARY = 114`. More presets than that ship now. At about 122 the last column reaches the pane, and
+the test would still pass, because it measures a library that no longer exists. The count should come
+from `rlx_core::preset::default_presets().len()`.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0206's close review finding 6 (nit). **Owner if
+  taken:** `dev` (test logic).
+- **Verified 2026-09-27** — the count is a literal:
+  `present: const LIBRARY: usize = 114; in: standalone/src/overlay/tests.rs`
+
+## 0266 — the exe's size cap is written in three places that nothing holds equal, and the Linux recipe measures nothing
+
+[Plan 0207](plans/done/0207-the-commitments-get-their-instruments.md) gave the exe a cap and a 90 %
+warning threshold. The pair is written in `packaging/windows/stage.ps1`, in
+`packaging/macos/bundle.sh`, and in NFR section 4. Guard (e) in `core/tests/suite/hygiene.rs` holds
+the *component's* pair to the NFR and re-derives the 90 %, but it reads neither exe recipe. That
+leaves ADR-0159's own stated negative, a number in two scripts drifting from its source, reproduced
+and untested. Separately, `packaging/linux/stage.sh` is the one standalone recipe with no measurement
+block, although two of NFR section 4's three size-series rows are Linux readings taken by hand.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0207's close review findings 3 (minor) and 7
+  (nit). **Owner if taken:** `dev` (a guard beside (e), and the Linux measurement block).
+- **Verified 2026-09-27** — the guard reads neither exe recipe:
+  `absent: stage\.ps1|bundle\.sh in: core/tests/suite/hygiene.rs`
+- **Verified 2026-09-27** — the Windows recipe carries its own copy of the pair:
+  `present: \$ExeCapBytes = 16777216 in: packaging/windows/stage.ps1`
+- **Verified 2026-09-27** — the Linux recipe has no size warning:
+  `absent: WarnBytes|warn-bytes|WARN_BYTES in: packaging/linux/stage.sh`
+
+## 0267 — the conductor's `Remove-Item` deletion bound was never asked of the real CLI
+
+[Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) put the allowlist's
+refusals on a recorded transcript (ADR-0233), and the probe ran on Linux. The PowerShell tool exists
+only on Windows, so every `Remove-Item` deny rule, including `PowerShell(Remove-Item *$*)` and the
+quoted-absolute-path twins added at the close, rests on the `decide` model rather than on what the
+CLI did. The shape the plan named, `Remove-Item -Recurse $env:USERPROFILE\WORK`, is one of them.
+`node tools/conductor/spike/matcher-probe.mjs` on a Windows box answers it, and the verdicts go in
+the `spike/README.md` table beside the Linux ones.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0208's close review finding 0 (minor), also
+  recorded in ADR-0233's Outcome. **Owner if taken:** `human` (a Windows run of the probe) then
+  `dev` (moving the cases onto the table).
+- **Verified 2026-09-27** — the rule exists and the table says it was not asked:
+  `present: PowerShell\(Remove-Item \*\$\*\) in: tools/conductor/settings.conductor.json`
+- **Verified 2026-09-27** — `present: Remove-Item -Recurse .*not asked in: tools/conductor/spike/README.md`
+
+## 0268 — under `order = "sequential"`, Space after a browser pick does not continue from what is on screen
+
+With presets alpha to echo in sequential order: Space gives alpha, Space gives bravo, pick `echo` in
+the browser, Space gives `charlie` and not `alpha`. A browser pick never enters the traversal, which
+is inherited from [Plan 0205](plans/done/0205-the-library-becomes-navigable.md) (it never enters the
+shuffle's `seen` either), but only sequential order makes it visible. It leaves ADR-0239's "Space
+means the next preset again" partly undelivered, since the rule before 0205 took the successor of the
+active index. Whether a manual selection should re-anchor the traversal is a design call.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0216's close review finding 1 (minor). **Owner
+  if taken:** `architect` (the re-anchor rule), then `dev`.
+- **Verified 2026-09-27** — the sequential arm is where the entry says:
+  `present: Order::Sequential => in: standalone/src/director.rs`
+- **Verified 2026-09-27** — the defect itself is a runtime order:
+  `unprobeable: the successor after a browser pick is decided at runtime, and no text line shows it`
+
+## 0269 — two unreachable divergences Plan 0215's review left: a capture loop's `lost`, and `Observed<T>`'s feedback
+
+Both are unreachable today and both would bite silently if that changed.
+
+- `standalone/src/capture_linux/rt.rs`: the `let Some(window) = bytes.get_mut(carry..filled) else {
+  return; }` exit leaves `lost` unset, while the `stream.read` error path three lines below stores
+  it. The two ways the loop ends report differently. The bound is unreachable at the sizes the caller
+  establishes.
+- `core/src/render/tests.rs`: `Observed<T>` no longer forwards `set_feedback`, so it inherits
+  `Scene`'s `None` for `as_feedback_sink`, and `hand_over_active_preset` would drop an observed
+  attractor's `[feedback]` table. No scene observed today has that capability.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0215's close review findings 3 and 4 (nits).
+  **Owner if taken:** `dev`.
+- **Verified 2026-09-27** — `present: let Some\(window\) = bytes\.get_mut\(carry\.\.filled\) else in: standalone/src/capture_linux/rt.rs`
+- **Verified 2026-09-27** — `present: struct Observed<T> in: core/src/render/tests.rs`
+
+## 0270 — an npm advisory with no GHSA url could only be cleared by a bump
+
+`scripts/check-npm-audit.mjs` gives an advisory without a GHSA url the id `npm-<source>`, and the
+allow file's reader accepts only GHSA ids. Such an advisory could never be excepted with a reason,
+which ADR-0244 says every exception carries. It is theoretical while npm keys every advisory by GHSA.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0220's close review finding 3 (nit). **Owner if
+  taken:** `dev`.
+- **Verified 2026-09-27** — `present: npm-\$\{via\.source\} in: scripts/check-npm-audit.mjs`
+
+## 0271 — the studio's missing-player banner says to edit a settings file without saying where it is
+
+When no player resolves, the banner reads *"Set "playerPath" in the studio settings file to a
+ritmolux build."* The file is `settings.json` under a per-OS directory (`%APPDATA%/ritmolux-studio`,
+`~/Library/Application Support/ritmolux-studio`, `~/.config/ritmolux-studio`), which
+`studio/README.md` names and the banner does not. The person who sees the banner is the one who has
+not read the README.
+
+- **Raised:** 2026-09-27 by `architect`, filing the unrouted followup from
+  [Plan 0219](plans/done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s Phase 4 notes.
+  **Owner if taken:** `studio-builder`.
+- **Verified 2026-09-27** — `present: Set "playerPath" in the studio settings file in: studio/renderer/App.tsx`
+
+## 0272 — `npm run dev` leaves Vite and the esbuild watchers running after the studio window closes
+
+The studio's `dev` script starts four processes under `concurrently` without `--kill-others`, so
+closing the Electron window ends the player and Electron but leaves Vite and both esbuild watchers
+running. The next `npm run dev` then finds port 5273 taken.
+
+- **Raised:** 2026-09-27 by `architect`, filing the unrouted followup from
+  [Plan 0219](plans/done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s Phase 4 notes.
+  **Owner if taken:** `studio-builder`.
+- **Verified 2026-09-27** — `absent: kill-others in: studio/package.json`

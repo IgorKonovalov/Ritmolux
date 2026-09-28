@@ -69,9 +69,14 @@ fn stderr(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).into_owned()
 }
 
-/// The cache directory a run with data root `root` writes into.
+/// The cache directory a run whose data root env vars all name `root` writes
+/// into — the per-OS arms of `standalone::preset_data_root`, plus the app dir.
 fn cache_dir(root: &Path) -> PathBuf {
-    root.join("Ritmolux").join("thumbnails")
+    #[cfg(target_os = "macos")]
+    let root = root.join("Library").join("Application Support");
+    #[cfg(not(target_os = "macos"))]
+    let root = root.to_path_buf();
+    root.join(standalone::APP_DIR_NAME).join("thumbnails")
 }
 
 /// Every file in the cache directory, or an empty list when it does not exist.

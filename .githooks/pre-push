@@ -274,6 +274,14 @@ echo "pre-push: running the fast subset (doc links, backlog claims, comment hygi
 # the gates beside it. It greps rather than parses, so `settings-allow: <why>` on
 # the line is the escape and a marker with no reason is itself a finding.
 #
+# The claude-declaration gate (ADR-0210) reads plans rather than code: a phase
+# whose body names a skill, a hook, `settings.json` or a conductor-mode section
+# must write a `.claude/` path into its `**Files touched:**` bullet, because that
+# literal path is the only thing the conductor reads before parking a phase no
+# headless session can do. It reads prose, so `claude-allow: <why>` in the phase
+# body is the escape, and a closed plan is an advisory rather than a failure.
+# Twice, for the index-row reason: a detector that stopped matching exits 0.
+#
 # The roster's own gate closes the block (ADR-0217), and its subject is this file
 # rather than a document: the list above is one of THREE copies - the hook, CI's
 # `links` job and the conductor's `defaultGate()` - and nothing held them equal,
@@ -303,10 +311,12 @@ if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-translations.mjs --self-test" node scripts/check-translations.mjs --self-test
     run_step "node scripts/check-system-counts.mjs" node scripts/check-system-counts.mjs
     run_step "node scripts/check-settings-have-files.mjs" node scripts/check-settings-have-files.mjs
+    run_step "node scripts/check-claude-declarations.mjs" node scripts/check-claude-declarations.mjs
+    run_step "node scripts/check-claude-declarations.mjs --self-test" node scripts/check-claude-declarations.mjs --self-test
     run_step "node scripts/check-gate-carriers.mjs" node scripts/check-gate-carriers.mjs
     run_step "node scripts/check-gate-carriers.mjs --self-test" node scripts/check-gate-carriers.mjs --self-test
 else
-    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure, comment-hygiene, reader-prose, contents-block, release-tag, translation, system-count, settings-file and gate-roster checks (no node on PATH)"
+    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure, comment-hygiene, reader-prose, contents-block, release-tag, translation, system-count, settings-file, claude-declaration and gate-roster checks (no node on PATH)"
 fi
 
 # The diffusion filter's own suite (Plan 0106 Phase 7c) rides the same guard, in
