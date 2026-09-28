@@ -126,9 +126,8 @@ pub fn route_into(
 ///
 /// The same implementation the frame path runs — it delegates rather than
 /// restating the rule, so a test can never pass against a second copy of the
-/// routing that the show does not use. Test-only because the frame path wants
-/// the draining form; the logic under assertion is `route_into` either way.
-#[cfg(test)]
+/// routing that the show does not use. The frame path wants the draining form;
+/// the logic under assertion is `route_into` either way.
 pub fn route(mut chrome: Vec<Line>, mut modal: Vec<Line>, console: Console) -> FrameText {
     let mut dst = FrameText::default();
     route_into(&mut dst, &mut chrome, &mut modal, console);
@@ -380,11 +379,11 @@ pub fn action_for(button: Button, view: &crate::settings::SettingsView) -> Conso
 /// `auto` twice must not turn rotation off — which is what `auto_enabled` is
 /// read for, and the only asymmetry between the two sources.
 pub fn action_for_transport(
-    verb: standalone::osc::decode::Transport,
+    verb: crate::osc::decode::Transport,
     auto_enabled: bool,
     view: &crate::settings::SettingsView,
 ) -> Option<ConsoleAction> {
-    use standalone::osc::decode::Transport;
+    use crate::osc::decode::Transport;
     Some(match verb {
         Transport::Next => action_for(Button::Next, view),
         Transport::Prev => action_for(Button::Prev, view),
@@ -494,6 +493,25 @@ pub fn transport_lines(auto: bool) -> Vec<Line> {
             )
         })
         .collect()
+}
+
+/// The console's standing furniture at the reference geometry, in draw order:
+/// the header, the transport labels, then the staging line.
+///
+/// Drawn only while no modal is up — a browse list or a settings menu starts at
+/// the same inset, and the two overlap into an unreadable pile. Scaled onto the
+/// real window with the routed lines by one [`scale_lines`] call, so the header
+/// cannot drift off the rows.
+pub fn standing_lines(
+    preset: &str,
+    auto: bool,
+    next: Option<&str>,
+    dwell: (u32, u32),
+) -> Vec<Line> {
+    let mut lines = vec![header(preset)];
+    lines.extend(transport_lines(auto));
+    lines.push(staging_line(next, auto, dwell));
+    lines
 }
 
 /// A live control's label colour.

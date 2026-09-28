@@ -26,7 +26,7 @@
 
 use rlx_core::render::{GridScale, Tier};
 
-use standalone::config::{GridScaleChoice, InputMode, RotateOrder, RotateSource};
+use crate::config::{GridScaleChoice, InputMode, RotateOrder, RotateSource};
 
 /// The fixed values the Grid scale row steps through, smallest first; `auto`
 /// sits past the top. Quarters, because a finer step is not a difference an

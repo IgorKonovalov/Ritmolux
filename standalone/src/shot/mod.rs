@@ -29,6 +29,7 @@ pub mod horizon;
 pub mod json;
 pub mod render;
 pub mod report;
+pub mod ui;
 pub mod wav;
 
 use rlx_core::preset::Preset;

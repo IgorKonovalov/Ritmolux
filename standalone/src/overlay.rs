@@ -8,6 +8,54 @@
 
 use std::borrow::Cow;
 
+use crate::console::Line;
+use crate::settings::{SettingsState, SettingsView};
+
+// ---------------------------------------------------------------------------
+// The corner name plate (device px)
+// ---------------------------------------------------------------------------
+
+/// On-canvas active-preset-name label: top-left inset (device px), font size,
+/// and a light near-white color legible over most scenes.
+pub const NAME_INSET: f32 = 16.0;
+pub const NAME_SIZE: f32 = 28.0;
+pub const NAME_COLOR: [f32; 4] = [0.9, 0.95, 1.0, 1.0];
+
+/// The rotation countdown sits directly under the preset name, smaller and
+/// dimmer: it is a status line about the show's cadence, not part of the show.
+pub const NEXT_TOP: f32 = NAME_INSET + NAME_SIZE + 6.0;
+pub const NEXT_SIZE: f32 = 18.0;
+pub const NEXT_COLOR: [f32; 4] = [0.72, 0.80, 0.90, 0.8];
+
+/// How the corner name reports the marks the preset on screen carries.
+///
+/// Suffixed rather than prefixed so the name still starts at the same x on
+/// every preset, and spelled out rather than glyphed: the browser's single
+/// character has a column of them to be read against, and one floating in a
+/// corner does not.
+pub fn mark_suffix(favourite: bool, hidden: bool) -> &'static str {
+    match (favourite, hidden) {
+        (true, true) => "  (favourite, hidden)",
+        (true, false) => "  (favourite)",
+        (false, true) => "  (hidden)",
+        (false, false) => "",
+    }
+}
+
+/// The countdown line, or `None` when there is nothing to count down to.
+///
+/// `remaining` is the director's own answer and is already `None` while
+/// auto-rotate is off, so "says nothing when it is off" is that `None` rather
+/// than a second rule here. `enabled` is the operator's switch.
+///
+/// Whole seconds, rounded up, so the line reaches `1 s` and then the rotation
+/// happens — a line that showed `0 s` for most of a second would read as a
+/// stalled timer.
+pub fn next_rotation_line(remaining: Option<f32>, enabled: bool) -> Option<String> {
+    let secs = remaining.filter(|_| enabled)?;
+    Some(format!("next in {} s", secs.ceil().max(0.0) as u32))
+}
+
 // ---------------------------------------------------------------------------
 // List geometry (device px)
 // ---------------------------------------------------------------------------
@@ -335,7 +383,7 @@ pub fn mark_glyph(row: &Row<'_>) -> char {
 /// column, and the family.
 ///
 /// Built here rather than at the draw site so the format and the column
-/// arithmetic above live together — a name column that outgrew [`COL_CHARS`]
+/// arithmetic above live together — a name column that outgrew `COL_CHARS`
 /// would collide with the next column's text, and nothing on screen would say
 /// why.
 pub fn row_text(row: &Row<'_>, marker: &str) -> String {
@@ -369,6 +417,157 @@ pub fn header_text(state: &OverlayState) -> String {
         parts.push("+hidden".to_owned());
     }
     parts.join("   ")
+}
+
+// ---------------------------------------------------------------------------
+// Composition: the lines a frame draws
+// ---------------------------------------------------------------------------
+//
+// Pure functions of state, window size and fixed geometry. The shell calls them
+// once per frame and `shot --ui` calls them against fixture state, so a headless
+// capture of a modal is built by exactly the code the window draws with.
+
+/// The marker and colour one **browse-list** row is drawn with.
+///
+/// **The cursor wins.** A highlighted row is [`ROW_HL_COLOR`] whether or not it
+/// is a favourite, so there is never a frame in which two rows could be read as
+/// the one the keys act on. Below that, a favourite is warm and everything else
+/// is the plain row colour.
+///
+/// Hidden rows have no colour of their own and keep [`ROW_COLOR`] behind their
+/// `-` glyph, so a preset carrying both marks draws warm with a `-` — the
+/// glyph's own precedence rule meeting a colour that says otherwise. A third
+/// colour to disambiguate a state this rare costs more than it returns.
+///
+/// The settings menu's rows are deliberately not routed through here: they carry
+/// no marks, so a shared function would take a parameter that is always `false`.
+pub fn browse_row_style(highlighted: bool, favourite: bool) -> (&'static str, [f32; 4]) {
+    match (highlighted, favourite) {
+        (true, _) => ("> ", ROW_HL_COLOR),
+        (false, true) => ("  ", FAV_COLOR),
+        (false, false) => ("  ", ROW_COLOR),
+    }
+}
+
+/// The corner name plate: the active preset's name carrying its marks, and the
+/// countdown under it when there is one.
+///
+/// The marks ride on the name rather than on a line of their own: marking is
+/// worthless if you cannot see what is marked without opening the browser, and
+/// a second line for two words is furniture the show does not need.
+pub fn corner_lines(
+    name: &str,
+    favourite: bool,
+    hidden: bool,
+    countdown: Option<String>,
+    out: &mut Vec<Line>,
+) {
+    out.push(Line::new(
+        format!("{name}{}", mark_suffix(favourite, hidden)),
+        NAME_INSET,
+        NAME_INSET,
+        NAME_SIZE,
+        NAME_COLOR,
+    ));
+    if let Some(text) = countdown {
+        out.push(Line::new(text, NAME_INSET, NEXT_TOP, NEXT_SIZE, NEXT_COLOR));
+    }
+}
+
+/// The F3 capture line, placed under the core's diagnostics panel.
+pub fn capture_verdict_line(token: &str) -> Line {
+    Line::new(
+        capture_line(token),
+        NAME_INSET,
+        CAPTURE_TOP,
+        CAPTURE_SIZE,
+        CAPTURE_COLOR,
+    )
+}
+
+/// The settings menu: its key-hint header, then one row per setting with the
+/// highlight marker on [`SettingsState::row`].
+///
+/// One column, always: the rows start at [`ROWS_TOP`] with a [`ROW_H`] pitch,
+/// which fits any window this app opens in, and a settings menu that reflowed
+/// would move a row out from under the operator's hand mid-edit.
+pub fn settings_lines(state: &SettingsState, view: &SettingsView, out: &mut Vec<Line>) {
+    out.push(Line::new(
+        "settings  -  up/down  left/right  esc".to_owned(),
+        LIST_INSET,
+        LIST_TOP,
+        ROW_SIZE,
+        HEADER_COLOR,
+    ));
+    for (row, (label, value)) in state.lines(view).into_iter().enumerate() {
+        let (marker, color) = if row == state.row() {
+            ("> ", ROW_HL_COLOR)
+        } else {
+            ("  ", ROW_COLOR)
+        };
+        out.push(Line::new(
+            format!("{marker}{label:<14}{value}"),
+            LIST_INSET,
+            ROWS_TOP + row as f32 * ROW_H,
+            ROW_SIZE,
+            color,
+        ));
+    }
+}
+
+/// The browser: the header naming the query and every narrowing, then the
+/// `visible` rows placed by `layout`.
+///
+/// Every placement decision is [`layout`]'s, so this only turns `(column, row)`
+/// into pixels. Rows the layout scrolls off answer `None` and are skipped.
+pub fn browse_lines(
+    state: &OverlayState,
+    visible: &[(usize, Row<'_>)],
+    layout: &ListLayout,
+    out: &mut Vec<Line>,
+) {
+    out.push(Line::new(
+        header_text(state),
+        LIST_INSET,
+        LIST_TOP,
+        ROW_SIZE,
+        HEADER_COLOR,
+    ));
+    for (row, (_abs, entry)) in visible.iter().enumerate() {
+        let Some((col, r)) = layout.place(row) else {
+            continue;
+        };
+        let (marker, color) = browse_row_style(row == state.highlight(), entry.favourite);
+        out.push(Line::new(
+            row_text(entry, marker),
+            LIST_INSET + col as f32 * COL_W,
+            ROWS_TOP + r as f32 * ROW_H,
+            ROW_SIZE,
+            color,
+        ));
+    }
+}
+
+/// The preview pane's text: the placeholder inside the image's rectangle while
+/// `shown` is false, and the highlighted preset's name under it either way.
+pub fn pane_lines(pane: &Pane, name: &str, shown: bool, out: &mut Vec<Line>) {
+    if !shown {
+        let (x, y) = pane.placeholder_at();
+        out.push(Line::new(
+            PANE_PLACEHOLDER.to_owned(),
+            x,
+            y,
+            PANE_TEXT_SIZE,
+            PANE_PLACEHOLDER_COLOR,
+        ));
+    }
+    out.push(Line::new(
+        name.to_owned(),
+        pane.x,
+        pane.caption_y,
+        PANE_TEXT_SIZE,
+        PANE_CAPTION_COLOR,
+    ));
 }
 
 /// A key the overlay reacts to, decoded from the platform's input upstream so

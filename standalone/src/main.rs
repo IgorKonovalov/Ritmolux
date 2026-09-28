@@ -24,7 +24,6 @@ mod capture_verdict;
 #[cfg(windows)]
 mod capture_win;
 mod cli;
-mod console;
 mod diaglog;
 mod director;
 mod downbeatlog;
@@ -35,14 +34,18 @@ mod input;
 // never fed — the same asymmetry loopback capture already has.
 #[cfg(windows)]
 mod nowplaying_win;
-mod overlay;
 mod preset_dir;
 mod run;
-mod settings;
 mod show;
 mod soak;
 mod stream;
 mod thumbs;
+
+// The three pure modal and routing modules live in the library, so the headless
+// `shot --ui` capture composes a frame's interface text with the same functions
+// this binary draws with. Imported at the root so `crate::overlay` and its
+// siblings keep resolving from every module here.
+use standalone::{console, overlay, settings};
 
 fn main() {
     // The thumbnail child (ADR-0230), before the launch path: this mode renders

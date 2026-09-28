@@ -701,3 +701,80 @@ fn a_rotation_the_director_asks_for_changes_the_preset() {
         "the outgoing preset stays active until the dissolve's capture frame"
     );
 }
+
+/// **The name the console announces is the one the rotation then takes**, against
+/// the shipped roster rather than a hand-written one.
+///
+/// The staging line is fed by the traversal's own peek, so this drives a real
+/// [`Director`] to a real rotation and compares what the console would have
+/// announced *beforehand* with the name the draw returns *afterwards*. The rule
+/// itself is asserted above; what this adds is the shipped library, the director
+/// firing, and the console's own line carrying the name.
+///
+/// Needs a GPU device for the roster, so it takes ADR-0016's skip shape.
+#[test]
+fn the_staged_name_is_the_one_the_rotation_then_takes() {
+    use crate::console::staging_line;
+    use rlx_core::render::{HeadlessOptions, RenderError, Renderer};
+    use standalone::config::{Rotate, RotateSource};
+    use standalone::marks::Marks;
+
+    let renderer = match Renderer::new_headless(HeadlessOptions {
+        width: 64,
+        height: 64,
+        prefer_software: true,
+    }) {
+        Ok(r) => r,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+
+    // Zero dwell bounds so the timer fires on the first advance: this test is
+    // about *which* preset a rotation takes, and the *when* has its own tests
+    // above.
+    let mut director = Director::from_config(&Rotate {
+        auto: true,
+        min_dwell_secs: 0,
+        max_dwell_secs: 0,
+        track_change: false,
+        ..Rotate::default()
+    });
+
+    let marks = Marks::default();
+    let eligible = eligible_names(renderer.preset_names(), &marks, RotateSource::All);
+    assert!(
+        eligible.len() > 1,
+        "the embedded roster needs more than one eligible preset for this to \
+         say anything"
+    );
+
+    let mut traversal = Traversal::new(renderer.preset_names().count() as u32);
+    let announced = traversal
+        .peek(&eligible)
+        .map(str::to_owned)
+        .expect("a multi-preset roster stages a next");
+    let staged = staging_line(Some(&announced), true, (20, 90));
+    assert!(
+        staged.text.contains(&announced),
+        "the staging line did not carry the announced name: {}",
+        staged.text
+    );
+
+    let fired = director.advance(1.0 / 60.0, &AnalysisFrame::default());
+    assert!(
+        fired.is_some(),
+        "a director at zero dwell must rotate on its first advance, or this \
+         test is comparing against a rotation that never happened"
+    );
+
+    let taken = traversal.draw(&eligible).expect("a non-empty eligible set");
+    assert_eq!(
+        taken, announced,
+        "the console announced a different preset than the rotation took — the \
+         staging line is computed from something other than the traversal the \
+         rotation draws from"
+    );
+}

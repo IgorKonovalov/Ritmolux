@@ -6,7 +6,7 @@ use super::{
 
 use std::path::Path;
 
-use standalone::config::Config;
+use crate::config::Config;
 
 fn view() -> SettingsView {
     SettingsView {

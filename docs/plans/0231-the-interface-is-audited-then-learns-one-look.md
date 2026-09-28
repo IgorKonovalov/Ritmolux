@@ -1,6 +1,6 @@
 # 0231 — The interface is audited, then learns one look
 
-> **Status:** approved
+> **Status:** in-progress
 > **Approved:** 2026-09-27 (user). Queued in `tools/conductor/queue.json` 2026-09-28 at the owner's request, for Phases 1-2; the run parks at Phase 3, the `human` audit that re-scopes Phases 8, 9 and 11
 > **Created:** 2026-09-27
 > **Owner skill(s):** dev, studio-builder, human
@@ -374,11 +374,11 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(not started)_
+**Lane:** `plan-0231-the-interface-is-audited-then-learns-one-look`, worktree `/home/igor/Work/rlx-plan-0231`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Engine UI captures | dev | not started | |
+| 1 — Engine UI captures | dev | done | committed with this row |
 | 2 — Studio captures | studio-builder | not started | |
 | 3 — Audit and direction | human | not started | |
 | 4 — The look declared once | dev | not started | |
@@ -392,6 +392,24 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | 12 — Before and after on devices | human | not started | |
 
 ### Notes
+
+- Phase 1, files outside its list. The `shot` example cannot reach binary modules, so
+  `overlay.rs`, `settings.rs` and `console.rs` moved from the `ritmolux` binary into the `standalone`
+  library at the same paths (`standalone/src/lib.rs`, `standalone/src/main.rs` re-imports them at
+  the root). That also touched `settings.rs`, `settings/tests.rs` and `console/tests.rs`
+  (`standalone::` paths to `crate::`), made `console::route` non-test-only because `hud.rs`'s tests
+  call it across the crate boundary, and moved the one console test that needs the binary's
+  `director` (`the_staged_name_is_the_one_the_rotation_then_takes`) into `director/tests.rs`.
+- Phase 1, what was factored out. `hud.rs`'s line-building moved into pure library functions that
+  both the app and `shot --ui` call: `overlay::{corner_lines, capture_verdict_line, settings_lines,
+  browse_lines, pane_lines, browse_row_style}` and `console::standing_lines`. The name-plate
+  constants, `mark_suffix` and `next_rotation_line` moved from `hud.rs` to `overlay.rs` with them.
+  The fixtures and the composition are `standalone/src/shot/ui.rs`. The flag itself is parsed in
+  `standalone/examples/shot.rs`, which is also not in the file list.
+- Phase 1, approximations. The `console` state draws the console's lines over the full-frame scene,
+  where the real console shows a letterboxed preview. The `browse-thumbs` still is the scene frame
+  itself, shrunk to 160x90. The scene is `Nebula` unless `--preset` is given. `docs/capturing.md`
+  records all three.
 
 ### Close triggers
 
