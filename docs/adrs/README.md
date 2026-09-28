@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0254.** *(0120 was reserved for
+**Next free number: 0255.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -275,4 +275,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0251](0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md) | A gated compile path has a named job, and the upstream reading is advisory | accepted 2026-09-24, Plan 0227; generalises 0181 |
 | [0252](0252-the-interfaces-look-is-declared-once-in-the-core-and-the-studios-stylesheet-is-generated-from-it.md) | The interface's look is declared once in the core, and the studio's stylesheet is generated from it | proposed 2026-09-27, Plan 0231 |
 | [0253](0253-a-retirement-may-land-ahead-of-its-replacement-when-a-walk-convicts-it.md) | A retirement may land ahead of its replacement when a walk convicts it | proposed 2026-09-27, Plan 0232; amends 0089 |
+| [0254](0254-the-release-artifact-count-runs-on-every-release-run-and-proves-it-refuses.md) | The release artifact count runs on every release run, and proves it refuses | proposed 2026-09-28, Plan 0214 |
 <!-- roster:end -->
