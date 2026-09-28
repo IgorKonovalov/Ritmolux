@@ -163,6 +163,16 @@ npm run build
 npx electron . --capture ../target/studio-shots/now.png --capture-after 10000
 ```
 
+`npm run ui-shots` captures every view and modal instead: the five editor tabs
+(the library is one of them), Settings, the problems list and the fork prompt,
+at the window's default size and at 1280x800, into `target/ui-audit/<size>/`.
+It builds the studio, finds a built player the way the tests do (or takes
+`-- --player <path>`), and runs it windowless against a scratch preset directory
+holding `presets/curve_phosphor.toml` and two broken presets, so the problems
+list has rows. Nothing of the user's is read or written except, on macOS, the
+player's own data directory. Captures use the machine's fonts and a live
+picture, so they are for looking at, never for comparing.
+
 ## What the studio may and may not do
 
 - Three domain IPC channels carry every player message and there are only three:

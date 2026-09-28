@@ -379,7 +379,7 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Engine UI captures | dev | done | committed with this row |
-| 2 — Studio captures | studio-builder | not started | |
+| 2 — Studio captures | studio-builder | done | committed with this row |
 | 3 — Audit and direction | human | not started | |
 | 4 — The look declared once | dev | not started | |
 | 5 — Panels and measured text | dev | not started | |
@@ -410,6 +410,24 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   where the real console shows a letterboxed preview. The `browse-thumbs` still is the scene frame
   itself, shrunk to 160x90. The scene is `Nebula` unless `--preset` is given. `docs/capturing.md`
   records all three.
+- Phase 2, shape. `studio/scripts/ui-shots.mjs` runs twice: under Node it lays out scratch and
+  relaunches itself under Electron, where it loads the built `dist/main/index.cjs` unchanged and
+  walks the window with `executeJavaScript` and `capturePage`. Nothing under `studio/electron/`
+  changed. It puts the studio's name and version back on `app` (Electron reports its own when the
+  entry has no `package.json` beside it). States: `editor-parameters`, `editor-structure`,
+  `editor-palette`, `editor-file`, `library` (an editor tab), `settings`, `problems`,
+  `fork-prompt`, under `studio/target/ui-audit/default/` and `.../1280x800/`.
+- Phase 2, fixture. No committed fixture: the scratch preset directory is a copy of
+  `presets/curve_phosphor.toml` plus two broken presets the script writes (a parse error and an
+  unknown parameter), which is what makes the problems button and modal reachable. Settings,
+  `RLX_PRESET_DIR` and `XDG_DATA_HOME` (`APPDATA` on Windows) all point into scratch.
+- Phase 2, what it took on this machine (Arch, Hyprland). The player runs **windowless** by default
+  (`--mode windowed` opts back in), so no show window opens on the desktop. The window's size is
+  pinned (min = max) before it first maps, or the tiling manager resized it mid-walk. Under Wayland
+  Electron is started with `--ozone-platform=x11`: a surface the compositor is not showing gets no
+  frame callbacks, and `capturePage` then returned the previous state's frame, one step behind.
+  Each capture also waits for two animation frames after the step. Runs on Windows and macOS are
+  unmeasured. Also touched outside the list: `studio/README.md` (the command's paragraph).
 
 ### Close triggers
 
