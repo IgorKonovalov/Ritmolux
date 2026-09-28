@@ -57,7 +57,7 @@
 //!   --bar-grid <path>        also write the render's bar starts, in frames, as
 //!                            JSON for the diffusion filter's --timeline. The
 //!                            frame stream is unchanged. Needs --render
-//!   --help, -h              print the usage text and exit 0
+//!   --help, -h               print the usage text and exit 0
 //!
 //! Which preset library is used, highest precedence first: `--preset-file`,
 //! `--presets`, the `RLX_PRESET_DIR` override, the per-user preset directory,
@@ -480,7 +480,7 @@ fn print_usage() {
          --bar-grid <path>          also write the render's bar starts, in\n\
                                     frames, as JSON (for sd-filter --timeline).\n\
                                     The stream is unchanged. Needs --render\n\
-         --help, -h                print this usage and exit"
+         --help, -h                 print this usage and exit"
     );
 }
 
