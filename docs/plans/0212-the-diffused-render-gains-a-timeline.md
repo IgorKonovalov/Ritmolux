@@ -224,6 +224,22 @@ flowchart LR
   fix is on the sidecar's side (read the grid after the first frame arrives, or wait for the file) or
   a documented two-step, and it is not repaired here.
 
+- **Phase 3, the full track, rendered 2026-09-27/28** (by a session at the owner's request; the
+  verdict is the owner's). The whole of *Yes, I Know* (4:27, 8 008 frames), `star_rosewindow`,
+  `--fps 30 --size 1920x1080 --tier rich`, `--profile quality` (the owner judged it enough in
+  Plan 0211 Phase 2), seed 1234. The grid had 124 bars, 15 locked and 109 on the fallback counter.
+  The timeline held a rose window for bars 1-24, blended to *"a vast canyon of luminous glowing rock
+  strata"* by 36 and held it to 60, blended to the ice cave by 72 and held it to 100, and blended back
+  to the rose window by 112. It took 22 351.6 s wall clock (2.791 s per emitted frame), with a peak of
+  4.88 GiB, on the RTX 3080 Laptop, in one uninterrupted run. An earlier attempt was killed at frame
+  2 140 by an editor closing and another was stopped at 830 for a reboot; neither is in these figures.
+  The file is `target/p0212/track.mp4` in the main checkout, uncommitted, and `track_sheet.png` beside
+  it shows one frame at the middle of each hold and each blend (bars 12, 30, 48, 66, 86, 106, 120).
+  **Read from the sheet, before the owner's verdict:** each hold is its prompt over the same star,
+  though the canyon reads more as a nebula with rock strata at the frame edge than as a canyon. Each
+  blend midpoint is a third, darker abstract figure in neither prompt's palette, the same thing the
+  short clip showed.
+
 ### Close triggers
 
 - **`presets/` touched:** no
