@@ -265,6 +265,13 @@ flowchart LR
   - **So a timeline's bar is the right length and not reliably on the music's bar 1.** That is the
     Risks section's case of the grid rather than the blend, and evidence for backlog 0042, not
     against ADR-0236. It did not cost the verdict above: a 12-bar blend has no downbeat to miss.
+- Close review round 1, finding 0 (major, the filter read `--bar-grid` at startup): fixed in
+  68070a57 - the grid loads once the Y4M header arrives; a subprocess test starts the filter first.
+- Round 1, finding 1 (minor, the diffusion filter page's flags): fixed in a56d7b21.
+- Round 1, finding 2 (minor, the `--help` row's alignment in `shot`): fixed in 6cb70cc7.
+- Round 1, finding 3 (minor, a grid not checked against its stream): fixed in b56153ec - another
+  frame rate is refused, and a stream past the grid warns once.
+- Round 1, finding 4 (minor, the log's length): no repair, as the review says.
 
 ### Close triggers
 
