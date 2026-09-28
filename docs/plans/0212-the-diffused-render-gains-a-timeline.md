@@ -240,6 +240,12 @@ flowchart LR
   blend midpoint is a third, darker abstract figure in neither prompt's palette, the same thing the
   short clip showed.
 
+- **Phase 3 verdict, 2026-09-28 (owner), on the full-track render:** *"it looks great, amazing
+  really"*. That is **the variation reads**, the done-when's first outcome, and the plan closes on it.
+  The blend midpoints read as a third figure rather than as a crossfade between two wrong images, so
+  ADR-0236's named failure mode is not what the owner saw. The bar check against `--downbeat-log` is
+  recorded separately below.
+
 ### Close triggers
 
 - **`presets/` touched:** no
