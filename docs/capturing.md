@@ -549,7 +549,9 @@ cargo run -p standalone --release --example shot -- --preset "Leviathan" \
 ```
 
 The file is written before the first frame, and **the stream is byte-identical
-with and without the flag**. It is one JSON object:
+with and without the flag**. The filter reads it only once the stream's header
+has arrived, so both ends of the pipe can name a file that does not exist yet.
+It is one JSON object:
 
 ```json
 {"fps":"60:1","frames":14400,"bar_starts":[0,131,247,...],"bar_locked":[false,false,...]}

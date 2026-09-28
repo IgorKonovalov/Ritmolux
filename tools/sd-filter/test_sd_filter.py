@@ -671,22 +671,51 @@ with tempfile.TemporaryDirectory() as td:
         except sd_filter.ConfigError:
             check("refused grid: %s" % why, True)
 
+    # The grid is attached once the stream's header is in, and hands the stage
+    # the grid's bars.
+    y4m = b"YUV4MPEG2 W8 H8 F60:1 Ip A1:1 C444 XCOLORRANGE=FULL" + NL
+    astage = sd_filter.DiffusionStage(cell(timeline="t.json"), tl)
+    sd_filter.attach_bar_grid(astage, gpath, sd_filter.parse_header(y4m))
+    check("an attached grid resolves frame 180 to bar 3",
+          astage.bar_of is not None and astage.bar_of(180) == 3.0)
+
     # Past the track, now that the track's length is known: the 4-bar grid
     # refuses an entry at bar 5 before any model is built.
     tpath = os.path.join(td, "timeline.json")
     with open(tpath, "w", encoding="utf-8") as f:
         json.dump([{"at_bar": 1, "prompt": "a"}, {"at_bar": 5, "prompt": "b"}], f)
-    err = io.StringIO()
-    real_err, sys.stderr = sys.stderr, err
     try:
-        code = sd_filter.main(["sd_filter.py", "--timeline", tpath,
-                               "--bar-grid", gpath])
-    finally:
-        sys.stderr = real_err
-    check("an entry past the grid's last bar exits 2, naming it",
-          code == 2 and "timeline entry 2" in err.getvalue()
-          and "bar 4" in err.getvalue(),
-          "exit %r, stderr %r" % (code, err.getvalue()[-200:]))
+        sd_filter.attach_bar_grid(
+            sd_filter.DiffusionStage(cell(timeline=tpath),
+                                     sd_filter.load_timeline(tpath)),
+            gpath, sd_filter.parse_header(y4m))
+        check("an entry past the grid's last bar is refused", False, "did not raise")
+    except sd_filter.ConfigError as e:
+        check("an entry past the grid's last bar is refused, naming it",
+              "timeline entry 2" in str(e) and "bar 4" in str(e), str(e))
+
+    # `shot --bar-grid g.json | sd_filter.py --bar-grid g.json` starts both
+    # together, and shot writes g.json only before its first stream byte: the
+    # filter must be running, waiting on the header, while the file does not
+    # exist yet. The bar-5 timeline makes the grid's arrival observable - it
+    # exits 2 naming the entry, not the missing file - without building a model.
+    fresh = os.path.join(td, "fresh-grid.json")
+    proc = subprocess.Popen(
+        [sys.executable, os.path.join(HERE, "sd_filter.py"),
+         "--timeline", tpath, "--bar-grid", fresh],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    first = proc.stderr.readline()  # the expansion: startup is behind it
+    check("the filter starts while the grid file does not exist",
+          not os.path.exists(fresh) and first.startswith(b"sd-filter: "),
+          "stderr %r" % first)
+    with open(fresh, "w", encoding="utf-8") as f:
+        f.write(json.dumps(GRID_DOC, separators=(",", ":")) + "\n")
+    _, rest = proc.communicate(input=y4m)
+    check("  ... and reads it once the stream's header arrives",
+          proc.returncode == 2 and b"timeline entry 2" in rest
+          and b"No such file" not in rest,
+          "exit %r, stderr %r" % (proc.returncode, rest[-300:]))
 
     tcfg = sd_filter.resolve(parser.parse_args(
         ["--profile", "quality", "--timeline", tpath, "--bar-grid", gpath]))

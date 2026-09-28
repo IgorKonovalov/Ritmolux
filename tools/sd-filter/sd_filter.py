@@ -323,6 +323,24 @@ def bar_grid_echo(grid):
                len(grid.starts) - estimated))
 
 
+def attach_bar_grid(stage, path, fmt, log=None):
+    """Load the `--bar-grid` file and hand `stage` its frame -> bar mapping.
+
+    Called once the stream's header has arrived, never at startup: in
+    `shot --render --bar-grid g.json | sd_filter.py --bar-grid g.json` both
+    processes start together, and shot writes the file before the first byte of
+    its stream - so the header arriving is what guarantees the file is there
+    and is this render's rather than an earlier one's.
+    """
+    grid = load_bar_grid(path)
+    if stage.timeline:
+        check_timeline_fits(stage.timeline, len(grid.starts))
+    if log:
+        print("sd-filter: %s" % bar_grid_echo(grid), file=log, flush=True)
+    stage.bar_of = lambda frame: bar_position(grid, frame)
+    return grid
+
+
 # ------------------------------------------------------------------ the wire
 
 
@@ -387,8 +405,12 @@ def read_exactly(src, n):
     return bytes(buf)
 
 
-def run(src, dst, log=None, stage=None):
+def run(src, dst, log=None, stage=None, on_header=None):
     """Pump one Y4M stream from src to dst through `stage`. Returns frames out.
+
+    `on_header(fmt)`, when given, runs once the header is parsed and before the
+    stage begins - the first moment a file the producer writes ahead of its
+    stream can be relied on to exist.
 
     With no stage this is the pass-through: the header and every FRAME line are
     re-emitted as the exact bytes they arrived as rather than reserialized from
@@ -412,6 +434,8 @@ def run(src, dst, log=None, stage=None):
             % (fmt.width, fmt.height, fmt.colour.decode(), fmt.frame_bytes),
             file=log, flush=True,
         )
+    if on_header is not None:
+        on_header(fmt)
     if stage is not None:
         stage.begin(fmt, log)
 
@@ -1071,29 +1095,26 @@ def main(argv):
 
     try:
         stage = None
+        on_header = None
         if not args.passthrough:
             cfg = resolve(args)
             timeline = load_timeline(cfg["timeline"]) if cfg["timeline"] else None
-            grid = load_bar_grid(cfg["bar_grid"]) if cfg["bar_grid"] else None
-            if timeline and grid:
-                check_timeline_fits(timeline, len(grid.starts))
             print("sd-filter: %s" % expansion(cfg), file=sys.stderr, flush=True)
             if timeline:
                 print("sd-filter: %s" % timeline_echo(timeline),
                       file=sys.stderr, flush=True)
-            if grid:
-                print("sd-filter: %s" % bar_grid_echo(grid),
-                      file=sys.stderr, flush=True)
-            stage = DiffusionStage(cfg, timeline)
-            if grid:
-                stage.bar_of = lambda frame: bar_position(grid, frame)
-            if timeline and stage.bar_of is None:
+            if timeline and not cfg["bar_grid"]:
                 raise ConfigError(
                     "--timeline places its entries by bar, and no bar grid "
                     "reached this filter to resolve a frame to its bar: pass "
                     "--bar-grid with the file `shot --render --bar-grid` wrote"
                 )
-        run(sys.stdin.buffer, sys.stdout.buffer, log=sys.stderr, stage=stage)
+            stage = DiffusionStage(cfg, timeline)
+            if cfg["bar_grid"]:
+                def on_header(fmt):
+                    attach_bar_grid(stage, cfg["bar_grid"], fmt, log=sys.stderr)
+        run(sys.stdin.buffer, sys.stdout.buffer, log=sys.stderr, stage=stage,
+            on_header=on_header)
     except ConfigError as e:
         print("sd-filter: %s" % e, file=sys.stderr)
         return 2
