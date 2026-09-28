@@ -280,11 +280,12 @@ flowchart LR
 - **What shipped:** feature, in dev tooling only: `shot --render --bar-grid <path>` (an example,
   not in the release zip), plus `--timeline` and `--bar-grid` in `tools/sd-filter/`, which never ships
 - **Operator docs touched:** `docs/capturing.md` (the `--bar-grid` flag row and the section
-  "The bar grid: `--bar-grid`")
+  "The bar grid: `--bar-grid`"), `docs/diffusion-filter.md` (the flag list: `--timeline`,
+  `--bar-grid`)
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0; 49 stated reductions hold
   across 23 live entries, 4 unprobeable
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
-- **Outstanding `human` phases:** Phase 3 (a full track, judged)
+- **Outstanding `human` phases:** none - Phase 3 done 2026-09-28
 
 ## Followups (after this lands)
 
