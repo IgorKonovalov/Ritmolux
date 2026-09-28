@@ -183,7 +183,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — the sidecar accepts a timeline | dev | done | e245ef72 |
 | 2 — the bar grid reaches the sidecar | dev | done | 87242235 |
-| 3 — a full track, judged | human | not started | |
+| 3 — a full track, judged | human | done | committed with this row |
 
 ### Notes
 
@@ -245,6 +245,26 @@ flowchart LR
   The blend midpoints read as a third figure rather than as a crossfade between two wrong images, so
   ADR-0236's named failure mode is not what the owner saw. The bar check against `--downbeat-log` is
   recorded separately below.
+
+- **Phase 3, the bar check, 2026-09-28.** The release `ritmolux` built from this lane ran windowed
+  with `--downbeat-log` on the Arch box (tier rich from `config.toml`), capturing
+  `@DEFAULT_MONITOR@` while `pw-play` played the render's own `track.wav`, with the start stamped in
+  unix milliseconds. 266.99 s played and 962 beat rows fell inside it. Offsets are uncorrected for
+  capture latency, which is tens of milliseconds against a 0.517 s beat.
+  - **Tempo agrees.** The live tracker's median was 115.98 BPM, and the render's median bar is
+    2.13 s, which is 4.12 of those beats.
+  - **The downbeat phase does not agree.** Of 247 live downbeats (rows where `fold_beat % 4 ==
+    held`), the median distance to the nearest render bar start was 1.05 beats, and 33 fell within a
+    quarter beat. Chance alone puts 12.5 % there, about 31. Of the 12 downbeats the live estimator
+    published as locked, 1 was within a quarter beat.
+  - **Both estimators locked in the same passage and disagreed on beat 1.** The render's 15 locked
+    bars cluster at 78-91 s, and the live locked downbeats at about 80-85 s, 0.5-0.85 s (1-1.6 beats)
+    off the render's. The render's grid also carries near-duplicate starts (78.2/78.4, 80.5/80.6,
+    104.1/104.6 s) where its counter stepped as the estimator locked or realigned, as
+    `docs/capturing.md` says it may.
+  - **So a timeline's bar is the right length and not reliably on the music's bar 1.** That is the
+    Risks section's case of the grid rather than the blend, and evidence for backlog 0042, not
+    against ADR-0236. It did not cost the verdict above: a 12-bar blend has no downbeat to miss.
 
 ### Close triggers
 
