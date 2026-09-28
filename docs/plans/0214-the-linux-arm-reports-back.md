@@ -347,3 +347,60 @@ ordering deserves a guard of its own is a design question this pass did not answ
 **Still owed on this phase.** The arm cancelled before its later steps again, so `cargo test --doc`,
 `clippy`, `fmt` and `doc` on Linux, the adapter Phase 1's done-when names, and the list of
 GPU-touching tests that ran rather than skipped are all still unread. They arrive on the next push.
+
+### Phase 1 readings, complete, and Phase 2 closes (2026-09-28, recorded by an architect session at the owner's request)
+
+**Run [36297464014](https://github.com/IgorKonovalov/Ritmolux/actions/runs/36297464014)** on
+`4ffed870`, 2026-09-27, read with `gh`. Every job green. The `check (ubuntu-latest)` arm:
+
+- **The six steps**, one line each: `cargo build` green; `cargo nextest run --workspace -P fast`
+  green, `1775 tests run: 1775 passed (3 slow), 90 skipped`; `cargo test --workspace --doc` green;
+  `cargo clippy --workspace --all-targets -- -D warnings` green; `cargo fmt --all --check` green;
+  `cargo doc --workspace --no-deps` green.
+- **The runner:** image `ubuntu-24.04`, version `20260828.587`.
+- **The adapter is not named by anything the job prints.** No step or test writes the adapter it
+  resolved. The job installs `mesa-vulkan-drivers` 25.2.8 (`0ubuntu0.24.04.2`), and a runner has no
+  GPU, so the one Vulkan device available is Mesa's software rasterizer, lavapipe. **That is an
+  inference from the job's packages, not a reading**, and it is the one item of this phase's
+  done-when the log cannot close. A one-line adapter print in the harness would close it on the next
+  push.
+- **GPU-touching tests ran rather than skipped.** No line in the log carries the harness's
+  no-adapter skip notice (`no suitable GPU adapter`). Tests that request an adapter passed, among
+  them `render::scenes::analytic_field::tests::the_pipeline_builds_on_the_adapter`,
+  `render::scenes::cellular::tests::the_resources_build_on_the_adapter`,
+  `the_field_matches_the_cpu_rule_generation_by_generation`,
+  `render::scenes::particles::tests::the_cpu_step_mirrors_the_shader`,
+  `render::tests::a_headless_renderer_resolves_full_scale_on_any_adapter_unless_pinned`, and the
+  ADR-0071 dual-live report (signal peak 0.0093 against a control peak 0.2507, ratio 0.0371). The 90
+  skips are the `-P fast` profile's deferred suites. So tests that skip on macOS for want of an
+  adapter **run** on this arm, against a rasterizer this repository has not compared against, which
+  is the case 0120 named and Plan 0218 (ADR-0242) now takes up.
+- **`$HOME/.local/share` untouched: by construction, not observed.** `standalone/tests/common`
+  points `HOME`, `XDG_DATA_HOME` and `APPDATA` at a scratch root under `CARGO_TARGET_TMPDIR` for
+  every spawned player, and `help_cli` (three cases) and `stream_pipe` passed on this run. Nothing
+  asserts afterwards that the runner's real directory is empty, and a finished runner cannot be
+  inspected.
+
+**Phase 2's done-when is met by the same run.** The arm is green on run 36297464014, 2026-09-27.
+Neither repair widened or loosened a platform gate; both passes above record what they changed.
+
+### Phase 3, the release dry run (2026-09-28, triggered and read by an architect session at the owner's request)
+
+**Run [36471874865](https://github.com/IgorKonovalov/Ritmolux/actions/runs/36471874865)**,
+`workflow_dispatch` on `main` at `4ffed870`, concluded **success**.
+
+- **Six build jobs green:** `macos`, `windows`, `linux`, `foobar`, `studio-macos`,
+  `studio-windows`.
+- **Six artifacts, named:** `macos-universal` (8.4 MB), `windows-x64` (4.9 MB), `linux-x64`
+  (5.6 MB), `foobar2000-component` (4.2 MB), `studio-macos-universal` (236.5 MB),
+  `studio-windows-x64` (168.1 MB).
+- **Nothing was published.** The `release` job reads `skipped`, and the newest GitHub Release is
+  still `v0.151.0`.
+- **The count guard was not exercised, and a dispatch cannot exercise it.** The assertion of
+  exactly 5 `.zip` and 1 `.tar.gz` is a step inside the `release` job, which is gated
+  `if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')`. So this done-when
+  clause can never be met by the dry run it names. The guard has run for real on every tag since
+  `v0.148.0`, each publishing six artifacts, which shows it passes a correct release. No run has
+  shown it would refuse one without the Linux tarball, which is the property the clause wanted. That
+  is an architect finding for this plan: reword the clause, or move the per-kind count into a step
+  the dispatch path also runs.
