@@ -371,13 +371,16 @@ impl Show {
 
     /// **The single caller of [`reload_presets`]**, which is what holds the
     /// startup load and the watcher's reload to one behaviour rather than two
-    /// that agree today. `sig` is re-baselined here so the next poll compares
-    /// against what this load actually saw.
+    /// that agree today. `sig` is re-baselined here, **before** the load reads
+    /// the directory: the load emits `roster`, and a parent may write a file the
+    /// moment it reads that event. A signature taken after the load would
+    /// swallow that file, and the watcher would never report it; taken before,
+    /// a file landing during the load costs one extra reload at worst.
     fn reload(&mut self, renderer: &mut Renderer) {
+        self.sig = dir_signature(&self.dir);
         if let Some(families) = reload_presets(renderer, &self.dir, self.events.as_mut()) {
             self.families = families;
         }
-        self.sig = dir_signature(&self.dir);
         // The roster the renderer is actually running is the embedded set
         // whenever a load installed nothing — at startup, and after a reload
         // that found no valid preset and kept what was there. A length that
