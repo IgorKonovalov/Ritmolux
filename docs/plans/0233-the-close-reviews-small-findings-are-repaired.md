@@ -184,8 +184,8 @@ flowchart LR
 | 2 — an explicit selection re-anchors the sequential walk | dev | done | 0c3db3c5 |
 | 3 — the pane test counts the library | dev | done | 959b4f85 |
 | 4 — thumbnail passes cannot collide | dev | done | 96b39b12 |
-| 5 — the exe size pair is held | dev | committed with this row | |
-| 6 — two latent divergences | dev | not started | |
+| 5 — the exe size pair is held | dev | done | 6b9c6a45 |
+| 6 — two latent divergences | dev | committed with this row | |
 | 7 — a non-GHSA advisory can be excepted | dev | not started | |
 | 8 — the banner names the settings file | studio-builder | not started | |
 | 9 — npm run dev leaves nothing running | studio-builder | not started | |
@@ -210,6 +210,10 @@ flowchart LR
   `bash -n packaging/linux/stage.sh` was not run: the session's allowlist denies `bash -n` and
   `sh -n`; the block mirrors `packaging/macos/bundle.sh`'s. `docs/nfr.md` section 4 still names
   only `stage.ps1` and `bundle.sh` as the recipes that print the length (outside the file list).
+- Phase 6: the observed scene in the new test is a recording `FeedbackSink` in the attractor's
+  roster slot handed an attractor preset, not the real `AttractorScene`, whose table is private to
+  its module. With `Observed`'s forward disabled the test fails (`left: None`), checked by hand.
+  The capture loop's two exits are one `lost` store; nothing tests that path.
 
 ### Close triggers
 

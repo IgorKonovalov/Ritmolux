@@ -3149,14 +3149,31 @@ fn a_format_with_no_name_is_refused_rather_than_guessed() {
 /// holds, so a value the `Scene` trait cannot report is readable after the
 /// renderer has driven that scene through its real evaluation path.
 ///
-/// `mirror_overflow` and every capability accessor hand out a borrow a
-/// `RefCell` cannot outlive, so they keep the trait's `None`. Neither scene
-/// observed here has any of them, so nothing is hidden by that.
+/// `mirror_overflow` and the capability accessors other than the feedback sink
+/// hand out a borrow a `RefCell` cannot outlive, so they keep the trait's
+/// `None`; no scene observed here has any of them. The feedback sink is
+/// forwarded — `Observed` is the sink itself and passes the table through —
+/// because an observed attractor's `[feedback]` table would otherwise be
+/// dropped at hand-over without a word.
 struct Observed<T>(std::rc::Rc<std::cell::RefCell<T>>);
+
+impl<T: super::scenes::Scene> super::scenes::FeedbackSink for Observed<T> {
+    fn set_feedback(&mut self, cfg: super::feedback::FeedbackConfig) {
+        if let Some(sink) = self.0.borrow_mut().as_feedback_sink() {
+            sink.set_feedback(cfg);
+        }
+    }
+}
 
 impl<T: super::scenes::Scene> super::scenes::Scene for Observed<T> {
     fn name(&self) -> &'static str {
         self.0.borrow().name()
+    }
+    fn as_feedback_sink(&mut self) -> Option<&mut dyn super::scenes::FeedbackSink> {
+        // A sink exactly when the observed scene is one, so a scene that keeps
+        // no accumulation is still skipped at hand-over.
+        let sinks = self.0.borrow_mut().as_feedback_sink().is_some();
+        if sinks { Some(self) } else { None }
     }
     fn update(&mut self, frame: &AnalysisFrame) {
         self.0.borrow_mut().update(frame);
@@ -3218,6 +3235,76 @@ fn observe<T: super::scenes::Scene + 'static>(
     renderer.time = 0.0;
     renderer.configure_active_scene();
     shared
+}
+
+/// A scene that draws nothing and records the `[feedback]` table it is handed,
+/// standing in the attractor's roster slot: the attractor keeps its table
+/// private, and what is asserted is that the table reaches the scene through
+/// [`Observed`], not what the attractor then does with it.
+#[derive(Default)]
+struct FeedbackRecorder {
+    handed: Option<super::feedback::FeedbackConfig>,
+}
+
+impl super::scenes::FeedbackSink for FeedbackRecorder {
+    fn set_feedback(&mut self, cfg: super::feedback::FeedbackConfig) {
+        self.handed = Some(cfg);
+    }
+}
+
+impl super::scenes::Scene for FeedbackRecorder {
+    fn name(&self) -> &'static str {
+        "attractor"
+    }
+    fn update(&mut self, _frame: &AnalysisFrame) {}
+    fn render(
+        &mut self,
+        _queue: &wgpu::Queue,
+        _encoder: &mut wgpu::CommandEncoder,
+        _view: &wgpu::TextureView,
+        _aspect: f32,
+    ) {
+    }
+    fn as_feedback_sink(&mut self) -> Option<&mut dyn super::scenes::FeedbackSink> {
+        Some(self)
+    }
+}
+
+/// **An observed attractor's `[feedback]` table reaches it.** An attractor
+/// preset carrying `warp = "swirl"` is handed over to an observed feedback
+/// sink in the attractor's slot, and the sink receives that table rather than
+/// nothing.
+#[test]
+fn an_observed_attractor_is_handed_its_feedback_table() {
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 48,
+        height: 48,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    let swirl = Preset::from_toml_str(
+        "system = \"attractor\"\nname = \"Swirled\"\n\n[feedback]\nwarp = \"swirl\"\n",
+    )
+    .expect("valid attractor preset with a [feedback] table");
+    let expected = swirl.feedback;
+    assert_ne!(
+        expected,
+        super::feedback::FeedbackConfig::default(),
+        "the probe table must differ from the default a table-less preset hands"
+    );
+    renderer.set_presets(vec![swirl]);
+
+    let recorder = observe(
+        &mut renderer,
+        SystemKind::Attractor,
+        FeedbackRecorder::default(),
+    );
+    assert_eq!(
+        recorder.borrow().handed,
+        Some(expected),
+        "the observed scene was not handed the preset's [feedback] table"
+    );
 }
 
 /// **The switch frame integrates the bound rate.** A fresh emitter preset
