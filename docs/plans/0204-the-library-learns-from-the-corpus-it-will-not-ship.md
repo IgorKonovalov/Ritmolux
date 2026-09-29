@@ -243,16 +243,34 @@ that needs one, that is a feedback note to `architect`, not a phase of this plan
 > Written by the lane — one row per phase as that phase's commit lands, and the close block after
 > the last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled)_
+**Lane:** `main` for the log; Phase 1 writes nothing in the repository
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The reference sheet | human | not started | |
+| 1 — The reference sheet | human | done | committed with this row |
 | 2 — The routing table and the cohort | human | not started | |
 | 3 — The cohort is authored | human | not started | |
 | 4 — The verdict, in the live app | human | not started | |
 
 ### Notes
+
+- **Phase 1, 2026-09-29** (built by an agent session at the owner's request, from `017c1a35`). The
+  sheet is `WORK/milk-browse/refs/`, outside the checkout, 125 MB: one folder per pick
+  (`01-molten-gold` to `21-hexcollies`), each holding `converted.toml`, a loud and a quiet still at
+  960x540 after 300 frames (the `--set` stimuli of the `preset-author` skill's loud/quiet commands),
+  an 8 s clip at 640x360 cut from the 0212 music excerpt, and the logs. `refs/README.md` records every
+  command, and `make.sh` with `picks.tsv` re-creates the sheet from the corpus.
+  - **All 21 converted and none was rejected.** The only conversion notes are names the engine does
+    not use, such as `monitor`. No render is blank (`sheet_loud.png` tiles the 21 loud stills); pick
+    03 is mostly dark, and its README line says so.
+  - **Every pick got a clip**, because all 21 convert to feedback worlds and a still understates
+    one. The README gives one line per pick on what its still misses. That judgement is the
+    phase's own, and the owner may prune it.
+  - **Two departures from the plan's text.** The picks were converted fresh from
+    `WORK/milkdrop-corpus`, because the plan's `WORK/milk-browse/<theme>/` conversions exist only on
+    the Windows box. Picks 03 and 04, shortened with "..." in the table, were matched to the files
+    the full names imply (*INFECTIONFX A*, *mstress + 4*), and 08, 15 and 21 use the exact-name file
+    where siblings share a stem.
 
 ### Close triggers
 
