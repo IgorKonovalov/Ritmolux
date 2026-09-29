@@ -479,3 +479,22 @@ lists `verify` in `needs:` and `verify` has no `if:`; `bash -n .githooks/pre-pus
 conductor's `node --test tools/conductor/test/` is 467 passed, 0 failed. `docs/releasing.md`,
 `docs/developing.md` (the pre-push table) and `CLAUDE.md` name the job and the gate, and the doc
 gates pass. **Nothing here has run on GitHub yet**: the push is Phase 5's.
+
+### Phase 5, the dry run taken again (2026-09-29, triggered and read by an architect session after the owner's push)
+
+The owner pushed `29994a84`, which carries Phase 4, with the `workflow` scope.
+
+- **Dry run [36609820016](https://github.com/IgorKonovalov/Ritmolux/actions/runs/36609820016)**,
+  `workflow_dispatch` on `main` at `29994a84`, concluded **success**. The six builds are green, and
+  **`verify` ran and passed**. Its step printed `release assets: OK (5 zips and 1 tarball in assets)`
+  and listed the six. The artifacts carry `v0.151.0`, the version `29994a84` declares, which is before
+  Plan 0212's close moved it.
+- **`release` read `skipped`, and nothing was published.** The newest GitHub Release is still
+  `v0.151.0`.
+- **The refusal half, on the same push:** CI run
+  [36609778943](https://github.com/IgorKonovalov/Ritmolux/actions/runs/36609778943)'s `links` job ran
+  `node scripts/check-release-assets.mjs --self-test`: `5 zips, no tarball -> refused`,
+  `4 zips, 1 tarball -> refused`, `5 zips, 1 tarball -> passed`, `3 of 3`.
+
+Phase 3's moved clause is met: the count ran on a dispatch, on real artifacts, and its refusal is
+proven on every push. Phase 6, the Ubuntu box, is what remains.
