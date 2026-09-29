@@ -118,9 +118,17 @@ export function readPlanFile(path) {
   return parsePlan(readFileSync(path, "utf8"));
 }
 
-/** A log row counts as done when it reads `done`, or is the row a phase commit carried. */
+/**
+ * A log row counts as done when it reads `done`, is the row a phase commit carried, or reads
+ * `not run` - a phase whose done-when said it was not to run is settled, not pending. `not started`
+ * and `parked: ...` are not done.
+ */
 export function rowIsDone(row) {
-  return /^done\b/i.test(row.state) || /^committed with this row$/i.test(row.state);
+  return (
+    /^done\b/i.test(row.state) ||
+    /^committed with this row$/i.test(row.state) ||
+    /^not run\b/i.test(row.state)
+  );
 }
 
 export function donePhases(plan) {

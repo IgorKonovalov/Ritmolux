@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { claudePaths, donePhases, findPlan, nextStep, parsePlan, rangeLabel, readPlanFile, runs } from "../lib/plan.mjs";
+import { claudePaths, donePhases, findPlan, nextStep, parsePlan, rangeLabel, readPlanFile, rowIsDone, runs } from "../lib/plan.mjs";
 import { validateQueue } from "../lib/queue.mjs";
 import { REPO, planText, tmp, writePlan } from "./helpers.mjs";
 
@@ -37,6 +37,17 @@ test("closed Plan 0172 reads as a dev run then a studio-builder run, every row d
   assert.deepEqual([...donePhases(plan)], ["1", "2", "3", "4"]);
   assert.deepEqual(plan.log.rows.map((r) => r.commit), ["c303c1f", "6ce0594", "db0df8e", "fc4c9ee"]);
   assert.deepEqual(nextStep(plan), { kind: "review" });
+});
+
+test("a row reading not run is settled; not started and parked are not", () => {
+  const row = (state) => ({ id: "1", title: "t", owner: "dev", state, commit: null });
+  assert.equal(rowIsDone(row("not run: Phase 1 falsified the candidate")), true);
+  assert.equal(rowIsDone(row("not run")), true);
+  assert.equal(rowIsDone(row("not started")), false);
+  assert.equal(rowIsDone(row("parked: check_red on the suite")), false);
+
+  const skipped = parsePlan(planText({ ...MIXED, rows: { 1: { state: "done" }, 2: { state: "not run: Phase 1 falsified the candidate" } } }));
+  assert.deepEqual([...donePhases(skipped)], ["1", "2"]);
 });
 
 test("the status word is the leading word, whatever punctuation follows it", () => {
