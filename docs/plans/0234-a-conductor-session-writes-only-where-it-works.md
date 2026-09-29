@@ -108,6 +108,9 @@ flowchart LR
 - **Phase 3 took two commits.** `af200b33` carries only this log's row, because the README edit it
   was meant to hold failed its anchor check (0208's close had reworded the bullet) while the commit
   in the same command went ahead. The README text is in the commit carrying this note.
+- **A third grant shipped, beyond Phase 1's lane and temp shapes.** The probe's Candidate A reviews
+  row (`spike/README.md`) refused a review session's write to `state/reviews/` even with `--add-dir`,
+  so the settings also grant `Write`/`Edit(/state/reviews/**)`; ADR-0255's `Outcome` records it.
 
 ### Close triggers
 

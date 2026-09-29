@@ -1,6 +1,6 @@
 # ADR-0255 — A conductor session writes inside its lane and the OS temp directory
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-29 (Plan 0234), with an `Outcome`
 > **Date:** 2026-09-29
 > **Related plan(s):** [0234](../plans/0234-a-conductor-session-writes-only-where-it-works.md)
 > **Extends:** [ADR-0233](0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md)
@@ -73,3 +73,26 @@ A `PreToolUse` hook could resolve each `Write` or `Edit` path and deny any outsi
 not depend on the permission matcher's spellings. It lost as the first move because the settings file
 is where every other bound lives and is what the transcript tests. It stays the fallback if the probe
 shows the matcher cannot express the bound.
+
+## Outcome (2026-09-29, Plan 0234)
+
+**The bound that shipped has a third grant, and the Decision's "and nothing else" is not what
+shipped.** `settings.conductor.json` grants `Write` and `Edit` on `./**` (the lane), `//tmp/**` (the
+Linux temp directory) and `/state/reviews/**`, which the CLI resolves against the settings file's own
+directory, so it names the running checkout's `tools/conductor/state/reviews/`.
+
+**The Negative bullet "None is known today" was falsified by the probe.** A review session writes its
+review into that directory, and a close session reads it there; neither is the conductor process. On
+2.1.283 the probe's Candidate A row (`./**` plus `//tmp/**`) refused the reviews write even though the
+session was handed the directory with `--add-dir`: `--add-dir` grants nothing on its own. Candidate B
+added `/state/reviews/**` and wrote it. The table is in `tools/conductor/spike/README.md`. **Do not
+delete the reviews grant**: without it every review and close session is refused its own review file.
+
+**The price of that grant.** One settings file serves every session kind, so a `dev` implement or fix
+session may also create or overwrite any plan's review file under `state/reviews/`, including an
+earlier round's review that the next review reads as prior findings. It is accepted: the directory
+holds only reviews, and the conductor, not a review file, decides a verdict. A per-kind settings file
+is the only structural repair, and it is not worth one today.
+
+**The temp-directory grant is Linux-only.** macOS's `$TMPDIR` and Windows' `%TEMP%` are unprobed and
+owed, beside backlog 0267.
