@@ -419,6 +419,15 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   only a Windows run can ask. **Every rule has a case in `test/settings.test.mjs`**, which fails on a rule added without one;
   a refusal the probe recorded is asserted against that table and against a model of the file, so a
   deny rule deleted since the probe turns it red, and everything else against the model alone.
+- **Writing is bounded too, by path** (ADR-0255). `Write` and `Edit` are granted only as
+  `./**` (the session's working directory, which is its lane), `//tmp/**` (the OS temp directory on
+  Linux) and `/state/reviews/**` (resolved against this settings file's own directory, so it names
+  `tools/conductor/state/reviews/`, where a review or close session writes its review). A write
+  anywhere else is refused by dontAsk. `--add-dir` grants nothing on its own: the reviews rule is what
+  lets a review write there. All of this was observed on 2.1.283 (the write table in
+  `spike/README.md`, from `spike/matcher-probe.mjs --writes`), and `test/settings.test.mjs` holds the
+  grants to exactly the spellings that table names. **Linux only so far:** `//tmp/**` is not the
+  Windows or macOS temp directory, and no probe has run there.
 - **A command is admitted when the session already holds that capability through `Read`, `Glob`,
   `Grep` or `Write`, and refused otherwise.** Admitting such a command buys turns, not power: a
   session denied `ls` lists the directory with `Glob` on its next turn. So `ls`, `printenv`, `grep` and

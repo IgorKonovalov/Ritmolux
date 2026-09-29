@@ -104,6 +104,10 @@ flowchart LR
 
 ### Notes
 
+- **Phase 3 took two commits.** `af200b33` carries only this log's row, because the README edit it
+  was meant to hold failed its anchor check (0208's close had reworded the bullet) while the commit
+  in the same command went ahead. The README text is in the commit carrying this note.
+
 ### Close triggers
 
 - **`presets/` touched:**
