@@ -339,15 +339,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0263 | The conductor reads a `not run` log row as unfinished | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
-| 0264 | Two players' thumbnail passes collide in one cache | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
-| 0265 | The pane-clearance test pins the library at 114 presets | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
-| 0266 | The exe size cap has three unheld copies; the Linux recipe measures nothing | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
-| 0268 | Space after a browser pick does not continue from it under sequential order | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
-| 0269 | Two unreachable divergences from Plan 0215's review | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
-| 0270 | An npm advisory with no GHSA id can only be cleared by a bump | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
-| 0271 | The missing-player banner does not say where the settings file is | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
-| 0272 | `npm run dev` leaves Vite and the watchers running | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -654,6 +645,15 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0125 | Every diffused frame is an upscale: both profiles diffuse well below the stream's resolution | [Plan 0211](plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) Phases 1-2. `quality` answers it; the residue is 0262. **Closed 2026-09-27** |
 | 0126 | A render is one prompt, one seed and one preset from first frame to last | [Plan 0212](plans/done/0212-the-diffused-render-gains-a-timeline.md) + ADR-0236. A prompt timeline in bars; the owner judged it reads. **Closed 2026-09-28** |
 | 0273 | A headless session's `Write` can create a file outside its lane | [Plan 0234](plans/done/0234-a-conductor-session-writes-only-where-it-works.md) + ADR-0255. Lane, `/tmp` and reviews; Linux only. **Closed 2026-09-29** |
+| 0263 | The conductor reads a `not run` log row as unfinished | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 1. `rowIsDone` accepts `not run`. **Closed 2026-09-29** |
+| 0264 | Two players' thumbnail passes collide in one cache | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 4. The temp name carries the pid; a pass removes only its own. **Closed 2026-09-29** |
+| 0265 | The pane-clearance test pins the library at 114 presets | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 3. The count is `default_presets().len()`. **Closed 2026-09-29** |
+| 0266 | The exe size cap has three unheld copies; the Linux recipe measures nothing | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 5. A hygiene guard holds four copies; Linux measures. **Closed 2026-09-29** |
+| 0268 | Space after a browser pick does not continue from it under sequential order | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 2. Every explicit selection re-anchors; `--stream`'s empty-trail Prev does not. **Closed 2026-09-29** |
+| 0269 | Two unreachable divergences from Plan 0215's review | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 6. One `lost` exit; `Observed` forwards the sink. **Closed 2026-09-29** |
+| 0270 | An npm advisory with no GHSA id can only be cleared by a bump | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 7. The allow reader accepts `npm-<digits>`. **Closed 2026-09-29** |
+| 0271 | The missing-player banner does not say where the settings file is | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 8. The banner names the path. **Closed 2026-09-29** |
+| 0272 | `npm run dev` leaves Vite and the watchers running | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 9. `--kill-others`. **Closed 2026-09-29** |
 <!-- roster:end -->
 
 ---
@@ -16359,7 +16359,10 @@ the same way unless its implementer happens to spell the row `done - ...`.
   `absent: not run in: tools/conductor/lib/plan.mjs`
 - **Verified 2026-09-27** — the predicate is where the entry says:
   `present: export function rowIsDone in: tools/conductor/lib/plan.mjs`
-- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
 
 ## 0264 — two players at once run two thumbnail passes into one cache, and their temp files collide
 
@@ -16374,7 +16377,10 @@ the docs says the studio's player runs the pass at all.
   if taken:** `dev` (a per-process temp name or a lock file), plus a docs line in `docs/running.md`.
 - **Verified 2026-09-27** — the temp name carries no process identity:
   `present: with_extension\("rlxthumb-part"\) in: standalone/src/thumbs.rs`
-- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
 
 ## 0265 — the pane-clearance test pins the library at 114 presets while more ship
 
@@ -16387,7 +16393,10 @@ from `rlx_core::preset::default_presets().len()`.
   taken:** `dev` (test logic).
 - **Verified 2026-09-27** — the count is a literal:
   `present: const LIBRARY: usize = 114; in: standalone/src/overlay/tests.rs`
-- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
 
 ## 0266 — the exe's size cap is written in three places that nothing holds equal, and the Linux recipe measures nothing
 
@@ -16407,7 +16416,10 @@ block, although two of NFR section 4's three size-series rows are Linux readings
   `present: \$ExeCapBytes = 16777216 in: packaging/windows/stage.ps1`
 - **Verified 2026-09-27** — the Linux recipe has no size warning:
   `absent: WarnBytes|warn-bytes|WARN_BYTES in: packaging/linux/stage.sh`
-- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
 
 ## 0268 — under `order = "sequential"`, Space after a browser pick does not continue from what is on screen
 
@@ -16424,7 +16436,10 @@ active index. Whether a manual selection should re-anchor the traversal is a des
   `present: Order::Sequential => in: standalone/src/director.rs`
 - **Verified 2026-09-27** — the defect itself is a runtime order:
   `unprobeable: the successor after a browser pick is decided at runtime, and no text line shows it`
-- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
 
 ## 0269 — two unreachable divergences Plan 0215's review left: a capture loop's `lost`, and `Observed<T>`'s feedback
 
@@ -16442,7 +16457,10 @@ Both are unreachable today and both would bite silently if that changed.
   **Owner if taken:** `dev`.
 - **Verified 2026-09-27** — `present: let Some\(window\) = bytes\.get_mut\(carry\.\.filled\) else in: standalone/src/capture_linux/rt.rs`
 - **Verified 2026-09-27** — `present: struct Observed<T> in: core/src/render/tests.rs`
-- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
 
 ## 0270 — an npm advisory with no GHSA url could only be cleared by a bump
 
@@ -16453,7 +16471,10 @@ which ADR-0244 says every exception carries. It is theoretical while npm keys ev
 - **Raised:** 2026-09-27 by `architect`, filing Plan 0220's close review finding 3 (nit). **Owner if
   taken:** `dev`.
 - **Verified 2026-09-27** — `present: npm-\$\{via\.source\} in: scripts/check-npm-audit.mjs`
-- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
 
 ## 0271 — the studio's missing-player banner says to edit a settings file without saying where it is
 
@@ -16467,7 +16488,10 @@ not read the README.
   [Plan 0219](plans/done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s Phase 4 notes.
   **Owner if taken:** `studio-builder`.
 - **Verified 2026-09-27** — `present: Set "playerPath" in the studio settings file in: studio/renderer/App.tsx`
-- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
 
 ## 0272 — `npm run dev` leaves Vite and the esbuild watchers running after the studio window closes
 
@@ -16479,7 +16503,10 @@ running. The next `npm run dev` then finds port 5273 taken.
   [Plan 0219](plans/done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s Phase 4 notes.
   **Owner if taken:** `studio-builder`.
 - **Verified 2026-09-27** — `absent: kill-others in: studio/package.json`
-- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
 
 ## 0273 — a headless session's `Write` can create a file outside its lane, and nothing bounds it
 

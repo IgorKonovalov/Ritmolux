@@ -49,7 +49,6 @@ place. The plan file carries the real link.
 | [0230](0230-the-russian-slice-becomes-findable.md) | The Russian slice becomes findable | draft | dev, human | ADR-0213 (proposed): a header `LanguageSelect` override, a `ru` entrance page, `lang="ru"` + hreflang via route middleware (splits Pagefind by language), landing links. Every dev phase builds the site. |
 | [0231](0231-the-interface-is-audited-then-learns-one-look.md) | The interface is audited, then learns one look | approved | dev, studio-builder, human | ADR-0252 (proposed): one theme table in the core, studio CSS generated. Phases 1-2 build captures; Phase 3 audit re-scopes 8, 9, 11. |
 | [0232](0232-the-library-is-walked-cut-and-refilled.md) | The library is walked, cut and refilled | approved | human, dev | ADR-0253 (proposed): report, owner's walk, cull without replacement down to a two-per-family floor, retunes, gap brief, refill. Takes backlog 0256 step 2 and the six content-brief sittings. |
-| [0233](0233-the-close-reviews-small-findings-are-repaired.md) | The close reviews' small findings are repaired | approved | dev, studio-builder | Nine phases, no human phase, queued. Backlog 0263-0272 bar 0267; 0268 by the owner's 2026-09-29 call (a browser pick re-anchors). |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -1045,6 +1044,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0233 - The close reviews' small findings are repaired](done/0233-the-close-reviews-small-findings-are-repaired.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.153.0**. Closes 0263-0272 bar 0267. [Write-up](README-archive.md).
 - [0234 - A conductor session writes only where it works](done/0234-a-conductor-session-writes-only-where-it-works.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (fixed), two nits.** Version: none. ADR-0255 accepted, Outcome. Closes 0273. [Write-up](README-archive.md).
 - [0212 - The diffused render gains a timeline](done/0212-the-diffused-render-gains-a-timeline.md) - closed 2026-09-28. Review: **two rounds; one major (fixed), five minors (four fixed).** Version: **0.152.0**. ADR-0236 accepted. Closes 0126. [Write-up](README-archive.md).
 - [0211 - The diffused frame's resolution is measured before it is designed](done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) - closed 2026-09-27. Review: **no blockers, no majors, three minors (two fixed).** Version: none. Closes 0125; filed 0262. [Write-up](README-archive.md).

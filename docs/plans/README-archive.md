@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0233 - The close reviews' small findings are repaired](#0233---the-close-reviews-small-findings-are-repaired)
   - [0234 - A conductor session writes only where it works](#0234---a-conductor-session-writes-only-where-it-works)
   - [0212 - The diffused render gains a timeline](#0212---the-diffused-render-gains-a-timeline)
   - [0211 - The diffused frame's resolution is measured before it is designed](#0211---the-diffused-frames-resolution-is-measured-before-it-is-designed)
@@ -269,6 +270,25 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0233 - The close reviews' small findings are repaired](done/0233-the-close-reviews-small-findings-are-repaired.md)
+
+- closed 2026-09-29, conductor-run close of lane `plan-0233-the-close-reviews-small-findings-are-repaired`.
+Nine phases, no human phase: `4e2085d5`, `0c3db3c5`, `959b4f85`, `96b39b12`, `6b9c6a45`, `cae0ca7b`,
+`eb1b4274`, `1dff2c94`, `6ccaa3c1`. Round 1 review: **no blockers, no majors, two minors, one nit**.
+Minor 1 (`docs/nfr.md` section 4 naming two measuring recipes) was repaired at the close in
+`d664dbc6`. Version: **0.153.0** (minor: Phase 2 changes what Space does after a pick). Closes
+backlog 0263, 0264, 0265, 0266, 0268, 0269, 0270, 0271, 0272. Upstream CI read green at the close.
+The full review is the plan's own `## Close review` section.
+- **What landed.** Under sequential order every explicit selection re-anchors the walk; the
+  thumbnail temp name carries the pid; a hygiene guard holds the exe's size pair equal across NFR
+  section 4 and the three recipes, and the Linux recipe measures; the conductor settles a `not run`
+  row; an `npm-<digits>` advisory can be excepted; the studio's banner names its settings file and
+  `npm run dev` ends every process.
+- **Open.** Minor 2: `--stream`'s empty-trail Prev selects without re-anchoring
+  (`standalone/src/stream.rs`), code the close cannot repair. Nit 3: Phase 5's `bash -n` done-when
+  is not runnable under the conductor's allowlist. Translation advisory at the close:
+  `how-it-works.ru.md`, `running.ru.md` (moved by this plan) and the foobar `READ-ME-FIRST.ru.md`.
 
 ### [0234 - A conductor session writes only where it works](done/0234-a-conductor-session-writes-only-where-it-works.md)
 

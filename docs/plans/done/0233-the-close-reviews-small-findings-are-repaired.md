@@ -1,14 +1,17 @@
 # 0233 — The close reviews' small findings are repaired
 
-> **Status:** in-progress
+> **Status:** done - closed 2026-09-29 by the conductor's close, round 1: phases 4e2085d5, 0c3db3c5,
+> 959b4f85, 96b39b12, 6b9c6a45, cae0ca7b, eb1b4274, 1dff2c94, 6ccaa3c1; review clean (no blockers,
+> no majors, two minors, one nit); full suite green on the graded tree. Minor 1 repaired at the
+> close; minor 2 (`--stream`'s empty-trail Prev) and nit 3 left open. v0.153.0.
 > **Created:** 2026-09-29
 > **Approved:** 2026-09-29 (owner), selected for the conductor; queued in `tools/conductor/queue.json`
 > **Owner skill(s):** dev, studio-builder
-> **Related ADRs:** [0239](../adrs/0239-rotation-carries-two-orders-and-the-shuffles-seed-varies-per-launch.md) (the sequential walk),
-> [0230](../adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md) (the thumbnail pass),
-> [0159](../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) and
-> [0231](../adrs/0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md) (the size caps),
-> [0244](../adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md)
+> **Related ADRs:** [0239](../../adrs/0239-rotation-carries-two-orders-and-the-shuffles-seed-varies-per-launch.md) (the sequential walk),
+> [0230](../../adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md) (the thumbnail pass),
+> [0159](../../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) and
+> [0231](../../adrs/0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md) (the size caps),
+> [0244](../../adrs/0244-the-npm-graphs-are-gated-like-the-cargo-graph-and-an-install-script-runs-by-name.md)
 > (the npm gate)
 > **Closes:** design-backlog 0263, 0264, 0265, 0266, 0268, 0269, 0270, 0271, 0272
 
@@ -232,6 +235,134 @@ flowchart LR
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
 - **Outstanding `human` phases:** none.
 
+## Close review
+
+> The conductor's round-1 review, in full, graded at `f79c82b8`. Round 1 was the only round, so no
+> earlier finding was resolved by a fix round. At the close, minor 1 was repaired in `d664dbc6`
+> (`docs/nfr.md`); minor 2 is code and stays open; nit 3 owes no repair in this lane.
+
+### Plan 0233 — close review, round 1
+
+Graded at `f79c82b8d55a1b627f19ba7f70a66b819207e9a8` (tree `4eaa850e`), lane
+`/home/igor/Work/rlx-plan-0233` on `plan-0233-the-close-reviews-small-findings-are-repaired`.
+
+**Verdict: Plan 0233 landed cleanly. No blockers, no majors, two minors and one nit.** All nine
+phases are present, each owner-tagged in vocabulary, each with the test or grep its done-when names,
+and the full suite is green on the exact tree graded.
+
+#### Evidence run in this session
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 4eaa850 is green in the suite ledger, run
+  by gate 0233-pre-review at 2026-09-29T19:29:32.936Z: 1867 tests run: 1867 passed (5 slow), 8
+  skipped`. `git rev-parse HEAD^{tree}` is `4eaa850e3a53...`, so the record covers the graded tip.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: clean.
+- `node --test tools/conductor/test/`: 479 tests, 477 pass, 0 fail, 2 skipped (Windows-only).
+- `node scripts/check-npm-audit.mjs --self-test`: 34 of 34.
+- `npm --prefix studio run typecheck`, `run lint`, `test`: clean; vitest 299/299 in 32 files.
+- `node scripts/check-comment-hygiene.mjs`: OK. `node scripts/check-backlog-claims.mjs`: exit 0,
+  50 reductions across 24 live entries; the moved-path advisories on `app_state.rs`, `show.rs` and
+  `thumbs.rs` (0165, 0187, 0220, 0260, 0261) are paths this plan touched, and none went red.
+- `git status` clean before and after.
+
+#### Lens 1 — alignment
+
+- **Implementation log** present, shorter than the phases section, phase-to-commit table complete.
+  Its `Full suite:` bullet defers to the conductor's pre-review gate, which is correct in conductor
+  mode and is evidenced above.
+- **Phase 1** (`tools/conductor/lib/plan.mjs:126`): `rowIsDone` accepts `^not run\b`; the new test
+  asserts both `not run` spellings true, `not started` and `parked: ...` false, and `donePhases` on a
+  parsed plan. Matches the done-when.
+- **Phase 2**: `Traversal` gains an `anchor` separate from `last`, so the shuffle's
+  cycle-restart exclusion is untouched; `reanchor` drops `upcoming` only under sequential.
+  `director/tests.rs` walks alpha, bravo, select `echo`, alpha exactly as the plan wrote it, and the
+  shuffle test compares a 12-draw walk with and without selections under one seed. The `show.rs`
+  test drives `ctl/preset charlie` over a real loopback socket through `apply_control_rest`, and the
+  browser leg calls `Show::reanchor`, the seam `AppState::on_preset_selected` calls. The window's
+  browser, favourites, console `random`, A/B, Backspace and its fallback all route through
+  `on_preset_selected`. `docs/running.md` states the two orders' behaviour after a pick. One path
+  was missed: see minor 2.
+- **Phase 3**: literal gone (`git grep` finds nothing); the library size is read from
+  `default_presets()`.
+- **Phase 4**: temp name is `<entry>.<pid>.rlxthumb-part`; cleanup chosen is "only its own child's,
+  by pid, after the child ends", stated in `discard_partials`'s doc comment together with its cost.
+  The comment's `nice execs the player` claim holds (`nice` execs). The two-pass test re-runs the
+  test binary on an ignored case that writes through the shipped `write_entry` 200 times, and asserts
+  both passes' last note, one complete entry, and no other file. `docs/running.md` says the studio's
+  player runs the pass too.
+- **Phase 5**: the guard reads NFR section 4 and all three recipes, refuses a copy it cannot parse,
+  and asserts 90 %; the seeded test edits each recipe's warning, renames each assignment away, and
+  moves NFR's warning, each refused. Since a `replace` that matched nothing would leave the guard
+  green and fail the seeded test, its green run proves the edits landed. `stage.sh` gains the
+  measurement block, never fatal. `git grep 16777216` finds the cap. `bash -n` was not run (nit 3).
+- **Phase 6**: the capture loop now has one exit that stores `lost` for both an out-of-bounds window
+  and a failed read (`capture_linux/rt.rs:54`), with no allocation added on that thread.
+  `Observed<T>` forwards `as_feedback_sink` only when the observed scene is a sink, and the new test
+  asserts a non-default `[feedback]` table reaches the scene in the attractor slot.
+- **Phase 7**: `isAdvisoryId` accepts a whole GHSA id or `npm-<digits>`; self-test covers the
+  survey's `npm-1234` naming, acceptance, excusal through `judge`, and five malformed ids refused.
+- **Phase 8**: `AppInfo.settingsFile` from `main.ts`'s `file`, the banner interpolates it; the test
+  asserts the path and `"playerPath"` in the banner detail, and the banner's absence with a player.
+- **Phase 9**: `--kill-others` on the `dev` script.
+
+#### Lens 2 — layering, real-time, contracts
+
+No core layering change (the core diff is test-only). No C ABI change. No control-protocol widening:
+Phase 2 reacts to the existing `ctl/preset`. The capture-thread edit adds no allocation, lock or log.
+
+#### Lens 3 — docs and bookkeeping
+
+- Operator docs: `docs/running.md` swept for Phases 2 and 4. `docs/nfr.md` section 4 is now stale
+  about which recipes measure (minor 1). No other user-facing doc names the banner text.
+- Owed at the close: plan to `done/`, backlog 0263, 0264, 0265, 0266, 0268, 0269, 0270, 0271, 0272
+  moved from the archive's `### Promoted` table to `### Closed` with their `CLOSED` markers, the plans
+  index, `toc.mjs`, and a **minor** version bump (Phase 2 is a user-visible behaviour change), with
+  the studio's two version copies following. `presets/` untouched: no curation owed.
+
+#### Lens 4 — correctness
+
+The integer arithmetic of the 90 % guard (`16777216 * 9 / 10 = 15099494`) matches the committed
+figure. The show-seam and render tests skip without an adapter in ADR-0016's shape. The accepted
+cost of Phase 4 (a partial from a pass that died hard is never swept) is stated in the code and the
+plan's risks.
+
+#### Lens 5 — design integrity
+
+The anchor kept apart from `last` is the right separation: sequential reads one field, the shuffle
+the other, and neither can reach the other's state. `on_preset_selected` gives the window one
+funnel for explicit selections; the `--stream` shell lacks the equivalent (minor 2).
+
+#### Findings
+
+**minor 1 — `docs/nfr.md:234-239` names two measuring recipes where there are now three.**
+Phase 5 added the measurement block to `packaging/linux/stage.sh`, but NFR section 4 still says
+"both recipes below measure per executable", names only `stage.ps1` and `bundle.sh` as printing the
+length, and says "Neither fails a release". The implementation log notes it as out of the file list.
+**Repair (prose, close-repairable):** replace "and both recipes below measure per executable." with
+"and every recipe below measures per executable.", replace
+"`packaging/windows/stage.ps1` and `packaging/macos/bundle.sh` print the length on every build," with
+"`packaging/windows/stage.ps1`, `packaging/macos/bundle.sh` and `packaging/linux/stage.sh` print the
+length on every build,", and replace "Neither fails" with "None fails". *Repaired at the close in
+`d664dbc6`.*
+
+**minor 2 — `standalone/src/stream.rs:1130` the `--stream` Prev fallback selects without
+re-anchoring.** The plan's amended Phase 2 says every explicit selection re-anchors. In the window,
+`Backspace`'s roster-predecessor fallback does (`AppState::step_previous` calls
+`on_preset_selected`); in the headless `--stream` shell the same fallback (`ConsoleAction::Prev` with
+an empty trail) calls `renderer.select_preset(index)` and `note_shown` only, so under sequential the
+next `Next` gives the library's first name rather than the successor of what is on screen. Rare (only
+before anything has been drawn) and the log discloses it, but it is the two run modes disagreeing.
+**Fix (code, not close-repairable):** after the `select_preset` there, call
+`show.reanchor(&outgoing, renderer)`. *Open.*
+
+**nit 3 — `docs/plans/0233-...md:118` Phase 5's `bash -n` done-when is not runnable under the
+conductor.** Neither the implementing session nor this review could run
+`bash -n packaging/linux/stage.sh`: the conductor's allowlist denies it. The block was read by eye
+here and is well-formed (`version` is set at line 102 before its use at 133; `set -u` safe). The
+first real exercise is the release job at the next tag. Recorded so a plan does not name a check the
+conductor cannot run; no repair owed in this lane. *Open.*
+
 ## Followups (after this lands)
 
 - Backlog 0273, the conductor's write bound, is planned separately.
+- The close review's minor 2 is open: `--stream`'s empty-trail Prev does not re-anchor.
