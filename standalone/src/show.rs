@@ -308,11 +308,23 @@ impl Show {
     pub(crate) fn step_back(&mut self, renderer: &mut Renderer) -> Option<String> {
         while let Some(name) = self.traversal.step_back() {
             if renderer.select_preset_by_name(&name) {
-                self.refresh_upcoming(renderer);
+                self.reanchor(&name, renderer);
                 return Some(name);
             }
         }
         None
+    }
+
+    /// Record that an explicit selection — the browser, a control message, a
+    /// hotkey, a step back — put `name` on screen, so a sequential walk's next
+    /// rotation continues from it (ADR-0239's "Space means the next preset").
+    ///
+    /// **Every switch but a rotation's own draw comes through here**; a draw
+    /// anchors itself. The refresh rides along so the console always names the
+    /// successor of the current anchor.
+    pub(crate) fn reanchor(&mut self, name: &str, renderer: &Renderer) {
+        self.traversal.reanchor(name);
+        self.refresh_upcoming(renderer);
     }
 
     /// Record `name` as having been on screen, so a step backwards can return
@@ -604,6 +616,9 @@ impl Show {
         };
         let drained = control.last_drained();
         let applied = standalone::control::apply_to_renderer(drained, renderer);
+        // The name a `ctl/preset` put on screen, copied out before the listener
+        // goes back: it re-anchors the walk below, which needs `self`.
+        let selected = drained.preset().copied().filter(|_| applied.switched);
         // A ping is rare and deliberate and the cap is eight, so copying the
         // nonces out is bounded by construction and off the steady-state path.
         let nonces = drained.pings();
@@ -620,6 +635,9 @@ impl Show {
             .collect();
         control.note_refused(applied.refused);
         self.control = Some(control);
+        if let Some(name) = selected {
+            self.reanchor(name.as_str(), renderer);
+        }
         // The one message answered individually (ADR-0176): OSC carries no
         // acknowledgement, so `ping` exists precisely so a studio can tell a dead
         // player from a quiet one, and the answer goes back on the stream that
@@ -713,6 +731,103 @@ mod tests {
             marks_path: None,
             next_health: now + HEALTH_INTERVAL,
         }
+    }
+
+    /// A `[curve]` preset named `name`, for a roster whose names are the point.
+    fn named(name: &str) -> Preset {
+        let text = format!(
+            "system = \"parametric_curve\"\nname = \"{name}\"\n\n[curve]\nfamily = \"lissajous\"\n"
+        );
+        Preset::from_toml_str(&text).expect("the fixture parses")
+    }
+
+    /// **A browser selection and a control-protocol selection both re-anchor a
+    /// sequential walk**, so the next rotation continues from what is on screen.
+    ///
+    /// The browser's pick reaches the show through [`Show::reanchor`], which is
+    /// what `AppState::on_preset_selected` calls; the control message arrives
+    /// over a real loopback socket and goes through `apply_control_rest`, the
+    /// drain both run modes share.
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "a delivery deadline on a socket this test does not schedule"
+    )]
+    #[test]
+    fn a_browser_pick_and_a_control_selection_both_re_anchor_the_walk() {
+        let Ok(mut renderer) = Renderer::new_headless(HeadlessOptions {
+            width: 64,
+            height: 48,
+            prefer_software: true,
+        }) else {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        };
+        let Ok(control) = Control::bind("127.0.0.1:0") else {
+            eprintln!("skipped: could not bind a loopback control socket");
+            return;
+        };
+        let addr = control.local_addr();
+        let mut show = show();
+        show.traversal = Traversal::new_sequential();
+        show.control = Some(control);
+        renderer.set_presets(
+            ["alpha", "bravo", "charlie", "delta", "echo"]
+                .into_iter()
+                .map(named)
+                .collect(),
+        );
+
+        assert_eq!(show.rotate(&mut renderer).as_deref(), Some("alpha"));
+        assert_eq!(show.rotate(&mut renderer).as_deref(), Some("bravo"));
+
+        // The browser: the renderer switches, then the shell re-anchors.
+        assert!(renderer.select_preset_by_name("echo"));
+        show.reanchor("echo", &renderer);
+        assert_eq!(
+            show.next_up(),
+            Some("alpha"),
+            "the console must name the successor of the browser's pick"
+        );
+        assert_eq!(
+            show.rotate(&mut renderer).as_deref(),
+            Some("alpha"),
+            "Space after a browser pick of `echo` must wrap to `alpha`"
+        );
+
+        // The control protocol: `ctl/preset charlie` over the wire.
+        let mut datagram = Vec::new();
+        standalone::osc::decode::Action::Preset {
+            name: standalone::osc::decode::Name::new("charlie").expect("a short name"),
+        }
+        .encode(&mut datagram);
+        let sender = std::net::UdpSocket::bind("127.0.0.1:0").expect("bind an ephemeral sender");
+        sender
+            .send_to(&datagram, addr)
+            .expect("send to the loopback listener");
+        let deadline = Instant::now() + std::time::Duration::from_secs(5);
+        while !show.control.as_ref().is_some_and(Control::has_pending) && Instant::now() < deadline
+        {
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        let mut transports = Vec::new();
+        assert!(
+            show.take_control_transports(&mut transports),
+            "the selection never reached the listener"
+        );
+        assert!(
+            show.apply_control_rest(&mut renderer),
+            "`ctl/preset charlie` did not switch"
+        );
+        assert_eq!(
+            show.next_up(),
+            Some("delta"),
+            "the console must name the successor of the control selection"
+        );
+        assert_eq!(
+            show.rotate(&mut renderer).as_deref(),
+            Some("delta"),
+            "the next rotation after `ctl/preset charlie` must continue from `charlie`"
+        );
     }
 
     /// **With no `[rotate] seed`, the walk is a function of a number that moves

@@ -180,8 +180,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — a skipped phase settles | dev | committed with this row | |
-| 2 — an explicit selection re-anchors the sequential walk | dev | not started | |
+| 1 — a skipped phase settles | dev | done | 4e2085d5 |
+| 2 — an explicit selection re-anchors the sequential walk | dev | committed with this row | |
 | 3 — the pane test counts the library | dev | not started | |
 | 4 — thumbnail passes cannot collide | dev | not started | |
 | 5 — the exe size pair is held | dev | not started | |
@@ -191,6 +191,13 @@ flowchart LR
 | 9 — npm run dev leaves nothing running | studio-builder | not started | |
 
 ### Notes
+
+- Phase 2: besides the browser pick and `ctl/preset`, the window's other explicit selections
+  re-anchor too (favourite digits, console `random`, A/B, `Backspace` and its roster-predecessor
+  fallback), through `AppState::on_preset_selected`. The headless `--stream` path's `prev` fallback
+  when the trail is empty (`standalone/src/stream.rs`, not in the phase's file list) does not
+  re-anchor; its trail step-back and `ctl/preset` do, through `show.rs`. The anchor is a field of
+  its own beside `last`, so the shuffle's cycle-restart exclusion is untouched.
 
 ### Close triggers
 

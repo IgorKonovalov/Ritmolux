@@ -39,6 +39,13 @@ shown twice, and a new shuffle starts when the round is exhausted. Press `R` for
 `[rotate]` is the same choice made in the file. Under the shuffle the walk also differs from launch
 to launch; `seed` under `[rotate]` pins it when you want the same evening twice.
 
+**After you pick a preset yourself, the two orders answer `Space` differently.** A pick is anything
+but rotation itself: the browser, a favourite's number key, `B`, `Backspace`, the console, or the
+studio selecting one. Under sequential, the next `Space` continues from the preset you picked, so
+picking the last preset in the list and pressing `Space` gives the first. Under the shuffle, a pick
+changes nothing about the round: the next `Space` draws the preset the shuffle was going to draw
+anyway.
+
 **What rotation draws from is the second switch.** Presets you have hidden are never drawn, in
 either order. `L` moves between the whole library and your favourites, and `source = "favourites"`
 under `[rotate]` is the same choice in the file; with nothing marked yet, favourites falls back to
