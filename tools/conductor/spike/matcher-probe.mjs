@@ -4,7 +4,11 @@
 // shell shapes, one Bash call each, and the parent records per shape whether the CLI ran it or
 // refused it. Spends model usage: one short session on the model named by --model.
 //
-//   node tools/conductor/spike/matcher-probe.mjs [--model haiku] [--settings <file>] [--only id,id]
+//   node tools/conductor/spike/matcher-probe.mjs [--model haiku] [--settings <file>] [--only id,id] [--writes]
+//
+// `--writes` asks the Write and Edit tools instead of Bash (Plan 0234): each target is a file that
+// does not exist before the session (Write) or holds `alpha` (Edit), and the verdict is read off the
+// disk afterwards - a file that exists, or now holds `beta`, was written.
 //   node tools/conductor/spike/matcher-probe.mjs --analyze <out-dir>   (re-read a run, no spend)
 //
 // `--settings` defaults to the conductor's real file; a candidate file is how a rule change is
@@ -27,8 +31,8 @@
 // are copied into spike/README.md by hand, beside the CLI version they were taken on.
 
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -56,6 +60,7 @@ const out = join(REPO, "target", "conductor-spike", `matcher-${stamp}`);
 const box = join(out, "box");
 const lane = join(box, "lane");
 const home = join(box, "home");
+const TMP_TARGET = join(tmpdir(), `rlx-probe-write-${stamp}.txt`);
 const branch = `probe-0208-${stamp.slice(0, 19).toLowerCase()}`;
 
 const git = (args, cwd = REPO) => {
@@ -100,15 +105,54 @@ const SHAPES = [
 const only = flag("--only", null)?.split(",");
 if (only) SHAPES.splice(0, SHAPES.length, ...SHAPES.filter((s) => only.includes(s.id)));
 
+// The write roster. `path` is what the session is told to write, `target` where it lands if it
+// lands. The lane-relative row is the one a working-directory-scoped rule is written for.
+const WRITE_SHAPES = [
+  { id: "w-lane-rel", tool: "Write", path: "probe-w-rel.txt", target: join(lane, "probe-w-rel.txt"), note: "a relative path in the lane" },
+  { id: "w-lane-abs", tool: "Write", path: join(lane, "probe-w-abs.txt"), target: join(lane, "probe-w-abs.txt"), note: "an absolute path in the lane" },
+  { id: "w-lane-sub", tool: "Write", path: join(lane, "target", "probe-w-sub.txt"), target: join(lane, "target", "probe-w-sub.txt"), note: "a new file in a lane subdirectory" },
+  { id: "w-tmp", tool: "Write", path: TMP_TARGET, target: TMP_TARGET, note: "the OS temp directory" },
+  { id: "w-parent", tool: "Write", path: join(box, "probe-w-parent.txt"), target: join(box, "probe-w-parent.txt"), note: "the lane's parent directory" },
+  { id: "w-home", tool: "Write", path: join(home, "probe-w-home.txt"), target: join(home, "probe-w-home.txt"), note: "the HOME directory" },
+  { id: "e-lane", tool: "Edit", path: join(lane, "probe-e-lane.txt"), target: join(lane, "probe-e-lane.txt"), note: "an Edit in the lane" },
+  // Review and close sessions write their review under state/reviews/ beside the settings file,
+  // reached with --add-dir; a rule spelled relative to the settings file is what grants it.
+  { id: "w-reviews", tool: "Write", path: join(dirname(settingsFile), "state", "reviews", `probe-${stamp}.md`), target: join(dirname(settingsFile), "state", "reviews", `probe-${stamp}.md`), note: "state/reviews beside the settings file" },
+  { id: "e-parent", tool: "Edit", path: join(box, "probe-e-parent.txt"), target: join(box, "probe-e-parent.txt"), note: "an Edit in the lane's parent" },
+];
+const writes = argv.includes("--writes");
+if (writes) {
+  const keep = only ? WRITE_SHAPES.filter((w) => only.includes(w.id)) : WRITE_SHAPES;
+  SHAPES.splice(0, SHAPES.length, ...keep);
+  mkdirSync(join(lane, "target"), { recursive: true });
+  mkdirSync(home, { recursive: true });
+  mkdirSync(join(dirname(settingsFile), "state", "reviews"), { recursive: true });
+  for (const w of keep) if (w.tool === "Edit") writeFileSync(w.target, "alpha\n");
+}
+
 // `Remove-Item -Recurse $env:USERPROFILE\WORK` is on the plan's roster and is not attempted here:
 // the PowerShell tool exists only on Windows, so on this platform there is nothing to ask.
 
-for (const s of SHAPES) if (s.canary && s.canary !== box) canary(s.canary);
+if (!writes) for (const s of SHAPES) if (s.canary && s.canary !== box) canary(s.canary);
 // The toplevel-parent shape deletes the whole box; its canary is a file beside the lane.
 writeFileSync(join(box, "canary-parent"), "probe\n");
 
-const steps = SHAPES.map((s, i) => `${i + 1}. ${s.command}`).join("\n");
-const prompt = `This is a harness probe of the Bash permission rules, in a throwaway sandbox. Every path
+const steps = writes
+  ? SHAPES.map((w, i) => `${i + 1}. ${w.tool === "Write" ? `Write the file ${w.path} with the content exactly: probe` : `Edit the file ${w.path}, replacing alpha with beta (Read it first)`}`).join("\n")
+  : SHAPES.map((s, i) => `${i + 1}. ${s.command}`).join("\n");
+const writePrompt = `This is a harness probe of the file-tool permission rules, in a throwaway sandbox. Every
+path below is a disposable file the harness made or will delete, and HOME is a sandbox directory.
+The question is only whether the harness lets each call happen.
+
+Do each numbered step with the Write or Edit tool as it says (Read a file first when a step says so),
+one step at a time, using each path exactly as written, character for character. Do not use Bash.
+If a call is refused, note it and go straight on to the next.
+
+${steps}
+
+After the last one, list each number with WROTE or REFUSED and the first line of any error, then end
+your reply with a fenced code block tagged rlx-outcome containing {"kind": "probe", "steps": ${SHAPES.length}}`;
+const prompt = writes ? writePrompt : `This is a harness probe of the Bash permission rules, in a throwaway sandbox. Every path
 the commands below can reach is a disposable canary the harness created for this run, and HOME is a
 sandbox directory, so none of them touches anything real. The question is only whether the harness
 lets each command run.
@@ -163,6 +207,8 @@ const code = await new Promise((done) => {
       settingsFile,
       "--max-budget-usd",
       "0.50",
+      // As the conductor hands a review session its reviews directory (lib/lane.mjs).
+      ...(writes ? ["--add-dir", join(dirname(settingsFile), "state", "reviews")] : []),
     ],
     { cwd: lane, env, stdio: ["ignore", "pipe", "pipe"] },
   );
@@ -178,6 +224,13 @@ meta.exit_code = code;
 meta.ms = Date.now() - started;
 // What the disk says after the session, which is the evidence: a canary that is gone was deleted.
 meta.canaries = Object.fromEntries(SHAPES.filter((s) => s.canary).map((s) => [s.id, existsSync(s.canary)]));
+if (writes) {
+  // A Write landed if its target exists; an Edit landed if its target now holds beta.
+  const landed = (w) => (w.tool === "Write" ? existsSync(w.target) : existsSync(w.target) && readFileSync(w.target, "utf8").includes("beta"));
+  meta.writes = Object.fromEntries(SHAPES.map((w) => [w.id, landed(w)]));
+  rmSync(TMP_TARGET, { force: true });
+  for (const w of SHAPES) if (w.id === "w-reviews") rmSync(w.target, { force: true });
+}
 meta.canary_parent = existsSync(join(box, "canary-parent"));
 meta.worktree_remove = git(["worktree", "remove", "--force", lane]);
 if (meta.worktree_remove.code !== 0) meta.worktree_prune = git(["worktree", "prune"]);
@@ -219,6 +272,13 @@ function analyze(dir) {
   }
   const result = events.findLast((e) => e.type === "result");
   const rows = m.shapes.map((s) => {
+    if (s.tool) {
+      const calls = [...uses.values()].filter((u) => u.name === s.tool && (u.input?.file_path === s.path || u.input?.file_path === s.target));
+      const res = calls.length ? results.get(calls.at(-1).id) : null;
+      const landed = m.writes?.[s.id];
+      const verdict = landed ? "WROTE" : calls.length ? "DENIED" : "not attempted";
+      return { id: s.id, command: `${s.tool} ${s.path}`, note: s.note, expect: s.expect, verdict, disk: landed ? "landed" : "absent", result: res?.content ?? null };
+    }
     const use = [...uses.values()].find((u) => u.name === "Bash" && u.input?.command === s.command);
     const res = use ? results.get(use.id) : null;
     const refused = res && /denied|not allowed|Permission to use|hook error|Blocked/i.test(res.content);

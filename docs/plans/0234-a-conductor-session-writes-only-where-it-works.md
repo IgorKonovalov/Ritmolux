@@ -1,6 +1,6 @@
 # 0234 — A conductor session writes only where it works
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-29
 > **Approved:** 2026-09-29 (owner). Taken in an interactive session and NOT queued: it edits
 > `tools/conductor/settings.conductor.json`, which every conductor session runs under, as Plan 0208 did
@@ -94,11 +94,11 @@ flowchart LR
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `main` directly (an interactive session, as Plan 0208)
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — write shapes get a transcript | dev | not started | |
+| 1 — write shapes get a transcript | dev | committed with this row | |
 | 2 — the settings ship the spellings | dev | not started | |
 | 3 — the README states the write bound | dev | not started | |
 
