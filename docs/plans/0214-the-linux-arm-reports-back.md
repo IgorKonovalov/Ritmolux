@@ -459,3 +459,23 @@ Neither repair widened or loosened a platform gate; both passes above record wha
   shown it would refuse one without the Linux tarball, which is the property the clause wanted. That
   is an architect finding for this plan: reword the clause, or move the per-kind count into a step
   the dispatch path also runs.
+
+### Phase 4, the count moves (2026-09-29)
+
+**Lane:** `main` directly, as Phases 1-3. **Commit:** the one this entry rides in.
+
+`scripts/check-release-assets.mjs <dir>` counts top-level `.zip` and `.tar.gz` files and exits 1
+unless there are exactly 5 and 1, listing what it found. `release.yml` gains a `verify` job that
+needs the six builds, carries no `if:`, downloads the artifacts with `merge-multiple` and runs the
+script. `release` now needs `verify` too, and its publish step keeps the two globs only for the
+upload. `--self-test` runs the script as a child over three scratch directories (5+0 and 4+1
+refused, 5+1 passed) and joins the gate roster after `check-release-tag.mjs --remote`, so
+`.githooks/pre-push` and the CI `links` job run it.
+
+**Checks:** `node scripts/check-release-assets.mjs --self-test` prints 3 of 3, with both short sets
+refused and the full one passed; `node scripts/check-gate-carriers.mjs` reads hook 20/20 and ci
+20/20 and passes, and its self-test is 22 of 22; `release.yml` and `ci.yml` parse as YAML, `release`
+lists `verify` in `needs:` and `verify` has no `if:`; `bash -n .githooks/pre-push` is clean; the
+conductor's `node --test tools/conductor/test/` is 467 passed, 0 failed. `docs/releasing.md`,
+`docs/developing.md` (the pre-push table) and `CLAUDE.md` name the job and the gate, and the doc
+gates pass. **Nothing here has run on GitHub yet**: the push is Phase 5's.

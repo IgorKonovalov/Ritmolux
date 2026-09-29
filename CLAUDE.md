@@ -217,7 +217,10 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   ANNOTATED `v` tag - offline at pre-push (exists, annotated, on HEAD's
                      #   history), `--remote` in CI on a push to main (origin advertises it), and
                      #   at the close after the tag is written, with `--stranded` listing any older
-                     #   tag origin lacks (ADR-0203); check-translations.mjs reads every `.ru.md`
+                     #   tag origin lacks (ADR-0203); check-release-assets.mjs --self-test proves
+                     #   the release's per-kind count (5 zips, 1 tarball) refuses a short set,
+                     #   since release.yml's `verify` job can only ever see it pass (ADR-0254);
+                     #   check-translations.mjs reads every `.ru.md`
                      #   translation's `translated-from: <sha>` stamp - a MISSING or malformed one
                      #   is an exit code, a source that has MOVED past its stamp is an advisory row
                      #   and never one, because no machine here can read the prose either way

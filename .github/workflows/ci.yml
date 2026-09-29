@@ -332,6 +332,10 @@ jobs:
       - run: node scripts/check-release-tag.mjs --self-test
       - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: node scripts/check-release-tag.mjs --remote
+      # And the release-asset count's self-test (ADR-0254): release.yml's `verify`
+      # job runs the count on real artifacts, where it can only be seen passing;
+      # this proves it refuses a set short a zip or short the Linux tarball.
+      - run: node scripts/check-release-assets.mjs --self-test
       # And the translation gate (ADR-0185): every `.ru.md` translation opens with a
       # `translated-from: <sha>` stamp naming the commit its source was
       # translated from. A translation is the one second copy here that no
