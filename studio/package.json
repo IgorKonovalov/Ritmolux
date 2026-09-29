@@ -7,7 +7,7 @@
   "main": "dist/main/index.cjs",
   "type": "module",
   "scripts": {
-    "dev": "concurrently --names \"main,preload,vite,electron\" -c \"yellow,magenta,cyan,green\" \"node scripts/build-main.mjs --watch\" \"node scripts/build-preload.mjs --watch\" \"vite\" \"wait-on http://localhost:5273 file:dist/main/index.cjs file:dist/preload/index.cjs && cross-env ELECTRON_RENDERER_URL=http://localhost:5273 electron .\"",
+    "dev": "concurrently --kill-others --names \"main,preload,vite,electron\" -c \"yellow,magenta,cyan,green\" \"node scripts/build-main.mjs --watch\" \"node scripts/build-preload.mjs --watch\" \"vite\" \"wait-on http://localhost:5273 file:dist/main/index.cjs file:dist/preload/index.cjs && cross-env ELECTRON_RENDERER_URL=http://localhost:5273 electron .\"",
     "build:main": "node scripts/build-main.mjs",
     "build:preload": "node scripts/build-preload.mjs",
     "build:renderer": "vite build",
