@@ -1425,12 +1425,14 @@ gate does not retry (ADR-0193), so while this entry is open every full suite car
 
 **Medium.** It is a loopback datagram lost on the control path the studio uses. It is intermittent
 and has so far been seen only under heavy concurrent GPU load.
-- **Recurred twice as a red conductor close gate**, both under machine load and both passing alone
-  on re-run: 2026-09-27, Plan 0211's close (tree `1cc0754b`, 1 of 1858 failed), and 2026-09-29,
-  Plan 0212's post-close gate (1 of 1777), each time
-  `standalone::stream_show a_headless_run_emits_the_roster_the_preset_and_a_preset_error`. The gate
-  does not retry a red (ADR-0193), so each cost a park or a repair session and a re-run of the full
-  suite. Load was two render agents on 09-29 and a concurrent GPU render on 09-27.
+- **Corrected 2026-09-29: two red conductor gates first recorded here were not this entry.**
+  `standalone::stream_show a_headless_run_emits_the_roster_the_preset_and_a_preset_error` failed
+  Plan 0211's close gate (2026-09-27) and Plan 0212's post-close gate (2026-09-29), both under load,
+  and was first noted here as this entry's flake. Plan 0212's repair session found the cause elsewhere
+  and fixed it in `1afa2e9`: `Show::reload` re-baselined the preset directory's signature *after* the
+  load that emits `roster`, so a file the test's parent wrote on reading that event could land inside
+  the new baseline and never be reported. The baseline is now taken before the load. This entry, a
+  lost `ctl/preset` datagram, is unaffected by that and stays as it was.
 
 ## 0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen
 
