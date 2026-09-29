@@ -181,8 +181,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — a skipped phase settles | dev | done | 4e2085d5 |
-| 2 — an explicit selection re-anchors the sequential walk | dev | committed with this row | |
-| 3 — the pane test counts the library | dev | not started | |
+| 2 — an explicit selection re-anchors the sequential walk | dev | done | 0c3db3c5 |
+| 3 — the pane test counts the library | dev | committed with this row | |
 | 4 — thumbnail passes cannot collide | dev | not started | |
 | 5 — the exe size pair is held | dev | not started | |
 | 6 — two latent divergences | dev | not started | |
