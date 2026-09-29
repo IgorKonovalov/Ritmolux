@@ -781,7 +781,7 @@ fn roster_change_reclamps_the_highlight_and_keeps_open() {
 ///
 /// The library's size is read from the embedded set rather than written here,
 /// so a library that grows into the pane fails this test instead of passing it
-/// against a count that no longer ships.
+/// against a count other than the one that ships.
 #[test]
 fn the_pane_is_clear_of_the_shipped_librarys_rows() {
     let library = rlx_core::preset::default_presets().len();

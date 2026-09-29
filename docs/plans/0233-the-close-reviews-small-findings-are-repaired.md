@@ -182,8 +182,8 @@ flowchart LR
 |---|---|---|---|
 | 1 — a skipped phase settles | dev | done | 4e2085d5 |
 | 2 — an explicit selection re-anchors the sequential walk | dev | done | 0c3db3c5 |
-| 3 — the pane test counts the library | dev | committed with this row | |
-| 4 — thumbnail passes cannot collide | dev | not started | |
+| 3 — the pane test counts the library | dev | done | 959b4f85 |
+| 4 — thumbnail passes cannot collide | dev | committed with this row | |
 | 5 — the exe size pair is held | dev | not started | |
 | 6 — two latent divergences | dev | not started | |
 | 7 — a non-GHSA advisory can be excepted | dev | not started | |
@@ -198,6 +198,13 @@ flowchart LR
   when the trail is empty (`standalone/src/stream.rs`, not in the phase's file list) does not
   re-anchor; its trail step-back and `ctl/preset` do, through `show.rs`. The anchor is a field of
   its own beside `last`, so the shuffle's cycle-restart exclusion is untouched.
+- Phase 3's commit 959b4f85 left a comment `check-comment-hygiene.mjs` rejects (`no longer`); the
+  one-line rewording rides in Phase 4's commit, outside Phase 4's file list.
+- Phase 4: the cleanup rule chosen is "only its own": a pass removes the partial of each child it
+  ran, by that child's pid, once the child ends, and no longer sweeps the directory at start. A
+  partial whose child and pass both died hard stays behind, unread. The two-pass test's child is the
+  test binary re-run on an `#[ignore]`d case that writes through `write_entry`; with the pid dropped
+  from the temp name it fails (`thumbnail failed: Gyre: exit status: 101`), checked by hand.
 
 ### Close triggers
 

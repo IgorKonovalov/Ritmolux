@@ -135,6 +135,9 @@ the next launch picks up whatever the last one did not reach. Editing a preset i
 [`RLX_PRESET_DIR`](configuration.md) library re-renders that preset's picture, and only that one,
 when the app reloads the file; until the new picture lands the pane keeps showing the previous one
 rather than a placeholder. A preset that fails to render is not tried again until its file changes.
+The studio's player runs the same pass into the same cache, so with the studio open beside the app
+two passes can be rendering at once; they fill one set of pictures and neither's render can spoil
+the other's.
 The settings menu's **Thumbnails** row
 turns that off (`[thumbnails] enabled`, see [Configuration](configuration.md#thumbnails)), which is
 what a machine on battery wants.
