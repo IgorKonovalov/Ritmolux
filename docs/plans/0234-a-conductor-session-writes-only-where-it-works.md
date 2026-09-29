@@ -98,8 +98,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — write shapes get a transcript | dev | committed with this row | |
-| 2 — the settings ship the spellings | dev | not started | |
+| 1 — write shapes get a transcript | dev | done | edfb02a1 |
+| 2 — the settings ship the spellings | dev | committed with this row | |
 | 3 — the README states the write bound | dev | not started | |
 
 ### Notes
