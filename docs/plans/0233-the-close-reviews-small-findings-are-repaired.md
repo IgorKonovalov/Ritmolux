@@ -185,8 +185,8 @@ flowchart LR
 | 3 — the pane test counts the library | dev | done | 959b4f85 |
 | 4 — thumbnail passes cannot collide | dev | done | 96b39b12 |
 | 5 — the exe size pair is held | dev | done | 6b9c6a45 |
-| 6 — two latent divergences | dev | committed with this row | |
-| 7 — a non-GHSA advisory can be excepted | dev | not started | |
+| 6 — two latent divergences | dev | done | cae0ca7b |
+| 7 — a non-GHSA advisory can be excepted | dev | committed with this row | |
 | 8 — the banner names the settings file | studio-builder | not started | |
 | 9 — npm run dev leaves nothing running | studio-builder | not started | |
 

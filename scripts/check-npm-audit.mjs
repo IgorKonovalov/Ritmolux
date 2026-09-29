@@ -18,14 +18,16 @@
 //         node scripts/check-npm-audit.mjs --self-test
 //
 // Exit 0 = no advisory at or over its graph's line that the allow file does not excuse. Exit 1 =
-// each one listed as `<graph>  <severity>  <GHSA id>  <package>  <title>`, or an allow file this
-// gate refuses, or an audit that did not answer.
+// each one listed as `<graph>  <severity>  <id>  <package>  <title>`, or an allow file this gate
+// refuses, or an audit that did not answer.
 //
 // THE ALLOW FILE is `npm-audit.allow.json` at the repository root: `{ "allow": [ { "id":
-// "GHSA-....", "reason": "..." } ] }`. An entry excuses its id in every graph. An entry with no
-// reason is a failure, so the list cannot become an off switch - the same rule `deny.toml`'s
-// ignores follow. An entry whose id no graph reports any more is PRINTED and does not fail: the
-// advisory went away, and the entry is owed a deletion rather than a red build.
+// "GHSA-....", "reason": "..." } ] }`. The id is the one this gate prints for the advisory: its
+// GHSA id, or `npm-<source>` for an advisory whose url carries none (see below), so every advisory
+// can be excepted with a reason. Any other id is refused. An entry excuses its id in every graph.
+// An entry with no reason is a failure, so the list cannot become an off switch - the same rule
+// `deny.toml`'s ignores follow. An entry whose id no graph reports any more is PRINTED and does not
+// fail: the advisory went away, and the entry is owed a deletion rather than a red build.
 //
 // A FAILED AUDIT IS A FAILURE, NEVER A PASS. `npm audit` exits non-zero both when it finds
 // something and when it cannot reach the registry, so its exit status says nothing here. What is
@@ -35,7 +37,9 @@
 // ONLY ADVISORIES ARE COUNTED, NOT THE PACKAGES THEY REACH. A report lists every package that sits
 // above a vulnerable one, with a bare package name in `via`; those entries repeat an advisory
 // already counted at its source and are skipped. An advisory's id is the GHSA id at the end of its
-// `url`, which is the id the allow file names and the one GitHub's advisory database is keyed on.
+// `url`, which is the id the allow file names and the one GitHub's advisory database is keyed on;
+// an advisory whose url carries no GHSA id is named `npm-<source>`, from npm's own numeric
+// `source` for it, and the allow file names it that way.
 //
 // NOT ON THE PRE-PUSH ROSTER, AND NOT IN `scripts/gates.manifest.mjs`. It needs the network and its
 // answer changes without a commit, so it runs in its own CI job, beside `deny` (ADR-0244, which
@@ -65,6 +69,14 @@ const rank = (severity) => SEVERITIES.indexOf(severity);
 function ghsaOf(url) {
   const m = typeof url === "string" ? url.match(/(GHSA(?:-[0-9a-z]{4}){3})\b/i) : null;
   return m ? m[1] : null;
+}
+
+/**
+ * Whether `id` is one this gate assigns an advisory, and so one an allow entry may name: a whole
+ * GHSA id, or `npm-` and the digits of npm's numeric `source`.
+ */
+function isAdvisoryId(id) {
+  return ghsaOf(id) === id || /^npm-[0-9]+$/.test(id);
 }
 
 /**
@@ -133,8 +145,8 @@ export function readAllow(text) {
   doc.allow.forEach((entry, i) => {
     const id = typeof entry?.id === "string" ? entry.id.trim() : "";
     const reason = typeof entry?.reason === "string" ? entry.reason.trim() : "";
-    if (!ghsaOf(id) || ghsaOf(id) !== id) {
-      problems.push(`${ALLOW_FILE} entry ${i + 1}: "${id}" is not a GHSA id`);
+    if (!isAdvisoryId(id)) {
+      problems.push(`${ALLOW_FILE} entry ${i + 1}: "${id}" is neither a GHSA id nor npm-<source>`);
       return;
     }
     if (!reason) {
@@ -215,7 +227,7 @@ function report(verdict) {
   console.error(
     "\nThe lines are ADR-0244's: high in studio's shipped graph (--omit=dev), critical in every\n" +
       "full graph. The repair is a bump that clears the advisory, or an entry in\n" +
-      `${ALLOW_FILE} naming its GHSA id with the reason the studio or the site is not exposed.\n` +
+      `${ALLOW_FILE} naming the id printed above with the reason the studio or the site is not exposed.\n` +
       "The reason is reviewed rather than checked, so write the one you would defend.",
   );
 }
@@ -278,6 +290,35 @@ function selfTest() {
   is("and names the entry", v5.allowProblems.join(" / "), `${ALLOW_FILE} entry 1: GHSA-fxhi-fxhi-fxhi gives no reason`);
   is("an allow file that is not JSON fails", readAllow("{ not json").problems.length, 1);
   is("an allow id that is not a GHSA id fails", readAllow('{"allow":[{"id":"CVE-2026-1","reason":"r"}]}').problems.length, 1);
+
+  // An advisory with no GHSA url is named `npm-<source>`, and an allow entry naming it excuses it.
+  const noGhsa = readAudit({
+    stdout: JSON.stringify({
+      auditReportVersion: 2,
+      vulnerabilities: {
+        leftpad: {
+          name: "leftpad",
+          severity: "high",
+          via: [{ source: 1234, name: "leftpad", title: "t", url: "https://npmjs.com/advisories/1234", severity: "high" }],
+        },
+      },
+    }),
+  });
+  is("an advisory with no GHSA url is named npm-<source>", noGhsa.advisories?.[0]?.id, "npm-1234");
+  const npmAllow = readAllow('{"allow":[{"id":"npm-1234","reason":"r"}]}');
+  is("an npm-<source> allow entry is accepted", npmAllow.problems.length, 0);
+  const v9 = judge(
+    [
+      { graph: shipped, audit: noGhsa },
+      { graph: studioFull, audit: audit("clean.json") },
+      { graph: siteFull, audit: audit("clean.json") },
+    ],
+    npmAllow,
+  );
+  is("and it excuses that advisory", v9.ok && v9.excused.map((r) => r.id).join(","), "npm-1234");
+  for (const bad of ["npm-", "npm-12a", "NPM-1234", "npm-GHSA-fxhi-fxhi-fxhi", "1234"]) {
+    is(`a malformed id ${JSON.stringify(bad)} still fails`, readAllow(JSON.stringify({ allow: [{ id: bad, reason: "r" }] })).problems.length, 1);
+  }
 
   // An allow entry whose id no longer appears is reported, and does not fail.
   const v6 = verdictOf("clean.json", "clean.json", "allow-stale.json");
