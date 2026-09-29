@@ -301,6 +301,15 @@ accepted cost" are different documents and only one of them is honest.
 - [0255 — `docs-shots.mjs` renders all or nothing, so adding one card is done by hand-copying its manifest entry](#0255--docs-shotsmjs-renders-all-or-nothing-so-adding-one-card-is-done-by-hand-copying-its-manifest-entry)
 - [0258 — the content lane's scene catalogue covers ten of fourteen systems, and nothing makes it notice the four it skipped](#0258--the-content-lanes-scene-catalogue-covers-ten-of-fourteen-systems-and-nothing-makes-it-notice-the-four-it-skipped)
 - [0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution](#0125--every-diffused-frame-is-an-upscale-both-profiles-diffuse-well-below-the-streams-own-resolution)
+- [0263 — the conductor reads a `not run` log row as unfinished, so a phase whose done-when was not to run parks its plan as a disagreement](#0263--the-conductor-reads-a-not-run-log-row-as-unfinished-so-a-phase-whose-done-when-was-not-to-run-parks-its-plan-as-a-disagreement)
+- [0264 — two players at once run two thumbnail passes into one cache, and their temp files collide](#0264--two-players-at-once-run-two-thumbnail-passes-into-one-cache-and-their-temp-files-collide)
+- [0265 — the pane-clearance test pins the library at 114 presets while more ship](#0265--the-pane-clearance-test-pins-the-library-at-114-presets-while-more-ship)
+- [0266 — the exe's size cap is written in three places that nothing holds equal, and the Linux recipe measures nothing](#0266--the-exes-size-cap-is-written-in-three-places-that-nothing-holds-equal-and-the-linux-recipe-measures-nothing)
+- [0268 — under `order = "sequential"`, Space after a browser pick does not continue from what is on screen](#0268--under-order--sequential-space-after-a-browser-pick-does-not-continue-from-what-is-on-screen)
+- [0269 — two unreachable divergences Plan 0215's review left: a capture loop's `lost`, and `Observed<T>`'s feedback](#0269--two-unreachable-divergences-plan-0215s-review-left-a-capture-loops-lost-and-observedts-feedback)
+- [0270 — an npm advisory with no GHSA url could only be cleared by a bump](#0270--an-npm-advisory-with-no-ghsa-url-could-only-be-cleared-by-a-bump)
+- [0271 — the studio's missing-player banner says to edit a settings file without saying where it is](#0271--the-studios-missing-player-banner-says-to-edit-a-settings-file-without-saying-where-it-is)
+- [0272 — `npm run dev` leaves Vite and the esbuild watchers running after the studio window closes](#0272--npm-run-dev-leaves-vite-and-the-esbuild-watchers-running-after-the-studio-window-closes)
 <!-- toc:end -->
 
 ## The ledger
@@ -329,6 +338,15 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
+| 0263 | The conductor reads a `not run` log row as unfinished | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
+| 0264 | Two players' thumbnail passes collide in one cache | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
+| 0265 | The pane-clearance test pins the library at 114 presets | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
+| 0266 | The exe size cap has three unheld copies; the Linux recipe measures nothing | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
+| 0268 | Space after a browser pick does not continue from it under sequential order | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
+| 0269 | Two unreachable divergences from Plan 0215's review | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
+| 0270 | An npm advisory with no GHSA id can only be cleared by a bump | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
+| 0271 | The missing-player banner does not say where the settings file is | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
+| 0272 | `npm run dev` leaves Vite and the watchers running | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -16312,3 +16330,151 @@ one machine. The owner's verdict was *"quality are fine"*: `quality` answers the
 filed as a wall was a profile default. Phase 3's tiled route was not run, and ADR-0121's Alternative
 C was not reopened. The residue is documentation: which profile `docs/diffusion-filter.md` leads
 with, and a cost table measured on another OS with another preset. It is live as backlog 0262.
+
+## 0263 — the conductor reads a `not run` log row as unfinished, so a phase whose done-when was not to run parks its plan as a disagreement
+
+In [Plan 0226](plans/done/0226-the-conductor-stops-waiting-for-the-owner.md)'s pilot run (started
+2026-09-26 16:50 UTC), 0202 parked `disagreement` after its amended Phase 3 landed:
+*"implement 2-3: the log does not mark Phase 2 done; log row for Phase 2 names 09be6b65, not a commit
+this step made"*. Phase 2's done-when said the phase does not run if Phase 1 falsified its candidate.
+Phase 1 had falsified it, and the log row honestly read `not run: Phase 1 falsified the candidate`.
+`rowIsDone` in `tools/conductor/lib/plan.mjs` accepts only a state beginning `done`, or
+`committed with this row`. So on resume the conductor handed the session "2-3", re-verified Phase 2
+against that step's commits, and parked. The owner reworded the row to `done - not run: ...`
+(`941941be`) and resumed.
+
+That is the only park of the pilot's ten that the pipeline should have absorbed. The other nine were
+judgements it could not make (two `plan_wrong`, a `stop_condition`, three `human_phase`), an edit
+under `.claude/` (`claude_dir`), a dirty main (`main_dirty`), and a red close gate (`check_red`) that
+the gate refuses to retry by design, the flake itself being backlog 0219. The shape recurs: closed
+plans already carry `not run` rows written by hand. So the next plan with a conditional phase parks
+the same way unless its implementer happens to spell the row `done - ...`.
+
+- **Raised:** 2026-09-27 by `architect`, recording Plan 0226 Phase 7's pilot readings. **Owner if
+  taken:** `dev` for `rowIsDone`, or `architect` if the answer is instead a rule that a skipped phase
+  writes `done - not run`.
+- **Verified 2026-09-27** — `rowIsDone` has no case for a skipped phase:
+  `absent: not run in: tools/conductor/lib/plan.mjs`
+- **Verified 2026-09-27** — the predicate is where the entry says:
+  `present: export function rowIsDone in: tools/conductor/lib/plan.mjs`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+## 0264 — two players at once run two thumbnail passes into one cache, and their temp files collide
+
+The studio's windowed player and the standalone app each start the thumbnail pass
+([Plan 0206](plans/done/0206-the-browser-shows-the-look.md)). Both write into the one per-user
+cache, and both name an in-flight entry `<entry>.rlxthumb-part`. So two children rendering the same
+preset collide. The loser logs the collision as a failure, which counts toward the pass giving up on
+that preset, and `discard_partials` in either process deletes the other's in-flight file. Nothing in
+the docs says the studio's player runs the pass at all.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0206's close review finding 1 (minor). **Owner
+  if taken:** `dev` (a per-process temp name or a lock file), plus a docs line in `docs/running.md`.
+- **Verified 2026-09-27** — the temp name carries no process identity:
+  `present: with_extension\("rlxthumb-part"\) in: standalone/src/thumbs.rs`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+## 0265 — the pane-clearance test pins the library at 114 presets while more ship
+
+`standalone/src/overlay/tests.rs` asserts that the browser's last column clears the pane with
+`LIBRARY = 114`. More presets than that ship now. At about 122 the last column reaches the pane, and
+the test would still pass, because it measures a library that no longer exists. The count should come
+from `rlx_core::preset::default_presets().len()`.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0206's close review finding 6 (nit). **Owner if
+  taken:** `dev` (test logic).
+- **Verified 2026-09-27** — the count is a literal:
+  `present: const LIBRARY: usize = 114; in: standalone/src/overlay/tests.rs`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+## 0266 — the exe's size cap is written in three places that nothing holds equal, and the Linux recipe measures nothing
+
+[Plan 0207](plans/done/0207-the-commitments-get-their-instruments.md) gave the exe a cap and a 90 %
+warning threshold. The pair is written in `packaging/windows/stage.ps1`, in
+`packaging/macos/bundle.sh`, and in NFR section 4. Guard (e) in `core/tests/suite/hygiene.rs` holds
+the *component's* pair to the NFR and re-derives the 90 %, but it reads neither exe recipe. That
+leaves ADR-0159's own stated negative, a number in two scripts drifting from its source, reproduced
+and untested. Separately, `packaging/linux/stage.sh` is the one standalone recipe with no measurement
+block, although two of NFR section 4's three size-series rows are Linux readings taken by hand.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0207's close review findings 3 (minor) and 7
+  (nit). **Owner if taken:** `dev` (a guard beside (e), and the Linux measurement block).
+- **Verified 2026-09-27** — the guard reads neither exe recipe:
+  `absent: stage\.ps1|bundle\.sh in: core/tests/suite/hygiene.rs`
+- **Verified 2026-09-27** — the Windows recipe carries its own copy of the pair:
+  `present: \$ExeCapBytes = 16777216 in: packaging/windows/stage.ps1`
+- **Verified 2026-09-27** — the Linux recipe has no size warning:
+  `absent: WarnBytes|warn-bytes|WARN_BYTES in: packaging/linux/stage.sh`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+## 0268 — under `order = "sequential"`, Space after a browser pick does not continue from what is on screen
+
+With presets alpha to echo in sequential order: Space gives alpha, Space gives bravo, pick `echo` in
+the browser, Space gives `charlie` and not `alpha`. A browser pick never enters the traversal, which
+is inherited from [Plan 0205](plans/done/0205-the-library-becomes-navigable.md) (it never enters the
+shuffle's `seen` either), but only sequential order makes it visible. It leaves ADR-0239's "Space
+means the next preset again" partly undelivered, since the rule before 0205 took the successor of the
+active index. Whether a manual selection should re-anchor the traversal is a design call.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0216's close review finding 1 (minor). **Owner
+  if taken:** `architect` (the re-anchor rule), then `dev`.
+- **Verified 2026-09-27** — the sequential arm is where the entry says:
+  `present: Order::Sequential => in: standalone/src/director.rs`
+- **Verified 2026-09-27** — the defect itself is a runtime order:
+  `unprobeable: the successor after a browser pick is decided at runtime, and no text line shows it`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+## 0269 — two unreachable divergences Plan 0215's review left: a capture loop's `lost`, and `Observed<T>`'s feedback
+
+Both are unreachable today and both would bite silently if that changed.
+
+- `standalone/src/capture_linux/rt.rs`: the `let Some(window) = bytes.get_mut(carry..filled) else {
+  return; }` exit leaves `lost` unset, while the `stream.read` error path three lines below stores
+  it. The two ways the loop ends report differently. The bound is unreachable at the sizes the caller
+  establishes.
+- `core/src/render/tests.rs`: `Observed<T>` no longer forwards `set_feedback`, so it inherits
+  `Scene`'s `None` for `as_feedback_sink`, and `hand_over_active_preset` would drop an observed
+  attractor's `[feedback]` table. No scene observed today has that capability.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0215's close review findings 3 and 4 (nits).
+  **Owner if taken:** `dev`.
+- **Verified 2026-09-27** — `present: let Some\(window\) = bytes\.get_mut\(carry\.\.filled\) else in: standalone/src/capture_linux/rt.rs`
+- **Verified 2026-09-27** — `present: struct Observed<T> in: core/src/render/tests.rs`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+## 0270 — an npm advisory with no GHSA url could only be cleared by a bump
+
+`scripts/check-npm-audit.mjs` gives an advisory without a GHSA url the id `npm-<source>`, and the
+allow file's reader accepts only GHSA ids. Such an advisory could never be excepted with a reason,
+which ADR-0244 says every exception carries. It is theoretical while npm keys every advisory by GHSA.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0220's close review finding 3 (nit). **Owner if
+  taken:** `dev`.
+- **Verified 2026-09-27** — `present: npm-\$\{via\.source\} in: scripts/check-npm-audit.mjs`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+## 0271 — the studio's missing-player banner says to edit a settings file without saying where it is
+
+When no player resolves, the banner reads *"Set "playerPath" in the studio settings file to a
+ritmolux build."* The file is `settings.json` under a per-OS directory (`%APPDATA%/ritmolux-studio`,
+`~/Library/Application Support/ritmolux-studio`, `~/.config/ritmolux-studio`), which
+`studio/README.md` names and the banner does not. The person who sees the banner is the one who has
+not read the README.
+
+- **Raised:** 2026-09-27 by `architect`, filing the unrouted followup from
+  [Plan 0219](plans/done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s Phase 4 notes.
+  **Owner if taken:** `studio-builder`.
+- **Verified 2026-09-27** — `present: Set "playerPath" in the studio settings file in: studio/renderer/App.tsx`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+## 0272 — `npm run dev` leaves Vite and the esbuild watchers running after the studio window closes
+
+The studio's `dev` script starts four processes under `concurrently` without `--kill-others`, so
+closing the Electron window ends the player and Electron but leaves Vite and both esbuild watchers
+running. The next `npm run dev` then finds port 5273 taken.
+
+- **Raised:** 2026-09-27 by `architect`, filing the unrouted followup from
+  [Plan 0219](plans/done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s Phase 4 notes.
+  **Owner if taken:** `studio-builder`.
+- **Verified 2026-09-27** — `absent: kill-others in: studio/package.json`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
