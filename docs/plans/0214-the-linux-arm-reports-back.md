@@ -7,7 +7,9 @@
 > **Related ADRs:** [0131](../adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md),
 > [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
 > [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
-> [0203](../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)
+> [0203](../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md),
+> [0254](../adrs/0254-the-release-artifact-count-runs-on-every-release-run-and-proves-it-refuses.md)
+> (proposed, 2026-09-28)
 > **Depends on:** [0120](done/0120-the-standalone-ships-on-ubuntu.md) — every phase landed and on `main`
 
 > **Amended 2026-09-22 (architect).** [Plan 0219](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)
@@ -78,6 +80,15 @@ flowchart TD
 only Phase 2 changes code.
 
 ## Implementation phases
+
+> **Amended 2026-09-28 (architect, owner's decision).** Phase 3's count-guard clause cannot be met:
+> the count lives in the publish-only `release` job, which a `workflow_dispatch` skips by design, so
+> dry run 36471874865 built six artifacts and never ran it. Per
+> [ADR-0254](../adrs/0254-the-release-artifact-count-runs-on-every-release-run-and-proves-it-refuses.md)
+> the count moves into a self-tested script run by a `verify` job on both events. Two phases are
+> inserted: **Phase 4** (`dev`) builds that, and **Phase 5** (`human`) re-takes the dry run. The
+> Ubuntu-box run moves from Phase 4 to **Phase 6**, unchanged. Phase 3 keeps its other two clauses,
+> which its log entry already meets.
 
 ### Phase 1 — The arm reports what it sees
 
@@ -153,17 +164,61 @@ rather than inspecting an archive** — if the guard is wrong, that is itself th
 **Done when:**
 
 - The dry run is green and the artifact list is in the log: **six**, named.
-- The count guard's assertion of **5 `.zip` and exactly 1 `.tar.gz`** was exercised by that run —
-  not read in the diff. A guard that would pass a Linux-less release is the thing most worth
-  catching here, and only a run catches it.
+- ~~The count guard's assertion of **5 `.zip` and exactly 1 `.tar.gz`** was exercised by that
+  run.~~ **Moved to Phase 5 (2026-09-28)**: the count runs only in the publish-only job, so no
+  dispatch can exercise it until Phase 4 moves it (ADR-0254).
 - Nothing was published. The dispatch path's whole point is that it cannot.
 
-### Phase 4 — Run it on the Ubuntu box
+### Phase 4 — The count runs on every release run, and proves it refuses
+
+- **Owner skill:** dev
+
+Per [ADR-0254](../adrs/0254-the-release-artifact-count-runs-on-every-release-run-and-proves-it-refuses.md).
+Move the per-kind count out of the `release` job's publish step into
+`scripts/check-release-assets.mjs <dir>`: it lists `<dir>` and exits non-zero unless it holds
+exactly 5 `.zip` and exactly 1 `.tar.gz`, naming what it found. Add a `verify` job to
+`release.yml` that needs the six builds, runs on both events (no event gate), downloads the
+artifacts with `merge-multiple` as `release` does, and runs the script. `release` then needs
+`verify` as well as the six builds, and its publish step keeps no count of its own. The script
+carries `--self-test`: it builds three scratch directories under the OS temp dir, holding 5 zips
+and no tarball, 4 zips and a tarball, and 5 zips and a tarball, and asserts it refuses the first
+two and passes the third. The self-test joins `scripts/gates.manifest.mjs` with the checkout
+carriers, so `.githooks/pre-push` and the CI `links` job run it.
+
+- **Files touched:** a new `scripts/check-release-assets.mjs`, `.github/workflows/release.yml`,
+  `scripts/gates.manifest.mjs`, `.githooks/pre-push`, `.github/workflows/ci.yml`,
+  `docs/releasing.md`, `docs/developing.md` (the pre-push step table), `CLAUDE.md` (the `scripts/`
+  block names the new gate).
+
+**Done when:**
+
+- `node scripts/check-release-assets.mjs --self-test` exits 0 and prints that the two short
+  directories were refused and the full one passed.
+- `node scripts/check-gate-carriers.mjs` exits 0, with the self-test in the roster.
+- `release.yml`'s `release` job carries no count of its own, and `verify` has no `if:` on the event.
+- `docs/releasing.md` says a dry run runs the count, and names the job that does.
+
+### Phase 5 — The dry run, taken again
+
+- **Owner skill:** human
+
+Push Phase 4, then run `release.yml` under `workflow_dispatch` again and read it. (The push needs the
+`workflow` OAuth scope on the credential.)
+
+**Done when:**
+
+- The dry run is green, the `verify` job ran and passed, and its log line names the six assets it
+  counted.
+- `release` read `skipped` and nothing was published.
+- The pre-push hook or the CI `links` job shows the `--self-test` run green on that push: the
+  refusal half, which no release run can show.
+
+### Phase 6 — Run it on the Ubuntu box
 
 - **Owner skill:** human
 
 0120 Phase 6, carried across whole. Validate **the artifact that ships**, not a `cargo run`:
-extract the tarball from the Phase 3 dispatch run (or from a local `stage.sh`) on the Ubuntu
+extract the tarball from the Phase 3 or Phase 5 dispatch run (or from a local `stage.sh`) on the Ubuntu
 machine.
 
 **The box is Ubuntu 26.04 and the build floor is 24.04** (0120 Phase 1's reading), so this run also
@@ -404,3 +459,23 @@ Neither repair widened or loosened a platform gate; both passes above record wha
   shown it would refuse one without the Linux tarball, which is the property the clause wanted. That
   is an architect finding for this plan: reword the clause, or move the per-kind count into a step
   the dispatch path also runs.
+
+### Phase 4, the count moves (2026-09-29)
+
+**Lane:** `main` directly, as Phases 1-3. **Commit:** the one this entry rides in.
+
+`scripts/check-release-assets.mjs <dir>` counts top-level `.zip` and `.tar.gz` files and exits 1
+unless there are exactly 5 and 1, listing what it found. `release.yml` gains a `verify` job that
+needs the six builds, carries no `if:`, downloads the artifacts with `merge-multiple` and runs the
+script. `release` now needs `verify` too, and its publish step keeps the two globs only for the
+upload. `--self-test` runs the script as a child over three scratch directories (5+0 and 4+1
+refused, 5+1 passed) and joins the gate roster after `check-release-tag.mjs --remote`, so
+`.githooks/pre-push` and the CI `links` job run it.
+
+**Checks:** `node scripts/check-release-assets.mjs --self-test` prints 3 of 3, with both short sets
+refused and the full one passed; `node scripts/check-gate-carriers.mjs` reads hook 20/20 and ci
+20/20 and passes, and its self-test is 22 of 22; `release.yml` and `ci.yml` parse as YAML, `release`
+lists `verify` in `needs:` and `verify` has no `if:`; `bash -n .githooks/pre-push` is clean; the
+conductor's `node --test tools/conductor/test/` is 467 passed, 0 failed. `docs/releasing.md`,
+`docs/developing.md` (the pre-push table) and `CLAUDE.md` name the job and the gate, and the doc
+gates pass. **Nothing here has run on GitHub yet**: the push is Phase 5's.

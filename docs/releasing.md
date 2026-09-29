@@ -150,10 +150,15 @@ reason the studio is a release artifact rather than a checkout-only tool. If any
 release job is **skipped** and no release exists — there is no half-published state. Re-running
 the same tag's workflow replaces the assets rather than failing.
 
-The publish step asserts exactly five zips **and** exactly one tarball, counted per kind, so a job
+The `verify` job asserts exactly five zips **and** exactly one tarball, counted per kind, so a job
 that silently stopped producing its artifact fails the release instead of shortening it — a count
-of zips alone would pass a release that shipped nothing for Linux. Both `gh release` commands
-upload the two kinds it counted.
+of zips alone would pass a release that shipped nothing for Linux. The `release` job needs
+`verify`, so it never publishes a set that failed the count, and both `gh release` commands upload
+the two kinds that were counted. The count is `scripts/check-release-assets.mjs`, and **`verify`
+runs on a dispatch as well as on a tag push**, so a rehearsal checks the assets exactly as a release
+does ([ADR-0254](adrs/0254-the-release-artifact-count-runs-on-every-release-run-and-proves-it-refuses.md)).
+A release run can only show the count passing, so its `--self-test` proves it refuses a short set on
+every push instead.
 
 **Every archive's name carries the version from `[workspace.package]`, the studio's included.**
 `studio/package.json` has a `version` field of its own and `cargo-release` does not touch it, so
@@ -179,7 +184,8 @@ gh auth refresh -s workflow
 ```
 
 To rehearse the builds, run the workflow from the Actions tab (`workflow_dispatch`): it produces
-every archive as **run artifacts**. Note that a `workflow_dispatch` is only offered once the
+every archive as **run artifacts**, and its `verify` job runs the same per-kind count a release
+does. Note that a `workflow_dispatch` is only offered once the
 workflow file exists on the default branch.
 
 **A dispatch never publishes, on any ref — a tag included.** The `release` job's condition names

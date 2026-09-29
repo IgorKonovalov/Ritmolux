@@ -758,7 +758,7 @@ path has: no CI runner has a sound server with something playing, so `capture_li
 compiled and linted on every push and executed only here. The scope is the **artifact that
 ships** — the `.tar.gz` from a `v*` tag or a `workflow_dispatch` run, unpacked on a real desktop
 — not a `cargo run`, whose binary was linked against the box's own glibc and says nothing about
-the runner's. [Plan 0214](plans/0214-the-linux-arm-reports-back.md) Phase 4 runs this list on the
+the runner's. [Plan 0214](plans/0214-the-linux-arm-reports-back.md) Phase 6 runs this list on the
 Ubuntu box.
 
 Run it from the graphical session, not over SSH — there is no user sound server to reach there —
