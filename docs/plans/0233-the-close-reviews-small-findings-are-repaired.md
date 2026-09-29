@@ -42,7 +42,7 @@ session runs under, so it is its own plan, taken interactively.
 ```mermaid
 flowchart LR
     subgraph dev["dev phases 1-7"]
-        P1[0263 conductor: not run settles a phase] --> P2[0268 sequential walk re-anchors]
+        P1[0263 conductor: not run settles a phase] --> P2[0268 a selection re-anchors the walk]
         P2 --> P3[0265 pane test count] --> P4[0264 thumbnail temp name]
         P4 --> P5[0266 exe size pair held] --> P6[0269 two latent divergences]
         P6 --> P7[0270 npm advisory id]
@@ -65,17 +65,27 @@ flowchart LR
   `not run: Phase 1 falsified the candidate` and `not run` are done, and that `not started` and
   `parked: ...` are not. `node --test tools/conductor/test/` passes.
 
-### Phase 2 — A browser pick re-anchors the sequential walk (backlog 0268)
+### Phase 2 — An explicit selection re-anchors the sequential walk (backlog 0268)
 - **Owner skill:** dev
-- **What:** Under `order = "sequential"`, choosing a preset in the browser makes it the anchor the
-  next Space steps from. With alpha to echo: Space gives alpha, Space gives bravo, pick `echo`, and
-  Space gives alpha (the successor of `echo`, wrapping). Shuffle is unchanged. `docs/running.md`
-  says what Space does after a browser pick, under each order.
+- **Amended 2026-09-29 (architect), after the phase parked `plan_wrong`.** The first file list named
+  only `director.rs`, which cannot learn what was picked: the browser's selection is in `input.rs`
+  and reaches the traversal only through `show.rs`, and the phase never said whether a selection
+  over the control protocol re-anchors as well. **Every explicit selection re-anchors**, whether
+  it is a browser pick or a preset selected over the control protocol (the studio, OSC). This is the
+  reading the owner's 2026-09-29 answer implies: the next Space continues from what is on screen,
+  however it got there. Rotation's own advance does not re-anchor, because it is the walk itself.
+- **What:** Under `order = "sequential"`, an explicit selection makes the selected preset the anchor
+  the next Space steps from. With alpha to echo: Space gives alpha, Space gives bravo, select
+  `echo`, and Space gives alpha (the successor of `echo`, wrapping). Shuffle is unchanged.
+  `docs/running.md` says what Space does after a selection, under each order.
 - **Files touched:** `standalone/src/director.rs`, `standalone/src/director/tests.rs`,
-  `docs/running.md`.
+  `standalone/src/show.rs`, `standalone/src/input.rs`, `standalone/src/control.rs`,
+  `standalone/src/app_state.rs`, `docs/running.md`. The dev lane touches only those of the last four
+  that carry a selection into the traversal.
 - **Done when:** a test in `director/tests.rs` walks exactly the sequence above and asserts `alpha`
-  after the pick, and a second asserts that a pick under shuffle leaves the shuffle's behaviour as it
-  was. `cargo nextest run -p standalone` passes (through the suite lock).
+  after the selection; a second asserts a selection under shuffle leaves the shuffle's behaviour as
+  it was; and a test at the `show.rs` seam asserts that a browser selection and a control-protocol
+  selection both reach the anchor. `cargo nextest run -p standalone` passes (through the suite lock).
 
 ### Phase 3 — The pane-clearance test counts the library it measures (backlog 0265)
 - **Owner skill:** dev
@@ -171,7 +181,7 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — a skipped phase settles | dev | committed with this row | |
-| 2 — a browser pick re-anchors the sequential walk | dev | not started | |
+| 2 — an explicit selection re-anchors the sequential walk | dev | not started | |
 | 3 — the pane test counts the library | dev | not started | |
 | 4 — thumbnail passes cannot collide | dev | not started | |
 | 5 — the exe size pair is held | dev | not started | |

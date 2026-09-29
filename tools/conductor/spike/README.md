@@ -323,6 +323,46 @@ still ran. The `cd` rows were not asked again; the rules added touch only `rm` a
 **`Remove-Item` was not asked.** The PowerShell tool exists only on Windows, so this platform has no
 call to make. The row stays open until the probe runs on a Windows box.
 
+## What may a session write? Observed on 2.1.283
+
+- **Date:** 2026-09-29
+- **CLI:** `claude --version` -> `2.1.283 (Claude Code)`, on Linux (Arch, Node 26.8.2)
+- **Run:** `node tools/conductor/spike/matcher-probe.mjs --model haiku --writes`, once per settings
+  file below; about $0.05-0.09 each. `--writes` has the session call `Write` and `Edit` instead of
+  Bash, and `--add-dir` hands it `state/reviews/` beside the settings file, as `lib/lane.mjs` hands a
+  review session its reviews directory. The parent reads the disk afterwards: a `Write` landed if its
+  target exists, and an `Edit` landed if its target now holds `beta`. Plan 0234 Phase 1.
+
+| Shape | Today's settings (bare `Write`, `Edit`) | Candidate A: `./**` + `//tmp/**` | Candidate B: A + `/state/reviews/**` |
+|---|---|---|---|
+| `Write` a relative path in the lane | **WROTE** | **WROTE** | **WROTE** |
+| `Write` an absolute path in the lane | **WROTE** | **WROTE** | **WROTE** |
+| `Write` a new file in a lane subdirectory | **WROTE** | **WROTE** | **WROTE** |
+| `Write` in the OS temp directory | **WROTE** | **WROTE** | **WROTE** |
+| `Write` in the lane's parent | **WROTE** | **DENIED** | **DENIED** |
+| `Write` in `$HOME` (the sandbox) | **WROTE** | **DENIED** | **DENIED** |
+| `Edit` in the lane | **WROTE** | **WROTE** | **WROTE** |
+| `Edit` in the lane's parent | **WROTE** | **DENIED** | **DENIED** |
+| `Write` in `state/reviews/` beside the settings file, with `--add-dir` | not asked | **DENIED** | **WROTE** |
+
+**Today's settings bound nothing**: every write landed, the parent and home included, which is
+backlog 0273 reproduced deliberately. **Candidate B is the bound ADR-0255 asks for.** It replaces the
+bare grants with `Write(./**)`, `Edit(./**)`, `Write(//tmp/**)`, `Edit(//tmp/**)`,
+`Write(/state/reviews/**)` and `Edit(/state/reviews/**)`.
+
+**Three spellings, three anchors, all read off this table.**
+
+- **`./**` is the session's working directory, which is the lane.** The candidate files lived in
+  `target/p0234/`, outside the probe's box, and the lane writes were granted while the box's own
+  directory was refused. So `./` did not resolve against the settings file.
+- **`//tmp/**` is an absolute path.**
+- **`/state/reviews/**` is relative to the settings file's own directory**, so the committed file
+  names `tools/conductor/state/reviews/` without naming a machine.
+
+**`--add-dir` grants nothing on its own.** Under candidate A the reviews write was refused although
+the session was handed that directory. Without the `/state/reviews/**` rule, every review and close
+session would be refused its own review file.
+
 ## Also observed, and relevant to the conductor
 
 - **Usage limits are visible in the stream before they bite.** `rate_limit_event` carries

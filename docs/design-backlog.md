@@ -44,7 +44,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0261 — the thumbnail child picks its own GPU, and on a hybrid laptop the pass moved the show's frame-time tail](#0261--the-thumbnail-child-picks-its-own-gpu-and-on-a-hybrid-laptop-the-pass-moved-the-shows-frame-time-tail)
 - [0262 — the diffusion filter's cost page reads 2.5x what `quality` measured on Linux, and nothing says which profile a reader should start from](#0262--the-diffusion-filters-cost-page-reads-25x-what-quality-measured-on-linux-and-nothing-says-which-profile-a-reader-should-start-from)
 - [0267 — the conductor's `Remove-Item` deletion bound was never asked of the real CLI](#0267--the-conductors-remove-item-deletion-bound-was-never-asked-of-the-real-cli)
-- [0273 — a headless session's `Write` can create a file outside its lane, and nothing bounds it](#0273--a-headless-sessions-write-can-create-a-file-outside-its-lane-and-nothing-bounds-it)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1800,26 +1799,3 @@ the `spike/README.md` table beside the Linux ones.
 - **Verified 2026-09-27** — the rule exists and the table says it was not asked:
   `present: PowerShell\(Remove-Item \*\$\*\) in: tools/conductor/settings.conductor.json`
 - **Verified 2026-09-27** — `present: Remove-Item -Recurse .*not asked in: tools/conductor/spike/README.md`
-
-## 0273 — a headless session's `Write` can create a file outside its lane, and nothing bounds it
-
-Re-verifying the conductor's CLI on 2.1.283 (2026-09-29) found `~/Work/rlx-probe-0187\probe-control.txt`,
-a file in the directory **above** a probe worktree, holding `delta`. The 2.1.282 probe run of
-2026-09-26 wrote it. Its session C runs under `tools/conductor/settings.conductor.json` exactly as a
-conductor session does, and its prompt carried a Windows backslash, so the path the model wrote named
-a file beside the worktree rather than in it. The `Write` succeeded. The settings allow the bare
-`Write` and `Edit` tools, and
-[Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md)'s lane bound covers
-deletions only (`rm`, `Remove-Item`). So a session can create or overwrite any file its user can,
-anywhere on the machine, and the README's claim that the lane is the bound holds for deletion and not
-for writing. The probe's prompt is fixed; the gap it exposed is not. Path-scoped `Write(<lane>/**)`
-rules are the obvious shape, and 2.1.273 showed the matcher ignores some path-scoped spellings for
-`.claude/`, so a probe row has to decide it, the way ADR-0233 decided the deletion bound.
-
-- **Raised:** 2026-09-29 by `architect`, from the 2.1.283 re-verification in
-  `tools/conductor/spike/README.md`. **Owner if taken:** `architect` (the bound and its probe),
-  then `dev`.
-- **Verified 2026-09-29** — the settings allow the bare tools, with no path scope:
-  `present: "Write", in: tools/conductor/settings.conductor.json`
-- **Verified 2026-09-29** — no path-scoped write rule exists:
-  `absent: Write\( in: tools/conductor/settings.conductor.json`
