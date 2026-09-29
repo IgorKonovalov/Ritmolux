@@ -276,5 +276,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0252](0252-the-interfaces-look-is-declared-once-in-the-core-and-the-studios-stylesheet-is-generated-from-it.md) | The interface's look is declared once in the core, and the studio's stylesheet is generated from it | proposed 2026-09-27, Plan 0231 |
 | [0253](0253-a-retirement-may-land-ahead-of-its-replacement-when-a-walk-convicts-it.md) | A retirement may land ahead of its replacement when a walk convicts it | proposed 2026-09-27, Plan 0232; amends 0089 |
 | [0254](0254-the-release-artifact-count-runs-on-every-release-run-and-proves-it-refuses.md) | The release artifact count runs on every release run, and proves it refuses | proposed 2026-09-28, Plan 0214 |
-| [0255](0255-a-conductor-session-writes-inside-its-lane-and-the-os-temp-directory.md) | A conductor session writes inside its lane and the OS temp directory | proposed 2026-09-29, Plan 0234 |
+| [0255](0255-a-conductor-session-writes-inside-its-lane-and-the-os-temp-directory.md) | A conductor session writes inside its lane and the OS temp directory | accepted 2026-09-29, Plan 0234, Outcome |
 <!-- roster:end -->

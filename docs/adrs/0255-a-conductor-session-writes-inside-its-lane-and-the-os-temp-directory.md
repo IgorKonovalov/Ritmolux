@@ -2,7 +2,7 @@
 
 > **Status:** accepted 2026-09-29 (Plan 0234), with an `Outcome`
 > **Date:** 2026-09-29
-> **Related plan(s):** [0234](../plans/0234-a-conductor-session-writes-only-where-it-works.md)
+> **Related plan(s):** [0234](../plans/done/0234-a-conductor-session-writes-only-where-it-works.md)
 > **Extends:** [ADR-0233](0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md)
 > (a refusal is asserted against a transcript)
 

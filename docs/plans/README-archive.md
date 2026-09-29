@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0234 - A conductor session writes only where it works](#0234---a-conductor-session-writes-only-where-it-works)
   - [0212 - The diffused render gains a timeline](#0212---the-diffused-render-gains-a-timeline)
   - [0211 - The diffused frame's resolution is measured before it is designed](#0211---the-diffused-frames-resolution-is-measured-before-it-is-designed)
   - [0208 - The conductor's safety claims get their evidence](#0208---the-conductors-safety-claims-get-their-evidence)
@@ -268,6 +269,25 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0234 - A conductor session writes only where it works](done/0234-a-conductor-session-writes-only-where-it-works.md)
+
+- closed 2026-09-29, conductor-run close of lane `plan-0234-a-conductor-session-writes-only-where-it-works`.
+Phases 1-3 ran interactively on `main`, because they edit the settings every conductor session runs
+under: Phase 1 `edfb02a1`, Phase 2 `62bf76c6`, Phase 3 `af200b33` + `cf0502e6`. Round 1 review: **no
+blockers, no majors, two minors, two nits**. Both minors were repaired at the close in `79bca2cd`;
+the nits (a test comment and a settings rule) stay open. Version: **none** (repository tooling: the
+conductor's settings, its probe and tests; no shipped artifact changes). ADR-0255 accepted with an
+`Outcome`. Closes backlog 0273. Upstream CI read green at the close. The full review is the plan's own
+`## Close review` section.
+- **What landed.** `Write` and `Edit` are granted on `./**` (the lane), `//tmp/**` and
+  `/state/reviews/**` (relative to the settings file), and nothing bare. `matcher-probe.mjs --writes`
+  recorded the lane's parent and `$HOME` DENIED on 2.1.283, and that `--add-dir` alone grants nothing;
+  `settings.test.mjs` reads the refusals from that table.
+- **Open.** The macOS and Windows temp-directory rows are unprobed, beside backlog 0267. Every session
+  kind, not only a review, may write `state/reviews/` (review nit 4). Translation advisory at the
+  close: `how-it-works.ru.md`, `running.ru.md` and the foobar `READ-ME-FIRST.ru.md` have moved
+  sources; this plan moved none of them.
 
 ### [0212 - The diffused render gains a timeline](done/0212-the-diffused-render-gains-a-timeline.md)
 

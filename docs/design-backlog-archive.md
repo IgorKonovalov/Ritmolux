@@ -348,7 +348,6 @@ live entry citing this one.
 | 0270 | An npm advisory with no GHSA id can only be cleared by a bump | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
 | 0271 | The missing-player banner does not say where the settings file is | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
 | 0272 | `npm run dev` leaves Vite and the watchers running | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
-| 0273 | A headless session's `Write` can create a file outside its lane | [Plan 0234](plans/0234-a-conductor-session-writes-only-where-it-works.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -654,6 +653,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0241 | The allowlist is asserted against a model of the CLI's matcher, which one run falsified | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phases 1-2 + ADR-0233. Deny cases rest on a transcript. **Closed 2026-09-27** |
 | 0125 | Every diffused frame is an upscale: both profiles diffuse well below the stream's resolution | [Plan 0211](plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) Phases 1-2. `quality` answers it; the residue is 0262. **Closed 2026-09-27** |
 | 0126 | A render is one prompt, one seed and one preset from first frame to last | [Plan 0212](plans/done/0212-the-diffused-render-gains-a-timeline.md) + ADR-0236. A prompt timeline in bars; the owner judged it reads. **Closed 2026-09-28** |
+| 0273 | A headless session's `Write` can create a file outside its lane | [Plan 0234](plans/done/0234-a-conductor-session-writes-only-where-it-works.md) + ADR-0255. Lane, `/tmp` and reviews; Linux only. **Closed 2026-09-29** |
 <!-- roster:end -->
 
 ---
@@ -16503,4 +16503,11 @@ rules are the obvious shape, and 2.1.273 showed the matcher ignores some path-sc
   `present: "Write", in: tools/conductor/settings.conductor.json`
 - **Verified 2026-09-29** — no path-scoped write rule exists:
   `absent: Write\( in: tools/conductor/settings.conductor.json`
-- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0234](plans/0234-a-conductor-session-writes-only-where-it-works.md) was approved.
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0234](plans/done/0234-a-conductor-session-writes-only-where-it-works.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0234](plans/done/0234-a-conductor-session-writes-only-where-it-works.md)
+and [ADR-0255](adrs/0255-a-conductor-session-writes-inside-its-lane-and-the-os-temp-directory.md).
+`settings.conductor.json` grants `Write` and `Edit` on `./**`, `//tmp/**` and `/state/reviews/**` and
+nothing bare; the `--writes` probe recorded the lane's parent and `$HOME` DENIED on 2.1.283, and
+`settings.test.mjs` reads those refusals from the table. The macOS and Windows temp-directory rows are
+owed beside 0267.
