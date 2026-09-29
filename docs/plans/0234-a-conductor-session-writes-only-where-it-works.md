@@ -1,9 +1,10 @@
 # 0234 — A conductor session writes only where it works
 
-> **Status:** in-progress
+> **Status:** approved
 > **Created:** 2026-09-29
-> **Approved:** 2026-09-29 (owner). Taken in an interactive session and NOT queued: it edits
-> `tools/conductor/settings.conductor.json`, which every conductor session runs under, as Plan 0208 did
+> **Approved:** 2026-09-29 (owner). Phases 1-3 taken in an interactive session, because they edit
+> `tools/conductor/settings.conductor.json`, which every conductor session runs under; queued
+> afterwards for its review and close only, as Plan 0208 was
 > **Owner skill(s):** dev
 > **Related ADRs:** [0255](../adrs/0255-a-conductor-session-writes-inside-its-lane-and-the-os-temp-directory.md)
 > (proposed), [0233](../adrs/0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md)
@@ -100,7 +101,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — write shapes get a transcript | dev | done | edfb02a1 |
 | 2 — the settings ship the spellings | dev | done | 62bf76c6 |
-| 3 — the README states the write bound | dev | committed with this row | |
+| 3 — the README states the write bound | dev | done | af200b33, cf0502e6 |
 
 ### Notes
 
@@ -110,13 +111,13 @@ flowchart LR
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** design-backlog 0273
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** fix-only, in the conductor, which never ships: path-scoped `Write`/`Edit` grants, a `--writes` probe mode, and tests
+- **Operator docs touched:** `tools/conductor/README.md` (the operator guide), `tools/conductor/spike/README.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0; 50 stated reductions hold across 24 live entries, 4 unprobeable
+- **Full suite:** no Rust changed; `node --test tools/conductor/test/` 476 passed, 0 failed. `cargo nextest run --workspace` owed to the conductor's pre-review gate
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
 
