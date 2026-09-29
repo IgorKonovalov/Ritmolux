@@ -15,6 +15,8 @@ export interface AppInfo {
   /** The binary that was resolved, and which root it came from. */
   playerPath: string | undefined
   playerSource: string | undefined
+  /** The full path of this machine's `settings.json`, where `playerPath` is set. */
+  settingsFile: string
   /** The mode the running player was spawned in (ADR-0186). */
   playerMode: PlayerMode
 }

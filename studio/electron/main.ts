@@ -82,6 +82,7 @@ function start(): void {
     studioVersion: app.getVersion(),
     playerPath: resolved?.path,
     playerSource: resolved?.source,
+    settingsFile: file,
     playerMode: mode,
   })
   const schema = new SchemaCache(resolved?.path)

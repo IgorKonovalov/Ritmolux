@@ -186,8 +186,8 @@ flowchart LR
 | 4 — thumbnail passes cannot collide | dev | done | 96b39b12 |
 | 5 — the exe size pair is held | dev | done | 6b9c6a45 |
 | 6 — two latent divergences | dev | done | cae0ca7b |
-| 7 — a non-GHSA advisory can be excepted | dev | committed with this row | |
-| 8 — the banner names the settings file | studio-builder | not started | |
+| 7 — a non-GHSA advisory can be excepted | dev | done | eb1b4274 |
+| 8 — the banner names the settings file | studio-builder | committed with this row | |
 | 9 — npm run dev leaves nothing running | studio-builder | not started | |
 
 ### Notes
@@ -214,6 +214,9 @@ flowchart LR
   roster slot handed an attractor preset, not the real `AttractorScene`, whose table is private to
   its module. With `Observed`'s forward disabled the test fails (`left: None`), checked by hand.
   The capture loop's two exits are one `lost` store; nothing tests that path.
+- Phase 8: `AppInfo` gains `settingsFile`, the path main already reads settings from. The type is
+  declared three times (`studio/electron/ipc/appHandlers.ts`, `studio/electron/preload/api/app.ts`,
+  `App.tsx`), so the first two ride in the commit as the shared type the phase allows.
 
 ### Close triggers
 
