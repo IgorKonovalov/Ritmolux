@@ -188,7 +188,7 @@ flowchart LR
 | 6 — two latent divergences | dev | done | cae0ca7b |
 | 7 — a non-GHSA advisory can be excepted | dev | done | eb1b4274 |
 | 8 — the banner names the settings file | studio-builder | done | 1dff2c94 |
-| 9 — npm run dev leaves nothing running | studio-builder | committed with this row | |
+| 9 — npm run dev leaves nothing running | studio-builder | done | 6ccaa3c1 |
 
 ### Notes
 
@@ -220,13 +220,17 @@ flowchart LR
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none (`git diff --stat main...HEAD`).
 - **Plan header `Closes:`** design-backlog 0263, 0264, 0265, 0266, 0268, 0269, 0270, 0271, 0272
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** a behaviour change (Phase 2: an explicit selection re-anchors the sequential
+  walk), fixes in `standalone/`, `studio/`, `scripts/`, `tools/conductor/` and
+  `packaging/linux/stage.sh`, and test guards in `core/`.
+- **Operator docs touched:** `docs/running.md` (Phases 2 and 4).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, "50 stated reductions still
+  hold across all 24 live entries (4 unprobeable)"; 35 moved-path advisories, among them 0165, 0187
+  and 0220 on `app_state.rs` / `show.rs` and 0260, 0261 on `thumbs.rs`, which this plan touched.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** none.
 
 ## Followups (after this lands)
 
