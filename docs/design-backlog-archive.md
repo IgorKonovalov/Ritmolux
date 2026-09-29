@@ -310,6 +310,7 @@ accepted cost" are different documents and only one of them is honest.
 - [0270 — an npm advisory with no GHSA url could only be cleared by a bump](#0270--an-npm-advisory-with-no-ghsa-url-could-only-be-cleared-by-a-bump)
 - [0271 — the studio's missing-player banner says to edit a settings file without saying where it is](#0271--the-studios-missing-player-banner-says-to-edit-a-settings-file-without-saying-where-it-is)
 - [0272 — `npm run dev` leaves Vite and the esbuild watchers running after the studio window closes](#0272--npm-run-dev-leaves-vite-and-the-esbuild-watchers-running-after-the-studio-window-closes)
+- [0273 — a headless session's `Write` can create a file outside its lane, and nothing bounds it](#0273--a-headless-sessions-write-can-create-a-file-outside-its-lane-and-nothing-bounds-it)
 <!-- toc:end -->
 
 ## The ledger
@@ -347,6 +348,7 @@ live entry citing this one.
 | 0270 | An npm advisory with no GHSA id can only be cleared by a bump | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
 | 0271 | The missing-player banner does not say where the settings file is | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
 | 0272 | `npm run dev` leaves Vite and the watchers running | [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md). **Promoted** |
+| 0273 | A headless session's `Write` can create a file outside its lane | [Plan 0234](plans/0234-a-conductor-session-writes-only-where-it-works.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -16478,3 +16480,27 @@ running. The next `npm run dev` then finds port 5273 taken.
   **Owner if taken:** `studio-builder`.
 - **Verified 2026-09-27** — `absent: kill-others in: studio/package.json`
 - **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+## 0273 — a headless session's `Write` can create a file outside its lane, and nothing bounds it
+
+Re-verifying the conductor's CLI on 2.1.283 (2026-09-29) found `~/Work/rlx-probe-0187\probe-control.txt`,
+a file in the directory **above** a probe worktree, holding `delta`. The 2.1.282 probe run of
+2026-09-26 wrote it. Its session C runs under `tools/conductor/settings.conductor.json` exactly as a
+conductor session does, and its prompt carried a Windows backslash, so the path the model wrote named
+a file beside the worktree rather than in it. The `Write` succeeded. The settings allow the bare
+`Write` and `Edit` tools, and
+[Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md)'s lane bound covers
+deletions only (`rm`, `Remove-Item`). So a session can create or overwrite any file its user can,
+anywhere on the machine, and the README's claim that the lane is the bound holds for deletion and not
+for writing. The probe's prompt is fixed; the gap it exposed is not. Path-scoped `Write(<lane>/**)`
+rules are the obvious shape, and 2.1.273 showed the matcher ignores some path-scoped spellings for
+`.claude/`, so a probe row has to decide it, the way ADR-0233 decided the deletion bound.
+
+- **Raised:** 2026-09-29 by `architect`, from the 2.1.283 re-verification in
+  `tools/conductor/spike/README.md`. **Owner if taken:** `architect` (the bound and its probe),
+  then `dev`.
+- **Verified 2026-09-29** — the settings allow the bare tools, with no path scope:
+  `present: "Write", in: tools/conductor/settings.conductor.json`
+- **Verified 2026-09-29** — no path-scoped write rule exists:
+  `absent: Write\( in: tools/conductor/settings.conductor.json`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0234](plans/0234-a-conductor-session-writes-only-where-it-works.md) was approved.
