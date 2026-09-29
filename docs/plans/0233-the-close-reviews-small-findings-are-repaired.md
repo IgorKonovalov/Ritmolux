@@ -183,8 +183,8 @@ flowchart LR
 | 1 — a skipped phase settles | dev | done | 4e2085d5 |
 | 2 — an explicit selection re-anchors the sequential walk | dev | done | 0c3db3c5 |
 | 3 — the pane test counts the library | dev | done | 959b4f85 |
-| 4 — thumbnail passes cannot collide | dev | committed with this row | |
-| 5 — the exe size pair is held | dev | not started | |
+| 4 — thumbnail passes cannot collide | dev | done | 96b39b12 |
+| 5 — the exe size pair is held | dev | committed with this row | |
 | 6 — two latent divergences | dev | not started | |
 | 7 — a non-GHSA advisory can be excepted | dev | not started | |
 | 8 — the banner names the settings file | studio-builder | not started | |
@@ -205,6 +205,11 @@ flowchart LR
   partial whose child and pass both died hard stays behind, unread. The two-pass test's child is the
   test binary re-run on an `#[ignore]`d case that writes through `write_entry`; with the pid dropped
   from the temp name it fails (`thumbnail failed: Gyre: exit status: 101`), checked by hand.
+- Phase 5: the guard reads the Linux recipe too, as a fourth copy, since the phase adds the pair
+  there. The seeded check is its own test, `the_exe_size_guard_refuses_an_edited_copy`.
+  `bash -n packaging/linux/stage.sh` was not run: the session's allowlist denies `bash -n` and
+  `sh -n`; the block mirrors `packaging/macos/bundle.sh`'s. `docs/nfr.md` section 4 still names
+  only `stage.ps1` and `bundle.sh` as the recipes that print the length (outside the file list).
 
 ### Close triggers
 

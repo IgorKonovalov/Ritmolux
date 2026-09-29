@@ -1050,6 +1050,170 @@ fn the_component_size_cap_agrees_between_the_recipe_and_the_nfr() {
     );
 }
 
+/// The recipes that carry the exe's size pair, as `(path, cap name, warning
+/// name)`: each is read for `<name> = <bytes>` (PowerShell) or `<name>=<bytes>`
+/// (shell), whichever the line uses.
+const EXE_RECIPES: [(&str, &str, &str); 3] = [
+    (
+        "packaging/windows/stage.ps1",
+        "$ExeCapBytes",
+        "$ExeWarnBytes",
+    ),
+    (
+        "packaging/macos/bundle.sh",
+        "EXE_CAP_BYTES",
+        "EXE_WARN_BYTES",
+    ),
+    (
+        "packaging/linux/stage.sh",
+        "EXE_CAP_BYTES",
+        "EXE_WARN_BYTES",
+    ),
+];
+
+/// The first whole number assigned to `name` at the start of a line of
+/// `text`, with or without spaces around the `=`.
+fn assigned_bytes(text: &str, name: &str) -> Option<u64> {
+    text.lines().find_map(|line| {
+        let rest = line.trim_start().strip_prefix(name)?;
+        let rest = rest.trim_start().strip_prefix('=')?.trim_start();
+        let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+        digits.parse().ok()
+    })
+}
+
+/// The byte figure written right after `marker` in `text`, in NFR's own form
+/// (`16,777,216 B`): digits with comma separators, then ` B`.
+fn figure_after(text: &str, marker: &str) -> Option<u64> {
+    let rest = &text[text.find(marker)? + marker.len()..];
+    let written: String = rest
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == ',')
+        .collect();
+    if !rest[written.len()..].starts_with(" B") {
+        return None;
+    }
+    written.replace(',', "").parse().ok()
+}
+
+/// The exe's `(cap, warning)` pair as NFR §4 states it: the bullet naming the
+/// standalone release exe, read for its `**Soft cap … B` and its
+/// `**warn** above … B`.
+fn nfr_exe_pair(nfr: &str) -> Result<(u64, u64), String> {
+    let start = nfr
+        .find("## 4. ")
+        .ok_or("docs/nfr.md has no section 4 heading")?;
+    let section = &nfr[start..];
+    let section = &section[..section[1..]
+        .find("\n## ")
+        .map_or(section.len(), |at| at + 1)];
+    let bullet = section
+        .split("\n- ")
+        .find(|bullet| bullet.contains("for the standalone release exe"))
+        .ok_or("docs/nfr.md §4 has no bullet for the standalone release exe")?;
+    let cap = figure_after(bullet, "**Soft cap ")
+        .ok_or("docs/nfr.md §4's exe bullet states no `**Soft cap <n> B`")?;
+    let warn = figure_after(bullet, "**warn** above ")
+        .ok_or("docs/nfr.md §4's exe bullet states no `**warn** above <n> B`")?;
+    Ok((cap, warn))
+}
+
+/// Whether every copy of the exe's size pair agrees with NFR §4's, and the
+/// warning is 90 % of the cap. `recipes` is `(path, text)` per entry of
+/// [`EXE_RECIPES`], in its order. Returns the pair, or what disagrees.
+fn exe_pairs_agree(nfr: &str, recipes: &[(&str, String)]) -> Result<(u64, u64), String> {
+    let (cap, warn) = nfr_exe_pair(nfr)?;
+    if warn != cap * 9 / 10 {
+        return Err(format!(
+            "docs/nfr.md §4 warns at {warn} B, which is not 90 % of its {cap} B cap"
+        ));
+    }
+    for ((path, text), (_, cap_name, warn_name)) in recipes.iter().zip(EXE_RECIPES) {
+        for (name, want) in [(cap_name, cap), (warn_name, warn)] {
+            match assigned_bytes(text, name) {
+                None => {
+                    return Err(format!(
+                        "{path} assigns no `{name}`; the parse read nothing"
+                    ));
+                }
+                Some(got) if got != want => {
+                    return Err(format!(
+                        "{path} sets `{name}` to {got}, docs/nfr.md §4 says {want} B"
+                    ));
+                }
+                Some(_) => {}
+            }
+        }
+    }
+    Ok((cap, warn))
+}
+
+fn read_exe_recipes(root: &std::path::Path) -> Vec<(&'static str, String)> {
+    EXE_RECIPES
+        .iter()
+        .map(|(path, _, _)| {
+            let text = std::fs::read_to_string(root.join(path))
+                .unwrap_or_else(|e| panic!("read {path}: {e}"));
+            (*path, text)
+        })
+        .collect()
+}
+
+/// **The exe's size pair is held equal wherever it is written**: NFR §4 and
+/// the three recipes that measure the exe, with the warning at 90 % of the cap.
+///
+/// The same negative ADR-0159 names for the component — a number in a script
+/// drifting from the document it cites — with three scripts rather than one.
+/// Each copy is read, not compared against a constant here, and a copy that
+/// reads as nothing is a failure, so a reformatted recipe is red rather than
+/// vacuously green.
+#[test]
+fn the_exe_size_pair_agrees_between_the_recipes_and_the_nfr() {
+    let root = workspace_root();
+    let nfr = std::fs::read_to_string(root.join("docs/nfr.md")).expect("read docs/nfr.md");
+    let recipes = read_exe_recipes(&root);
+    let (cap, warn) = exe_pairs_agree(&nfr, &recipes).unwrap_or_else(|why| panic!("{why}"));
+    // Non-vacuity: the pair read is the one NFR §4 states today.
+    assert_eq!((cap, warn), (16_777_216, 15_099_494));
+}
+
+/// **The guard above bites**: one copy edited by one byte, a warning moved off
+/// 90 %, and a recipe whose assignment was reformatted away are each refused.
+#[test]
+fn the_exe_size_guard_refuses_an_edited_copy() {
+    let root = workspace_root();
+    let nfr = std::fs::read_to_string(root.join("docs/nfr.md")).expect("read docs/nfr.md");
+    let recipes = read_exe_recipes(&root);
+
+    for (index, (path, _, warn_name)) in EXE_RECIPES.iter().enumerate() {
+        let mut edited = recipes.clone();
+        let text = &edited[index].1;
+        let line = text
+            .lines()
+            .find(|line| assigned_bytes(line, warn_name).is_some())
+            .expect("the recipe assigns its warning")
+            .to_owned();
+        edited[index].1 = text.replace(&line, &line.replace("15099494", "15099495"));
+        assert!(
+            exe_pairs_agree(&nfr, &edited).is_err(),
+            "an edit to {path}'s `{warn_name}` passed the guard"
+        );
+
+        let mut renamed = recipes.clone();
+        renamed[index].1 = renamed[index].1.replace(warn_name, "SOMETHING_ELSE");
+        assert!(
+            exe_pairs_agree(&nfr, &renamed).is_err(),
+            "{path} with no `{warn_name}` at all passed the guard"
+        );
+    }
+
+    let off_ninety = nfr.replace("above 15,099,494 B", "above 15,099,495 B");
+    assert!(
+        exe_pairs_agree(&off_ninety, &recipes).is_err(),
+        "an NFR warning that is not 90 % of the cap passed the guard"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // (f) One stall policy (ADR-0191)
 // ---------------------------------------------------------------------------
