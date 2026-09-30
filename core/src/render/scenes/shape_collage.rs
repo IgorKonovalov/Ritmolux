@@ -83,7 +83,7 @@ use super::Scene;
 use super::common;
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::Palette;
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// Element kind selectors, as they reach the shader's `shape.z`. Phase 7 of
 /// Plan 0113 extends this roster; these three are what a suprematist canvas is
@@ -1501,6 +1501,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How many elements are placed; 0 lets the layout decide. Truncated, so a rise \
                admits its next element on arrival.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "layout",
@@ -1508,6 +1510,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 8.0]),
         doc: "Picks which arrangement the elements are placed by.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "seed",
@@ -1516,6 +1520,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Chooses one arrangement out of the family; the same seed always composes the \
                same way. Truncated, like `count`.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "size_hierarchy",
@@ -1523,6 +1529,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much larger the leading elements are than the rest; 0 makes them equal.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "angle_bias",
@@ -1530,6 +1538,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "Degrees the elements lean by, which is what gives the composition its tilt.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "roster",
@@ -1537,6 +1547,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 8.0]),
         doc: "Picks which set of shapes the elements are drawn from.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "density",
@@ -1544,6 +1556,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 2.0]),
         doc: "How much of the frame the arrangement fills.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "drift",
@@ -1551,6 +1565,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 2.0]),
         doc: "How far the elements wander from their placed positions.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "spin",
@@ -1558,6 +1574,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-2.0, 2.0]),
         doc: "Turns per second the elements rotate by.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "recompose",
@@ -1565,6 +1583,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Crossing zero lays the composition out again from a new arrangement.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "recompose_blend",
@@ -1572,6 +1592,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How long the change between two arrangements takes, rather than cutting.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "pump_size",
@@ -1579,6 +1601,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 2.0]),
         doc: "Scales every element together, for a beat to make the whole composition breathe.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "pump_alpha",
@@ -1586,6 +1610,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 2.0]),
         doc: "Fades every element together, the opacity twin of `pump_size`.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "scale",
@@ -1593,6 +1619,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.1, 4.0]),
         doc: "Size of the whole composition within the frame.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     crate::render::scenes::common::PAN_X,
     crate::render::scenes::common::PAN_Y,
@@ -1602,6 +1630,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How opaque the ground behind the elements is; 0 leaves the backdrop showing.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "color_span",
@@ -1609,6 +1639,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much of the palette the elements are coloured across.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "palette_shift",
@@ -1616,6 +1648,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Rotates every element's colour along the palette together.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,
@@ -1625,6 +1659,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How opaque each element is, so overlaps can show through.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "edge_softness",
@@ -1632,6 +1668,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How far each element's edge fades; 0 is a hard cut.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
 ];
 

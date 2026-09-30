@@ -85,7 +85,9 @@ use super::{FeedbackSink, Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::{self, FeedbackConfig, PingPongField};
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{FamilyParam, FamilyRange, ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{
+    FamilyParam, FamilyRange, ParamGroup, ParamKind, ParamSpec, default_of,
+};
 
 /// Compute workgroup size (1D). 64 is a safe, portable default across DX12/Metal.
 const WORKGROUP: u32 = 64;
@@ -1416,6 +1418,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "First of the four family coefficients; what it means depends on the attractor family the tuple picked.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "b",
@@ -1423,6 +1427,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "Second family coefficient - see the roster's attractor essay for what each family does with it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "c",
@@ -1430,6 +1436,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "Third family coefficient, and on the IFS figures it means nothing at all.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "d",
@@ -1437,6 +1445,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "Fourth family coefficient; like the other three it is inert on the IFS figures.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "tuple",
@@ -1444,6 +1454,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "Picks a whole known-good figure - family, coefficients and framing together.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "size",
@@ -1451,6 +1463,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "Size of each particle's deposit into the accumulation.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),
     crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
@@ -1460,6 +1474,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much of the accumulation survives each second; near 1 the figure builds up for a long time.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "hue_spread",
@@ -1467,6 +1483,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How far across the palette the particle band reaches.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "hue_center",
@@ -1474,6 +1492,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Where that band sits along the palette.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,
@@ -1488,6 +1508,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Crossing zero throws every particle back onto a fresh start position.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "perspective",
@@ -1495,6 +1517,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How strongly depth shrinks a particle, turning a flat figure into a solid one.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "depth_fade",
@@ -1502,6 +1526,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much depth dims a particle, which is what reads as air between the layers.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "depth_hue",
@@ -1509,6 +1535,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Shifts colour with depth, so far parts of the figure sit elsewhere on the palette.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "spin",
@@ -1516,6 +1544,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-2.0, 2.0]),
         doc: "Turns per second the figure rotates by about its vertical axis.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "morph",
@@ -1523,6 +1553,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Travels between the tuple's figure and the next one; the visible rate is steepest near zero.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "curl",
@@ -1530,6 +1562,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-2.0, 2.0]),
         doc: "Adds a rotational term to the map, curling the trajectories.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "vigor",
@@ -1537,6 +1571,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "How far a particle moves per step, so higher spreads the figure and thins it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "lean",
@@ -1544,6 +1580,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Tilts the map, breaking the figure's symmetry.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "bias",
@@ -1551,6 +1589,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Offsets the map, sliding the figure within its own attractor.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "map_tint",
@@ -1558,6 +1598,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much a particle's colour follows which branch of the map produced it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "map_hue",
@@ -1565,6 +1607,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "How far apart on the palette those branches are placed.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "root_tint",
@@ -1572,6 +1616,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much a particle's colour follows the seed it started from.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "root_hue",
@@ -1579,6 +1625,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "How far apart on the palette those seeds are placed.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "emergence",
@@ -1586,6 +1634,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 60.0]),
         doc: "How many seconds the figure takes to settle out of its starting cloud.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "fb_zoom",
@@ -1593,6 +1643,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.9, 1.1]),
         doc: "Scale the attractor's own accumulation is grown by each second.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "fb_rotate",
@@ -1600,6 +1652,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Turns per second that accumulation is rotated by.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "fb_dx",
@@ -1607,6 +1661,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Sideways drift of that accumulation, in frame widths per second.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "fb_dy",
@@ -1614,6 +1670,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Vertical drift of that accumulation, in frame heights per second.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "fb_center_x",
@@ -1621,6 +1679,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "The horizontal point its zoom and rotation pivot about, in uv.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "fb_center_y",
@@ -1628,6 +1688,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "The vertical point its zoom and rotation pivot about, in uv.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "fb_warp",
@@ -1635,6 +1697,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 0.5]),
         doc: "Amplitude of a swirl added to its feedback sample, so the trail curls.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
 ];
 

@@ -76,7 +76,7 @@ use super::{
 use crate::dsp::AnalysisFrame;
 use crate::preset::Easing;
 use crate::render::palette::{self, Palette, desaturate};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// Largest element count a `[spectrum]` table may ask for — the band count
 /// itself, because above it the 64 → N reduction stops being a partition of the
@@ -155,6 +155,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Height the readout sits at when the band is silent.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "scale",
@@ -162,6 +164,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "How far a full band pushes the readout above its base.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "curve",
@@ -169,6 +173,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([CURVE_MIN, CURVE_MAX]),
         doc: "Exponent on each band's level: 1 is linear, below 1 lifts quiet detail, above 1 pushes it down.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "radius",
@@ -176,6 +182,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Radius of the ring the readout is drawn around, in the radial layouts.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "span",
@@ -183,6 +191,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much of the frequency axis is shown; below 1 the top end is cut.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "baseline",
@@ -190,6 +200,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "Where the flat layout's zero line sits vertically.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "rotation",
@@ -197,6 +209,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, std::f32::consts::TAU]),
         doc: "Turns the readout, in radians.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     crate::render::scenes::lines::thickness(DEFAULT_THICKNESS),
     crate::render::scenes::common::hue(DEFAULT_HUE),

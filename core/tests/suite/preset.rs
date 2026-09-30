@@ -2055,6 +2055,11 @@ fn render_parameter_reference() -> String {
          the family the system draws: it reads over the range given beside each family named, \
          and does nothing at all on a family the cell calls inert.\n",
     );
+    out.push_str(
+        "\nThe **Group** cell is where the studio files the parameter — shape, motion, colour, \
+         light or post — and **main** marks the few that most decide the look, which the studio \
+         lists first when that group is opened.\n",
+    );
 
     let systems: Vec<_> = reference_rosters();
     let stage_names: Vec<&str> = engine_stage_rosters().iter().map(|(n, _)| *n).collect();
@@ -2078,8 +2083,10 @@ fn render_parameter_reference() -> String {
                 continue;
             }
             out.push_str(&format!("\n**{group}**\n\n"));
-            out.push_str("| Parameter | Default | Range | What it does |\n");
-            out.push_str("|---|---|---|---|\n");
+            // Group last, so every reader of the first four cells reads them
+            // where it always has.
+            out.push_str("| Parameter | Default | Range | What it does | Group |\n");
+            out.push_str("|---|---|---|---|---|\n");
             let families = rlx_core::render::scenes::family_params(label);
             for spec in rows {
                 let range = match (
@@ -2091,10 +2098,12 @@ fn render_parameter_reference() -> String {
                     (None, None) => String::new(),
                 };
                 out.push_str(&format!(
-                    "| `{}` | `{}` | {range} | {} |\n",
+                    "| `{}` | `{}` | {range} | {} | {}{} |\n",
                     spec.name,
                     number(spec.default),
                     spec.doc,
+                    spec.group.as_str(),
+                    if spec.main { ", main" } else { "" },
                 ));
             }
         }

@@ -426,6 +426,15 @@ fn push_roster(out: &mut String, label: &str, specs: &[ParamSpec]) {
         push_range(out, spec.range);
         out.push_str(",\"doc\":");
         push_string(out, spec.doc);
+        // The editor's grouping (ADR-0256): which group the parameter is filed
+        // under and whether it leads that group. Additive for the reason `kind`
+        // is, below. Written ahead of `kind` so the parameter object still
+        // closes on `kind` or opens `families` after it, which is the shape a
+        // consumer scanning for `"kind":"structural"}` reads.
+        out.push_str(",\"group\":");
+        push_string(out, spec.group.as_str());
+        out.push_str(",\"main\":");
+        out.push_str(if spec.main { "true" } else { "false" });
         // ADR-0180 rule 4's distinction, so a studio can group its panel the
         // way the reference groups its tables. Additive: a consumer that does
         // not know the field ignores it, which is why `SCHEMA_VERSION` does

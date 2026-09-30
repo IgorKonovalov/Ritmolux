@@ -99,7 +99,7 @@ use super::tier::GridScale;
 use super::trails::Trails;
 use crate::preset::LayerBlend;
 use crate::render::gpu;
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// How many stages the chain holds. A compile-time constant, not a capacity:
 /// [`PostChain::new`] fills the array exactly, and [`Routing`] is sized from it so
@@ -221,6 +221,8 @@ pub const CHAIN_PARAMS: &[ParamSpec] = &[ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "How much of the backdrop the scene's own coverage hides; 0 lets the sky through everywhere.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Post,
+    main: false,
 }];
 
 /// How much of the scene's coverage the backdrop resolves against, by default:

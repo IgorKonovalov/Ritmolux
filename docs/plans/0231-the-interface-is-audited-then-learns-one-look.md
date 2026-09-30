@@ -443,9 +443,9 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | 4 — The look declared once | dev | done | 6202a083 |
 | 5 — Panels and measured text | dev | done | 4d82db06 |
 | 6 — Overlays move | dev | done | 697fafc4 |
-| 7 — Binding table, help, hint | dev | done | committed with this row |
-| 8 — Standalone workflow fixes | dev | not started | |
-| 9 — foobar component | dev | not started | |
+| 7 — Binding table, help, hint | dev | done | fb237a6c |
+| 8 — Parameter group and main (F2, engine) | dev | done | committed with this row |
+| 9 — foobar component takes the look | dev | not started | |
 | 10 — Studio tokens and motion | studio-builder | not started | |
 | 11 — Studio workflow fixes | studio-builder | not started | |
 | 12 — Before and after on devices | human | not started | |
@@ -544,6 +544,22 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   pointer-move arm), motion.rs (the hint's envelope), stream.rs, shot/ui.rs, keymap/tests.rs}`, the
   view fixtures in `settings/tests.rs` and `console/tests.rs`, and `docs/capturing.md` (the `help`
   state).
+- Phase 8, the judgement. Every declaration's `group` and `main` were set in one pass: a scratch
+  script (not committed) wrote the fields from a per-file name table, so the choices are readable as
+  a block in each diff. `main` is true on 2 to 4 declarations per system. The shared blocks in
+  `scenes/common.rs` declare `hue` (colour) and `brightness` (light) as main, so every system that
+  shares them has a main parameter through them as well. The engine stages follow the ADR: `post`,
+  except `exposure` and `bg_bright`, which are `light`. Each stage's leading amount (`trails`,
+  `bloom_amount`, `kaleido_order`, `ink_amount`, `bg_hue`, `bg_bright`, `exposure`) is main.
+- Phase 8, shape. The export writes `group` and `main` **before** `kind`, because
+  `preset.rs`'s reference/schema agreement test reads a parameter object as closing on
+  `"kind":"structural"}`. The reference table's `Group` column is **last** (`shape`, or
+  `shape, main`), so the two tests that read its first four cells by index are unchanged. The
+  per-system editor hover files do not print the group.
+- Phase 8, files outside the list: `core/src/preset/schema/export.rs` (the export itself),
+  `core/tests/suite/preset.rs` (the reference renderer) and `core/tests/suite/preset_schema.rs` (the
+  two new tests). The schema export lives in `core`, not `standalone/src/`; `ritmolux --schema`
+  prints it unchanged. The studio's vitests pass on the widened `docs/specs/player-schema.json`.
 
 ### Close triggers
 

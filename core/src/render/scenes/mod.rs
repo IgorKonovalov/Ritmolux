@@ -133,6 +133,55 @@ pub struct ParamSpec {
     /// compares this against a hand-kept roster — a field nothing checks is a
     /// field that drifts.
     pub kind: ParamKind,
+    /// Which of the five groups an editor files the parameter under (ADR-0256).
+    pub group: ParamGroup,
+    /// Whether the parameter is one of the few that most decide its system's
+    /// look — listed first when its group is opened. One flag per declaration,
+    /// not per preset: a parameter central to one preset is shown by the
+    /// preset binding it.
+    pub main: bool,
+}
+
+/// The group a parameter is filed under in an editor (ADR-0256), in the order
+/// an editor lists them.
+///
+/// The engine-wide stages declare [`Post`](Self::Post), except the overall
+/// exposure and the backdrop's brightness, which are [`Light`](Self::Light).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParamGroup {
+    /// What is drawn: form, count, mode, extent, framing.
+    Shape,
+    /// How it moves: speed, spin, drift, flow, anything over time.
+    Motion,
+    /// Hue, saturation, the palette and how the picture reads it.
+    Colour,
+    /// Brightness, glow, fade and the other amounts of light.
+    Light,
+    /// A pass over the finished frame: the backdrop, trails, mirroring,
+    /// bloom, the ink remap.
+    Post,
+}
+
+impl ParamGroup {
+    /// Every group, in listing order.
+    pub const ALL: [ParamGroup; 5] = [
+        ParamGroup::Shape,
+        ParamGroup::Motion,
+        ParamGroup::Colour,
+        ParamGroup::Light,
+        ParamGroup::Post,
+    ];
+
+    /// The name the generated reference and the exported schema print.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ParamGroup::Shape => "shape",
+            ParamGroup::Motion => "motion",
+            ParamGroup::Colour => "colour",
+            ParamGroup::Light => "light",
+            ParamGroup::Post => "post",
+        }
+    }
 }
 
 /// Byte-wise `str` equality, usable in a `const fn`.

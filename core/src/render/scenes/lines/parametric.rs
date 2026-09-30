@@ -45,7 +45,9 @@ use super::{
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::Palette;
-use crate::render::scenes::{FamilyParam, FamilyRange, ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{
+    FamilyParam, FamilyRange, ParamGroup, ParamKind, ParamSpec, default_of,
+};
 
 // Parameter defaults — a calm, whole, slowly turning rose when nothing is bound.
 const DEFAULT_N: f32 = default_of(PARAMS, "n");
@@ -368,6 +370,8 @@ pub const PARAMS: &[ParamSpec] = &[
                number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed \
                radius ratio.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "d",
@@ -377,6 +381,8 @@ pub const PARAMS: &[ParamSpec] = &[
                Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the \
                superformula's lobe skew.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "phase",
@@ -385,6 +391,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Offsets where the figure starts: inside the rose's sine, between the Lissajous and \
                harmonograph axes, and at the hypotrochoid's pen.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "radial_offset",
@@ -392,6 +400,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Pushes every point out from the centre, opening the figure into a ring.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "pen",
@@ -400,6 +410,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How far the tracing point sits from the rolling circle's centre, in rolling radii: \
                1 draws cusps, less rounds them off, more throws them into loops.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "sym",
@@ -407,6 +419,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([1.0, 24.0]),
         doc: "How many lobes the figure repeats around its centre, as a whole number.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "sharpness",
@@ -415,6 +429,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How pointed the lobes are: low draws a spiky star, high rounds the figure toward a \
                circle.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "lobe",
@@ -423,6 +439,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How the lobes swell between their tips: low pinches them thin, high fills them \
                into a polygon.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "decay",
@@ -431,6 +449,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How fast the pendulums die away along the trace: 0 closes the figure, more spirals \
                it inward.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "samples",
@@ -439,6 +459,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How many points the curve is drawn from; fewer reads as a polygon. Truncated, so \
                a rise adds its next point on arrival.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     crate::render::scenes::lines::thickness(DEFAULT_THICKNESS),
     crate::render::scenes::common::hue(DEFAULT_HUE),
@@ -453,6 +475,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-2.0, 2.0]),
         doc: "Turns per second the whole figure rotates by.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     crate::render::scenes::lines::scale(DEFAULT_SCALE),
     crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),

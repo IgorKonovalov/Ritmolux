@@ -65,7 +65,7 @@ use super::marks;
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// The scene's spawn seed — the only randomness it has, and it is explicit
 /// (NFR §6). The bytes are ASCII used as a number: re-spelling them to match
@@ -812,6 +812,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 2000.0]),
         doc: "New objects launched per second.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "gravity",
@@ -819,6 +821,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-4.0, 8.0]),
         doc: "Downward acceleration, in frame heights per second squared; negative floats them up.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "launch_speed",
@@ -826,6 +830,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 6.0]),
         doc: "Speed each object leaves the source at.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "launch_angle",
@@ -833,6 +839,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-std::f32::consts::PI, std::f32::consts::PI]),
         doc: "Direction of launch, in radians clockwise from straight up.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "spread",
@@ -840,6 +848,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How wide the launch directions fan out about that angle.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "lifetime",
@@ -847,6 +857,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.1, 20.0]),
         doc: "Seconds an object lives before it fades out.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "lifetime_spread",
@@ -854,6 +866,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much lifetimes vary between objects; 0 makes them all die together.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "source_y",
@@ -861,6 +875,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "Height the source sits at, which is normally just below the frame.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "source_width",
@@ -868,6 +884,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "How wide a line the objects are launched from; 0 is a single point.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "spawn_fade",
@@ -875,6 +893,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Fades each object in over the start of its life rather than popping it on.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "prewarm",
@@ -882,6 +902,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Back-dates the population so the first frame is already the steady state.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "size",
@@ -889,6 +911,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "Size of each object's mark.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "size_spread",
@@ -896,6 +920,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much sizes vary between objects.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "spin",
@@ -903,6 +929,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-4.0, 4.0]),
         doc: "Turns per second each object rotates by as it flies.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "twinkle",
@@ -910,6 +938,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Per-object brightness flicker, seeded so it is reproducible.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
     crate::render::scenes::common::hue(DEFAULT_HUE),
@@ -919,6 +949,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How far across the palette the object colours reach.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "hue_center",
@@ -926,6 +958,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Where that band sits along the palette.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,

@@ -166,7 +166,7 @@
 )]
 
 use crate::render::gpu;
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// The `shape` roster, in the order the numeric parameter positions along.
 ///
@@ -578,6 +578,8 @@ pub(crate) const SHAPE: ParamSpec = ParamSpec {
           a whole number is that figure exactly and a value between two travels from one to \
           the other.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Shape,
+    main: true,
 };
 
 /// `points`, shared by the three shaped-mark scenes: the silhouette's count.
@@ -587,6 +589,8 @@ pub(crate) const POINTS: ParamSpec = ParamSpec {
     range: Some([3.0, 16.0]),
     doc: "How many points or sides the silhouette has, where the shape has a count at all.",
     kind: ParamKind::Structural,
+    group: ParamGroup::Shape,
+    main: true,
 };
 
 /// `star_valley`, shared: how deep a star's notches cut.
@@ -596,6 +600,8 @@ pub(crate) const STAR_VALLEY: ParamSpec = ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "How deep the notches between a star's points cut; near 1 the star becomes a disc.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Shape,
+    main: false,
 };
 
 /// `star_curve`, shared: how far a star's edges bow.
@@ -605,6 +611,8 @@ pub(crate) const STAR_CURVE: ParamSpec = ParamSpec {
     range: Some([-1.0, 1.0]),
     doc: "Bows a star's edges inward or outward instead of leaving them straight.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Shape,
+    main: false,
 };
 
 /// `star_jitter`, shared: the seeded variation in point length.
@@ -614,6 +622,8 @@ pub(crate) const STAR_JITTER: ParamSpec = ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "Randomises each point's length by a seeded amount, so the star reads as hand-drawn.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Shape,
+    main: false,
 };
 
 /// `star_seed`, shared: which arrangement the jitter and the wobble draw.
@@ -624,6 +634,8 @@ pub(crate) const STAR_SEED: ParamSpec = ParamSpec {
     doc: "Picks a different arrangement of the same amount of jitter and wobble - a whole number, \
           and every value is as rough as every other.",
     kind: ParamKind::Structural,
+    group: ParamGroup::Shape,
+    main: false,
 };
 
 /// `star_wobble`, shared: how far a star's edges wander between tip and valley.
@@ -634,6 +646,8 @@ pub(crate) const STAR_WOBBLE: ParamSpec = ParamSpec {
     doc: "Waves each edge in and out along its length, leaving the points where they are - the \
           wander a hand-drawn outline has.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Motion,
+    main: false,
 };
 
 /// `star_wobble_freq`, shared: how many waves fit along one edge.
@@ -644,6 +658,8 @@ pub(crate) const STAR_WOBBLE_FREQ: ParamSpec = ParamSpec {
     doc: "How many waves the edge wander fits between a point and the notch beside it. Does \
           nothing while star_wobble is 0.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Motion,
+    main: false,
 };
 
 pub(crate) const PARAMS: &[ParamSpec] = &[
