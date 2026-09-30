@@ -321,10 +321,11 @@ fn no_tracked_preset_violates_the_schema() {
     let mut findings: Vec<String> = Vec::new();
     let files = corpus();
     assert!(
-        files.len() >= 100,
-        "the corpus walk found only {} files, which means it stopped reading the \
-         tree rather than that the library shrank",
-        files.len()
+        files.len() >= rlx_core::preset::EMBEDDED.len(),
+        "the corpus walk found only {} files against {} embedded presets, which means \
+         it stopped reading the tree",
+        files.len(),
+        rlx_core::preset::EMBEDDED.len()
     );
     for file in &files {
         let src = std::fs::read_to_string(file)
@@ -355,10 +356,11 @@ fn every_library_preset_validates_against_its_familys_schema() {
     let mut findings: Vec<String> = Vec::new();
     let files = library();
     assert!(
-        files.len() >= 100,
-        "the library walk found only {} files, which means it stopped reading the \
-         tree rather than that the library shrank",
-        files.len()
+        files.len() >= rlx_core::preset::EMBEDDED.len(),
+        "the library walk found only {} files against {} embedded presets, which \
+         means it stopped reading the tree",
+        files.len(),
+        rlx_core::preset::EMBEDDED.len()
     );
     for file in &files {
         let stem = file
