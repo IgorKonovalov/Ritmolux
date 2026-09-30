@@ -340,8 +340,8 @@ export const onRequest = defineRouteMiddleware((context) => {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The header control, and a Russian entrance for it to point at | dev | done | bc09b3d0 |
-| 2 — The Russian pages say they are Russian | dev | done | committed with this row |
-| 3 — The front door names the Russian pages | dev | not started | |
+| 2 — The Russian pages say they are Russian | dev | done | d9160208 |
+| 3 — The front door names the Russian pages | dev | done | committed with this row |
 | 4 — The live site, read after the push | human | not started | |
 
 ### Notes
@@ -363,6 +363,11 @@ export const onRequest = defineRouteMiddleware((context) => {
   `"ru":{"page_count":6}`, `"en":{"page_count":221}` (227 of the 228 HTML files are indexed).
 - Phase 2: the README sentence on the split index is written into the new row of the
   transformations table rather than as a free-standing sentence.
+- Phase 3: the 375 px check used neither `npm run preview` nor a reading of the CSS. A foreground
+  `node -e` drove the Playwright Chromium the mermaid build uses, serving `site/dist/` through request
+  interception, at a 375x800 viewport. It read `scrollWidth` 375 = `clientWidth` 375, and the row
+  wraps to two lines: `Download` and `Start here` at top 252, `The repository` and `По-русски` at
+  top 336, rightmost edge 270. `site.css` is unchanged.
 
 ### Close triggers
 

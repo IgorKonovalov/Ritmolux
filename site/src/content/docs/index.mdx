@@ -18,6 +18,10 @@ import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
   subpath out - and this site is built at two different ones (`/ritmolux/` for the
   demo, `/Ritmolux/` for the project deployment). `import.meta.env.BASE_URL` is
   whichever one this build used, and it always ends in a slash.
+
+  `По-русски` is the only way into the Russian slice on this page at phone width:
+  a splash page has no sidebar and no mobile menu, and the header hides its
+  language control below the medium breakpoint.
 */}
 
 <div class="hero-actions">
@@ -29,6 +33,15 @@ import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
   </LinkButton>
   <LinkButton href="https://github.com/IgorKonovalov/Ritmolux" variant="minimal" icon="github">
     The repository
+  </LinkButton>
+  <LinkButton
+    href={`${import.meta.env.BASE_URL}ru/`}
+    variant="minimal"
+    icon="translate"
+    lang="ru"
+    hreflang="ru"
+  >
+    По-русски
   </LinkButton>
 </div>
 
