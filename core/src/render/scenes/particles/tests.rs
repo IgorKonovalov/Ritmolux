@@ -2334,7 +2334,7 @@ fn the_hue_route_moves_hue_and_leaves_the_palette_coordinate_alone() {
 /// to the LUT, and the hue route leaves that coordinate untouched and rotates
 /// the colour that came back. That separation is what makes `root_hue` the
 /// escape when the palette coordinate is already fully spent — which Plan
-/// 0074's Phase 2 gate measured it to be on `attractor_fern`.
+/// 0074's Phase 2 gate measured it to be on the Barnsley fern preset.
 #[test]
 fn the_root_hue_route_rotates_without_touching_the_palette_coordinate() {
     use projection_mirror as m;

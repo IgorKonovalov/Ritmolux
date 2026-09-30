@@ -239,26 +239,17 @@ const CARDS = [
   "analytic_stainedglass",
   "analytic_standingwave",
   "analytic_twobandjulia",
-  // attractor (20)
+  // attractor (11)
   "attractor_clifford",
   "attractor_cliffordgallery",
-  "attractor_dejonggallery",
   "attractor_dragon",
-  "attractor_fern",
   "attractor_fernmono",
   "attractor_ink",
   "attractor_leviathan",
-  "attractor_lorenzgallery",
   "attractor_lorenzknot",
-  "attractor_thomas",
   "attractor_thomasgallery",
   "attractor_thomasred",
-  "attractor_torusknot",
-  "attractor_valentine",
-  "attractor_volute",
   "attractor_walkdejong",
-  "attractor_walkknot",
-  "attractor_walkrho",
   "attractor_walkthomas",
   // cellular (5)
   "cellular_ember_life",
@@ -341,7 +332,7 @@ const CARDS = [
 const IMAGES = [
   {
     // Judged at the Plan 0088 close (Phase 7) against fragment_supernova,
-    // fragment_vitrail, fragment_mandala and attractor_volute. Supernova held
+    // fragment_vitrail, fragment_mandala and a since-retired attractor. Supernova held
     // this slot through Phases 2-6 and lost it on the front page's terms rather
     // than on its own: a flat salmon field over most of the frame reads as
     // wallpaper at the top of a README. Tunnel has real blacks, so it carries

@@ -249,7 +249,7 @@ impl AttractorFamily {
     ///
     /// The consequence for anyone editing this table: **an entry's index is a
     /// preset-visible name.** The shipped `attractor_*gallery` presets step
-    /// through these by index, and a preset may pin one (`attractor_torusknot`
+    /// through these by index, and a preset may pin one (`attractor_lorenzknot`
     /// pins Lorenz entry 1), so inserting or reordering renames figures out from
     /// under them. Append; do not insert.
     ///

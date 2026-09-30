@@ -476,15 +476,81 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The candidate sheet | human | done | committed with this row |
-| 2 — The walk | human | done | committed with this row |
-| 3 — The cull | dev | not started | |
+| 1 — The candidate sheet | human | done | `29994a84` |
+| 2 — The walk | human | done | `cbf4d37b`, `3adf77d6` |
+| 3 — The cull | dev | done | committed with this row |
 | 4 — The retunes and the sittings | human | not started | |
 | 5 — The gap brief | human | not started | |
 | 6 — The first refill cohort | human | not started | |
 | 7 — The verdict | human | not started | |
 
 ### Notes
+
+- **Phase 3 commits, one per family**, oldest first: analytic_field `7b6ea80a`, shape_collage
+  `5bb65a53`, fragment_field `306d823a` (+ `e1a551d3`), reaction_diffusion `44761aea`, lsystem
+  `ad4f8351`, spectrum `b748c7f3`, parametric_curve `33b2ee96`, star_pattern `0254edaa`, shape_field
+  `b54e4032`, swarm `d6728725`, emitter `0d6b23ab`, warp_mesh `195c5603`, attractor (the row's own
+  commit); plus `8a4cf6fb`. The ledger's `commit` column is left empty: it is not `dev`'s to write.
+- **Two coverage floors moved in `core/tests/sanity.rs`**, because `MAX_FLOOR_SLACK` convicted
+  them once a cut removed the family minimum: `FragmentField` 0.08 -> 0.21 (Drift Mono 0.4274) in
+  its own commit `e1a551d3`, after the fragment_field commit, and `Swarm` 0.33 -> 0.37 (Braid
+  0.7403) inside the swarm commit.
+- **`8a4cf6fb` changes a guard outside the plan's carrier list**: `preset_schema.rs`'s two walks
+  asserted `files.len() >= 100`, and the library is 86. The bound is now `EMBEDDED.len()`.
+- **Four gallery slots were re-pointed and re-rendered** with new alt text in `docs/preset-guide.md`:
+  parametric_curve -> `curve_loom`, swarm -> `swarm_braid`, emitter -> `emitter_heartfall`, warp_mesh
+  -> `warp_tracery`. The ledger names no survivor for Perseids or Wellhead, so the emitter and
+  warp_mesh picks are `dev`'s; all four are marked UNJUDGED in the manifest.
+- **Tests re-pointed to a survivor:** `core/tests/attractor.rs` `FLOW_3D` `Thomas` -> `Thomas
+  Gallery`, a roster-stepping gallery captured at frame 90, inside its first step;
+  `standalone/src/shot/horizon/tests.rs`'s label `Etching` -> `Lichen`. **Not re-pointed:**
+  `standalone/src/shot/report/tests.rs` keeps `Star Mandala Bordered` and `Tiled Rosette` as synthetic
+  long and colliding names (they build rows by hand, and `Rose Window` would not exercise the
+  fitter); `curves/tests.rs` keeps Nightbloom's `d` values 29/37/43, with only the comment changed.
+- **Where the ledger says Fern's and Facet's references move to Fern Mono and Path Maple**, the Rust
+  hits were measurement records taken on those presets (`particles/mod.rs`, `particles/tests.rs`,
+  `marks/tests.rs`, `suite/preset.rs`). They now describe the retired preset or state the number
+  without a file, rather than attribute the measurement to the survivor.
+- **Display names of cut presets remain** in dated measurement comments (`sanity.rs` floor tables,
+  `animation.rs`, `geometry_extent.rs`, the `capturing.md` horizon timings) and in a few survivor
+  headers. The done-when grep is on stems.
+- **`docs/content-brief.md`** records each retirement in §1, §2, §3 and §5. No item moved to
+  `Done`; that is Phase 4's.
+- **Skill-reference hits for Phase 4** (`git grep -n -w <stem> -- .claude`), with replacement text:
+  - `.claude/skills/architect/SKILL.md:650` (`emitter_perseids.toml:7`) — a step 3b historical
+    example; stays as written.
+  - `.claude/skills/preset-author/SKILL.md:388` — `(`swarm_shatter`: no trend across ten minutes)` ->
+    `(Shatter, since retired: no trend across ten minutes)`.
+  - `.claude/skills/preset-author/SKILL.md:467` — `(`spectrum_ridge` comes out as two straight lines`
+    -> `(a polyline spectrum comes out as two straight lines`.
+  - `.claude/skills/preset-author/references/craft.md:169-170` — `Shipped headers that record the
+    choice: `presets/attractor_lorenzgallery.toml` ("over 1.0 deliberately") and
+    `presets/attractor_clifford.toml` (...)` -> `A shipped header that records the choice:
+    `presets/attractor_clifford.toml` (only the densest filaments cross it).`
+  - `.claude/skills/preset-author/references/grammar.md:104-105` — `Shipped examples: `star_corona`,
+    `star_mandala_bordered`, `star_zellij`.` -> `Shipped examples: `star_corona` (rings only) and
+    `star_rosewindow` (interlace only).`
+  - `.claude/skills/preset-author/references/systems.md:116` — `(`lsystem_bower`'s `F =
+    "F[+F]F[-F]F"`)` -> `(`lsystem_icecrystal`'s `F = "FF-[-F+F+F]+[+F-F-F]"`)`.
+  - `.claude/skills/preset-author/references/systems.md:144-145` — `Shipped: `star_corona` and
+    `star_mandala_bordered` (rings only), `star_zellij` (rings plus an 8-fold interlace).` ->
+    `Shipped: `star_corona` (rings only); no shipped world is a composite since Zellij (rings plus an
+    8-fold interlace) was retired.`
+  - `.claude/skills/preset-author/references/systems.md:173` — `(`attractor_fern`,
+    `attractor_dragon` ship)` -> `(`attractor_fernmono`, `attractor_dragon` ship)`.
+  - `.claude/skills/preset-author/references/systems.md:294-296` — `emitter_perseids.toml` puts its
+    crest off-frame deliberately; `emitter_emberjet.toml` is the inverse — ...` -> `v = 2.6, g = 1.3
+    from the default source crests off frame at y = 1.48, which avoids the ceiling;
+    `emitter_heartfall.toml` keeps its crest in frame at y ≈ 0.88 (v = 2.3, g = 1.3, source_y =
+    -1.15), so the room sees the hearts turn over.`
+  - Display names of cut presets also appear there (`systems.md:481,485,493` name Searchlight) and are
+    not listed above.
+- **Checks run this session:** `cargo fmt --all --check`, `cargo clippy --workspace --all-targets
+  -- -D warnings`, `cargo nextest run --workspace -P fast` (1784 run, one failure fixed by
+  `8a4cf6fb`, which then passed with `hygiene::`), and the `sanity`, `reactivity`, `animation`,
+  `distinctness`, `golden` and `attractor` binaries (all pass; `git status` showed no golden baseline
+  moved). The full `cargo nextest run --workspace` the done-when names was not run here; the
+  conductor's pre-review gate runs it.
 
 ### Close triggers
 

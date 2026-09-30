@@ -1230,8 +1230,8 @@ Four things you cannot discover by binding them:
   whole sweep is **6 %**. A `zoom` is a static scale, so it cannot recover a
   phase-varying translation: all it can do is shrink the figure until the orbit
   fits inside the frame, which is what the 3-D presets paid for
-  (`attractor_lorenz`, since retired, went 1.32 -> 1.16; `attractor_thomas`
-  1.14 -> 1.02).
+  (`attractor_lorenz` went 1.32 -> 1.16 and Thomas 1.14 -> 1.02, both since
+  retired).
   **So the real ceiling is ~`0.3`, not the `0.8` clamp** — past that the figure
   visibly slides around the frame instead of turning in place, which is a worse
   artifact than the flatness `perspective` was bought to fix. The clamp is not
@@ -1248,9 +1248,9 @@ Four things you cannot discover by binding them:
   arcs, which destroys exactly the volume `perspective` was bought to buy.
   **Measured**: at `fade = 0.932` (~15 frames of trail)
   the rendered ladder `1 / 2 / 3 / 5 / 8` reads *crisp, crisp, softening,
-  smeared, scribble* — usable peak about **1.9**; `attractor_thomas` runs
-  `fade = 0.955` (~22 frames) and its ceiling is correspondingly lower, about
-  **1.3**. The arithmetic agrees: holding the smear under ~5° needs
+  smeared, scribble* — usable peak about **1.9**; at `fade = 0.955` (~22
+  frames, what the retired Thomas ran) the ceiling is correspondingly lower,
+  about **1.3**. The arithmetic agrees: holding the smear under ~5° needs
   `rate < 0.087 / (frames / 60)` rad/s, so the ceiling *falls* as `fade`
   rises. (This bullet used to say `2`–`4` is where the rotation becomes
   legible — true for a trail-free scene, wrong for every attractor preset that
@@ -4599,7 +4599,7 @@ Two things worth knowing before you reach for it:
   across a dissolve. `size` and `fade` also buy level and change the picture
   while they do it — a wider nib and a longer trail are looks, not stops — so
   reach for them when you want what they do, not when you only want less light.
-  (`attractor_thomas` ships `brightness = 0.10` at `density = 0.02`, and the
+  (`attractor_lorenzknot` ships `brightness = 0.18` at `density = 0.02`, and the
   since-retired `attractor_lorenz` shipped `0.03` at `0.002` — the worked
   examples of that cut. An older copy of either may carry the same number on
   `exposure` instead; the swap is level-neutral and the value transfers unchanged.)
@@ -4706,7 +4706,7 @@ Two facts about specific entries that a still will not tell you:
   figure. Four De Jong candidates were rejected at curation for the same reason.
 
 **Indices are names.** The shipped `attractor_*gallery` presets step these by
-index and `attractor_torusknot` pins Lorenz entry `1`, so a roster edit that
+index and `attractor_lorenzknot` pins Lorenz entry `1`, so a roster edit that
 inserts or reorders renames figures out from under them. Append instead.
 
 #### Walking between two entries — `tuple_from`, `tuple_to`, and `morph`
@@ -4846,13 +4846,13 @@ corner at some point in the rotation: `sierpinski` by 34 %, `tree` by 41 %,
 `dragon` by 58 %, `spiral` by 79 %.
 
 So the fit's actual guarantee is **inside the frame at neutral levers and zero
-rotation**, and `zoom` is the recourse for both. That is why all three shipped
-2-D IFS worlds carry a base `zoom` below 1 — `attractor_dragon` `0.92`,
-`attractor_fern` and `attractor_volute` `0.96`. Those are framing values, not
-taste: raising one back to `1.0` puts the figure's corner off screen at some spin
-phase. A new 2-D IFS world either binds `spin` down to a small rock, or pays the
-same static `zoom`, or does both — which is what each of the three did
-independently before this was written down.
+rotation**, and `zoom` is the recourse for both. That is why the shipped 2-D IFS
+worlds carry a base `zoom` below 1 — `attractor_dragon` `0.92`,
+`attractor_fernmono` `0.58` (and two since-retired worlds ran `0.96`). Those are
+framing values, not taste: raising one back to `1.0` puts the figure's corner off
+screen at some spin phase. A new 2-D IFS world either binds `spin` down to a
+small rock, or pays the same static `zoom`, or does both — which is what each of
+them did independently before this was written down.
 
 <a id="morph-is-a-travel-knob"></a>
 
@@ -4871,7 +4871,7 @@ recursion**. A cross that stays recognisably the figure you named would have to
 live under about `0.03`, which is not a lever. **So: bind `morph` when the
 preset is meant to travel, and leave it alone when it is meant to be one
 figure** — the four levers are what change a figure without leaving it.
-`attractor_fern` binds no `morph` at all; the since-retired `attractor_dissolve`
+`attractor_fernmono` binds no `morph` at all; the since-retired `attractor_dissolve`
 used the full range, and travelling was its whole point — its file remains the
 worked example, in git history.
 
@@ -4959,8 +4959,8 @@ Each reaches the picture by **two routes**, which is four params:
 > A **negative** value is legal and is the obvious escape: it ramps down the
 > ramp's dark end instead. But the coordinate is sampled by a **repeating** LUT,
 > so once it crosses zero the darkest points wrap to the ramp's *brightest*
-> stop and a cream speckle appears where the figure should be darkest. On
-> `attractor_fern` that is around `root_tint = -0.38` (its coordinate floor is
+> stop and a cream speckle appears where the figure should be darkest. On the
+> since-retired Barnsley fern preset that was around `root_tint = -0.38` (its coordinate floor was
 > `hue_center`'s sine trough `0.20` minus `hue_spread/2`, against a `root01`
 > ceiling of `0.46`). Do the same arithmetic for your own preset before going
 > negative.
@@ -4974,8 +4974,8 @@ Each reaches the picture by **two routes**, which is four params:
 **Which route do you want?** They are not peers — `*_tint` is the default and
 `*_hue` is the special case. `*_tint` keeps the figure inside the ramp you
 authored, so a fern stays botanical and merely separates; `*_hue` throws a part
-clear of the ramp entirely (on `attractor_fern`'s greens it sends the fronds to
-teal and periwinkle), which is striking and fights a palette you spent five
+clear of the ramp entirely (on the retired Barnsley fern's greens it sent the
+fronds to teal and periwinkle), which is striking and fights a palette you spent five
 stops on. Reach for `*_hue` when your palette is a narrow band and you want one
 part *out* of it — or when the palette coordinate is already full, which is the
 next thing on this page.
@@ -4984,7 +4984,7 @@ next thing on this page.
 you a session.** *Three* params write it — `hue_spread` per particle at random,
 `map_tint` per part, `root_tint` per distance — so adding one means **taking
 authority away from another**, not stacking a third term on top. Twice measured on
-`attractor_fern`:
+the Barnsley fern preset, since retired:
 
 - Its `hue_spread` had to come down from `0.16..0.42` to `0.05..0.125` before
   `map_tint` read at all; above that the parts smeared into each other and

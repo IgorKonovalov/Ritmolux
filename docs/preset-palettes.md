@@ -242,11 +242,11 @@ coordinate one way, which matters when you are budgeting.
 
 **And it is a budget.** All three write the same number, so **adding one means
 taking authority away from another**, not stacking a third term on top. It has
-been measured twice on the same preset:
+been measured twice on the same preset, the Barnsley fern (since retired):
 
 | the change | why |
 |---|---|
-| `attractor_fern`'s `hue_spread` `0.16..0.42` → `0.05..0.125` | at the wider spread the random per-particle scatter smeared the parts together and `map_tint` was a faint wash at *any* setting |
+| the fern's `hue_spread` `0.16..0.42` → `0.05..0.125` | at the wider spread the random per-particle scatter smeared the parts together and `map_tint` was a faint wash at *any* setting |
 | the same fern's `map_tint` `0.46` → `0.22` | stacked at full strength alongside `root_tint` the plant washes out; the stock preset looked better once the budget was split |
 
 **The `*_hue` routes are the escape, and that is what they are for.** Neither

@@ -111,22 +111,25 @@ measurement** as a new backlog entry rather than reopening 0084.
 ## 3. The attractor binds `tuple` — [Plan 0079](plans/done/0079-the-attractor-learns-new-figures.md)'s Followup
 
 A different family and a different sitting from §1 — do not bundle it. Eleven presets landed *with*
-the capability: four `attractor_*gallery` demonstrations, the pinned `attractor_torusknot`,
-`attractor_valentine`, and four walk worlds.
+the capability: four `attractor_*gallery` demonstrations, the pinned Torus Knot, Valentine, and four
+walk worlds. **Plan 0232 Phase 3 retired six of them on 2026-09-30** — the De Jong and Lorenz
+galleries, Torus Knot, Valentine, and the Rho and Butterfly-to-Knot walks — leaving the Clifford and
+Thomas galleries and the De Jong and Thomas walks.
 
 **The question this pass should answer first is a curation question, not a tuning one.** The attractor
 family is now **17 of 37 presets — 46 % of the library on one system**, the sharpest single-family
 convergence the set has seen. Three things measured at the close rather than guessed:
 
-- `attractor_dejonggallery` and `attractor_cliffordgallery` are **near-twins by construction** —
-  identical `tuple` / `brightness` / `fade` / `reseed`, differing only in family and palette.
+- The De Jong gallery and `attractor_cliffordgallery` were **near-twins by construction** —
+  identical `tuple` / `brightness` / `fade` / `reseed`, differing only in family and palette. The De
+  Jong one was retired 2026-09-30.
 - All four galleries step on a **wall clock** (`mod(floor(time * 0.33), N)`) with audio only on
   secondary levers, which makes them demonstrations of the roster rather than worlds.
 - So: **do the galleries earn standing places, or were they scaffolding for a `human` gate?** That is
   the lane's call, and it is the first thing to decide because it changes how much new attractor
   content the set can absorb.
 
-**An entry's index is a preset-visible name** — the galleries step them, `attractor_torusknot` pins
+**An entry's index is a preset-visible name** — the galleries step them, `attractor_lorenzknot` pins
 Lorenz entry 1 — so the roster table is append-only in practice. Two roster facts a still cannot show,
 both already in `presets/README.md`: the Lorenz torus knot **blooms slowly on a `reseed`** (a wide
 excursion to ~2.2x its own extent, seconds to fall back, where the canonical butterfly absorbs the

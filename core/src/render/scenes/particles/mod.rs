@@ -885,8 +885,8 @@ pub struct AttractorScene {
     ///
     /// **`root_hue` is the escape from a full palette coordinate.** Three params
     /// write that coordinate and it is a fixed budget — Plan 0074's gate measured
-    /// `attractor_fern` needing `map_tint` cut `0.46 -> 0.22` before `root_tint`
-    /// improved on stock. This route costs it nothing.
+    /// the Barnsley fern preset needing `map_tint` cut `0.46 -> 0.22` before
+    /// `root_tint` improved on stock. This route costs it nothing.
     ///
     /// These replaced `age_tint`/`age_hue`, which read the decaying age proxy and
     /// never produced a gradient.

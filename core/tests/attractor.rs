@@ -30,12 +30,12 @@ const SIZE: u32 = 96;
 /// idiom the scene supports. Repointed at Plan 0075 cohort five, which retired
 /// the De Jong and Lorenz presets: Ink on Paper carries the same `de_jong`
 /// family (and, deliberately, no trails stage, so the bit-exact
-/// reproducibility check below stays clear of WARP's trails quirks); Thomas is
-/// the remaining continuous flow. The bare inline `lorenz`-family presets
-/// further down are unaffected — the family still ships, only its preset
-/// retired.
+/// reproducibility check below stays clear of WARP's trails quirks); Thomas
+/// Gallery is the continuous flow, captured at frame 90 (1.5 s), inside the
+/// first of its roster steps. The bare inline `lorenz`-family presets further
+/// down are unaffected — the family still ships, only its preset retired.
 const MAP_2D: &str = "Ink on Paper";
-const FLOW_3D: &str = "Thomas";
+const FLOW_3D: &str = "Thomas Gallery";
 
 /// A De Jong attractor preset with an extra `[params]` line, isolating the view
 /// transform (Phase 4): the compute/accumulation path is identical, so any render

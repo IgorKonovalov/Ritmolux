@@ -1549,8 +1549,8 @@ mod tests {
             Err(e) => panic!("headless context build failed: {e}"),
         };
 
-        // `density = 0.02` is the shipped trace value — `attractor_thomas` and
-        // `fragment_sumi`'s layer among them.
+        // `density = 0.02` is the shipped trace value — `attractor_lorenzknot`
+        // and `fragment_sumi`'s layer among them.
         const DENSITY: f32 = 0.02;
         let rich = TierConfig::RICH;
 
