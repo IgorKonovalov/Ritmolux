@@ -29,6 +29,13 @@ export const PARAM_KINDS = ['modal', 'structural'] as const
 export type ParamKind = (typeof PARAM_KINDS)[number]
 
 /**
+ * Which part of the look a parameter moves (ADR-0256), in the order the
+ * parameter panel lists its groups.
+ */
+export const PARAM_GROUPS = ['shape', 'motion', 'colour', 'light', 'post'] as const
+export type ParamGroup = (typeof PARAM_GROUPS)[number]
+
+/**
  * Where one parameter reads on one family of a family-bearing system.
  *
  * `family` is spelled exactly as a preset writes it in its own family table, and
@@ -37,13 +44,6 @@ export type ParamKind = (typeof PARAM_KINDS)[number]
  * that family does not read the parameter at all — the arithmetic never looks at
  * it, so there is no travel to offer and no bounds to invent.
  */
-/**
- * Which part of the look a parameter moves (ADR-0256), in the order the
- * parameter panel lists its groups.
- */
-export const PARAM_GROUPS = ['shape', 'motion', 'colour', 'light', 'post'] as const
-export type ParamGroup = (typeof PARAM_GROUPS)[number]
-
 export const familyRangeSchema = z.object({
   family: z.string().min(1),
   range: z.tuple([z.number(), z.number()]).nullable(),

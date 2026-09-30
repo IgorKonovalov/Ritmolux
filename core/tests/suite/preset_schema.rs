@@ -150,6 +150,11 @@ fn every_exported_parameter_carries_its_group_and_main() {
 /// **Every system has at least one main parameter** (ADR-0256), so an editor
 /// that opens a system's groups has something to lead with in at least one of
 /// them. The engine-wide stages are not systems and are not held to it.
+///
+/// This cannot fail for a system built from the shared blocks: `hue` and
+/// `brightness` there are declared main, so it holds whether or not a system
+/// marks any of its own parameters main. Which of a system's own parameters are
+/// main is a judgement read from the declarations, not something this guards.
 #[test]
 fn every_system_has_a_main_parameter() {
     for kind in SystemKind::ALL {

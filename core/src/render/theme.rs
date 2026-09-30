@@ -216,8 +216,10 @@ pub struct Theme {
     pub error: Color,
     /// A meter's empty track.
     pub trough: Color,
-    /// Font sizes in px at a 1080-line target, smallest first. A surface scales
-    /// them by `target height / 1080`, never by an internal grid (ADR-0037).
+    /// Font sizes in px at a 1080-line target, smallest first. Declared for the
+    /// studio's generated tokens; no engine surface reads them yet, and the
+    /// overlays still carry their own fixed sizes. A surface that adopts them
+    /// scales by `target height / 1080`, never by an internal grid (ADR-0037).
     pub type_scale: [f32; 5],
     /// Spacing steps in px at the same 1080-line reference, smallest first.
     pub space: [f32; 5],
