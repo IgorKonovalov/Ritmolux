@@ -371,18 +371,18 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 | `lsystem_sumimono` | lsystem |  | 0.031/0.012/0.004/0.000 | 0.050 | 0.000 | 1.021 | Bower (0.150) |  | retune | | |
 | `lsystem_vellum` | lsystem |  | 0.160/0.003/0.000/0.004 | 0.184 | 0.029 | 1.208 | Sumi Mono (0.162) |  | retune | | |
 | `curve_blueprint` | parametric_curve |  | 0.033/0.000/0.000/0.000 | 0.033 | 0.016 | 3.655 | Gyre (0.114) |  | keep | | |
-| `curve_broadside` | parametric_curve |  | 0.086/0.166/0.000/0.023 | 0.206 | 0.129 | 0.708 | Blueprint (0.179) |  | keep | | |
-| `curve_cogwheel` | parametric_curve |  | 0.056/0.000/0.007/0.000 | 0.041 | 0.011 | 5.411 | Turnabout (0.159) |  | retune | | |
+| `curve_broadside` | parametric_curve | yes (new) | 0.086/0.166/0.000/0.023 | 0.206 | 0.129 | 0.708 | Blueprint (0.179) |  | keep | | |
+| `curve_cogwheel` | parametric_curve |  | 0.056/0.000/0.007/0.000 | 0.041 | 0.011 | 5.411 | Turnabout (0.159) |  | retune | | 20dfff85 |
 | `curve_gyre` | parametric_curve | yes (new) | 0.044/0.015/0.000/0.003 | 0.047 | 0.013 | 5.986 | Blueprint (0.114) |  | keep | | |
-| `curve_inkpendulum` | parametric_curve |  | 0.027/0.027/0.000/0.000 | 0.033 | 0.017 | 3.645 | Gyre (0.116) |  | retune | | |
-| `curve_ionwake` | parametric_curve |  | 0.008/0.000/0.003/0.035 | 0.100 | 0.010 | 1.745 | Blueprint (0.114) |  | retune | | |
+| `curve_inkpendulum` | parametric_curve |  | 0.027/0.027/0.000/0.000 | 0.033 | 0.017 | 3.645 | Gyre (0.116) |  | retune | | 20dfff85 |
+| `curve_ionwake` | parametric_curve |  | 0.008/0.000/0.003/0.035 | 0.100 | 0.010 | 1.745 | Blueprint (0.114) |  | retune | | 20dfff85 |
 | `curve_lacework` | parametric_curve |  | 0.042/0.000/0.001/0.000 | 0.042 | 0.028 | 4.156 | Blueprint (0.174) |  | keep | | |
-| `curve_loom` | parametric_curve | yes | 0.071/0.045/0.012/0.047 | 0.104 | 0.039 | 3.316 | Turnabout (0.176) |  | retune | | |
-| `curve_nightbloom` | parametric_curve | yes | 0.071/0.016/0.012/0.006 | 0.091 | 0.023 | 2.500 | Ion Wake (0.160) | header: ADR-0109: `beat_index` counts detections; musical-period retune named as a followup (Plan 0095) | cut | Redundant with a stronger keep in its family. Its code references move to Loom. | |
+| `curve_loom` | parametric_curve |  | 0.071/0.045/0.012/0.047 | 0.104 | 0.039 | 3.316 | Turnabout (0.176) |  | cut | Retired by the owner at the retune (Phase 4), after the walk had marked it retune. Its roles move to Broadside: representative, preset-guide card, and the references Nightbloom's cut had sent here. | 20dfff85 |
+| `curve_nightbloom` | parametric_curve | yes | 0.071/0.016/0.012/0.006 | 0.091 | 0.023 | 2.500 | Ion Wake (0.160) | header: ADR-0109: `beat_index` counts detections; musical-period retune named as a followup (Plan 0095) | cut | Redundant with a stronger keep in its family. Its code references move to Broadside (Loom, first named, was retired at the retune). | |
 | `curve_phosphor` | parametric_curve |  | 0.042/0.048/0.000/0.000 | 0.048 | 0.047 | 5.749 | Blueprint (0.213) |  | keep | | |
 | `curve_prismscope` | parametric_curve |  | 0.052/0.040/0.000/0.000 | 0.041 | 0.035 | 4.278 | Blueprint (0.193) |  | keep | | |
-| `curve_rosemono` | parametric_curve |  | 0.039/0.000/0.000/0.137 | 0.155 | 0.134 | 1.141 | Lacework (0.186) |  | retune | | |
-| `curve_turnabout` | parametric_curve |  | 0.022/0.007/0.000/0.003 | 0.026 | 0.003 | 4.844 | Cogwheel (0.159) |  | retune | | |
+| `curve_rosemono` | parametric_curve |  | 0.039/0.000/0.000/0.137 | 0.155 | 0.134 | 1.141 | Lacework (0.186) |  | retune | | 20dfff85 |
+| `curve_turnabout` | parametric_curve |  | 0.022/0.007/0.000/0.003 | 0.026 | 0.003 | 4.844 | Cogwheel (0.159) |  | retune | | 20dfff85 |
 | `reaction_etching` | reaction_diffusion | yes | 0.053/0.025/0.007/0.006 | 0.059 | 0.081 | 4.368 | Lichen (0.278) |  | cut | Redundant with a stronger keep in its family. Its code references move to Lichen. | |
 | `reaction_fluxmono` | reaction_diffusion | yes | 0.352/0.047/0.000/0.237 | 0.168 | 0.430 | 4.658 | Mitosis (0.177) |  | keep | | |
 | `reaction_glaciermono` | reaction_diffusion |  | 0.157/0.033/0.000/0.132 | 0.395 | 0.320 | 4.745 | Mitosis (0.236) |  | keep | | |
