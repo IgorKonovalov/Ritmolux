@@ -28,14 +28,29 @@ constexpr size_t kMenuPresetMax = 900;
 
 } // namespace
 
+// The placeholder's two colours: the theme's `panel` fill and its `accent`
+// (core/src/render/theme.rs, ADR-0252). HAND-COPIED, because this C++ cannot
+// read the Rust table, and so OUTSIDE the gate that holds the studio's
+// generated stylesheet to it: a change to either role in the table does not
+// reach these two lines on its own. The panel's own alpha is dropped: GDI
+// fills an opaque rectangle and there is no scene under it.
+constexpr COLORREF kPanelFill = RGB(0x11, 0x14, 0x1a);
+constexpr COLORREF kAccentText = RGB(0xff, 0xb4, 0x54);
+
 // Paint the "someone else owns the core" placeholder for a non-owning host.
 void paint_placeholder(HWND wnd, HDC hdc) {
     RECT rc = {};
     GetClientRect(wnd, &rc);
-    FillRect(hdc, &rc, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+    HBRUSH fill = CreateSolidBrush(kPanelFill);
+    if (fill != nullptr) {
+        FillRect(hdc, &rc, fill);
+        DeleteObject(fill);
+    } else {
+        FillRect(hdc, &rc, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+    }
     const wchar_t *msg = L"Ritmolux is active in another window";
     SetBkMode(hdc, TRANSPARENT);
-    SetTextColor(hdc, RGB(180, 180, 180));
+    SetTextColor(hdc, kAccentText);
     // Word-wrap, then vertically centre the wrapped block within the client.
     RECT measure = rc;
     DrawTextW(hdc, msg, -1, &measure, DT_CENTER | DT_WORDBREAK | DT_CALCRECT);

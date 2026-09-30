@@ -444,8 +444,8 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | 5 — Panels and measured text | dev | done | 4d82db06 |
 | 6 — Overlays move | dev | done | 697fafc4 |
 | 7 — Binding table, help, hint | dev | done | fb237a6c |
-| 8 — Parameter group and main (F2, engine) | dev | done | committed with this row |
-| 9 — foobar component takes the look | dev | not started | |
+| 8 — Parameter group and main (F2, engine) | dev | done | d9ddfe12 |
+| 9 — foobar component takes the look | dev | done | committed with this row |
 | 10 — Studio tokens and motion | studio-builder | not started | |
 | 11 — Studio workflow fixes | studio-builder | not started | |
 | 12 — Before and after on devices | human | not started | |
@@ -546,7 +546,7 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   state).
 - Phase 8, the judgement. Every declaration's `group` and `main` were set in one pass: a scratch
   script (not committed) wrote the fields from a per-file name table, so the choices are readable as
-  a block in each diff. `main` is true on 2 to 4 declarations per system. The shared blocks in
+  a block in each diff. `main` is true on a few of each system's own declarations. The shared blocks in
   `scenes/common.rs` declare `hue` (colour) and `brightness` (light) as main, so every system that
   shares them has a main parameter through them as well. The engine stages follow the ADR: `post`,
   except `exposure` and `bg_bright`, which are `light`. Each stage's leading amount (`trails`,
@@ -560,6 +560,11 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   `core/tests/suite/preset.rs` (the reference renderer) and `core/tests/suite/preset_schema.rs` (the
   two new tests). The schema export lives in `core`, not `standalone/src/`; `ritmolux --schema`
   prints it unchanged. The studio's vitests pass on the widened `docs/specs/player-schema.json`.
+- Phase 9, done-when not met in this session: the plugin was **not built**. It needs MSVC and the
+  foobar2000 SDK, and this lane ran on Linux, so "builds in CI's `foobar` job" is owed to that job.
+  The placeholder fills with `panel`'s colour at full opacity (GDI has no scene to blend over) and
+  draws its text in `accent`. The stock black brush remains the fallback if the brush cannot be
+  created.
 
 ### Close triggers
 
