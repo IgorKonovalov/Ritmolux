@@ -11,6 +11,7 @@ import { stripProvenance } from './src/plugins/strip-provenance.mjs';
 import { translationBanner } from './src/plugins/translation-banner.mjs';
 import { PUBLISHED, REPO_ROOT } from './src/plugins/rewrite-links.mjs';
 import { sidebarGroup } from './src/plugins/split-document.mjs';
+import { RU_ENTRANCE, twinOf } from './src/plugins/twins.mjs';
 
 /**
  * The Pages subpath, read by the link rewriter and by
@@ -146,10 +147,14 @@ function stripLeadingHeading() {
 /**
  * Links a translated page to its English twin and each twin back to it.
  *
- * The pair is a sibling pair on disk - `<name>.md` and `<name>.ru.md` - so the
- * twin is derived rather than listed, and a translation added to `PUBLISHED`
- * gets its link with no edit here. A page whose twin is not published gets
- * nothing, which is what keeps this inert for the other thirty sources.
+ * The pair is a sibling pair on disk - `<name>.md` and `<name>.ru.md` - and
+ * `twinOf` in `src/plugins/twins.mjs` derives it, the same rule the header
+ * control reads, so a translation added to `PUBLISHED` gets its link with no
+ * edit here. A page whose twin is not published gets nothing, which is what
+ * keeps this inert for the other thirty sources.
+ *
+ * The link carries `lang` and `hreflang` for the language it names, so a screen
+ * reader voices `Читать по-русски` in Russian on an English page.
  *
  * It runs AFTER `translationBanner` and BEFORE `stripLeadingHeading`, and the
  * order is load-bearing on both sides: the banner has already removed the stamp
@@ -163,19 +168,18 @@ function translationCrossLink() {
     if (!file?.path) return;
     const source = path.relative(REPO_ROOT, path.resolve(file.path)).split(path.sep).join('/');
     if (!(source in PUBLISHED)) return;
-    const ru = source.endsWith('.ru.md');
-    const twin = ru ? source.slice(0, -'.ru.md'.length) + '.md' : source.slice(0, -'.md'.length) + '.ru.md';
-    const entry = PUBLISHED[twin];
+    const entry = twinOf(source);
     if (entry === undefined) return;
 
+    const ru = source.endsWith('.ru.md');
     const label = ru ? 'In English' : 'Читать по-русски';
+    const lang = ru ? 'en' : 'ru';
     const at = tree.children[0]?.type === 'heading' && tree.children[0].depth === 1 ? 1 : 0;
     // A blockquote rather than a bare paragraph: Starlight gives it a left rule
-    // and a tinted ground, so the one affordance a reader has for finding the
-    // other language reads as a control rather than as the page's first
-    // sentence. It was a plain link until 2026-09-17, and the owner reported not
-    // finding it. There is no header picker to compete with - that needs the
-    // locale migration this site has not made.
+    // and a tinted ground, so the link reads as a control rather than as the
+    // page's first sentence. The header control goes to the same twin from every
+    // page; this one is the in-body copy, for a reader who has scrolled past the
+    // header or is on a phone with the menu closed.
     tree.children.splice(at, 0, {
       type: 'blockquote',
       children: [
@@ -186,6 +190,7 @@ function translationCrossLink() {
               type: 'link',
               url: `${BASE}${entry.route}/`,
               title: entry.title,
+              data: { hProperties: { lang, hreflang: lang } },
               children: [{ type: 'strong', children: [{ type: 'text', value: label }] }],
             },
           ],
@@ -309,7 +314,10 @@ export default defineConfig({
     starlight({
       title: 'Ritmolux',
       customCss: ['./src/styles/site.css'],
-      components: { Footer: './src/components/Footer.astro' },
+      components: {
+        Footer: './src/components/Footer.astro',
+        LanguageSelect: './src/components/LanguageSelect.astro',
+      },
       description:
         'Reader-facing documentation for Ritmolux: preset authoring, the expression language, ' +
         'the parameter roster, and the engine contracts.',
@@ -321,9 +329,10 @@ export default defineConfig({
         },
       ],
       // Six groups, each named for what the reader is doing rather than for
-      // where the file came from (ADR-0169). Every group's first entry is a page
-      // a stranger can start from; `scripts/check-site-routes.mjs` holds every
-      // route to being reachable from here rather than only by search.
+      // where the file came from (ADR-0169), and a seventh holding the Russian
+      // translations (ADR-0185). Every group's first entry is a page a stranger
+      // can start from; `scripts/check-site-routes.mjs` holds every route to
+      // being reachable from here rather than only by search.
       sidebar: [
         {
           label: 'Get it',
@@ -390,9 +399,10 @@ export default defineConfig({
             doc('docs/diffusion-filter.md'),
           ],
         },
-              {
+        {
           label: 'Русский',
           items: [
+            { label: 'Обзор', slug: RU_ENTRANCE.route },
             doc('docs/how-it-works.ru.md'),
             doc('docs/running.ru.md'),
             doc('packaging/windows/READ-ME-FIRST.ru.md'),

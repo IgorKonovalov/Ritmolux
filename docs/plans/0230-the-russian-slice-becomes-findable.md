@@ -1,6 +1,6 @@
 # 0230 — The Russian slice becomes findable
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-26
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0213](../adrs/0213-the-russian-slice-stays-a-section-and-gets-a-header-control.md),
@@ -335,16 +335,24 @@ export const onRequest = defineRouteMiddleware((context) => {
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by the implementer)_
+**Lane:** branch `plan-0230-the-russian-slice-becomes-findable`, worktree `/home/igor/Work/rlx-plan-0230`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The header control, and a Russian entrance for it to point at | dev | not started | |
+| 1 — The header control, and a Russian entrance for it to point at | dev | done | committed with this row |
 | 2 — The Russian pages say they are Russian | dev | not started | |
 | 3 — The front door names the Russian pages | dev | not started | |
 | 4 — The live site, read after the push | human | not started | |
 
 ### Notes
+
+- Phase 1: control counts over `site/dist/**/*.html` (228 files; `pagefind/` and `_astro/` skipped),
+  counting `class="rlx-language"`: 226 pages with a sidebar carry 2; `index.html` and `404.html`
+  carry 1.
+- Phase 1: `twinOf` returns `undefined` for a source not ending in `.md`, which the plan's sketch
+  did not: without it `core-cabi/include/rlx_core.h` maps to itself and is its own twin.
+- Phase 1: `declaredTitle` in `content.config.ts` does not call `sourceOf`. At `parseData` time the
+  glob loader passes an absolute `filePath`, while `sourceOf` takes the store's `site/`-relative one.
 
 ### Close triggers
 

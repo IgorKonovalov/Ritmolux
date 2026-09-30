@@ -1,0 +1,36 @@
+---
+import { Icon } from '@astrojs/starlight/components';
+import { RU_ENTRANCE, langOf, sourceOf, twinOf } from '../plugins/twins.mjs';
+
+/**
+ * The header's language control (ADR-0213): one link to the other language.
+ *
+ * Replaces Starlight's `LanguageSelect`, which renders nothing on a site with no
+ * i18n locales. Starlight places this slot twice - in the header beside the theme
+ * toggle, and in the mobile menu's footer - so every page with a sidebar carries
+ * it twice and a splash page once.
+ *
+ * Where it goes: an English page to its Russian twin, or to the Russian entrance
+ * page when it has none; a Russian page to its English twin, or to the site root
+ * when it has none, which is the entrance page's case. A chunk of a split
+ * document carries its source's `filePath`, so it links to the whole twin.
+ *
+ * Every href is the build's base plus a route from `PUBLISHED` or
+ * `RU_ENTRANCE` - no route is spelled here, so the control is right at both of
+ * the site's bases. `scripts/check-site-links.mjs` holds the result on every
+ * built page.
+ */
+const base = import.meta.env.BASE_URL;
+const source = sourceOf(Astro.locals.starlightRoute.entry?.filePath);
+const twin = twinOf(source);
+const russian = langOf(source) === 'ru';
+
+const target = russian ? 'en' : 'ru';
+const label = russian ? 'English' : 'Русский';
+const href = twin ? `${base}${twin.route}/` : russian ? base : `${base}${RU_ENTRANCE.route}/`;
+---
+
+<a class="rlx-language" href={href} lang={target} hreflang={target}>
+  <Icon name="translate" />
+  <span>{label}</span>
+</a>
