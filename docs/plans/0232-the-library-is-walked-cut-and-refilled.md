@@ -367,9 +367,9 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 | `lsystem_bower` | lsystem |  | 0.022/0.031/0.007/0.023 | 0.081 | 0.013 | 3.519 | Coral (0.132) |  | cut | Redundant with a stronger keep in its family. | |
 | `lsystem_coral` | lsystem | yes | 0.043/0.035/0.004/0.000 | 0.083 | 0.012 | 3.782 | Bower (0.132) |  | cut | Redundant with a stronger keep in its family. | |
 | `lsystem_icecrystal` | lsystem | yes (new) | 0.008/0.104/0.028/0.000 | 0.181 | 0.020 | 3.333 | Bower (0.173) |  | keep | | |
-| `lsystem_rime` | lsystem | yes | 0.048/0.004/0.012/0.005 | 0.102 | 0.015 | 3.191 | Sumi Mono (0.218) |  | retune | | |
-| `lsystem_sumimono` | lsystem |  | 0.031/0.012/0.004/0.000 | 0.050 | 0.000 | 1.021 | Bower (0.150) |  | retune | | |
-| `lsystem_vellum` | lsystem |  | 0.160/0.003/0.000/0.004 | 0.184 | 0.029 | 1.208 | Sumi Mono (0.162) |  | retune | | |
+| `lsystem_rime` | lsystem | yes | 0.048/0.004/0.012/0.005 | 0.102 | 0.015 | 3.191 | Sumi Mono (0.218) |  | retune | | e2d90a14 |
+| `lsystem_sumimono` | lsystem |  | 0.031/0.012/0.004/0.000 | 0.050 | 0.000 | 1.021 | Bower (0.150) |  | keep | Re-judged at the retune (Phase 4): the owner tried a mirrored tree-and-reflection and asked for the original back, since the look is the tree shape. | |
+| `lsystem_vellum` | lsystem |  | 0.160/0.003/0.000/0.004 | 0.184 | 0.029 | 1.208 | Sumi Mono (0.162) |  | cut | Retired by the owner at the retune (Phase 4): too sparse, and a denser retune did not save it. Rime takes the guide card; Sumi Mono takes its README example and softness-sheet slot. | e2d90a14, d7d630c5 |
 | `curve_blueprint` | parametric_curve |  | 0.033/0.000/0.000/0.000 | 0.033 | 0.016 | 3.655 | Gyre (0.114) |  | keep | | |
 | `curve_broadside` | parametric_curve | yes (new) | 0.086/0.166/0.000/0.023 | 0.206 | 0.129 | 0.708 | Blueprint (0.179) |  | keep | | |
 | `curve_cogwheel` | parametric_curve |  | 0.056/0.000/0.007/0.000 | 0.041 | 0.011 | 5.411 | Turnabout (0.159) |  | retune | | 20dfff85 |
