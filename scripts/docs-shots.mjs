@@ -317,9 +317,8 @@ const CARDS = [
   "reaction_mitosis",
   "reaction_spotmono",
   "reaction_verdigris",
-  // shape_collage (4)
+  // shape_collage (3)
   "collage_mono",
-  "collage_nocturne",
   "collage_onwhite",
   "collage_suprematist",
   // shape_field (9)
@@ -595,7 +594,7 @@ const IMAGES = [
     // shape_collage — the first shipped world on the system (ADR-0123), and the
     // only family here that draws a GRAPHIC rather than light: a pixel starts at
     // the paper colour and composites each element with `over`, so the array
-    // index is the depth. Chosen over the three others for the same reason
+    // index is the depth. Chosen over the other two for the same reason
     // shape_pulse was — collage_mono and collage_onwhite are two-ink by intent.
     out: "docs/images/gallery/shape_collage.png",
     presetFile: "presets/collage_suprematist.toml",
