@@ -1,15 +1,15 @@
 # 0231 — The interface is audited, then learns one look
 
-> **Status:** in-progress
+> **Status:** done - Phase 12 owed, ADR-0249. Closed 2026-09-30 by a conductor-run close: Phases 1-11 landed (`21f261cb` to `cfc7ed95`), round 1 review no blockers, no majors, two minors (fixed), two nits (one fixed) in `dad17147`; ADR-0252 (with an Outcome) and ADR-0256 accepted; version 0.154.0
 > **Approved:** 2026-09-27 (user). Queued in `tools/conductor/queue.json` 2026-09-28 at the owner's request, for Phases 1-2; the run parks at Phase 3, the `human` audit that re-scopes Phases 8, 9 and 11
 > **Created:** 2026-09-27
 > **Owner skill(s):** dev, studio-builder, human
-> **Related ADRs:** [0252](../adrs/0252-the-interfaces-look-is-declared-once-in-the-core-and-the-studios-stylesheet-is-generated-from-it.md) (proposed),
-> [0256](../adrs/0256-a-parameter-declares-its-group-and-whether-it-is-main.md) (proposed, from the audit),
-> [0240](../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md),
-> [0009](../adrs/0009-glyphon-text-rendering.md),
-> [0143](../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md),
-> [0178](../adrs/0178-the-studio-shell-conventions.md)
+> **Related ADRs:** [0252](../../adrs/0252-the-interfaces-look-is-declared-once-in-the-core-and-the-studios-stylesheet-is-generated-from-it.md) (accepted, Outcome),
+> [0256](../../adrs/0256-a-parameter-declares-its-group-and-whether-it-is-main.md) (accepted, from the audit),
+> [0240](../../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md),
+> [0009](../../adrs/0009-glyphon-text-rendering.md),
+> [0143](../../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md),
+> [0178](../../adrs/0178-the-studio-shell-conventions.md)
 
 ## TL;DR
 
@@ -613,5 +613,180 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   vitest (311 tests) ran at Phase 11's tip.
 - Not verified on this lane: Phase 9's plugin build (needs CI's `foobar` job on Windows).
 - `human` phases remaining: 12 (before and after on devices; `Blocks merge: no`).
+
+## Close review
+
+Conductor-run close, 2026-09-30, of round 1's clean review. Round 1 is the only round, so no earlier
+finding was resolved by a fix round. **Phase 12 is owed** (ADR-0249): the before-and-after judgement on
+Windows, Linux and macOS, including the foobar panel on Windows, has not been made, so no Phase 3
+finding is yet marked resolved on a real device. Phase 9's plugin build is owed to CI's `foobar` job
+after the push.
+
+Repaired at the close in `dad17147`, comment text only: M1 (the family-range JSDoc sits on
+`familyRangeSchema` again), M2 (the `type_scale` doc says no engine surface reads it yet; ADR-0252
+carries the same point as its Outcome) and N2 (the main-parameter test's doc says what it cannot
+catch). N1 is code and stays open. Upstream CI read green at the close (run 36682421248 on `22a665a`).
+Translation advisory: `docs/running.ru.md` (moved by this plan), `docs/how-it-works.ru.md` and
+`packaging/foobar/READ-ME-FIRST.ru.md`.
+
+The round 1 review, in full:
+
+### Plan 0231 — close review, round 1
+
+Graded at tip `2d03406dfa9d2cfa896eeb8195f6ba8c83b84e0b` on `plan-0231-the-interface-is-audited-then-learns-one-look`
+(lane `/home/igor/Work/rlx-plan-0231`), which already carries `main`.
+
+**Verdict: Plan 0231 landed as amended by its Phase 3 audit. No blockers and no majors; two minors and
+two nits.** Phase 12 (`human`, `Blocks merge: no`) is correctly `owed` (ADR-0249).
+
+#### Evidence run in this session
+
+- **Full suite (lens 1).** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed the
+  ledger record instead of re-running:
+  `with-lock: skipped cargo nextest run --workspace: tree 6e09016 is green in the suite ledger, run by gate 0231-pre-review at 2026-09-30T12:32:23.232Z: 1907 tests run: 1907 passed (12 slow), 8 skipped`.
+  That record is the full-suite evidence. The log's `Full suite:` bullet names this pre-review gate,
+  which is correct in conductor mode.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: green.
+- Studio: `npm --prefix studio run typecheck` green, `run lint` green, `npm --prefix studio test`
+  32 files / 311 tests passed.
+- Node gates: `check-comment-hygiene` OK, `check-doc-links` OK, `check-settings-have-files` OK,
+  `check-reader-prose` OK, `check-system-counts` OK, `toc.mjs --check` OK, `check-backlog-claims`
+  OK (50 reductions / 24 live entries, 4 unprobeable).
+- Phase 1's done-when, re-run: `cargo run -p standalone --example shot -- --ui all --size 1280x800
+  --out target/ui-audit/review-1280` wrote all nine states (`hud`, `browse`, `browse-filtered`,
+  `browse-thumbs`, `settings`, `console`, `banner`, `diagnostics`, `help`). `--ui help` was also run at
+  1920x1080. The captures were inspected: the browser, the settings menu, the HUD plate, the banner and
+  the help sheet all sit on panels with the amber edge. The browser column holds "Iris Bloom
+  Kaleidoscope" and "Star Mandala Bordered" in full, which F1 and F3 needed.
+- Done-whens run as written, each a single `git grep` call:
+  - Phase 4: `git grep -n "_COLOR: \[f32" -- standalone/src core/src/render` returns nothing.
+  - Phase 5: `git grep -n "0.62" -- standalone/src/overlay.rs` returns nothing.
+  - Phase 10: `git grep -n "#[0-9a-fA-F]\{3,6\}" -- "studio/renderer/*.css"` finds hex only in
+    `studio/renderer/tokens.css`. Git's pathspec `*` crosses `/`, so the modules are covered.
+
+#### Lens 1 — alignment
+
+Every phase has one in-vocabulary `**Owner skill:**` tag. `Blocks merge: no` appears only on Phase 12,
+which is `human`. No phase reads Phase 12's output. Each phase maps to one commit (log table), and
+Phase 3's amendment of Phases 8, 9 and 11 is recorded along with the owner's re-approval.
+
+Tests the plan named, read rather than trusted:
+
+- **Phase 4.** `ui_tokens::the_studio_tokens_are_what_the_theme_declares` compares the committed file
+  with `theme::css()` byte for byte (CRLF-normalised) and rewrites it under `RLX_UPDATE_UI_TOKENS=1`.
+  The log is honest that the rewrite path was not exercised under the allowlist, and the red half was
+  shown by a hand edit.
+- **Phase 5.** `text::tests::a_fitted_string_never_measures_wider_than_asked_on_the_system_font`
+  asserts `measure(fit(s)) <= max` and that a string which fits comes back borrowed and unchanged. It
+  runs over a seeded corpus that includes multi-byte strings. A second test holds the same property
+  under a non-monotone measurer. Both are properties per ADR-0071, not font numbers.
+- **Phase 6.** In `motion/tests.rs`, the envelope is monotone and lands exactly 1.0 at and after the
+  duration, `reduced` is a step, and `a_key_during_the_open_animation_moves_the_selection_on_that_frame`
+  asserts the state moved and that the marker moved one row pitch while the envelope was below 1. The
+  one weakening, "short of the end at 0.9·d" rather than "just before", is disclosed in the log with
+  its f32 reason. It is acceptable.
+- **Phase 7.** `no_two_rows_in_one_context_share_a_key` is a real check.
+  `every_action_the_dispatcher_can_emit_has_a_row` enumerates through exhaustive matches, so a new
+  `Action`, `OverlayKey` or `SettingsKey` variant fails to compile until it is listed, and it checks
+  both directions. `?` being bound exactly once per context is tested, and so is the character match on
+  a foreign physical key.
+- **Phase 8.** `every_exported_parameter_carries_its_group_and_main` walks every roster of the real
+  export and matches each parameter's own object. `every_system_has_a_main_parameter` exists, but see
+  nit N2.
+- **Phase 11.** Four vitests run against the committed `player-schema.json`, not a fixture: exactly the
+  three bound rows sit above every `<details>` and all groups are closed; every unbound parameter is in
+  its own schema group; the group order and counts are checked; main rows come first, with a guard that
+  some group actually mixes main and secondary rows; and a newly bound row moves up.
+
+Files outside each phase's list are all declared in the log (Phase 1's move of `overlay`/`settings`/
+`console` into the library, the export living in `core/src/preset/schema/export.rs` rather than
+`standalone/src/`). None of them reverses a decision.
+
+The log (about 185 lines) is shorter than `## Implementation phases` (about 225 lines).
+
+#### Lens 2 — layering, real-time, seams
+
+- `core/src/render/theme.rs` and `panel.rs` are pure data plus a wgpu pass, with no platform type.
+  Both carry the render/ panic-denial pragma. `keymap.rs` and `motion.rs` live in `standalone/`, where
+  winit belongs.
+- Nothing touches an audio callback. The per-frame allocation in `fit_width` and `TextMeasure::width`
+  runs on the render thread, which the rules allow.
+- **C ABI:** unchanged. **Control protocol:** the schema export widens with `group`/`main`. That is
+  recorded in `docs/specs/0003-studio-control-protocol.md` and `docs/specs/player-schema.json` and is
+  decided by ADR-0256, so it is not a casual widening. The studio now *rejects* a schema without the
+  fields, as ADR-0256 says. `EXPECTED_PLAYER_VERSION` is what pins the pair, so the close's studio
+  version sync matters more than usual here.
+- The panel pass outputs `Color::linear()` for the `*Srgb` targets every `TextLayer` is built on (the
+  surface, the headless `Rgba8UnormSrgb`, the aux surface). That matches the rest of the core's
+  assumption about sRGB targets.
+
+#### Lens 3 — docs and bookkeeping
+
+- The operator docs moved with the code. `README.md` Controls and `docs/running.md` name `?`.
+  `docs/configuration.md` carries `[ui] motion`, `[ui] hints` and `ui.reducedMotion`.
+  `docs/developing.md` names `RLX_UPDATE_UI_TOKENS=1`. `docs/capturing.md` carries `--ui` and the
+  `help` state. `presets/README.md` was regenerated with the `Group` column. `studio/README.md` covers
+  `ui-shots` and the settings table.
+- **Translation advisory:** `docs/running.ru.md` is stamped `b3015078`, and `docs/running.md` moved in
+  this plan (`fb237a6c`). The close notes owe that row, along with the two older rows,
+  `how-it-works.ru.md` and `packaging/foobar/READ-ME-FIRST.ru.md`.
+- **Owed at the close:**
+  - flip ADR-0252 and ADR-0256 `proposed -> accepted` and refresh the ADR index;
+  - move the plan to `done/` with `Status: done - Phase 12 owed, ADR-0249`, and name the owed phase in
+    the plans-index bullet;
+  - a **minor** version bump (a feature plan), with the studio's two version copies following it.
+- `presets/` changed only `presets/README.md`, which is generated. No `.toml` was touched, so there is
+  no curation to do. The plan names no `Closes:` entry.
+
+#### Lens 4 — correctness
+
+- `Ease::at` bisects in f64 and reads the height at the lower bound, so it is monotone by
+  construction. Its tests check the pins, monotonicity and the ease-out shape.
+- **Only one configuration verified:** Phase 9's placeholder was **not built**, because it needs MSVC
+  and the foobar2000 SDK and the lane ran on Linux. "Builds in CI's `foobar` job" is owed to the first
+  CI run after the push. The change is small: `CreateSolidBrush`/`DeleteObject` with a stock-brush
+  fallback, and `constexpr COLORREF` from `RGB()`. It is recorded here as a residual risk, not a
+  finding.
+- The two capture sizes (the ADR-0037 pair) show the overlays at identical pixel sizes. That is the
+  existing overlay behaviour, but it bears on minor M2.
+
+#### Lens 5 — design integrity
+
+The look is one table (`THEME`), and the studio's stylesheet is generated from it and gated. The only
+hand copy is foobar's, and a comment marks it as outside that gate. The keymap is one table read by
+both dispatch and the sheet, so the help sheet cannot go stale. OCP holds: a new binding is a row.
+
+#### Findings
+
+##### Minor
+
+**M1 — `studio/shared/schema.ts:40`: the new `PARAM_GROUPS` doc block was inserted between
+`familyRangeSchema`'s JSDoc (lines 31-39) and the declaration it documents.** The family-range comment
+now documents nothing, and editors attach the wrong text on hover. **Fix (comment-only, a close may
+repair it):** move lines 40-45 (the `PARAM_GROUPS` JSDoc, the const and the type) above line 31, so the
+"Where one parameter reads on one family..." block sits directly on `familyRangeSchema` again.
+
+**M2 — `core/src/render/theme.rs:219-221`: the `type_scale` doc says "A surface scales them by
+`target height / 1080`", but no engine surface reads `type_scale`.** `git grep type_scale` finds only
+`theme.rs`. The overlays still draw at their own fixed sizes, identical at 1280x800 and 1920x1080 in
+this review's captures. Only `THEME.space[1]` has readers (`now_playing.rs:219`, `console.rs:108`,
+`overlay.rs:696`). The comment states an invariant the code does not hold, and ADR-0252's "declared
+once" is therefore true for colour and motion only. **Fix at the close (comment-only):** reword it to
+say the steps are declared for the studio's tokens and that engine surfaces still carry their own
+sizes. Wiring the overlays to the scale is follow-up work, not a close edit.
+
+##### Nit
+
+**N1 — `standalone/src/overlay.rs:616`: the help sheet's mid-group column break drops the group
+heading.** At 1280x800, `? this sheet` lands alone at the top of a second column with no `menus`
+heading over it. The function's doc promises only that "a heading never ends a column". A
+continuation heading, or keeping a short group whole, would read better. This is code, so it stays
+open.
+
+**N2 — `core/tests/suite/preset_schema.rs:153`: `every_system_has_a_main_parameter` cannot fail for
+any system built from the shared blocks.** `common::hue()` and `common::brightness()` both declare
+`main: true`, so the test passes whether or not a system marks any of its *own* parameters main.
+ADR-0256's "the `main` judgement is reviewed at the close" rests on the diff, not on this test. That is
+acceptable, but the test's doc overstates what it guards. Test logic, so it stays open.
 
 ## Followups (after this lands)

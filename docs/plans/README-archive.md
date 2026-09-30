@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0231 - The interface is audited, then learns one look](#0231---the-interface-is-audited-then-learns-one-look)
   - [0233 - The close reviews' small findings are repaired](#0233---the-close-reviews-small-findings-are-repaired)
   - [0234 - A conductor session writes only where it works](#0234---a-conductor-session-writes-only-where-it-works)
   - [0212 - The diffused render gains a timeline](#0212---the-diffused-render-gains-a-timeline)
@@ -270,6 +271,26 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0231 - The interface is audited, then learns one look](done/0231-the-interface-is-audited-then-learns-one-look.md)
+
+- closed 2026-09-30, conductor-run close of lane `plan-0231-the-interface-is-audited-then-learns-one-look`.
+Phases 1-11 landed: `21f261cb`, `98e4d4e7`, `9907f1b5` (the owner's audit, look A), `6202a083`,
+`4d82db06`, `697fafc4`, `fb237a6c`, `d9ddfe12`, `b548dedc`, `7a4996aa`, `cfc7ed95`. **Phase 12 is
+owed** (ADR-0249): the before-and-after judgement on devices, including the foobar panel on Windows.
+Round 1 review: **no blockers, no majors, two minors, two nits**. Both minors and N2 were repaired at
+the close in `dad17147` (comment text only). Version: **0.154.0** (minor: a feature plan).
+ADR-0252 accepted with an `Outcome` (the type scale is declared but no engine surface reads it yet);
+ADR-0256 accepted. Closes no backlog entry. Upstream CI read green at the close. The full review is the
+plan's own `## Close review` section.
+- **What landed.** One `THEME` table in the core, with the studio's `tokens.css` generated from it and
+  gated; panels with the amber edge and width-measured text; overlay motion with a reduced-motion key;
+  one binding table read by dispatch and by the `?` help sheet; parameter `group` and `main` in the
+  schema export, and a studio parameter panel that lists bound rows first and groups the rest.
+- **Open.** N1: the help sheet's mid-group column break drops the group heading
+  (`standalone/src/overlay.rs`), code the close cannot repair. Phase 9's plugin build is owed to CI's
+  `foobar` job after the push. Translation advisory at the close: `running.ru.md` (moved by this
+  plan), `how-it-works.ru.md` and the foobar `READ-ME-FIRST.ru.md`.
 
 ### [0233 - The close reviews' small findings are repaired](done/0233-the-close-reviews-small-findings-are-repaired.md)
 

@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0235** (ADRs are a separate sequence — next free there is **0256**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0235** (ADRs are a separate sequence — next free there is **0257**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -47,7 +47,6 @@ place. The plan file carries the real link.
 | [0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md) | The library learns from the corpus it will not ship | approved | human | ADR-0227 (proposed): a borrowed look authored natively, reference outside. A 4-6 cohort of 21 picks. Its cohort reads 0232's gap table; its Phase 3 lands after 0232 Phase 3. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0230](0230-the-russian-slice-becomes-findable.md) | The Russian slice becomes findable | draft | dev, human | ADR-0213 (proposed): a header `LanguageSelect` override, a `ru` entrance page, `lang="ru"` + hreflang via route middleware (splits Pagefind by language), landing links. Every dev phase builds the site. |
-| [0231](0231-the-interface-is-audited-then-learns-one-look.md) | The interface is audited, then learns one look | approved | dev, studio-builder, human | ADR-0252 (proposed): one theme table in the core, studio CSS generated. Phases 1-2 build captures; Phase 3 audit re-scopes 8, 9, 11. |
 | [0232](0232-the-library-is-walked-cut-and-refilled.md) | The library is walked, cut and refilled | approved | human, dev | ADR-0253 (proposed): report, owner's walk, cull without replacement down to a two-per-family floor, retunes, gap brief, refill. Takes backlog 0256 step 2 and the six content-brief sittings. |
 <!-- roster:end -->
 
@@ -1044,6 +1043,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0231 - The interface is audited, then learns one look](done/0231-the-interface-is-audited-then-learns-one-look.md) - closed 2026-09-30, **Phase 12 owed**. Review: **no blockers, no majors, two minors (fixed), two nits (one fixed).** Version: **0.154.0**. ADR-0252 + 0256 accepted. [Write-up](README-archive.md).
 - [0233 - The close reviews' small findings are repaired](done/0233-the-close-reviews-small-findings-are-repaired.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.153.0**. Closes 0263-0272 bar 0267. [Write-up](README-archive.md).
 - [0234 - A conductor session writes only where it works](done/0234-a-conductor-session-writes-only-where-it-works.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (fixed), two nits.** Version: none. ADR-0255 accepted, Outcome. Closes 0273. [Write-up](README-archive.md).
 - [0212 - The diffused render gains a timeline](done/0212-the-diffused-render-gains-a-timeline.md) - closed 2026-09-28. Review: **two rounds; one major (fixed), five minors (four fixed).** Version: **0.152.0**. ADR-0236 accepted. Closes 0126. [Write-up](README-archive.md).

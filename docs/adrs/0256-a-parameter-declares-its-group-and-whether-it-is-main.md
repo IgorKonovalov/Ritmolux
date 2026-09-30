@@ -1,8 +1,8 @@
 # ADR-0256 — A parameter declares its group and whether it is main
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-30 (Plan 0231's close)
 > **Date:** 2026-09-30
-> **Related plan(s):** [0231](../plans/0231-the-interface-is-audited-then-learns-one-look.md) (Phases 8 and 11)
+> **Related plan(s):** [0231](../plans/done/0231-the-interface-is-audited-then-learns-one-look.md) (Phases 8 and 11)
 > **Extends:** [ADR-0170](0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
 > (the declaration is the source), [ADR-0176](0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md)
 > (the schema the studio reads)

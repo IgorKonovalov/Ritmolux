@@ -1,8 +1,8 @@
 # ADR-0252 — The interface's look is declared once in the core, and the studio's stylesheet is generated from it
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-30 (Plan 0231's close), with an Outcome
 > **Date:** 2026-09-27
-> **Related plan(s):** [0231](../plans/0231-the-interface-is-audited-then-learns-one-look.md)
+> **Related plan(s):** [0231](../plans/done/0231-the-interface-is-audited-then-learns-one-look.md)
 
 ## Context
 
@@ -92,3 +92,15 @@ An OFL face bundled in both the standalone and the studio would give identical t
 stronger retro accent. The owner declined it. It adds bytes to an exe measured against NFR section 4's
 cap (ADR-0231) and brings a licence file into two archives, for an accent the owner wants subtle.
 Revisit it only through a new ADR.
+
+## Outcome (2026-09-30, Plan 0231's close)
+
+The table landed as decided. `THEME` in `core/src/render/theme.rs` is the one declaration, and the
+studio's `studio/renderer/tokens.css` is generated from it, with a test holding the two equal. The
+foobar placeholder's colours are the one hand copy, and a comment marks it as outside that gate.
+
+**For the type scale, "every renderer reads it" is not yet true.** `THEME.type_scale` is declared and
+reaches the studio's tokens, but no engine surface reads it: the overlays still draw at their own fixed
+sizes, identical in pixels at 1280x800 and 1920x1080. Colour, spacing and motion are the parts every
+surface takes from the table. Wiring the engine's text sizes to the scale, relative to target height
+per ADR-0037, is follow-up work that a plan has to take.
