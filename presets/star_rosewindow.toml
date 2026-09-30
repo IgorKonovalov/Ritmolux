@@ -13,8 +13,8 @@
 # and `trefoil` are G1 arc chains, and only `diamond` and `chevron` are still
 # polylines. Motifs are available to this world now and it declines them on
 # taste - a bare interlace multiplied by the symmetry stage is a different
-# picture from an ornamented one, and `star_zellij` (Plan 0104 Phase 4) is where
-# the composite went instead.
+# picture from an ornamented one. The ornamented composite was authored as
+# Zellij (Plan 0104 Phase 4), since retired.
 #
 # WHAT DRIVES WHAT. variant sweeps the contact angle continuously (the morph
 # is engine-quantized to 0.1 degrees, so it rebuilds cleanly); kaleido_zoom is
@@ -23,6 +23,7 @@
 # axis stays frame-centred, so nothing here pans (kaleido folds fight pan).
 system = "star_pattern"
 name   = "Rose Window"
+representative = true
 
 [generator]
 tiling            = "12"

@@ -331,11 +331,9 @@ const CARDS = [
   "spectrum_metermono",
   "spectrum_radialbloom",
   "spectrum_skyline",
-  // star_pattern (4)
+  // star_pattern (2)
   "star_corona",
-  "star_mandala_bordered",
   "star_rosewindow",
-  "star_zellij",
   // swarm (5)
   "swarm_braid",
   "swarm_drift",
@@ -507,7 +505,7 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // star_pattern — UNJUDGED. Chosen when this family shipped one preset; 4
+    // star_pattern — UNJUDGED. Chosen when this family shipped one preset; 2
     // ship now. The Plan 0088 close notes this picture's outermost ring runs off
     // all four edges, and called that content work rather than a hop.
     out: "docs/images/gallery/star_pattern.png",

@@ -47,9 +47,9 @@ const CHAR_W: f32 = ROW_SIZE * 0.62;
 /// the family.
 const COL_CHARS: usize = 2 + 1 + 1 + NAME_CHARS + 1 + FAMILY_CHARS;
 /// Characters of the **name** a column can show before [`fit`] truncates it.
-/// Every shipped name fits but one — `Star Mandala Bordered` is 21 characters
-/// and draws as `Star Mandala Bo...` — so truncation is a case the embedded set
-/// reaches, not only a custom `RLX_PRESET_DIR`.
+/// Every shipped name fits — the longest, `Tiled Rosette Mono`, is exactly 18 —
+/// so truncation is reached by a custom `RLX_PRESET_DIR` or by the next longer
+/// shipped name, and a 21-character name draws as `Star Mandala Bo...`.
 pub const NAME_CHARS: usize = 18;
 /// Characters the family label reserves. The longest system family is
 /// `attractor` at nine, and [`SystemKind::family`](rlx_core::preset::SystemKind::family)
