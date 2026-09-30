@@ -387,8 +387,8 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 | `reaction_fluxmono` | reaction_diffusion | yes | 0.352/0.047/0.000/0.237 | 0.168 | 0.430 | 4.658 | Mitosis (0.177) |  | keep | | |
 | `reaction_glaciermono` | reaction_diffusion |  | 0.157/0.033/0.000/0.132 | 0.395 | 0.320 | 4.745 | Mitosis (0.236) |  | keep | | |
 | `reaction_lichen` | reaction_diffusion | yes (new) | 0.052/0.015/0.008/0.016 | 0.073 | 0.027 | 5.866 | Spot Mono (0.169) |  | keep | | |
-| `reaction_mitosis` | reaction_diffusion |  | 0.056/0.028/0.028/0.015 | 0.087 | 0.020 | 5.645 | Flux Mono (0.177) |  | retune | | |
-| `reaction_spotmono` | reaction_diffusion |  | 0.039/0.016/0.000/0.000 | 0.046 | 0.024 | 4.443 | Lichen (0.169) |  | retune | | |
+| `reaction_mitosis` | reaction_diffusion |  | 0.056/0.028/0.028/0.015 | 0.087 | 0.020 | 5.645 | Flux Mono (0.177) |  | retune | | 1ecc2af7 |
+| `reaction_spotmono` | reaction_diffusion |  | 0.039/0.016/0.000/0.000 | 0.046 | 0.024 | 4.443 | Lichen (0.169) |  | retune | | 1ecc2af7 |
 | `reaction_verdigris` | reaction_diffusion |  | 0.052/0.014/0.008/0.008 | 0.068 | 0.018 | 6.356 | Flux Mono (0.250) |  | keep | | |
 | `collage_mono` | shape_collage | yes | 0.056/0.002/0.000/0.000 | 0.058 | 0.002 | 1.065 | Nocturne (0.240) |  | keep | | |
 | `collage_nocturne` | shape_collage |  | 0.055/0.002/0.002/0.029 | 0.065 | 0.016 | 1.755 | Suprematist (0.211) |  | cut | Redundant with a stronger keep in its family. | |
