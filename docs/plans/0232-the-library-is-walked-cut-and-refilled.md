@@ -427,7 +427,35 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 
 ## Gaps
 
-_(Filled by Phase 5.)_
+**DRAFT, 2026-09-30, written by the session that ran Phase 4, for the owner to correct.** It reads
+the set after the cull and the retunes: 81 presets on 14 systems. `fragment_field` 13,
+`analytic_field` 11, `parametric_curve` 11, `attractor` 10, `reaction_diffusion` 6, `cellular` 5,
+`shape_field` 5, `warp_mesh` 4, `spectrum` 4, `lsystem` 3, `shape_collage` 3, and `emitter`,
+`star_pattern` and `swarm` at their floor of two. Three things decide the rows. The first is the
+thin families. The second is the verdict the walk and the retunes returned most often: "boring",
+with the fixes that worked making a look bolder, faster or more graphic, never softer. The third
+is what the owner asked for by name at the retunes: crisp thick lines, black-white-red, and no
+kaleidoscope rotation.
+
+| # | system | the look | why the set needs it | route |
+|---|---|---|---|---|
+| 1 | `emitter` | a burst world: sparks thrown out on each hit, building and dying with the phrase | The family is at its floor, and both survivors are calm: Drift Field drifts, Heartfall arcs. Since Perseids went, nothing in the set answers a drop by throwing light. | `0204` (10 brainlocknrelease, or 14 square-party) |
+| 2 | `swarm` | a dense, fast swarm pulsing hard on the beat | The family is at its floor. Braid and Murmuration are both flowing and slow, and the retune that tried to make Drift energetic ended in a cut. | `0204` (16 pulse-permission, or 15 more-waveforms) |
+| 3 | `warp_mesh` | a liquid feedback world with warm metallic colour: molten gold or a fire field churning | The family's four are a ladder, wind, smoke and tracery, and none is the churning liquid field MilkDrop is known for. The set also has no warm metallic palette; its warm worlds are ink or dusk. | `0204` (01 molten-gold, 02 fire-field or 19 nuclear) |
+| 4 | `parametric_curve` | one dancing ribbon: a single long glowing line that swings with the music over a dark ground | The family's eleven are figures that turn and redraw: roses, gears, pendulums. None is one gestural line whose whole body moves, which is the Dancer idiom. | `0204` (08 nematodes, or 09 isosceles-mashup13) |
+| 5 | `star_pattern` | an edge-to-edge Islamic wallpaper: a square or hexagon tiling filling the frame, thick crisp lines, no rotation | The family is at its floor, and both survivors are single rosettes (a 12-order window and a rings-only corona). The system's planar tilings, `square` and `hexagon`, ship unused. The walk's standing ask was crisp thick lines, and a periodic pattern gives them the whole frame. | `native` |
+| 6 | `shape_field` | a drop world in black, white and red: nested bands whose count steps every second beat | The §6 sitting found that a band count stepping every second beat reads as a response, and no preset uses it. Nothing in the set is built to hit hard on a loud passage; this does it with bands rather than flashes. | `native` |
+| 7 | `lsystem` | a plant that grows: a branching figure drawing itself on over a phrase, then regrowing | Two of the three survivors are ice (Ice Crystal and Rime), and Sumi Mono is a still tree. The system's defining verb, a figure that grows, has no world since the walk. | `native` |
+
+**Not a row, because no system can express it:** a route traced through the maze Labyrinth grows is
+backlog 0274, filed at the retune. No other gap in this draft needs engine work.
+
+**What this hands Plan 0204:** rows 1 to 4 name four systems and at least one pick each, which is
+more than 0204's Phase 2 needs (four to six picks across at least three systems). The picks not
+named here (03-07, 11-13, 17, 18, 20, 21) have no gap behind them, so they would be additions rather
+than fills. That is 0204's call to make, and this table does not make it. **What it hands Phase 6:**
+rows 5 to 7, three presets on three systems, which is inside that phase's four to six only if one
+row takes two presets or the owner adds a row.
 
 ## Data shapes
 
