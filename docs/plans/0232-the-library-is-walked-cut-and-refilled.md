@@ -420,8 +420,8 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 | `warp_cauldron` | warp_mesh | yes | 0.033/0.038/0.000/0.031 | 0.100 | 0.027 | 4.001 | Wellhead (0.192) |  | cut | Broken or ugly in the running app. | |
 | `warp_ladder` | warp_mesh | yes (new) | 0.067/0.000/0.053/0.688 | 0.560 | 0.593 | 1.612 | Wellhead (0.265) |  | keep | | |
 | `warp_millrace` | warp_mesh | yes | 0.018/0.042/0.004/0.014 | 0.097 | 0.027 | 4.286 | Wellhead (0.187) |  | cut | Broken or ugly in the running app. | |
-| `warp_sirocco` | warp_mesh |  | 0.015/0.038/0.002/0.012 | 0.097 | 0.038 | 4.153 | Smoke (0.177) |  | retune | | |
-| `warp_smoke` | warp_mesh |  | 0.029/0.009/0.001/0.002 | 0.058 | 0.018 | 2.060 | Sirocco (0.177) |  | retune | | |
+| `warp_sirocco` | warp_mesh |  | 0.015/0.038/0.002/0.012 | 0.097 | 0.038 | 4.153 | Smoke (0.177) |  | retune | | 9641e2ca |
+| `warp_smoke` | warp_mesh |  | 0.029/0.009/0.001/0.002 | 0.058 | 0.018 | 2.060 | Sirocco (0.177) |  | retune | | 9641e2ca |
 | `warp_tracery` | warp_mesh | yes (new) | 0.041/0.067/0.023/0.181 | 0.167 | 0.112 | 1.734 | Wellhead (0.223) |  | keep | | |
 | `warp_wellhead` | warp_mesh |  | 0.021/0.033/0.002/0.012 | 0.117 | 0.038 | 4.079 | Sirocco (0.177) |  | cut | Broken or ugly in the running app. | |
 
