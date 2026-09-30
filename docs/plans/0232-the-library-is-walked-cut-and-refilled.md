@@ -555,7 +555,7 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 ### Close triggers
 
 - **`presets/` touched:** yes — 30 presets deleted (116 -> 86), `representative = true` added to 11
-  survivors, header comments edited on 12 survivors, `presets/README.md` and
+  survivors, header comments edited on 13 survivors, `presets/README.md` and
   `presets/pending/README.md` edited.
 - **Plan header `Closes:`** none (takes backlog 0256 step 2)
 - **What shipped:** content removal plus test and documentation re-pointing; two sanity coverage
