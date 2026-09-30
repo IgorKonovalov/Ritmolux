@@ -61,8 +61,8 @@ zoom         = "1.35"
 # uniform lavender and the darkness that makes the window read was gone. The
 # vault's light lives in its bands and the fold, not in an ambient lift.
 glow         = "0.15 + clamp(bass * 0.176, 0, 0.15)"
-# Onset gets a structural flash, not bloom (the report is bloom-blind - house
-# note from cohort 4).
+# Onset gets a structural flash rather than bloom: it lights the panes
+# themselves instead of a halo around the leading, which is the look.
 flash        = "clamp(onset * 0.42, 0, 0.30)"
 color_span   = "0.85"
 # Treble slides the vault's light through the panes - the first report pass

@@ -321,18 +321,18 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 | `analytic_standingwave` | analytic_field | yes | 0.193/0.197/0.000/0.000 | 0.195 | 0.009 | 1.855 | Lace Grid (0.203) |  | keep | | |
 | `analytic_twobandjulia` | analytic_field |  | 0.121/0.000/0.164/0.000 | 0.156 | 0.000 | 3.004 | Lace Grid (0.181) |  | retune | | 12b46290 |
 | `attractor_clifford` | attractor | yes (new) | 0.155/0.112/0.087/0.108 | 0.196 | 0.084 | 10.416 | Thomas (0.184) |  | keep | | |
-| `attractor_cliffordgallery` | attractor |  | 0.048/0.000/0.019/0.017 | 0.055 | 0.025 | 2.538 | Thomas (0.154) |  | keep | | |
+| `attractor_cliffordgallery` | attractor |  | 0.048/0.000/0.019/0.017 | 0.055 | 0.025 | 2.538 | Thomas (0.154) |  | cut | Content-brief section 3, judged at the Phase 4 sitting: the owner kept Thomas Gallery as a world and cut this one. | 66212420 |
 | `attractor_dejonggallery` | attractor |  | 0.053/0.000/0.011/0.013 | 0.055 | 0.030 | 1.343 | Fern Mono (0.142) |  | cut | Near-twin of Fern Mono, the ledger's nearest shape. | |
 | `attractor_dragon` | attractor |  | 0.100/0.036/0.062/0.041 | 0.141 | 0.022 | 6.439 | Volute (0.182) | header: ADR-0103: fit holds only at zero rotation, so base `zoom` sits under 1 | keep | | |
 | `attractor_fern` | attractor |  | 0.091/0.096/0.029/0.074 | 0.137 | 0.035 | 6.242 | Fern Mono (0.148) |  | cut | Does not follow the music. Its code references move to Fern Mono. | |
 | `attractor_fernmono` | attractor |  | 0.037/0.038/0.009/0.010 | 0.056 | 0.026 | 1.190 | Rho Walk (0.125) |  | keep | | |
-| `attractor_ink` | attractor |  | 0.089/0.039/0.044/0.013 | 0.103 | 0.053 | 3.985 | De Jong Gallery (0.142) |  | keep | | |
+| `attractor_ink` | attractor |  | 0.089/0.039/0.044/0.013 | 0.103 | 0.053 | 3.985 | De Jong Gallery (0.142) |  | retune | Content-brief section 2, re-judged at the Phase 4 sitting: it bites harder and walks the Thomas roster in 3D; every term that disturbed the cloud went, because with music it read as noise. | f226cbcc |
 | `attractor_leviathan` | attractor | yes | 0.135/0.111/0.173/0.075 | 0.182 | 0.069 | 11.929 | Clifford (0.233) |  | keep | | |
 | `attractor_lorenzgallery` | attractor |  | 0.045/0.000/0.011/0.030 | 0.054 | 0.040 | 3.896 | Valentine (0.066) | NEAR-DUP ~ Valentine (distinctness+report, shape 0.066); NEAR-DUP ~ Butterfly to Knot (distinctness+report, shape 0.071); NEAR-DUP ~ Rho Walk (distinctness, shape 0.068) | cut | Redundant with a stronger keep in its family. | |
 | `attractor_lorenzknot` | attractor |  | 0.103/0.010/0.016/0.000 | 0.107 | 0.008 | 4.012 | Valentine (0.190) |  | keep | | |
 | `attractor_thomas` | attractor |  | 0.079/0.016/0.046/0.076 | 0.074 | 0.061 | 1.544 | Thomas Gallery (0.097) | header: ADR-0109: `beat_index` counts detections, not beats | cut | Redundant with a stronger keep in its family. Its code references move to Thomas Gallery. | |
-| `attractor_thomasgallery` | attractor |  | 0.020/0.000/0.042/0.114 | 0.090 | 0.125 | 3.235 | Thomas (0.097) |  | keep | | |
-| `attractor_thomasred` | attractor |  | 0.042/0.008/0.038/0.000 | 0.032 | 0.045 | 3.672 | Thomas (0.213) |  | retune | | |
+| `attractor_thomasgallery` | attractor |  | 0.020/0.000/0.042/0.114 | 0.090 | 0.125 | 3.235 | Thomas (0.097) |  | keep | Content-brief section 3, judged at the Phase 4 sitting: the owner kept this gallery as a world and cut the Clifford one. | |
+| `attractor_thomasred` | attractor |  | 0.042/0.008/0.038/0.000 | 0.032 | 0.045 | 3.672 | Thomas (0.213) |  | retune | | 9b70a9ee |
 | `attractor_torusknot` | attractor |  | 0.033/0.003/0.008/0.034 | 0.126 | 0.010 | 3.611 | Valentine (0.127) | header: ADR-0109: `beat_index` counts detections, not beats | cut | Near-twin of Valentine, the ledger's nearest shape. Its code references move to Lorenz Knot. | |
 | `attractor_valentine` | attractor |  | 0.026/0.026/0.048/0.023 | 0.034 | 0.043 | 4.525 | Butterfly to Knot (0.059) | NEAR-DUP ~ Lorenz Gallery (distinctness+report, shape 0.066); NEAR-DUP ~ Butterfly to Knot (distinctness+report, shape 0.059); NEAR-DUP ~ Rho Walk (distinctness+report, shape 0.064); header: ADR-0109: `beat_index` counts detections, not beats | cut | Does not follow the music. | |
 | `attractor_volute` | attractor |  | 0.048/0.041/0.006/0.021 | 0.065 | 0.010 | 5.179 | Thomas (0.166) |  | cut | Redundant with a stronger keep in its family. | |
@@ -345,7 +345,7 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 | `cellular_spiral_bloom` | cellular | yes | 0.000/0.169/0.053/0.000 | 0.274 | 0.148 | 1.624 | Wavefront (0.192) |  | retune | | 660333c1 |
 | `cellular_tide_bugs` | cellular |  | 0.381/0.000/0.000/0.000 | 0.360 | 0.058 | 1.273 | Ember Life (0.206) |  | keep | | |
 | `cellular_wavefront` | cellular |  | 0.114/0.055/0.110/0.000 | 0.291 | 0.084 | 1.597 | Ember Life (0.187) |  | keep | | |
-| `emitter_driftfield` | emitter | yes (new) | 0.021/0.001/0.000/0.000 | 0.019 | 0.004 | 2.759 | Petalfall (0.151) |  | retune | | |
+| `emitter_driftfield` | emitter | yes (new) | 0.021/0.001/0.000/0.000 | 0.019 | 0.004 | 2.759 | Petalfall (0.151) |  | retune | | 9b70a9ee |
 | `emitter_emberjet` | emitter |  | 0.044/0.002/0.002/0.000 | 0.059 | 0.006 | 3.448 | Perseids (0.123) |  | cut | Does not follow the music. | |
 | `emitter_heartfall` | emitter | yes | 0.016/0.000/0.000/0.085 | 0.130 | 0.073 | 0.926 | Petalfall (0.202) |  | keep | | |
 | `emitter_perseids` | emitter | yes | 0.050/0.012/0.000/0.022 | 0.065 | 0.024 | 1.645 | Ember Jet (0.123) |  | cut | Does not follow the music. | |
@@ -392,7 +392,7 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 | `reaction_verdigris` | reaction_diffusion |  | 0.052/0.014/0.008/0.008 | 0.068 | 0.018 | 6.356 | Flux Mono (0.250) |  | keep | | |
 | `collage_mono` | shape_collage | yes | 0.056/0.002/0.000/0.000 | 0.058 | 0.002 | 1.065 | Nocturne (0.240) |  | keep | | |
 | `collage_nocturne` | shape_collage |  | 0.055/0.002/0.002/0.029 | 0.065 | 0.016 | 1.755 | Suprematist (0.211) |  | cut | Redundant with a stronger keep in its family. | |
-| `collage_onwhite` | shape_collage |  | 0.037/0.002/0.003/0.000 | 0.039 | 0.021 | 1.887 | Suprematist (0.219) |  | retune | | |
+| `collage_onwhite` | shape_collage |  | 0.037/0.002/0.003/0.000 | 0.039 | 0.021 | 1.887 | Suprematist (0.219) |  | retune | | 9b70a9ee |
 | `collage_suprematist` | shape_collage | yes | 0.047/0.008/0.002/0.000 | 0.064 | 0.008 | 1.031 | Nocturne (0.211) |  | keep | | |
 | `shape_aperture` | shape_field |  | 0.070/0.106/0.030/0.040 | 0.164 | 0.031 | 3.406 | Strata Heart (0.231) |  | keep | | |
 | `shape_contourmono` | shape_field | yes | 0.457/0.000/0.467/0.642 | 0.367 | 0.159 | 1.283 | Aperture (0.256) |  | keep | | |
@@ -405,15 +405,15 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 | `shape_strataheart` | shape_field |  | 0.203/0.041/0.000/0.171 | 0.181 | 0.004 | 3.846 | Path Maple (0.199) |  | keep | Re-judged at the retune (Phase 4): the owner found it a little boring but right as it is, and it takes Pulse's guide card. | |
 | `spectrum_anemone` | spectrum | yes (new) | 0.032/0.013/0.005/0.049 | 0.056 | 0.008 | 0.820 | Radial Bloom (0.180) |  | keep | | |
 | `spectrum_metermono` | spectrum |  | 0.104/0.055/0.034/0.156 | 0.156 | 0.000 | 0.646 | Radial Bloom (0.101) |  | keep | | |
-| `spectrum_radialbloom` | spectrum |  | 0.050/0.081/0.063/0.199 | 0.173 | 0.000 | 2.719 | Meter Mono (0.101) |  | retune | | |
+| `spectrum_radialbloom` | spectrum |  | 0.050/0.081/0.063/0.199 | 0.173 | 0.000 | 2.719 | Meter Mono (0.101) |  | retune | | 9b70a9ee |
 | `spectrum_ridge` | spectrum | yes | 0.065/0.038/0.008/0.028 | 0.117 | 0.007 | 3.286 | Radial Bloom (0.126) |  | cut | Redundant with a stronger keep in its family. Its code references move to Skyline. | |
 | `spectrum_skyline` | spectrum | yes | 0.040/0.070/0.006/0.088 | 0.114 | 0.002 | 2.834 | Meter Mono (0.194) |  | keep | | |
 | `star_corona` | star_pattern | yes | 0.084/0.029/0.039/0.067 | 0.134 | 0.019 | 3.033 | Zellij (0.203) |  | keep | | |
 | `star_mandala_bordered` | star_pattern | yes | 0.104/0.097/0.040/0.007 | 0.158 | 0.069 | 1.046 | Zellij (0.190) |  | cut | Redundant with a stronger keep in its family. Its code references move to Rose Window. | |
-| `star_rosewindow` | star_pattern | yes (new) | 0.085/0.006/0.009/0.007 | 0.090 | 0.039 | 2.115 | Zellij (0.187) |  | keep | | |
+| `star_rosewindow` | star_pattern | yes (new) | 0.085/0.006/0.009/0.007 | 0.090 | 0.039 | 2.115 | Zellij (0.187) |  | keep | Content-brief section 5, judged in motion at the Phase 4 sitting: it still crops at every edge; a reframe at scale 0.66 was tried and the owner kept it as it is. | |
 | `star_zellij` | star_pattern |  | 0.085/0.047/0.057/0.021 | 0.106 | 0.043 | 1.008 | Rose Window (0.187) |  | cut | Redundant with a stronger keep in its family. | |
-| `swarm_braid` | swarm |  | 0.110/0.050/0.010/0.092 | 0.123 | 0.093 | 7.565 | Stipple (0.147) |  | keep | | |
-| `swarm_drift` | swarm | yes | 0.105/0.123/0.007/0.099 | 0.136 | 0.104 | 5.341 | Shatter (0.187) |  | retune | | |
+| `swarm_braid` | swarm | yes (new) | 0.110/0.050/0.010/0.092 | 0.123 | 0.093 | 7.565 | Stipple (0.147) |  | keep | Becomes a swarm representative when Drift is cut at the retune (Phase 4). | |
+| `swarm_drift` | swarm | yes | 0.105/0.123/0.007/0.099 | 0.136 | 0.104 | 5.341 | Shatter (0.187) |  | cut | Retired by the owner at the retune (Phase 4): still boring after a retune. Braid becomes a swarm representative and takes its test and docs roles. | c7a5913b |
 | `swarm_murmuration` | swarm | yes (new) | 0.055/0.070/0.042/0.060 | 0.128 | 0.105 | 7.007 | Stipple (0.125) |  | keep | | |
 | `swarm_shatter` | swarm |  | 0.099/0.064/0.013/0.106 | 0.103 | 0.092 | 4.635 | Braid (0.177) |  | cut | Redundant with a stronger keep in its family. Its code references move to Braid. | |
 | `swarm_stipple` | swarm | yes | 0.050/0.013/0.001/0.011 | 0.057 | 0.010 | 3.982 | Murmuration (0.125) |  | cut | Redundant with a stronger keep in its family. | |
@@ -479,7 +479,7 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 | 1 — The candidate sheet | human | done | `29994a84` |
 | 2 — The walk | human | done | `cbf4d37b`, `3adf77d6` |
 | 3 — The cull | dev | done | `bcdd5892` (last of the family commits listed in Notes) |
-| 4 — The retunes and the sittings | human | not started | |
+| 4 — The retunes and the sittings | human | done | many, one per family: see Notes |
 | 5 — The gap brief | human | not started | |
 | 6 — The first refill cohort | human | not started | |
 | 7 — The verdict | human | not started | |
@@ -516,6 +516,21 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
   headers. The done-when grep is on stems.
 - **`docs/content-brief.md`** records each retirement in §1, §2, §3 and §5. No item moved to
   `Done`; that is Phase 4's.
+- **Phase 4 ran in one owner sitting on 2026-09-30.** Every retune was loaded into a running
+  player on its own preset directory, edited live and judged by the owner before it landed; each
+  row's `commit` cell names its landing. Retirements at the retune: Loom (`20dfff85`, `03b87350`),
+  Vellum (`e2d90a14`, `d7d630c5`), Pulse (`a1d196e3`), Drift (`c7a5913b`), Clifford Gallery
+  (`66212420`). Two of those split across commits because a staged `git rm` rode into the
+  preceding commit. Kept on re-judging: Interference Mono, Sumi Mono, Strata Heart; Lace Grid
+  abandoned as boring.
+- **Guards moved in Phase 4:** `sanity.rs`'s `ShapeCollage` coverage floor 0.13 -> 0.027 (On White
+  cut to five-to-seven forms by the owner, 0.0556); `preset_check.rs`'s corpus-walk floor 100 ->
+  50; `render/tests.rs`'s capture test `Drift` -> `Braid`; `attractor.rs`'s `MAP_2D` `Ink on
+  Paper` -> `De Jong Walk`, because Ink on Paper moved to the Thomas family.
+- **Content brief:** all six sittings are in `Done`. Section 4 was closed by the owner as
+  answered by the walk; backlog 0038 is still live on `main` and wants archiving at the close.
+  Section 6's strobe probes no longer existed and were rebuilt from Strata Heart. The Phase 1
+  workaround check: Dragon's header already said why its clause stays, and Walk De Jong's now does.
 - **Skill-reference hits for Phase 4** (`git grep -n -w <stem> -- .claude`), with replacement text:
   - `.claude/skills/architect/SKILL.md:650` (`emitter_perseids.toml:7`) — a step 3b historical
     example; stays as written.
