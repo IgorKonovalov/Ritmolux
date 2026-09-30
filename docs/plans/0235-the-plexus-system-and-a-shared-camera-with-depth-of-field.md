@@ -1,6 +1,6 @@
 # 0235 — The plexus system, and a shared camera with depth of field
 
-> **Status:** draft
+> **Status:** approved (2026-09-30; run by hand in ordinary sessions, not queued for the conductor)
 > **Created:** 2026-09-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md) (proposed), [ADR-0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0256](../adrs/0256-a-parameter-declares-its-group-and-whether-it-is-main.md)
