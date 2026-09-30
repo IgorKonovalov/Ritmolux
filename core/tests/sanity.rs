@@ -382,7 +382,12 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // large drop and it costs nothing the shells do not already catch: a
         // broken field scores near zero at zero shells and is convicted, while
         // `Tiled Rosette` was already riding the structural rescue at 9/10.
-        SystemKind::FragmentField => 0.08,
+        //
+        // Re-derived 2026-09-30 (Plan 0232 Phase 3) from 0.08. `Tiled Rosette`
+        // was retired, and the family minimum moved to `Drift Mono` at 0.4274,
+        // which left the old floor 5.34x below it — over this file's 2.2x
+        // slack. Half of that minimum.
+        SystemKind::FragmentField => 0.21,
         // A dense point cloud that fills the frame far more than "sparse points"
         // suggested — the old 0.01 was 84x below the thinnest of the three.
         // Re-derived 2026-08-27 (Plan 0122 Phase 5) from 0.28, which the slack
