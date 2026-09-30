@@ -171,7 +171,7 @@ import { basename, relative, resolve, sep } from "node:path";
 // third of a page column, and over a hundred of them at full size would put tens of
 // megabytes of derived PNG into the repository for detail no reader can see.
 const CARD_SIZE = "640x360";
-const CARD_HOP_OVERRIDES = { swarm_braid: 374, swarm_drift: 374 };
+const CARD_HOP_OVERRIDES = { swarm_braid: 374 };
 
 /// The clip `shot` synthesizes when `--signal-secs` is absent — `SIGNAL_SECS` in
 /// standalone/src/shot/args.rs — and the analysis-hop arithmetic every `hop`
@@ -315,9 +315,8 @@ const CARDS = [
   // star_pattern (2)
   "star_corona",
   "star_rosewindow",
-  // swarm (3)
+  // swarm (2)
   "swarm_braid",
-  "swarm_drift",
   "swarm_murmuration",
   // warp_mesh (4)
   "warp_ladder",
@@ -444,9 +443,9 @@ const IMAGES = [
   {
     // swarm — UNJUDGED. The world judged into this slot at the Plan 0088 close
     // was retired at the Plan 0232 walk; `swarm_braid` is the survivor that walk
-    // named for its references. swarm_drift held the slot before and lost it
-    // for a reason no column measures: drift is charcoal on black and collapses
-    // to a dark rectangle at README column width.
+    // named for its references. A since-retired charcoal-on-black swarm held the
+    // slot before and lost it because it collapsed to a dark rectangle at
+    // README column width.
     //
     // The hop is still NOT 300, and for drift's original reason: a swarm is a
     // MOTION, and at full energy it photographs as uniform noise. 374 is inside

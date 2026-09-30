@@ -43,12 +43,12 @@ the one place it is maintained; this document does not duplicate it.
    standalone app and the foobar2000 plugin read this same folder — it is seeded
    with the curated set on first run.
 
-2. **Copy an existing preset** as a starting point. `swarm_drift.toml` (a calm
+2. **Copy an existing preset** as a starting point. `swarm_braid.toml` (a calm
    particle swarm) and `fragment_whorl.toml` (a slow warp field) are the
    friendliest bases:
 
    ```
-   copy swarm_drift.toml   my_first.toml
+   copy swarm_braid.toml   my_first.toml
    ```
 
 3. **Edit the bindings.** Open `my_first.toml` and change an expression — for

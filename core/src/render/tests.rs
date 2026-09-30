@@ -582,7 +582,7 @@ fn analysis_metrics_follow_the_drawn_frame() {
 }
 
 /// Phase 2 (Plan 0013): `capture_preset` is a pure function of
-/// `(name, frame, frames)`. Uses the stateful swarm preset "Drift" — the
+/// `(name, frame, frames)`. Uses the stateful swarm preset "Braid" — the
 /// case where a missing state reset would leak history — to prove two
 /// captures are byte-identical, that N=1 differs from N=120 (the scene
 /// animates), and that an unknown name is a clean error.
@@ -598,19 +598,19 @@ fn capture_preset_is_deterministic_and_animates() {
     let frame = AnalysisFrame::default();
 
     let a = renderer
-        .capture_preset("Drift", &frame, 120)
-        .expect("capture Drift @120");
+        .capture_preset("Braid", &frame, 120)
+        .expect("capture Braid @120");
     let b = renderer
-        .capture_preset("Drift", &frame, 120)
-        .expect("recapture Drift @120");
+        .capture_preset("Braid", &frame, 120)
+        .expect("recapture Braid @120");
     assert_eq!(
         a.rgba, b.rgba,
         "same (preset, frame, N) is byte-identical across calls"
     );
 
     let one = renderer
-        .capture_preset("Drift", &frame, 1)
-        .expect("capture Drift @1");
+        .capture_preset("Braid", &frame, 1)
+        .expect("capture Braid @1");
     assert_ne!(
         one.rgba, a.rgba,
         "N=1 differs from N=120 — the scene advances over time"

@@ -1285,7 +1285,7 @@ so a very large window resolves the attractor alone slightly finer.
 distinct streams a frame can hold. The scene steers every particle by a scalar
 potential sampled at `world * field_freq`, so it sets the size of a current
 relative to the frame. Default `2.3`, which is the constant it replaced — a preset
-that does not bind it is unchanged. Measured across the range on `Drift`:
+that does not bind it is unchanged. Measured across the range on a since-retired swarm:
 
 | value | what the frame does |
 |---|---|
@@ -1310,11 +1310,10 @@ the same shape `fragment_field`'s
 [`field_speed` / `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed),
 `warp_mesh`'s `warp_speed` and `parametric_curve`'s `spin` take — so it is safe to
 bind to audio. A rate that instead *multiplied* the shared clock is what makes this
-matter: `swarm_drift` binds `spin` to `mid`, and under that older form a `0.75` swing a
+matter: a since-retired swarm bound `spin` to `mid`, and under that older form a `0.75` swing a
 hundred seconds into a set advanced the field clock about **four seconds in one frame**
 against a nominal `0.019` — a re-roll of the whole field, growing without bound as a set
-runs. The world is tuned for the integrated form, so a `spin` range lifted from its file
-is a range for what ships.
+runs. Every shipped swarm is tuned for the integrated form.
 
 The swarm's marks individuate the way the emitter's do —
 same names, same semantics (see [Individuation](#individuation--the-distribution-params)).
@@ -1347,7 +1346,7 @@ the camera is usable down to about **`0.84`**. Note that figure is the *near dep
 layer's*, not the domain's: `1.25 * zoom` alone would reach the frame edge at
 `0.80`, but the near layer takes 1.25x of the zoom deflection too, so it is the
 first thing to show an edge and it does so at `1.25 * (1 + (zoom - 1) * 1.25) = 1`.
-Pan pulls that further up — see the arithmetic in `swarm_drift.toml`.
+Pan pulls that further up.
 
 And **every particle carries a depth**, 0 far to 1 near, fixed for its life from
 the seeded scatter. It scales the sprite (0.55x–1.5x), fades brightness with
@@ -5385,7 +5384,6 @@ Presets worth reading as **worked examples** of one control each:
 
 | Preset | Shows |
 |--------|-------|
-| `swarm_drift` | the shared view **zoom** breathing with the music |
 | `attractor_dragon` | a scene over a vignetted **background** gradient (`bg_*`), and an onset-latched structural re-cut (`hash(floor(beat_index * 0.25))`) |
 | `fragment_tiledmono` | the screen-space **kaleidoscope** folding a field into a figure, printed in a **limited ink set** — `palette_steps` as a hard quantizer with the stops written as plateaus, and the whites driven into the tonemap shoulder so the scene shader's built-in radial vignette stops reading as shading |
 | `attractor_clifford` | **feedback trails** stretching a figure into a long exposure |

@@ -48,6 +48,7 @@
 # to stay alive would die in a quiet passage.
 system = "swarm"
 name   = "Braid"
+representative = true
 
 [palette]
 stops = [
@@ -67,11 +68,11 @@ stops = [
 # a fixed 6.4 and a one-signed 0.03, this world COLLAPSED: `shot --horizon 10`
 # at bass 0.6 / mid 0.45 took coverage from 0.5647 to 0.0002 and peak/mean from
 # 6.7 to 4608 - the whole population converged onto the field's attracting
-# streamlines, then onto points on them, and the frame went empty. The shipped
-# `swarm_drift`, run identically as a control, held coverage 0.910 to 0.948, so
-# the collapse was this world's and not the family's. What separates them is
-# that Drift's two structural params both TRAVEL: its field breathes and its
-# `spin` crosses zero and reverses. A high `field_freq` converges faster than a
+# streamlines, then onto points on them, and the frame went empty. The then-shipped
+# `swarm_drift` (since retired), run identically as a control, held coverage 0.910
+# to 0.948, so the collapse was this world's and not the family's. What separated
+# them is that Drift's two structural params both TRAVELLED: its field breathed and its
+# `spin` crossed zero and reversed. A high `field_freq` converges faster than a
 # low one - thin streamlines are exactly what it is for - so at this end of the
 # range the field has to keep being rewritten or the ribbons become beads.
 #

@@ -73,14 +73,14 @@ fn the_wrap_seam_projects_outside_the_visible_frame() {
     // The family's working range (Plan 0043 Phase 1).
     const ZOOMS: [f32; 4] = [1.0, 1.1, 1.2, 1.3];
     /// The range the **shipped** presets actually reach, which starts *below* 1:
-    /// `swarm_drift.toml` binds `zoom = "1.04 + sin(...) * 0.05 + ..."`, so it
-    /// bottoms out just under 1 and a guard starting at 1.0 leaves the shipped
+    /// a since-retired swarm bound `zoom = "1.04 + sin(...) * 0.05 + ..."`, so it
+    /// bottomed out just under 1 and a guard starting at 1.0 leaves the shipped
     /// minimum unmeasured (Plan 0043 close review). Used for the concrete block
     /// below, not the general one — "clears by at least `headroom`" is a
     /// `zoom >= 1` property by construction, while "clears at all" is the claim
     /// that has to hold everywhere the family goes.
     const SHIPPED_ZOOMS: [f32; 5] = [0.99, 1.0, 1.1, 1.2, 1.3];
-    /// The largest `pan_*` amplitude any surviving preset binds (Drift's `pan_x`).
+    /// The largest `pan_*` amplitude any surviving preset binds (a since-retired swarm's `pan_x`).
     /// A future preset that pans further or zooms lower has to widen these two —
     /// which is why they say where they come from.
     const PAN: f32 = 0.16;
