@@ -1,10 +1,11 @@
 .map {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-0);
   padding: 10px 12px;
   border: 1px solid var(--panel-edge);
-  border-radius: 4px;
+  border-radius: var(--radius);
+  background: var(--scanlines), var(--panel);
 }
 
 .heading {
@@ -16,14 +17,14 @@
 }
 
 .doc {
-  margin: 0 0 4px;
+  margin: 0 0 var(--space-0);
   color: var(--text-dim);
   font-size: 11px;
   line-height: 1.5;
 }
 
 .empty {
-  margin: 0 0 4px;
+  margin: 0 0 var(--space-0);
   color: var(--text-dim);
   font-family: var(--mono);
   font-size: 11px;
@@ -33,14 +34,14 @@
 .add {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: var(--space-1);
   align-items: center;
 }
 
 .add {
   margin-top: 6px;
-  padding-top: 8px;
-  border-top: 1px solid var(--panel-edge);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--control-edge);
 }
 
 .name {
@@ -58,11 +59,11 @@
 .remove,
 .addButton {
   background: none;
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   color: var(--text-dim);
   font-size: 11px;
-  padding: 2px 8px;
+  padding: 2px var(--space-1);
   cursor: pointer;
 }
 

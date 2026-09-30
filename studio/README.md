@@ -142,8 +142,9 @@ window, which is what they are for.
 | ------------ | ----------------------------- | ---------------------------------------------------------------- |
 | `playerPath` | path                          | An explicit player binary, second in the resolution order above  |
 | `playerMode` | `windowed` or `windowless`    | Which sink the player is spawned with, read at spawn (ADR-0186)  |
+| `ui`         | `{ "reducedMotion": bool }`   | `reducedMotion` (default `false`) stops the window's transitions; applied at once |
 
-Both are optional, and a file that is missing, is not JSON, or carries a key of
+All are optional, and a file that is missing, is not JSON, or carries a key of
 the wrong shape degrades to "no setting" rather than failing the launch — the
 resolution order has two other roots and the mode has a default.
 

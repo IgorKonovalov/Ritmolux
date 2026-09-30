@@ -446,7 +446,7 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | 7 — Binding table, help, hint | dev | done | fb237a6c |
 | 8 — Parameter group and main (F2, engine) | dev | done | d9ddfe12 |
 | 9 — foobar component takes the look | dev | done | committed with this row |
-| 10 — Studio tokens and motion | studio-builder | not started | |
+| 10 — Studio tokens and motion | studio-builder | done | committed with this row |
 | 11 — Studio workflow fixes | studio-builder | not started | |
 | 12 — Before and after on devices | human | not started | |
 
@@ -565,6 +565,26 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   The placeholder fills with `panel`'s colour at full opacity (GDI has no scene to blend over) and
   draws its text in `accent`. The stock black brush remains the fallback if the brush cannot be
   created.
+- Phase 10, shape. `styles.css` `@import`s `tokens.css` and derives only from it: `--control-edge`
+  (the `trough` role) for control borders and dividers, so the amber lit edge (`panel-edge`) is on
+  panels only; `--control-radius` (half the theme radius); `--scanlines`, a repeating gradient laid
+  over every panel's fill at the theme's pitch. The selected Library row and the open tab take
+  `highlight` plus an accent bar, as the standalone's browser does. Motion is two keyframes
+  (`rlx-enter`, `rlx-fade`) on the theme's `--motion-*` and `--ease`: a tab's pane, the Settings
+  panel, a banner, the problems modal and the fork prompt play them on mount; controls transition
+  colour and border. `ui.reducedMotion` or `prefers-reduced-motion` zeroes the two duration tokens,
+  so every one becomes a step.
+- Phase 10, the setting. `ui.reducedMotion` travels on a new OS channel, `app:set-reduced-motion`,
+  beside `app:set-player-mode`; it is applied at once as `data-motion` on the root, after the file
+  took it. `main.ts`'s settings became session state that each setter replaces, so a second write
+  in one session keeps the first. The two hard-coded hex values left in the modules (the preview's
+  `#000` letterbox, the system picker's dark text on `warn`) now read `bg`.
+- Phase 10, done-when. `npm run ui-shots -- --player target/debug/ritmolux` captured all 16
+  states; they show look A. The walk's 800 ms settle is longer than the 320 ms motion, so the
+  captures are of settled states. Files outside the list: `studio/electron/{main.ts,
+  ipc/appHandlers.ts, preload/api/app.ts, settings.test.ts}`, `studio/shared/ipc-channels.ts`,
+  `studio/renderer/{App.tsx, App.test.tsx, views/Settings.test.tsx}` and `studio/README.md` (the
+  settings table, held to `StudioSettings` by `settings.doc.test.ts`).
 
 ### Close triggers
 

@@ -1,9 +1,9 @@
 .table {
   border: 1px solid var(--panel-edge);
-  border-radius: 4px;
-  background: var(--panel);
+  border-radius: var(--radius);
+  background: var(--scanlines), var(--panel);
   margin-bottom: 0.6rem;
-  padding: 0.5rem 0.75rem 0.6rem;
+  padding: var(--space-1) 0.75rem 0.6rem;
 }
 
 .heading {
@@ -20,7 +20,7 @@
   display: grid;
   grid-template-columns: minmax(6rem, 10rem) 1fr auto;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-1);
   padding: 0.12rem 0;
 }
 
@@ -34,13 +34,17 @@
 
 .control {
   background: var(--bg);
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   color: var(--text);
   font-family: inherit;
   font-size: 0.75rem;
   padding: 0.15rem 0.3rem;
   width: 100%;
+}
+
+.control:hover:enabled {
+  border-color: var(--accent);
 }
 
 .control:disabled {

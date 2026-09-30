@@ -23,6 +23,10 @@ export interface SettingsProps {
   playerPath: string | undefined
   playerSource: string | undefined
   studioVersion: string
+  /** `ui.reducedMotion` as it applies now. */
+  reducedMotion: boolean
+  /** Apply a new `ui.reducedMotion` to the window; called once the file took it. */
+  onReducedMotion: (on: boolean) => void
   onClose: () => void
 }
 
@@ -38,6 +42,8 @@ export function Settings({
   playerPath,
   playerSource,
   studioVersion,
+  reducedMotion,
+  onReducedMotion,
   onClose,
 }: SettingsProps): JSX.Element {
   /**
@@ -50,7 +56,17 @@ export function Settings({
    */
   const [picked, setPicked] = useState<PlayerMode>()
   const [problem, setProblem] = useState<string>()
+  const [motionProblem, setMotionProblem] = useState<string>()
   const chosen = picked ?? running
+
+  const setMotion = (on: boolean): void => {
+    void window.api.app.setReducedMotion(on).then((result) => {
+      // Applied only once the file took it, so the window never shows a choice
+      // the next launch will not read.
+      if (result.ok) onReducedMotion(on)
+      setMotionProblem(result.ok ? undefined : result.reason)
+    })
+  }
 
   const choose = (mode: PlayerMode): void => {
     setPicked(mode)
@@ -93,6 +109,29 @@ export function Settings({
         {problem !== undefined && (
           <p className={styles.problem} role="alert">
             The setting was not written: {problem}
+          </p>
+        )}
+      </fieldset>
+
+      <fieldset className={styles.group}>
+        <legend className={styles.legend}>Motion</legend>
+        <label className={styles.choice}>
+          <input
+            type="checkbox"
+            name="reduced-motion"
+            checked={reducedMotion}
+            onChange={(event) => setMotion(event.target.checked)}
+          />
+          <span className={styles.choiceName}>reduce motion</span>
+          <span className={styles.choiceDoc}>
+            Panels, tabs and dialogs appear at once instead of fading in. The system&apos;s own
+            reduced-motion preference does the same whatever this says. Saved as{' '}
+            <code>ui.reducedMotion</code> and applied now.
+          </span>
+        </label>
+        {motionProblem !== undefined && (
+          <p className={styles.problem} role="alert">
+            The setting was not written: {motionProblem}
           </p>
         )}
       </fieldset>

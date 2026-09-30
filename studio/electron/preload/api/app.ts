@@ -11,6 +11,7 @@ export interface AppInfo {
   playerSource: string | undefined
   settingsFile: string
   playerMode: PlayerMode
+  reducedMotion: boolean
 }
 
 export const appApi = {
@@ -29,4 +30,8 @@ export const appApi = {
    */
   setPlayerMode: (mode: PlayerMode): Promise<SettingsResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.APP_SET_PLAYER_MODE, mode) as Promise<SettingsResult>,
+
+  /** Remember `ui.reducedMotion`. The renderer applies it; nothing restarts. */
+  setReducedMotion: (on: boolean): Promise<SettingsResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.APP_SET_REDUCED_MOTION, on) as Promise<SettingsResult>,
 }

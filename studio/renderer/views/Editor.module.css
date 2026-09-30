@@ -11,8 +11,8 @@
   font-size: 0.72rem;
   line-height: 1.4;
   margin: 0;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--panel-edge);
+  padding: var(--space-1) 0.75rem;
+  border-bottom: 1px solid var(--control-edge);
 }
 
 .note {
@@ -27,33 +27,43 @@
 
 .tabs {
   display: flex;
-  gap: 0.25rem;
-  padding: 0.4rem 0.5rem 0;
+  gap: var(--space-0);
+  padding: 0.4rem var(--space-1) 0;
+  border-bottom: 1px solid var(--control-edge);
 }
 
+/* The open tab is marked the way the standalone marks a selected row: the
+   highlight fill, and an accent bar - here along the tab's lower edge. */
 .tab,
 .tabOn {
   background: none;
-  border: 1px solid transparent;
-  border-radius: 3px 3px 0 0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--control-radius) var(--control-radius) 0 0;
   color: var(--text-dim);
   cursor: pointer;
   font-family: inherit;
   font-size: 0.7rem;
   letter-spacing: 0.06em;
-  padding: 0.25rem 0.6rem;
+  padding: var(--space-0) 0.6rem;
   text-transform: uppercase;
 }
 
-.tabOn {
-  background: var(--panel);
-  border-color: var(--panel-edge);
+.tab:hover {
   color: var(--text);
 }
 
+.tabOn {
+  background: var(--highlight);
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Each tab's pane mounts when it opens, so the arrival plays on every switch. */
 .pane {
   flex: 1;
   min-height: 0;
   padding: 0.75rem;
   overflow-y: auto;
+  animation: rlx-enter var(--motion-long) var(--ease);
 }

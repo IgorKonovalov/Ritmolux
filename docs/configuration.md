@@ -643,6 +643,15 @@ menu or a panel is an editor of that file.
 can read it, and `scripts/check-settings-have-files.mjs` is what holds that to being a property
 rather than a habit.
 
+| Key | Values | Default | What it does |
+|---|---|---|---|
+| `playerPath` | a path | none | An explicit player binary, tried after the bundled one and before `PATH` |
+| `playerMode` | `windowed`, `windowless` | `windowed` | Which sink the player is spawned with; read at spawn |
+| `ui.reducedMotion` | `true`, `false` | `false` | Stops the studio's transitions: panels, tabs and dialogs appear at once. Applied the moment the Settings view writes it. The system's own reduced-motion preference does the same whatever this says |
+
+The studio's Settings view edits the last two and shows the first; a `settings.json` written by hand
+before the first launch is read the same way.
+
 **The foobar2000 component has no settings and no file**, and the one thing it stores host-side is
 not one. `g_cfg_preset` is a `cfg_string` holding the **name** of the preset that was last on
 screen, so a session reopens on the look it closed with. That is **resume state, not a setting**:
