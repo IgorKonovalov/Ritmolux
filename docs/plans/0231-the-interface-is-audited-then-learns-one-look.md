@@ -5,6 +5,7 @@
 > **Created:** 2026-09-27
 > **Owner skill(s):** dev, studio-builder, human
 > **Related ADRs:** [0252](../adrs/0252-the-interfaces-look-is-declared-once-in-the-core-and-the-studios-stylesheet-is-generated-from-it.md) (proposed),
+> [0256](../adrs/0256-a-parameter-declares-its-group-and-whether-it-is-main.md) (proposed, from the audit),
 > [0240](../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md),
 > [0009](../adrs/0009-glyphon-text-rendering.md),
 > [0143](../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md),
@@ -103,6 +104,53 @@ flowchart LR
     T -. "RLX_UPDATE_UI_TOKENS=1<br/>ui_tokens.rs gate" .-> CSS --> V
     KM --> OV
 ```
+
+## Audit findings
+
+Phase 3, 2026-09-30. The owner walked the standalone (a first launch from an empty data folder) and the
+studio live, on the Arch box, with the Phase 1-2 captures (`target/ui-audit/`) as the shared reference.
+An architect session proposed findings from the captures, and the owner confirmed, rejected or added
+to them. The owner's own words are quoted.
+
+| # | Surface | Task | Finding | Severity | Owner phase |
+|---|---|---|---|---|---|
+| F1 | standalone | browse, settings | *"when settings or list of presets are opened - it is hard to see on light background. it needs some form of semi transparent box behind"*. The same in the captures: the browser's second column vanishes over a bright figure. | major | 5 |
+| F2 | studio | edit a parameter | *"a lot of parameters all on display all the time ... derive main ones and hide secondary under some accordions"*. The owner chose both halves: the parameters a preset binds on top, the rest in engine-declared groups, collapsed (ADR-0256). | major | 8 (engine), 11 (studio) |
+| F3 | standalone | find a preset | Names are cut off by a width guess ("Iris Bloom Kale...", "Star Mandala Bo...") with room to spare. Confirmed by the owner. | minor | 5 |
+| F4 | standalone | first launch, read the keys | Nothing on screen says `Tab`, `S` or `C` exist; the only hint is inside the browser once open. Confirmed by the owner. | minor | 7 |
+
+**Declined by the owner**, who found the standalone's workflow *"fine"*, and raised nothing further in
+the studio:
+
+- Phase 8's drafted standalone candidates: settings sections with file keys, an empty-filter state, an
+  input-gone cue, and a marks filter.
+- Phase 11's drafted studio candidates: a shortcut sheet, Library and Problems empty states, and a fork
+  prompt shown before the first edit.
+- Six studio observations from the captures that the owner did not raise: full absolute paths, the
+  permanent problem banner, tiny low-contrast labels and truncated expressions, settings pushing the
+  preview down, raw TOML names on the Structure tab, and engineer-speak in the status bar. Look A's
+  type scale and contrast (Phase 10) touch some of them, and none is a phase's done-when.
+
+**Deferred:** the foobar2000 half of the task script (add the panel, pick a preset, the pop-out,
+reload). It needs Windows. So Phase 9 carries only the theme's values, and **the preferences-page
+question is declined for this plan** rather than decided without a walk.
+
+### The chosen direction: A, Amber phosphor
+
+Chosen by the owner from three drawn directions (`target/ui-audit/looks.png`: A Amber phosphor, B Cyan
+terminal, C Coral dusk), each shown as the same browser panel over the same bright scene. As values for
+ADR-0252's roles:
+
+| Role | Value |
+|---|---|
+| `panel` | `#11141a`, alpha 0.92 over the scene |
+| `panel_edge` | `accent` at alpha 0.43, 1 px |
+| `scanline` | black at alpha 0.06, every 4th line of a panel |
+| `text` | `#ece8e1` |
+| `text_dim` | `#a7acb5` |
+| `accent` | `#ffb454` |
+| `highlight` | `accent` at alpha 0.13 fill, with a 4 px `accent` bar at the row's left edge |
+| motion | one curve for every panel's open and close: 180 ms, ease-out with a short settle |
 
 ## Implementation phases
 
@@ -255,30 +303,36 @@ Order: `dev` (1), `studio-builder` (2), `human` (3), `dev` (4-9), `studio-builde
   - `--ui help` is added to Phase 1's state list and captures the sheet.
   - `README.md` and `docs/running.md` name `?`.
 
-### Phase 8 — Standalone workflow fixes (re-scoped by Phase 3)
+### Phase 8 — Each parameter declares its group and whether it is main (F2, engine half)
 - **Owner skill:** dev
-- **What:** The audit's standalone findings on workflow and discoverability. Candidates visible at
-  drafting, to be confirmed or cut by Phase 3:
-  - the settings menu grouped into sections, with each row's current value and its file key shown;
-  - an empty-filter and a no-match state in the browser;
-  - a visible cue when the input goes away;
-  - marks given a filter of their own in the browser.
-- **Files touched:** set by Phase 3's amendment.
-- **Done when:** set by Phase 3's amendment. Each finding it owns is visible in a Phase 1 capture or
-  held by a test.
+- **Amended by Phase 3 (2026-09-30).** The owner found the standalone's workflow fine, so the drafted
+  candidates are declined; this phase carries the engine half of F2 instead (ADR-0256).
+- **What:** `ParamSpec` in `core/src/render/scenes/mod.rs` gains `group` (`Shape`, `Motion`,
+  `Colour`, `Light`, `Post`) and `main` (a boolean), both required. Every scene's declarations and the
+  engine-wide stages' declarations state both. `ritmolux --schema` exports them, and
+  `docs/specs/player-schema.json` and `docs/specs/0003-studio-control-protocol.md` record the widened
+  shape. The generated parameter reference in `presets/README.md` prints each parameter's group,
+  regenerated with `RLX_UPDATE_PARAM_REFERENCE=1`.
+- **Files touched:** `core/src/render/scenes/mod.rs`, every scene's parameter declarations under
+  `core/src/render/scenes/**`, `core/src/render/{background,trails,kaleidoscope,bloom,tonemap,ink}.rs`,
+  `core/src/render/post.rs`, the schema export in `standalone/src/`, `docs/specs/player-schema.json`,
+  `docs/specs/0003-studio-control-protocol.md`, `presets/README.md` (regenerated).
+- **Done when:** the workspace compiles, which proves every declaration states both fields; a test
+  asserts every system has at least one `main` parameter; `ritmolux --schema` output carries `group`
+  and `main` for every parameter, asserted by a test over the export; and the parameter-reference and
+  preset-schema gates pass on the regenerated files.
 
-### Phase 9 — The foobar component (re-scoped by Phase 3)
+### Phase 9 — The foobar component takes the look (deferred audit)
 - **Owner skill:** dev
-- **What:** The audit's foobar findings. Visible at drafting:
-  - the right-click menu is reordered and grouped (presets first, then view, then maintenance);
-  - the GDI placeholder takes the theme's neutral and accent (hand-copied values, noted as outside
-    ADR-0252's gate);
-  - Phase 3 decides whether a preferences page exists. If it does, it is an editor of the plugin's
-    `config.toml` keys, per ADR-0240.
-- **Files touched:** `plugin-foobar/host_window.cpp`, `plugin-foobar/foo_ritmolux.cpp`, and more if
-  Phase 3 adds a page. Also `docs/configuration.md` if keys are added.
-- **Done when:** set by Phase 3's amendment. At minimum, the menu order matches the amendment and the
-  plugin builds under `plugin-foobar/build.ps1` in CI's `foobar` job.
+- **Amended by Phase 3 (2026-09-30).** The foobar half of the audit was deferred, because it needs
+  Windows. So this phase carries the look and nothing the audit did not see. The menu reorder and the
+  preferences page are **declined for this plan**.
+- **What:** The GDI placeholder takes look A's `panel` and `accent`, as hand-copied values with a
+  comment naming them as outside ADR-0252's gate. The banner and diagnostics the core draws follow the
+  theme through Phase 4 with no plugin change.
+- **Files touched:** `plugin-foobar/host_window.cpp`.
+- **Done when:** the placeholder's colours match look A's table, and the plugin builds in CI's `foobar`
+  job.
 
 ### Phase 10 — The studio takes the tokens, and moves
 - **Owner skill:** studio-builder
@@ -300,16 +354,21 @@ Order: `dev` (1), `studio-builder` (2), `human` (3), `dev` (4-9), `studio-builde
   - The studio's typecheck, lint and tests are green.
   - `docs/configuration.md` carries `ui.reducedMotion`.
 
-### Phase 11 — Studio workflow fixes (re-scoped by Phase 3)
+### Phase 11 — The parameter panel shows the bound ones first, and groups the rest (F2, studio half)
 - **Owner skill:** studio-builder
-- **What:** The audit's studio findings on workflow and discoverability. Candidates visible at
-  drafting:
-  - a shortcut sheet matching the standalone's `?`;
-  - empty states for the Library and the ProblemsModal;
-  - the fork-on-first-touch prompt made legible before the first edit rather than on it.
-- **Files touched:** set by Phase 3's amendment.
-- **Done when:** set by Phase 3's amendment. Each finding it owns is visible in a Phase 2 capture or
-  held by a vitest.
+- **Amended by Phase 3 (2026-09-30).** The drafted candidates are declined; this phase carries the
+  studio half of F2 (ADR-0256).
+- **What:** The Parameters tab lists the parameters the preset binds first, always open. Below them,
+  every unbound parameter sits in a collapsed accordion per `group` from the schema, in the order
+  Shape, Motion, Colour, Light, Post, each headed with its count. Expanding a group shows its `main`
+  rows first. A group's open or closed state is momentary view state and owes no settings key
+  (ADR-0240). Binding a parameter moves its row up into the bound list.
+- **Files touched:** the Parameters view and its components under `studio/renderer/`, the schema type
+  in `studio/shared/`, and their vitests.
+- **Done when:** a vitest renders a preset binding three parameters and asserts exactly those three
+  appear above the groups, and that every other parameter sits in a collapsed group matching its
+  schema `group`; a second asserts expanding a group lists its `main` rows first; `npm run ui-shots`
+  shows the Parameters tab in the new layout; the studio's typecheck, lint and tests pass.
 
 ### Phase 12 — Before and after, judged on devices
 - **Owner skill:** human
