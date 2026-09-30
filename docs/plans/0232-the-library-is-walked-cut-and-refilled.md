@@ -176,18 +176,21 @@ working surface, and nowhere else fits it better.
     `docs/content-brief.md`;
   - `scripts/softness-sheets.mjs`, `scripts/docs-clip.mjs` and `tools/sd-filter/test_sd_filter.py`;
   - `presets/pending/README.md`;
-  - `.claude/skills/preset-author/references/systems.md` and the other preset-author references
-    that list what ships. A headless session cannot write under `.claude/` (ADR-0210), so `dev`
-    lists these hits in the log with the replacement text and the owner applies them. A skill line
-    that cites a preset as a **historical example**, such as the architect skill's step 3b, is a
-    record and stays as written.
+  - **Not the preset-author skill's references.** A headless session cannot write under the
+    skills directory (ADR-0210), and a phase that declares such a path never reaches one. So this
+    phase **greps** those references for each cut name, and writes every hit into the log with its
+    replacement text; Phase 4 applies them. <!-- claude-allow: Phase 3 only greps the skill references and writes no file there; Phase 4 declares the path and applies the edits --> A skill line that cites a preset as a **historical
+    example**, such as the architect skill's step 3b, is a record and stays as written.
+  - **Amended 2026-09-30 (architect):** the skill-reference edits moved to Phase 4, because the
+    conductor parks a phase whose files include that directory before it runs (`claude_dir`), which
+    stalled the whole cull on its smallest part.
 - **Done when:**
   - Each family's cuts land as **one commit per family**, and the message lists the ledger rows it
     executes.
   - For every cut name, `git grep -n -w <name>` hits only records and measurements:
     `docs/plans/**`, `docs/adrs/**`, `docs/design-backlog*.md`, `presets/proposed/ROSTER.md`,
-    `scripts/bench/results/**` (a dated sweep names what it measured), and the `.claude/` lines the
-    log hands to the owner.
+    `scripts/bench/results/**` (a dated sweep names what it measured), and the skill-reference lines
+    the log hands to Phase 4.
   - `cargo nextest run --workspace` is green, **the full run and not `-P fast`**, because the
     gallery-card hygiene test, the representative floor and the distinctness pair counts all live in
     different binaries.
@@ -204,7 +207,9 @@ working surface, and nowhere else fits it better.
   rather than judging (the `tuple` binding, and the `occlude` retune with backlog 0038). Each lands
   through the ADR-0081 route.
 - **Files touched:** `presets/*.toml`, their gallery PNGs where the look moved,
-  `docs/content-brief.md` (each sitting moves to `Done` with its date and a one-line verdict).
+  `docs/content-brief.md` (each sitting moves to `Done` with its date and a one-line verdict), and
+  `.claude/skills/preset-author/references/systems.md` with any other preset-author reference
+  Phase 3's log names, whose recorded replacement text is applied first, before any retune.
 - **Done when:**
   - Every `retune` row names its landing commit, or reads `abandoned: <reason>`.
   - Each retuned preset was rendered and looked at in the running app before it was committed.
