@@ -29,6 +29,7 @@
 
 use std::borrow::Cow;
 
+use super::panel::Panel;
 use super::theme::THEME;
 
 /// Seconds the banner takes to reach full opacity.
@@ -179,6 +180,30 @@ impl NowPlaying {
 
         [artist_line, title_line]
     }
+}
+
+/// The panel the banner's lines sit on, given each line's measured width, or
+/// `None` while the banner is invisible.
+///
+/// It fades with the text: the panel's alpha is the envelope the lines carry,
+/// so the backdrop never lingers after the words, or arrives before them.
+pub fn backdrop(lines: &[Option<BannerLine<'_>>; 2], widths: [f32; 2]) -> Option<Panel> {
+    let mut bounds: Option<(f32, f32, f32, f32, f32)> = None;
+    for (line, width) in lines.iter().zip(widths) {
+        let Some(line) = line else { continue };
+        let (x0, y0) = (line.x, line.y);
+        let (x1, y1) = (line.x + width, line.y + line.size * LINE_HEIGHT_RATIO);
+        let [_, _, _, alpha] = line.color;
+        bounds = Some(match bounds {
+            None => (x0, y0, x1, y1, alpha),
+            Some((a, b, c, d, e)) => (a.min(x0), b.min(y0), c.max(x1), d.max(y1), e.max(alpha)),
+        });
+    }
+    let (x0, y0, x1, y1, alpha) = bounds?;
+    Some(Panel {
+        alpha,
+        ..Panel::around(x0, y0, x1, y1, THEME.space[1])
+    })
 }
 
 /// The envelope: ramp in, hold, ramp out, then nothing. A pure function of
@@ -461,6 +486,25 @@ mod tests {
         // Clear of the top-left furniture the shell owns (the preset name at
         // y = 16 and the F3 panel below it).
         assert!(artist.y > h * 0.5, "the banner belongs in the lower half");
+    }
+
+    #[test]
+    fn the_backdrop_holds_both_lines_and_fades_with_them() {
+        let mut np = NowPlaying::default();
+        np.set("Artist - Title");
+        assert!(backdrop(&np.layout(1920.0, 1080.0), [0.0; 2]).is_none());
+
+        np.advance(FADE_IN_SECS / 2.0);
+        let lines = np.layout(1920.0, 1080.0);
+        let panel = backdrop(&lines, [120.0, 200.0]).unwrap();
+        let (artist, title) = (lines[0].as_ref().unwrap(), lines[1].as_ref().unwrap());
+        assert!(panel.x < artist.x && panel.y < artist.y);
+        assert!(panel.x + panel.w >= title.x + 200.0);
+        assert!(panel.y + panel.h >= title.y + title.size * LINE_HEIGHT_RATIO);
+        assert!(
+            (panel.alpha - np.alpha()).abs() < 1e-6,
+            "the backdrop's alpha is the envelope's"
+        );
     }
 
     #[test]

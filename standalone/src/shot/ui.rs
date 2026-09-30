@@ -16,12 +16,12 @@
 //! [`UiFrame::lines`], turns the diagnostics panel on when the state asks for it,
 //! and draws a still of the scene into [`UiFrame::still`].
 
-use rlx_core::render::now_playing::{FADE_IN_SECS, NowPlaying};
+use rlx_core::render::now_playing::{self, FADE_IN_SECS, NowPlaying};
 use rlx_core::render::{GridScale, Tier};
 
 use crate::config::{GridScaleChoice, InputMode, RotateOrder, RotateSource};
 use crate::console::{self, Line};
-use crate::overlay::{self, OverlayKey, OverlayState, Pane, Row};
+use crate::overlay::{self, Measure, OverlayKey, OverlayState, Pane, Row};
 use crate::settings::{SettingsKey, SettingsState, SettingsView, TierState};
 
 /// One interface state `--ui` can capture.
@@ -265,23 +265,33 @@ pub struct UiFrame {
 /// [`console::scale`], as the console window's are. The real console draws a
 /// letterboxed preview of the show behind them; the capture draws the scene
 /// full-frame instead.
-pub fn compose(state: UiState, width: f32, height: f32, preset: &str) -> UiFrame {
+///
+/// `measure` is the drawing surface's text measurement — the renderer's, in the
+/// example — which places the backdrops and cuts a name that overruns its slot.
+pub fn compose(
+    state: UiState,
+    width: f32,
+    height: f32,
+    preset: &str,
+    measure: &mut Measure<'_>,
+) -> UiFrame {
     let mut frame = UiFrame {
         lines: Vec::new(),
         diagnostics: false,
         still: None,
     };
-    let corner = |lines: &mut Vec<Line>| {
+    let corner = |lines: &mut Vec<Line>, measure: &mut Measure<'_>| {
         overlay::corner_lines(
             preset,
             true,
             false,
             overlay::next_rotation_line(Some(FIXTURE_NEXT_SECS), true),
+            measure,
             lines,
         );
     };
     match state {
-        UiState::Hud => corner(&mut frame.lines),
+        UiState::Hud => corner(&mut frame.lines, measure),
         UiState::Browse | UiState::BrowseFiltered | UiState::BrowseThumbs => {
             let rows = fixture_rows();
             let mut browse = OverlayState::new();
@@ -294,11 +304,11 @@ pub fn compose(state: UiState, width: f32, height: f32, preset: &str) -> UiFrame
             }
             let visible = browse.visible(&rows);
             let layout = overlay::layout(visible.len(), browse.highlight(), width, height);
-            overlay::browse_lines(&browse, &visible, &layout, &mut frame.lines);
+            overlay::browse_lines(&browse, &visible, &layout, measure, &mut frame.lines);
             let highlighted = visible.get(browse.highlight()).map(|(_, row)| row.name);
             if let (Some(pane), Some(name)) = (overlay::pane(width, height), highlighted) {
                 let shown = state == UiState::BrowseThumbs;
-                overlay::pane_lines(&pane, name, shown, &mut frame.lines);
+                overlay::pane_lines(&pane, name, shown, measure, &mut frame.lines);
                 frame.still = shown.then_some(pane);
             }
         }
@@ -306,20 +316,36 @@ pub fn compose(state: UiState, width: f32, height: f32, preset: &str) -> UiFrame
             let view = fixture_view();
             let mut settings = SettingsState::new();
             settings.handle_key(SettingsKey::Toggle, &view);
-            overlay::settings_lines(&settings, &view, &mut frame.lines);
+            overlay::settings_lines(&settings, &view, measure, &mut frame.lines);
         }
         UiState::Console => {
-            let mut lines =
-                console::standing_lines(preset, true, Some(FIXTURE_NEXT_UP), FIXTURE_DWELL);
+            let mut lines = console::standing_lines(
+                preset,
+                true,
+                Some(FIXTURE_NEXT_UP),
+                FIXTURE_DWELL,
+                measure,
+            );
             console::scale_lines(&mut lines, console::scale(height));
             frame.lines = lines;
         }
         UiState::Banner => {
-            corner(&mut frame.lines);
+            corner(&mut frame.lines, measure);
             let mut banner = NowPlaying::default();
             banner.set(FIXTURE_BANNER);
             banner.advance(FADE_IN_SECS);
-            for line in banner.layout(width, height).into_iter().flatten() {
+            // The backdrop the core puts under a live banner, which a headless
+            // capture never draws itself.
+            let layout = banner.layout(width, height);
+            let widths = layout
+                .each_ref()
+                .map(|line| line.as_ref().map_or(0.0, |l| measure(&l.text, l.size)));
+            if let Some(panel) = now_playing::backdrop(&layout, widths) {
+                frame
+                    .lines
+                    .push(Line::backdrop(panel.x, panel.y, panel.w, panel.h));
+            }
+            for line in layout.into_iter().flatten() {
                 frame.lines.push(Line::new(
                     line.text.into_owned(),
                     line.x,
@@ -346,6 +372,46 @@ mod tests {
     /// The pair ADR-0037 names: a mistake keyed to the wrong axis is invisible
     /// at the first and glaring at the second.
     const SIZES: [(f32, f32); 2] = [(1920.0, 1080.0), (1280.0, 800.0)];
+
+    /// Half an em per character: a stand-in for the renderer's measurement,
+    /// which nothing asserted here depends on.
+    fn compose(state: UiState, width: f32, height: f32, preset: &str) -> UiFrame {
+        super::compose(state, width, height, preset, &mut |text, size| {
+            text.chars().count() as f32 * size * 0.5
+        })
+    }
+
+    /// **Every state but the diagnostics line draws its text on a backdrop**,
+    /// and every text line of it lies inside one — the F1 finding, held as a
+    /// property of the composition rather than of a screenshot.
+    #[test]
+    fn every_state_puts_its_text_on_a_backdrop() {
+        for (w, h) in SIZES {
+            for state in UiState::ALL {
+                let frame = compose(state, w, h, "Aurora");
+                let panels: Vec<_> = frame.lines.iter().filter_map(Line::as_panel).collect();
+                if state == UiState::Diagnostics {
+                    continue;
+                }
+                assert!(
+                    !panels.is_empty(),
+                    "{} at {w}x{h} has no backdrop",
+                    state.name()
+                );
+                for line in frame.lines.iter().filter(|l| l.backdrop.is_none()) {
+                    let inside = panels.iter().any(|p| {
+                        line.x >= p.x && line.y >= p.y && line.x <= p.x + p.w && line.y <= p.y + p.h
+                    });
+                    assert!(
+                        inside,
+                        "{} at {w}x{h}: `{}` is not on a backdrop",
+                        state.name(),
+                        line.text
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn all_expands_to_every_state_in_order_and_names_parse_back() {
@@ -401,7 +467,7 @@ mod tests {
                         line.y
                     );
                     assert!(
-                        line.size > 0.0,
+                        line.size > 0.0 || line.backdrop.is_some(),
                         "{}: `{}` has no size",
                         state.name(),
                         line.text

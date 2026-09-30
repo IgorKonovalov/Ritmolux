@@ -16,8 +16,9 @@
 //! The console owns no state of its own yet — it is a second destination, not a
 //! second model.
 
-use rlx_core::render::TextRun;
+use rlx_core::render::text::LINE_HEIGHT_RATIO;
 use rlx_core::render::theme::THEME;
+use rlx_core::render::{Panel, TextRun};
 
 /// One positioned line of text, owned so the routing can move it between
 /// destinations without borrowing the roster it was built from.
@@ -25,6 +26,11 @@ use rlx_core::render::theme::THEME;
 /// The shape mirrors [`TextRun`] one field at a time; it exists because a
 /// `TextRun` borrows its `&str`, and routing decides a line's destination after
 /// the strings that back it are built.
+///
+/// **A line may instead be a backdrop** — the panel a block of text sits on —
+/// built by [`Line::backdrop`]. It travels with the text it backs: the routing,
+/// the console's scaling and every envelope treat it as one more line, so a
+/// panel can never land on one surface while its text lands on the other.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Line {
     pub text: String,
@@ -32,6 +38,10 @@ pub struct Line {
     pub y: f32,
     pub size: f32,
     pub color: [f32; 4],
+    /// `Some((width, height))` when this line is a backdrop rather than text.
+    /// Its opacity is `color`'s alpha, so an envelope that fades the text
+    /// fades the panel under it by the same step.
+    pub backdrop: Option<(f32, f32)>,
 }
 
 impl Line {
@@ -43,7 +53,42 @@ impl Line {
             y,
             size,
             color,
+            backdrop: None,
         }
+    }
+
+    /// A backdrop panel at `(x, y)`, `w` x `h` device pixels, in the theme's
+    /// panel roles.
+    pub fn backdrop(x: f32, y: f32, w: f32, h: f32) -> Self {
+        Self {
+            text: String::new(),
+            x,
+            y,
+            size: 0.0,
+            color: [1.0; 4],
+            backdrop: Some((w, h)),
+        }
+    }
+
+    /// The backdrop that holds the text lines of `lines` whose widths
+    /// `measure` reports, padded by the theme's small spacing step, or `None`
+    /// when there is no text among them.
+    pub fn backdrop_around(
+        lines: &[Line],
+        mut measure: impl FnMut(&str, f32) -> f32,
+    ) -> Option<Self> {
+        let mut bounds: Option<(f32, f32, f32, f32)> = None;
+        for line in lines.iter().filter(|l| l.backdrop.is_none()) {
+            let x1 = line.x + measure(&line.text, line.size);
+            let y1 = line.y + line.size * LINE_HEIGHT_RATIO;
+            bounds = Some(match bounds {
+                None => (line.x, line.y, x1, y1),
+                Some((a, b, c, d)) => (a.min(line.x), b.min(line.y), c.max(x1), d.max(y1)),
+            });
+        }
+        let (x0, y0, x1, y1) = bounds?;
+        let p = Panel::around(x0, y0, x1, y1, THEME.space[1]);
+        Some(Self::backdrop(p.x, p.y, p.w, p.h))
     }
 
     /// Borrow this line as a [`TextRun`] for the frame it is drawn in.
@@ -55,6 +100,15 @@ impl Line {
             size: self.size,
             color: self.color,
         }
+    }
+
+    /// This line as a [`Panel`], when it is a backdrop.
+    pub fn as_panel(&self) -> Option<Panel> {
+        let (w, h) = self.backdrop?;
+        Some(Panel {
+            alpha: self.color[3],
+            ..Panel::new(self.x, self.y, w, h)
+        })
     }
 }
 
@@ -68,15 +122,34 @@ pub struct FrameText {
 }
 
 impl FrameText {
-    /// The output's lines as borrowed runs, ready for `queue_text`.
+    /// The output's text lines as borrowed runs, ready for `queue_text`.
     pub fn output_runs(&self) -> Vec<TextRun<'_>> {
-        self.output.iter().map(Line::as_run).collect()
+        runs(&self.output)
     }
 
-    /// The console's lines as borrowed runs, ready for `present_aux`.
-    pub fn console_runs(&self) -> Vec<TextRun<'_>> {
-        self.console.iter().map(Line::as_run).collect()
+    /// The output's backdrops, ready for `queue_panels`.
+    pub fn output_panels(&self) -> Vec<Panel> {
+        self.output.iter().filter_map(Line::as_panel).collect()
     }
+
+    /// The console's text lines as borrowed runs, ready for `present_aux`.
+    pub fn console_runs(&self) -> Vec<TextRun<'_>> {
+        runs(&self.console)
+    }
+
+    /// The console's backdrops, ready for `present_aux`.
+    pub fn console_panels(&self) -> Vec<Panel> {
+        self.console.iter().filter_map(Line::as_panel).collect()
+    }
+}
+
+/// The text lines of `lines`, skipping backdrops.
+fn runs(lines: &[Line]) -> Vec<TextRun<'_>> {
+    lines
+        .iter()
+        .filter(|l| l.backdrop.is_none())
+        .map(Line::as_run)
+        .collect()
 }
 
 /// Whether the operator console is currently open.
@@ -185,6 +258,10 @@ pub fn scale_lines(lines: &mut [Line], s: f32) {
         line.x *= s;
         line.y *= s;
         line.size *= s;
+        if let Some((w, h)) = line.backdrop.as_mut() {
+            *w *= s;
+            *h *= s;
+        }
     }
 }
 
@@ -502,16 +579,18 @@ pub fn transport_lines(auto: bool) -> Vec<Line> {
 /// Drawn only while no modal is up — a browse list or a settings menu starts at
 /// the same inset, and the two overlap into an unreadable pile. Scaled onto the
 /// real window with the routed lines by one [`scale_lines`] call, so the header
-/// cannot drift off the rows.
+/// cannot drift off the rows. One backdrop holds the three, appended last.
 pub fn standing_lines(
     preset: &str,
     auto: bool,
     next: Option<&str>,
     dwell: (u32, u32),
+    measure: &mut crate::overlay::Measure<'_>,
 ) -> Vec<Line> {
     let mut lines = vec![header(preset)];
     lines.extend(transport_lines(auto));
     lines.push(staging_line(next, auto, dwell));
+    crate::overlay::push_backdrop(&mut lines, 0, measure);
     lines
 }
 

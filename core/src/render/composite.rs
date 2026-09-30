@@ -491,6 +491,12 @@ pub(super) fn encode_on_canvas(
         if text || image {
             // Load: composite over the scene already in the view.
             let mut pass = gpu::color_pass(encoder, "rlx-text-pass", view, wgpu::LoadOp::Load);
+            // Panels under everything: the picture sits on one, its caption
+            // over both.
+            if text_layer.has_panels() {
+                text_layer.render_panels(&mut pass);
+                draw_calls += 1;
+            }
             if image {
                 image_layer.render(&mut pass);
                 draw_calls += 1;

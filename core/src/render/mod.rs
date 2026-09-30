@@ -66,6 +66,9 @@ pub mod now_playing;
 pub mod overlay;
 mod overlay_font;
 pub mod palette;
+// The interface's backdrops. The rectangle type is in every build; the pass
+// that draws them is behind `text`, inside the text layer that records it.
+pub mod panel;
 // `pub(crate)` for the same reason the stage modules are: the preset loader's
 // typo check unions every global vocabulary, and since ADR-0085 one of them —
 // `occlude` — belongs to the chain rather than to a stage inside it.
@@ -106,13 +109,14 @@ use ink::Ink;
 use now_playing::NowPlaying;
 use overlay::Overlay;
 use palette::Palette;
+pub use panel::Panel;
 use post::PostChain;
 use scenes::Scene;
 pub use scenes::lines::CapOverflow;
 #[cfg(feature = "text")]
 use text::TextLayer;
 #[cfg(feature = "text")]
-pub use text::TextRun;
+pub use text::{TextMeasure, TextRun, fit_width};
 pub use tier::{GridScale, REFERENCE_PX, Tier, TierConfig, attractor_budget};
 use tonemap::Tonemap;
 use transition::{Blend, DEFAULT_DURATION_SECS, Transition, TransitionKind};
@@ -1201,9 +1205,13 @@ impl Renderer {
     /// [`aux_counts`](Self::aux_counts) is what makes such a reading
     /// distinguishable from a console that never presented at all.
     #[cfg(feature = "text")]
-    pub fn present_aux(&mut self, runs: &[TextRun<'_>]) -> Result<(), RenderError> {
+    pub fn present_aux(
+        &mut self,
+        runs: &[TextRun<'_>],
+        panels: &[Panel],
+    ) -> Result<(), RenderError> {
         match self.aux.as_mut() {
-            Some(aux) => aux.present(&self.ctx, runs, self.preview.target()),
+            Some(aux) => aux.present(&self.ctx, runs, panels, self.preview.target()),
             None => Ok(()),
         }
     }
@@ -1215,6 +1223,21 @@ impl Renderer {
     #[cfg(feature = "text")]
     pub fn queue_text(&mut self, runs: &[TextRun<'_>]) {
         self.text_layer.queue(runs);
+    }
+
+    /// Queue the panels the next frame's text sits on; replaced by each call
+    /// and cleared after each `render`, like [`queue_text`](Self::queue_text).
+    /// All of a frame's panels are one draw, under the picture and the text.
+    #[cfg(feature = "text")]
+    pub fn queue_panels(&mut self, panels: &[Panel]) {
+        self.text_layer.queue_panels(panels);
+    }
+
+    /// The laid-out width of `text` at `size` device pixels, shaped with the
+    /// same fonts the output's text is drawn with.
+    #[cfg(feature = "text")]
+    pub fn measure_text(&mut self, text: &str, size: f32) -> f32 {
+        self.text_layer.measure(text, size)
     }
 
     /// Set the one picture the shell may draw over the frame, or clear it with
@@ -1283,7 +1306,15 @@ impl Renderer {
             ..
         } = self;
         let (width, height) = (ctx.config.width as f32, ctx.config.height as f32);
-        for line in now_playing.layout(width, height).into_iter().flatten() {
+        let lines = now_playing.layout(width, height);
+        let widths = lines.each_ref().map(|line| {
+            line.as_ref()
+                .map_or(0.0, |l| text_layer.measure(&l.text, l.size))
+        });
+        if let Some(panel) = now_playing::backdrop(&lines, widths) {
+            text_layer.push_panel(panel);
+        }
+        for line in lines.into_iter().flatten() {
             text_layer.push(TextRun {
                 text: &line.text,
                 x: line.x,

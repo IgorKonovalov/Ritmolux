@@ -144,7 +144,14 @@ impl AppState {
                 h: pane.h,
             });
         }
-        overlay::pane_lines(&pane, name, shown, lines);
+        let renderer = &mut self.renderer;
+        overlay::pane_lines(
+            &pane,
+            name,
+            shown,
+            &mut |text, size| renderer.measure_text(text, size),
+            lines,
+        );
     }
 
     /// The factor the console's text is shrunk by, or `1.0` with none attached.
@@ -187,18 +194,25 @@ impl AppState {
             self.diagnostics.overlay_on,
             self.config.hud.preset_name,
         ) {
-            let name = self.renderer.preset_name();
+            // Owned: the backdrop's measurement borrows the renderer mutably.
+            let name = self.renderer.preset_name().to_owned();
             let marks = self.show.marks();
+            let (favourite, hidden) = (
+                marks.is(Mark::Favourite, &name),
+                marks.is(Mark::Hidden, &name),
+            );
+            let renderer = &mut self.renderer;
             // The countdown under it, on the same visibility rule: it belongs
             // to the same corner and yields to the same things.
             overlay::corner_lines(
-                name,
-                marks.is(Mark::Favourite, name),
-                marks.is(Mark::Hidden, name),
+                &name,
+                favourite,
+                hidden,
                 next_rotation_line(
                     self.show.director.remaining_secs(),
                     self.config.hud.next_rotation,
                 ),
+                &mut |text, size| renderer.measure_text(text, size),
                 &mut chrome,
             );
         }
@@ -213,7 +227,13 @@ impl AppState {
 
         if self.modal() == Some(Modal::Settings) {
             let view = self.settings_view();
-            overlay::settings_lines(&self.hud.settings, &view, &mut modal);
+            let renderer = &mut self.renderer;
+            overlay::settings_lines(
+                &self.hud.settings,
+                &view,
+                &mut |text, size| renderer.measure_text(text, size),
+                &mut modal,
+            );
         } else if self.modal() == Some(Modal::Browse) {
             let names = self.roster_names();
             let rows = self.browse_rows(&names);
@@ -224,7 +244,14 @@ impl AppState {
             // plus every narrowing that is on — a list that shrank and said
             // nothing reads as a roster that lost presets.
             let layout = self.list_layout(visible.len());
-            overlay::browse_lines(&self.hud.browse, &visible, &layout, &mut modal);
+            let renderer = &mut self.renderer;
+            overlay::browse_lines(
+                &self.hud.browse,
+                &visible,
+                &layout,
+                &mut |text, size| renderer.measure_text(text, size),
+                &mut modal,
+            );
 
             // The pane beside the list, for the highlighted row. An empty
             // list highlights nothing, and then the pane is simply absent.
@@ -253,14 +280,17 @@ impl AppState {
         if console_open.is_open() && self.modal().is_none() {
             // Built at the reference geometry like every routed line, so the one
             // scaling below moves all of them together.
+            let preset = self.renderer.preset_name().to_owned();
+            let renderer = &mut self.renderer;
             let furniture = console::standing_lines(
-                self.renderer.preset_name(),
+                &preset,
                 self.show.director.auto_enabled(),
                 self.show.next_up(),
                 (
                     self.config.rotate.min_dwell_secs,
                     self.config.rotate.max_dwell_secs,
                 ),
+                &mut |text, size| renderer.measure_text(text, size),
             );
             self.hud.frame_text.console.splice(0..0, furniture);
         }
@@ -274,6 +304,8 @@ impl AppState {
 
         let runs = self.hud.frame_text.output_runs();
         self.renderer.queue_text(&runs);
+        self.renderer
+            .queue_panels(&self.hud.frame_text.output_panels());
 
         // `runs` borrows `self.hud.frame_text`, so the scratch buffers can only go
         // home once its last use is behind us.
@@ -308,7 +340,8 @@ impl AppState {
             return;
         }
         let runs = self.hud.frame_text.console_runs();
-        let result = self.renderer.present_aux(&runs);
+        let panels = self.hud.frame_text.console_panels();
+        let result = self.renderer.present_aux(&runs, &panels);
         drop(runs);
         if let Err(err) = result {
             eprintln!("console present failed, closing it: {err}");

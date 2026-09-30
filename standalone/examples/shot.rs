@@ -740,7 +740,9 @@ fn ui_shots(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String
         let scene = r
             .capture_preset(&name, &args.stimulus, args.frames)
             .map_err(|e| format!("capture `{name}`: {e}"))?;
-        let frame = ui::compose(state, w, h, &name);
+        let frame = ui::compose(state, w, h, &name, &mut |text, size| {
+            r.measure_text(text, size)
+        });
 
         if let Some(pane) = frame.still {
             // The scene itself stands in for the highlighted preset's picture:
@@ -766,8 +768,15 @@ fn ui_shots(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String
             });
         }
         r.set_overlay(frame.diagnostics);
-        let runs: Vec<_> = frame.lines.iter().map(|line| line.as_run()).collect();
+        let runs: Vec<_> = frame
+            .lines
+            .iter()
+            .filter(|line| line.backdrop.is_none())
+            .map(|line| line.as_run())
+            .collect();
         r.queue_text(&runs);
+        let panels: Vec<_> = frame.lines.iter().filter_map(|l| l.as_panel()).collect();
+        r.queue_panels(&panels);
         let img = r
             .capture_frame(&args.stimulus)
             .map_err(|e| format!("--ui {}: {e}", state.name()))?;

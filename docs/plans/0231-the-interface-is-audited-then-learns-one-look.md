@@ -440,8 +440,8 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | 1 — Engine UI captures | dev | done | 21f261cb |
 | 2 — Studio captures | studio-builder | done | 98e4d4e7 |
 | 3 — Audit and direction | human | done | 9907f1b5 |
-| 4 — The look declared once | dev | done | committed with this row |
-| 5 — Panels and measured text | dev | not started | |
+| 4 — The look declared once | dev | done | 6202a083 |
+| 5 — Panels and measured text | dev | done | committed with this row |
 | 6 — Overlays move | dev | not started | |
 | 7 — Binding table, help, hint | dev | not started | |
 | 8 — Standalone workflow fixes | dev | not started | |
@@ -505,6 +505,18 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   prefix. A hand edit of `--accent` turned `ui_tokens::the_studio_tokens_are_what_the_theme_declares`
   red, and the file was restored by hand. No golden includes the banner or the diagnostics panel,
   so none was re-blessed.
+- Phase 5, shape. The panel pass is `core/src/render/panel.rs`, owned by `TextLayer`: one
+  instanced draw per surface, recorded before the shell's picture and the glyphs. A backdrop
+  travels as a `console::Line` with `backdrop: Some((w, h))`, so routing and console scaling carry
+  it with its text. `TextMeasure`/`fit_width` in `text.rs` measure and truncate; the browser row is
+  three pieces at fixed offsets (`NAME_X`, `FAMILY_X`) rather than space-padded text.
+- Phase 5, files outside the list: `core/src/render/{mod.rs, composite.rs, aux_target.rs}` (the
+  renderer API, the pass order, the console surface's panels), `standalone/src/shot/ui.rs`,
+  `standalone/examples/shot.rs` and `standalone/src/overlay/tests.rs`.
+- Phase 5, not done: the diagnostics capture line has no backdrop (not in the phase's surface list).
+  The settings rows still pad `label` with spaces, which is ragged in a proportional font.
+- Phase 5, the property test is `render::text::tests::a_fitted_string_never_measures_wider_than_asked_on_the_system_font`.
+  Captures were checked at both sizes under `target/ui-audit/after-1080/` and `after-1280/`.
 
 ### Close triggers
 
