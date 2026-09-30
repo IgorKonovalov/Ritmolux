@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0235** (ADRs are a separate sequence — next free there is **0257**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0236** (ADRs are a separate sequence — next free there is **0258**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -47,6 +47,7 @@ place. The plan file carries the real link.
 | [0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md) | The library learns from the corpus it will not ship | approved | human | ADR-0227 (proposed): a borrowed look authored natively, reference outside. A 4-6 cohort of 21 picks. Its cohort reads 0232's gap table; its Phase 3 lands after 0232 Phase 3. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0232](0232-the-library-is-walked-cut-and-refilled.md) | The library is walked, cut and refilled | approved | human, dev | ADR-0253 (proposed): report, owner's walk, cull without replacement down to a two-per-family floor, retunes, gap brief, refill. Takes backlog 0256 step 2 and the six content-brief sittings. |
+| [0235](0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md) | The plexus system, and a shared camera with depth of field | draft | dev, human | ADR-0257 (proposed): a 3D proximity-graph system; one camera and per-endpoint depth of field shared by lines, quads, attractor. 2D goldens unchanged. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
