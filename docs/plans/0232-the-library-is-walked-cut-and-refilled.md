@@ -400,9 +400,9 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 | `shape_heartmono` | shape_field |  | 0.556/0.000/0.359/0.017 | 0.444 | 0.000 | 0.877 | Path Maple (0.243) |  | cut | Redundant with a stronger keep in its family. | |
 | `shape_lion` | shape_field |  | 0.167/0.000/0.009/0.000 | 0.169 | 0.000 | 5.746 | Path Maple (0.186) |  | cut | Redundant with a stronger keep in its family. | |
 | `shape_maple` | shape_field | yes (new) | 0.175/0.000/0.016/0.000 | 0.180 | 0.000 | 5.847 | Path Lion (0.186) |  | keep | | |
-| `shape_pulse` | shape_field |  | 0.343/0.000/0.014/0.000 | 0.341 | 0.017 | 0.758 | Path Maple (0.194) |  | retune | | |
+| `shape_pulse` | shape_field |  | 0.343/0.000/0.014/0.000 | 0.341 | 0.017 | 0.758 | Path Maple (0.194) |  | cut | Retired by the owner at the retune (Phase 4) as a duplicate of Strata Heart, one heart as concentric palette bands. Strata Heart takes its guide card. | a1d196e3 |
 | `shape_ringmono` | shape_field |  | 0.486/0.000/0.297/0.009 | 0.349 | 0.000 | 1.024 | Aperture (0.285) |  | keep | | |
-| `shape_strataheart` | shape_field |  | 0.203/0.041/0.000/0.171 | 0.181 | 0.004 | 3.846 | Path Maple (0.199) |  | retune | | |
+| `shape_strataheart` | shape_field |  | 0.203/0.041/0.000/0.171 | 0.181 | 0.004 | 3.846 | Path Maple (0.199) |  | keep | Re-judged at the retune (Phase 4): the owner found it a little boring but right as it is, and it takes Pulse's guide card. | |
 | `spectrum_anemone` | spectrum | yes (new) | 0.032/0.013/0.005/0.049 | 0.056 | 0.008 | 0.820 | Radial Bloom (0.180) |  | keep | | |
 | `spectrum_metermono` | spectrum |  | 0.104/0.055/0.034/0.156 | 0.156 | 0.000 | 0.646 | Radial Bloom (0.101) |  | keep | | |
 | `spectrum_radialbloom` | spectrum |  | 0.050/0.081/0.063/0.199 | 0.173 | 0.000 | 2.719 | Meter Mono (0.101) |  | retune | | |
