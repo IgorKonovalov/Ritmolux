@@ -1,6 +1,6 @@
 # 0230 — The Russian slice becomes findable
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-26
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0213](../adrs/0213-the-russian-slice-stays-a-section-and-gets-a-header-control.md),
