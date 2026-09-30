@@ -342,7 +342,7 @@ export const onRequest = defineRouteMiddleware((context) => {
 | 1 — The header control, and a Russian entrance for it to point at | dev | done | bc09b3d0 |
 | 2 — The Russian pages say they are Russian | dev | done | d9160208 |
 | 3 — The front door names the Russian pages | dev | done | 8c931753 |
-| 4 — The live site, read after the push | human | not started | |
+| 4 — The live site, read after the push | human | owed | |
 
 ### Notes
 
