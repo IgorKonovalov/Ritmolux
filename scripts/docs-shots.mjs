@@ -69,8 +69,8 @@
 // So hop 340 is not the peak of the build — it is 34 hops INTO the quiet bar,
 // and every reactive family photographs there at its resting state. Measured on
 // the shipped library: spectrum_halo's readout is collapsed to a stub at 340 and
-// fully extended at 300; fragment_supernova's `kaleido_order` select drops to its
-// lowest arm and the frame flattens to a near-uniform wash.
+// fully extended at 300; fragment_supernova's `kaleido_order` select, since fixed at 8
+// (Plan 0232), dropped to its lowest arm and the frame flattened to a near-uniform wash.
 //
 // Hop 300 is the last hop of beat 5: maximum energy, and the most scene time any
 // accumulating family can have before the rest. attractor_leviathan — the

@@ -35,11 +35,13 @@ name = "Vitrail"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#26164d" },
-  { at = 0.30, color = "#5d47a5" },
-  { at = 0.55, color = "#8c6cdd" },
-  { at = 0.80, color = "#e684d4" },
-  { at = 1.00, color = "#ffeef8" },
+  { at = 0.00, color = "#1b1034" },
+  { at = 0.18, color = "#8e1b2e" },  # ruby
+  { at = 0.36, color = "#1d3f9a" },  # cobalt
+  { at = 0.54, color = "#157a55" },  # emerald
+  { at = 0.72, color = "#d9a23a" },  # gold
+  { at = 0.88, color = "#b3306a" },  # rose
+  { at = 1.00, color = "#fbe9c8" },
 ]
 
 [params]
@@ -110,7 +112,7 @@ family = "maurer_rose"
 n             = "6"
 d             = "29 + floor(hash(floor(beat_index * 0.25)) * 5) * 6"
 phase         = "time * 0.010"
-samples       = "500"
+samples       = "240"
 # THIS WAS THE WHOLE BUG, FIXED 2026-08-16 ON A USER LOOK CALL: the rose was
 # rendering as STIPPLE - scattered dots rather than a line figure - and it read
 # as gauze over the vault instead of as a window.
@@ -135,7 +137,7 @@ samples       = "500"
 # straight back to dots, so there is no continuous dial down to the old look.
 # 1.0 is the thinnest CONTINUOUS line available, and it reads as lace that sits
 # back into the vault rather than as leading laid over it.
-thickness     = "1.0 + clamp(treb * 0.55, 0, 0.35)"
+thickness     = "2.1 + clamp(treb * 0.55, 0, 0.35)"
 # THE WINDOW KEEPS THE OLD PROFILE, DELIBERATELY - do not "fix" it to the 0.25
 # default. Plan 0114's look gate named 1.0 for the Maurer roses and this layer
 # is one, for the reason that gate gave: crossing chords read as lace only
@@ -153,7 +155,8 @@ thickness     = "1.0 + clamp(treb * 0.55, 0, 0.35)"
 # is all edge floor, and Phase 3 measured this file drawing 0.00 and 0.25
 # byte-identically at BOTH sizes. Buying range means thickness, and the comment
 # above is why thickness is not available.
-softness      = "1.0"
+softness      = "0"
+stroke_blend  = "1"
 brightness    = "1.15 + clamp(treb * 0.41, 0, 0.35)"
 glow          = "0.25"
 scale         = "0.80"
