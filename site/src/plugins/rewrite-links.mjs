@@ -286,6 +286,13 @@ export function rewriteLinks({ base }) {
           leaf.type = 'text';
           leaf.value = title;
         }
+        // A link from an English page into a `.ru.md` translation names its
+        // language, as the header control and the landing button do by hand.
+        // A Russian page's links into its own slice share its `lang` already.
+        if (node.type === 'link' && rel.endsWith('.ru.md') && !(ownSource ?? '').endsWith('.ru.md')) {
+          node.data = node.data ?? {};
+          node.data.hProperties = { ...node.data.hProperties, lang: 'ru', hreflang: 'ru' };
+        }
         return;
       }
 
