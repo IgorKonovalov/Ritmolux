@@ -613,9 +613,19 @@ pub fn help_lines(ctx: keymap::Ctx, height: f32, measure: &mut Measure<'_>, out:
         ));
         y += ROW_H;
         for row in rows {
+            // A group broken across columns repeats its heading atop the new one,
+            // so no row stands in a column with nothing naming its group.
             if y + ROW_H > bottom {
                 x += HELP_COL_W;
                 y = ROWS_TOP;
+                out.push(Line::new(
+                    group.title().to_owned(),
+                    x,
+                    y,
+                    ROW_SIZE,
+                    THEME.text_dim.rgba(),
+                ));
+                y += ROW_H;
             }
             out.push(Line::new(
                 row.shown.to_owned(),
