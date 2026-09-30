@@ -478,7 +478,7 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 |---|---|---|---|
 | 1 — The candidate sheet | human | done | `29994a84` |
 | 2 — The walk | human | done | `cbf4d37b`, `3adf77d6` |
-| 3 — The cull | dev | done | committed with this row |
+| 3 — The cull | dev | done | `bcdd5892` (last of the family commits listed in Notes) |
 | 4 — The retunes and the sittings | human | not started | |
 | 5 — The gap brief | human | not started | |
 | 6 — The first refill cohort | human | not started | |
@@ -489,8 +489,8 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 - **Phase 3 commits, one per family**, oldest first: analytic_field `7b6ea80a`, shape_collage
   `5bb65a53`, fragment_field `306d823a` (+ `e1a551d3`), reaction_diffusion `44761aea`, lsystem
   `ad4f8351`, spectrum `b748c7f3`, parametric_curve `33b2ee96`, star_pattern `0254edaa`, shape_field
-  `b54e4032`, swarm `d6728725`, emitter `0d6b23ab`, warp_mesh `195c5603`, attractor (the row's own
-  commit); plus `8a4cf6fb`. The ledger's `commit` column is left empty: it is not `dev`'s to write.
+  `b54e4032`, swarm `d6728725`, emitter `0d6b23ab`, warp_mesh `195c5603`, attractor `bcdd5892`;
+  plus `8a4cf6fb`. The ledger's `commit` column is left empty: it is not `dev`'s to write.
 - **Two coverage floors moved in `core/tests/sanity.rs`**, because `MAX_FLOOR_SLACK` convicted
   them once a cut removed the family minimum: `FragmentField` 0.08 -> 0.21 (Drift Mono 0.4274) in
   its own commit `e1a551d3`, after the fragment_field commit, and `Swarm` 0.33 -> 0.37 (Braid
@@ -554,13 +554,20 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** yes — 30 presets deleted (116 -> 86), `representative = true` added to 11
+  survivors, header comments edited on 12 survivors, `presets/README.md` and
+  `presets/pending/README.md` edited.
 - **Plan header `Closes:`** none (takes backlog 0256 step 2)
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** content removal plus test and documentation re-pointing; two sanity coverage
+  floors re-derived and one schema-walk guard re-bounded. No engine behaviour changed.
+- **Operator docs touched:** `docs/preset-guide.md` (four gallery pictures re-rendered),
+  `docs/capturing.md`, `docs/preset-palettes.md`, `docs/content-brief.md`, `presets/README.md`,
+  `presets/pending/README.md`; images under `docs/images/gallery/` (four re-rendered, 30 cards
+  deleted).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 50 reductions hold across
+  24 live entries (4 unprobeable).
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** 4, 5, 6, 7 (7 is `Blocks merge: no`).
 
 ## Followups (after this lands)
 
