@@ -14,8 +14,8 @@ import { langOf } from '../../plugins/twins.mjs';
 
 export const translations = Object.entries(PUBLISHED).filter(([source]) => langOf(source) === 'ru');
 
-На русский переведены пять страниц: установка на Windows, macOS и в foobar2000, работа с
-приложением и то, как оно устроено. Остальная документация сайта — на английском.
+Ниже — страницы документации, переведённые на русский. Остальная документация сайта — на
+английском.
 
 <ul>
   {translations.map(([, { route, title }]) => (
