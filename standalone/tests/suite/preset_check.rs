@@ -430,9 +430,11 @@ fn the_corpus_holds_to_the_engine_and_to_the_house_style() {
     }
 
     // A walk that stopped reading the tree would otherwise pass by finding
-    // nothing, which is the one way a corpus gate fails quietly.
+    // nothing, which is the one way a corpus gate fails quietly. The floor sits
+    // near half the corpus (99 files at Plan 0232 Phase 4), so a curation that
+    // retires presets does not trip it and a walk that reads one directory does.
     assert!(
-        checked >= 100,
+        checked >= 50,
         "the corpus walk found only {checked} files, which means it stopped \
          reading the tree rather than that the library shrank"
     );

@@ -163,10 +163,10 @@ from the outside in.
 
 ### `lsystem`
 
-![A gold interlocking maze on deep navy: a dense space-filling curve of hexagonal turns forming a
-rough diamond](images/gallery/lsystem.png)
+![A pale ice-blue Koch snowflake outline on a dark slate ground: one closed crystalline edge, its
+facets furred by a faint outward trail](images/gallery/lsystem.png)
 
-*`presets/lsystem_vellum.toml`*
+*`presets/lsystem_rime.toml`*
 
 A turtle walking a string produced by rewriting an axiom with production rules. The expansion happens
 once when the preset loads — one cached segment buffer per depth — so per frame the scene only picks

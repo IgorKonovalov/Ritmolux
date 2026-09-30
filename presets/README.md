@@ -2584,7 +2584,7 @@ wrong one is the trap the `glow` entry below records.
 
   > **`1.0` is a legitimate value, not a leftover.** The look gate that set the
   > default returned `1.0` for the Maurer roses, `0` for `curve_ionwake` and
-  > `0.25` for `lsystem_vellum` — the right stroke is a property of the figure.
+  > `0.25` for a since-retired ink-on-paper lsystem — the right stroke is a property of the figure.
   > A preset keeping `1.0` wants a header line saying why, or the next reader
   > will "fix" it.
   >
@@ -3859,7 +3859,7 @@ the three-lever note below says which does what.
 > and is decoded at load, so the hex you write is the colour that
 > renders. `paper_bright` and `ink_bright` take no decode — they are the light
 > itself, so a "dark" paper needs a far smaller number than the display value
-> suggests: `lsystem_vellum` measured `0.07` as a mid violet and settled on
+> suggests: a since-retired ink-on-paper lsystem measured `0.07` as a mid violet and settled on
 > `0.015` for a true near-black. The same is true of `bg_bright`. If a pole reads
 > far brighter than the number you typed, this is why, and the fix is a smaller
 > number rather than a different hue.
@@ -5394,7 +5394,7 @@ Presets worth reading as **worked examples** of one control each:
 | `fragment_supernova` | beat-driven flash/glow **eased** through a `[smoothing]` table |
 | `attractor_ink` | the terminal **ink-on-paper** remap (`ink_*` / `paper_*`) |
 | `curve_rosemono` | the audio-morphable curve **shape** params (`phase` on the onset, `radial_offset` held) |
-| `lsystem_vellum` | `draw_progress` for a **line-draw-on** |
+| `lsystem_sumimono` | `draw_progress` for a **line-draw-on** |
 | `star_rosewindow` | **`rings`** — concentric motifs giving a rosette an interior |
 | `fragment_vitrail` | the **`[layer]` table** — a crisp `over` layer with a bindable `mix`, and per-beat `draw_progress` on the layer |
 | `fragment_sumi` | a **stateful layer** — the attractor as `[layer]` scene, `add`-blended over a field |

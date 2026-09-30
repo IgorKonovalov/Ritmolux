@@ -45,7 +45,7 @@ import { join, resolve } from "node:path";
 const SUBJECTS = [
   { file: "curve_broadside", table: "[params]", note: "a Maurer rose, the family the verdict was given on" },
   { file: "curve_ionwake", table: "[params]", note: "a curve at the thin end of the shipped range" },
-  { file: "lsystem_vellum", table: "[params]", note: "straight stems and a branching figure" },
+  { file: "lsystem_sumimono", table: "[params]", note: "straight stems and a branching figure" },
   { file: "star_rosewindow", table: "[params]", note: "a ring of ARCS — the primitive that surfaced this" },
   { file: "spectrum_radialbloom", table: "[params]", note: "straight spokes, where a plateau could read heavy rather than crisp" },
   { file: "fragment_vitrail", table: "[layer.params]", note: "a line layer over a fragment field" },

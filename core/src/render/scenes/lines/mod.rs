@@ -91,7 +91,7 @@ pub fn half_width(thickness: f32) -> f32 {
 ///
 /// **`1.0` remains reachable and is not dead surface.** The same gate returned
 /// `1.0` for the Maurer roses, `0` for `curve_ionwake` and `0.25` for
-/// `lsystem_vellum` — which is why this is an authorable parameter with a
+/// a since-retired ink-on-paper lsystem — which is why this is an authorable parameter with a
 /// default rather than a constant. A preset that wants the luminous smear
 /// binds one number and gets the pre-Plan-0114 fragment back, term for term.
 ///

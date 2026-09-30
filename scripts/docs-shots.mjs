@@ -274,11 +274,10 @@ const CARDS = [
   "fragment_tunnel",
   "fragment_vitrail",
   "fragment_whorl",
-  // lsystem (4)
+  // lsystem (3)
   "lsystem_icecrystal",
   "lsystem_rime",
   "lsystem_sumimono",
-  "lsystem_vellum",
   // parametric_curve (12)
   "curve_blueprint",
   "curve_broadside",
@@ -473,10 +472,9 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // lsystem — UNJUDGED. Chosen when this family shipped one preset; 4 ship
-    // now and none has been compared against vellum.
+    // lsystem — the family's representative.
     out: "docs/images/gallery/lsystem.png",
-    presetFile: "presets/lsystem_vellum.toml",
+    presetFile: "presets/lsystem_rime.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
