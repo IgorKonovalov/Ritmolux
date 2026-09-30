@@ -1131,6 +1131,7 @@ fn apply_transport(
                 {
                     renderer.select_preset(index);
                     let outgoing = renderer.preset_name().to_owned();
+                    show.reanchor(&outgoing, renderer);
                     show.note_shown(&outgoing);
                 }
             }
