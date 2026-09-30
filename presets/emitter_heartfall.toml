@@ -1,6 +1,6 @@
 # Heartfall - black hearts thrown up a white page, arcing over and falling out of
-# shot. The cohort's second heart and its opposite: `shape_heartmono.toml` is ONE
-# heart the whole frame is made of, this is MANY the frame merely contains.
+# shot. The opposite of a frame-scale heart such as `shape_pulse.toml`, which is
+# ONE heart the whole frame is made of: this is MANY the frame merely contains.
 #
 # -- IT IS A DUOTONE, AND THAT IS A CEILING RATHER THAN A CHOICE ------------------
 #
@@ -38,7 +38,7 @@
 #
 # `shape = "4"` IS THE HEART, from the closed five-name roster shared by `swarm`,
 # `emitter` and `shape_field` (ADR-0084/0105). It is the same selector
-# `shape_heartmono.toml` uses at frame scale.
+# `shape_pulse.toml` uses at frame scale.
 #
 # -- THE THROW --------------------------------------------------------------------
 #

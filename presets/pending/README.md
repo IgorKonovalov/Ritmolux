@@ -37,7 +37,9 @@ as that blocker lifts.
 
 ## What left, and why the record is worth keeping
 
-### `shape_maple.toml` and `shape_lion.toml` — shipped 2026-09-09
+### `shape_maple.toml` and the lion mask — shipped 2026-09-09
+
+(The lion, Path Lion, was retired by the library walk of 2026-09-30; the maple still ships.)
 
 Two authored-path worlds, a maple leaf and a maned lion mask, each one closed contour of 54 SVG
 commands drawn as the shape field's banded emblem. They were the first content anywhere to use a

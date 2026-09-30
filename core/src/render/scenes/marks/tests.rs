@@ -2274,8 +2274,8 @@ fn no_arm_returns_a_negative_normalized_distance() {
 /// It is rendered rather than argued because the defect was only ever visible
 /// through this scene: the shader takes `select(pow(d, gamma), d, gamma == 1.0)`
 /// and `pow` of a negative base is NaN, so an author who bound the exponent got a
-/// hard artifact rather than a rounded one. `presets/shape_facet.toml` pins
-/// `gamma = "1.0"` today for exactly this reason.
+/// hard artifact rather than a rounded one, which is the reason a star world
+/// would pin `gamma = "1.0"`.
 ///
 /// # What is asserted, and why none of it is a brightness
 ///

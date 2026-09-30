@@ -3753,7 +3753,7 @@ color_span = "0.037"
 /// a span that animates rather than resting, and a system whose `color_span` is
 /// not a figure coordinate at all.
 ///
-/// The `palette_steps` row is the load-bearing one — `shape_facet` ships at
+/// The `palette_steps` row is the load-bearing one — a banded figure can sit at
 /// `color_span = 0.0521`, thirteen texels, and is unaffected because it bands.
 #[test]
 fn the_starved_span_warning_is_silent_where_the_trap_does_not_exist() {

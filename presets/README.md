@@ -1800,8 +1800,9 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 > deepest-point distance, so the coordinate is `0` there — **exactly** `0` while the spikes are all
 > the same length, and within about `0.09` of it under `star_jitter`, where the divisor is the
 > unjittered figure's while the measurement is the fragment's own spike's. Either way `gamma` is an
-> ordinary knob on every star. **`presets/shape_facet.toml` is the worked example**: it pinned
-> `gamma = "1.0"` for exactly this defect, and now binds it to `treb`.
+> ordinary knob on every star, and a star world may bind it to a band like any other figure's.
+> (The worked example, Facet, bound it to `treb` after pinning `gamma = "1.0"` for this defect; it
+> has since been retired, and no shipped star world binds `gamma` today.)
 
 #### Two coordinates — offsets and scaled copies
 
@@ -1826,8 +1827,8 @@ by its overall size.** Erosion eats a thin feature entirely before it has touche
 a broad one, so the band count is a question about the narrowest part of the
 silhouette and about nothing else. The cases that are measured: at three interior
 bands a koi's fins and tail were eaten and the figure read as a lumpy blob, and
-`presets/shape_lion.toml`'s mane tufts went the same way — **both settled at
-two**, and the lion's header says so. `presets/shape_maple.toml` carries **three**
+the retired Path Lion's mane tufts went the same way — **both settled at
+two**. `presets/shape_maple.toml` carries **three**
 because its lobes are broad; it is not the sturdier drawing, it is the fatter one.
 Under `"1"` the question does not arise by construction: an interior contour there
 is a scaled copy, so a fin is still a fin at a smaller size rather than something
@@ -2058,7 +2059,7 @@ color_center  = "mod(0.875 + beat_index / 16, 1)"   # 14/16, stepping by 1/16
 
 Every number is a multiple of `1/16`, which is why `presets/shape_maple.toml`
 looks the way it does: `14/16 + 3/16` lands on an edge, and so does every step of
-the travel. `presets/shape_lion.toml` does the same at `14/16 + 2/16`.
+the travel. A figure with two interior bands does the same at `14/16 + 2/16`.
 
 **Two consequences, and they are what you act on:**
 

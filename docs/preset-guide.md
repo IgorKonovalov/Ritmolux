@@ -261,8 +261,7 @@ hairline at each band edge.
 It is also the one system where the figure itself can be **authored rather than selected**. A
 `[path]` table takes inline SVG path data — one closed contour, pasted out of a design tool and
 rendered as the same distance field, so `palette_steps` and `palette_contour` band an outline nobody
-put in the roster. `presets/shape_maple.toml` and `presets/shape_lion.toml` are that: a leaf and a
-lion mask, each 54 commands. A second contour in `morph_to` gives the bindable `morph`, so a figure
+put in the roster. `presets/shape_maple.toml` is that: a maple leaf, 54 commands. A second contour in `morph_to` gives the bindable `morph`, so a figure
 can *become* another figure on the beat.
 
 **Reach for this when** the subject is a **figure and its echoes**: nested outlines, a breathing

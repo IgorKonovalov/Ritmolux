@@ -316,12 +316,9 @@ const CARDS = [
   "collage_mono",
   "collage_onwhite",
   "collage_suprematist",
-  // shape_field (9)
+  // shape_field (6)
   "shape_aperture",
   "shape_contourmono",
-  "shape_facet",
-  "shape_heartmono",
-  "shape_lion",
   "shape_maple",
   "shape_pulse",
   "shape_ringmono",
@@ -549,9 +546,9 @@ const IMAGES = [
     // one that shows what the family is FOR: the scene hands the palette a
     // FIGURE COORDINATE rather than a level, so `palette_steps` turns it into
     // flat graphic bands and `palette_contour` draws the hairline between them.
-    // Chosen over shape_aperture and shape_facet on that ground; the three mono
-    // worlds are deliberate two-ink prints and read as a different family at
-    // gallery size.
+    // Chosen over shape_aperture and a since-retired star world on that ground;
+    // the mono worlds are deliberate two-ink prints and read as a different
+    // family at gallery size.
     out: "docs/images/gallery/shape_field.png",
     presetFile: "presets/shape_pulse.toml",
     signal: "dynamic:110",

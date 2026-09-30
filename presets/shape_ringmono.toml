@@ -9,7 +9,8 @@
 #
 # -- HOW IT DIFFERS FROM THE OTHER TWO `shape_field` MONO WORLDS ------------------
 #
-# `shape_contourmono` draws the STAR arm and `shape_heartmono` the HEART, so the
+# `shape_contourmono` draws the STAR arm and Heart Mono (since retired) drew the
+# HEART, so the
 # obvious third is a different silhouette from the same closed roster - `shape =
 # "1"` is the ring. But the more interesting difference is the COORDINATE, and
 # this file takes the other one:
@@ -18,7 +19,7 @@
 #                       OFFSET of the outline
 #   `coord_mode = "1"`  `r / r_boundary(theta)`; a contour is a SCALED COPY
 #
-# `shape_heartmono` must use mode 1, because an inward offset is an EROSION and
+# A heart must use mode 1, because an inward offset is an EROSION and
 # erosion rounds a reflex corner - it fills in a heart's top notch and no value
 # of `gamma` or `palette_steps` recovers it (ADR-0111). A ring has NO reflex
 # corner and no corner at all, so the two modes are much closer here, and mode 0
@@ -40,9 +41,9 @@
 # THE PALETTE REPEATS, AND ON THIS FIGURE THAT IS THE WHOLE POINT. The LUT is
 # sampled with `AddressMode::Repeat`, so a coordinate past 1.0 wraps and draws
 # the run again - which is how a figure whose coordinate keeps growing outward
-# fills the frame with rings instead of stopping at one. `shape_heartmono`
-# records the same mechanism at length; it was found there by rendering, after a
-# draft written on the assumption that the coordinate clamped.
+# fills the frame with rings instead of stopping at one. The mechanism was
+# found on Heart Mono by rendering, after a draft written on the assumption that
+# the coordinate clamped.
 #
 # Because it repeats, the palette's two ENDS are a seam that is on screen. Stop 0
 # is white and stop 1.0 is black, so the seam is an ordinary run boundary with no
