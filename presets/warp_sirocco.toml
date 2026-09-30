@@ -50,8 +50,10 @@
 # looks like a leak. Put the source at the upwind edge and the streak is the
 # whole picture, arriving and crossing.
 #
-# WHAT DRIVES WHAT. Bass drives the wind speed, mid feeds the source, treble
-# tightens the banding, onset brightens. The `[per_vertex]` audio terms are kept
+# WHAT DRIVES WHAT. Bass drives the wind speed, mid feeds the source and the
+# turbulence (`warp`), treble tightens the banding, onset throws a burst of sand
+# from the source. The wind GUSTS: the bands travel down the frame, a slow noise
+# swells the whole flow, and the palette walks a full cycle about every 50 s. The `[per_vertex]` audio terms are kept
 # small: `[smoothing]` cannot ease a per-vertex binding, so they arrive
 # unsmoothed and a large one would read as a jolt.
 system = "warp_mesh"
@@ -68,13 +70,15 @@ y = 48
 [per_vertex]
 # THE WIND. Three bands across the frame's height, each moving at its own speed
 # and two of them backward - `sin` over `y` is what makes them shear against
-# each other instead of travelling as one sheet.
-dx = "0.16 + sin(y * 18.85) * 0.13 + clamp(bass * 0.047, 0, 0.04)"
+# each other instead of travelling as one sheet. The `time` phase rolls the bands
+# through the frame, and the noise term is a gust that swells every band at once.
+dx = "0.16 + sin(y * 18.85 + time * 0.9) * 0.13 + noise(time * 0.35) * 0.12 + clamp(bass * 0.12, 0, 0.1)"
 # A slow sag, modulated across x so the bands are not perfectly straight.
-dy = "0.02 + sin(x * 12.57) * 0.025"
+dy = "0.02 + sin(x * 12.57 - time * 1.3) * 0.07"
 # Held at 1: any zoom at all turns this back into a radial world, which is the
 # one thing it is not.
 zoom = "1.0"
+warp = "0.4 + clamp(mid * 1.6, 0, 1.2)"
 
 [palette]
 stops = [
@@ -94,14 +98,14 @@ decay = "0.55 + clamp(bass * 0.118, 0, 0.1)"
 
 # THE SOURCE, upwind (see header). A narrow ring rather than a blob so the
 # bands have an edge to smear.
-deposit        = "1.5 + clamp(mid * 1.06, 0, 0.9) + clamp(onset * 0.67, 0, 0.4)"
+deposit        = "1.8 + clamp(mid * 1.06, 0, 0.9) + clamp(onset * 1.4, 0, 1.0)"
 deposit_x      = "0.14"
 deposit_y      = "0.5"
 deposit_radius = "0.34"
 deposit_width  = "0.09"
 deposit_arms   = "4"
 deposit_twist  = "0.6"
-deposit_spin   = "0.3"
+deposit_spin   = "0.9"
 
 # Off. A dark disc in the middle of a directional field is a hole in the wind -
 # it is there to stop a ZOOMING loop saturating at its fixed point, and this
@@ -110,10 +114,10 @@ darken_center = "0"
 
 hue           = "0.04"
 color_span    = "0.8"
-color_center  = "time * 0.006"
+color_center  = "time * 0.02 + clamp(bass * 0.12, 0, 0.1)"
 saturation    = "0.95 + clamp(treb * 0.167, 0, 0.1)"
 palette_steps = "5"
-brightness    = "0.55 + clamp(mid * 0.141, 0, 0.12)"
+brightness    = "0.72 + clamp(mid * 0.2, 0, 0.16)"
 
 exposure     = "0.78 + clamp(bass * 0.235, 0, 0.2)"
 bloom_amount = "0.22 + clamp(onset * 0.5, 0, 0.3)"
