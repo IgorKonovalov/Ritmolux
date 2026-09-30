@@ -6,6 +6,7 @@
 # highlight.
 system = "reaction_diffusion"
 name = "Lichen"
+representative = true
 
 [palette]
 stops = [

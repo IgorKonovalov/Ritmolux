@@ -308,8 +308,7 @@ const CARDS = [
   "curve_prismscope",
   "curve_rosemono",
   "curve_turnabout",
-  // reaction_diffusion (7)
-  "reaction_etching",
+  // reaction_diffusion (6)
   "reaction_fluxmono",
   "reaction_glaciermono",
   "reaction_lichen",

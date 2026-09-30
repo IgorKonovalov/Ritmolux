@@ -90,10 +90,9 @@ Small: two headers, both **predicted at Plan 0075's close as workarounds that wo
 moment this lever landed.** It has landed — `presets/README.md`'s ink section carries the three-lever
 note (`ink_gamma` × `ink_amount` × `exposure`) and the measured mean-byte ladder.
 
-- **`reaction_etching.toml`** — its duotone is painted into `[palette]` because *"the ink remap gives
-  a mid-contrast field no contrast lever of its own."* Note the world has since been **inverted to
-  scratchboard** (bright line work on black), so whether the palette version still earns its place is
-  a live judgement, **not a foregone retune**.
+- **Etching** (`reaction_diffusion`) — **retired 2026-09-30 by Plan 0232 Phase 3**, so this bullet
+  has no world left to re-judge. Its duotone was painted into `[palette]` because *"the ink remap
+  gives a mid-contrast field no contrast lever of its own."*
 - **`swarm_shatter.toml`** — its light-ground twin was routed out with *"when ink grows a contrast
   control, the light-ground twin becomes authorable."* That condition is met.
 

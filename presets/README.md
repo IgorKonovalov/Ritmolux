@@ -358,9 +358,9 @@ regime is a narrow band in the `feed`×`kill` plane. Gains derived by the house
 rule take the field into the filled regime, where the gaps close, no contour is
 left to draw, and the preset renders as a flat wash — found by rendering it, as
 flat mustard, by the author of a reaction-diffusion preset that did not survive
-curation. The three shipped ones show the treatment instead: `reaction_etching`
-runs `feed = "0.0420 + noise(…) * 0.0022 + clamp(bass * 1.18, 0, 1) * 0.0016"` —
-a base inside the live band, a **±0.0016** reactive span, and the `clamp` bounding
+curation. The shipped ones show the treatment instead: `reaction_lichen`
+runs `feed = "0.0505 + noise(…) * 0.0025 + clamp(bass * 1.18, 0, 1) * 0.0018"` —
+a base inside the live band, a **±0.0018** reactive span, and the `clamp` bounding
 the *band* rather than capping the term. `reaction_verdigris` and
 `reaction_mitosis` are the same shape at their own regimes.
 
