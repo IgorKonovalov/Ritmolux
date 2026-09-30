@@ -30,17 +30,20 @@
 # -- THE REGIME IS THE PRESET, AND IT IS THE THING NOT TO CASUALLY RETUNE ---------
 #
 # `feed` and `kill` together select which member of the Gray-Scott family this
-# is, and the interesting regimes occupy a narrow band of that plane. The moves
-# below are deliberately tiny - a few thousandths - because a few hundredths is a
-# different world, and several nearby ones are degenerate: the field either dies
-# to uniform solvent or fills to uniform plateau, and both are a flat frame that
-# every gate in the suite will pass while showing nothing.
+# is, and the interesting regimes occupy a narrow band of that plane. A few
+# hundredths is a different world, and several nearby ones are degenerate: the
+# field either dies to uniform solvent or fills to uniform plateau, and both are a
+# flat frame that every gate in the suite will pass while showing nothing. The feed
+# here deliberately TRAVELS that band - a ~105 s sine from 0.029 (spots) to 0.051
+# (stripes and mazes) - because one regime held still read as boring; the onset
+# inject keeps reseeding, so the solvent end never empties the frame.
 #
 # WHAT DRIVES WHAT
-#   feed     a slow autonomous wander plus the low end - cells fatten and divide
-#   kill     the mids, very slightly - the rim thickness
-#   flow     the simulation rate, so a loud passage is a faster culture
-#   inject   the onset, seeding fresh disturbance into the field
+#   feed     the regime sweep above, plus the low end - cells fatten and divide
+#   kill     a slow wander, and the mids very slightly - the rim thickness
+#   flow     the simulation rate (3.0-4.0), so a loud passage is a faster culture
+#   inject   the onset, seeding a visible burst of fresh disturbance
+#   color_center  the low end, so the printed bands pump on the kick
 #
 # THE WARM-UP IS REAL AND IT IS NOT A BUG. A Gray-Scott field starts as noise and
 # takes seconds to establish its pattern, so this world ARRIVES LATE after a
@@ -77,25 +80,24 @@ stops = [
 palette_steps   = "20"
 palette_contour = "0.35"
 
-# THE REGIME. Spots rather than coral - see the header on why these moves are
-# thousandths. The bass term is section-slow through `[smoothing]` below, so
+# THE REGIME, SWEPT from spots to stripes - see the header. The bass term is section-slow through `[smoothing]` below, so
 # loud PASSAGES fatten the cells and quiet ones let them divide, on a timescale
 # the chemistry can actually follow.
-feed = "0.0295 + noise(time * 0.045 + 30) * 0.0016 + clamp(bass * 0.0041, 0, 0.0035)"
-kill = "0.0615 + noise(time * 0.038 + 70) * 0.0004 + clamp(mid * 0.00035, 0, 0.0003)"
+feed = "0.0290 + (0.5 + 0.5 * sin(time * 0.06)) * 0.022 + clamp(bass * 0.0041, 0, 0.0035)"
+kill = "0.0605 + noise(time * 0.038 + 70) * 0.0012 + clamp(mid * 0.00035, 0, 0.0003)"
 
 # The simulation rate. A loud passage is a faster culture, which is growth rather
 # than brightness and is the right place for the energy on a banded field.
-flow = "1.60 + clamp(bass * 0.941, 0, 0.80)"
+flow = "3.0 + clamp(bass * 1.2, 0, 1.0)"
 
-# Fresh disturbance on a hit. Small: this field's pattern is its own, and a heavy
-# inject overwrites it with noise rather than perturbing it.
-inject = "0.030 + clamp(onset * 0.117, 0, 0.07)"
+# Fresh disturbance on a hit, strong enough to read as a burst. Kept below 0.25:
+# a heavier inject overwrites the pattern with noise rather than perturbing it.
+inject = "0.030 + clamp(onset * 0.25, 0, 0.2)"
 
 # The coordinate. RD's field tops out well under 1, so the span has to reach past
 # it for the palette's upper bands to be used at all.
 color_span   = "2.05"
-color_center = "0.02"
+color_center = "0.02 + clamp(bass * 0.18, 0, 0.12)"
 saturation   = "1"
 palette_mix  = "0"
 
@@ -103,6 +105,7 @@ palette_mix  = "0"
 # microscope, which on this cohort would be a camera move.
 zoom = "0.78"
 glow = "0.62"
+
 
 [smoothing]
 # The chemistry needs a SUSTAINED push to change regime, so `feed` follows
