@@ -45,6 +45,9 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0262 — the diffusion filter's cost page reads 2.5x what `quality` measured on Linux, and nothing says which profile a reader should start from](#0262--the-diffusion-filters-cost-page-reads-25x-what-quality-measured-on-linux-and-nothing-says-which-profile-a-reader-should-start-from)
 - [0267 — the conductor's `Remove-Item` deletion bound was never asked of the real CLI](#0267--the-conductors-remove-item-deletion-bound-was-never-asked-of-the-real-cli)
 - [0274 — the cellular scene cannot trace a route through the maze it grows, so a labyrinth never shows its longest path](#0274--the-cellular-scene-cannot-trace-a-route-through-the-maze-it-grows-so-a-labyrinth-never-shows-its-longest-path)
+- [0275 — Murmuration sits at zoom 0.78, under the swarm's measured seam-safe 0.84 and under the range the seam test says the shipped presets reach](#0275--murmuration-sits-at-zoom-078-under-the-swarms-measured-seam-safe-084-and-under-the-range-the-seam-test-says-the-shipped-presets-reach)
+- [0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen](#0276--a-collage-elements-own-drift-and-spin-are-too-slow-for-the-animation-gate-to-see-so-a-sparse-canvas-reads-as-frozen)
+- [0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`](#0277--the-owners-hotkey-walk-and-the-live-retune-loop-exist-only-as-scratch-scripts-under-target)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1819,3 +1822,61 @@ changes. The drawn route could be one new overlay colour, or a distance a palett
   is it refreshed), then `dev`.
 - **Verified 2026-09-30** — the scene has no route search:
   `absent: [Bb]readth|\bbfs\b|\bBFS\b|[Ll]ongest path in: core/src/render/scenes/cellular`
+
+## 0275 — Murmuration sits at zoom 0.78, under the swarm's measured seam-safe 0.84 and under the range the seam test says the shipped presets reach
+
+`presets/README.md` measures the swarm's wrap seam as usable down to about **`0.84`**. Below it, the
+near depth layer reaches the frame edge first. `swarm_murmuration.toml` binds `zoom = "0.78"`, a
+constant, so it sits under that bound for its whole run. The seam test in
+`core/src/render/scenes/swarm/tests.rs` takes its concrete zooms from `SHIPPED_ZOOMS`, which starts
+at `0.99` and whose doc says it is "the range the shipped presets actually reach". The test therefore
+never measures the shipped minimum, and nothing gates it. Two questions follow. Does Murmuration
+show the seam on screen? The walk kept it, and the seam was not what anyone was looking for. And
+should `SHIPPED_ZOOMS` be derived from the shipped set rather than written down?
+
+- **Raised:** 2026-09-30 by `preset-author`, found while re-pointing the seam test's comment off the
+  retired `swarm_drift` at Plan 0232 Phase 4. **Owner if taken:** the owner (a look at Murmuration
+  in the running app), then `dev` (widen `SHIPPED_ZOOMS`, or derive it).
+- **Verified 2026-09-30** — Murmuration binds the constant:
+  `present: ^zoom = "0\.78" in: presets/swarm_murmuration.toml`
+- **Verified 2026-09-30** — the test's shipped range starts above it:
+  `present: SHIPPED_ZOOMS: \[f32; 5\] = \[0\.99 in: core/src/render/scenes/swarm/tests.rs`
+
+## 0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen
+
+`shape_collage` moves an element at `DRIFT_SPEED` (0.035 canvas units a second at `drift = 1`,
+scaled by a per-element 0.3 to 1) and turns it at `SPIN_SPEED` (0.07 rad/s at `spin = 1`). The
+animation gate compares frames 24 and 48 of a 96x96 capture. In that 0.4 s an element travels about
+a pixel at most, so the gate cannot see the scene's own motion. A dense canvas passes anyway,
+because forty edges each moving a little add up. At Plan 0232 Phase 4, On White was cut from forty
+elements to five-to-seven and was convicted frozen (0.0018 against the 0.01 floor). Raising `drift`
+from 0.55 to 1.3 and `spin` from 0.35 to 0.8 moved that score by nothing measurable. It passed only
+once a constant `pump_size` of 0.9 made every form breathe. That pump is now part of its look,
+chosen by the gate rather than by the owner. The question is which side is wrong. Either a sparse
+collage is legitimately too still to ship, or the gate's window is too short for a scene whose
+motion is slow by design. If the gate is wrong, the fix is a longer window for this system, or a
+per-system note in `docs/testing.md`, not a faster `DRIFT_SPEED`.
+
+- **Raised:** 2026-09-30 by `preset-author`, at Plan 0232 Phase 4's On White retune.
+  **Owner if taken:** `architect` (is the gate or the scene wrong), then `dev`.
+- **Verified 2026-09-30** — the drift and spin rates:
+  `present: const DRIFT_SPEED: f32 = 0\.035; in: core/src/render/scenes/shape_collage/layout.rs`
+- **Verified 2026-09-30** — `present: const SPIN_SPEED: f32 = 0\.07; in: core/src/render/scenes/shape_collage/layout.rs`
+
+## 0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`
+
+Plan 0232's walk (Phase 2) and its retunes and sittings (Phase 4) ran on two throwaway scripts. They
+live in the gitignored `target/p0232/`. `walk.sh` loads one family into a player on its own
+`RLX_PRESET_DIR` and `XDG_DATA_HOME`, moves the window to a workspace and makes it fullscreen. The
+owner then marks keep and cut with F1 and F2, and `apply.py` folds that run's `marks.toml` into the
+ledger. `retune.sh` loads a named set of presets, which are edited in place while the player
+hot-reloads them. The owner called the hotkey walk a large speed-up, and every Phase 4 verdict came
+from it. Plan 0204 Phase 4 and 0232 Phase 6 both need the same loop, and a `cargo clean` deletes it.
+The window placement is Hyprland-specific, which is one reason it is not a script in `scripts/`
+today. The part worth keeping is portable: a preset set loaded into an isolated data directory,
+with marks read back afterwards.
+
+- **Raised:** 2026-09-30 by `preset-author`, at the end of Plan 0232 Phase 4. **Owner if taken:**
+  `architect` (does a judging loop belong in `scripts/`, and in what shape), then `dev`.
+- **Verified 2026-09-30** — nothing in the repository carries it:
+  `absent: walk\.sh|retune\.sh|apply\.py in: scripts`
