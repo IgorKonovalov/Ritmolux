@@ -44,6 +44,9 @@ pub mod console;
 pub mod control;
 pub mod events;
 pub mod gpu;
+// Every key binding, read by the binary's dispatch and by the help sheet the
+// headless capture draws, so both come from one table.
+pub mod keymap;
 // The per-user preset marks (ADR-0228). A library module for the reason
 // `config` is: it is the binary's alone, but it round-trips through a file, and
 // a library module is where that test runs.

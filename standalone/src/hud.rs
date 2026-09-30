@@ -24,6 +24,8 @@ use crate::thumbs;
 pub(crate) enum Modal {
     Browse,
     Settings,
+    /// The key help sheet, over whichever menu it was opened from.
+    Help,
 }
 
 /// Whether the corner preset name is drawn this frame (Plan 0096 Phase 1).
@@ -67,7 +69,11 @@ impl AppState {
     /// calls kept in agreement by hand is how a key gets routed to the modal that
     /// is not on screen and silently swallowed.
     pub(crate) fn modal(&self) -> Option<Modal> {
-        if self.hud.settings.is_open() {
+        // First: the sheet sits over the menu it was opened from, which stays
+        // open under it and gets the keyboard back when the sheet closes.
+        if self.hud.help.is_some() {
+            Some(Modal::Help)
+        } else if self.hud.settings.is_open() {
             Some(Modal::Settings)
         } else if self.hud.browse.is_open() {
             Some(Modal::Browse)
@@ -81,6 +87,13 @@ impl AppState {
     /// [`overlay::ListLayout`], so the drawing and the `Left`/`Right` keys can
     /// never disagree about where a row is.
     pub(crate) fn list_layout(&self, visible_len: usize) -> overlay::ListLayout {
+        let (w, h) = self.modal_surface();
+        overlay::layout(visible_len, self.hud.browse.highlight(), w, h)
+    }
+
+    /// The size a menu is laid out against: the console's logical size while
+    /// one is attached, the show window's otherwise.
+    fn modal_surface(&self) -> (f32, f32) {
         // Laid out against whichever surface will actually draw it. With the
         // console open that is the console: laying the browser out for the
         // output's 1920x1080 and then drawing it into a 900x640 window puts
@@ -91,14 +104,13 @@ impl AppState {
         // down on the way out (`console::scale_lines`), so a smaller window gets
         // smaller type and more of the roster rather than a clipped corner of a
         // full-size grid.
-        let (w, h) = match self.renderer.aux_size() {
+        match self.renderer.aux_size() {
             Some((w, h)) => console::logical_size(w as f32, h as f32),
             None => {
                 let size = self.window.inner_size();
                 (size.width as f32, size.height as f32)
             }
-        };
-        overlay::layout(visible_len, self.hud.browse.highlight(), w, h)
+        }
     }
 
     /// The preview pane on the output, or `None` when the browser is on the
@@ -232,6 +244,23 @@ impl AppState {
             chrome.push(overlay::capture_verdict_line(&self.capture.capture_token));
         }
 
+        // The launch hint, on the show and only while no menu is up: a menu
+        // is already a list of what its keys do.
+        self.hud.hint_secs = (self.hud.hint_secs - dt).max(0.0);
+        if self.modal().is_none() && self.hud.hint_secs > 0.0 {
+            let size = self.window.inner_size();
+            let alpha = standalone::motion::hint_alpha(self.hud.hint_secs, motion);
+            let renderer = &mut self.renderer;
+            overlay::hint_lines(
+                &standalone::keymap::hint_text(),
+                size.width as f32,
+                size.height as f32,
+                alpha,
+                &mut |text, size| renderer.measure_text(text, size),
+                &mut chrome,
+            );
+        }
+
         // Each modal's envelope runs every frame, open or not: a closed one
         // appends the lines it last drew while it fades out. Each is handed the
         // index its own block starts at, so the one fading out and the one
@@ -287,6 +316,25 @@ impl AppState {
             .motion
             .browse
             .frame(browse_open, &mut modal, browse_from, dt, motion);
+
+        // The help sheet, over the menu it was opened from — which the lines
+        // above have faded out under it, and fade back in when it closes.
+        let help_from = modal.len();
+        let help_open = self.modal() == Some(Modal::Help);
+        if let (true, Some(ctx)) = (help_open, self.hud.help) {
+            let (_, h) = self.modal_surface();
+            let renderer = &mut self.renderer;
+            overlay::help_lines(
+                ctx,
+                h,
+                &mut |text, size| renderer.measure_text(text, size),
+                &mut modal,
+            );
+        }
+        self.hud
+            .motion
+            .help
+            .frame(help_open, &mut modal, help_from, dt, motion);
 
         // The console's standing header, so an idle console still reads as live.
         // Queued after the routing has cleared last frame's lines and before the

@@ -178,6 +178,7 @@ cargo run -p standalone --example shot -- --ui settings --preset "Whorl" --out t
 | `console` | the operator console's header, transport labels and staging line, scaled to the capture as a console window of that size scales them |
 | `banner` | the now-playing banner at full opacity, under the corner name |
 | `diagnostics` | the F3 panel and the audio line under it |
+| `help` | the key help sheet `?` opens on the show, drawn from the table the keys are dispatched from |
 | `all` | every state above, in this order |
 
 The scene is `Nebula` unless `--preset` names another; a library without it falls back to its first

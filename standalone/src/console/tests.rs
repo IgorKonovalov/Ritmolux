@@ -338,6 +338,7 @@ fn view() -> crate::settings::SettingsView {
         console: false,
         thumbnails: true,
         motion: crate::config::Motion::Full,
+        hints: true,
         adapter_index: 0,
         adapter_count: 1,
         adapter_name: "adapter".to_owned(),

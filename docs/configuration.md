@@ -542,8 +542,10 @@ How the interface drawn over the show behaves, where `[hud]` is *what* it draws.
 |---|---|---|
 | `motion` | `"full"` | `"full"`: the browser and the settings menu fade and slide as they open and close, the selection glides between rows, the corner name crossfades when the preset changes, and the now-playing banner eases in and out. `"reduced"`: every one of those is a step, so things appear and vanish in one frame |
 
+| `hints` | `true` | Show the key hint — `?  help     Tab  browse     S  settings` — in the lower-right corner for a few seconds at launch, and again whenever the pointer moves over the window. It is never drawn while a menu is open |
+
 The animation is only ever a view: a key pressed while a menu is still opening acts on that frame,
-under either value. The settings menu's **Motion** row writes this key.
+under either value. The settings menu's **Motion** and **Key hints** rows write these two keys.
 
 ### A complete file
 
@@ -602,6 +604,7 @@ enabled = true
 
 [ui]
 motion = "full"
+hints = true
 ```
 
 ## Precedence

@@ -179,6 +179,14 @@ pub(crate) struct Hud {
     /// never consulted to decide what a key does.
     pub(crate) motion: standalone::motion::OverlayMotion,
 
+    /// The help sheet, when open: the context whose keys it lists, which is
+    /// the one `?` was pressed in.
+    pub(crate) help: Option<standalone::keymap::Ctx>,
+
+    /// Seconds the launch hint has left on screen. Set at launch and whenever
+    /// the pointer moves over the show's window, while `[ui] hints` is on.
+    pub(crate) hint_secs: f32,
+
     /// The settings modal's state (`S` toggles; Plan 0050 Phase 4). A second,
     /// independent pure state machine — see [`crate::settings`] for why it is not the
     /// same one.
@@ -569,6 +577,12 @@ impl AppState {
         )]
         let start = Instant::now();
         let renderer_overflow = renderer.cap_overflow().copied();
+        // The launch hint shows from the first frame, while `[ui] hints` is on.
+        let hint_secs = if config.ui.hints {
+            standalone::motion::HINT_SECS
+        } else {
+            0.0
+        };
         let mut state = Self {
             window,
             renderer,
@@ -602,6 +616,8 @@ impl AppState {
                 now_playing: nowplaying_win::NowPlayingSource::start(),
                 browse: OverlayState::new(),
                 motion: standalone::motion::OverlayMotion::default(),
+                help: None,
+                hint_secs,
                 settings: SettingsState::new(),
                 console_window: None,
                 console_frame: 0,
@@ -2085,6 +2101,7 @@ impl AppState {
             next_rotation: self.config.hud.next_rotation,
             thumbnails: self.config.thumbnails.enabled,
             motion: self.config.ui.motion,
+            hints: self.config.ui.hints,
             // Read off the cache, like the input roster. A running adapter the
             // roster does not hold reads as no roster at all: the row then
             // names what is running and goes inert, rather than walking from
@@ -2176,6 +2193,14 @@ impl AppState {
                 self.config.ui.motion = motion;
                 self.renderer
                     .set_reduced_motion(motion == config::Motion::Reduced);
+                self.save_config();
+            }
+            // Persisted; turning it off also takes a hint on screen away.
+            SettingsAction::ToggleHints => {
+                self.config.ui.hints = !self.config.ui.hints;
+                if !self.config.ui.hints {
+                    self.hud.hint_secs = 0.0;
+                }
                 self.save_config();
             }
         }

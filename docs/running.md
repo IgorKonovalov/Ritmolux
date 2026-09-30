@@ -60,15 +60,23 @@ rotates through a small library of dissolves (crossfade, additive burn, luma dis
 wipe), and a switch arriving mid-dissolve finishes the one in flight and starts the new
 one, so you always land where you asked.
 
+`?` opens a **help sheet** that lists every key for where you are: pressed on the show it lists the
+show's keys, pressed in the browser or the settings menu it lists that menu's. `?` or `Esc` closes it
+and hands the keyboard back to the menu underneath. The sheet is drawn from the same table the keys
+are dispatched from, so it is always complete. At launch, and whenever the pointer moves over the
+window, a hint in the lower-right corner names `?`, `Tab` and `S` for a few seconds; the settings
+menu's **Key hints** row turns it off (`[ui] hints`).
+
 | Key       | Action                                                      |
 |-----------|-------------------------------------------------------------|
+| `?`       | The help sheet — every key for the show, the browser or settings, whichever you are in. `?` or `Esc` closes it |
 | `Space`   | Next preset — dissolves (and restarts the auto-rotate timer) |
 | `Backspace` | Back to the preset you were on before — walks the presets actually shown, one step per press |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
 | `R`       | Switch the rotation **order** — shuffled (the default) or alphabetical by preset name. Persisted |
 | `L`       | Switch what rotation **draws from** — the whole library or your favourites. Persisted |
 | `Tab`     | Open/close the preset browser — opens on the preset you're watching. Arrow keys walk the list and wrap at both ends, left/right step a column, holding an arrow scrolls, type to filter, `Enter` selects (also dissolves), `Esc` closes |
-| `S`       | Open/close the settings menu — quality, grid scale, adapter, auto-rotate, rotation order, what rotation draws from, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, next-in countdown, console, motion. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and is written to `config.toml` |
+| `S`       | Open/close the settings menu — quality, grid scale, adapter, auto-rotate, rotation order, what rotation draws from, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, next-in countdown, console, motion, key hints. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and is written to `config.toml` |
 | `C`       | Open/close the **operator console** — a second window on another display carrying the browser, the settings menu, a transport strip and a live preview of the output |
 | `[` / `]` | Drop / raise the quality tier live — pins it for the session and persists the choice |
 | `F`       | Toggle fullscreen                                           |

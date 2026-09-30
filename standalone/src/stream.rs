@@ -1196,6 +1196,7 @@ fn headless_view(
         // No browser, so no thumbnail pass runs here whatever the key says.
         thumbnails: false,
         motion: config.ui.motion,
+        hints: config.ui.hints,
         // No roster and no switch on this path: a headless renderer keeps the
         // adapter it was built on for the life of the run, so the row that
         // would move it has nothing to move.

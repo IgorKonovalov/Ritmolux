@@ -35,12 +35,26 @@ pub struct Config {
 
 /// `[ui]` — how the interface drawn over the show behaves, as distinct from
 /// `[hud]`, which is *what* it draws.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ui {
     /// Whether the overlays move — the browser, settings menu and banner fade
     /// and slide, the selection glides — or every change is a step.
     pub motion: Motion,
+    /// Show the launch hint — the keys for help, the browser and settings —
+    /// for a few seconds at launch and whenever the pointer moves over the
+    /// window. `true` because a first launch otherwise says nothing about what
+    /// the keys are, and the hint clears itself.
+    pub hints: bool,
+}
+
+impl Default for Ui {
+    fn default() -> Self {
+        Self {
+            motion: Motion::Full,
+            hints: true,
+        }
+    }
 }
 
 /// How the interface moves. Serializes as `"full"` / `"reduced"`.

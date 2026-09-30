@@ -43,11 +43,13 @@ pub enum UiState {
     Banner,
     /// The F3 diagnostics panel and the capture line under it.
     Diagnostics,
+    /// The key help sheet `?` opens on the show.
+    Help,
 }
 
 impl UiState {
     /// Every state, in the order `--ui all` writes them.
-    pub const ALL: [UiState; 8] = [
+    pub const ALL: [UiState; 9] = [
         UiState::Hud,
         UiState::Browse,
         UiState::BrowseFiltered,
@@ -56,6 +58,7 @@ impl UiState {
         UiState::Console,
         UiState::Banner,
         UiState::Diagnostics,
+        UiState::Help,
     ];
 
     /// The name `--ui` takes, which is also the PNG's file stem.
@@ -69,6 +72,7 @@ impl UiState {
             UiState::Console => "console",
             UiState::Banner => "banner",
             UiState::Diagnostics => "diagnostics",
+            UiState::Help => "help",
         }
     }
 
@@ -221,6 +225,7 @@ pub fn fixture_view() -> SettingsView {
         console: false,
         thumbnails: true,
         motion: crate::config::Motion::Full,
+        hints: true,
         adapter_index: 0,
         adapter_count: 2,
         adapter_name: "GPU (fixture)".to_owned(),
@@ -361,6 +366,9 @@ pub fn compose(
             frame
                 .lines
                 .push(overlay::capture_verdict_line(FIXTURE_CAPTURE_TOKEN));
+        }
+        UiState::Help => {
+            overlay::help_lines(crate::keymap::Ctx::Show, height, measure, &mut frame.lines);
         }
     }
     frame
@@ -545,8 +553,45 @@ mod tests {
         };
         assert!(has_name(UiState::Hud));
         assert!(has_name(UiState::Banner));
-        for state in [UiState::Browse, UiState::Settings, UiState::Diagnostics] {
+        for state in [
+            UiState::Browse,
+            UiState::Settings,
+            UiState::Diagnostics,
+            UiState::Help,
+        ] {
             assert!(!has_name(state), "{} covers the corner", state.name());
+        }
+    }
+
+    /// **The help capture lists every binding the show's dispatch reads**, at
+    /// both sizes, and every line of it stays on the surface.
+    #[test]
+    fn the_help_sheet_lists_every_show_binding() {
+        for (w, h) in SIZES {
+            let frame = compose(UiState::Help, w, h, "Aurora");
+            for row in crate::keymap::KEYMAP
+                .iter()
+                .filter(|b| b.ctx == crate::keymap::Ctx::Show)
+            {
+                assert!(
+                    frame.lines.iter().any(|l| l.text == row.shown),
+                    "{w}x{h}: `{}` ({}) is not on the sheet",
+                    row.shown,
+                    row.label
+                );
+                assert!(
+                    frame.lines.iter().any(|l| l.text == row.label),
+                    "{w}x{h}: `{}` is cut or missing",
+                    row.label
+                );
+            }
+            for line in frame.lines.iter().filter(|l| l.backdrop.is_none()) {
+                assert!(
+                    line.y + crate::overlay::ROW_H <= h,
+                    "{w}x{h}: `{}` runs off",
+                    line.text
+                );
+            }
         }
     }
 }

@@ -22,6 +22,23 @@ use crate::console::Line;
 /// above its resting place.
 pub const SLIDE_PX: f32 = 12.0;
 
+/// Seconds the launch hint stays up, from launch or from the pointer's last
+/// move over the window.
+pub const HINT_SECS: f32 = 4.0;
+
+/// The launch hint's opacity with `remaining` of its [`HINT_SECS`] left: it
+/// eases in at the start, holds, and eases out over its last short envelope.
+/// Under [`Motion::Reduced`] it is on for its whole life and off after.
+pub fn hint_alpha(remaining: f32, motion: Motion) -> f32 {
+    if !remaining.is_finite() || remaining <= 0.0 {
+        return 0.0;
+    }
+    let d = short_secs();
+    let rise = progress(HINT_SECS - remaining, d, motion);
+    let fall = progress(remaining, d, motion);
+    rise.min(fall)
+}
+
 /// Seconds every panel's open and close takes.
 pub fn short_secs() -> f32 {
     THEME.motion_short_ms as f32 / 1000.0
@@ -266,6 +283,7 @@ impl Crossfade {
 pub struct OverlayMotion {
     pub browse: ModalMotion,
     pub settings: ModalMotion,
+    pub help: ModalMotion,
     pub corner: Crossfade,
 }
 

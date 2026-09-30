@@ -11,6 +11,7 @@ use std::borrow::Cow;
 use rlx_core::render::theme::THEME;
 
 use crate::console::Line;
+use crate::keymap;
 use crate::settings::{SettingsState, SettingsView};
 
 // ---------------------------------------------------------------------------
@@ -574,6 +575,96 @@ pub fn browse_lines(
         }
     }
     push_backdrop(out, from, measure);
+}
+
+/// Width the help sheet gives a row's keys before its label.
+const HELP_KEY_W: f32 = 150.0;
+/// Horizontal pitch between the help sheet's columns.
+const HELP_COL_W: f32 = 560.0;
+
+/// The help sheet for `ctx`: a header, then every row [`keymap::sheet`] lists
+/// for that context — the rows the dispatch reads — under its group's heading,
+/// flowed top-down into as many columns as a surface `height` px tall needs.
+///
+/// A heading never ends a column: it moves to the next one with its first row.
+pub fn help_lines(ctx: keymap::Ctx, height: f32, measure: &mut Measure<'_>, out: &mut Vec<Line>) {
+    let from = out.len();
+    out.push(Line::new(
+        format!("{}  -  ? or esc closes", ctx.title()),
+        LIST_INSET,
+        LIST_TOP,
+        ROW_SIZE,
+        THEME.text_dim.rgba(),
+    ));
+    let bottom = (height - LIST_INSET).max(ROWS_TOP + 2.0 * ROW_H);
+    let (mut x, mut y) = (LIST_INSET, ROWS_TOP);
+    for (group, rows) in keymap::sheet(ctx) {
+        // The heading and its first row go together, or both to the next column.
+        if y + 2.0 * ROW_H > bottom && y > ROWS_TOP {
+            x += HELP_COL_W;
+            y = ROWS_TOP;
+        }
+        out.push(Line::new(
+            group.title().to_owned(),
+            x,
+            y,
+            ROW_SIZE,
+            THEME.text_dim.rgba(),
+        ));
+        y += ROW_H;
+        for row in rows {
+            if y + ROW_H > bottom {
+                x += HELP_COL_W;
+                y = ROWS_TOP;
+            }
+            out.push(Line::new(
+                row.shown.to_owned(),
+                x,
+                y,
+                ROW_SIZE,
+                THEME.accent.rgba(),
+            ));
+            out.push(Line::new(
+                fit(row.label, HELP_COL_W - HELP_KEY_W - COL_GUTTER, measure).into_owned(),
+                x + HELP_KEY_W,
+                y,
+                ROW_SIZE,
+                THEME.text.rgba(),
+            ));
+            y += ROW_H;
+        }
+    }
+    push_backdrop(out, from, measure);
+}
+
+/// The launch hint, bottom-right on a `width` x `height` surface, on its own
+/// backdrop and at opacity `alpha`.
+pub fn hint_lines(
+    text: &str,
+    width: f32,
+    height: f32,
+    alpha: f32,
+    measure: &mut Measure<'_>,
+    out: &mut Vec<Line>,
+) {
+    if alpha <= 0.0 {
+        return;
+    }
+    let from = out.len();
+    let w = measure(text, CAPTURE_SIZE);
+    let x = (width - LIST_INSET - w).max(LIST_INSET);
+    let y = height - LIST_INSET - CAPTURE_SIZE * rlx_core::render::text::LINE_HEIGHT_RATIO;
+    out.push(Line::new(
+        text.to_owned(),
+        x,
+        y,
+        CAPTURE_SIZE,
+        THEME.text.rgba(),
+    ));
+    push_backdrop(out, from, measure);
+    for line in out.get_mut(from..).unwrap_or_default() {
+        line.color[3] *= alpha;
+    }
 }
 
 /// Horizontal room a row highlight takes left of the row's text: the accent

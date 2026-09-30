@@ -442,8 +442,8 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | 3 — Audit and direction | human | done | 9907f1b5 |
 | 4 — The look declared once | dev | done | 6202a083 |
 | 5 — Panels and measured text | dev | done | 4d82db06 |
-| 6 — Overlays move | dev | done | committed with this row |
-| 7 — Binding table, help, hint | dev | not started | |
+| 6 — Overlays move | dev | done | 697fafc4 |
+| 7 — Binding table, help, hint | dev | done | committed with this row |
 | 8 — Standalone workflow fixes | dev | not started | |
 | 9 — foobar component | dev | not started | |
 | 10 — Studio tokens and motion | studio-builder | not started | |
@@ -531,6 +531,19 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   `standalone/src/{app_state.rs, lib.rs, console.rs, stream.rs, shot/ui.rs}`,
   `standalone/examples/shot.rs`, `standalone/src/motion/tests.rs` and the view fixtures in
   `settings/tests.rs` and `console/tests.rs`.
+- Phase 7, shape. `keymap.rs` is a library module (`standalone::keymap`), because the `shot --ui help`
+  capture draws the sheet from it. A row carries a *set* of keys plus a `shown` spelling ("1-9",
+  "Enter" for both Enter keys), not a single key. Typing in the browser is a key-less `Action::Filter`
+  row, so the sheet lists it and the completeness test covers it. `?` is matched by the character the
+  layout types, not by a physical key. Help is `Modal::Help` over the menu it was opened from, which
+  stays open underneath. `favourite_slot` and the repeat rule moved into the table.
+- Phase 7, `?` in the browser. It was a filter character; now it opens help there. A test asserts
+  that no shipped preset name contains `?`, and that `?` is bound exactly once in each context.
+  Non-US layouts were not tried on a machine; the test feeds a `?` from a different physical key.
+- Phase 7, files outside the list: `standalone/src/{lib.rs, app_state.rs, run.rs (the show window's
+  pointer-move arm), motion.rs (the hint's envelope), stream.rs, shot/ui.rs, keymap/tests.rs}`, the
+  view fixtures in `settings/tests.rs` and `console/tests.rs`, and `docs/capturing.md` (the `help`
+  state).
 
 ### Close triggers
 
