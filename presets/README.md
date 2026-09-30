@@ -5390,7 +5390,7 @@ Presets worth reading as **worked examples** of one control each:
 | `attractor_clifford` | **feedback trails** stretching a figure into a long exposure |
 | `fragment_supernova` | beat-driven flash/glow **eased** through a `[smoothing]` table |
 | `attractor_ink` | the terminal **ink-on-paper** remap (`ink_*` / `paper_*`) |
-| `curve_nightbloom` | the audio-morphable curve **shape** params (`phase`, `radial_offset`) |
+| `curve_loom` | the audio-morphable curve **shape** params (`phase`, `radial_offset`) |
 | `lsystem_vellum` | `draw_progress` for a **line-draw-on** |
 | `star_rosewindow` | **`rings`** — concentric motifs giving a rosette an interior |
 | `fragment_vitrail` | the **`[layer]` table** — a crisp `over` layer with a bindable `mix`, and per-beat `draw_progress` on the layer |

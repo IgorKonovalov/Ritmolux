@@ -292,7 +292,7 @@ const CARDS = [
   "lsystem_rime",
   "lsystem_sumimono",
   "lsystem_vellum",
-  // parametric_curve (13)
+  // parametric_curve (12)
   "curve_blueprint",
   "curve_broadside",
   "curve_cogwheel",
@@ -301,7 +301,6 @@ const CARDS = [
   "curve_ionwake",
   "curve_lacework",
   "curve_loom",
-  "curve_nightbloom",
   "curve_phosphor",
   "curve_prismscope",
   "curve_rosemono",
@@ -487,9 +486,11 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // parametric_curve — provisional, from 2 candidates.
+    // parametric_curve — UNJUDGED. The Maurer web that held this slot was
+    // retired at the Plan 0232 walk; `curve_loom` is the family representative
+    // that walk named for its references, and it is the same family of figure.
     out: "docs/images/gallery/parametric_curve.png",
-    presetFile: "presets/curve_nightbloom.toml",
+    presetFile: "presets/curve_loom.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",

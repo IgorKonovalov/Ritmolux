@@ -15,6 +15,7 @@
 # 0.178 -> 0.173 (0.47). Breathes; nothing accumulates.
 system = "parametric_curve"
 name = "Gyre"
+representative = true
 
 [curve]
 family = "harmonograph"

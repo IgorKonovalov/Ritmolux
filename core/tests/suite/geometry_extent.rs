@@ -443,9 +443,9 @@ fn an_over_scaled_figure_measures_below_its_repaired_counterpart() {
         .collect();
     // Re-derived twice, and the number is the shipped count rather than a
     // claim: 8 at Plan 0075 cohort four, then 6 -> 5 when `lsystem_wildwood`
-    // was retired (`7596d56`). The library now draws segments from five
-    // presets — `curve_ionwake`, `curve_nightbloom`, `lsystem_vellum`,
-    // `star_rosewindow` and `spectrum_halo` — so a floor above that fails a
+    // was retired (`7596d56`). The library then drew segments from five
+    // presets — `curve_ionwake`, a since-retired Maurer web, `lsystem_vellum`,
+    // `star_rosewindow` and `spectrum_halo` — so a floor above that failed a
     // library that is fully covered. The guard still catches the real failure
     // it exists for: the filter matching nothing.
     //

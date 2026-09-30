@@ -116,7 +116,7 @@ samples       = "500"
 # as gauze over the vault instead of as a window.
 #
 # It was `0.016`, about a HUNDREDTH of what this param takes. Every other line
-# preset in the library sits at 1.5-3.2 (`curve_nightbloom` 1.5, `curve_ionwake`
+# preset in the library sits at 1.5-3.2 (`curve_loom` 1.6, `curve_ionwake`
 # 2.6, `lsystem_vellum` 2.0, `star_rosewindow` 3.2). At 0.016 the stroke is
 # sub-pixel, so nothing survives rasterization except where a sample happens to
 # land - which is exactly the dotted figure that was on screen, and it is why
@@ -138,8 +138,8 @@ samples       = "500"
 thickness     = "1.0 + clamp(treb * 0.55, 0, 0.35)"
 # THE WINDOW KEEPS THE OLD PROFILE, DELIBERATELY - do not "fix" it to the 0.25
 # default. Plan 0114's look gate named 1.0 for the Maurer roses and this layer
-# is one, for the same reason `curve_nightbloom` is: crossing chords read as
-# lace only while each thread is a bright centre in a dim skirt.
+# is one, for the reason that gate gave: crossing chords read as lace only
+# while each thread is a bright centre in a dim skirt.
 #
 # It carries an extra reason the solo rose does not. This figure hangs OVER a
 # processed vault, and the whole join depends on it sitting BACK into that
