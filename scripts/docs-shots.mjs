@@ -228,7 +228,7 @@ const cardHop = (preset) =>
 /// each group is a count, so a family that gains a preset and not a card is
 /// visible here as well as in the test.
 const CARDS = [
-  // analytic_field (12)
+  // analytic_field (11)
   "analytic_echoplate",
   "analytic_juliacircuit",
   "analytic_lacegrid",
@@ -237,7 +237,6 @@ const CARDS = [
   "analytic_pearlstring",
   "analytic_ringorbit",
   "analytic_seahorse",
-  "analytic_searchlight",
   "analytic_stainedglass",
   "analytic_standingwave",
   "analytic_twobandjulia",

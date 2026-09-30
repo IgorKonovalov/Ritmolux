@@ -1,6 +1,6 @@
 # 0232 — The library is walked, cut and refilled
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-27
 > **Approved:** 2026-09-27 (user)
 > **Owner skill(s):** human (the `preset-author` lane and the owner), dev
@@ -472,7 +472,7 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 > Written by the lane — one row per phase as that phase's commit lands, and the close block after
 > the last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled)_
+**Lane:** `plan-0232-the-library-is-walked-cut-and-refilled`, worktree `/home/igor/Work/rlx-plan-0232`
 
 | phase | owner | state | commit |
 |---|---|---|---|
