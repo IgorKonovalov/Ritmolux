@@ -447,7 +447,7 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | 8 — Parameter group and main (F2, engine) | dev | done | d9ddfe12 |
 | 9 — foobar component takes the look | dev | done | b548dedc |
 | 10 — Studio tokens and motion | studio-builder | done | 7a4996aa |
-| 11 — Bound first, the rest grouped (F2, studio) | studio-builder | done | committed with this row |
+| 11 — Bound first, the rest grouped (F2, studio) | studio-builder | done | cfc7ed95 |
 | 12 — Before and after on devices | human | not started | |
 
 ### Notes
@@ -598,5 +598,20 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   `studio/electron/player/schema.test.ts`, `studio/renderer/views/Editor.test.tsx` (fixtures).
 
 ### Close triggers
+
+- `presets/`: `presets/README.md` only (regenerated, Phase 8); no `.toml` touched.
+- Plan header carries no `**Closes:**` entries.
+- Shipped: features in the standalone (theme, panels, motion, keymap, help sheet, hint, `[ui]` keys),
+  the core (theme, panel pass, text measurement, `group`/`main` in the schema), the foobar
+  placeholder colours and the studio (tokens, motion, `ui.reducedMotion`, grouped parameter panel).
+- Operator docs moved on the lane: `README.md`, `docs/capturing.md`, `docs/configuration.md`,
+  `docs/developing.md`, `docs/running.md`, `docs/specs/0003-studio-control-protocol.md`,
+  `docs/specs/player-schema.json`, `presets/README.md`, `studio/README.md`.
+- `node scripts/check-backlog-claims.mjs`: exit 0, 50 reductions across 24 live entries, 4
+  unprobeable; no entry named.
+- Full suite: owed to the conductor's pre-review gate (ADR-0207). The studio's typecheck, lint and
+  vitest (311 tests) ran at Phase 11's tip.
+- Not verified on this lane: Phase 9's plugin build (needs CI's `foobar` job on Windows).
+- `human` phases remaining: 12 (before and after on devices; `Blocks merge: no`).
 
 ## Followups (after this lands)
