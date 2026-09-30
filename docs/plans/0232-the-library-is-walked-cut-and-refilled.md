@@ -310,16 +310,16 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | `analytic_echoplate` | analytic_field |  | 0.110/0.075/0.000/0.004 | 0.116 | 0.014 | 3.309 | Lace Grid (0.210) |  | keep | | |
 | `analytic_juliacircuit` | analytic_field |  | 0.233/0.000/0.000/0.008 | 0.233 | 0.000 | 4.233 | Multibrot (0.207) |  | keep | | |
-| `analytic_lacegrid` | analytic_field |  | 0.076/0.000/0.151/0.000 | 0.165 | 0.036 | 4.808 | Seahorse (0.166) |  | retune | | |
+| `analytic_lacegrid` | analytic_field |  | 0.076/0.000/0.151/0.000 | 0.165 | 0.036 | 4.808 | Seahorse (0.166) |  | retune | abandoned: the owner found it boring at the retune (Phase 4) and chose not to retune it; it ships unchanged. | |
 | `analytic_multibrot` | analytic_field |  | 0.061/0.060/0.000/0.000 | 0.092 | 0.021 | 1.737 | Lace Grid (0.184) |  | keep | | |
-| `analytic_parabolicdust` | analytic_field |  | 0.287/0.053/0.000/0.000 | 0.281 | 0.006 | 6.147 | Seahorse (0.162) |  | retune | | |
-| `analytic_pearlstring` | analytic_field |  | 0.270/0.054/0.000/0.000 | 0.260 | 0.037 | 8.172 | Standing Wave (0.216) |  | retune | | |
+| `analytic_parabolicdust` | analytic_field |  | 0.287/0.053/0.000/0.000 | 0.281 | 0.006 | 6.147 | Seahorse (0.162) |  | retune | | 12b46290 |
+| `analytic_pearlstring` | analytic_field |  | 0.270/0.054/0.000/0.000 | 0.260 | 0.037 | 8.172 | Standing Wave (0.216) |  | retune | | 12b46290 |
 | `analytic_ringorbit` | analytic_field |  | 0.418/0.000/0.000/0.000 | 0.418 | 0.000 | 7.909 | Stained Glass (0.240) |  | keep | | |
 | `analytic_seahorse` | analytic_field |  | 0.087/0.000/0.000/0.000 | 0.088 | 0.006 | 9.141 | Parabolic Dust (0.162) |  | keep | | |
 | `analytic_searchlight` | analytic_field |  | 0.322/0.000/0.000/0.000 | 0.319 | 0.241 | 7.651 | Standing Wave (0.220) |  | cut | Near-twin of Standing Wave, the ledger's nearest shape. | |
-| `analytic_stainedglass` | analytic_field | yes | 0.040/0.224/0.000/0.000 | 0.342 | 0.094 | 5.373 | Lace Grid (0.198) |  | retune | | |
+| `analytic_stainedglass` | analytic_field | yes | 0.040/0.224/0.000/0.000 | 0.342 | 0.094 | 5.373 | Lace Grid (0.198) |  | retune | | 12b46290 |
 | `analytic_standingwave` | analytic_field | yes | 0.193/0.197/0.000/0.000 | 0.195 | 0.009 | 1.855 | Lace Grid (0.203) |  | keep | | |
-| `analytic_twobandjulia` | analytic_field |  | 0.121/0.000/0.164/0.000 | 0.156 | 0.000 | 3.004 | Lace Grid (0.181) |  | retune | | |
+| `analytic_twobandjulia` | analytic_field |  | 0.121/0.000/0.164/0.000 | 0.156 | 0.000 | 3.004 | Lace Grid (0.181) |  | retune | | 12b46290 |
 | `attractor_clifford` | attractor | yes (new) | 0.155/0.112/0.087/0.108 | 0.196 | 0.084 | 10.416 | Thomas (0.184) |  | keep | | |
 | `attractor_cliffordgallery` | attractor |  | 0.048/0.000/0.019/0.017 | 0.055 | 0.025 | 2.538 | Thomas (0.154) |  | keep | | |
 | `attractor_dejonggallery` | attractor |  | 0.053/0.000/0.011/0.013 | 0.055 | 0.030 | 1.343 | Fern Mono (0.142) |  | cut | Near-twin of Fern Mono, the ledger's nearest shape. | |
