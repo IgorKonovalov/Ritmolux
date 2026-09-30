@@ -176,18 +176,21 @@ working surface, and nowhere else fits it better.
     `docs/content-brief.md`;
   - `scripts/softness-sheets.mjs`, `scripts/docs-clip.mjs` and `tools/sd-filter/test_sd_filter.py`;
   - `presets/pending/README.md`;
-  - `.claude/skills/preset-author/references/systems.md` and the other preset-author references
-    that list what ships. A headless session cannot write under `.claude/` (ADR-0210), so `dev`
-    lists these hits in the log with the replacement text and the owner applies them. A skill line
-    that cites a preset as a **historical example**, such as the architect skill's step 3b, is a
-    record and stays as written.
+  - **Not the preset-author skill's references.** A headless session cannot write under the
+    skills directory (ADR-0210), and a phase that declares such a path never reaches one. So this
+    phase **greps** those references for each cut name, and writes every hit into the log with its
+    replacement text; Phase 4 applies them. <!-- claude-allow: Phase 3 only greps the skill references and writes no file there; Phase 4 declares the path and applies the edits --> A skill line that cites a preset as a **historical
+    example**, such as the architect skill's step 3b, is a record and stays as written.
+  - **Amended 2026-09-30 (architect):** the skill-reference edits moved to Phase 4, because the
+    conductor parks a phase whose files include that directory before it runs (`claude_dir`), which
+    stalled the whole cull on its smallest part.
 - **Done when:**
   - Each family's cuts land as **one commit per family**, and the message lists the ledger rows it
     executes.
   - For every cut name, `git grep -n -w <name>` hits only records and measurements:
     `docs/plans/**`, `docs/adrs/**`, `docs/design-backlog*.md`, `presets/proposed/ROSTER.md`,
-    `scripts/bench/results/**` (a dated sweep names what it measured), and the `.claude/` lines the
-    log hands to the owner.
+    `scripts/bench/results/**` (a dated sweep names what it measured), and the skill-reference lines
+    the log hands to Phase 4.
   - `cargo nextest run --workspace` is green, **the full run and not `-P fast`**, because the
     gallery-card hygiene test, the representative floor and the distinctness pair counts all live in
     different binaries.
@@ -204,7 +207,9 @@ working surface, and nowhere else fits it better.
   rather than judging (the `tuple` binding, and the `occlude` retune with backlog 0038). Each lands
   through the ADR-0081 route.
 - **Files touched:** `presets/*.toml`, their gallery PNGs where the look moved,
-  `docs/content-brief.md` (each sitting moves to `Done` with its date and a one-line verdict).
+  `docs/content-brief.md` (each sitting moves to `Done` with its date and a one-line verdict), and
+  `.claude/skills/preset-author/references/systems.md` with any other preset-author reference
+  Phase 3's log names, whose recorded replacement text is applied first, before any retune.
 - **Done when:**
   - Every `retune` row names its landing commit, or reads `abandoned: <reason>`.
   - Each retuned preset was rendered and looked at in the running app before it was committed.
@@ -263,6 +268,163 @@ flags, verdict, reason, survivor/representative, commit.)_
 are `keep`. Phase 1 still gives them rows and flags, and Phase 2 does not re-judge them. A retune
 proposal for either goes back to the owner rather than into Phase 4 on its own.
 
+**Phase 1, the candidate sheet, 2026-09-29.** One row per file `ls presets/*.toml` listed at the
+start of the phase: **116**. The plan's Context counted 121 on 2026-09-27; the ledger counts what
+ships at `66ce9350`. Every value is copied from a tool, and nothing in this table is a verdict.
+
+- **Sources.** `cargo run -p standalone --example shot -- --presets presets --report` (release
+  profile, tier floor, on the AMD Radeon RENOIR iGPU through RADV) and
+  `cargo nextest run -p rlx-core --test distinctness --no-capture`, both on the Arch box at `66ce9350`.
+  Their raw output is under `target/p0232/`, uncommitted.
+- **Columns.** `bass/mid/treb/onset` is the report's reactivity reading, and `drive` and `anim`
+  are printed as the report prints them. `ms/frame` is the report's headless cost at 1920x1080. It
+  carries a `!` past the 16.67 ms budget, and **no preset carries one**. `nearest shape` is the
+  closest in-family partner in distinctness's `shape (struct_diff)` matrix, with its distance. The
+  report and the test flag a pair `NEAR-DUP` below shape 0.08. `machine flags` names which tool
+  raised each flag.
+- **Near-duplicates.** Only the attractor family has any. It has six pairs among four presets
+  (Lorenz Gallery, Valentine, Butterfly to Knot, Rho Walk). The report prints five of them;
+  `Lorenz Gallery ~ Rho Walk` comes from distinctness alone.
+- **The `sanity` NOTE** is copied from `each_structure_candidate_is_tabled_against_the_library` in
+  `core/tests/sanity.rs`, which names backlog 0248's four presets. That measurement test was not
+  run for this sheet.
+- **Headers.** The close-ceremony step 3b grep matched 292 lines across the library, and each was
+  read. Most cite the ADR or plan a preset was authored under. None cites a live backlog entry. A
+  `header:` flag marks the six presets whose header describes a clause built around a named
+  decision: five around ADR-0109 and `attractor_dragon` around ADR-0103. Workarounds that later
+  plans removed, such as Clifford's reseed gate, Perseids' walls and Cauldron's clock, are
+  recorded in their headers as history and are not flagged.
+
+**The six content-brief sittings, attached to the family whose walk answers them:**
+
+| sitting | family | answer (Phase 2) |
+|---|---|---|
+| §1 The sky family (Perseids' quiet sky, the dusk ground, the galaxy) | emitter (`emitter_perseids`), plus the stale `fragment_vitrail` header it names | retired: Perseids, the sky it names, is cut |
+| §2 The ink worlds re-judge on `ink_gamma` | reaction_diffusion (`reaction_etching`), and attractor for `attractor_ink` | to Phase 4 (Etching cut; Ink on Paper kept and re-judged there) |
+| §3 The attractor binds `tuple` | attractor | to Phase 4 |
+| §4 The `occlude` retune, with backlog 0038 | every family. It is library-wide, and the brief orders it last | to Phase 4, library-wide and last |
+| §5 Two families photograph badly | emitter (`emitter_perseids`) and star_pattern (`star_rosewindow`) | half retired: Perseids cut; Rose Window kept, so Phase 4 takes that half |
+| §6 The figure at frame scale | shape_field | to Phase 4 |
+
+| preset | family | rep | bass/mid/treb/onset | drive | anim | ms/frame | nearest shape | machine flags | verdict | reason | commit |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `analytic_echoplate` | analytic_field |  | 0.110/0.075/0.000/0.004 | 0.116 | 0.014 | 3.309 | Lace Grid (0.210) |  | keep | | |
+| `analytic_juliacircuit` | analytic_field |  | 0.233/0.000/0.000/0.008 | 0.233 | 0.000 | 4.233 | Multibrot (0.207) |  | keep | | |
+| `analytic_lacegrid` | analytic_field |  | 0.076/0.000/0.151/0.000 | 0.165 | 0.036 | 4.808 | Seahorse (0.166) |  | retune | | |
+| `analytic_multibrot` | analytic_field |  | 0.061/0.060/0.000/0.000 | 0.092 | 0.021 | 1.737 | Lace Grid (0.184) |  | keep | | |
+| `analytic_parabolicdust` | analytic_field |  | 0.287/0.053/0.000/0.000 | 0.281 | 0.006 | 6.147 | Seahorse (0.162) |  | retune | | |
+| `analytic_pearlstring` | analytic_field |  | 0.270/0.054/0.000/0.000 | 0.260 | 0.037 | 8.172 | Standing Wave (0.216) |  | retune | | |
+| `analytic_ringorbit` | analytic_field |  | 0.418/0.000/0.000/0.000 | 0.418 | 0.000 | 7.909 | Stained Glass (0.240) |  | keep | | |
+| `analytic_seahorse` | analytic_field |  | 0.087/0.000/0.000/0.000 | 0.088 | 0.006 | 9.141 | Parabolic Dust (0.162) |  | keep | | |
+| `analytic_searchlight` | analytic_field |  | 0.322/0.000/0.000/0.000 | 0.319 | 0.241 | 7.651 | Standing Wave (0.220) |  | cut | Near-twin of Standing Wave, the ledger's nearest shape. | |
+| `analytic_stainedglass` | analytic_field | yes | 0.040/0.224/0.000/0.000 | 0.342 | 0.094 | 5.373 | Lace Grid (0.198) |  | retune | | |
+| `analytic_standingwave` | analytic_field | yes | 0.193/0.197/0.000/0.000 | 0.195 | 0.009 | 1.855 | Lace Grid (0.203) |  | keep | | |
+| `analytic_twobandjulia` | analytic_field |  | 0.121/0.000/0.164/0.000 | 0.156 | 0.000 | 3.004 | Lace Grid (0.181) |  | retune | | |
+| `attractor_clifford` | attractor | yes (new) | 0.155/0.112/0.087/0.108 | 0.196 | 0.084 | 10.416 | Thomas (0.184) |  | keep | | |
+| `attractor_cliffordgallery` | attractor |  | 0.048/0.000/0.019/0.017 | 0.055 | 0.025 | 2.538 | Thomas (0.154) |  | keep | | |
+| `attractor_dejonggallery` | attractor |  | 0.053/0.000/0.011/0.013 | 0.055 | 0.030 | 1.343 | Fern Mono (0.142) |  | cut | Near-twin of Fern Mono, the ledger's nearest shape. | |
+| `attractor_dragon` | attractor |  | 0.100/0.036/0.062/0.041 | 0.141 | 0.022 | 6.439 | Volute (0.182) | header: ADR-0103: fit holds only at zero rotation, so base `zoom` sits under 1 | keep | | |
+| `attractor_fern` | attractor |  | 0.091/0.096/0.029/0.074 | 0.137 | 0.035 | 6.242 | Fern Mono (0.148) |  | cut | Does not follow the music. Its code references move to Fern Mono. | |
+| `attractor_fernmono` | attractor |  | 0.037/0.038/0.009/0.010 | 0.056 | 0.026 | 1.190 | Rho Walk (0.125) |  | keep | | |
+| `attractor_ink` | attractor |  | 0.089/0.039/0.044/0.013 | 0.103 | 0.053 | 3.985 | De Jong Gallery (0.142) |  | keep | | |
+| `attractor_leviathan` | attractor | yes | 0.135/0.111/0.173/0.075 | 0.182 | 0.069 | 11.929 | Clifford (0.233) |  | keep | | |
+| `attractor_lorenzgallery` | attractor |  | 0.045/0.000/0.011/0.030 | 0.054 | 0.040 | 3.896 | Valentine (0.066) | NEAR-DUP ~ Valentine (distinctness+report, shape 0.066); NEAR-DUP ~ Butterfly to Knot (distinctness+report, shape 0.071); NEAR-DUP ~ Rho Walk (distinctness, shape 0.068) | cut | Redundant with a stronger keep in its family. | |
+| `attractor_lorenzknot` | attractor |  | 0.103/0.010/0.016/0.000 | 0.107 | 0.008 | 4.012 | Valentine (0.190) |  | keep | | |
+| `attractor_thomas` | attractor |  | 0.079/0.016/0.046/0.076 | 0.074 | 0.061 | 1.544 | Thomas Gallery (0.097) | header: ADR-0109: `beat_index` counts detections, not beats | cut | Redundant with a stronger keep in its family. Its code references move to Thomas Gallery. | |
+| `attractor_thomasgallery` | attractor |  | 0.020/0.000/0.042/0.114 | 0.090 | 0.125 | 3.235 | Thomas (0.097) |  | keep | | |
+| `attractor_thomasred` | attractor |  | 0.042/0.008/0.038/0.000 | 0.032 | 0.045 | 3.672 | Thomas (0.213) |  | retune | | |
+| `attractor_torusknot` | attractor |  | 0.033/0.003/0.008/0.034 | 0.126 | 0.010 | 3.611 | Valentine (0.127) | header: ADR-0109: `beat_index` counts detections, not beats | cut | Near-twin of Valentine, the ledger's nearest shape. Its code references move to Lorenz Knot. | |
+| `attractor_valentine` | attractor |  | 0.026/0.026/0.048/0.023 | 0.034 | 0.043 | 4.525 | Butterfly to Knot (0.059) | NEAR-DUP ~ Lorenz Gallery (distinctness+report, shape 0.066); NEAR-DUP ~ Butterfly to Knot (distinctness+report, shape 0.059); NEAR-DUP ~ Rho Walk (distinctness+report, shape 0.064); header: ADR-0109: `beat_index` counts detections, not beats | cut | Does not follow the music. | |
+| `attractor_volute` | attractor |  | 0.048/0.041/0.006/0.021 | 0.065 | 0.010 | 5.179 | Thomas (0.166) |  | cut | Redundant with a stronger keep in its family. | |
+| `attractor_walkdejong` | attractor |  | 0.087/0.000/0.022/0.056 | 0.113 | 0.049 | 4.158 | Thomas (0.150) | header: ADR-0109: `beat_index` counts detections, not beats | keep | | |
+| `attractor_walkknot` | attractor |  | 0.032/0.003/0.009/0.018 | 0.039 | 0.050 | 4.594 | Rho Walk (0.036) | NEAR-DUP ~ Lorenz Gallery (distinctness+report, shape 0.071); NEAR-DUP ~ Valentine (distinctness+report, shape 0.059); NEAR-DUP ~ Rho Walk (distinctness+report, shape 0.036) | cut | Redundant with a stronger keep in its family. | |
+| `attractor_walkrho` | attractor | yes | 0.028/0.002/0.007/0.014 | 0.032 | 0.046 | 3.887 | Butterfly to Knot (0.036) | NEAR-DUP ~ Valentine (distinctness+report, shape 0.064); NEAR-DUP ~ Butterfly to Knot (distinctness+report, shape 0.036); NEAR-DUP ~ Lorenz Gallery (distinctness, shape 0.068) | cut | Near-twin of Butterfly to Knot, the ledger's nearest shape. | |
+| `attractor_walkthomas` | attractor |  | 0.034/0.004/0.013/0.040 | 0.074 | 0.020 | 3.016 | Thomas (0.118) |  | keep | | |
+| `cellular_ember_life` | cellular | yes | 0.015/0.215/0.000/0.000 | 0.192 | 0.168 | 2.326 | Labyrinth (0.183) |  | keep | | |
+| `cellular_labyrinth` | cellular |  | 0.001/0.133/0.001/0.000 | 0.105 | 0.102 | 1.234 | Ember Life (0.183) |  | retune | | |
+| `cellular_spiral_bloom` | cellular | yes | 0.000/0.169/0.053/0.000 | 0.274 | 0.148 | 1.624 | Wavefront (0.192) |  | retune | | |
+| `cellular_tide_bugs` | cellular |  | 0.381/0.000/0.000/0.000 | 0.360 | 0.058 | 1.273 | Ember Life (0.206) |  | keep | | |
+| `cellular_wavefront` | cellular |  | 0.114/0.055/0.110/0.000 | 0.291 | 0.084 | 1.597 | Ember Life (0.187) |  | keep | | |
+| `emitter_driftfield` | emitter | yes (new) | 0.021/0.001/0.000/0.000 | 0.019 | 0.004 | 2.759 | Petalfall (0.151) |  | retune | | |
+| `emitter_emberjet` | emitter |  | 0.044/0.002/0.002/0.000 | 0.059 | 0.006 | 3.448 | Perseids (0.123) |  | cut | Does not follow the music. | |
+| `emitter_heartfall` | emitter | yes | 0.016/0.000/0.000/0.085 | 0.130 | 0.073 | 0.926 | Petalfall (0.202) |  | keep | | |
+| `emitter_perseids` | emitter | yes | 0.050/0.012/0.000/0.022 | 0.065 | 0.024 | 1.645 | Ember Jet (0.123) |  | cut | Does not follow the music. | |
+| `emitter_petalfall` | emitter |  | 0.060/0.001/0.007/0.024 | 0.081 | 0.015 | 3.997 | Drift Field (0.151) |  | cut | Near-twin of Drift Field, the ledger's nearest shape. | |
+| `fragment_driftmono` | fragment_field |  | 0.261/0.443/0.153/0.143 | 0.469 | 0.264 | 0.842 | Banded Mandala (0.252) |  | keep | | |
+| `fragment_drostemono` | fragment_field |  | 0.328/0.406/0.132/0.218 | 0.459 | 0.382 | 1.170 | Banded Mandala (0.214) |  | keep | | |
+| `fragment_etchingplate` | fragment_field |  | 0.093/0.022/0.009/0.000 | 0.106 | 0.027 | 1.372 | Nebula (0.182) |  | keep | | |
+| `fragment_interferencemono` | fragment_field |  | 0.182/0.079/0.000/0.023 | 0.234 | 0.043 | 1.850 | Marbled Strata (0.227) |  | retune | | |
+| `fragment_mandala` | fragment_field |  | 0.065/0.124/0.024/0.007 | 0.085 | 0.020 | 4.570 | Nebula (0.183) |  | keep | | |
+| `fragment_nebula` | fragment_field |  | 0.190/0.132/0.140/0.099 | 0.212 | 0.059 | 8.628 | Whorl (0.179) |  | keep | | |
+| `fragment_strata` | fragment_field |  | 0.141/0.102/0.138/0.026 | 0.167 | 0.071 | 0.885 | Banded Mandala (0.211) |  | keep | | |
+| `fragment_sumi` | fragment_field |  | 0.096/0.029/0.047/0.142 | 0.165 | 0.104 | 6.850 | Vitrail (0.169) | sanity NOTE: one of the four groundless luminous fields ADR-0128 leaves open | keep | 0248: the problem is the fill, not the composition. | |
+| `fragment_supernova` | fragment_field |  | 0.278/0.308/0.252/0.203 | 0.280 | 0.236 | 3.882 | Banded Mandala (0.199) | sanity NOTE: one of the four groundless luminous fields ADR-0128 leaves open | retune | 0248: the problem is the fill, not the composition. | |
+| `fragment_tiled` | fragment_field |  | 0.082/0.099/0.021/0.019 | 0.072 | 0.049 | 4.772 | Banded Mandala (0.256) |  | cut | Near-twin of Banded Mandala, the ledger's nearest shape. Its code references move to Tiled Rosette Mono. | |
+| `fragment_tiledmono` | fragment_field | yes | 0.347/0.000/0.119/0.000 | 0.461 | 0.523 | 1.162 | Interference Mono (0.301) |  | keep | | |
+| `fragment_tunnel` | fragment_field |  | 0.243/0.017/0.086/0.085 | 0.296 | 0.107 | 6.171 | Vitrail (0.202) | sanity NOTE: one of the four groundless luminous fields ADR-0128 leaves open | retune | 0248: the problem is the fill, not the composition. | |
+| `fragment_vitrail` | fragment_field |  | 0.113/0.058/0.062/0.129 | 0.246 | 0.058 | 6.116 | Sumi (0.169) |  | retune | | |
+| `fragment_whorl` | fragment_field | yes | 0.254/0.040/0.019/0.048 | 0.295 | 0.084 | 5.113 | Nebula (0.179) | sanity NOTE: one of the four groundless luminous fields ADR-0128 leaves open | keep | 0248: the problem is the fill, not the composition. | |
+| `lsystem_bower` | lsystem |  | 0.022/0.031/0.007/0.023 | 0.081 | 0.013 | 3.519 | Coral (0.132) |  | cut | Redundant with a stronger keep in its family. | |
+| `lsystem_coral` | lsystem | yes | 0.043/0.035/0.004/0.000 | 0.083 | 0.012 | 3.782 | Bower (0.132) |  | cut | Redundant with a stronger keep in its family. | |
+| `lsystem_icecrystal` | lsystem | yes (new) | 0.008/0.104/0.028/0.000 | 0.181 | 0.020 | 3.333 | Bower (0.173) |  | keep | | |
+| `lsystem_rime` | lsystem | yes | 0.048/0.004/0.012/0.005 | 0.102 | 0.015 | 3.191 | Sumi Mono (0.218) |  | retune | | |
+| `lsystem_sumimono` | lsystem |  | 0.031/0.012/0.004/0.000 | 0.050 | 0.000 | 1.021 | Bower (0.150) |  | retune | | |
+| `lsystem_vellum` | lsystem |  | 0.160/0.003/0.000/0.004 | 0.184 | 0.029 | 1.208 | Sumi Mono (0.162) |  | retune | | |
+| `curve_blueprint` | parametric_curve |  | 0.033/0.000/0.000/0.000 | 0.033 | 0.016 | 3.655 | Gyre (0.114) |  | keep | | |
+| `curve_broadside` | parametric_curve |  | 0.086/0.166/0.000/0.023 | 0.206 | 0.129 | 0.708 | Blueprint (0.179) |  | keep | | |
+| `curve_cogwheel` | parametric_curve |  | 0.056/0.000/0.007/0.000 | 0.041 | 0.011 | 5.411 | Turnabout (0.159) |  | retune | | |
+| `curve_gyre` | parametric_curve | yes (new) | 0.044/0.015/0.000/0.003 | 0.047 | 0.013 | 5.986 | Blueprint (0.114) |  | keep | | |
+| `curve_inkpendulum` | parametric_curve |  | 0.027/0.027/0.000/0.000 | 0.033 | 0.017 | 3.645 | Gyre (0.116) |  | retune | | |
+| `curve_ionwake` | parametric_curve |  | 0.008/0.000/0.003/0.035 | 0.100 | 0.010 | 1.745 | Blueprint (0.114) |  | retune | | |
+| `curve_lacework` | parametric_curve |  | 0.042/0.000/0.001/0.000 | 0.042 | 0.028 | 4.156 | Blueprint (0.174) |  | keep | | |
+| `curve_loom` | parametric_curve | yes | 0.071/0.045/0.012/0.047 | 0.104 | 0.039 | 3.316 | Turnabout (0.176) |  | retune | | |
+| `curve_nightbloom` | parametric_curve | yes | 0.071/0.016/0.012/0.006 | 0.091 | 0.023 | 2.500 | Ion Wake (0.160) | header: ADR-0109: `beat_index` counts detections; musical-period retune named as a followup (Plan 0095) | cut | Redundant with a stronger keep in its family. Its code references move to Loom. | |
+| `curve_phosphor` | parametric_curve |  | 0.042/0.048/0.000/0.000 | 0.048 | 0.047 | 5.749 | Blueprint (0.213) |  | keep | | |
+| `curve_prismscope` | parametric_curve |  | 0.052/0.040/0.000/0.000 | 0.041 | 0.035 | 4.278 | Blueprint (0.193) |  | keep | | |
+| `curve_rosemono` | parametric_curve |  | 0.039/0.000/0.000/0.137 | 0.155 | 0.134 | 1.141 | Lacework (0.186) |  | retune | | |
+| `curve_turnabout` | parametric_curve |  | 0.022/0.007/0.000/0.003 | 0.026 | 0.003 | 4.844 | Cogwheel (0.159) |  | retune | | |
+| `reaction_etching` | reaction_diffusion | yes | 0.053/0.025/0.007/0.006 | 0.059 | 0.081 | 4.368 | Lichen (0.278) |  | cut | Redundant with a stronger keep in its family. Its code references move to Lichen. | |
+| `reaction_fluxmono` | reaction_diffusion | yes | 0.352/0.047/0.000/0.237 | 0.168 | 0.430 | 4.658 | Mitosis (0.177) |  | keep | | |
+| `reaction_glaciermono` | reaction_diffusion |  | 0.157/0.033/0.000/0.132 | 0.395 | 0.320 | 4.745 | Mitosis (0.236) |  | keep | | |
+| `reaction_lichen` | reaction_diffusion | yes (new) | 0.052/0.015/0.008/0.016 | 0.073 | 0.027 | 5.866 | Spot Mono (0.169) |  | keep | | |
+| `reaction_mitosis` | reaction_diffusion |  | 0.056/0.028/0.028/0.015 | 0.087 | 0.020 | 5.645 | Flux Mono (0.177) |  | retune | | |
+| `reaction_spotmono` | reaction_diffusion |  | 0.039/0.016/0.000/0.000 | 0.046 | 0.024 | 4.443 | Lichen (0.169) |  | retune | | |
+| `reaction_verdigris` | reaction_diffusion |  | 0.052/0.014/0.008/0.008 | 0.068 | 0.018 | 6.356 | Flux Mono (0.250) |  | keep | | |
+| `collage_mono` | shape_collage | yes | 0.056/0.002/0.000/0.000 | 0.058 | 0.002 | 1.065 | Nocturne (0.240) |  | keep | | |
+| `collage_nocturne` | shape_collage |  | 0.055/0.002/0.002/0.029 | 0.065 | 0.016 | 1.755 | Suprematist (0.211) |  | cut | Redundant with a stronger keep in its family. | |
+| `collage_onwhite` | shape_collage |  | 0.037/0.002/0.003/0.000 | 0.039 | 0.021 | 1.887 | Suprematist (0.219) |  | retune | | |
+| `collage_suprematist` | shape_collage | yes | 0.047/0.008/0.002/0.000 | 0.064 | 0.008 | 1.031 | Nocturne (0.211) |  | keep | | |
+| `shape_aperture` | shape_field |  | 0.070/0.106/0.030/0.040 | 0.164 | 0.031 | 3.406 | Strata Heart (0.231) |  | keep | | |
+| `shape_contourmono` | shape_field | yes | 0.457/0.000/0.467/0.642 | 0.367 | 0.159 | 1.283 | Aperture (0.256) |  | keep | | |
+| `shape_facet` | shape_field | yes | 0.110/0.021/0.043/0.122 | 0.125 | 0.038 | 4.503 | Path Lion (0.245) |  | cut | Redundant with a stronger keep in its family. Its code references move to Path Maple. | |
+| `shape_heartmono` | shape_field |  | 0.556/0.000/0.359/0.017 | 0.444 | 0.000 | 0.877 | Path Maple (0.243) |  | cut | Redundant with a stronger keep in its family. | |
+| `shape_lion` | shape_field |  | 0.167/0.000/0.009/0.000 | 0.169 | 0.000 | 5.746 | Path Maple (0.186) |  | cut | Redundant with a stronger keep in its family. | |
+| `shape_maple` | shape_field | yes (new) | 0.175/0.000/0.016/0.000 | 0.180 | 0.000 | 5.847 | Path Lion (0.186) |  | keep | | |
+| `shape_pulse` | shape_field |  | 0.343/0.000/0.014/0.000 | 0.341 | 0.017 | 0.758 | Path Maple (0.194) |  | retune | | |
+| `shape_ringmono` | shape_field |  | 0.486/0.000/0.297/0.009 | 0.349 | 0.000 | 1.024 | Aperture (0.285) |  | keep | | |
+| `shape_strataheart` | shape_field |  | 0.203/0.041/0.000/0.171 | 0.181 | 0.004 | 3.846 | Path Maple (0.199) |  | retune | | |
+| `spectrum_anemone` | spectrum | yes (new) | 0.032/0.013/0.005/0.049 | 0.056 | 0.008 | 0.820 | Radial Bloom (0.180) |  | keep | | |
+| `spectrum_metermono` | spectrum |  | 0.104/0.055/0.034/0.156 | 0.156 | 0.000 | 0.646 | Radial Bloom (0.101) |  | keep | | |
+| `spectrum_radialbloom` | spectrum |  | 0.050/0.081/0.063/0.199 | 0.173 | 0.000 | 2.719 | Meter Mono (0.101) |  | retune | | |
+| `spectrum_ridge` | spectrum | yes | 0.065/0.038/0.008/0.028 | 0.117 | 0.007 | 3.286 | Radial Bloom (0.126) |  | cut | Redundant with a stronger keep in its family. Its code references move to Skyline. | |
+| `spectrum_skyline` | spectrum | yes | 0.040/0.070/0.006/0.088 | 0.114 | 0.002 | 2.834 | Meter Mono (0.194) |  | keep | | |
+| `star_corona` | star_pattern | yes | 0.084/0.029/0.039/0.067 | 0.134 | 0.019 | 3.033 | Zellij (0.203) |  | keep | | |
+| `star_mandala_bordered` | star_pattern | yes | 0.104/0.097/0.040/0.007 | 0.158 | 0.069 | 1.046 | Zellij (0.190) |  | cut | Redundant with a stronger keep in its family. Its code references move to Rose Window. | |
+| `star_rosewindow` | star_pattern | yes (new) | 0.085/0.006/0.009/0.007 | 0.090 | 0.039 | 2.115 | Zellij (0.187) |  | keep | | |
+| `star_zellij` | star_pattern |  | 0.085/0.047/0.057/0.021 | 0.106 | 0.043 | 1.008 | Rose Window (0.187) |  | cut | Redundant with a stronger keep in its family. | |
+| `swarm_braid` | swarm |  | 0.110/0.050/0.010/0.092 | 0.123 | 0.093 | 7.565 | Stipple (0.147) |  | keep | | |
+| `swarm_drift` | swarm | yes | 0.105/0.123/0.007/0.099 | 0.136 | 0.104 | 5.341 | Shatter (0.187) |  | retune | | |
+| `swarm_murmuration` | swarm | yes (new) | 0.055/0.070/0.042/0.060 | 0.128 | 0.105 | 7.007 | Stipple (0.125) |  | keep | | |
+| `swarm_shatter` | swarm |  | 0.099/0.064/0.013/0.106 | 0.103 | 0.092 | 4.635 | Braid (0.177) |  | cut | Redundant with a stronger keep in its family. Its code references move to Braid. | |
+| `swarm_stipple` | swarm | yes | 0.050/0.013/0.001/0.011 | 0.057 | 0.010 | 3.982 | Murmuration (0.125) |  | cut | Redundant with a stronger keep in its family. | |
+| `warp_cauldron` | warp_mesh | yes | 0.033/0.038/0.000/0.031 | 0.100 | 0.027 | 4.001 | Wellhead (0.192) |  | cut | Broken or ugly in the running app. | |
+| `warp_ladder` | warp_mesh | yes (new) | 0.067/0.000/0.053/0.688 | 0.560 | 0.593 | 1.612 | Wellhead (0.265) |  | keep | | |
+| `warp_millrace` | warp_mesh | yes | 0.018/0.042/0.004/0.014 | 0.097 | 0.027 | 4.286 | Wellhead (0.187) |  | cut | Broken or ugly in the running app. | |
+| `warp_sirocco` | warp_mesh |  | 0.015/0.038/0.002/0.012 | 0.097 | 0.038 | 4.153 | Smoke (0.177) |  | retune | | |
+| `warp_smoke` | warp_mesh |  | 0.029/0.009/0.001/0.002 | 0.058 | 0.018 | 2.060 | Sirocco (0.177) |  | retune | | |
+| `warp_tracery` | warp_mesh | yes (new) | 0.041/0.067/0.023/0.181 | 0.167 | 0.112 | 1.734 | Wellhead (0.223) |  | keep | | |
+| `warp_wellhead` | warp_mesh |  | 0.021/0.033/0.002/0.012 | 0.117 | 0.038 | 4.079 | Sirocco (0.177) |  | cut | Broken or ugly in the running app. | |
+
 ## Gaps
 
 _(Filled by Phase 5.)_
@@ -314,8 +476,8 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The candidate sheet | human | not started | |
-| 2 — The walk | human | not started | |
+| 1 — The candidate sheet | human | done | committed with this row |
+| 2 — The walk | human | done | committed with this row |
 | 3 — The cull | dev | not started | |
 | 4 — The retunes and the sittings | human | not started | |
 | 5 — The gap brief | human | not started | |

@@ -773,17 +773,18 @@ fn roster_change_reclamps_the_highlight_and_keeps_open() {
 // The preview pane
 // ---------------------------------------------------------------------------
 
-/// The shipped library's size when the pane was placed. Pinned as a number for
-/// the reason [`SHIPPED`] is: the claim is arithmetic over it.
-const LIBRARY: usize = 114;
-
 /// **The pane sits beside the list, clear of every row, at the sizes the app is
 /// run at.** The list is laid out exactly as it is with no pane — `layout` is not
 /// told about it — so what is asserted is that the shipped library's rows leave
 /// the corner the pane occupies empty, whichever row is highlighted, and that
 /// the pane and its caption stay on the surface.
+///
+/// The library's size is read from the embedded set rather than written here,
+/// so a library that grows into the pane fails this test instead of passing it
+/// against a count other than the one that ships.
 #[test]
 fn the_pane_is_clear_of_the_shipped_librarys_rows() {
+    let library = rlx_core::preset::default_presets().len();
     for (width, height) in [HD, QHD] {
         let pane = pane(width, height).unwrap_or_else(|| panic!("{width}x{height} has a pane"));
         assert!(pane.x + pane.w <= width, "{width}x{height}: off the right");
@@ -794,9 +795,9 @@ fn the_pane_is_clear_of_the_shipped_librarys_rows() {
         assert_eq!((pane.w, pane.h), (PANE_IMAGE_W, PANE_IMAGE_H));
 
         let pane_bottom = pane.caption_y + ROW_H;
-        for highlight in [0, LIBRARY - 1] {
-            let list = layout(LIBRARY, highlight, width, height);
-            for row in 0..LIBRARY {
+        for highlight in [0, library - 1] {
+            let list = layout(library, highlight, width, height);
+            for row in 0..library {
                 let Some((col, r)) = list.place(row) else {
                     continue;
                 };

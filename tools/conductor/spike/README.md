@@ -141,6 +141,39 @@ wrote the path with a backslash, so the tool answered *"File does not exist"* ra
 the permission. Its first `Read` failed on the same path, and its relative-path `Read` succeeded.
 D is the reading that counts for `Edit`, as C was for the control write on 2.1.280.
 
+## Re-verified on 2.1.283, on Linux
+
+- **Date:** 2026-09-29
+- **CLI:** `claude --version` -> `2.1.283 (Claude Code)`
+- **Machine:** Arch Linux (Omarchy, Hyprland), Node v26.8.2, worktree at `~/Work/rlx-probe-0187`
+- **Run:** `node tools/conductor/spike/probe.mjs --model haiku`, all four sessions: $0.095 (A) +
+  $0.061 (B) + $0.070 (C) + $0.062 (D). Then `--sessions c,d` again after the path fix below: $0.065
+  (C) + $0.068 (D). Raw output under `target/conductor-spike/<stamp>/`.
+
+Every row holds. Session A: the `dev` skill loads (the session quoted `# dev — Ritmolux`), the
+`git add -A` denial comes back as the readable hook error, `cargo --version` runs, the `node -e` call
+is denied in dontAsk mode without a stall, and `Write` then `Edit` land (`probe-out.txt` reads back
+`beta`). `result/success` after 8 turns. Session B ends exit 1, `error_max_budget_usd`, after 2
+turns. `git worktree remove` exits 0 and leaves no directory.
+
+**`.claude/` is still write-denied, and this time C and D are both readings.** Under
+`settings.conductor.json` (C) and under settings naming `.claude/` paths (D), a `Read` of
+`.claude/skills/probe-scratch/NOTES.md` returned the file, and the `Edit` of it and a `Write` beside it
+were refused with the dontAsk denial. The control `Write` in the worktree root succeeded. Read back
+from the parent afterwards, `NOTES.md` still holds `alpha` and `NEW.md` does not exist.
+
+**The first C and D runs were not readings, and the fault was the probe's.** Their prompts spelled
+paths with a Windows backslash (`${CLAUDE_SCRATCH}\NOTES.md`), which on Linux names a file whose
+name contains a backslash. That is the same fault the 2.1.282 notes saw once in C's `Edit`. On
+2.1.283 a `Read` of such a path answers *"Refusing to read ...: its symlink resolution changed after
+permission was checked"*, a new message for a malformed path rather than a permission ruling. The
+prompts now build every path with `path.join`. **The same fault falsifies one earlier Linux reading.**
+The 2.1.282 run's "control `Write` outside `.claude/` succeeded" was a write to
+`~/Work/rlx-probe-0187\probe-control.txt`, a file in the directory **above** the worktree, found
+still holding `delta` on this date and removed. So under `settings.conductor.json` a headless
+session's `Write` reached a path outside its lane. Nothing in the settings bounds the `Write` tool to
+the worktree; the deletion bound in `settings.test.mjs` covers `rm` and `Remove-Item` only.
+
 ## What the probe does
 
 Four sessions. Two of them, A and B, are `claude -p "/dev implement plan 9999"` with the worktree as cwd, and with
@@ -289,6 +322,46 @@ still ran. The `cd` rows were not asked again; the rules added touch only `rm` a
 
 **`Remove-Item` was not asked.** The PowerShell tool exists only on Windows, so this platform has no
 call to make. The row stays open until the probe runs on a Windows box.
+
+## What may a session write? Observed on 2.1.283
+
+- **Date:** 2026-09-29
+- **CLI:** `claude --version` -> `2.1.283 (Claude Code)`, on Linux (Arch, Node 26.8.2)
+- **Run:** `node tools/conductor/spike/matcher-probe.mjs --model haiku --writes`, once per settings
+  file below; about $0.05-0.09 each. `--writes` has the session call `Write` and `Edit` instead of
+  Bash, and `--add-dir` hands it `state/reviews/` beside the settings file, as `lib/lane.mjs` hands a
+  review session its reviews directory. The parent reads the disk afterwards: a `Write` landed if its
+  target exists, and an `Edit` landed if its target now holds `beta`. Plan 0234 Phase 1.
+
+| Shape | Today's settings (bare `Write`, `Edit`) | Candidate A: `./**` + `//tmp/**` | Candidate B: A + `/state/reviews/**` |
+|---|---|---|---|
+| `Write` a relative path in the lane | **WROTE** | **WROTE** | **WROTE** |
+| `Write` an absolute path in the lane | **WROTE** | **WROTE** | **WROTE** |
+| `Write` a new file in a lane subdirectory | **WROTE** | **WROTE** | **WROTE** |
+| `Write` in the OS temp directory | **WROTE** | **WROTE** | **WROTE** |
+| `Write` in the lane's parent | **WROTE** | **DENIED** | **DENIED** |
+| `Write` in `$HOME` (the sandbox) | **WROTE** | **DENIED** | **DENIED** |
+| `Edit` in the lane | **WROTE** | **WROTE** | **WROTE** |
+| `Edit` in the lane's parent | **WROTE** | **DENIED** | **DENIED** |
+| `Write` in `state/reviews/` beside the settings file, with `--add-dir` | not asked | **DENIED** | **WROTE** |
+
+**Today's settings bound nothing**: every write landed, the parent and home included, which is
+backlog 0273 reproduced deliberately. **Candidate B is the bound ADR-0255 asks for.** It replaces the
+bare grants with `Write(./**)`, `Edit(./**)`, `Write(//tmp/**)`, `Edit(//tmp/**)`,
+`Write(/state/reviews/**)` and `Edit(/state/reviews/**)`.
+
+**Three spellings, three anchors, all read off this table.**
+
+- **`./**` is the session's working directory, which is the lane.** The candidate files lived in
+  `target/p0234/`, outside the probe's box, and the lane writes were granted while the box's own
+  directory was refused. So `./` did not resolve against the settings file.
+- **`//tmp/**` is an absolute path.**
+- **`/state/reviews/**` is relative to the settings file's own directory**, so the committed file
+  names `tools/conductor/state/reviews/` without naming a machine.
+
+**`--add-dir` grants nothing on its own.** Under candidate A the reviews write was refused although
+the session was handed that directory. Without the `/state/reviews/**` rule, every review and close
+session would be refused its own review file.
 
 ## Also observed, and relevant to the conductor
 

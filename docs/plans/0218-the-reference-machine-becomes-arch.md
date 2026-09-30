@@ -273,11 +273,11 @@ flowchart TB
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by the implementer)_
+**Lane:** `main` for the log; Phase 1 changes no code
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Ask Hyprland what a client may do | human | not started | |
+| 1 — Ask Hyprland what a client may do | human | done - one display, so D and a second-display console were not answerable | committed with this row |
 | 2 — The baselines move to lavapipe | dev | not started | |
 | 3 — Judge the 44 | human | not started | |
 | 4 — Every WARP claim takes one of three exits | dev | not started | |
@@ -285,6 +285,39 @@ flowchart TB
 | 6 — A rehearsal on the box | human | not started | |
 
 ### Notes
+
+- **Phase 1 readings, 2026-09-29.** Taken on the Arch box (Omarchy, Hyprland) with the owner at the
+  screen, reading what happened aloud, and an architect session reading the compositor with
+  `hyprctl clients -j`. Player: the release `ritmolux` built at `fb083a31` (v0.152.0), run with a
+  scratch `XDG_DATA_HOME` so the owner's own `config.toml` was neither read nor written. **One display
+  was connected**: `eDP-1`, Chimei Innolux 0x1540, 2560x1440 @ 165 Hz, scale 1.25.
+  - **Fullscreen on a named output.** Asked for with `[output] display_name = "eDP-1"` and
+    `fullscreen = true`. The compositor reported the show window fullscreen (state 2) on monitor 0,
+    `eDP-1`, at 2048x1152 logical (2560x1440 at 1.25), at 165 fps. Owner: *"yes"*, fullscreen and
+    reacting to the music.
+  - **`D` to the next monitor.** Pressed twice. Owner: *"nothing"*. With one display there is no next
+    monitor, so this is not a reading of the cycle; it shows only that `D` with nowhere to go does
+    nothing visible. **Owed with a second display.**
+  - **`C`, the console on a different display.** Owner: *"yes, on top"*. `diagnostics.log` recorded
+    `console opened: 1014x553, present mode Mailbox, frame latency 1, presented every 1 frame(s), with
+    preview`, and on closing `393 presented, 0 skipped`. That is `docs/running.md`'s single-monitor
+    behaviour, an ordinary window on the one monitor. **The different-display half is owed with a
+    second display.**
+  - **`F` and `Esc`.** Owner: `F` left fullscreen and `F` went back. After the sequence the compositor
+    showed the show windowed (fullscreen 0) and tiled beside the editor, with the process running, so
+    `Esc` left fullscreen and did not quit.
+  - **Capture on PipeWire with a real player.** Music played from Firefox (YouTube). The player's
+    capture stream is PipeWire source-output "system audio", application `Ritmolux`, on source
+    `alsa_output.pci-0000_07_00.6.analog-stereo.monitor`, the default sink's monitor. Owner: the show
+    reacted to the music.
+  - **`vulkaninfo --summary`:** `AMD Radeon Graphics (RADV RENOIR)` (integrated, driver `radv`, API
+    1.4.354), `NVIDIA GeForce RTX 3080 Laptop GPU` (discrete, driver `NVIDIA`, API 1.4.341), and
+    `llvmpipe (LLVM 22.1.8, 256 bits)` (CPU, driver `llvmpipe`, API 1.4.354). The last is Mesa's
+    software Vulkan, lavapipe, which is the adapter ADR-0242 makes the golden reference.
+  - **Found, not asked:** the show's window reports an **empty app class** to Hyprland (`class: ""`),
+    where every other client names itself (`code`, `firefox`). A user cannot target the show with a
+    window rule (a workspace, a monitor, "no blur") by class, only by title, and the title changes
+    with every preset. This is a reading for the architect, not a defect repaired here.
 
 ### Close triggers
 

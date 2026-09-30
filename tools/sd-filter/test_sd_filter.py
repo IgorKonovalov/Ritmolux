@@ -24,6 +24,7 @@ geometry arithmetic, and the reproducibility of a configuration from its echo.
 """
 
 import io
+import json
 import math
 import os
 import shlex
@@ -416,10 +417,13 @@ for name in sorted(sd_filter.PROFILES):
     again = sd_filter.resolve(parser.parse_args(shlex.split(echoed)))
     check("--profile %s round-trips through its expansion" % name, again == cfg,
           "%r" % ({k: (cfg[k], again[k]) for k in cfg if cfg[k] != again[k]},))
+    # Every flag the cell sets. The unset one of --prompt / --timeline is
+    # absent by design: echoing it as "None" would round-trip as a prompt.
     check("  ... the echo names every flag the cell has",
           all(("--" + k.replace("_", "-")) in echoed
-              for k in cfg if k not in ("lcm_lora",)),
+              for k in cfg if k not in ("lcm_lora",) and cfg[k] is not None),
           echoed)
+    check("  ... and nothing it does not", "None" not in echoed, echoed)
 
 # An explicit flag beats the profile it was passed alongside - the reason the
 # profile is a preset and not a mode.
@@ -448,6 +452,301 @@ for bad, why in [
         check("refused: %s" % why, False, "did not raise")
     except sd_filter.ConfigError:
         check("refused: %s" % why, True)
+
+print()
+print("a prompt timeline interpolates the conditioning between its entries:")
+
+# Plan 0212 Phase 1 and ADR-0236. Asserted on the interpolation itself, because
+# the rendered frames are the one thing here that is not reproducible. Floats
+# stand in for the encoded prompts: `conditioning_at` is the same `a + (b - a)
+# * t` on a float as on the text encoder's tensor.
+TL = sd_filter.parse_timeline([
+    {"at_bar": 1, "prompt": "a vast canyon of luminous glowing rock strata"},
+    {"at_bar": 9, "prompt": "a frozen sea under aurora"},
+])
+EMB = [0.0, 80.0]
+
+check("two entries parse, in order",
+      TL == (sd_filter.TimelineEntry(1, "a vast canyon of luminous glowing rock strata"),
+             sd_filter.TimelineEntry(9, "a frozen sea under aurora")), "%r" % (TL,))
+check("at the first entry's bar: the first prompt's conditioning",
+      sd_filter.conditioning_at(TL, EMB, 1) == 0.0)
+check("at the second entry's bar: the second prompt's conditioning",
+      sd_filter.conditioning_at(TL, EMB, 9) == 80.0)
+for bar, want in [(3, 20.0), (5, 40.0), (8.5, 75.0)]:
+    got = sd_filter.conditioning_at(TL, EMB, bar)
+    check("between them, bar %s: the blend %.0f" % (bar, want),
+          abs(got - want) < 1e-9, "got %r" % (got,))
+check("before the first entry the first holds",
+      sd_filter.timeline_position(TL, 0.5) == (0, 0, 0.0))
+check("after the last entry the last holds",
+      sd_filter.conditioning_at(TL, EMB, 40) == 80.0
+      and sd_filter.timeline_position(TL, 40) == (1, 1, 0.0))
+
+# Exactly on an entry the blend is that entry's own value, not one computed
+# from its neighbours - the object itself, so a tensor is not recomputed.
+marker = object()
+check("on an entry's bar the entry's own conditioning is returned",
+      sd_filter.conditioning_at(TL, [marker, 1.0], 1) is marker)
+
+# Three entries: each span interpolates only between its own two neighbours.
+TL3 = sd_filter.parse_timeline([
+    {"at_bar": 1, "prompt": "a"}, {"at_bar": 5, "prompt": "b"},
+    {"at_bar": 6.5, "prompt": "c"},
+])
+for bar, want in [(3, (0, 1, 0.5)), (5, (1, 2, 0.0)), (5.75, (1, 2, 0.5)),
+                  (6.5, (2, 2, 0.0))]:
+    got = sd_filter.timeline_position(TL3, bar)
+    check("three entries, bar %s -> %r" % (bar, want), got == want, "got %r" % (got,))
+
+print()
+print("the stage hands each frame the conditioning for its bar:")
+
+# `_conditioning` as it ships; only the encoder's output is replaced, by floats.
+tcell = cell(timeline="t.json")
+tcell["prompt"] = None
+stage = sd_filter.DiffusionStage(tcell, TL)
+stage.embeds = EMB
+stage.negative_embeds = -1.0
+stage.bar_of = lambda frame: 1 + frame / 4.0   # four frames a bar, bar 1 at frame 0
+for frame, want in [(0, 0.0), (8, 20.0), (16, 40.0), (32, 80.0), (60, 80.0)]:
+    got = stage._conditioning(frame)
+    check("frame %d (bar %g) is conditioned on %.0f" % (frame, 1 + frame / 4.0, want),
+          got == {"prompt_embeds": want, "negative_prompt_embeds": -1.0}, "got %r" % (got,))
+
+# A single prompt, with no timeline, is the call it always was: text, not
+# embeddings - which is what keeps every existing figure valid.
+single = sd_filter.DiffusionStage(cell(negative="n"))
+check("with no timeline the call is the one prompt, as text",
+      single._conditioning(0) == {"prompt": "x", "negative_prompt": "n"},
+      "got %r" % (single._conditioning(0),))
+
+print()
+print("a malformed timeline is refused, naming the entry:")
+
+for doc, why, names in [
+    ([], "empty", None),
+    ({"at_bar": 1, "prompt": "a"}, "not an array", None),
+    ([{"at_bar": 1, "prompt": "a"}, {"at_bar": 5, "prompt": "b"},
+      {"at_bar": 3, "prompt": "c"}], "a bar out of order", "entry 3"),
+    ([{"at_bar": 1, "prompt": "a"}, {"at_bar": 1, "prompt": "b"}],
+     "two entries on one bar", "entry 2"),
+    ([{"at_bar": 1, "prompt": "a"}, {"at_bar": 4, "prompt": "   "}],
+     "an empty prompt", "entry 2"),
+    ([{"at_bar": 1, "prompt": ""}], "a zero-length prompt", "entry 1"),
+    ([{"at_bar": 0, "prompt": "a"}], "a bar before bar 1", "entry 1"),
+    ([{"at_bar": "5", "prompt": "a"}], "a bar that is a string", "entry 1"),
+    ([{"at_bar": True, "prompt": "a"}], "a bar that is a boolean", "entry 1"),
+    ([{"at_bar": 1, "prompt": 7}], "a prompt that is not text", "entry 1"),
+    ([{"bar": 1, "prompt": "a"}], "a misspelt key", "entry 1"),
+    ([{"at_bar": 1, "prompt": "a", "seed": 9}], "a key the timeline has not got",
+     "entry 1"),
+]:
+    try:
+        sd_filter.parse_timeline(doc)
+        check("refused: %s" % why, False, "did not raise")
+    except sd_filter.ConfigError as e:
+        check("refused: %s" % why, names is None or ("timeline " + names) in str(e),
+              "message does not name %s: %s" % (names, e))
+
+# Past the track: a bar the render never reaches. With 16 bars the positions
+# run from 1 up to, not including, 17.
+fits = [{"at_bar": 1, "prompt": "a"}, {"at_bar": 16.5, "prompt": "b"}]
+check("an entry inside the last bar is accepted",
+      len(sd_filter.parse_timeline(fits, bars=16)) == 2)
+for at in [17, 40]:
+    try:
+        sd_filter.parse_timeline([{"at_bar": 1, "prompt": "a"},
+                                  {"at_bar": at, "prompt": "b"}], bars=16)
+        check("refused: bar %d past a 16-bar track" % at, False, "did not raise")
+    except sd_filter.ConfigError as e:
+        check("refused: bar %d past a 16-bar track" % at,
+              "timeline entry 2" in str(e) and "bar 16" in str(e), str(e))
+
+print()
+print("a timeline is a flag like any other:")
+
+with tempfile.TemporaryDirectory() as td:
+    path = os.path.join(td, "timeline.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump([{"at_bar": 1, "prompt": "a canyon"},
+                   {"at_bar": 9, "prompt": "a frozen sea"}], f)
+    tcfg = sd_filter.resolve(parser.parse_args(
+        ["--profile", "quality", "--timeline", path]))
+    techo = sd_filter.expansion(tcfg)
+    check("--timeline round-trips through its expansion",
+          sd_filter.resolve(parser.parse_args(shlex.split(techo))) == tcfg, techo)
+    check("  ... and the echo carries no --prompt", "--prompt" not in techo, techo)
+    check("the file loads to the entries it holds",
+          sd_filter.load_timeline(path) == (sd_filter.TimelineEntry(1, "a canyon"),
+                                            sd_filter.TimelineEntry(9, "a frozen sea")))
+    check("its content is echoed, not only its path",
+          '"prompt": "a frozen sea"' in sd_filter.timeline_echo(
+              sd_filter.load_timeline(path)))
+
+    bad = os.path.join(td, "bad.json")
+    with open(bad, "w", encoding="utf-8") as f:
+        f.write("[{\"at_bar\": 1, \"prompt\": \"a\"},")
+    for p, why in [(bad, "a file that is not JSON"),
+                   (os.path.join(td, "absent.json"), "a file that is not there")]:
+        try:
+            sd_filter.load_timeline(p)
+            check("refused: %s" % why, False, "did not raise")
+        except sd_filter.ConfigError:
+            check("refused: %s" % why, True)
+
+    try:
+        sd_filter.resolve(parser.parse_args(["--prompt", "p", "--timeline", path]))
+        check("refused: --prompt and --timeline together", False, "did not raise")
+    except sd_filter.ConfigError:
+        check("refused: --prompt and --timeline together", True)
+
+    # A timeline with nothing to place its bars on exits 2 before any model is
+    # built, rather than failing at the first frame after the load.
+    err = io.StringIO()
+    real_err, sys.stderr = sys.stderr, err
+    try:
+        code = sd_filter.main(["sd_filter.py", "--timeline", path])
+    finally:
+        sys.stderr = real_err
+    check("a timeline with no bar grid exits 2 before loading anything",
+          code == 2 and "bar grid" in err.getvalue()
+          and "--bar-grid" in err.getvalue(),
+          "exit %r, stderr %r" % (code, err.getvalue()[-200:]))
+
+print()
+print("a bar grid file resolves a frame to its bar:")
+
+# The shape `shot --render --bar-grid` writes (asserted verbatim on the Rust
+# side in `the_bar_grid_file_is_one_json_object_in_a_fixed_order`). Bars of
+# uneven length on purpose: a grid is where the analyzer put the bars, not a
+# fixed count of frames each.
+GRID_DOC = {"fps": "60:1", "frames": 300, "bar_starts": [0, 100, 180, 260],
+            "bar_locked": [False, False, True, True]}
+
+with tempfile.TemporaryDirectory() as td:
+    gpath = os.path.join(td, "grid.json")
+    with open(gpath, "w", encoding="utf-8") as f:
+        f.write(json.dumps(GRID_DOC, separators=(",", ":")) + "\n")
+    grid = sd_filter.load_bar_grid(gpath)
+    check("the file loads to the bars it holds",
+          grid.starts == (0, 100, 180, 260) and grid.frames == 300, "%r" % (grid,))
+    for frame, want in [(0, 1.0), (50, 1.5), (99, 1.99), (100, 2.0), (140, 2.5),
+                        (180, 3.0), (260, 4.0), (280, 4.5), (299, 4.975),
+                        (900, 4.975)]:
+        got = sd_filter.bar_position(grid, frame)
+        check("frame %d is at bar %g" % (frame, want), abs(got - want) < 1e-9,
+              "got %r" % (got,))
+    check("the echo says how much of the grid is estimated",
+          "4 bars" in sd_filter.bar_grid_echo(grid)
+          and "2 of them on an estimated downbeat" in sd_filter.bar_grid_echo(grid)
+          and "2 on the fallback counter" in sd_filter.bar_grid_echo(grid),
+          sd_filter.bar_grid_echo(grid))
+
+    # Through the stage: a frame's conditioning follows the grid's bars, so a
+    # timeline entry at bar 3 is reached at frame 180 and not at a frame count
+    # anybody assumed.
+    tl = sd_filter.parse_timeline([{"at_bar": 1, "prompt": "a"},
+                                   {"at_bar": 3, "prompt": "b"}], bars=4)
+    gstage = sd_filter.DiffusionStage(cell(timeline="t.json"), tl)
+    gstage.embeds, gstage.negative_embeds = [0.0, 80.0], -1.0
+    gstage.bar_of = lambda frame: sd_filter.bar_position(grid, frame)
+    for frame, want in [(0, 0.0), (100, 40.0), (140, 60.0), (180, 80.0)]:
+        got = gstage._conditioning(frame)["prompt_embeds"]
+        check("through the grid, frame %d is conditioned on %.0f" % (frame, want),
+              abs(got - want) < 1e-9, "got %r" % (got,))
+
+    for bad, why in [
+        (dict(GRID_DOC, bar_starts=[5, 100]), "a first bar not at frame 0"),
+        (dict(GRID_DOC, bar_starts=[0, 180, 100, 260]), "bars out of order"),
+        (dict(GRID_DOC, bar_starts=[0, 300], bar_locked=[False, True]),
+         "a bar starting past the last frame"),
+        (dict(GRID_DOC, bar_locked=[True]), "one locked flag for four bars"),
+        (dict(GRID_DOC, frames=0), "no frames"),
+        ([0, 100], "a bare list"),
+    ]:
+        try:
+            sd_filter.parse_bar_grid(bad)
+            check("refused grid: %s" % why, False, "did not raise")
+        except sd_filter.ConfigError:
+            check("refused grid: %s" % why, True)
+
+    # The grid is attached once the stream's header is in, and hands the stage
+    # the grid's bars.
+    y4m = b"YUV4MPEG2 W8 H8 F60:1 Ip A1:1 C444 XCOLORRANGE=FULL" + NL
+    astage = sd_filter.DiffusionStage(cell(timeline="t.json"), tl)
+    sd_filter.attach_bar_grid(astage, gpath, sd_filter.parse_header(y4m))
+    check("an attached grid resolves frame 180 to bar 3",
+          astage.bar_of is not None and astage.bar_of(180) == 3.0)
+
+    # The grid is paired with the stream it was written beside: another rate
+    # is refused, and a stream that outruns it is warned of once.
+    try:
+        sd_filter.attach_bar_grid(
+            sd_filter.DiffusionStage(cell(timeline="t.json"), tl), gpath,
+            sd_filter.parse_header(y4m.replace(b"F60:1", b"F30:1")))
+        check("refused: a 60:1 grid on an F30:1 stream", False, "did not raise")
+    except sd_filter.ConfigError as e:
+        check("refused: a 60:1 grid on an F30:1 stream",
+              "60:1" in str(e) and "F30:1" in str(e), str(e))
+    wlog = io.StringIO()
+    wstage = sd_filter.DiffusionStage(cell(timeline="t.json"), tl)
+    sd_filter.attach_bar_grid(
+        wstage, gpath, sd_filter.parse_header(y4m.replace(b"F60:1", b"F120:2")),
+        log=wlog)
+    quiet = "warning" not in wlog.getvalue()
+    for frame in (299, 300, 301, 400):
+        wstage.bar_of(frame)
+    check("an equal rate spelt differently is accepted, and frames inside the "
+          "grid warn of nothing", quiet, wlog.getvalue())
+    check("  ... and a stream past the grid warns once, at frame 300",
+          wlog.getvalue().count("warning") == 1
+          and "frame 300 is past the bar grid's 300 frames" in wlog.getvalue(),
+          wlog.getvalue())
+
+    # Past the track, now that the track's length is known: the 4-bar grid
+    # refuses an entry at bar 5 before any model is built.
+    tpath = os.path.join(td, "timeline.json")
+    with open(tpath, "w", encoding="utf-8") as f:
+        json.dump([{"at_bar": 1, "prompt": "a"}, {"at_bar": 5, "prompt": "b"}], f)
+    try:
+        sd_filter.attach_bar_grid(
+            sd_filter.DiffusionStage(cell(timeline=tpath),
+                                     sd_filter.load_timeline(tpath)),
+            gpath, sd_filter.parse_header(y4m))
+        check("an entry past the grid's last bar is refused", False, "did not raise")
+    except sd_filter.ConfigError as e:
+        check("an entry past the grid's last bar is refused, naming it",
+              "timeline entry 2" in str(e) and "bar 4" in str(e), str(e))
+
+    # `shot --bar-grid g.json | sd_filter.py --bar-grid g.json` starts both
+    # together, and shot writes g.json only before its first stream byte: the
+    # filter must be running, waiting on the header, while the file does not
+    # exist yet. The bar-5 timeline makes the grid's arrival observable - it
+    # exits 2 naming the entry, not the missing file - without building a model.
+    fresh = os.path.join(td, "fresh-grid.json")
+    proc = subprocess.Popen(
+        [sys.executable, os.path.join(HERE, "sd_filter.py"),
+         "--timeline", tpath, "--bar-grid", fresh],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    first = proc.stderr.readline()  # the expansion: startup is behind it
+    check("the filter starts while the grid file does not exist",
+          not os.path.exists(fresh) and first.startswith(b"sd-filter: "),
+          "stderr %r" % first)
+    with open(fresh, "w", encoding="utf-8") as f:
+        f.write(json.dumps(GRID_DOC, separators=(",", ":")) + "\n")
+    _, rest = proc.communicate(input=y4m)
+    check("  ... and reads it once the stream's header arrives",
+          proc.returncode == 2 and b"timeline entry 2" in rest
+          and b"No such file" not in rest,
+          "exit %r, stderr %r" % (proc.returncode, rest[-300:]))
+
+    tcfg = sd_filter.resolve(parser.parse_args(
+        ["--profile", "quality", "--timeline", tpath, "--bar-grid", gpath]))
+    techo = sd_filter.expansion(tcfg)
+    check("--bar-grid round-trips through its expansion",
+          sd_filter.resolve(parser.parse_args(shlex.split(techo))) == tcfg, techo)
 
 print()
 print("end to end, as a subprocess (Phase 3's done-when as written):")
@@ -480,6 +779,26 @@ else:
               "%d vs %d bytes" % (len(filtered.stdout), len(direct.stdout)))
         check("the stream was not empty", len(direct.stdout) > 1000,
               "%d bytes" % len(direct.stdout))
+
+        # --bar-grid writes a file beside the stream and nothing into it.
+        gpath = os.path.join(td, "grid.json")
+        gridded = subprocess.run(args + ["--bar-grid", gpath],
+                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        check("shot --bar-grid exits 0", gridded.returncode == 0)
+        check("the stream is byte-identical with and without --bar-grid",
+              gridded.stdout == direct.stdout,
+              "%d vs %d bytes" % (len(gridded.stdout), len(direct.stdout)))
+        try:
+            written = sd_filter.load_bar_grid(gpath)
+            header = direct.stdout.index(NL) + 1
+            frames = (len(direct.stdout) - header) // (len(b"FRAME" + NL) + 256 * 144 * 3)
+            check("the grid it writes loads, spanning the stream's %d frames"
+                  % frames, written.frames == frames and written.starts[0] == 0,
+                  "%r" % (written,))
+            check("  ... and resolves the first frame to bar 1",
+                  sd_filter.bar_position(written, 0) == 1.0)
+        except sd_filter.ConfigError as e:
+            check("the grid it writes loads", False, str(e))
 
     # Asking for a render without saying what to render is a configuration
     # error and exits 2, distinct from a malformed stream's 1 - and it must not

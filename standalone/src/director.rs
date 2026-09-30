@@ -281,8 +281,9 @@ pub enum Order {
     ///
     /// Carries no state of its own: the successor is computed against the set
     /// handed to *that* draw, so a mark toggled mid-walk changes what comes next
-    /// without the walk losing its place — the preset after the last one drawn
-    /// is still the answer whether or not that one is still eligible.
+    /// without the walk losing its place — the preset after the anchor (the
+    /// last one drawn or explicitly selected) is still the answer whether or
+    /// not the anchor is still eligible.
     Sequential,
 }
 
@@ -319,8 +320,14 @@ pub struct Traversal {
     /// Which order the next draw comes from.
     order: Order,
     /// The name the last draw handed out — excluded when a shuffle's cycle
-    /// restarts, and the anchor a sequential walk takes the successor of.
+    /// restarts. A selection never moves it, so a shuffle behaves the same
+    /// whatever the operator picked in between.
     last: Option<String>,
+    /// The preset a sequential walk takes the successor of: the last draw, or
+    /// the last explicit selection when one came after it ([`Self::reanchor`]).
+    /// Kept apart from `last` so re-anchoring the walk cannot reach the
+    /// shuffle's cycle.
+    anchor: Option<String>,
     /// The next draw, and whether taking it restarts the cycle. Held so the
     /// console can name what a rotation will take without the answer changing
     /// between the announcement and the rotation.
@@ -361,11 +368,10 @@ impl Traversal {
     /// Switch the order a **running** traversal draws in, the way
     /// [`Director::set_dwell_bounds`] switches a running dwell.
     ///
-    /// Keeps `trail` and `last`, so `Backspace` still walks what was shown and
-    /// a sequential walk picked up mid-show continues from the last preset
-    /// *rotation drew* — or from the first name in the library when it has drawn
-    /// none, `last` being the anchor a draw sets and a manual selection does
-    /// not. Drops the announced `upcoming`,
+    /// Keeps `trail`, `last` and `anchor`, so `Backspace` still walks what was
+    /// shown and a sequential walk picked up mid-show continues from the preset
+    /// last drawn or explicitly selected — or from the first name in the library
+    /// when there is neither. Drops the announced `upcoming`,
     /// which the departing order chose — the next peek names what the incoming
     /// one will actually take. A call naming the order
     /// already running is a no-op, so a surface restating it cannot restart a
@@ -390,8 +396,27 @@ impl Traversal {
         Self {
             order,
             last: None,
+            anchor: None,
             upcoming: None,
             trail: Vec::new(),
+        }
+    }
+
+    /// Make `name` — a preset just put on screen by an explicit selection, not
+    /// by a draw — the point a sequential walk continues from.
+    ///
+    /// The anchor moves under either order, so switching to sequential later
+    /// still starts from what is on screen. The announced `upcoming` is dropped
+    /// only under sequential, where it was the old anchor's successor; a
+    /// shuffle's next pick does not depend on the anchor, so it and the cycle
+    /// are left exactly as they were.
+    pub fn reanchor(&mut self, name: &str) {
+        if name.is_empty() {
+            return;
+        }
+        self.anchor = Some(name.to_owned());
+        if matches!(self.order, Order::Sequential) {
+            self.upcoming = None;
         }
     }
 
@@ -434,6 +459,7 @@ impl Traversal {
             seen.retain(|name| eligible.contains(&name.as_str()));
         }
         self.last = Some(pick.clone());
+        self.anchor = Some(pick.clone());
         Some(pick)
     }
 
@@ -445,8 +471,14 @@ impl Traversal {
     /// does once a frame — never advances the traversal's own state. A
     /// sequential walk has no cycle to restart and always answers `false`.
     fn pick(&mut self, eligible: &[&str]) -> Option<(String, bool)> {
-        let Self { order, last, .. } = self;
+        let Self {
+            order,
+            last,
+            anchor,
+            ..
+        } = self;
         let last = last.as_deref();
+        let anchor = anchor.as_deref();
         match order {
             Order::Shuffled { seen, rng } => {
                 let unseen: Vec<&str> = eligible
@@ -482,7 +514,8 @@ impl Traversal {
                 // Strictly greater, so the anchor need not still be eligible:
                 // the first name past it is the successor either way. Wrapping
                 // to the first is what closes the lap.
-                last.and_then(|last| sorted.iter().copied().find(|name| *name > last))
+                anchor
+                    .and_then(|anchor| sorted.iter().copied().find(|name| *name > anchor))
                     .or_else(|| sorted.first().copied())
                     .map(|name| (name.to_owned(), false))
             }

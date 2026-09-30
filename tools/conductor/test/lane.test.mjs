@@ -1051,6 +1051,23 @@ test("once the owner has done the `.claude/` phase and marked its row, the plan 
   assert.equal(readFileSync(join(repo, "phase-0101-1.txt"), "utf8"), "done by the owner\n");
 });
 
+test("a `.claude/` park settles when the plan is amended so the phase no longer declares that path", async () => {
+  const { parkStillTrue } = await import("../lib/lane.mjs");
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [claudePhase("1"), dev("2")] }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  const parked = ctx.state.plans["0101"];
+  assert.equal(parked.park.reason, "claude_dir");
+  assert.match(parkStillTrue(parked, repo) ?? "", /Phase 1 is still not marked done/, "unamended, the park holds");
+
+  // The architect moves the skill edit out of Phase 1; the row stays not started.
+  const planPath = join(parked.worktree, "docs", "plans", "0101-fixture.md");
+  writeFileSync(planPath, readFileSync(planPath, "utf8").replace("`.claude/skills/dev/SKILL.md`", "`core/src/lib.rs`"));
+  sh(["add", "docs/plans/0101-fixture.md"], parked.worktree);
+  sh(["commit", "-q", "-m", "docs(plans): phase 1 no longer edits the skill"], parked.worktree);
+
+  assert.equal(parkStillTrue(parked, repo), null, "the reason it could not run is gone");
+});
+
 // ADR-0218: a lane makes its plan's preconditions true. `studio/node_modules` is gitignored and
 // `git worktree add` never creates one, so without an install the gate's three studio checks skip.
 

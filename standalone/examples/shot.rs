@@ -58,6 +58,9 @@
 //!                            <out>/<state>.png, of that state's overlay text
 //!                            composed over the preset's frame from fixed
 //!                            fixture data. System-font text: never a golden
+//!   --bar-grid <path>        also write the render's bar starts, in frames, as
+//!                            JSON for the diffusion filter's --timeline. The
+//!                            frame stream is unchanged. Needs --render
 //!   --help, -h               print the usage text and exit 0
 //!
 //! Which preset library is used, highest precedence first: `--preset-file`,
@@ -187,6 +190,9 @@ struct Args {
     /// `--ui <state>,...`: the interface states to capture, one PNG each, over
     /// the preset's frame. `None` leaves the mode off.
     ui: Option<Vec<UiState>>,
+    /// `--bar-grid <path>`: write the render's bar starts, in frames, to this
+    /// file — see [`render::BarGrid`].
+    bar_grid: Option<PathBuf>,
 }
 
 impl Default for Args {
@@ -220,6 +226,7 @@ impl Default for Args {
             ffmpeg: None,
             crf: None,
             ui: None,
+            bar_grid: None,
         }
     }
 }
@@ -288,6 +295,9 @@ fn parse_args() -> Result<Args, String> {
             "--fps" => args.fps = parse_fps(&next_value(&mut it, "--fps")?)?,
             "--ffmpeg" => args.ffmpeg = Some(PathBuf::from(next_value(&mut it, "--ffmpeg")?)),
             "--crf" => args.crf = Some(render::parse_crf(&next_value(&mut it, "--crf")?)?),
+            "--bar-grid" => {
+                args.bar_grid = Some(PathBuf::from(next_value(&mut it, "--bar-grid")?));
+            }
             "--at" => args.at = Some(parse_hops(&next_value(&mut it, "--at")?)?),
             "--frame-at" => {
                 let value = next_value(&mut it, "--frame-at")?;
@@ -426,6 +436,9 @@ fn parse_args() -> Result<Args, String> {
         if args.crf.is_some() {
             return Err("--crf only applies to --render <clip.wav>".to_string());
         }
+        if args.bar_grid.is_some() {
+            return Err("--bar-grid only applies to --render <clip.wav>".to_string());
+        }
     }
     Ok(args)
 }
@@ -500,6 +513,9 @@ fn print_usage() {
                                     diagnostics. Fixed fixture data over the\n\
                                     preset's frame; system-font text, so a\n\
                                     capture and never a golden. Needs --out\n\
+         --bar-grid <path>          also write the render's bar starts, in\n\
+                                    frames, as JSON (for sd-filter --timeline).\n\
+                                    The stream is unchanged. Needs --render\n\
          --help, -h                 print this usage and exit"
     );
 }
@@ -649,6 +665,7 @@ fn offline_render(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), 
             height: args.height,
             tier: args.tier,
             encoder,
+            bar_grid: args.bar_grid.clone(),
         },
         &pcm,
         format,

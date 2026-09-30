@@ -142,7 +142,7 @@ flowchart TB
 ## What this plan does NOT do
 
 - **It does not add variety across a track.** That is backlog 0126 and
-  [Plan 0212](../0212-the-diffused-render-gains-a-timeline.md), and 0126 says why they must not be folded
+  [Plan 0212](0212-the-diffused-render-gains-a-timeline.md), and 0126 says why they must not be folded
   together: *"one is a pixel budget against a VRAM wall, the other is a timeline the pipeline does not
   have."*
 - **It does not reopen ADR-0121's Alternative C.** It produces the evidence that decision needs. The ADR

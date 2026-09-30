@@ -177,10 +177,10 @@ const CLAUDE_DIR_PROMPT = `Do exactly these five steps in order, using only Read
 Report each one verbatim, naming the tool, the path, and the exact text of any error. If a step is
 refused, say so and go on to the next.
 
-1. Read ${CLAUDE_SCRATCH}\\NOTES.md
+1. Read ${join(CLAUDE_SCRATCH, "NOTES.md")}
 2. Edit that same file, changing the word alpha to beta.
-3. Write ${CLAUDE_SCRATCH}\\NEW.md containing exactly: gamma
-4. Write ${worktree}\\probe-control.txt containing exactly: delta
+3. Write ${join(CLAUDE_SCRATCH, "NEW.md")} containing exactly: gamma
+4. Write ${join(worktree, "probe-control.txt")} containing exactly: delta
    (outside .claude/, the control: it shows whether this session could write at all)
 5. Read the relative path .claude/skills/probe-scratch/NOTES.md and report which absolute path the
    tool says it looked at.
@@ -209,9 +209,9 @@ const CLAUDE_OPEN_PROMPT = `Do exactly these three steps in order, using only Ed
 Report each one verbatim, naming the tool, the path, and the exact text of any error. If a step is
 refused, say so and go on to the next.
 
-1. Edit ${CLAUDE_SCRATCH}\\NOTES.md, changing the word alpha to beta.
-2. Write ${CLAUDE_SCRATCH}\\NEW.md containing exactly: gamma
-3. Write ${worktree}\\probe-control.txt containing exactly: delta
+1. Edit ${join(CLAUDE_SCRATCH, "NOTES.md")}, changing the word alpha to beta.
+2. Write ${join(CLAUDE_SCRATCH, "NEW.md")} containing exactly: gamma
+3. Write ${join(worktree, "probe-control.txt")} containing exactly: delta
 
 Then end your reply with a fenced code block tagged rlx-outcome containing {"kind": "probe", "steps": 3}`;
 

@@ -118,8 +118,9 @@ whose meaning may since have moved. Pass the echoed flags back without
 Both are the same cell. They differ in what they spend and how much they persist,
 not in what they draw.
 
-**`--prompt` is required and no profile supplies one**, because the image is the
-whole signal and there is no default worth having. With no prompt the filter exits
+**`--prompt` or `--timeline` is required and no profile supplies either**, because
+the image is the whole signal and there is no default worth having. With neither the
+filter exits
 **2 before importing torch** — a missing prompt costs a second, not a
 multi-gigabyte weight download.
 
@@ -159,7 +160,9 @@ for their own machine.
 
 ```
 --profile quality|fast     a known-good combination of everything below
---prompt STR               required; what the render should become
+--prompt STR               what the render should become; this or --timeline is required
+--timeline FILE            prompts placed on bars, blended between them; needs --bar-grid
+--bar-grid FILE            the file shot --render --bar-grid wrote for this stream
 --negative STR             default: text, watermark, blurry, low quality, frame, border
 --size BUDGET|WxH          a pixel budget spent at the stream's aspect, or an explicit size
 --strength F               how far from the render the image is allowed to travel (0..1]
@@ -174,6 +177,9 @@ for their own machine.
 --seed N                   fixed for the whole render, so motion comes from the render
 --passthrough              no model, no GPU: emit the stream unchanged
 ```
+
+What the bar-grid file holds, and how far to trust its bars, is in
+[capturing.md's bar-grid section](capturing.md#the-bar-grid---bar-grid).
 
 ### The three that decide what you get
 

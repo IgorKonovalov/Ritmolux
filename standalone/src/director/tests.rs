@@ -565,6 +565,68 @@ fn a_sequential_walk_skips_a_preset_hidden_mid_walk_without_losing_its_place() {
     assert_eq!(traversal.draw(&eligible).as_deref(), Some("charlie"));
 }
 
+/// **An explicit selection re-anchors a sequential walk**: Space gives alpha,
+/// Space gives bravo, `echo` is selected, and the next Space gives `alpha` —
+/// the successor of what is on screen, wrapping — rather than `charlie`, the
+/// successor of the last draw.
+#[test]
+fn a_selection_re_anchors_a_sequential_walk_on_what_is_on_screen() {
+    let mut traversal = Traversal::new_sequential();
+    let eligible = library();
+    assert_eq!(traversal.draw(&eligible).as_deref(), Some("alpha"));
+    assert_eq!(traversal.draw(&eligible).as_deref(), Some("bravo"));
+    // The console names the next preset before the selection, as it does each
+    // frame; the selection must replace that announcement, not be overruled by it.
+    assert_eq!(traversal.peek(&eligible), Some("charlie"));
+
+    traversal.reanchor("echo");
+
+    assert_eq!(
+        traversal.peek(&eligible),
+        Some("alpha"),
+        "the console still names the successor of the last draw"
+    );
+    assert_eq!(
+        traversal.draw(&eligible).as_deref(),
+        Some("alpha"),
+        "Space after selecting `echo` must continue from `echo`, wrapping to `alpha`"
+    );
+    assert_eq!(traversal.draw(&eligible).as_deref(), Some("bravo"));
+}
+
+/// **A selection leaves a shuffle exactly as it was**: the same seed walks the
+/// same order whether or not presets were selected between its draws, and the
+/// announced next preset survives the selection.
+#[test]
+fn a_selection_under_shuffle_leaves_the_shuffle_as_it_was() {
+    let eligible = library();
+    let walk = |select: bool| {
+        let mut traversal = Traversal::new(7);
+        let mut drawn = Vec::new();
+        for step in 0..12 {
+            let announced = traversal.peek(&eligible).expect("a next").to_owned();
+            if select {
+                // Select a preset other than the announced one, so a
+                // re-anchor that reached the shuffle would have something to move.
+                let other = eligible[step % eligible.len()];
+                traversal.reanchor(other);
+                assert_eq!(
+                    traversal.peek(&eligible),
+                    Some(announced.as_str()),
+                    "a selection changed the shuffle's announced next preset"
+                );
+            }
+            drawn.push(traversal.draw(&eligible).expect("a non-empty set"));
+        }
+        drawn
+    };
+    assert_eq!(
+        walk(true),
+        walk(false),
+        "selecting presets between draws moved the shuffle's order"
+    );
+}
+
 /// **`trail` and `upcoming` are the shared half**, so they behave identically
 /// whichever order is drawing — the same sequence of calls run through each.
 ///

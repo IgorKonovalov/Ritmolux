@@ -307,6 +307,7 @@ if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-reader-prose.mjs" node scripts/check-reader-prose.mjs
     run_step "node scripts/check-release-tag.mjs" node scripts/check-release-tag.mjs
     run_step "node scripts/check-release-tag.mjs --self-test" node scripts/check-release-tag.mjs --self-test
+    run_step "node scripts/check-release-assets.mjs --self-test" node scripts/check-release-assets.mjs --self-test
     run_step "node scripts/check-translations.mjs" node scripts/check-translations.mjs
     run_step "node scripts/check-translations.mjs --self-test" node scripts/check-translations.mjs --self-test
     run_step "node scripts/check-system-counts.mjs" node scripts/check-system-counts.mjs

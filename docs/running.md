@@ -39,6 +39,13 @@ shown twice, and a new shuffle starts when the round is exhausted. Press `R` for
 `[rotate]` is the same choice made in the file. Under the shuffle the walk also differs from launch
 to launch; `seed` under `[rotate]` pins it when you want the same evening twice.
 
+**After you pick a preset yourself, the two orders answer `Space` differently.** A pick is anything
+but rotation itself: the browser, a favourite's number key, `B`, `Backspace`, the console, or the
+studio selecting one. Under sequential, the next `Space` continues from the preset you picked, so
+picking the last preset in the list and pressing `Space` gives the first. Under the shuffle, a pick
+changes nothing about the round: the next `Space` draws the preset the shuffle was going to draw
+anyway.
+
 **What rotation draws from is the second switch.** Presets you have hidden are never drawn, in
 either order. `L` moves between the whole library and your favourites, and `source = "favourites"`
 under `[rotate]` is the same choice in the file; with nothing marked yet, favourites falls back to
@@ -128,6 +135,9 @@ the next launch picks up whatever the last one did not reach. Editing a preset i
 [`RLX_PRESET_DIR`](configuration.md) library re-renders that preset's picture, and only that one,
 when the app reloads the file; until the new picture lands the pane keeps showing the previous one
 rather than a placeholder. A preset that fails to render is not tried again until its file changes.
+The studio's player runs the same pass into the same cache, so with the studio open beside the app
+two passes can be rendering at once; they fill one set of pictures and neither's render can spoil
+the other's.
 The settings menu's **Thumbnails** row
 turns that off (`[thumbnails] enabled`, see [Configuration](configuration.md#thumbnails)), which is
 what a machine on battery wants.

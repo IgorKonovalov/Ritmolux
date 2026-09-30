@@ -184,8 +184,8 @@ impl AppState {
                 OverlayAction::None => return, // closed + non-toggle: let it fall away
                 OverlayAction::Redraw | OverlayAction::Close => {}
                 OverlayAction::Select(index) => {
-                    self.renderer.select_preset(index);
-                    self.on_preset_switched(Trail::Record);
+                    let incoming = self.renderer.select_preset(index).to_owned();
+                    self.on_preset_selected(&incoming);
                 }
             }
             self.window.request_redraw();
@@ -337,8 +337,8 @@ impl AppState {
                 if let Some(index) =
                     console::random_index(count, self.renderer.active_index(), seed)
                 {
-                    self.renderer.select_preset(index);
-                    self.on_preset_switched(Trail::Record);
+                    let incoming = self.renderer.select_preset(index).to_owned();
+                    self.on_preset_selected(&incoming);
                 }
             }
             // The director's own reset comes with it, so the dwell restarts from

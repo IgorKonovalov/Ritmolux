@@ -230,7 +230,7 @@ entry. Every other reason is yours: `resume` it once you have acted.
 | Reason | What to do before `resume` |
 |---|---|
 | `human_phase` | Do the phase. Mark its row `done` in the plan's `## Implementation log` **in the lane** (`WORK/rlx-plan-NNNN`) and commit it there. `resume` checks the row, and a live run resumes it by itself. A phase marked `Blocks merge: no` settles with an `owed` row and does not need `done`; the conductor writes that row itself when it reaches the phase, so only a park from before the marker was added needs it written by hand: see below. |
-| `claude_dir` | The same, and for the same reason: the phase declares a file under `.claude/`, which the CLI will not let a session write (ADR-0210). **Nothing was run** — the park comes before the phase. The detail names the paths. Do the phase in the lane, mark its row `done`, commit; `resume` checks the row. |
+| `claude_dir` | The same, and for the same reason: the phase declares a file under `.claude/`, which the CLI will not let a session write (ADR-0210). **Nothing was run** — the park comes before the phase. The detail names the paths. Do the phase in the lane, mark its row `done`, commit; `resume` checks the row. Or amend the plan so the phase no longer declares a `.claude/` path, merge that into the lane, and `resume`: the park settles once the phase names no such file. |
 | `studio_install` | The plan declares files under `studio/` and `npm --prefix studio ci` failed, so the gate's three studio checks could not run (ADR-0218). The detail carries the install's tail; the usual cause is no network. **Nothing was run** — the park comes before the first session. Install by hand in the lane, or wait and `resume`, which installs again: the trigger is a missing `studio/node_modules`, so the open lane the park left behind is installed into rather than skipped. |
 | `stop_condition`, `plan_wrong`, `question` | Read the transcript the inbox names. Settle it in a human-started `/architect` session. A `plan_wrong` from the readiness check names the phase and the contradiction, and nothing was implemented: edit the plan, or resume to overrule it. |
 | `gate_red` | The gate was red, a repair session ran, and the re-run was red too; or the plan had already run its three repairs. The park reads the second run's log. Fix the defect in the lane. |
@@ -419,6 +419,15 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   only a Windows run can ask. **Every rule has a case in `test/settings.test.mjs`**, which fails on a rule added without one;
   a refusal the probe recorded is asserted against that table and against a model of the file, so a
   deny rule deleted since the probe turns it red, and everything else against the model alone.
+- **Writing is bounded too, by path** (ADR-0255). `Write` and `Edit` are granted only as
+  `./**` (the session's working directory, which is its lane), `//tmp/**` (the OS temp directory on
+  Linux) and `/state/reviews/**` (resolved against this settings file's own directory, so it names
+  `tools/conductor/state/reviews/`, where a review or close session writes its review). A write
+  anywhere else is refused by dontAsk. `--add-dir` grants nothing on its own: the reviews rule is what
+  lets a review write there. All of this was observed on 2.1.283 (the write table in
+  `spike/README.md`, from `spike/matcher-probe.mjs --writes`), and `test/settings.test.mjs` holds the
+  grants to exactly the spellings that table names. **Linux only so far:** `//tmp/**` is not the
+  Windows or macOS temp directory, and no probe has run there.
 - **A command is admitted when the session already holds that capability through `Read`, `Glob`,
   `Grep` or `Write`, and refused otherwise.** Admitting such a command buys turns, not power: a
   session denied `ls` lists the directory with `Glob` on its next turn. So `ls`, `printenv`, `grep` and

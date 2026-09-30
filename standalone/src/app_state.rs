@@ -1339,6 +1339,17 @@ impl AppState {
         self.window.request_redraw();
     }
 
+    /// Bookkeeping for a switch an explicit selection made — the browser, a
+    /// favourite's digit, the console's `random`, A/B — naming the `incoming`
+    /// preset: everything [`on_preset_switched`](AppState::on_preset_switched)
+    /// does, and the sequential walk re-anchored on it, so the next Space
+    /// continues from what is on screen. A rotation never comes here; its draw
+    /// anchors itself.
+    pub(crate) fn on_preset_selected(&mut self, incoming: &str) {
+        self.on_preset_switched(Trail::Record);
+        self.show.reanchor(incoming, &self.renderer);
+    }
+
     /// Advance to the next preset and record the switch.
     ///
     /// **The single path a rotation takes**, whether the director asked for it
@@ -1371,8 +1382,8 @@ impl AppState {
         }
         let count = self.renderer.preset_names().count();
         if let Some(index) = console::previous_index(count, self.renderer.active_index()) {
-            self.renderer.select_preset(index);
-            self.on_preset_switched(Trail::Record);
+            let incoming = self.renderer.select_preset(index).to_owned();
+            self.on_preset_selected(&incoming);
         }
     }
 
@@ -1876,7 +1887,7 @@ impl AppState {
         }
         if self.renderer.select_preset_by_name(&held) {
             self.hud.ab_side = Some(current);
-            self.on_preset_switched(Trail::Record);
+            self.on_preset_selected(&held);
         } else {
             // The roster does not hold it — a hot-reload retired it while it
             // was stashed. Say so and re-hold what is on screen, rather than
@@ -1909,7 +1920,7 @@ impl AppState {
             return;
         };
         if self.renderer.select_preset_by_name(&name) {
-            self.on_preset_switched(Trail::Record);
+            self.on_preset_selected(&name);
         }
     }
 

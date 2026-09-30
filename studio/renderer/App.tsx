@@ -26,6 +26,7 @@ interface AppInfo {
   studioVersion: string
   playerPath: string | undefined
   playerSource: string | undefined
+  settingsFile: string
   playerMode: PlayerMode
 }
 
@@ -76,7 +77,7 @@ export function App(): JSX.Element {
             title="No player found"
             detail={
               'Looked in the bundle, then the studio settings, then PATH. ' +
-              'Set "playerPath" in the studio settings file to a ritmolux build.'
+              `Set "playerPath" in ${info.settingsFile} to a ritmolux build.`
             }
           />
         )}

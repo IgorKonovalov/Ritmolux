@@ -211,6 +211,7 @@ It stops at the first failure and names the step that failed:
 | Reader prose | `node scripts/check-reader-prose.mjs` |
 | Release tag | `node scripts/check-release-tag.mjs` |
 | Release tag (self-test) | `node scripts/check-release-tag.mjs --self-test` |
+| Release assets (self-test) | `node scripts/check-release-assets.mjs --self-test` |
 | Translations | `node scripts/check-translations.mjs` |
 | Translations (self-test) | `node scripts/check-translations.mjs --self-test` |
 | System counts | `node scripts/check-system-counts.mjs` |

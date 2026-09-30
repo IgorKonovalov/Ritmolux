@@ -132,8 +132,18 @@ const CASES = [
   { tool: "Read", command: "", allowed: true },
   { tool: "Glob", command: "", allowed: true },
   { tool: "Grep", command: "", allowed: true },
-  { tool: "Edit", command: "", allowed: true },
-  { tool: "Write", command: "", allowed: true },
+  // Write and Edit are path-scoped (ADR-0255): the lane (`./`, the session's cwd), the OS temp
+  // directory, and state/reviews/ beside this settings file. The model reads the path as the command;
+  // the refusals below are also asserted against the recorded write table.
+  { tool: "Write", command: "./core/src/lib.rs", allowed: true },
+  { tool: "Edit", command: "./core/src/lib.rs", allowed: true },
+  { tool: "Write", command: "//tmp/rlx-scratch.txt", allowed: true },
+  { tool: "Edit", command: "//tmp/rlx-scratch.txt", allowed: true },
+  { tool: "Write", command: "/state/reviews/0233-round-1.md", allowed: true, why: "a review session's own output" },
+  { tool: "Edit", command: "/state/reviews/0233-round-1.md", allowed: true },
+  { tool: "Write", command: "../rlx-plan-0180/x.txt", allowed: false, why: "the lane's parent" },
+  { tool: "Edit", command: "../rlx-plan-0180/x.txt", allowed: false },
+  { tool: "Write", command: "~/.bashrc", allowed: false, why: "outside the lane and the temp directory" },
   { tool: "Skill", command: "", allowed: true },
   { tool: "Monitor", command: "", allowed: false, why: "nothing re-invokes a headless session" },
   { tool: "WebFetch", command: "", allowed: false },
@@ -342,6 +352,46 @@ test("a deletion through a shell expansion is refused by the file, not only by t
 
 test("a literal in-lane deletion still runs, so the bound did not buy safety by refusing work", () => {
   assert.equal(recorded.verdicts.get("rm -rf target/debug"), "RAN");
+});
+
+// The recorded write table (Plan 0234): its shipped column, and the spellings it says ship.
+const writeTable = readWriteTable(readFileSync(join(TOOL_DIR, "spike", "README.md"), "utf8"));
+
+/** { cli, rows: [{ shape, verdict }], spellings } from the write section of spike/README.md. */
+function readWriteTable(md) {
+  const heading = md.match(/^## What may a session write\? Observed on (\S+)$/m);
+  assert.ok(heading, "spike/README.md carries no write verdict table");
+  const section = md.slice(heading.index).split(/\n## /)[0];
+  const lines = section.split("\n").filter((l) => l.startsWith("|"));
+  const cells = (l) => l.slice(1, -1).split(/(?<!\\)\|/).map((c) => c.trim());
+  const header = cells(lines[0]);
+  const col = header.length - 1;
+  assert.match(header[col], /^Candidate B/, "the shipped column is the table's last, Candidate B");
+  const rows = lines.slice(2).map((l) => {
+    const row = cells(l);
+    return { shape: row[0], verdict: row[col].match(/\*\*(.+?)\*\*/)?.[1] ?? row[col] };
+  });
+  // The paragraph naming the shipped grants; it wraps, and its spellings carry dots of their own.
+  const shipped = section.match(/It replaces the\s+bare grants with ([\s\S]*?)\n\n/)?.[1] ?? "";
+  const spellings = [...shipped.matchAll(/`((?:Write|Edit)\([^`]+\))`/g)].map((m) => m[1]);
+  return { cli: heading[1], rows, spellings };
+}
+
+test("the Write and Edit grants are exactly the spellings the write probe recorded", () => {
+  // A grant edited without re-running the probe is a bound nobody measured.
+  const granted = allow.filter((r) => /^(Write|Edit)(\(|$)/.test(r)).sort();
+  assert.deepEqual(granted, [...writeTable.spellings].sort(), `recorded on ${writeTable.cli}`);
+  assert.ok(!allow.includes("Write") && !allow.includes("Edit"), "a bare Write or Edit grant reaches every path");
+});
+
+test("the recorded write table refuses the parent, home and a parent Edit, and allows the rest", () => {
+  const verdict = (prefix) => writeTable.rows.find((r) => r.shape.startsWith(prefix))?.verdict;
+  for (const shape of ["`Write` in the lane's parent", "`Write` in `$HOME`", "`Edit` in the lane's parent"]) {
+    assert.equal(verdict(shape), "DENIED", shape);
+  }
+  for (const shape of ["`Write` a relative path in the lane", "`Write` an absolute path in the lane", "`Write` in the OS temp directory", "`Edit` in the lane", "`Write` in `state/reviews/`"]) {
+    assert.equal(verdict(shape), "WROTE", shape);
+  }
 });
 
 test("the verdict table's literal-escape controls are refused, or the run proved nothing", () => {

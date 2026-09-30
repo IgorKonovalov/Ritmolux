@@ -57,6 +57,9 @@ export const GATES = [
   { script: "check-release-tag.mjs", args: [], carriers: ["hook", "conductor"] },
   { script: "check-release-tag.mjs", args: ["--self-test"], carriers: CHECKOUT },
   { script: "check-release-tag.mjs", args: ["--remote"], carriers: ["ci"] },
+  // The release count needs a release's assets, which only a release run has, so the roster runs
+  // its self-test: the refusal half no release run can show (ADR-0254).
+  { script: "check-release-assets.mjs", args: ["--self-test"], carriers: CHECKOUT },
   { script: "check-translations.mjs", args: [], carriers: CHECKOUT },
   { script: "check-translations.mjs", args: ["--self-test"], carriers: CHECKOUT },
   { script: "check-system-counts.mjs", args: [], carriers: CHECKOUT },

@@ -232,10 +232,11 @@ the decision that moved it is linked.
   [ADR-0159](adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) asks for
   exactly — one more feature of the largest class is admitted and the second has to be argued
   for. The cap names the Windows exe; whether each platform's binary owes a figure of its
-  own is still not decided, and both recipes below measure per executable.
-  `packaging/windows/stage.ps1` and `packaging/macos/bundle.sh` print the length on every build,
+  own is still not decided, and every recipe below measures per executable.
+  `packaging/windows/stage.ps1`, `packaging/macos/bundle.sh` and `packaging/linux/stage.sh` print
+  the length on every build,
   beside the build that produced it, and **warn** above 15,099,494 B (90 % of the cap) — each
-  Apple slice on its own, since a universal binary is two executables in one file. Neither fails
+  Apple slice on its own, since a universal binary is two executables in one file. None fails
   a release over a size: these caps are soft. **The Windows release exe carries `--features
   spout` and has not been measured with it**; the first tag build prints that figure.
 

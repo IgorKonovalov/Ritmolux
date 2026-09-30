@@ -9,6 +9,7 @@ export interface AppInfo {
   studioVersion: string
   playerPath: string | undefined
   playerSource: string | undefined
+  settingsFile: string
   playerMode: PlayerMode
 }
 
