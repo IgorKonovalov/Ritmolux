@@ -4310,7 +4310,7 @@ is `1.0`. The figure is not clipped, not squashed and not dimmed — it is *outs
 the picture*, and there is no `clamp` anywhere in that line for a reviewer, a
 reachability walk or `--report`'s occupancy column to catch it on.
 
-**This shipped.** `spectrum_ridge` carried `scale = 3.20` from before
+**This shipped.** Spectrum Ridge, since retired, carried `scale = 3.20` from before
 [ADR-0049](../docs/adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)
 normalized the bands to `0..1`. Afterwards the same constant multiplied a value
 roughly five times larger, and the preset rendered as an **empty frame** under

@@ -219,8 +219,9 @@ either side of it.
 `golden/line_joint_zigzag.png`, blessed with
 `RLX_BLESS=1 cargo test -p rlx-core --test suite line_joints::`. It exists because the
 defect that motivated ADR-0041 — the polyline's notch — was pinned by no pixels
-anywhere: `spectrum.toml` below takes the default `bars` layout, and
-`spectrum_ridge` is a shipped preset guarded behaviorally. A shader edit could
+anywhere: `spectrum.toml` below takes the default `bars` layout, and no shipped
+preset draws the `polyline` layout, while a shipped one would be guarded only
+behaviorally. A shader edit could
 have reopened the notch on a gentler figure than this deliberately hostile zigzag
 and moved no file.
 

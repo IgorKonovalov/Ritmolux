@@ -1392,8 +1392,9 @@ fn each_term_of_the_flatness_conjunction_is_load_bearing() {
     }
 }
 
-/// **`spectrum_ridge` exactly as it shipped broken**, recovered from
-/// `git show 81190ac^:presets/spectrum_ridge.toml` — every table and every
+/// **Spectrum Ridge exactly as it shipped broken**, recovered from its preset
+/// file under `presets/` at `81190ac^` (the preset has since been retired) —
+/// every table and every
 /// binding byte-for-byte, comments stripped and the `name` suffixed so the
 /// output reads clearly. Nothing here is tunable: this is the defect, frozen.
 ///
@@ -1964,7 +1965,7 @@ fn the_honest_mandala_tunings_pass_the_structural_measure() {
 /// [`MAX_FLOOR_SLACK`]'s ceremony.
 ///
 /// **Non-vacuous, and by the case that motivated the gate**: the
-/// pre-repair `spectrum_ridge` scores `0.0000` here as well as at `LOUD`,
+/// pre-repair Spectrum Ridge scores `0.0000` here as well as at `LOUD`,
 /// asserted in
 /// [`the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one`].
 ///

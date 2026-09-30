@@ -327,11 +327,10 @@ const CARDS = [
   "shape_pulse",
   "shape_ringmono",
   "shape_strataheart",
-  // spectrum (5)
+  // spectrum (4)
   "spectrum_anemone",
   "spectrum_metermono",
   "spectrum_radialbloom",
-  "spectrum_ridge",
   "spectrum_skyline",
   // star_pattern (4)
   "star_corona",
@@ -538,7 +537,7 @@ const IMAGES = [
   {
     // spectrum — UNJUDGED. `spectrum_radialbloom` took this slot when the owner
     // retired `spectrum_halo` in its favour, so it inherits the slot rather than
-    // winning it; the other four spectrum worlds have not been compared at it.
+    // winning it; the other three spectrum worlds have not been compared at it.
     out: "docs/images/gallery/spectrum.png",
     presetFile: "presets/spectrum_radialbloom.toml",
     signal: "dynamic:110",

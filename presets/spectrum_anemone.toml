@@ -30,6 +30,7 @@
 # is bright.
 system = "spectrum"
 name   = "Anemone"
+representative = true
 
 [generator]
 seed = 3

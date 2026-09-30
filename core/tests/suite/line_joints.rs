@@ -25,9 +25,9 @@
 //!
 //! Plan 0040 Phase 1 added a **committed baseline** beside the relative claim,
 //! because the reported defect — the polyline's notch — was pinned by no pixels
-//! anywhere: `fixtures/spectrum.toml` takes the default `bars` layout, and
-//! `spectrum_ridge` is a shipped preset guarded behaviorally (ADR-0023). A
-//! shader edit could reopen the notch on a gentler figure than this deliberately
+//! anywhere: `fixtures/spectrum.toml` takes the default `bars` layout, and no
+//! shipped preset draws the `polyline` layout, while a shipped one would be
+//! guarded only behaviorally (ADR-0023). A shader edit could reopen the notch on a gentler figure than this deliberately
 //! hostile zigzag and move no file.
 //!
 //! The two are **not** redundant, and neither replaces the other. The baseline
