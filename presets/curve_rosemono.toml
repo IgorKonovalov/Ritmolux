@@ -123,16 +123,16 @@ hue_spread    = "0.70"
 # count is what makes it a Maurer rose rather than a plain rose curve; 480 is
 # well inside the 20 000 segment cap and dense enough for the moire to read.
 n       = "6"
-d       = "71 + sin(time * 0.041) * 4.0"
+d       = "71 + sin(time * 0.02) * 2.0"
 samples = "480"
 
 # Petal reshaping from inside the sine - NOT a rotation. The onset shoves it, so
 # a hit reorganises the figure instead of moving the camera. Gain 0.35 / 0.60.
-phase = "noise(time * 0.031) * 0.9 + clamp(onset * 0.583, 0, 0.35)"
+phase = "noise(time * 0.012) * 0.9 + clamp(onset * 0.25, 0, 0.15)"
 
 # Pushes `r` off the unit range, folding the rose toward spiral and annular
 # forms. A small, slow term - at any size it stops being a rose.
-radial_offset = "0.06 + noise(time * 0.019 + 50) * 0.10"
+radial_offset = "0.10"
 
 # THE ENGRAVING. Weight takes the low end. 1.10 to 1.60 is BELOW the 1.5 to 3.2
 # the shipped line presets use, and deliberately so on this figure alone: a
