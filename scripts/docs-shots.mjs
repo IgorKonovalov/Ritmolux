@@ -273,7 +273,7 @@ const CARDS = [
   "emitter_heartfall",
   "emitter_perseids",
   "emitter_petalfall",
-  // fragment_field (14)
+  // fragment_field (13)
   "fragment_driftmono",
   "fragment_drostemono",
   "fragment_etchingplate",
@@ -283,7 +283,6 @@ const CARDS = [
   "fragment_strata",
   "fragment_sumi",
   "fragment_supernova",
-  "fragment_tiled",
   "fragment_tiledmono",
   "fragment_tunnel",
   "fragment_vitrail",

@@ -1,7 +1,7 @@
 # Tiled Rosette Mono - the Tiled Rosette wallpaper mechanism cut down to a
-# LIMITED INK SET: black, white, and one red held to a thin accent. Sibling to
-# `fragment_tiled.toml`, which stays as it is; this one is the black-and-white
-# print of the same idea.
+# LIMITED INK SET: black, white, and one red held to a thin accent. The
+# full-colour Tiled Rosette it was cut from has since been retired; this is the
+# black-and-white print of the same idea, and the family's one tiling.
 #
 # ---------------------------------------------------------------------------
 # DO NOT RETUNE THIS PRESET CASUALLY. ITS FRAME IS A GATE CONSTANT.
@@ -115,8 +115,7 @@
 # puts a saturated red on the glass at this glow, and it is the red that renders.
 # A full `#ff0000` written here would be far too hot.
 #
-# THE TILE COUNT IS FIXED AT 2 for the reason `fragment_tiled.toml` records: a
-# tile count is discrete but is NOT quantized CPU-side, so any eased or audio
+# THE TILE COUNT IS FIXED AT 2 because a tile count is discrete but is NOT quantized CPU-side, so any eased or audio
 # driven binding sweeps it through fractional values and splits cells at the
 # frame edge. A constant is the only safe binding until that is fixed.
 system = "fragment_field"

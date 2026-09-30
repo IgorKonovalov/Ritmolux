@@ -7,8 +7,8 @@
 # Only the INKS and the tonemap-shoulder trick are inherited. The geometry, the
 # band layout and every gain were derived here, against the numbers below.
 #
-# WHY THE FOLD IS A CONSTANT. `fragment_tiled` and `fragment_tiledmono` both ride
-# a 6 -> 9 `kaleido_order` ladder, and that ladder is their signature. This world
+# WHY THE FOLD IS A CONSTANT. `fragment_tiledmono` rides a 6 -> 9
+# `kaleido_order` ladder, and that ladder is its signature. This world
 # holds the fold at 5 and puts the music on the tunnel's own axis - travel
 # (`kaleido_zoom`) and field deformation - so it is a different look rather than
 # a third tuning of the rosette.

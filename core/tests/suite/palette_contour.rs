@@ -19,9 +19,10 @@
 //!
 //! *"A smooth palette is unchanged"* is not testable here, because there is no
 //! second implementation to compare against. Its evidence is the **golden
-//! suite**: the five shipped presets carrying a non-zero `palette_contour` —
-//! `fragment_mandala`, `fragment_strata`, `fragment_tiled`, `fragment_vitrail`,
-//! `shape_pulse` — are all on smooth palettes, and none of their baselines moved.
+//! suite**: the five shipped presets that carried a non-zero `palette_contour`
+//! when it landed — `fragment_mandala`, `fragment_strata`, `fragment_vitrail`,
+//! `shape_pulse` and a since-retired kaleidoscope tiling — were all on smooth
+//! palettes, and none of their baselines moved.
 //! That is a byte-level claim this file could only weaken. What this file adds is
 //! the half a golden cannot see: that the suppression is driven by *colour* and
 //! not by step count, checked at a **high** step count as well as a low one — the

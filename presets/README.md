@@ -3566,7 +3566,7 @@ middle. Whether that clipped edge reads as deliberate or as a mistake is a
 question nobody has rendered; `1`–`16` is the accepted range and only values at
 or below `1` mean off.
 
-`fragment_tiled.toml` binds it as the constant `"2"`, which is **one choice and
+`fragment_tiledmono.toml` binds it as the constant `"2"`, which is **one choice and
 not the only one** — it is the preset that wanted a fixed wallpaper, not a
 statement that the param is constant-only.
 
@@ -5386,8 +5386,7 @@ Presets worth reading as **worked examples** of one control each:
 |--------|-------|
 | `swarm_drift` | the shared view **zoom** breathing with the music |
 | `attractor_dragon` | a scene over a vignetted **background** gradient (`bg_*`), and an onset-latched structural re-cut (`hash(floor(beat_index * 0.25))`) |
-| `fragment_tiled` | the screen-space **kaleidoscope** folding a field into a figure |
-| `fragment_tiledmono` | a **limited ink set** — `palette_steps` as a hard quantizer with the stops written as plateaus, and the whites driven into the tonemap shoulder so the scene shader's built-in radial vignette stops reading as shading |
+| `fragment_tiledmono` | the screen-space **kaleidoscope** folding a field into a figure, printed in a **limited ink set** — `palette_steps` as a hard quantizer with the stops written as plateaus, and the whites driven into the tonemap shoulder so the scene shader's built-in radial vignette stops reading as shading |
 | `attractor_clifford` | **feedback trails** stretching a figure into a long exposure |
 | `fragment_supernova` | beat-driven flash/glow **eased** through a `[smoothing]` table |
 | `attractor_ink` | the terminal **ink-on-paper** remap (`ink_*` / `paper_*`) |
