@@ -331,14 +331,11 @@ const CARDS = [
   "swarm_braid",
   "swarm_drift",
   "swarm_murmuration",
-  // warp_mesh (7)
-  "warp_cauldron",
+  // warp_mesh (4)
   "warp_ladder",
-  "warp_millrace",
   "warp_sirocco",
   "warp_smoke",
   "warp_tracery",
-  "warp_wellhead",
 ];
 
 const IMAGES = [
@@ -551,25 +548,19 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // warp_mesh — JUDGED at Plan 0136 Phase 10 and kept. Backlog 0133 and that
-    // plan both record that this family ships no preset, which had stopped being
-    // true: four warp worlds ship, and all four were shot at this hop and
-    // compared. A fifth, `warp_smoke`, was authored during that same phase and
-    // was NOT taken for this slot - the plume is a stronger picture of smoke than
-    // wellhead is of the family.
+    // warp_mesh — UNJUDGED. The world judged into this slot at Plan 0136 Phase
+    // 10 was retired at the Plan 0232 walk, with the two it was compared against
+    // there; `warp_tracery` is one of the two representatives that walk named.
     //
     // The whole family is SOFT — a warp field has no edges of its own, it only
     // moves what is already there — so the question is which world still has a
-    // readable subject at gallery size. Wellhead does: a dark star-shaped
-    // aperture against teal, with the ring feeding it legible as depth. Cauldron
-    // held this slot first and lost it on that ground, being a symmetric bloom
-    // with no hard edge anywhere in it; millrace is one crescent on black, and
-    // sirocco is a horizontal drape that reads as an abstract gradient.
+    // readable subject at gallery size. `warp_smoke` was not taken at that
+    // phase because the plume is a picture of smoke rather than of the family,
+    // and sirocco is a horizontal drape that reads as an abstract gradient.
     //
-    // Confirmed at that phase's own look. A later swap is one line here plus a
-    // re-run.
+    // A later swap is one line here plus a re-run.
     out: "docs/images/gallery/warp_mesh.png",
-    presetFile: "presets/warp_wellhead.toml",
+    presetFile: "presets/warp_tracery.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",

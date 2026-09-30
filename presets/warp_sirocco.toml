@@ -2,10 +2,9 @@
 # against each other, with no centre and no radius anywhere in the program
 # (Plan 0104 Phase 4b). Authored fresh-slate (ADR-0089).
 #
-# EVERY OTHER WORLD IN THIS FAMILY IS RADIAL, AND THAT IS THE GAP THIS FILLS.
-# `warp_wellhead` expands on `rad`, `warp_millrace` shears on `rad`,
-# `warp_cauldron` boils about the frame centre - all three are figures with a
-# middle. This one binds `dx` and `dy` against `y` and `x` instead, so the field
+# THE FAMILY'S FIRST WORLDS WERE ALL RADIAL, AND THAT IS THE GAP THIS FILLS.
+# Wellhead expanded on `rad`, Millrace sheared on `rad`, Cauldron boiled about
+# the frame centre (all three since retired) - figures with a middle. This one binds `dx` and `dy` against `y` and `x` instead, so the field
 # has a DIRECTION rather than an origin: horizontal bands travelling at
 # different speeds, sliding past one another the way wind does over sand. There
 # is no eye to look at, which is what makes it read as weather rather than as an

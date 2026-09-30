@@ -271,10 +271,10 @@ recipes are in [`../presets/README.md`](../presets/README.md).
 
 ### `warp_mesh`
 
-![A soft teal and steel-blue field with a black star-shaped aperture at its centre, ringed by a pale
-glow that reads as depth receding into the hole](images/gallery/warp_mesh.png)
+![Seven rounded lobes in a ring around a dark centre on black, each lobe a whorl of concentric
+cream and crimson contour lines like a cut agate, the ring haloed in a soft red glow](images/gallery/warp_mesh.png)
 
-*`presets/warp_wellhead.toml`*
+*`presets/warp_tracery.toml`*
 
 It covers the frame
 with a grid of cells and resamples the **previous** frame through it, giving every grid vertex its

@@ -26,9 +26,9 @@
 # field; it does not create structure in it. Drafted with a soft round blob for a
 # source (`deposit_radius = 0`, no arms) and a `warp` climbing to 4.5, the frame
 # came back as a perfectly smooth grey finger with no turbulence visible at ALL -
-# and raising `warp` further only made the finger wave about. `warp_cauldron`
-# records the same trap in one line: a wobble applied to a featureless gradient
-# moves it and changes nothing you can see. Twelve twisted arms give the field
+# and raising `warp` further only made the finger wave about. It is the same
+# trap in one line: a wobble applied to a featureless gradient moves it and
+# changes nothing you can see. Twelve twisted arms give the field
 # filaments, and only then does the warp have anything to shred. The arms are
 # invisible as arms - what you see is the wisps they become.
 #
