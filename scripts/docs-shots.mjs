@@ -239,9 +239,8 @@ const CARDS = [
   "analytic_stainedglass",
   "analytic_standingwave",
   "analytic_twobandjulia",
-  // attractor (11)
+  // attractor (10)
   "attractor_clifford",
-  "attractor_cliffordgallery",
   "attractor_dragon",
   "attractor_fernmono",
   "attractor_ink",
@@ -691,10 +690,10 @@ const aliases = (entry) =>
     a.replaceAll("\\", "/"),
   );
 
-/// Matching is EXACT against those spellings rather than a substring test.
-/// `attractor_clifford` and `attractor_cliffordgallery` are both shipped presets,
-/// so a substring match would re-render a card nobody asked for and put its
-/// driver drift in the same commit as the intended one.
+/// Matching is EXACT against those spellings rather than a substring test. When
+/// one shipped stem is a prefix of another, as `attractor_clifford` was of a
+/// since-retired gallery, a substring match would re-render a card nobody asked
+/// for and put its driver drift in the same commit as the intended one.
 const requested = process.argv.slice(2).map((name) => name.replaceAll("\\", "/"));
 const unmatched = requested.filter(
   (name) => !IMAGES.some((entry) => aliases(entry).includes(name)),

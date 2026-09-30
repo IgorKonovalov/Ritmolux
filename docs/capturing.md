@@ -1922,7 +1922,7 @@ not what this mode is for. `--preset <name>` holds one scene and turns rotation
 off. Rotations are announced:
 
 ```
-rotate   : frame 5400, AutoTimer -> 'Clifford Gallery'
+rotate   : frame 5400, AutoTimer -> 'Thomas Gallery'
 ```
 
 `Ctrl-C` stops the run through its own exit path, which is what makes it print
