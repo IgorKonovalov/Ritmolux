@@ -66,8 +66,8 @@ draw_progress = "0.975 + noise(time * 0.31) * 0.025"
 # A CRISP STROKE, WHICH IS THE POINT OF THE WHOLE WORLD. `softness` 0.08 is a
 # solid core with barely more than the one-pixel antialiased edge, so the
 # boundary reads as ETCHED rather than as a lit filament - the opposite
-# judgement from `lsystem_coral`, on the same param, for the same reason
-# (the figure decides the stroke, not the library). Thickness stays low because
+# judgement from the soft lit branching of the retired Coral, on the same
+# param, for the same reason (the figure decides the stroke, not the library). Thickness stays low because
 # a Koch edge doubles back on itself constantly and a wide nib fills its own
 # notches: measured, 3.0 closed the depth-5 facets entirely.
 thickness  = "1.7 + clamp(onset * 0.83, 0, 0.5)"

@@ -287,9 +287,7 @@ const CARDS = [
   "fragment_tunnel",
   "fragment_vitrail",
   "fragment_whorl",
-  // lsystem (6)
-  "lsystem_bower",
-  "lsystem_coral",
+  // lsystem (4)
   "lsystem_icecrystal",
   "lsystem_rime",
   "lsystem_sumimono",
@@ -499,7 +497,7 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // lsystem — UNJUDGED. Chosen when this family shipped one preset; 5 ship
+    // lsystem — UNJUDGED. Chosen when this family shipped one preset; 4 ship
     // now and none has been compared against vellum.
     out: "docs/images/gallery/lsystem.png",
     presetFile: "presets/lsystem_vellum.toml",

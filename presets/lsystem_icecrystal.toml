@@ -31,6 +31,7 @@
 
 system = "lsystem"
 name = "Ice Crystal"
+representative = true
 
 [generator]
 # A dense bush grammar: each F becomes eight. THE MIRROR IS INSIDE THE SEGMENT
