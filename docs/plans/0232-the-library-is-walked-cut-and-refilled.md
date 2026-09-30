@@ -353,16 +353,16 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 | `fragment_driftmono` | fragment_field |  | 0.261/0.443/0.153/0.143 | 0.469 | 0.264 | 0.842 | Banded Mandala (0.252) |  | keep | | |
 | `fragment_drostemono` | fragment_field |  | 0.328/0.406/0.132/0.218 | 0.459 | 0.382 | 1.170 | Banded Mandala (0.214) |  | keep | | |
 | `fragment_etchingplate` | fragment_field |  | 0.093/0.022/0.009/0.000 | 0.106 | 0.027 | 1.372 | Nebula (0.182) |  | keep | | |
-| `fragment_interferencemono` | fragment_field |  | 0.182/0.079/0.000/0.023 | 0.234 | 0.043 | 1.850 | Marbled Strata (0.227) |  | retune | | |
+| `fragment_interferencemono` | fragment_field |  | 0.182/0.079/0.000/0.023 | 0.234 | 0.043 | 1.850 | Marbled Strata (0.227) |  | keep | Re-judged at the retune (Phase 4): the owner found it right on a second look; the walk had read it as too still. | |
 | `fragment_mandala` | fragment_field |  | 0.065/0.124/0.024/0.007 | 0.085 | 0.020 | 4.570 | Nebula (0.183) |  | keep | | |
 | `fragment_nebula` | fragment_field |  | 0.190/0.132/0.140/0.099 | 0.212 | 0.059 | 8.628 | Whorl (0.179) |  | keep | | |
 | `fragment_strata` | fragment_field |  | 0.141/0.102/0.138/0.026 | 0.167 | 0.071 | 0.885 | Banded Mandala (0.211) |  | keep | | |
 | `fragment_sumi` | fragment_field |  | 0.096/0.029/0.047/0.142 | 0.165 | 0.104 | 6.850 | Vitrail (0.169) | sanity NOTE: one of the four groundless luminous fields ADR-0128 leaves open | keep | 0248: the problem is the fill, not the composition. | |
-| `fragment_supernova` | fragment_field |  | 0.278/0.308/0.252/0.203 | 0.280 | 0.236 | 3.882 | Banded Mandala (0.199) | sanity NOTE: one of the four groundless luminous fields ADR-0128 leaves open | retune | 0248: the problem is the fill, not the composition. | |
+| `fragment_supernova` | fragment_field |  | 0.278/0.308/0.252/0.203 | 0.280 | 0.236 | 3.882 | Banded Mandala (0.199) | sanity NOTE: one of the four groundless luminous fields ADR-0128 leaves open | retune | 0248: the problem is the fill, not the composition. | 41290a0f |
 | `fragment_tiled` | fragment_field |  | 0.082/0.099/0.021/0.019 | 0.072 | 0.049 | 4.772 | Banded Mandala (0.256) |  | cut | Near-twin of Banded Mandala, the ledger's nearest shape. Its code references move to Tiled Rosette Mono. | |
 | `fragment_tiledmono` | fragment_field | yes | 0.347/0.000/0.119/0.000 | 0.461 | 0.523 | 1.162 | Interference Mono (0.301) |  | keep | | |
-| `fragment_tunnel` | fragment_field |  | 0.243/0.017/0.086/0.085 | 0.296 | 0.107 | 6.171 | Vitrail (0.202) | sanity NOTE: one of the four groundless luminous fields ADR-0128 leaves open | retune | 0248: the problem is the fill, not the composition. | |
-| `fragment_vitrail` | fragment_field |  | 0.113/0.058/0.062/0.129 | 0.246 | 0.058 | 6.116 | Sumi (0.169) |  | retune | | |
+| `fragment_tunnel` | fragment_field |  | 0.243/0.017/0.086/0.085 | 0.296 | 0.107 | 6.171 | Vitrail (0.202) | sanity NOTE: one of the four groundless luminous fields ADR-0128 leaves open | retune | 0248: the problem is the fill, not the composition. | 41290a0f |
+| `fragment_vitrail` | fragment_field |  | 0.113/0.058/0.062/0.129 | 0.246 | 0.058 | 6.116 | Sumi (0.169) |  | retune | | 41290a0f |
 | `fragment_whorl` | fragment_field | yes | 0.254/0.040/0.019/0.048 | 0.295 | 0.084 | 5.113 | Nebula (0.179) | sanity NOTE: one of the four groundless luminous fields ADR-0128 leaves open | keep | 0248: the problem is the fill, not the composition. | |
 | `lsystem_bower` | lsystem |  | 0.022/0.031/0.007/0.023 | 0.081 | 0.013 | 3.519 | Coral (0.132) |  | cut | Redundant with a stronger keep in its family. | |
 | `lsystem_coral` | lsystem | yes | 0.043/0.035/0.004/0.000 | 0.083 | 0.012 | 3.782 | Bower (0.132) |  | cut | Redundant with a stronger keep in its family. | |
