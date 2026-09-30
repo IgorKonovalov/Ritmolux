@@ -74,7 +74,7 @@ stops = [
 # advance and the field stops reversing at all, which measured as the cloud
 # settling: over ten simulated minutes at a constant mid, coverage fell 0.60 ->
 # 0.52 with peak/mean above 18 on four rows of ten - the piling-onto-attractors
-# signature `swarm_shatter.toml` records from Plan 0075's three live failures.
+# signature Plan 0075's three live failures recorded on Shatter.
 # At 0.060 the rate itself swings through zero, so the field genuinely advances
 # and rewinds, bounded and independent of elapsed time: same run reads coverage
 # 0.60 -> 0.81 and peak/mean 5.29 -> 3.26. Image-domain proxies at 96x96 from

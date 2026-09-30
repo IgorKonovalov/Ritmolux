@@ -98,10 +98,10 @@ plasma, oil-on-water.
 
 ### `swarm`
 
-![Thousands of small coloured marks — teal, amber, violet — banked into a broad wave crest across a
-dark navy field, sparse above it and dense below](images/gallery/swarm.png)
+![Thousands of small teal marks gathered into two parallel wavy ribbons running across a black
+field, each ribbon twisting through a bright seam at every turn](images/gallery/swarm.png)
 
-*`presets/swarm_shatter.toml`*
+*`presets/swarm_braid.toml`*
 
 Around ten thousand CPU-simulated particles drifting through a flow field, drawn as instanced
 additive marks. Their world is a torus, so nothing ever leaves the frame — the field stays populated

@@ -172,7 +172,7 @@ import { basename, relative, resolve, sep } from "node:path";
 // third of a page column, and over a hundred of them at full size would put tens of
 // megabytes of derived PNG into the repository for detail no reader can see.
 const CARD_SIZE = "640x360";
-const CARD_HOP_OVERRIDES = { swarm_braid: 374, swarm_drift: 374, swarm_shatter: 374, swarm_stipple: 374 };
+const CARD_HOP_OVERRIDES = { swarm_braid: 374, swarm_drift: 374 };
 
 /// The clip `shot` synthesizes when `--signal-secs` is absent — `SIGNAL_SECS` in
 /// standalone/src/shot/args.rs — and the analysis-hop arithmetic every `hop`
@@ -331,12 +331,10 @@ const CARDS = [
   // star_pattern (2)
   "star_corona",
   "star_rosewindow",
-  // swarm (5)
+  // swarm (3)
   "swarm_braid",
   "swarm_drift",
   "swarm_murmuration",
-  "swarm_shatter",
-  "swarm_stipple",
   // warp_mesh (7)
   "warp_cauldron",
   "warp_ladder",
@@ -463,18 +461,18 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // swarm — judged at the Plan 0088 close (Phase 7). swarm_drift held this
-    // slot through Phase 3 and `dev` flagged it as the weakest picture in the
-    // set; the close agreed, for a reason no column measures: drift is charcoal
-    // on black and collapses to a dark rectangle at README column width. Both
-    // swarm presets were shot at 300 and 374 and shatter won at both.
+    // swarm — UNJUDGED. The world judged into this slot at the Plan 0088 close
+    // was retired at the Plan 0232 walk; `swarm_braid` is the survivor that walk
+    // named for its references. swarm_drift held the slot before and lost it
+    // for a reason no column measures: drift is charcoal on black and collapses
+    // to a dark rectangle at README column width.
     //
     // The hop is still NOT 300, and for drift's original reason: a swarm is a
     // MOTION, and at full energy it photographs as uniform noise. 374 is inside
     // the phrase's quiet bar, where the flock settles onto the flow field and
     // the wave crest driving it becomes legible.
     out: "docs/images/gallery/swarm.png",
-    presetFile: "presets/swarm_shatter.toml",
+    presetFile: "presets/swarm_braid.toml",
     hop: 374,
     signal: "dynamic:110",
     size: "1280x720",

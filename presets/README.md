@@ -1310,11 +1310,11 @@ the same shape `fragment_field`'s
 [`field_speed` / `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed),
 `warp_mesh`'s `warp_speed` and `parametric_curve`'s `spin` take — so it is safe to
 bind to audio. A rate that instead *multiplied* the shared clock is what makes this
-matter: `swarm_shatter` and `swarm_drift` both bind `spin` to `mid`, and under that
-older form a `0.75` swing a hundred seconds into a set advanced the field clock about
-**four seconds in one frame** against a nominal `0.019` — a re-roll of the whole field,
-growing without bound as a set runs. Both worlds are tuned for the integrated form, so a
-`spin` range lifted from either file is a range for what ships.
+matter: `swarm_drift` binds `spin` to `mid`, and under that older form a `0.75` swing a
+hundred seconds into a set advanced the field clock about **four seconds in one frame**
+against a nominal `0.019` — a re-roll of the whole field, growing without bound as a set
+runs. The world is tuned for the integrated form, so a `spin` range lifted from its file
+is a range for what ships.
 
 The swarm's marks individuate the way the emitter's do —
 same names, same semantics (see [Individuation](#individuation--the-distribution-params)).

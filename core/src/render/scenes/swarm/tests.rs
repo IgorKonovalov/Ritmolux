@@ -1460,9 +1460,8 @@ fn a_constant_spin_integrates_to_the_multiply_it_replaced() {
 }
 
 /// ...and the property the multiply failed, which on this scene is the whole
-/// point of the correction: `swarm_shatter` binds `spin` to `mid` through a
-/// `tau = 0.3` one-pole, so the rate moves ~0.04 in a frame across its 0.75
-/// swing. Integrated, the field clock advances one frame's worth whatever the
+/// point of the correction: a world binding `spin` to `mid` through a
+/// `tau = 0.3` one-pole moves the rate ~0.04 in a frame across a 0.75 swing. Integrated, the field clock advances one frame's worth whatever the
 /// elapsed time; multiplied, it advanced ~4 s at t = 100 s against a nominal
 /// 0.019 s and the flow re-rolled on every loud passage.
 #[test]

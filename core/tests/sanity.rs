@@ -399,7 +399,12 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // cloud. Half the new minimum, as every floor here is. The family is two
         // presets and both bind `spin`, so there is no unaffected member to hold
         // this number still: expect to re-derive it whenever either is retuned.
-        SystemKind::Swarm => 0.33,
+        //
+        // Re-derived 2026-09-30 (Plan 0232 Phase 3) from 0.33. `Shatter` was
+        // retired, and the family minimum moved to `Braid` at 0.7403, which left
+        // the old floor 2.24x below it — over this file's 2.2x slack. Half of
+        // that minimum.
+        SystemKind::Swarm => 0.37,
         // Line art. The trails-heavy looks score lowest because a faint tail is
         // still lit; Rose Trails at 0.6722 sets this one.
         SystemKind::ParametricCurve => 0.33,

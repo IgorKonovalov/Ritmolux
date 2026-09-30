@@ -165,11 +165,11 @@ previous row — plus a trend line per statistic.
 ```bash
 # Ten simulated minutes of a swarm world, a row every 30 s
 cargo run -p standalone --example shot -- \
-  --preset-file presets/swarm_shatter.toml --horizon 10 --size 96x96 --set bass=0.7
+  --preset-file presets/swarm_braid.toml --horizon 10 --size 96x96 --set bass=0.7
 
 # ...and the same run as JSON
 cargo run -p standalone --example shot -- \
-  --preset-file presets/swarm_shatter.toml --horizon 10 --interval 60 --json
+  --preset-file presets/swarm_braid.toml --horizon 10 --interval 60 --json
 ```
 
 **When to run it** ([ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) states the trigger once, so it can be found): on a
