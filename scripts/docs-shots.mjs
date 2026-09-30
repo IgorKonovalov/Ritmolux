@@ -287,7 +287,6 @@ const CARDS = [
   "curve_inkpendulum",
   "curve_ionwake",
   "curve_lacework",
-  "curve_loom",
   "curve_phosphor",
   "curve_prismscope",
   "curve_rosemono",
@@ -463,11 +462,11 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // parametric_curve — UNJUDGED. The Maurer web that held this slot was
-    // retired at the Plan 0232 walk; `curve_loom` is the family representative
-    // that walk named for its references, and it is the same family of figure.
+    // parametric_curve — the owner chose Broadside at the Plan 0232 retune, when
+    // Loom, which had held the slot since the walk, was retired. A crisp-lined
+    // Maurer rose, the same family of figure.
     out: "docs/images/gallery/parametric_curve.png",
-    presetFile: "presets/curve_loom.toml",
+    presetFile: "presets/curve_broadside.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",

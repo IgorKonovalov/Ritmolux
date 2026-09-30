@@ -112,10 +112,10 @@ this is the system a still photograph serves worst, for exactly that reason.
 
 ### `parametric_curve`
 
-![A pale grey-white web on a dark navy field: a five-sided figure with softly bowed sides and a small
-pentagonal hole at its centre, woven from straight interlacing chords](images/gallery/parametric_curve.png)
+![Crisp red and cream straight chords on black, interlaced into an eight-pointed star with bowed
+sides: a Maurer rose drawn as one continuous line](images/gallery/parametric_curve.png)
 
-*`presets/curve_loom.toml`*
+*`presets/curve_broadside.toml`*
 
 One continuous line, sampled every frame from a closed-form `t → (x, y)` curve and drawn as thick
 glowing strokes. Because it is resampled per frame rather than cached, audio can sweep the *shape*

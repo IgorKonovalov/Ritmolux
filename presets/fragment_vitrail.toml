@@ -118,7 +118,7 @@ samples       = "240"
 # as gauze over the vault instead of as a window.
 #
 # It was `0.016`, about a HUNDREDTH of what this param takes. Every other line
-# preset in the library sits at 1.5-3.2 (`curve_loom` 1.6, `curve_ionwake`
+# preset in the library sits at 1.5-3.2 (`curve_broadside` 2.1, `curve_ionwake`
 # 2.6, `lsystem_vellum` 2.0, `star_rosewindow` 3.2). At 0.016 the stroke is
 # sub-pixel, so nothing survives rasterization except where a sample happens to
 # land - which is exactly the dotted figure that was on screen, and it is why

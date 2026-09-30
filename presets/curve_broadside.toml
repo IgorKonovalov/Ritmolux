@@ -4,6 +4,7 @@
 # web reads as two press passes over one plate and not as a glowing wireframe.
 system = "parametric_curve"
 name = "Broadside"
+representative = true
 
 [curve]
 family = "maurer_rose"

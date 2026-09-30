@@ -43,7 +43,7 @@ import { join, resolve } from "node:path";
 /// belongs in — `fragment_vitrail` strokes through a parametric-curve **layer**,
 /// so its top-level `[params]` is the fragment field's and has no such name.
 const SUBJECTS = [
-  { file: "curve_loom", table: "[params]", note: "a Maurer rose, the family the verdict was given on" },
+  { file: "curve_broadside", table: "[params]", note: "a Maurer rose, the family the verdict was given on" },
   { file: "curve_ionwake", table: "[params]", note: "a curve at the thin end of the shipped range" },
   { file: "lsystem_vellum", table: "[params]", note: "straight stems and a branching figure" },
   { file: "star_rosewindow", table: "[params]", note: "a ring of ARCS — the primitive that surfaced this" },
