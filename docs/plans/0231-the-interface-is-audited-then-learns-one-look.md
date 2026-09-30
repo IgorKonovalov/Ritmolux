@@ -445,9 +445,9 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | 6 — Overlays move | dev | done | 697fafc4 |
 | 7 — Binding table, help, hint | dev | done | fb237a6c |
 | 8 — Parameter group and main (F2, engine) | dev | done | d9ddfe12 |
-| 9 — foobar component takes the look | dev | done | committed with this row |
-| 10 — Studio tokens and motion | studio-builder | done | committed with this row |
-| 11 — Studio workflow fixes | studio-builder | not started | |
+| 9 — foobar component takes the look | dev | done | b548dedc |
+| 10 — Studio tokens and motion | studio-builder | done | 7a4996aa |
+| 11 — Bound first, the rest grouped (F2, studio) | studio-builder | done | committed with this row |
 | 12 — Before and after on devices | human | not started | |
 
 ### Notes
@@ -585,6 +585,17 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   ipc/appHandlers.ts, preload/api/app.ts, settings.test.ts}`, `studio/shared/ipc-channels.ts`,
   `studio/renderer/{App.tsx, App.test.tsx, views/Settings.test.tsx}` and `studio/README.md` (the
   settings table, held to `StudioSettings` by `settings.doc.test.ts`).
+- Phase 11, shape. The roster headings (the system's name, each stage's) are gone: the bound list and
+  the groups each draw from the system's roster and the stages together. A group is a native
+  `<details>`, so its open state lives in the element. A row the family on screen does not read stays
+  in the trailing `not read on <family>` group **even when bound**, as before, rather than in the
+  bound list. `ParamRow` gained a `data-param` attribute, which the tests read.
+- Phase 11, schema. `group` and `main` are required in `studio/shared/schema.ts` (ADR-0256: reject a
+  schema without them), so a player built before Phase 8 now fails the schema with
+  `group Required`. The lane's `target/release/ritmolux` predated Phase 8 and failed
+  `fields`/`grammar`/`templates.test.ts` that way; it was rebuilt (`cargo build --release -p
+  standalone --bin ritmolux`) and the suite passed. Files outside the list:
+  `studio/electron/player/schema.test.ts`, `studio/renderer/views/Editor.test.tsx` (fixtures).
 
 ### Close triggers
 
