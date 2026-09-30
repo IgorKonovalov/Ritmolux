@@ -7,7 +7,8 @@
 # time), so the pearls slide along the filaments continuously. The bass pushes
 # the point outward (trap_radius 0.15 -> 0.55), which re-strings every pearl
 # at once; the mids nudge c_im a touch so the dendrite flexes. Everything but
-# the pearls is near-black: the palette is bright only in its first tenth.
+# the pearls is near-black: the palette is bright only in its first tenth, and color_span 0.6
+# keeps most trap distances in the dark end, so one soft halo rings the set, not a frame of rings.
 #
 # Judge: do the pearls read as discrete beads on a thread, or as a spray? And
 # does the bass re-stringing read as the necklace re-forming, or as a cut?
@@ -36,8 +37,8 @@ iterations   = "56"
 interior     = "1"
 trap_radius  = "0.15 + clamp(bass * 0.47, 0, 0.40)"
 trap_rotate  = "time * 0.05"
-zoom         = "0.78"
-color_span   = "1.8"
+zoom         = "1.1"
+color_span   = "0.6"
 brightness   = "1.3"
 bloom_amount    = "0.4"
 bloom_threshold = "0.85"

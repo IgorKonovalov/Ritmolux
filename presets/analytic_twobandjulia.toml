@@ -40,7 +40,7 @@ c_im          = "0.085 + clamp(treb * 0.1, 0, 0.06)"
 iterations    = "64"
 escape_radius = "32"
 interior      = "0"
-zoom          = "0.8"
+zoom          = "1.17"
 color_span    = "0.55"
 brightness    = "1.2"
 
