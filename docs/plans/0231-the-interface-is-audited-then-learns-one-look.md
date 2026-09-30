@@ -448,7 +448,7 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | 9 — foobar component takes the look | dev | done | b548dedc |
 | 10 — Studio tokens and motion | studio-builder | done | 7a4996aa |
 | 11 — Bound first, the rest grouped (F2, studio) | studio-builder | done | cfc7ed95 |
-| 12 — Before and after on devices | human | not started | |
+| 12 — Before and after on devices | human | owed | |
 
 ### Notes
 
