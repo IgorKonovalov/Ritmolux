@@ -339,8 +339,8 @@ export const onRequest = defineRouteMiddleware((context) => {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The header control, and a Russian entrance for it to point at | dev | done | committed with this row |
-| 2 — The Russian pages say they are Russian | dev | not started | |
+| 1 — The header control, and a Russian entrance for it to point at | dev | done | bc09b3d0 |
+| 2 — The Russian pages say they are Russian | dev | done | committed with this row |
 | 3 — The front door names the Russian pages | dev | not started | |
 | 4 — The live site, read after the push | human | not started | |
 
@@ -353,6 +353,16 @@ export const onRequest = defineRouteMiddleware((context) => {
   did not: without it `core-cabi/include/rlx_core.h` maps to itself and is its own twin.
 - Phase 1: `declaredTitle` in `content.config.ts` does not call `sourceOf`. At `parseData` time the
   glob loader passes an absolute `filePath`, while `sourceOf` takes the store's `site/`-relative one.
+- Phase 2: `<html lang>` / `<main lang>` / `og:locale` over all 228 built `.html` files: `ru/ru/ru`
+  on 6 (`ru/`, `ru/how-it-works/`, `ru/running/`, `ru/install-windows/`, `ru/install-macos/`,
+  `ru/install-foobar/`), `en/en/en` on 222.
+- Phase 2: alternates found on exactly the 10 pages of the five pairs, two each (`en`, `ru`), 20
+  in all; with `https://igorkonovalov.github.io` stripped, all 20 paths name a built `index.html`,
+  0 unresolved. None elsewhere.
+- Phase 2: `site/dist/pagefind/pagefind-entry.json` reads
+  `"ru":{"page_count":6}`, `"en":{"page_count":221}` (227 of the 228 HTML files are indexed).
+- Phase 2: the README sentence on the split index is written into the new row of the
+  transformations table rather than as a free-standing sentence.
 
 ### Close triggers
 

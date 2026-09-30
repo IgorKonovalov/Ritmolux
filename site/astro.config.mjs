@@ -318,6 +318,9 @@ export default defineConfig({
         Footer: './src/components/Footer.astro',
         LanguageSelect: './src/components/LanguageSelect.astro',
       },
+      // Gives a Russian route `lang="ru"` and each twinned pair its `hreflang`
+      // alternates; see the module.
+      routeMiddleware: './src/route-data.ts',
       description:
         'Reader-facing documentation for Ritmolux: preset authoring, the expression language, ' +
         'the parameter roster, and the engine contracts.',
