@@ -140,11 +140,10 @@ import { basename, relative, resolve, sep } from "node:path";
 /// judged and kept at Plan 0136 Phase 10, and the other two were seen at that
 /// same look and left standing. A swap is one line here plus a re-run.
 ///
-/// Two slots came out of the Plan 0088 pass with a picture that is accepted
+/// One slot came out of the Plan 0088 pass with a picture that is accepted
 /// rather than good, and the fix is content work rather than a hop:
-/// `emitter_perseids` bunches its fan into the right half at every hop tried,
-/// and `star_rosewindow`'s outermost ring runs off all four edges. Both are
-/// recorded as content-lane notes at that close, not as manifest bugs.
+/// `star_rosewindow`'s outermost ring runs off all four edges. It is recorded
+/// as a content-lane note at that close, not as a manifest bug.
 // --- the per-preset gallery cards ---------------------------------------
 //
 // One card per SHIPPED preset, filed under docs/images/gallery/presets/. This
@@ -267,12 +266,9 @@ const CARDS = [
   "cellular_spiral_bloom",
   "cellular_tide_bugs",
   "cellular_wavefront",
-  // emitter (5)
+  // emitter (2)
   "emitter_driftfield",
-  "emitter_emberjet",
   "emitter_heartfall",
-  "emitter_perseids",
-  "emitter_petalfall",
   // fragment_field (13)
   "fragment_driftmono",
   "fragment_drostemono",
@@ -593,11 +589,11 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // emitter — UNJUDGED. Chosen when this family shipped one preset; 5 ship
-    // now. The Plan 0088 close notes this picture bunches its fan into the right
-    // half at every hop tried, and called that content work rather than a hop.
+    // emitter — UNJUDGED. The meteor shower that held this slot was retired at
+    // the Plan 0232 walk; `emitter_heartfall` is the family's longer-standing
+    // representative of the two that ship.
     out: "docs/images/gallery/emitter.png",
-    presetFile: "presets/emitter_perseids.toml",
+    presetFile: "presets/emitter_heartfall.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",

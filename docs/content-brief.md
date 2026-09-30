@@ -79,8 +79,8 @@ Three questions no instrument in this repo can answer, and the first carries the
   and no earlier configuration could reach.
 - Two stale headers belong to this sitting: `fragment_vitrail.toml` still explains its onset-`flash`
   binding by *"the report is bloom-blind"* (fixed by Plan 0077 Phase 4 — the binding may stay for its
-  look, but the reason is gone), and `emitter_perseids.toml`'s header records the routed-out quiet sky
-  1a exists to ship.
+  look, but the reason is gone), and Perseids' header recorded the routed-out quiet sky 1a exists to
+  ship. **Perseids was retired 2026-09-30 by Plan 0232 Phase 3.**
 
 ---
 
@@ -184,10 +184,9 @@ built-in system, and the Phase 7 look call at its close accepted two of them as 
 than good*. Both families ship **exactly one preset**, so there is nothing to swap to — and the
 close established, by shooting alternatives, that the capture hop is not the lever either.
 
-- **`emitter_perseids`** — the meteor fan bunches into the right half of the frame and leaves the
-  left third empty navy. Shot at hops 250, 300 and 340: the same imbalance at all three, so this is
-  the preset's spawn geometry and not a moment in the clip. The gallery image is
-  `docs/images/gallery/emitter.png`.
+- **Perseids** (`emitter`) — the meteor fan bunched into the right half of the frame and left the
+  left third empty navy. **Retired 2026-09-30 by Plan 0232 Phase 3**; the gallery image,
+  `docs/images/gallery/emitter.png`, now pictures `emitter_heartfall`.
 - **`star_rosewindow`** — the outermost ring of the rosette runs off all four edges, so the image
   reads as a crop rather than as a rose window. Shot at 230 and 300: identical framing, different
   palette phase. The gallery image is `docs/images/gallery/star_pattern.png`.

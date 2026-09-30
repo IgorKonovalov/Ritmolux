@@ -234,10 +234,10 @@ readout renders as its inert resting comb; use `--signal` or `--audio`.
 
 ### `emitter`
 
-![A meteor shower: pale blue-white dashed streaks flying up and to the right in a broad fan across a
-dark navy field](images/gallery/emitter.png)
+![Dozens of soft charcoal hearts scattered across a white page at every angle, some upright, some
+tumbling, a few overlapping into dark clusters near the top](images/gallery/emitter.png)
 
-*`presets/emitter_perseids.toml`*
+*`presets/emitter_heartfall.toml`*
 
 Objects that spawn, follow an analytic ballistic path, age, and are retired. It is the only system
 whose population is not fixed — which is precisely what the swarm's wrap-around torus cannot express.

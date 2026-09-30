@@ -1422,7 +1422,7 @@ cargo run -p standalone --example shot -- --preset "Drift" \
   --signal dynamic:110 --strip 8 --out groove.png
 
 # Filmstrip from a real clip (16-bit PCM WAV)
-cargo run -p standalone --example shot -- --preset "Perseids" \
+cargo run -p standalone --example shot -- --preset "Heartfall" \
   --audio assets/test/clip.wav --strip 8 --out clip.png
 ```
 

@@ -19,6 +19,7 @@
 # and the light, mid turns the colour toward ice, onset blooms the cores.
 system = "emitter"
 name = "Drift Field"
+representative = true
 
 [palette]
 stops = [

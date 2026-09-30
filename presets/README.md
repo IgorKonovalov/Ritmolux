@@ -1405,8 +1405,10 @@ world units above the source line (at `y = -1.12` unless `source_y` moves it).
 **A frame is `|y| <= 1`**, so
 `v² / (2g) - 1.12` is where the crest of the shower sits. Every object shares
 `launch_speed`, so a crest *inside* the frame draws a visible horizontal ceiling
-where the population piles up at the top of its arc; `emitter_perseids.toml` puts
-its crest at `y = 1.48` (`v = 2.6`, `g = 1.3`), off frame, for exactly that reason.
+where the population piles up at the top of its arc. `v = 2.6`, `g = 1.3` from the
+default source puts the crest at `y = 1.48`, off frame, which is the way to avoid that
+ceiling; `emitter_heartfall.toml` instead keeps its crest inside at `y ≈ 0.88`
+(`v = 2.3`, `g = 1.3`, `source_y = -1.15`), so the room sees the hearts turn over.
 
 `lifetime` past the flight time is wasted pool. An object that has left the frame
 is retired the moment it does, so the only thing a long `lifetime` buys is slots
