@@ -498,7 +498,14 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // floor above. The areal question is now the one that convicts an
         // emptied canvas, at the quiet excitation where emptying happens —
         // [`a_canvas_the_music_empties_is_convicted_and_black_calls_it_full`].
-        SystemKind::ShapeCollage => 0.13,
+        //
+        // Re-derived 2026-09-30 (Plan 0232 Phase 4) from 0.13. `On White` was
+        // cut from forty elements to five-to-seven at the owner's direction, a
+        // sparse canvas by design, and reads 0.0556 against its paper — 2.3x
+        // under the old floor, over this file's 2.2x slack. Half of that
+        // minimum. The emptied-canvas conviction is untouched: it rests on
+        // `MODERATE_MIN_COVERAGE`, not on this floor.
+        SystemKind::ShapeCollage => 0.027,
         // **Derived from the distribution on 2026-09-11**, when the family's
         // first twelve worlds shipped, from a `0.08` borrowed off
         // `FragmentField`. The lowest shipped member is `Echo Plate` at 0.3253 —

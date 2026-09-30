@@ -6,9 +6,12 @@
 # slowly, so the figure reads as a corona around a dark centre.
 #
 # WHAT DRIVES IT: the band array, through the per-element `index` bindings.
-# `thickness` and `hue` both vary per element off `bin(index)`, so a spoke that is
-# loud is also fatter and further along the palette than its silent neighbours -
-# three cues for one signal, which is what stops a radial readout reading flat.
+# `hue` varies per element off `bin(index)`, so a spoke that is loud is also
+# further along the palette than its silent neighbours. `thickness` is a constant:
+# a spoke that fattened with its band read as wobble rather than as a readout.
+# A long trail zoomed outward each frame (`trails` 0.86, `fb_zoom` 1.05, faster on
+# an onset) sends every past ring expanding away from the live one, so the corona
+# leaves ripples, and the palette walks slowly with time.
 # `radius` pumps on bass; per-element easing (fast attack, slow release) is what
 # makes the spokes fall like a meter instead of strobing on every analysis hop.
 #
@@ -42,19 +45,20 @@ radius = 0.18
 rotation = 0.5
 
 [params]
-# The ring: a dark centre that opens on bass. 0.24 base, +0.14 at peak.
-radius = "0.24 + clamp(bass * 0.165, 0, 0.14)"
+# The ring: a dark centre that opens on bass. 0.20 base, +0.10 at peak, kept
+# small so the outward ripples have room.
+radius = "0.2 + clamp(bass * 0.12, 0, 0.1)"
 base = "0.035"
 scale = "1.5"
 curve = "0.72"
 span = "1.0"
 rotation = "time * 0.012 + sin(time * 0.07) * 0.02"
 
-# Per-element: a loud spoke is fatter and further along the palette.
+# Per-element: a loud spoke is further along the palette; every spoke is one width.
 # bin() typical value is 0.089, an order of magnitude under the band scalars, so
 # these gains are much larger than a `bass` term of the same cap would carry.
-thickness = "2.2 + clamp(bin(index) * 34, 0, 5.5)"
-hue = "0.10 + index * 0.62 + clamp(bin(index) * 2.6, 0, 0.22)"
+thickness = "3.0"
+hue = "0.10 + index * 0.62 + time * 0.01 + clamp(bin(index) * 2.6, 0, 0.22)"
 hue_spread = "0"
 
 brightness = "0.78"
@@ -72,3 +76,5 @@ bloom_amount = "0.42"
 bloom_threshold = "1.0"
 bloom_radius = "1.6"
 exposure = "1.0"
+trails   = "0.86"
+fb_zoom  = "1.05 + clamp(onset * 0.06, 0, 0.04)"

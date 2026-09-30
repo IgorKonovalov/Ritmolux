@@ -2,23 +2,12 @@
 # strokes and checker patches crossing each other, some of them translucent.
 # The second shipped world on `shape_collage` (ADR-0123, Plan 0113 Phase 7).
 #
-# THIS IS THE DENSE HALF OF THE REFERENCE SET. `collage_suprematist` is fourteen
-# opaque planes with room around them; this is forty elements of eight kinds
-# overlapping. Same engine, same paper, same knee constraint - the difference is
-# entirely `roster`, `count` and the palette.
-#
-# -- WHY THE COUNT IS EXACTLY 40 -------------------------------------------------
-#
-# ADR-0123 counts just above forty elements in `On White II` once its lines and
-# arcs are included, and Plan 0113 Phase 3 set the floor tier's element cap to
-# exactly 40 FROM that count. So this preset sits ON the cap, not under it: it is
-# the densest canvas the engine will draw at the floor tier, and a forty-first
-# element would be silently dropped rather than drawn.
-#
-# IF YOU WANT MORE, MOVE THE CAP - do not raise `count` here and assume it landed.
-# `TierConfig::collage_elements` is the number, `core/tests/collage_cost.rs` is
-# what prices moving it, and that file's own header says what a canvas costs per
-# element on an integrated GPU.
+# FEW FORMS, LARGE AND LEGIBLE. `collage_suprematist` is fourteen opaque planes;
+# this is five to seven elements of eight kinds, overlapping. Same engine, same
+# paper, same knee constraint - the difference is entirely `roster`, `count` and
+# the palette. It was forty, on the floor tier's element cap, and at forty the
+# canvas read as clutter; the owner cut it to a handful at the Plan 0232 retune,
+# so each form reads as itself and the crossings between them are the event.
 #
 # -- THE PALETTE IS STILL UNDER THE KNEE -----------------------------------------
 #
@@ -31,12 +20,14 @@
 # unreachable, and both reference canvases are off-white anyway.
 #
 # The colours are muddier than the suprematist file's on purpose. Kandinsky's
-# canvas is chalkier than Malevich's, and forty saturated elements overlapping
-# reads as noise where forty muted ones read as a painting.
+# canvas is chalkier than Malevich's, and saturated elements overlapping read as
+# a poster where muted ones read as a painting.
 #
 # WHAT DRIVES WHAT
 #   recompose   the canvas recomposes on roughly one beat in eight
-#   density     elements arrive and leave with the mid range
+#   count       a sixth and seventh element arrive with the mid range
+#   pump_size   every form breathes all the time, deeper on the low end
+#   density     how much of the frame the arrangement fills, with the mids
 #   drift/spin  every element carries its own slow travel and turn
 #   pump_alpha  the low end swells the translucent crossings, phase-offset
 #   scale       a slow breath, plus the low end
@@ -85,27 +76,26 @@ paper = "0.9375"
 roster = "1"
 
 # The diagonal-axis grammar, which Plan 0113 Phase 5 chose. `size_hierarchy` is
-# higher here than in the suprematist file - forty elements need a wider spread
-# between the dominant forms and the small ones, or the canvas reads as gravel.
+# higher here than in the suprematist file - a wider spread between the dominant
+# forms and the small ones, so even a handful has a clear lead form.
 layout         = "2"
 seed           = "29"
 size_hierarchy = "0.62"
 angle_bias     = "-24"
 
-# ON the cap, not under it. See the header before changing this.
-count = "40"
+# Five at rest, up to seven once the mids pass about 0.25. `count` truncates, so the
+# sixth element arrives only when the term reaches 6. See the header.
+count = "5 + clamp(mid * 8, 0, 2)"
 
-# The canvas is denser than the suprematist one, so `density` starts higher and
-# travels less: at forty elements, dropping to half is a visibly different
-# painting rather than a thinning of one.
+# `density` is how much of the frame the arrangement fills; it starts high and
+# travels little, so the few forms stay large.
 density = "0.78 + clamp(mid * 0.26, 0, 0.22)"
 
 scale = "1.00 + 0.04 * sin(time * 0.115) + clamp(bass * 0.0941, 0, 0.08)"
 pan_x = "0.12 * sin(time * 0.58)"
 pan_y = "0.08 * sin(time * 0.77 + 0.7)"
 
-# Slower than the suprematist file's. Forty elements travelling at that rate is
-# a swarm; at this rate it is a canvas whose forms are not quite still.
+# Slower than the suprematist file's: a canvas whose forms are not quite still.
 drift = "0.55 + clamp(bass * 0.47, 0, 0.4)"
 spin  = "0.35 + clamp(mid * 0.41, 0, 0.35)"
 
@@ -114,11 +104,16 @@ spin  = "0.35 + clamp(mid * 0.41, 0, 0.35)"
 recompose       = "select(hash(beat_index) > 0.93, 1, 0)"
 recompose_blend = "0.45"
 
-# THE SWELL GOES ON OPACITY HERE, NOT ON SIZE. About a quarter of this roster's
-# elements are already translucent, so modulating their alpha makes the crossings
-# breathe - which is the thing this canvas has that the suprematist one does not.
-# Phase-offset per element, so they do not pulse together.
+# THE SWELL IS ON OPACITY AND ON SIZE. About a quarter of this roster's elements
+# are already translucent, so modulating their alpha makes the crossings breathe -
+# which is the thing this canvas has that the suprematist one does not. The size
+# pump runs all the time, not only on bass: with five to seven small forms on a
+# large paper, drift and spin alone change so little of the frame that the
+# animation gate measured it frozen (0.0086 against its 0.01 floor at 0.6). At
+# 0.9 each form breathes visibly. Both are phase-offset per element, so the forms
+# do not pulse together.
 pump_alpha = "clamp(bass * 0.235, 0, 0.20)"
+pump_size  = "0.9 + clamp(bass * 1.2, 0, 0.8)"
 
 saturation = "0.90 + clamp(treb * 0.1176, 0, 0.10)"
 

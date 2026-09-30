@@ -15,8 +15,9 @@
 # the current one. Nothing else in the library does this because nothing else has
 # a population with an age.
 #
-# Drives: bass swells the stars and thickens the field, treble runs the shimmer
-# and the light, mid turns the colour toward ice, onset blooms the cores.
+# Drives: bass swells the stars, speeds the drift and thickens the field, every
+# beat launches a burst of new stars, treble runs the shimmer and the light, mid
+# turns the colour toward ice, onset blooms the cores. Each star turns slowly.
 system = "emitter"
 name = "Drift Field"
 representative = true
@@ -38,9 +39,9 @@ source_width = "1"
 spawn_fade = "0.18"
 prewarm = "1"
 
-spawn_rate = "38 + clamp(bass * 35, 0, 30)"
+spawn_rate = "38 + clamp(bass * 35, 0, 30) + beat * 60"
 gravity = "0"                      # no arc, no fall - a drift
-launch_speed = "0.28"              # 8 s of life carries a mark 2.24 units, so it crosses
+launch_speed = "0.36 + clamp(bass * 0.3, 0, 0.25)"
 launch_angle = "-0.2 + noise(time * 0.03) * 0.4"   # the heading wanders; old marks keep theirs
 spread = "0.3"
 lifetime = "8"
@@ -58,13 +59,13 @@ size = "0.9 + clamp(bass * 1.18, 0, 1.0)"
 size_spread = "0.8"                # near stars and far ones
 shape = "3"                        # a four-pointed star, not Perseids' glint
 points = "4"
-spin = "0"
-twinkle = "0.5 + clamp(treb * 0.42, 0, 0.25)"
+spin = "0.15"
+twinkle = "0.7 + clamp(treb * 0.42, 0, 0.3)"
 brightness = "0.8 + clamp(bass * 0.59, 0, 0.5)"
 
 hue = "0.55"
 hue_center = "0.6 + noise(time * 0.05 + 50) * 0.06 + clamp(mid * 0.088, 0, 0.075)"
-hue_spread = "0.55"
+hue_spread = "0.8"
 saturation = "0.7"
 
 bg_hue = "0.12"                    # low on the ramp - violet black, not the ice end

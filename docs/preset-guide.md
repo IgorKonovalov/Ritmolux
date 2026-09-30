@@ -219,9 +219,9 @@ figures. It has by far the largest parameter surface, and much of it is family-s
 
 ### `spectrum`
 
-![A radial spectrum readout: a ring of spokes around an empty centre on black, each spoke's length
-and thickness its own band, long magenta spokes to the upper left, short violet ones to the right
-and warm orange ones below](images/gallery/spectrum.png)
+![A radial spectrum readout: a ring of thin spokes of one width around an empty centre on black,
+each spoke's length its own band, long magenta spokes to the upper left, short violet ones to the
+upper right and warm orange ones below](images/gallery/spectrum.png)
 
 *`presets/spectrum_radialbloom.toml`*
 
