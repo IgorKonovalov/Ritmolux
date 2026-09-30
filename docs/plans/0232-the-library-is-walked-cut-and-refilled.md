@@ -341,8 +341,8 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 | `attractor_walkrho` | attractor | yes | 0.028/0.002/0.007/0.014 | 0.032 | 0.046 | 3.887 | Butterfly to Knot (0.036) | NEAR-DUP ~ Valentine (distinctness+report, shape 0.064); NEAR-DUP ~ Butterfly to Knot (distinctness+report, shape 0.036); NEAR-DUP ~ Lorenz Gallery (distinctness, shape 0.068) | cut | Near-twin of Butterfly to Knot, the ledger's nearest shape. | |
 | `attractor_walkthomas` | attractor |  | 0.034/0.004/0.013/0.040 | 0.074 | 0.020 | 3.016 | Thomas (0.118) |  | keep | | |
 | `cellular_ember_life` | cellular | yes | 0.015/0.215/0.000/0.000 | 0.192 | 0.168 | 2.326 | Labyrinth (0.183) |  | keep | | |
-| `cellular_labyrinth` | cellular |  | 0.001/0.133/0.001/0.000 | 0.105 | 0.102 | 1.234 | Ember Life (0.183) |  | retune | | |
-| `cellular_spiral_bloom` | cellular | yes | 0.000/0.169/0.053/0.000 | 0.274 | 0.148 | 1.624 | Wavefront (0.192) |  | retune | | |
+| `cellular_labyrinth` | cellular |  | 0.001/0.133/0.001/0.000 | 0.105 | 0.102 | 1.234 | Ember Life (0.183) |  | retune | | 660333c1 |
+| `cellular_spiral_bloom` | cellular | yes | 0.000/0.169/0.053/0.000 | 0.274 | 0.148 | 1.624 | Wavefront (0.192) |  | retune | | 660333c1 |
 | `cellular_tide_bugs` | cellular |  | 0.381/0.000/0.000/0.000 | 0.360 | 0.058 | 1.273 | Ember Life (0.206) |  | keep | | |
 | `cellular_wavefront` | cellular |  | 0.114/0.055/0.110/0.000 | 0.291 | 0.084 | 1.597 | Ember Life (0.187) |  | keep | | |
 | `emitter_driftfield` | emitter | yes (new) | 0.021/0.001/0.000/0.000 | 0.019 | 0.004 | 2.759 | Petalfall (0.151) |  | retune | | |
