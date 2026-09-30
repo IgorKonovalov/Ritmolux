@@ -437,10 +437,10 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Engine UI captures | dev | done | committed with this row |
-| 2 — Studio captures | studio-builder | done | committed with this row |
-| 3 — Audit and direction | human | done | committed with this row |
-| 4 — The look declared once | dev | not started | |
+| 1 — Engine UI captures | dev | done | 21f261cb |
+| 2 — Studio captures | studio-builder | done | 98e4d4e7 |
+| 3 — Audit and direction | human | done | 9907f1b5 |
+| 4 — The look declared once | dev | done | committed with this row |
 | 5 — Panels and measured text | dev | not started | |
 | 6 — Overlays move | dev | not started | |
 | 7 — Binding table, help, hint | dev | not started | |
@@ -494,6 +494,17 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   frame callbacks, and `capturePage` then returned the previous state's frame, one step behind.
   Each capture also waits for two animation frames after the step. Runs on Windows and macOS are
   unmeasured. Also touched outside the list: `studio/README.md` (the command's paragraph).
+- Phase 4, roles beyond look A's table: `bg`, `text_faint`, `favourite`, `good`, `info`, `warn`,
+  `error` and `trough` carry values chosen in this session, not by the owner (the diagnostics
+  panel's meters and the favourite row need them). The type scale and spacing steps are the sizes
+  the surfaces already used; nothing reads them yet.
+- Phase 4, colour encoding. Theme values are sRGB-encoded; the diagnostics panel's quad pass takes
+  `Color::linear()`, since its shader writes onto the `*Srgb` surface. Its old constants were linear
+  values, so its panel and meters moved to the theme's colours.
+- Phase 4, done-when. `RLX_UPDATE_UI_TOKENS=1` was **not run**: the conductor's allowlist refuses that
+  prefix. A hand edit of `--accent` turned `ui_tokens::the_studio_tokens_are_what_the_theme_declares`
+  red, and the file was restored by hand. No golden includes the banner or the diagnostics panel,
+  so none was re-blessed.
 
 ### Close triggers
 

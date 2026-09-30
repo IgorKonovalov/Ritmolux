@@ -33,6 +33,7 @@ use std::fmt::Write as _;
 use crate::diag::{AnalysisMetrics, Metrics};
 
 use super::overlay_font::{GLYPH_H, GLYPH_W, glyph};
+use super::theme::THEME;
 use super::tier::{GridScale, Tier};
 use crate::render::gpu;
 
@@ -93,24 +94,54 @@ struct Vp {
     h: f32,
 }
 
-const PANEL_COLOR: Rgba = [0.02, 0.02, 0.03, 0.66];
-const TEXT_COLOR: Rgba = [0.90, 0.95, 1.00, 1.0];
-const SPARK_GOOD: Rgba = [0.30, 0.90, 0.45, 1.0];
-const SPARK_WARN: Rgba = [0.95, 0.75, 0.20, 1.0];
-const SPARK_BAD: Rgba = [0.95, 0.32, 0.32, 1.0];
-const BAR_BG_COLOR: Rgba = [0.14, 0.14, 0.18, 0.85];
-const BAR_FILL_COLOR: Rgba = [0.35, 0.60, 1.00, 1.0];
-// Dim reference line drawn across the sparkline at the 60 fps budget, so the
-// trace reads against a known mark instead of floating.
-const BUDGET_LINE_COLOR: Rgba = [0.55, 0.55, 0.62, 0.5];
-// The three band levels share a fill; `onset` gets its own because it is a
-// different kind of quantity — an event envelope, not a standing level — and
-// reading them as one stack of four identical bars invites comparing them.
-const LEVEL_FILL_COLOR: Rgba = [0.35, 0.80, 0.95, 1.0];
-const ONSET_FILL_COLOR: Rgba = [0.95, 0.70, 0.30, 1.0];
-// The lock row, reinforcing its word rather than replacing it.
-const LOCKED_COLOR: Rgba = [0.35, 0.95, 0.55, 1.0];
-const FREE_COLOR: Rgba = [0.62, 0.62, 0.70, 1.0];
+/// The panel's colours, each a [`THEME`] role linearised for this pass's
+/// shader, which writes straight onto the `*Srgb` surface (see
+/// [`theme`](super::theme)'s colour-encoding note).
+///
+/// Resolved once per [`Overlay::build`] rather than held as constants, because
+/// the sRGB decode is not a `const fn`.
+struct Palette {
+    panel: Rgba,
+    text: Rgba,
+    spark_good: Rgba,
+    spark_warn: Rgba,
+    spark_bad: Rgba,
+    /// A bar's and a meter's empty track.
+    trough: Rgba,
+    /// The GPU-footprint bar's fill.
+    bar_fill: Rgba,
+    /// Dim reference line drawn across the sparkline at the 60 fps budget, so
+    /// the trace reads against a known mark instead of floating.
+    budget_line: Rgba,
+    /// The three band levels share a fill; `onset` gets its own because it is a
+    /// different kind of quantity — an event envelope, not a standing level —
+    /// and reading them as one stack of four identical bars invites comparing
+    /// them.
+    level_fill: Rgba,
+    onset_fill: Rgba,
+    /// The lock row, reinforcing its word rather than replacing it.
+    locked: Rgba,
+    free: Rgba,
+}
+
+impl Palette {
+    fn resolve() -> Self {
+        Self {
+            panel: THEME.panel.linear(),
+            text: THEME.text.linear(),
+            spark_good: THEME.good.linear(),
+            spark_warn: THEME.warn.linear(),
+            spark_bad: THEME.error.linear(),
+            trough: THEME.trough.linear(),
+            bar_fill: THEME.info.linear(),
+            budget_line: THEME.text_dim.alpha(0.5).linear(),
+            level_fill: THEME.info.linear(),
+            onset_fill: THEME.accent.linear(),
+            locked: THEME.good.linear(),
+            free: THEME.text_dim.linear(),
+        }
+    }
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -288,6 +319,7 @@ impl Overlay {
         grid_scale: GridScale,
     ) {
         self.quads.clear();
+        let pal = Palette::resolve();
 
         // Build the readout first so the panel sizes to whichever is wider — the
         // text row or the graph — and everything shares one content width.
@@ -314,17 +346,10 @@ impl Overlay {
             MARGIN,
             panel_w,
             panel_h,
-            PANEL_COLOR,
+            pal.panel,
         );
 
-        draw_text(
-            &mut self.quads,
-            vp,
-            content_x,
-            text_y,
-            &self.text,
-            TEXT_COLOR,
-        );
+        draw_text(&mut self.quads, vp, content_x, text_y, &self.text, pal.text);
 
         // Frame-time sparkline: one vertical bar per retained sample, newest at
         // the right, colored by how close each frame ran to the 60 fps budget.
@@ -337,11 +362,11 @@ impl Overlay {
                 let h = (frac * SPARK_H).max(1.0);
                 let x = content_x + i as f32 * step;
                 let color = if ms <= BUDGET_MS * 1.1 {
-                    SPARK_GOOD
+                    pal.spark_good
                 } else if ms <= SPARK_MAX_MS {
-                    SPARK_WARN
+                    pal.spark_warn
                 } else {
-                    SPARK_BAD
+                    pal.spark_bad
                 };
                 // Bars grow up from the baseline (bottom of the sparkline band).
                 push_rect(&mut self.quads, vp, x, spark_y + SPARK_H - h, bw, h, color);
@@ -357,7 +382,7 @@ impl Overlay {
             spark_y + SPARK_H - budget_h,
             content_w,
             1.0,
-            BUDGET_LINE_COLOR,
+            pal.budget_line,
         );
 
         // GPU-footprint bar: dark track with a colored fill.
@@ -368,7 +393,7 @@ impl Overlay {
             bar_y,
             content_w,
             BAR_H,
-            BAR_BG_COLOR,
+            pal.trough,
         );
         let fill = (metrics.gpu_bytes as f32 / GPU_BAR_MAX_BYTES).clamp(0.0, 1.0);
         if fill > 0.0 {
@@ -379,7 +404,7 @@ impl Overlay {
                 bar_y,
                 content_w * fill,
                 BAR_H,
-                BAR_FILL_COLOR,
+                pal.bar_fill,
             );
         }
 
@@ -387,45 +412,66 @@ impl Overlay {
         let meter_x = content_x + ROW_TEXT_CHARS * CHAR_ADVANCE;
         let meter_w = (content_x + content_w - meter_x).max(0.0);
         let levels = [
-            (analysis.bass, LEVEL_FILL_COLOR),
-            (analysis.mid, LEVEL_FILL_COLOR),
-            (analysis.treb, LEVEL_FILL_COLOR),
-            (analysis.onset, ONSET_FILL_COLOR),
+            (analysis.bass, pal.level_fill),
+            (analysis.mid, pal.level_fill),
+            (analysis.treb, pal.level_fill),
+            (analysis.onset, pal.onset_fill),
         ];
         for (row, (&label, (value, fill_color))) in LEVEL_LABELS.iter().zip(levels).enumerate() {
             let y = analysis_y + row as f32 * row_pitch;
             write_value_row(&mut self.text, label, value);
-            draw_text(&mut self.quads, vp, content_x, y, &self.text, TEXT_COLOR);
-            draw_meter(&mut self.quads, vp, meter_x, y, meter_w, value, fill_color);
+            draw_text(&mut self.quads, vp, content_x, y, &self.text, pal.text);
+            let meter = Meter {
+                x: meter_x,
+                y,
+                w: meter_w,
+                trough: pal.trough,
+            };
+            draw_meter(&mut self.quads, vp, meter, value, fill_color);
         }
 
         // The lock row. Its word carries the state and its meter carries the
         // confidence, so a screenshot says which one it was without a legend.
         let lock_y = analysis_y + 4.0 * row_pitch;
         let (label, color) = if analysis.downbeat_locked {
-            (LOCKED_LABEL, LOCKED_COLOR)
+            (LOCKED_LABEL, pal.locked)
         } else {
-            (FREE_LABEL, FREE_COLOR)
+            (FREE_LABEL, pal.free)
         };
         write_value_row(&mut self.text, label, analysis.downbeat_confidence);
         draw_text(&mut self.quads, vp, content_x, lock_y, &self.text, color);
+        let meter = Meter {
+            x: meter_x,
+            y: lock_y,
+            w: meter_w,
+            trough: pal.trough,
+        };
         draw_meter(
             &mut self.quads,
             vp,
-            meter_x,
-            lock_y,
-            meter_w,
+            meter,
             analysis.downbeat_confidence,
             color,
         );
     }
 }
 
+/// Where one analysis meter sits, and the track it fills.
+#[derive(Clone, Copy)]
+struct Meter {
+    x: f32,
+    /// Top of the text row the meter sits beside.
+    y: f32,
+    w: f32,
+    trough: Rgba,
+}
+
 /// One analysis meter: a dark track with a fill proportional to `value` in 0..1.
-fn draw_meter(out: &mut Vec<Quad>, vp: Vp, x: f32, y: f32, w: f32, value: f32, fill: Rgba) {
+fn draw_meter(out: &mut Vec<Quad>, vp: Vp, meter: Meter, value: f32, fill: Rgba) {
+    let Meter { x, y, w, trough } = meter;
     // Centred against the text row so the label and its bar sit on one line.
     let y = y + (TEXT_H - METER_H) * 0.5;
-    push_rect(out, vp, x, y, w, METER_H, BAR_BG_COLOR);
+    push_rect(out, vp, x, y, w, METER_H, trough);
     let frac = if value.is_finite() {
         value.clamp(0.0, 1.0)
     } else {

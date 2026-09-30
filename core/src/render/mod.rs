@@ -73,6 +73,9 @@ pub(crate) mod post;
 pub mod scenes;
 #[cfg(feature = "text")]
 pub mod text;
+// The interface's look (ADR-0252). Not behind `text`: the diagnostics panel
+// and the banner read it in every build.
+pub mod theme;
 pub mod tier;
 pub(crate) mod tonemap;
 pub(crate) mod trails;

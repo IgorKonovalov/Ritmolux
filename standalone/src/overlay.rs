@@ -8,6 +8,8 @@
 
 use std::borrow::Cow;
 
+use rlx_core::render::theme::THEME;
+
 use crate::console::Line;
 use crate::settings::{SettingsState, SettingsView};
 
@@ -15,17 +17,16 @@ use crate::settings::{SettingsState, SettingsView};
 // The corner name plate (device px)
 // ---------------------------------------------------------------------------
 
-/// On-canvas active-preset-name label: top-left inset (device px), font size,
-/// and a light near-white color legible over most scenes.
+/// On-canvas active-preset-name label: top-left inset (device px) and font
+/// size. Drawn in the theme's primary text role.
 pub const NAME_INSET: f32 = 16.0;
 pub const NAME_SIZE: f32 = 28.0;
-pub const NAME_COLOR: [f32; 4] = [0.9, 0.95, 1.0, 1.0];
 
-/// The rotation countdown sits directly under the preset name, smaller and
-/// dimmer: it is a status line about the show's cadence, not part of the show.
+/// The rotation countdown sits directly under the preset name, smaller and in
+/// the dim text role: it is a status line about the show's cadence, not part of
+/// the show.
 pub const NEXT_TOP: f32 = NAME_INSET + NAME_SIZE + 6.0;
 pub const NEXT_SIZE: f32 = 18.0;
-pub const NEXT_COLOR: [f32; 4] = [0.72, 0.80, 0.90, 0.8];
 
 /// How the corner name reports the marks the preset on screen carries.
 ///
@@ -123,23 +124,6 @@ pub const COL_W: f32 = CHAR_W * COL_CHARS as f32 + COL_GUTTER;
 /// audio verdict and the frame-time block readable as one screenshot.
 pub const CAPTURE_TOP: f32 = 252.0;
 pub const CAPTURE_SIZE: f32 = 18.0;
-/// Dimmer than the preset name, brighter than a browse row: a diagnostics line,
-/// not part of the show.
-pub const CAPTURE_COLOR: [f32; 4] = [0.72, 0.80, 0.90, 0.95];
-
-/// Browse-overlay row colors, beside the **geometry** above that they paint —
-/// the insets, pitch, font size and column width the pure layout function
-/// reasons about. One module owns both halves, so the pixels drawn and the
-/// arithmetic tested cannot drift apart.
-pub const ROW_COLOR: [f32; 4] = [0.72, 0.78, 0.88, 0.95];
-pub const ROW_HL_COLOR: [f32; 4] = [1.0, 0.88, 0.35, 1.0];
-/// A favourite's row. Warm against `ROW_COLOR`'s cool grey and darker than the
-/// cursor's yellow, so a column of forty reads as marked-or-not at a glance
-/// while the highlight still wins on the row it is on — the one-character `*`
-/// does not survive that scan, which is what this colour is for.
-pub const FAV_COLOR: [f32; 4] = [0.95, 0.80, 0.60, 0.95];
-/// The filter-echo header sits above the list; dimmer than the rows.
-pub const HEADER_COLOR: [f32; 4] = [0.6, 0.66, 0.76, 0.9];
 
 // ---------------------------------------------------------------------------
 // The preview pane (ADR-0230)
@@ -152,8 +136,6 @@ pub const PANE_IMAGE_H: f32 = 180.0;
 const PANE_CAPTION_GAP: f32 = 8.0;
 /// The caption under the image, and the placeholder inside it.
 pub const PANE_TEXT_SIZE: f32 = 18.0;
-pub const PANE_CAPTION_COLOR: [f32; 4] = HEADER_COLOR;
-pub const PANE_PLACEHOLDER_COLOR: [f32; 4] = [0.5, 0.55, 0.64, 0.85];
 /// What the pane says for a preset with no picture yet. A normal state on a
 /// first launch, so it reads as "not yet" rather than as a fault.
 pub const PANE_PLACEHOLDER: &str = "no picture yet";
@@ -429,23 +411,25 @@ pub fn header_text(state: &OverlayState) -> String {
 
 /// The marker and colour one **browse-list** row is drawn with.
 ///
-/// **The cursor wins.** A highlighted row is [`ROW_HL_COLOR`] whether or not it
-/// is a favourite, so there is never a frame in which two rows could be read as
-/// the one the keys act on. Below that, a favourite is warm and everything else
-/// is the plain row colour.
+/// **The cursor wins.** A highlighted row is the theme's `accent` whether or
+/// not it is a favourite, so there is never a frame in which two rows could be
+/// read as the one the keys act on. Below that, a favourite is the warm
+/// `favourite` role — so a column of forty reads as marked-or-not at a glance,
+/// which the one-character `*` does not survive — and everything else is plain
+/// `text`.
 ///
-/// Hidden rows have no colour of their own and keep [`ROW_COLOR`] behind their
-/// `-` glyph, so a preset carrying both marks draws warm with a `-` — the
-/// glyph's own precedence rule meeting a colour that says otherwise. A third
-/// colour to disambiguate a state this rare costs more than it returns.
+/// Hidden rows have no colour of their own and keep `text` behind their `-`
+/// glyph, so a preset carrying both marks draws warm with a `-` — the glyph's
+/// own precedence rule meeting a colour that says otherwise. A third colour to
+/// disambiguate a state this rare costs more than it returns.
 ///
 /// The settings menu's rows are deliberately not routed through here: they carry
 /// no marks, so a shared function would take a parameter that is always `false`.
 pub fn browse_row_style(highlighted: bool, favourite: bool) -> (&'static str, [f32; 4]) {
     match (highlighted, favourite) {
-        (true, _) => ("> ", ROW_HL_COLOR),
-        (false, true) => ("  ", FAV_COLOR),
-        (false, false) => ("  ", ROW_COLOR),
+        (true, _) => ("> ", THEME.accent.rgba()),
+        (false, true) => ("  ", THEME.favourite.rgba()),
+        (false, false) => ("  ", THEME.text.rgba()),
     }
 }
 
@@ -467,21 +451,28 @@ pub fn corner_lines(
         NAME_INSET,
         NAME_INSET,
         NAME_SIZE,
-        NAME_COLOR,
+        THEME.text.rgba(),
     ));
     if let Some(text) = countdown {
-        out.push(Line::new(text, NAME_INSET, NEXT_TOP, NEXT_SIZE, NEXT_COLOR));
+        out.push(Line::new(
+            text,
+            NAME_INSET,
+            NEXT_TOP,
+            NEXT_SIZE,
+            THEME.text_dim.rgba(),
+        ));
     }
 }
 
-/// The F3 capture line, placed under the core's diagnostics panel.
+/// The F3 capture line, placed under the core's diagnostics panel, in the dim
+/// text role: a diagnostics line, not part of the show.
 pub fn capture_verdict_line(token: &str) -> Line {
     Line::new(
         capture_line(token),
         NAME_INSET,
         CAPTURE_TOP,
         CAPTURE_SIZE,
-        CAPTURE_COLOR,
+        THEME.text_dim.rgba(),
     )
 }
 
@@ -497,13 +488,13 @@ pub fn settings_lines(state: &SettingsState, view: &SettingsView, out: &mut Vec<
         LIST_INSET,
         LIST_TOP,
         ROW_SIZE,
-        HEADER_COLOR,
+        THEME.text_dim.rgba(),
     ));
     for (row, (label, value)) in state.lines(view).into_iter().enumerate() {
         let (marker, color) = if row == state.row() {
-            ("> ", ROW_HL_COLOR)
+            ("> ", THEME.accent.rgba())
         } else {
-            ("  ", ROW_COLOR)
+            ("  ", THEME.text.rgba())
         };
         out.push(Line::new(
             format!("{marker}{label:<14}{value}"),
@@ -531,7 +522,7 @@ pub fn browse_lines(
         LIST_INSET,
         LIST_TOP,
         ROW_SIZE,
-        HEADER_COLOR,
+        THEME.text_dim.rgba(),
     ));
     for (row, (_abs, entry)) in visible.iter().enumerate() {
         let Some((col, r)) = layout.place(row) else {
@@ -558,7 +549,7 @@ pub fn pane_lines(pane: &Pane, name: &str, shown: bool, out: &mut Vec<Line>) {
             x,
             y,
             PANE_TEXT_SIZE,
-            PANE_PLACEHOLDER_COLOR,
+            THEME.text_faint.rgba(),
         ));
     }
     out.push(Line::new(
@@ -566,7 +557,7 @@ pub fn pane_lines(pane: &Pane, name: &str, shown: bool, out: &mut Vec<Line>) {
         pane.x,
         pane.caption_y,
         PANE_TEXT_SIZE,
-        PANE_CAPTION_COLOR,
+        THEME.text_dim.rgba(),
     ));
 }
 

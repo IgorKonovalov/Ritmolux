@@ -17,6 +17,7 @@
 //! second model.
 
 use rlx_core::render::TextRun;
+use rlx_core::render::theme::THEME;
 
 /// One positioned line of text, owned so the routing can move it between
 /// destinations without borrowing the roster it was built from.
@@ -191,20 +192,17 @@ pub fn scale_lines(lines: &mut [Line], s: f32) {
 ///
 /// Present even with no modal open, so an operator can tell a console that is
 /// alive and idle from one whose window is up but whose app has stopped
-/// presenting to it.
+/// presenting to it. In the dim text role, so it reads as a label rather than as
+/// content.
 pub fn header(preset: &str) -> Line {
     Line::new(
         format!("console  -  {preset}"),
         crate::overlay::LIST_INSET,
         crate::overlay::LIST_INSET,
         crate::overlay::ROW_SIZE,
-        HEADER_COLOR,
+        THEME.text_dim.rgba(),
     )
 }
-
-/// The console header's colour — dimmer than a modal row, so it reads as a
-/// label rather than as content.
-const HEADER_COLOR: [f32; 4] = [0.55, 0.62, 0.74, 0.9];
 
 // ---------------------------------------------------------------------------
 // The transport strip
@@ -465,13 +463,10 @@ pub fn staging_line(next: Option<&str>, auto: bool, dwell: (u32, u32)) -> Line {
         crate::overlay::LIST_INSET,
         STRIP_TOP + BUTTON_H + crate::overlay::LIST_INSET,
         crate::overlay::ROW_SIZE,
-        STAGING_COLOR,
+        // Standing information, not the thing being driven.
+        THEME.text_dim.rgba(),
     )
 }
-
-/// The staging line's colour — brighter than the header, dimmer than a modal
-/// row: it is standing information, not the thing being driven.
-const STAGING_COLOR: [f32; 4] = [0.72, 0.78, 0.88, 0.95];
 
 /// The transport's labels as lines, at the reference geometry.
 ///
@@ -483,13 +478,19 @@ pub fn transport_lines(auto: bool) -> Vec<Line> {
         .iter()
         .enumerate()
         .map(|(i, button)| {
+            // `auto` is the one control whose label reports a state as well as
+            // offering an action: faint while hands-off rotation is off.
             let lit = !matches!(button, Button::ToggleAuto) || auto;
             Line::new(
                 button.label().to_owned(),
                 crate::overlay::LIST_INSET + i as f32 * (BUTTON_W + BUTTON_GAP) + BUTTON_GAP,
                 STRIP_TOP + BUTTON_GAP,
                 crate::overlay::ROW_SIZE,
-                if lit { BUTTON_COLOR } else { BUTTON_OFF_COLOR },
+                if lit {
+                    THEME.text.rgba()
+                } else {
+                    THEME.text_faint.rgba()
+                },
             )
         })
         .collect()
@@ -513,12 +514,6 @@ pub fn standing_lines(
     lines.push(staging_line(next, auto, dwell));
     lines
 }
-
-/// A live control's label colour.
-const BUTTON_COLOR: [f32; 4] = [0.86, 0.90, 0.96, 1.0];
-/// The `auto` label while hands-off rotation is off — the one control whose
-/// label reports a state as well as offering an action.
-const BUTTON_OFF_COLOR: [f32; 4] = [0.45, 0.48, 0.55, 1.0];
 
 /// Which window an event arrived from, once the raw `WindowId` has been
 /// resolved against the two the app owns.

@@ -321,27 +321,32 @@ impl AppState {
 pub(crate) mod tests {
     use super::{Modal, output_modal, preset_name_visible};
     use crate::console;
-    use crate::overlay::{
-        FAV_COLOR, ROW_COLOR, ROW_HL_COLOR, browse_row_style, mark_suffix, next_rotation_line,
-    };
+    use crate::overlay::{browse_row_style, mark_suffix, next_rotation_line};
+    use rlx_core::render::theme::THEME;
 
     /// **A favourite reads as a warm row, and the cursor still wins on it.** The
     /// one-character `*` is unchanged and does not survive a scan down a column
     /// of forty; the colour is what does.
     #[test]
     fn a_favourite_row_is_warm_and_the_highlight_outranks_it() {
+        let (fav, row, hl) = (
+            THEME.favourite.rgba(),
+            THEME.text.rgba(),
+            THEME.accent.rgba(),
+        );
         assert_ne!(
-            FAV_COLOR, ROW_COLOR,
+            fav, row,
             "a favourite drawn in the plain row colour is the state this closes"
         );
+        assert_ne!(fav, hl, "a favourite must not read as the cursor");
 
-        assert_eq!(browse_row_style(false, true), ("  ", FAV_COLOR));
-        assert_eq!(browse_row_style(false, false), ("  ", ROW_COLOR));
+        assert_eq!(browse_row_style(false, true), ("  ", fav));
+        assert_eq!(browse_row_style(false, false), ("  ", row));
 
         for favourite in [false, true] {
             assert_eq!(
                 browse_row_style(true, favourite),
-                ("> ", ROW_HL_COLOR),
+                ("> ", hl),
                 "the highlighted row must be unambiguous whether or not it is \
                  marked (favourite={favourite})"
             );

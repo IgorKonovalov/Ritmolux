@@ -29,6 +29,8 @@
 
 use std::borrow::Cow;
 
+use super::theme::THEME;
+
 /// Seconds the banner takes to reach full opacity.
 pub const FADE_IN_SECS: f32 = 0.5;
 /// Seconds the banner holds at full opacity.
@@ -55,10 +57,6 @@ const TITLE_SIZE: f32 = 32.0;
 /// Must match `text::LINE_HEIGHT_RATIO` — the vertical extent glyphon gives a
 /// run, which is what stacks the two lines without them overlapping.
 const LINE_HEIGHT_RATIO: f32 = 1.25;
-/// Dimmer than the title: an attribution, not the announcement itself.
-const ARTIST_COLOR: [f32; 3] = [0.72, 0.80, 0.92];
-/// Near-white, matching the preset name's weight in the corner.
-const TITLE_COLOR: [f32; 3] = [0.95, 0.97, 1.0];
 
 /// Mean glyph advance as a fraction of the font size, used only to pick a
 /// character budget for truncation. A sans-serif estimate, deliberately not a
@@ -167,14 +165,16 @@ impl NowPlaying {
             x: INSET_X,
             y: title_y,
             size: TITLE_SIZE,
-            color: rgba(TITLE_COLOR, alpha),
+            // The title is primary text, matching the preset name's weight in
+            // the corner; the artist is an attribution and reads dimmer.
+            color: rgba(THEME.text.rgb(), alpha),
         });
         let artist_line = artist.map(|artist| BannerLine {
             text: fit(artist, budget(width, ARTIST_SIZE)),
             x: INSET_X,
             y: artist_y,
             size: ARTIST_SIZE,
-            color: rgba(ARTIST_COLOR, alpha),
+            color: rgba(THEME.text_dim.rgb(), alpha),
         });
 
         [artist_line, title_line]
