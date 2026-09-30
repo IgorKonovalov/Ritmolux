@@ -1801,3 +1801,20 @@ the `spike/README.md` table beside the Linux ones.
 - **Verified 2026-09-27** — the rule exists and the table says it was not asked:
   `present: PowerShell\(Remove-Item \*\$\*\) in: tools/conductor/settings.conductor.json`
 - **Verified 2026-09-27** — `present: Remove-Item -Recurse .*not asked in: tools/conductor/spike/README.md`
+
+## 0274 — the cellular scene cannot trace a route through the maze it grows, so a labyrinth never shows its longest path
+
+At the 0232 retune the owner asked for `cellular_labyrinth` to print, in red, the longest path through
+the maze the automaton is growing. The scene has no notion of a path. It holds each cell's state and,
+for a dead cell, how many generations ago it died, and it colours from those two numbers alone. So
+the red the retune could give it marks cells that changed recently, not a route. A route needs a
+search over the live grid: a breadth-first pass from one open cell, then a second from the farthest
+cell it reached, which finds the longest shortest path in a maze with no loops. It would have to run
+on the GPU, or on a readback of a grid of up to 1024 by 1024 cells, and be repeated as the maze
+changes. The drawn route could be one new overlay colour, or a distance a palette reads.
+
+- **Raised:** 2026-09-30 by the owner at the Plan 0232 Phase 4 retune, filed by `preset-author`.
+  **Owner if taken:** `architect` (does the route run on the GPU or on a readback, and how often
+  is it refreshed), then `dev`.
+- **Verified 2026-09-30** — the scene has no route search:
+  `absent: [Bb]readth|\bbfs\b|\bBFS\b|[Ll]ongest path in: core/src/render/scenes/cellular`
