@@ -439,7 +439,7 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 |---|---|---|---|
 | 1 — Engine UI captures | dev | done | committed with this row |
 | 2 — Studio captures | studio-builder | done | committed with this row |
-| 3 — Audit and direction | human | not started | |
+| 3 — Audit and direction | human | done | committed with this row |
 | 4 — The look declared once | dev | not started | |
 | 5 — Panels and measured text | dev | not started | |
 | 6 — Overlays move | dev | not started | |
@@ -451,6 +451,13 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | 12 — Before and after on devices | human | not started | |
 
 ### Notes
+
+- **Phase 3, 2026-09-30.** The owner walked the standalone and the studio live and chose look A;
+  the findings, the role values and the amended Phases 8, 9 and 11 are in `## Audit findings` and the
+  phase blocks (`4cc141b6` on main, merged here). **The owner re-approved the amended plan on
+  2026-09-30.** The foobar walk is deferred. The lane was brought up to main (`5c081bee`), resolving
+  the one conflict in `standalone/examples/shot.rs` and `docs/capturing.md` by keeping both the
+  lane's `--ui` and main's `--bar-grid`.
 
 - Phase 1, files outside its list. The `shot` example cannot reach binary modules, so
   `overlay.rs`, `settings.rs` and `console.rs` moved from the `ritmolux` binary into the `standalone`
