@@ -133,8 +133,16 @@ impl Ease {
     /// Progress at normalised time `t`: `0.0` at `t <= 0`, `1.0` at `t >= 1`, and
     /// the curve's height in between.
     ///
-    /// Solves `x(s) = t` by bisection on the curve parameter `s` — a fixed 24
-    /// halvings, which puts `s` within `2^-24` of the root and allocates nothing.
+    /// Solves `x(s) = t` by bisection on the curve parameter `s` — a fixed 40
+    /// halvings in `f64`, which puts `s` well inside an `f32` step of the root
+    /// and allocates nothing.
+    ///
+    /// **Monotone in `t` to the last bit, by construction.** The height is read
+    /// at the bisection's lower bound, which never decreases as `t` grows (every
+    /// comparison `t` passes, a larger `t` passes too), and it is computed in
+    /// `f64` and rounded once — an `f32` evaluation of the height wobbles by an
+    /// ulp near the top of a flat ease-out, which is a panel's alpha stepping
+    /// back down on its last frames.
     pub fn at(self, t: f32) -> f32 {
         if !t.is_finite() || t <= 0.0 {
             return 0.0;
@@ -142,16 +150,19 @@ impl Ease {
         if t >= 1.0 {
             return 1.0;
         }
-        let (mut lo, mut hi) = (0.0_f32, 1.0_f32);
-        for _ in 0..24 {
+        let t = f64::from(t);
+        let (x1, x2) = (f64::from(self.x1), f64::from(self.x2));
+        let (mut lo, mut hi) = (0.0_f64, 1.0_f64);
+        for _ in 0..40 {
             let mid = 0.5 * (lo + hi);
-            if bezier(self.x1, self.x2, mid) < t {
+            if bezier(x1, x2, mid) < t {
                 lo = mid;
             } else {
                 hi = mid;
             }
         }
-        bezier(self.y1, self.y2, 0.5 * (lo + hi)).clamp(0.0, 1.0)
+        let y = bezier(f64::from(self.y1), f64::from(self.y2), lo);
+        (y as f32).clamp(0.0, 1.0)
     }
 
     /// The CSS spelling, `cubic-bezier(x1, y1, x2, y2)`.
@@ -165,7 +176,7 @@ impl Ease {
 
 /// One coordinate of a cubic Bézier from `0` to `1` with control values `p1`
 /// and `p2`, at parameter `s`.
-fn bezier(p1: f32, p2: f32, s: f32) -> f32 {
+fn bezier(p1: f64, p2: f64, s: f64) -> f64 {
     let u = 1.0 - s;
     3.0 * u * u * s * p1 + 3.0 * u * s * s * p2 + s * s * s
 }

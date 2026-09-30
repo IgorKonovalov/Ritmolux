@@ -775,8 +775,7 @@ fn ui_shots(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String
             .map(|line| line.as_run())
             .collect();
         r.queue_text(&runs);
-        let panels: Vec<_> = frame.lines.iter().filter_map(|l| l.as_panel()).collect();
-        r.queue_panels(&panels);
+        r.queue_panels(&standalone::console::panels(&frame.lines));
         let img = r
             .capture_frame(&args.stimulus)
             .map_err(|e| format!("--ui {}: {e}", state.name()))?;

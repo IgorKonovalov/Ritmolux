@@ -18,7 +18,7 @@
 
 use rlx_core::render::text::LINE_HEIGHT_RATIO;
 use rlx_core::render::theme::THEME;
-use rlx_core::render::{Panel, TextRun};
+use rlx_core::render::{Panel, PanelKind, TextRun};
 
 /// One positioned line of text, owned so the routing can move it between
 /// destinations without borrowing the roster it was built from.
@@ -38,10 +38,19 @@ pub struct Line {
     pub y: f32,
     pub size: f32,
     pub color: [f32; 4],
-    /// `Some((width, height))` when this line is a backdrop rather than text.
-    /// Its opacity is `color`'s alpha, so an envelope that fades the text
-    /// fades the panel under it by the same step.
-    pub backdrop: Option<(f32, f32)>,
+    /// `Some` when this line is a panel rather than text. Its opacity is
+    /// `color`'s alpha, so an envelope that fades the text fades the panel
+    /// under it by the same step.
+    pub backdrop: Option<Backdrop>,
+}
+
+/// The size and kind of a line that is a panel.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Backdrop {
+    pub w: f32,
+    pub h: f32,
+    /// A block's backdrop, or the selection highlight on one of its rows.
+    pub kind: PanelKind,
 }
 
 impl Line {
@@ -60,13 +69,22 @@ impl Line {
     /// A backdrop panel at `(x, y)`, `w` x `h` device pixels, in the theme's
     /// panel roles.
     pub fn backdrop(x: f32, y: f32, w: f32, h: f32) -> Self {
+        Self::panel(x, y, w, h, PanelKind::Backdrop)
+    }
+
+    /// The selection highlight on a row at `(x, y)`, `w` x `h` device pixels.
+    pub fn highlight(x: f32, y: f32, w: f32, h: f32) -> Self {
+        Self::panel(x, y, w, h, PanelKind::Highlight)
+    }
+
+    fn panel(x: f32, y: f32, w: f32, h: f32, kind: PanelKind) -> Self {
         Self {
             text: String::new(),
             x,
             y,
             size: 0.0,
             color: [1.0; 4],
-            backdrop: Some((w, h)),
+            backdrop: Some(Backdrop { w, h, kind }),
         }
     }
 
@@ -102,14 +120,26 @@ impl Line {
         }
     }
 
-    /// This line as a [`Panel`], when it is a backdrop.
+    /// This line as a [`Panel`], when it is one.
     pub fn as_panel(&self) -> Option<Panel> {
-        let (w, h) = self.backdrop?;
+        let Backdrop { w, h, kind } = self.backdrop?;
+        let panel = match kind {
+            PanelKind::Backdrop => Panel::new(self.x, self.y, w, h),
+            PanelKind::Highlight => Panel::highlight(self.x, self.y, w, h),
+        };
         Some(Panel {
             alpha: self.color[3],
-            ..Panel::new(self.x, self.y, w, h)
+            ..panel
         })
     }
+}
+
+/// The panels among `lines`, backdrops first: one draw paints them in order,
+/// and a highlight has to land on its block's backdrop rather than under it.
+pub fn panels(lines: &[Line]) -> Vec<Panel> {
+    let mut out: Vec<Panel> = lines.iter().filter_map(Line::as_panel).collect();
+    out.sort_by_key(|p| p.kind == PanelKind::Highlight);
+    out
 }
 
 /// A frame's text, split by the surface it is destined for.
@@ -129,7 +159,7 @@ impl FrameText {
 
     /// The output's backdrops, ready for `queue_panels`.
     pub fn output_panels(&self) -> Vec<Panel> {
-        self.output.iter().filter_map(Line::as_panel).collect()
+        panels(&self.output)
     }
 
     /// The console's text lines as borrowed runs, ready for `present_aux`.
@@ -139,7 +169,7 @@ impl FrameText {
 
     /// The console's backdrops, ready for `present_aux`.
     pub fn console_panels(&self) -> Vec<Panel> {
-        self.console.iter().filter_map(Line::as_panel).collect()
+        panels(&self.console)
     }
 }
 
@@ -258,9 +288,9 @@ pub fn scale_lines(lines: &mut [Line], s: f32) {
         line.x *= s;
         line.y *= s;
         line.size *= s;
-        if let Some((w, h)) = line.backdrop.as_mut() {
-            *w *= s;
-            *h *= s;
+        if let Some(b) = line.backdrop.as_mut() {
+            b.w *= s;
+            b.h *= s;
         }
     }
 }

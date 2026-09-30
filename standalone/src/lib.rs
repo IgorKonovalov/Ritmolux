@@ -48,6 +48,9 @@ pub mod gpu;
 // `config` is: it is the binary's alone, but it round-trips through a file, and
 // a library module is where that test runs.
 pub mod marks;
+// How the overlays move. Beside `console` and `overlay` for their reason: pure,
+// and exercised against their state machines without a window.
+pub mod motion;
 pub mod osc;
 pub mod overlay;
 // The `--check` preset checker (ADR-0190). A library module rather than a binary

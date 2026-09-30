@@ -337,6 +337,7 @@ fn view() -> crate::settings::SettingsView {
         next_rotation: true,
         console: false,
         thumbnails: true,
+        motion: crate::config::Motion::Full,
         adapter_index: 0,
         adapter_count: 1,
         adapter_name: "adapter".to_owned(),

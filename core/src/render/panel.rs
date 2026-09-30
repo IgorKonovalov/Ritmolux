@@ -4,7 +4,9 @@
 //! A panel is a rounded rectangle in the theme's `panel` fill, with a 1 px lit
 //! edge in `panel_edge` and, optionally, a faint scanline modulation every
 //! `scanline_pitch`th row — every value from [`THEME`](super::theme::THEME), so a
-//! panel carries no colour of its own.
+//! panel carries no colour of its own. The same pass draws the row highlight
+//! ([`PanelKind::Highlight`]), which is why the selection can glide under text
+//! without a second pipeline.
 //!
 //! **All of a frame's panels are one instanced draw**, recorded by the text
 //! layer before its glyphs in the same pass. The rounded corners, the edge and
@@ -36,12 +38,29 @@ pub struct Panel {
     /// Opacity multiplier over the theme's own, `0.0..=1.0`: an envelope fading
     /// the panel with the text it holds.
     pub alpha: f32,
-    /// Whether the scanline modulation is drawn.
+    /// Whether the scanline modulation is drawn. A highlight never carries one.
     pub scanlines: bool,
+    /// What the rectangle is.
+    pub kind: PanelKind,
 }
 
+/// The two things a panel rectangle can be.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PanelKind {
+    /// A backdrop: the theme's `panel` fill, a 1 px `panel_edge`, rounded
+    /// corners, and the scanline when asked for.
+    #[default]
+    Backdrop,
+    /// The selection marker on a row: the theme's `highlight` fill with a 4 px
+    /// `accent` bar at its left edge, square-cornered, no edge.
+    Highlight,
+}
+
+/// Width of a highlight's accent bar, device pixels.
+pub const HIGHLIGHT_BAR_W: f32 = 4.0;
+
 impl Panel {
-    /// A fully opaque (as the theme declares it) panel with scanlines.
+    /// A fully opaque (as the theme declares it) backdrop with scanlines.
     pub fn new(x: f32, y: f32, w: f32, h: f32) -> Self {
         Self {
             x,
@@ -50,6 +69,16 @@ impl Panel {
             h,
             alpha: 1.0,
             scanlines: true,
+            kind: PanelKind::Backdrop,
+        }
+    }
+
+    /// A row highlight at `(x, y)`, `w` x `h`.
+    pub fn highlight(x: f32, y: f32, w: f32, h: f32) -> Self {
+        Self {
+            scanlines: false,
+            kind: PanelKind::Highlight,
+            ..Self::new(x, y, w, h)
         }
     }
 
@@ -82,7 +111,7 @@ pub(crate) use pass::PanelPass;
 
 #[cfg(feature = "text")]
 mod pass {
-    use super::Panel;
+    use super::{HIGHLIGHT_BAR_W, Panel, PanelKind};
     use crate::render::theme::THEME;
 
     /// Panels one frame draws; more are dropped. The interface draws a handful.
@@ -98,21 +127,28 @@ mod pass {
         fill: [f32; 4],
         /// The lit edge, linear, with the panel's alpha applied.
         edge: [f32; 4],
+        /// The accent bar at the left edge, linear, with the panel's alpha
+        /// applied; transparent on a backdrop.
+        bar: [f32; 4],
         /// `(radius px, scanline alpha, scanline pitch px, target height px)`.
         params: [f32; 4],
+        /// `(target width px, bar width px, unused, unused)`.
+        extra: [f32; 4],
     }
 
-    /// The rectangle becomes NDC in the vertex stage, from the target height in
-    /// `params.w` and the width in `target_w`; the fragment stage works in
-    /// framebuffer pixels (`@builtin(position)`, top-left origin, pixel centres
-    /// at `.5`), where the rounded-box distance is exact.
+    /// The rectangle becomes NDC in the vertex stage, from the target size in
+    /// `params.w` and `extra.x`; the fragment stage works in framebuffer pixels
+    /// (`@builtin(position)`, top-left origin, pixel centres at `.5`), where the
+    /// rounded-box distance is exact.
     const SHADER: &str = r#"
 struct VsOut {
     @builtin(position) pos: vec4<f32>,
     @location(0) rect: vec4<f32>,
     @location(1) fill: vec4<f32>,
     @location(2) edge: vec4<f32>,
-    @location(3) params: vec4<f32>,
+    @location(3) bar: vec4<f32>,
+    @location(4) params: vec4<f32>,
+    @location(5) extra: vec4<f32>,
 };
 
 @vertex
@@ -121,21 +157,24 @@ fn vs_main(
     @location(0) rect: vec4<f32>,
     @location(1) fill: vec4<f32>,
     @location(2) edge: vec4<f32>,
-    @location(3) params: vec4<f32>,
-    @location(4) target_w: f32,
+    @location(3) bar: vec4<f32>,
+    @location(4) params: vec4<f32>,
+    @location(5) extra: vec4<f32>,
 ) -> VsOut {
     var corners = array<vec2<f32>, 6>(
         vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0), vec2<f32>(0.0, 1.0),
         vec2<f32>(0.0, 1.0), vec2<f32>(1.0, 0.0), vec2<f32>(1.0, 1.0),
     );
     let px = rect.xy + corners[vi] * rect.zw;
-    let size = vec2<f32>(target_w, params.w);
+    let size = vec2<f32>(extra.x, params.w);
     var out: VsOut;
     out.pos = vec4<f32>(px.x / size.x * 2.0 - 1.0, 1.0 - px.y / size.y * 2.0, 0.0, 1.0);
     out.rect = rect;
     out.fill = fill;
     out.edge = edge;
+    out.bar = bar;
     out.params = params;
+    out.extra = extra;
     return out;
 }
 
@@ -163,8 +202,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // The 1 px lit edge: full for `d > -0.5`, gone by `d = -1.5`, so a one-pixel
     // band inside the outline, antialiased on its inner side (its outer side is
     // `coverage`'s).
-    let edge_amt = clamp(d + 1.5, 0.0, 1.0) * in.edge.a;
-    let rgb = in.edge.rgb * edge_amt + fill.rgb * fill.a * (1.0 - edge_amt);
+    var edge_amt = clamp(d + 1.5, 0.0, 1.0) * in.edge.a;
+    var edge_rgb = in.edge.rgb;
+    // The accent bar replaces the edge along the left `extra.y` pixels.
+    if (p.x - in.rect.x < in.extra.y) {
+        edge_amt = in.bar.a;
+        edge_rgb = in.bar.rgb;
+    }
+    let rgb = edge_rgb * edge_amt + fill.rgb * fill.a * (1.0 - edge_amt);
     let a = edge_amt + fill.a * (1.0 - edge_amt);
     return vec4<f32>(rgb, a) * coverage;
 }
@@ -175,18 +220,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     pub(crate) struct PanelPass {
         pipeline: wgpu::RenderPipeline,
         instances: wgpu::Buffer,
-        scratch: Vec<InstanceWithWidth>,
+        scratch: Vec<Instance>,
         /// Panels written by the last [`prepare`](Self::prepare).
         count: u32,
-    }
-
-    /// An [`Instance`] plus the target width, which the vertex stage needs and
-    /// no other field has room for.
-    #[repr(C)]
-    #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-    struct InstanceWithWidth {
-        inst: Instance,
-        target_w: f32,
     }
 
     impl PanelPass {
@@ -197,7 +233,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             });
             let instances = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("rlx-panel-instances"),
-                size: (MAX_PANELS * std::mem::size_of::<InstanceWithWidth>()) as u64,
+                size: (MAX_PANELS * std::mem::size_of::<Instance>()) as u64,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
@@ -214,14 +250,15 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                     entry_point: Some("vs_main"),
                     compilation_options: Default::default(),
                     buffers: &[Some(wgpu::VertexBufferLayout {
-                        array_stride: std::mem::size_of::<InstanceWithWidth>() as u64,
+                        array_stride: std::mem::size_of::<Instance>() as u64,
                         step_mode: wgpu::VertexStepMode::Instance,
                         attributes: &wgpu::vertex_attr_array![
                             0 => Float32x4,
                             1 => Float32x4,
                             2 => Float32x4,
                             3 => Float32x4,
-                            4 => Float32,
+                            4 => Float32x4,
+                            5 => Float32x4,
                         ],
                     })],
                 },
@@ -262,9 +299,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         ) -> bool {
             self.scratch.clear();
             // Resolved per prepare: the sRGB decode is not a `const fn`.
-            let fill = THEME.panel.linear();
-            let edge = THEME.panel_edge.linear();
+            let backdrop = (THEME.panel.linear(), THEME.panel_edge.linear());
+            let highlight = THEME.highlight.linear();
+            let accent = THEME.accent.linear();
             let scan = THEME.scanline.a;
+            let with_alpha = |[r, g, b, a]: [f32; 4], k: f32| [r, g, b, a * k];
             for panel in panels.iter().take(MAX_PANELS) {
                 let finite = [panel.x, panel.y, panel.w, panel.h, panel.alpha]
                     .iter()
@@ -273,21 +312,23 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                     continue;
                 }
                 let alpha = panel.alpha.min(1.0);
-                let [fr, fg, fb, fa] = fill;
-                let [er, eg, eb, ea] = edge;
-                self.scratch.push(InstanceWithWidth {
-                    inst: Instance {
-                        rect: [panel.x, panel.y, panel.w, panel.h],
-                        fill: [fr, fg, fb, fa * alpha],
-                        edge: [er, eg, eb, ea * alpha],
-                        params: [
-                            THEME.radius,
-                            if panel.scanlines { scan * alpha } else { 0.0 },
-                            THEME.scanline_pitch as f32,
-                            height.max(1) as f32,
-                        ],
-                    },
-                    target_w: width.max(1) as f32,
+                let (fill, edge, bar, radius, bar_w) = match panel.kind {
+                    PanelKind::Backdrop => (backdrop.0, backdrop.1, [0.0; 4], THEME.radius, 0.0),
+                    PanelKind::Highlight => (highlight, [0.0; 4], accent, 0.0, HIGHLIGHT_BAR_W),
+                };
+                let scanlines = panel.scanlines && panel.kind == PanelKind::Backdrop;
+                self.scratch.push(Instance {
+                    rect: [panel.x, panel.y, panel.w, panel.h],
+                    fill: with_alpha(fill, alpha),
+                    edge: with_alpha(edge, alpha),
+                    bar: with_alpha(bar, alpha),
+                    params: [
+                        radius,
+                        if scanlines { scan * alpha } else { 0.0 },
+                        THEME.scanline_pitch as f32,
+                        height.max(1) as f32,
+                    ],
+                    extra: [width.max(1) as f32, bar_w, 0.0, 0.0],
                 });
             }
             self.count = self.scratch.len() as u32;

@@ -220,6 +220,7 @@ pub fn fixture_view() -> SettingsView {
         next_rotation: true,
         console: false,
         thumbnails: true,
+        motion: crate::config::Motion::Full,
         adapter_index: 0,
         adapter_count: 2,
         adapter_name: "GPU (fixture)".to_owned(),

@@ -167,7 +167,11 @@ impl AppState {
     /// while a modal is open — that modal's own rows. Strings are owned locally
     /// so the renderer's `queue_text` (which copies them) needs no live borrow of
     /// the roster.
-    pub(crate) fn queue_frame_text(&mut self) {
+    ///
+    /// `dt` real seconds advance [`standalone::motion`]'s envelopes, which only
+    /// change how the built lines are drawn — never which lines are built.
+    pub(crate) fn queue_frame_text(&mut self, dt: f32) {
+        let motion = self.config.ui.motion;
         // Taken out and put back rather than borrowed in place: the body below
         // calls `&self` methods (`modal`, `settings_view`, `roster_names`,
         // `list_layout`) while filling them, which a live `&mut self.field`
@@ -216,6 +220,9 @@ impl AppState {
                 &mut chrome,
             );
         }
+        // Before anything else joins `chrome`: the crossfade reads the plate as
+        // everything from the start.
+        self.hud.motion.corner.frame(&mut chrome, 0, dt, motion);
 
         // The capture verdict, under the core's diagnostics panel and only while
         // it is up (Plan 0083). Built from the stored token rather than from the
@@ -225,7 +232,13 @@ impl AppState {
             chrome.push(overlay::capture_verdict_line(&self.capture.capture_token));
         }
 
-        if self.modal() == Some(Modal::Settings) {
+        // Each modal's envelope runs every frame, open or not: a closed one
+        // appends the lines it last drew while it fades out. Each is handed the
+        // index its own block starts at, so the one fading out and the one
+        // opening never animate each other's lines.
+        let settings_from = modal.len();
+        let settings_open = self.modal() == Some(Modal::Settings);
+        if settings_open {
             let view = self.settings_view();
             let renderer = &mut self.renderer;
             overlay::settings_lines(
@@ -234,7 +247,15 @@ impl AppState {
                 &mut |text, size| renderer.measure_text(text, size),
                 &mut modal,
             );
-        } else if self.modal() == Some(Modal::Browse) {
+        }
+        self.hud
+            .motion
+            .settings
+            .frame(settings_open, &mut modal, settings_from, dt, motion);
+
+        let browse_from = modal.len();
+        let browse_open = self.modal() == Some(Modal::Browse);
+        if browse_open {
             let names = self.roster_names();
             let rows = self.browse_rows(&names);
             let visible = self.hud.browse.visible(&rows);
@@ -262,6 +283,10 @@ impl AppState {
                 self.queue_pane(pane, &name, &mut modal);
             }
         }
+        self.hud
+            .motion
+            .browse
+            .frame(browse_open, &mut modal, browse_from, dt, motion);
 
         // The console's standing header, so an idle console still reads as live.
         // Queued after the routing has cleared last frame's lines and before the

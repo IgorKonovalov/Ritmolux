@@ -441,8 +441,8 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | 2 — Studio captures | studio-builder | done | 98e4d4e7 |
 | 3 — Audit and direction | human | done | 9907f1b5 |
 | 4 — The look declared once | dev | done | 6202a083 |
-| 5 — Panels and measured text | dev | done | committed with this row |
-| 6 — Overlays move | dev | not started | |
+| 5 — Panels and measured text | dev | done | 4d82db06 |
+| 6 — Overlays move | dev | done | committed with this row |
 | 7 — Binding table, help, hint | dev | not started | |
 | 8 — Standalone workflow fixes | dev | not started | |
 | 9 — foobar component | dev | not started | |
@@ -517,6 +517,20 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   The settings rows still pad `label` with spaces, which is ragged in a proportional font.
 - Phase 5, the property test is `render::text::tests::a_fitted_string_never_measures_wider_than_asked_on_the_system_font`.
   Captures were checked at both sizes under `target/ui-audit/after-1080/` and `after-1280/`.
+- Phase 6, shape. The glide needed a drawn highlight, so the core panel gained
+  `PanelKind::Highlight` (look A's `highlight` fill and 4 px accent bar), drawn in the same
+  instanced pass. `console::Line::backdrop` became a `Backdrop { w, h, kind }`. The banner's
+  reduced-motion step reaches the core through `Renderer::set_reduced_motion`.
+- Phase 6, a fix outside the phase's scope: `theme::Ease::at` wobbled down by one `f32` ulp near the
+  end of the curve, which the monotone test caught. It now bisects in `f64` and reads the height at
+  the lower bound.
+- Phase 6, done-when as tested. The "reaches its end at exactly the duration" test asserts the value
+  is the target from the duration on and short of it at 0.9 of it. The curve's flat tail rounds to
+  1.0 in `f32` a little before the duration, so "short of it just before" is not asserted.
+- Phase 6, files outside the list: `core/src/render/{panel.rs, mod.rs, theme.rs}`,
+  `standalone/src/{app_state.rs, lib.rs, console.rs, stream.rs, shot/ui.rs}`,
+  `standalone/examples/shot.rs`, `standalone/src/motion/tests.rs` and the view fixtures in
+  `settings/tests.rs` and `console/tests.rs`.
 
 ### Close triggers
 

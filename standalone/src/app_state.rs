@@ -175,6 +175,10 @@ pub(crate) struct Hud {
     /// The preset browse overlay's modal state (Tab toggles; Plan 0008).
     pub(crate) browse: OverlayState,
 
+    /// How the overlays are moving this frame: a view of the modal states,
+    /// never consulted to decide what a key does.
+    pub(crate) motion: standalone::motion::OverlayMotion,
+
     /// The settings modal's state (`S` toggles; Plan 0050 Phase 4). A second,
     /// independent pure state machine — see [`crate::settings`] for why it is not the
     /// same one.
@@ -545,6 +549,9 @@ impl AppState {
         renderer.enable_diagnostics(true);
         let overlay_on = config.hud.diagnostics;
         renderer.set_overlay(overlay_on);
+        // The banner's envelope is the core's; every other one reads the key
+        // each frame.
+        renderer.set_reduced_motion(config.ui.motion == standalone::config::Motion::Reduced);
 
         let capture = start_capture(&input);
         let capture_format = capture.format;
@@ -594,6 +601,7 @@ impl AppState {
                 #[cfg(windows)]
                 now_playing: nowplaying_win::NowPlayingSource::start(),
                 browse: OverlayState::new(),
+                motion: standalone::motion::OverlayMotion::default(),
                 settings: SettingsState::new(),
                 console_window: None,
                 console_frame: 0,
@@ -1232,8 +1240,9 @@ impl AppState {
             );
         }
 
-        // Queue the on-canvas text for this frame (active name + browse list).
-        self.queue_frame_text();
+        // Queue the on-canvas text for this frame (active name + browse list),
+        // animated by this frame's `dt`.
+        self.queue_frame_text(dt);
 
         if let Err(err) = self.renderer.render(&frame, dt) {
             eprintln!("render error: {err}");
@@ -2075,6 +2084,7 @@ impl AppState {
             now_playing: self.config.hud.now_playing,
             next_rotation: self.config.hud.next_rotation,
             thumbnails: self.config.thumbnails.enabled,
+            motion: self.config.ui.motion,
             // Read off the cache, like the input roster. A running adapter the
             // roster does not hold reads as no roster at all: the row then
             // names what is running and goes inert, rather than walking from
@@ -2160,6 +2170,14 @@ impl AppState {
                 self.save_config();
             }
             SettingsAction::ToggleThumbnails => self.toggle_thumbnails(),
+            // Persisted, and applied to the one envelope the core owns; the
+            // shell's own envelopes read the key every frame.
+            SettingsAction::SetMotion(motion) => {
+                self.config.ui.motion = motion;
+                self.renderer
+                    .set_reduced_motion(motion == config::Motion::Reduced);
+                self.save_config();
+            }
         }
         self.window.request_redraw();
     }

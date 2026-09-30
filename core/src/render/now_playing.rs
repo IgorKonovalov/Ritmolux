@@ -95,6 +95,9 @@ pub struct NowPlaying {
     /// injected `dt` and clamped at [`TOTAL_SECS`] so it cannot grow unbounded
     /// across a long session.
     elapsed: f32,
+    /// Whether the envelope is a step rather than the theme's curve — the
+    /// shell's reduced-motion choice.
+    reduced: bool,
 }
 
 impl NowPlaying {
@@ -127,12 +130,23 @@ impl NowPlaying {
         self.elapsed = (self.elapsed + dt).min(TOTAL_SECS);
     }
 
+    /// Make the envelope a step (`true`) or the theme's eased fade (`false`,
+    /// the default). A step shows the banner at full opacity for its whole
+    /// lifetime and not at all after it.
+    pub fn set_reduced_motion(&mut self, reduced: bool) {
+        self.reduced = reduced;
+    }
+
     /// The current opacity in `0.0..=1.0`; zero when there is nothing to draw.
     pub fn alpha(&self) -> f32 {
         if self.text.is_empty() {
             return 0.0;
         }
-        alpha_at(self.elapsed)
+        if self.reduced {
+            step_at(self.elapsed)
+        } else {
+            alpha_at(self.elapsed)
+        }
     }
 
     /// The string currently announced (`""` when the banner is unset).
@@ -206,19 +220,32 @@ pub fn backdrop(lines: &[Option<BannerLine<'_>>; 2], widths: [f32; 2]) -> Option
     })
 }
 
-/// The envelope: ramp in, hold, ramp out, then nothing. A pure function of
-/// elapsed seconds, which is what makes it identical at any refresh rate and
-/// testable without a device.
+/// The envelope: ease in, hold, ease out, then nothing — both ramps on the
+/// theme's one curve, the fade-out its mirror so it leaves as it arrived. A pure
+/// function of elapsed seconds, which is what makes it identical at any refresh
+/// rate and testable without a device.
 pub fn alpha_at(elapsed: f32) -> f32 {
     if !elapsed.is_finite() || elapsed <= 0.0 {
         return 0.0;
     }
     if elapsed < FADE_IN_SECS {
-        elapsed / FADE_IN_SECS
+        THEME.ease.at(elapsed / FADE_IN_SECS)
     } else if elapsed < FADE_IN_SECS + HOLD_SECS {
         1.0
     } else if elapsed < TOTAL_SECS {
-        (TOTAL_SECS - elapsed) / FADE_OUT_SECS
+        1.0 - THEME
+            .ease
+            .at((elapsed - FADE_IN_SECS - HOLD_SECS) / FADE_OUT_SECS)
+    } else {
+        0.0
+    }
+}
+
+/// The reduced-motion envelope: full opacity for the banner's whole lifetime,
+/// nothing before or after it.
+pub fn step_at(elapsed: f32) -> f32 {
+    if elapsed.is_finite() && elapsed > 0.0 && elapsed < TOTAL_SECS {
+        1.0
     } else {
         0.0
     }
@@ -486,6 +513,30 @@ mod tests {
         // Clear of the top-left furniture the shell owns (the preset name at
         // y = 16 and the F3 panel below it).
         assert!(artist.y > h * 0.5, "the banner belongs in the lower half");
+    }
+
+    /// The fade takes the theme's ease-out: past halfway by a quarter of the
+    /// fade-in, where the linear ramp it replaces was at a quarter.
+    #[test]
+    fn the_fade_in_takes_the_theme_easing() {
+        let a = alpha_at(FADE_IN_SECS * 0.25);
+        assert!((a - THEME.ease.at(0.25)).abs() < 1e-6);
+        assert!(a > 0.5, "an ease-out is past halfway early, got {a}");
+    }
+
+    /// Reduced motion makes the envelope a step: full for the whole lifetime,
+    /// nothing after it.
+    #[test]
+    fn reduced_motion_makes_the_envelope_a_step() {
+        let mut np = NowPlaying::default();
+        np.set_reduced_motion(true);
+        np.set("Artist - Title");
+        np.advance(0.001);
+        assert_eq!(np.alpha(), 1.0, "a step is full from the first frame");
+        np.advance(TOTAL_SECS - 0.01);
+        assert_eq!(np.alpha(), 1.0, "and full to the last");
+        np.advance(1.0);
+        assert_eq!(np.alpha(), 0.0, "and gone after it");
     }
 
     #[test]

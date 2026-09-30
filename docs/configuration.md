@@ -534,6 +534,17 @@ Turn it off on a machine running on battery or under security software that obje
 menu's **Thumbnails** row writes this key, and turning it off also stops a pass that is running.
 Pictures already in the cache still show either way.
 
+### `[ui]`
+
+How the interface drawn over the show behaves, where `[hud]` is *what* it draws.
+
+| Key | Default | What it means |
+|---|---|---|
+| `motion` | `"full"` | `"full"`: the browser and the settings menu fade and slide as they open and close, the selection glides between rows, the corner name crossfades when the preset changes, and the now-playing banner eases in and out. `"reduced"`: every one of those is a step, so things appear and vanish in one frame |
+
+The animation is only ever a view: a key pressed while a menu is still opening acts on that frame,
+under either value. The settings menu's **Motion** row writes this key.
+
 ### A complete file
 
 Every key at its default. `display_name` in `[output]` and `[console]`, and `gpu` in `[output]`,
@@ -588,6 +599,9 @@ present_every_n = 1
 
 [thumbnails]
 enabled = true
+
+[ui]
+motion = "full"
 ```
 
 ## Precedence

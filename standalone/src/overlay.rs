@@ -531,13 +531,13 @@ pub fn settings_lines(
         } else {
             ("  ", THEME.text.rgba())
         };
-        out.push(Line::new(
-            format!("{marker}{label:<14}{value}"),
-            LIST_INSET,
-            ROWS_TOP + row as f32 * ROW_H,
-            ROW_SIZE,
-            color,
-        ));
+        let text = format!("{marker}{label:<14}{value}");
+        let y = ROWS_TOP + row as f32 * ROW_H;
+        if row == state.row() {
+            let w = measure(&text, ROW_SIZE);
+            out.push(highlight_at(LIST_INSET, y, w));
+        }
+        out.push(Line::new(text, LIST_INSET, y, ROW_SIZE, color));
     }
     push_backdrop(out, from, measure);
 }
@@ -566,15 +566,24 @@ pub fn browse_lines(
         let Some((col, r)) = layout.place(row) else {
             continue;
         };
-        row_lines(
-            entry,
-            row == state.highlight(),
-            (LIST_INSET + col as f32 * COL_W, ROWS_TOP + r as f32 * ROW_H),
-            measure,
-            out,
-        );
+        let (x, y) = (LIST_INSET + col as f32 * COL_W, ROWS_TOP + r as f32 * ROW_H);
+        let highlighted = row == state.highlight();
+        row_lines(entry, highlighted, (x, y), measure, out);
+        if highlighted {
+            out.push(highlight_at(x, y, COL_W - COL_GUTTER));
+        }
     }
     push_backdrop(out, from, measure);
+}
+
+/// Horizontal room a row highlight takes left of the row's text: the accent
+/// bar and a gap before the marker.
+const HIGHLIGHT_LEAD: f32 = 8.0;
+
+/// The selection highlight under a row whose text starts at `(x, y)` and runs
+/// `w` device px.
+fn highlight_at(x: f32, y: f32, w: f32) -> Line {
+    Line::highlight(x - HIGHLIGHT_LEAD, y - 1.0, w + HIGHLIGHT_LEAD, ROW_H)
 }
 
 /// The preview pane's text: the placeholder inside the image's rectangle while

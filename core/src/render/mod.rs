@@ -109,7 +109,7 @@ use ink::Ink;
 use now_playing::NowPlaying;
 use overlay::Overlay;
 use palette::Palette;
-pub use panel::Panel;
+pub use panel::{Panel, PanelKind};
 use post::PostChain;
 use scenes::Scene;
 pub use scenes::lines::CapOverflow;
@@ -1289,6 +1289,13 @@ impl Renderer {
     /// Callers must not call this from an audio callback — the copy allocates.
     pub fn set_now_playing(&mut self, text: &str) {
         self.now_playing.set(text);
+    }
+
+    /// Make the banner's fade a step (`true`) or the theme's eased envelope
+    /// (`false`, the default) — the shell's reduced-motion choice reaching the
+    /// one envelope the core owns.
+    pub fn set_reduced_motion(&mut self, reduced: bool) {
+        self.now_playing.set_reduced_motion(reduced);
     }
 
     /// Append the banner's lines to this frame's text queue, after whatever the
