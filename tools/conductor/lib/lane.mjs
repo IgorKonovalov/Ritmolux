@@ -49,7 +49,7 @@ import {
 import { CLOSE, take } from "./locks.mjs";
 import { fastForwardMain, mergeMainInto } from "./merge.mjs";
 import { CLAUDE_DIR, CLI_CONTRACT, STUDIO_INSTALL } from "./outcome.mjs";
-import { donePhases, findPlan, nextStep, rangeLabel, readPlanFile, settledPhase } from "./plan.mjs";
+import { claudePaths, donePhases, findPlan, nextStep, rangeLabel, readPlanFile, settledPhase } from "./plan.mjs";
 import { adoptClose, clearPark, endStep, planContractHash, planRecord, saveState, spendSince, startStep, statePaths, takeResumeAsks } from "./state.mjs";
 import { USAGE_LIMIT, renderPromptFile, runStep } from "./step.mjs";
 
@@ -125,7 +125,11 @@ export function parkStillTrue(rec, repo) {
     const where = laneOpen(rec) ? rec.worktree : repo;
     const found = findPlan(where, rec.plan);
     if (!found) return `plan ${rec.plan} is not in ${where}`;
-    if (!settledPhase(readPlanFile(found.path), phase)) {
+    const plan = readPlanFile(found.path);
+    // A `claude_dir` park also settles when the plan was amended so the phase no longer declares a
+    // `.claude/` path: the reason it could not run is gone, and the owner has nothing left to do.
+    if (reason === CLAUDE_DIR && claudePaths(plan.phases.find((p) => p.id === phase)).length === 0) return null;
+    if (!settledPhase(plan, phase)) {
       const rel = relative(where, found.path).replace(/\\/g, "/");
       return `Phase ${phase} is still not marked done (or owed, on a phase marked Blocks merge: no) in the ## Implementation log of ${rel} in ${where}; commit the row there first`;
     }
