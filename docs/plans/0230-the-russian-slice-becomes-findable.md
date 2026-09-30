@@ -341,7 +341,7 @@ export const onRequest = defineRouteMiddleware((context) => {
 |---|---|---|---|
 | 1 — The header control, and a Russian entrance for it to point at | dev | done | bc09b3d0 |
 | 2 — The Russian pages say they are Russian | dev | done | d9160208 |
-| 3 — The front door names the Russian pages | dev | done | committed with this row |
+| 3 — The front door names the Russian pages | dev | done | 8c931753 |
 | 4 — The live site, read after the push | human | not started | |
 
 ### Notes
@@ -371,13 +371,16 @@ export const onRequest = defineRouteMiddleware((context) => {
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature, `site/` only - the header language control, the `ru` entrance page,
+  `lang`/`hreflang` on the Russian routes, and the front-door links. No Rust, C++ or `studio/` file
+  changed.
+- **Operator docs touched:** `site/README.md` only; nothing under `docs/` besides this plan.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 - 56 reductions hold across
+  28 live entries, 4 unprobeable, 35 advisory moved-path rows.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** Phase 4 (the live site, read after the push; `Blocks merge: no`).
 
 ## Followups (after this lands)
 
