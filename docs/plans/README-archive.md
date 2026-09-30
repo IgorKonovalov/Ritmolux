@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0230 - The Russian slice becomes findable](#0230---the-russian-slice-becomes-findable)
   - [0231 - The interface is audited, then learns one look](#0231---the-interface-is-audited-then-learns-one-look)
   - [0233 - The close reviews' small findings are repaired](#0233---the-close-reviews-small-findings-are-repaired)
   - [0234 - A conductor session writes only where it works](#0234---a-conductor-session-writes-only-where-it-works)
@@ -271,6 +272,23 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0230 - The Russian slice becomes findable](done/0230-the-russian-slice-becomes-findable.md)
+
+- closed 2026-09-30, conductor-run close of lane `plan-0230-the-russian-slice-becomes-findable`.
+Phases 1-3 landed: `bc09b3d0`, `d9160208`, `8c931753`. **Phase 4 is owed** (ADR-0249): the reading of
+the deployed site under `/Ritmolux/`. Round 1 review: **no blockers, no majors, no minors, two nits**,
+both left open. Version: **0.155.0** (minor: a feature plan, `site/` only). ADR-0213 accepted with an
+`Outcome` (the `lang` repair was taken; Pagefind splits en 221 / ru 6). Closes no backlog entry.
+Upstream CI read green at the close. The full review is the plan's own `## Close review` section.
+- **What landed.** A header `LanguageSelect` override linking every page to its twin or to a new `ru`
+  entrance page; the twin rule in one module, `site/src/plugins/twins.mjs`; a route middleware giving
+  the Russian routes `lang="ru"`, `og:locale` and `hreflang` alternates; a `По-русски` button on the
+  landing page and links on three *Start here* cards.
+- **Open.** Nit 1: `ru.mdx`'s paragraph hard-codes the count of translations (owner-approved Russian
+  prose). Nit 2: the *Start here* `По-русски` links carry no `lang`/`hreflang`, `dev` work. Translation
+  advisory at the close: `how-it-works.ru.md`, `running.ru.md` and the foobar `READ-ME-FIRST.ru.md`,
+  none moved by this plan.
 
 ### [0231 - The interface is audited, then learns one look](done/0231-the-interface-is-audited-then-learns-one-look.md)
 
