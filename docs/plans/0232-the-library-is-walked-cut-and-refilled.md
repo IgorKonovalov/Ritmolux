@@ -427,7 +427,7 @@ ships at `66ce9350`. Every value is copied from a tool, and nothing in this tabl
 
 ## Gaps
 
-**DRAFT, 2026-09-30, written by the session that ran Phase 4, for the owner to correct.** It reads
+**Approved by the owner 2026-09-30 as drafted by the session that ran Phase 4.** It reads
 the set after the cull and the retunes: 81 presets on 14 systems. `fragment_field` 13,
 `analytic_field` 11, `parametric_curve` 11, `attractor` 10, `reaction_diffusion` 6, `cellular` 5,
 `shape_field` 5, `warp_mesh` 4, `spectrum` 4, `lsystem` 3, `shape_collage` 3, and `emitter`,
@@ -508,7 +508,7 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 | 2 — The walk | human | done | `cbf4d37b`, `3adf77d6` |
 | 3 — The cull | dev | done | `bcdd5892` (last of the family commits listed in Notes) |
 | 4 — The retunes and the sittings | human | done | many, one per family: see Notes |
-| 5 — The gap brief | human | not started | |
+| 5 — The gap brief | human | done | 2619581b |
 | 6 — The first refill cohort | human | not started | |
 | 7 — The verdict | human | not started | |
 
