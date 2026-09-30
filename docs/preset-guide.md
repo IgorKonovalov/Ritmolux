@@ -372,7 +372,7 @@ Left alone they settle too, into still rings within a minute, so the preset pict
 disc of soup on every hard onset and at least every five seconds; the speckled blobs above are those
 discs, organising.
 
-![Interlocking spirals of three flat colours — coral, cornflower blue and sage green — covering the
+![Interlocking spirals of three flat colours — deep maroon, coral red and bone white — covering the
 whole frame, their arms curling round dozens of small cores](images/cellular/cyclic.png)
 
 *`family = "cyclic"` — `presets/cellular_spiral_bloom.toml`; the teaching preset is

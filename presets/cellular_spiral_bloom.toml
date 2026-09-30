@@ -1,4 +1,4 @@
-# Spiral Bloom - the cyclic automaton: every cell holds one of eight colours and advances when
+# Spiral Bloom - the cyclic automaton: every cell holds one of three colours and advances when
 # enough neighbours already hold the next. From seeded noise the field organises into interlocking
 # rotating spirals whose arms are the palette laid round in order.
 #
@@ -7,8 +7,10 @@
 #   beat      -> reseed: on roughly one beat in three a disc of fresh noise is dropped in, which
 #                boils for a second and then crystallises into a new cluster of spirals.
 #   time      -> reseed floor every 12 s; a slow hue drift so the arms rotate through colour.
-#   treb      -> saturation: bright top end pulls the colour fully saturated; a dull passage
-#                leaves it slightly muted.
+#   onset     -> bloom: a small flare on a hit, held low so the arms stay graphic.
+#
+# The palette is black, red and bone white, one per state, so the spirals read as printed ink
+# rather than as a rainbow. Saturation is pinned to 1 so the red never greys.
 #
 # Horizon verdict (shot --horizon 10, 96x96, bass 0.6 mid 0.45): alive at ten minutes. Footprint
 # holds 0.17-0.19 from 30 s to the end (delta -0.02) - the spirals keep turning and never lock into
@@ -34,19 +36,22 @@ threshold = "3"
 step_rate = "10 + clamp(mid * 16, 0, 14)"
 reseed = "max(beat * (hash(beat_index * 1.3) > 0.66), mod(time, 12) < 0.2)"
 hue = "mod(time * 0.012, 1)"
-saturation = "0.72 + clamp(treb * 0.4, 0, 0.24)"
-brightness = "0.8"
+saturation = "1"
+brightness = "0.95 + clamp(bass * 0.25, 0, 0.2)"
+bloom_amount    = "0.2 + clamp(onset * 0.35, 0, 0.25)"
+bloom_threshold = "0.8"
+bloom_radius    = "1.4"
 
 [smoothing]
 step_rate = 0.3
 saturation = 0.25
+brightness = { attack = 0.05, release = 0.4 }
 
 # A closed loop: the last stop returns to the first colour, so the cycle's wrap is seamless.
 [palette]
 stops = [
-  { at = 0.000, color = "#ff3d6e" },   # rose
-  { at = 0.250, color = "#ffb13d" },   # amber
-  { at = 0.500, color = "#3dffc4" },   # mint
-  { at = 0.750, color = "#3d6bff" },   # cobalt
-  { at = 1.000, color = "#ff3d6e" },   # rose again
+  { at = 0.000, color = "#070707" },   # black
+  { at = 0.333, color = "#c8141a" },   # red
+  { at = 0.667, color = "#f1ede6" },   # bone white
+  { at = 1.000, color = "#070707" },   # black again
 ]
