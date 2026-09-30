@@ -113,7 +113,7 @@ Only depths up to `max_depth` are built, so `visible_depth` is clamped to what e
 **`hue_spread` needs a grammar with branches.** Generation depth is bracket nesting, so a rule set
 with no `[` (`lsystem_rime`'s Koch rule `F = "F+F--F+F"`) has exactly one generation and the ramp is
 flat there however large `hue_spread` gets — a property of that figure, not a gap. A branching
-grammar (`lsystem_bower`'s `F = "F[+F]F[-F]F"`) ramps across its whole depth, because the divisor is
+grammar (`lsystem_icecrystal`'s `F = "FF-[-F+F+F]+[+F-F-F]"`) ramps across its whole depth, because the divisor is
 the built figure's own deepest generation.
 
 ## `star_pattern` — Hankin star rosette
@@ -141,8 +141,8 @@ same radius and there is no range to walk — `[palette]` itself works. (2) A ba
 interior empty: the strokes live in an outer annulus. **`rings` is the answer to both** — it puts
 segments at several radii, so the ramp spans the combined figure and the interior fills. On a
 composite (rings *plus* a tiling) the interlace sits at one end of the ramp and the ornament spreads
-along the rest. Shipped: `star_corona` and `star_mandala_bordered` (rings only), `star_zellij`
-(rings plus an 8-fold interlace). **Animate a mandala on `ring_spread` / `ring_scale`, not spin
+along the rest. Shipped: `star_corona` (rings only); no shipped world is a composite since Zellij (rings plus an
+8-fold interlace) was retired. **Animate a mandala on `ring_spread` / `ring_scale`, not spin
 alone** — a many-fold ring figure turned by any angle lands almost on itself, so rotation reads as
 frozen to the `animation` gate and, at a distance, to the eye; spend `ring_phase` on the
 counter-rotation as ornament.
@@ -170,7 +170,7 @@ they don't redraw a figure, so changes take a second or two to read. Composites 
 ## `attractor` — GPU compute particles on a strange attractor
 *Filamentary, chaotic, luminous.* `[particles] family = de_jong | clifford | thomas | lorenz`
 (optional; defaults `de_jong`), or an IFS figure from the same namespace —
-`fern | tree | dragon | sierpinski | spiral` (`attractor_fern`, `attractor_dragon` ship). The map
+`fern | tree | dragon | sierpinski | spiral` (`attractor_fernmono`, `attractor_dragon` ship). The map
 family sets the map **and** the meaning of `a`/`b`/`c`/`d`, each defaulting to that family's
 canonical value; the `tuple` roster and walk below are the map families' surface.
 
@@ -291,9 +291,9 @@ they launched on. There is also no `dt` in it, so the motion is identical on eve
 **Do the crest arithmetic before tuning.** A mark launched at `v` against `g` turns over `v² / (2g)`
 world units above the source line (at `y = -1.12` unless `source_y` moves it), and a frame is
 `|y| <= 1`. So a crest *inside* the frame draws a visible horizontal ceiling where the population
-piles up. `emitter_perseids.toml` puts its crest off-frame deliberately; `emitter_emberjet.toml` is
-the inverse — a fountain, where the arc turning over in frame *is* the figure — and its header does
-the arithmetic both ways.
+piles up. v = 2.6, g = 1.3 from the default source crests off frame at y = 1.48, which avoids the ceiling;
+`emitter_heartfall.toml` keeps its crest in frame at y ≈ 0.88 (v = 2.3, g = 1.3, source_y =
+-1.15), so the room sees the hearts turn over.
 
 ### The source, and the two warm-ups (Plan 0090)
 
@@ -370,8 +370,9 @@ tables are in `presets/README.md` under `warp_mesh`.
 
 It has two modes, split by `color_source`, and they want opposite settings for almost everything:
 
-- **Light** (`color_source = "0"`, the default; 5 of the 7 shipped: Wellhead, Millrace, Cauldron,
-  Sirocco, Smoke). The deposit is coloured by its own angle and the loop drags the colour around.
+- **Light** (`color_source = "0"`, the default; Sirocco and Smoke ship. Wellhead, Millrace and
+  Cauldron were retired in Plan 0232; the lessons below that name them were measured on them and
+  stand, but their files are gone). The deposit is coloured by its own angle and the loop drags the colour around.
   It glows and blooms like the other additive scenes.
 - **Print** (`color_source = "1"`; Ladder, Tracery). The field accumulates an uncoloured level, and
   the present reads that level as the palette coordinate. A stepped palette then prints the loop's
@@ -421,6 +422,10 @@ It has two modes, split by `color_source`, and they want opposite settings for a
 ---
 
 ## `shape_collage` — flat opaque elements on their own paper
+
+> Nocturne was retired in Plan 0232. What this section says it measured was measured on it and
+> stands; the canvases that ship are Suprematist, On White and Collage Mono.
+
 *Posters, constructivist canvases, cut paper.* Family `collage` (`collage_*.toml`). **This is the
 one scene that draws a graphic instead of light.** A pixel starts at the paper colour and composites
 each element `over` it in array order, so one form genuinely sits in front of another and the array
@@ -473,16 +478,16 @@ function of the pixel's position: no state, no accumulation, nothing to warm up.
 chooses between two different instruments that share a palette surface, and the params of the one
 not chosen are inert. The `[field]` table (`family`, `map`, `trap`) is in `docs/presets.md`.
 
-**`escape_time`: Julia and Mandelbrot sets** (9 shipped). Colouring is by smooth iteration count,
+**`escape_time`: Julia and Mandelbrot sets** (8 shipped). Colouring is by smooth iteration count,
 or with `trap` by the orbit's closest approach to a circle, line, point or cross.
 
 | Param | Typical | Controls / natural driver |
 |-------|---------|---------------------------|
-| `c_re` / `c_im` | a region, then an audio swing of `0.01 – 0.06` | Choose the region first; it is the look. Shipped regions: the main cardioid's edge (Julia Circuit tours it), fixed dendrites (`-0.1 + 0.95i` Searchlight, `-0.8 + 0.156i` Pearl String), just past the cusp (`0.274`, Parabolic Dust), Seahorse Valley (`-0.762 + 0.085i`, Two-Band Julia), inside the cardioid (`-0.30 + 0.45i`, Stained Glass). **Keep the audio swing small and smoothed** (0.12 – 0.8 s). Near a boundary the set's size is very sensitive to `c`: Parabolic Dust's first 0.07 swing read as a chaotic zoom and shipped at 0.04. Bass is the natural driver. Two-Band Julia splits bass onto `c_re` and treble onto `c_im`. |
+| `c_re` / `c_im` | a region, then an audio swing of `0.01 – 0.06` | Choose the region first; it is the look. Shipped regions: the main cardioid's edge (Julia Circuit tours it), a fixed dendrite (`-0.8 + 0.156i`, Pearl String), just past the cusp (`0.274`, Parabolic Dust), Seahorse Valley (`-0.762 + 0.085i`, Two-Band Julia), inside the cardioid (`-0.30 + 0.45i`, Stained Glass). **Keep the audio swing small and smoothed** (0.12 – 0.8 s). Near a boundary the set's size is very sensitive to `c`: Parabolic Dust's first 0.07 swing read as a chaotic zoom and shipped at 0.04. Bass is the natural driver. Two-Band Julia splits bass onto `c_re` and treble onto `c_im`. |
 | `iterations` | `20 – 64` | Cost: every pixel pays it. **The Floor tier caps it at 64**, so stay at or under 64 and both tiers draw the same picture. With a trap, fewer is better. Stained Glass needs 20, because with more every orbit eventually grazes the cross. Seahorse drives it from bass (40 → 160) as the structural lever on the Mandelbrot map, which carves the black back. That is a Rich-only picture, and 400 dropped the app to 15 fps. |
 | `interior` | `0`, `0.1 – 0.15`, or `1` | `0` is the textbook black set. `0.1 – 0.15` (+onset `0.12`) lifts it a touch. **Every trap preset sets `1`**, because a trap colours the interior too, and a black hole would punch out the filaments. |
-| `trap_radius` | `0 – 0.25` base, +bass `0.4 – 0.8` | **The trap presets' bass lever**, in all four. Moving the trap re-cuts every filament or pane at once, a structural change rather than a brightness one. Smoothed 0.12 – 0.2 s. |
-| `trap_rotate` | `time * 0.01 – 0.05` | A sweep (Searchlight's beam, Pearl String's sliding beads). Stained Glass adds a mid nudge (`+0.25`, eased 0.35 s). |
+| `trap_radius` | `0 – 0.25` base, +bass `0.4 – 0.8` | **The trap presets' bass lever**, in all three. Moving the trap re-cuts every filament or pane at once, a structural change rather than a brightness one. Smoothed 0.12 – 0.2 s. |
+| `trap_rotate` | `time * 0.01 – 0.05` | A sweep (Pearl String's sliding beads). Stained Glass adds a mid nudge (`+0.25`, eased 0.35 s). |
 | `power` | `2`, `3`, or whole `3 – 7` | A whole power `p` gives p-fold symmetry. Multibrot re-rolls it per bar, held by `[hold] power = "bar"`, and its `c` radius has to grow with the power (0.53 + 0.085 per step), or high powers go to dust. No shipped preset uses a fractional power. |
 | `escape_radius` | `24 – 64` | Larger smooths the band spacing. The shipped files that set it use 24 – 64; the rest leave the default 16. |
 | `zoom` | `0.72 – 0.9` whole set; `1.85`; `3.6`; `~220` | Most frame the whole Julia set just under 1. Stained Glass sits at 1.85 and Parabolic Dust about 3.7x in on one spiral arm (with `pan_*` aimed at it). Seahorse is ~220x into the Mandelbrot map with pan at the valley and `pow(2.2, noise - 0.5)` breathing; f32 holds there. A mid nudge of ≤ `0.07 – 0.2` on zoom, eased 0.3 – 1.2 s. |
@@ -490,7 +495,7 @@ or with `trap` by the orbit's closest approach to a circle, line, point or cross
 | `brightness` | `1.0 – 1.4` | Constant in every escape-time preset: the music goes into `c`, the trap, or `iterations`, not into light (only `interior` takes a small onset lift). Five of the nine bloom at `0.3 – 0.4`, threshold `0.8 – 0.9`. |
 
 **Palettes do the lighting.** A trap palette is bright only near distance 0 and near-black by
-0.3 – 0.6, so only the filaments light (Ring Orbit, Searchlight, Pearl String). The palette repeats
+0.3 – 0.6, so only the filaments light (Ring Orbit, Pearl String). The palette repeats
 past 1, so a trap's exterior shows as striped fringes and cannot be sent to one dark colour. Stained
 Glass records that as an engine gap.
 
