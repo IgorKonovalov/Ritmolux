@@ -301,11 +301,10 @@ const CARDS = [
   "collage_mono",
   "collage_onwhite",
   "collage_suprematist",
-  // shape_field (6)
+  // shape_field (5)
   "shape_aperture",
   "shape_contourmono",
   "shape_maple",
-  "shape_pulse",
   "shape_ringmono",
   "shape_strataheart",
   // spectrum (4)
@@ -521,7 +520,7 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // shape_field — the first shipped world on the system (ADR-0105), and the
+    // shape_field — a heart drawn as nested scaled copies of itself, and the
     // one that shows what the family is FOR: the scene hands the palette a
     // FIGURE COORDINATE rather than a level, so `palette_steps` turns it into
     // flat graphic bands and `palette_contour` draws the hairline between them.
@@ -529,7 +528,7 @@ const IMAGES = [
     // the mono worlds are deliberate two-ink prints and read as a different
     // family at gallery size.
     out: "docs/images/gallery/shape_field.png",
-    presetFile: "presets/shape_pulse.toml",
+    presetFile: "presets/shape_strataheart.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
@@ -559,7 +558,7 @@ const IMAGES = [
     // only family here that draws a GRAPHIC rather than light: a pixel starts at
     // the paper colour and composites each element with `over`, so the array
     // index is the depth. Chosen over the other two for the same reason
-    // shape_pulse was — collage_mono and collage_onwhite are two-ink by intent.
+    // shape_strataheart is — collage_mono and collage_onwhite are two-ink by intent.
     out: "docs/images/gallery/shape_collage.png",
     presetFile: "presets/collage_suprematist.toml",
     signal: "dynamic:110",

@@ -21,7 +21,7 @@
 //! second implementation to compare against. Its evidence is the **golden
 //! suite**: the five shipped presets that carried a non-zero `palette_contour`
 //! when it landed — `fragment_mandala`, `fragment_strata`, `fragment_vitrail`,
-//! `shape_pulse` and a since-retired kaleidoscope tiling — were all on smooth
+//! a since-retired contour heart and a since-retired kaleidoscope tiling — were all on smooth
 //! palettes, and none of their baselines moved.
 //! That is a byte-level claim this file could only weaken. What this file adds is
 //! the half a golden cannot see: that the suppression is driven by *colour* and

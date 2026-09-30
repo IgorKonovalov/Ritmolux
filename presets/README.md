@@ -2029,7 +2029,6 @@ pixel grid can carry and the picture breaks into **moire** — which reads as
 texture in a still and shimmers the moment anything moves. `d` at the corner is
 `1 + (|uv|_corner / scale - 1) / R` for inradius `R`, and the coordinate there is
 `d^gamma * color_span`; keep that under about 6 with `palette_steps` near 9.
-`shape_pulse`'s header carries the worked example.
 
 > **`points` on a `star` here is not the same picture as on a mark.** These
 > silhouettes were tuned for sprites a few pixels across, and at frame scale the
@@ -2129,12 +2128,11 @@ Read the three roles, because under the old coordinate they were not separable:
   means the same thing on every shape.
 
 > **The old route was to fake it in the palette, and you should not.**
-> `presets/shape_pulse.toml` reaches the ring *count* by packing 18 stripes as
+> A since-retired heart reached the ring *count* by packing 18 stripes as
 > gradient stops below the outline's coordinate — a 76-stop palette that has to
 > be regenerated whenever the count changes, and one that cannot fix the real
 > defect: the level sets are still offsets, so the inner figure still rounds off.
-> It is a shipped, accepted look and nothing forces it to move, but
-> `coord_mode = "1"` is the documented route now.
+> `coord_mode = "1"` is the documented route, and `shape_strataheart` takes it.
 
 ### `warp_mesh` — the past, resampled through a per-vertex grid
 

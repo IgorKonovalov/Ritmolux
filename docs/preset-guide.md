@@ -247,10 +247,11 @@ that should be triggered by a beat rather than modulated by a band.
 
 ### `shape_field`
 
-![Concentric heart-shaped bands in crimson, rose and peach on black, nested around a black heart at
-the centre and drawing out into fine parallel striations at the corners](images/gallery/shape_field.png)
+![Concentric heart-shaped bands in plum, crimson, orange and cream, each a scaled copy of the heart
+nested down to a tiny plum heart at the centre, with fine parallel striations at the
+corners](images/gallery/shape_field.png)
 
-*`presets/shape_pulse.toml`*
+*`presets/shape_strataheart.toml`*
 
 It draws one
 of five silhouettes — `disc`, `ring`, `polygon`, `star`, `heart` — as a **fullscreen distance
