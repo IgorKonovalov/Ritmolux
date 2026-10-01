@@ -105,6 +105,25 @@ export function laneOpen(rec) {
 }
 
 /**
+ * The phases a park waits on: the whole run of pending owner phases it recorded, or `[phase]` for a
+ * park recorded with no `phases` — a `claude_dir` park, or a `human_phase` one written before runs
+ * were recorded (ADR-0261).
+ */
+export function parkPhases(park) {
+  if (Array.isArray(park?.phases) && park.phases.length) return park.phases;
+  return park?.phase ? [park.phase] : [];
+}
+
+/**
+ * The park's phases `plan`'s log has not settled yet, in order. The one reader `parkStillTrue`,
+ * `selfResumeWhy` and the digest's `settledPark` share: a run parks once and settles only when every
+ * phase in it reads done, or owed on a phase marked `Blocks merge: no`.
+ */
+export function openParkPhases(plan, park) {
+  return parkPhases(park).filter((id) => !settledPhase(plan, id));
+}
+
+/**
  * Why a park still holds, or null when the tree shows it settled. `resume` asks this before it
  * clears a park, and a self-resume asks it first, so the two never disagree on the conditions they
  * share. Only `human_phase`, `claude_dir` and `main_dirty` have a condition here; every other reason
@@ -129,9 +148,11 @@ export function parkStillTrue(rec, repo) {
     // A `claude_dir` park also settles when the plan was amended so the phase no longer declares a
     // `.claude/` path: the reason it could not run is gone, and the owner has nothing left to do.
     if (reason === CLAUDE_DIR && claudePaths(plan.phases.find((p) => p.id === phase)).length === 0) return null;
-    if (!settledPhase(plan, phase)) {
+    const open = openParkPhases(plan, rec.park);
+    if (open.length) {
       const rel = relative(where, found.path).replace(/\\/g, "/");
-      return `Phase ${phase} is still not marked done (or owed, on a phase marked Blocks merge: no) in the ## Implementation log of ${rel} in ${where}; commit the row there first`;
+      const which = open.length === 1 ? `Phase ${open[0]} is` : `Phases ${open.join(", ")} are`;
+      return `${which} still not marked done (or owed, on a phase marked Blocks merge: no) in the ## Implementation log of ${rel} in ${where}; commit the ${open.length === 1 ? "row" : "rows"} there first`;
     }
   }
   if (reason === "main_dirty" && (currentBranch(repo) !== "main" || !isClean(repo))) {
@@ -154,8 +175,10 @@ export function selfResumeWhy(rec, repo, nowMs = Date.now()) {
   switch (reason) {
     case "human_phase":
     case CLAUDE_DIR: {
-      const found = findPlan(laneOpen(rec) ? rec.worktree : repo, rec.plan);
-      return `Phase ${rec.park.phase} reads ${settledPhase(readPlanFile(found.path), rec.park.phase)} in the plan's ## Implementation log`;
+      const plan = readPlanFile(findPlan(laneOpen(rec) ? rec.worktree : repo, rec.plan).path);
+      const ids = parkPhases(rec.park);
+      if (ids.length === 1) return `Phase ${ids[0]} reads ${settledPhase(plan, ids[0])} in the plan's ## Implementation log`;
+      return `Phases ${ids.map((id) => `${id} ${settledPhase(plan, id)}`).join(", ")} in the plan's ## Implementation log`;
     }
     case "main_dirty":
       return "the main checkout is on main and clean";
@@ -548,9 +571,11 @@ async function laneLoop(ctx, lane) {
   }
 }
 
-function park(ctx, rec, { reason, detail, phase = null, read = null, resetsAt = null }) {
+function park(ctx, rec, { reason, detail, phase = null, phases = null, read = null, resetsAt = null }) {
   rec.status = "parked";
   rec.park = { reason, detail, phase, read, worktree: rec.worktree, at: now() };
+  // Every phase of the run the park waits on; `phase` stays its first, for every older reader.
+  if (phases) rec.park.phases = [...phases];
   // The reset a usage limit reported, which is what lets the park clear itself once it passes.
   if (reason === USAGE_LIMIT && typeof resetsAt === "number") rec.park.resetsAt = resetsAt;
   // No session is trusted to have left the tree clean. The paths are recorded and never reverted:
@@ -1019,11 +1044,15 @@ export async function runPlan(ctx, lane, plan) {
       if (!file) return park(ctx, rec, { reason: "disagreement", detail: `plan ${plan} vanished from the worktree` });
       const next = nextStep(readPlanFile(file.path));
       if (next.kind === "human") {
+        // One park for the whole run: it holds until every phase in it settles (ADR-0261).
+        const label = rangeLabel(next.phases);
+        const one = next.phases.length === 1;
         return park(ctx, rec, {
           reason: "human_phase",
           phase: next.phases[0],
-          detail: `Phase ${next.phases[0]} is owned by human`,
-          read: `${file.rel} Phase ${next.phases[0]}`,
+          phases: next.phases,
+          detail: `${one ? "Phase" : "Phases"} ${label} ${one ? "is" : "are"} owned by human`,
+          read: `${file.rel} ${one ? "Phase" : "Phases"} ${label}`,
         });
       }
       if (next.kind === "claude_dir") {

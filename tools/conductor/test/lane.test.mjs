@@ -10,9 +10,9 @@ import { test } from "node:test";
 
 import { writeDigest, writeHistory } from "../lib/digest.mjs";
 import { git, resolveCommit, tagObjectType } from "../lib/git.mjs";
-import { gateDetail, runLanes } from "../lib/lane.mjs";
+import { gateDetail, parkStillTrue, runLanes } from "../lib/lane.mjs";
 import { readLedger } from "../lib/ledger.mjs";
-import { findPlan, readPlanFile } from "../lib/plan.mjs";
+import { findPlan, nextStep, readPlanFile } from "../lib/plan.mjs";
 import { validateQueue } from "../lib/queue.mjs";
 import { askResume, loadState, planRecord, statePaths } from "../lib/state.mjs";
 import { FAKE, REPO, TEST_DIR, TOOL_DIR, tmp, writePlan } from "./helpers.mjs";
@@ -1291,6 +1291,56 @@ test("a resident run resumes a human_phase park the lane's log settles while it 
   const entries = selfResumeEntries(ctx);
   assert.equal(entries.length, 1, entries.join("\n"));
   assert.match(readFileSync(statePaths(ctx.stateDir).inbox, "utf8"), /^- \*\*Settled:\*\* Phase 2 reads done in the plan's ## Implementation log$/m);
+});
+
+// ADR-0261: a run of consecutive human phases parks once, and settles only when every phase in it does.
+test("a run of three human phases parks once, holds while any is open, and resumes into the next implementer run", async () => {
+  const { ctx, repo } = scratch({
+    plans: [{ number: "0101", phases: [dev("1"), dev("2"), dev("3"), human("4"), human("5"), human("6"), dev("7")] }],
+    lanes: { a: ["0101"] },
+  });
+  const seen = [];
+  const r = resident(ctx, {
+    done: () => ctx.state.plans["0101"]?.status === "merged",
+    onLook: () => {
+      const rec = ctx.state.plans["0101"];
+      if (rec?.status !== "parked" || seen.length >= 2) return;
+      if (seen.length === 0) {
+        assert.equal(rec.park.reason, "human_phase");
+        assert.equal(rec.park.phase, "4");
+        assert.deepEqual(rec.park.phases, ["4", "5", "6"]);
+        assert.equal(rec.park.detail, "Phases 4-6 are owned by human");
+        markDone(rec.worktree, "0101", "4");
+        seen.push(parkStillTrue(rec, repo));
+        return;
+      }
+      markDone(rec.worktree, "0101", "5");
+      markDone(rec.worktree, "0101", "6");
+      seen.push(parkStillTrue(rec, repo));
+      assert.deepEqual(nextStep(readPlanFile(findPlan(rec.worktree, "0101").path)), { kind: "implement", owner: "dev", phases: ["7"], lastRun: true });
+    },
+  });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+
+  assert.match(seen[0], /^Phases 5, 6 are still not marked done .*; commit the rows there first$/, "partly settled names the phases still open");
+  assert.equal(seen[1], null, "all three marked settles it");
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.ok(r.looks() < 200);
+  assert.deepEqual(rec.parks.map((p) => p.reason), ["human_phase"], "one park for the whole run");
+  assert.deepEqual(kinds(rec), ["readiness:architect", "implement:dev", "implement:dev", "review:architect", "close:architect"]);
+  assert.match(readFileSync(statePaths(ctx.stateDir).inbox, "utf8"), /^- \*\*Settled:\*\* Phases 4 done, 5 done, 6 done in the plan's ## Implementation log$/m);
+});
+
+test("a human_phase park recorded with no phases list holds and settles on its one phase, as before", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1"), human("2"), human("3"), dev("4")] }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.deepEqual(rec.park.phases, ["2", "3"]);
+  delete rec.park.phases;
+  assert.match(parkStillTrue(rec, repo), /^Phase 2 is still not marked done .*; commit the row there first$/);
+  markDone(rec.worktree, "0101", "2");
+  assert.equal(parkStillTrue(rec, repo), null, "an old record waits on its one phase only");
 });
 
 test("a resident run leaves a settled human_phase park alone while its worktree is dirty", async () => {

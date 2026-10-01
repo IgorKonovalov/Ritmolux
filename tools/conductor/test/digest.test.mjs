@@ -490,6 +490,23 @@ test("a human_phase park whose phase is marked Blocks merge: no and whose row re
   }
 });
 
+// ADR-0261: a park over a run of human phases is settled only when every phase in it is.
+test("a human_phase park over a run of phases is settled only when every one of them reads done", () => {
+  const plan = (rows) => {
+    const repo = tmp("rlx-stale-run-");
+    writePlan(repo, { number: "0301", title: "A park to judge", phases: [{ id: "1", owner: "dev" }, { id: "2", owner: "human" }, { id: "3", owner: "human" }], rows });
+    return repo;
+  };
+  const state = parkedState("human_phase");
+  Object.assign(state.plans["0301"].park, { phases: ["2", "3"], detail: "Phases 2-3 are owned by human" });
+  const partly = plan({ 1: { state: "done" }, 2: { state: "done" }, 3: { state: "not started" } });
+  assert.equal(settledPark(state.plans["0301"], partly), null);
+  assert.match(renderDigest(state, { repo: partly, stateDir: tmp(), now: NOW }), /^1 park\.$/m);
+  const all = plan({ 1: { state: "done" }, 2: { state: "done" }, 3: { state: "done" } });
+  assert.equal(settledPark(state.plans["0301"], all), "Phases 2 `done`, 3 `done` in the plan's `## Implementation log`");
+  assert.match(renderDigest(state, { repo: all, stateDir: tmp(), now: NOW }), /^1 already settled\.$/m);
+});
+
 test("a gate_red park whose plan is under done/ is a record to clear", () => {
   const repo = repoWithPlan({ status: "done (2026-09-15)", rows: { 1: { state: "done" }, 2: { state: "done" } }, done: true });
   const text = renderDigest(parkedState("gate_red"), { repo, stateDir: tmp(), now: NOW });

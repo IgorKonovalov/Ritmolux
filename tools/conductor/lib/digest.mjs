@@ -24,7 +24,7 @@ import { join, relative } from "node:path";
 
 import { isAncestor, resolveCommit, tagObjectType } from "./git.mjs";
 import { dirtyText, resumeCommand } from "./inbox.mjs";
-import { laneOpen } from "./lane.mjs";
+import { laneOpen, openParkPhases, parkPhases } from "./lane.mjs";
 import { readLedger } from "./ledger.mjs";
 import { usageReading } from "./live.mjs";
 import { CLAUDE_DIR } from "./outcome.mjs";
@@ -178,9 +178,9 @@ function closedFindings(rec) {
  *
  * - the plan is under `docs/plans/done/` **in the main checkout** with `Status: done` — a close that
  *   landed outside the conductor, which never touches state/conductor.json;
- * - a park on a phase only the owner can do (`human_phase`, `claude_dir`) sits on a phase the plan's
- *   own `## Implementation log` now marks done, or owed on a phase marked `Blocks merge: no`
- *   (`settledPhase`, the same reader `parkStillTrue` asks). That row is read in the lane when the
+ * - a park on phases only the owner can do (`human_phase`, `claude_dir`) sits on phases the plan's
+ *   own `## Implementation log` now marks done, or owed on a phase marked `Blocks merge: no` —
+ *   every phase of the run it recorded (`openParkPhases`, the same reader `parkStillTrue` asks). That row is read in the lane when the
  *   worktree is still there and in the main checkout otherwise, so a lane removed by hand is not a
  *   missing plan.
  *
@@ -198,9 +198,13 @@ export function settledPark(rec, repo) {
   if ((reason !== "human_phase" && reason !== CLAUDE_DIR) || !phase) return null;
   const where = rec.worktree && existsSync(rec.worktree) ? rec.worktree : repo;
   const found = findPlan(where, rec.plan);
-  const how = found ? settledPhase(readPlanFile(found.path), phase) : null;
-  if (!how) return null;
-  return `Phase ${phase} now reads \`${how}\` in the plan's \`## Implementation log\``;
+  if (!found) return null;
+  const plan = readPlanFile(found.path);
+  // A run of phases settles only when every one of them has (openParkPhases, shared with resume).
+  if (openParkPhases(plan, rec.park).length) return null;
+  const ids = parkPhases(rec.park);
+  if (ids.length === 1) return `Phase ${phase} now reads \`${settledPhase(plan, phase)}\` in the plan's \`## Implementation log\``;
+  return `Phases ${ids.map((id) => `${id} \`${settledPhase(plan, id)}\``).join(", ")} in the plan's \`## Implementation log\``;
 }
 
 /**

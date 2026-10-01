@@ -169,8 +169,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The close's suite is served | dev | committed with this row | |
-| 2 — A run of human phases parks once | dev | not started | |
+| 1 — The close's suite is served | dev | done | `c1a17bf7` |
+| 2 — A run of human phases parks once | dev | committed with this row | |
 | 3 — A false repair claim reopens its finding | dev | not started | |
 | 4 — A diagnosed flake retries by name, and says so | dev | not started | |
 

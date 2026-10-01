@@ -221,7 +221,7 @@ plan about to start `cli_contract` and pauses the run.
 ## Acting on a park
 
 **Five reasons resume themselves** inside a live run, once the tree shows them settled (ADR-0250):
-`human_phase` and `claude_dir` once the phase's log row reads `done`, or `owed` on a human phase
+`human_phase` and `claude_dir` once every phase they parked on reads `done` in the log, or `owed` on a human phase
 marked `Blocks merge: no` (in the lane, or on `main` when the lane is gone), `usage_limit` once the reset it recorded has passed, `main_dirty` once the main
 checkout is on `main` and clean, and `studio_install` an hour after it failed, three times at most.
 **None of them resumes over a dirty worktree.** Each self-resume prints a line and writes an inbox
@@ -229,7 +229,7 @@ entry. Every other reason is yours: `resume` it once you have acted.
 
 | Reason | What to do before `resume` |
 |---|---|
-| `human_phase` | Do the phase. Mark its row `done` in the plan's `## Implementation log` **in the lane** (`WORK/rlx-plan-NNNN`) and commit it there. `resume` checks the row, and a live run resumes it by itself. A phase marked `Blocks merge: no` settles with an `owed` row and does not need `done`; the conductor writes that row itself when it reaches the phase, so only a park from before the marker was added needs it written by hand: see below. |
+| `human_phase` | Do the phase. Mark its row `done` in the plan's `## Implementation log` **in the lane** (`WORK/rlx-plan-NNNN`) and commit it there. A run of consecutive human phases parks **once**, naming them all (`Phases 4-6 are owned by human`), and holds until **every** row in it is marked: `resume` names the ones still open (ADR-0261). `resume` checks the rows, and a live run resumes it by itself. A phase marked `Blocks merge: no` settles with an `owed` row and does not need `done`; the conductor writes that row itself when it reaches the phase, so only a park from before the marker was added needs it written by hand: see below. |
 | `claude_dir` | The same, and for the same reason: the phase declares a file under `.claude/`, which the CLI will not let a session write (ADR-0210). **Nothing was run** — the park comes before the phase. The detail names the paths. Do the phase in the lane, mark its row `done`, commit; `resume` checks the row. Or amend the plan so the phase no longer declares a `.claude/` path, merge that into the lane, and `resume`: the park settles once the phase names no such file. |
 | `studio_install` | The plan declares files under `studio/` and `npm --prefix studio ci` failed, so the gate's three studio checks could not run (ADR-0218). The detail carries the install's tail; the usual cause is no network. **Nothing was run** — the park comes before the first session. Install by hand in the lane, or wait and `resume`, which installs again: the trigger is a missing `studio/node_modules`, so the open lane the park left behind is installed into rather than skipped. |
 | `stop_condition`, `plan_wrong`, `question` | Read the transcript the inbox names. Settle it in a human-started `/architect` session. A `plan_wrong` from the readiness check names the phase and the contradiction, and nothing was implemented: edit the plan, or resume to overrule it. |
