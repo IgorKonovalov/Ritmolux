@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0236** (ADRs are a separate sequence — next free there is **0258**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0241** (ADRs are a separate sequence — next free there is **0261**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -48,6 +48,11 @@ place. The plan file carries the real link.
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0232](0232-the-library-is-walked-cut-and-refilled.md) | The library is walked, cut and refilled | approved | human, dev | ADR-0253 (proposed): report, owner's walk, cull without replacement down to a two-per-family floor, retunes, gap brief, refill. Takes backlog 0256 step 2 and the six content-brief sittings. |
 | [0235](0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md) | The plexus system, and a shared camera with depth of field | approved | dev, human | ADR-0257 (proposed): a 3D proximity-graph system; one camera and per-endpoint depth of field shared by lines, quads, attractor. 2D goldens unchanged. |
+| [0236](0236-space-curves-and-the-camera-becomes-a-shared-block.md) | Space curves, and the camera becomes a shared block | draft | dev, human | ADR-0258 (proposed). Runs after 0235 closes. Its Phase 1 extracts the camera block that 0237-0240 splice, and its Phase 4 measures `seg3d_segments`. |
+| [0237](0237-the-l-system-turtle-turns-in-space.md) | The L-system turtle turns in space | draft | dev, human | ADR-0258. After 0236. `turtle = "space"` opt-in; the six shipped L-system presets keep their bytes. |
+| [0238](0238-the-waterfall-system.md) | The waterfall system | draft | dev, human | ADR-0258, ADR-0180 rule 1: a new `SystemKind`, spectrum history as a receding landscape. After 0236. |
+| [0239](0239-the-swarm-moves-into-a-real-camera.md) | The swarm moves into a real camera | draft | dev, human | ADR-0259 (proposed) supersedes 0044's depth model. After 0236. Every swarm preset changes look; Phase 6 (owner's judgement) blocks the merge. |
+| [0240](0240-the-attractor-projects-through-the-shared-camera.md) | The attractor projects through the shared camera | draft | dev, human | ADR-0260 (proposed): `perspective` retires, presets migrate by exact mapping, re-curation owed after merge. After 0236. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
