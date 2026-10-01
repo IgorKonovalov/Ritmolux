@@ -95,8 +95,22 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The sd-filter suite takes a current `shot` or skips | dev | done | committed with this row |
+| 1 — The sd-filter suite takes a current `shot` or skips | dev | done | 6526f9f8 |
 
 ### Notes
 
+- **Real tree:** the lane has no built `shot`, so the stale notice was observed against an empty
+  placeholder at `target/debug/examples/shot` backdated to 2026-01-01 (removed after), not a real
+  build. It printed `SKIPPED: stale shot at target/debug/examples/shot (built before 51c7d433
+  touched core/ standalone/ Cargo.toml Cargo.lock)` and the debug rebuild command.
+- **numpy absent on this machine:** the colour-table group skipped in every run here.
+
 ### Close triggers
+
+- **`presets/` touched:** no.
+- **Closes:** the plan header names no design-backlog entry.
+- **Shipped:** fix-only, in a test script; nothing that builds into an artifact.
+- **Operator docs moved:** `docs/developing.md` (pre-push table row), `tools/sd-filter/README.md`.
+- **Backlog claims:** `node scripts/check-backlog-claims.mjs` exit 0, no entry named.
+- **`human` phases remaining:** none.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
