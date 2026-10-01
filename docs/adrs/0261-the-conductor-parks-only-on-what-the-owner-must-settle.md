@@ -1,8 +1,8 @@
 # ADR-0261 — The conductor parks only on what the owner must settle: a human run parks once, a false repair claim reopens its finding, the close's suite is served, and a diagnosed flake retries by name
 
-> **Status:** proposed 2026-10-01
+> **Status:** accepted 2026-10-01 (Plan 0241 closed)
 > **Date:** 2026-10-01
-> **Related plan(s):** [0241](../plans/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md)
+> **Related plan(s):** [0241](../plans/done/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md)
 > **Amends:** [0207](0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md) (which runs a ledger may
 > serve), [0209](0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) (what a false `fixed_in` costs),
 > [0248](0248-the-pipeline-repairs-before-it-parks.md) (the park triggers)

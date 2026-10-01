@@ -1,9 +1,9 @@
 # 0241 — The conductor parks only on what the owner must settle
 
-> **Status:** in-progress (2026-10-01).
+> **Status:** done (2026-10-01; run by hand on `main`, not queued for the conductor. Phases 1-4 landed c1a17bf7..a5a52e4a. Mode 4 close review: no blockers, no majors, three minors (two repaired at the close in 2378cad8, one accepted as recorded), one nit (repaired). Full suite and `cargo doc` re-run green at d0e25876)
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0261](../adrs/0261-the-conductor-parks-only-on-what-the-owner-must-settle.md) (proposed), [ADR-0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md), [ADR-0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md), [ADR-0248](../adrs/0248-the-pipeline-repairs-before-it-parks.md), [ADR-0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)
+> **Related ADRs:** [ADR-0261](../../adrs/0261-the-conductor-parks-only-on-what-the-owner-must-settle.md) (accepted), [ADR-0207](../../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md), [ADR-0209](../../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md), [ADR-0248](../../adrs/0248-the-pipeline-repairs-before-it-parks.md), [ADR-0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)
 
 ## TL;DR
 
@@ -209,3 +209,39 @@ flowchart LR
 - **`human` phases remaining:** none; the plan has none.
 - **Full suite:** `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace` at
   `a5a52e4a`, exit 0, `1946 tests run: 1946 passed (15 slow), 8 skipped`, no flaky pass.
+
+## Close review
+
+Mode 4, run by hand in a fresh session on 2026-10-01 against `d0e25876`. **Verdict: no blockers, no
+majors, three minors, one nit.**
+
+**Evidence.** `cargo nextest run --workspace` at `d0e25876`: `1946 tests run: 1946 passed (11 slow),
+8 skipped`, exit 0, no flaky pass. `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` exit
+0. `node --test tools/conductor/test/*.test.mjs`: 494 pass, 2 skipped. The suite ledger carries the
+log's own green full record for `a5a52e4a`'s tree. `check-doc-links`, `check-backlog-claims` (exit 0),
+`check-index-rows` and `toc --check` green; upstream CI read green.
+
+**Lens 1.** Each phase is one commit, each done-when has a test whose assertions state it: served and
+not-served through the wrapper with a fake runner, skip-after-serving green and not after red,
+no-chaining, the human run parking once and holding while partly settled, the reopened `fixed_in` for
+a missing sha and for a wrong file, and the recorded flaky and retried-red fixtures.
+`servingRecord`'s filter was read, not only its tests: it still admits full green records only, so the
+invariant the Risks section asked a reviewer to read holds. `git grep -c retries -- .config/nextest.toml`
+is 1, and the one name has a live backlog entry (0219). Lenses 2, 4 and 5 have no subject: no Rust, C
+ABI or control-protocol surface moved.
+
+**Findings.**
+
+- minor - `tools/conductor/suite-record.mjs:13` and `.githooks/pre-push:416` still said a `-P fast`
+  record never answers the hook. Since Phase 1 a green served line on its own tree does, which is
+  sound (it is the hook's own tier on the exact tree). Repaired in `2378cad8`.
+- minor - `tools/conductor/lib/gate.mjs:9` said the gate never retries a red, without naming nextest's
+  by-name retry Phase 4 added. Repaired in `2378cad8`.
+- minor - Phase 4's done-when put the flaky names "next to its gate results"; they print on the history
+  page only (under Closed, or Failed and parked), not the current-state page. The log records it, and
+  the history page is where gate reds are listed. Accepted as recorded, not repaired.
+- nit - `tools/conductor/lib/ledger.mjs:22` was an over-long comment line. Repaired in `2378cad8`.
+
+**Close notes.** `presets/` untouched, so no curation. No `Closes:` entry. ADR-0261 accepted. Version:
+minor (the conductor's park, close and ledger behaviour, and the pre-push hook's skip, all change).
+Translation advisory: five `.ru.md` rows stale, none moved by this plan.

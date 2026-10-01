@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0241 - The conductor parks only on what the owner must settle](#0241---the-conductor-parks-only-on-what-the-owner-must-settle)
   - [0235 - The plexus system, and a shared camera with depth of field](#0235---the-plexus-system-and-a-shared-camera-with-depth-of-field)
   - [0230 - The Russian slice becomes findable](#0230---the-russian-slice-becomes-findable)
   - [0231 - The interface is audited, then learns one look](#0231---the-interface-is-audited-then-learns-one-look)
@@ -273,6 +274,21 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0241 - The conductor parks only on what the owner must settle](done/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md)
+
+- closed 2026-10-01, run by hand on `main` (no lane). Phases 1-4 landed: `c1a17bf7`, `7991c87e`,
+`3171cf30`, `a5a52e4a`. Mode 4 review: **no blockers, no majors, three minors (two repaired at the
+close in `2378cad8`, one accepted as recorded), one nit (repaired).** Version: **0.157.0** (minor: the
+conductor's and the pre-push hook's behaviour change). ADR-0261 accepted. Closes no backlog entry.
+Upstream CI read green at the close. The full review is the plan's own `## Close review` section.
+- **What landed.** A session's wrapped full suite is served `-P fast` the way the gate is, and a green
+  served line skips its own tree only; a run of human phases parks once and settles when every phase
+  does; a false `fixed_in` reopens its finding into the digest's Needs you instead of parking; one
+  diagnosed flake (backlog 0219's `a_preset_datagram_selects_by_name`) retries by exact name, and the
+  ledger and history digest name the flaky pass.
+- **Open.** The flaky names print on the history page only, not the current-state page. Backlog 0219
+  stays live and does not yet record the retry; when it closes, its test leaves `.config/nextest.toml`.
 
 ### [0235 - The plexus system, and a shared camera with depth of field](done/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md)
 
