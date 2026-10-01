@@ -355,7 +355,7 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 | 6 — Tier caps, golden, determinism | dev | done | 0c23e166 |
 | 7 — Documentation and the references | dev | done | 2ad353bc |
 | 8 — The look, judged | human | not started | |
-| 9 — The blur cap is a ceiling; the first set joins the gates | dev | committed with this row | |
+| 9 — The blur cap is a ceiling; the first set joins the gates | dev | done | 695b41cb |
 
 ### Notes
 
