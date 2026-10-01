@@ -365,6 +365,13 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 - Close-review fix, major 2 (the energy test passed on a two-reading dip): the summed light is now
   held to a ratio, a relative spread under a tenth of the peak's relative fall over the blurred
   sweep. Reads 0.0070 against 0.6013 on llvmpipe. Commit 7cdf291e.
+- Close-review fix round 2, major (the attractor's blur was in trail-grid pixels): the draw
+  uniform's `em.w` now carries the render target's height from `set_target_size`, not `trail_h`.
+  The new test sets grid scale 1.0 and 0.5 on one target and reads the scene's stored height
+  through the CPU mirror. It does not read the packed uniform back. Commit 75c80fee.
+- Close-review fix round 2, minor: the pairing comment in `plexus/sim.rs` states 180k checks at
+  Floor and 1.1M at Rich, and says only Floor is measured. Rich's cost is still unmeasured.
+  Commit 1222b4b6.
 
 ### Close triggers
 
@@ -384,6 +391,7 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
   at max outlier 0).
   After the two close-review fixes, at 7cdf291e: exit 0, 1938 passed, 8 skipped; `cargo doc
   --workspace --no-deps` under `-D warnings` clean.
+  After fix round 2, at 1222b4b6: exit 0, 1939 passed, 8 skipped; `cargo doc` clean.
 - **Outstanding `human` phases:** Phase 8 (the look, judged against the reference),
   `Blocks merge: no`.
 
