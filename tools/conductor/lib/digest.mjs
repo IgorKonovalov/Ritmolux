@@ -341,7 +341,7 @@ function standingParkLines(view, rec) {
 /** The current page's first section: everything waiting on the owner, and nothing else. */
 function needsYou(view) {
   const lines = [];
-  const counts = { parked: 0, stops: 0, findings: 0, lanes: 0, owed: 0, repairs: 0, upstream: 0 };
+  const counts = { parked: 0, advisories: 0, stops: 0, findings: 0, lanes: 0, owed: 0, repairs: 0, upstream: 0 };
   // The run carries its own CLI reading, so the line stops appearing on the first run whose version is listed.
   if (view.cli?.warning) {
     lines.push(`- **claude ${view.cli.version} is not a verified CLI version** - the last run went ahead with a warning (ADR-0208): ${view.cli.warning}.`);
@@ -360,6 +360,15 @@ function needsYou(view) {
   for (const rec of view.parked) {
     counts.parked += 1;
     lines.push(...standingParkLines(view, rec));
+  }
+  // What the readiness check noted beside its `ready`, carried until the plan merges. None of it
+  // parked anything or changed a step; it is here because only the owner can act on it.
+  for (const rec of view.plans) {
+    const advisories = rec.status === "merged" ? [] : (rec.readiness?.advisories ?? []);
+    if (advisories.length === 0) continue;
+    counts.advisories += 1;
+    lines.push(`- **${rec.plan} readiness ${advisories.length === 1 ? "advisory" : "advisories"}**, never a park: amend the plan or let ${advisories.length === 1 ? "it" : "them"} stand.`);
+    for (const a of advisories) lines.push(`  - ${a}`);
   }
   for (const o of view.owed) {
     counts.owed += 1;
@@ -417,6 +426,7 @@ function needsYou(view) {
   if (counts.upstream) parts.push("origin/main red");
   if (counts.parked) parts.push(plural(counts.parked, "park"));
   if (view.settled.length) parts.push(`${view.settled.length} already settled`);
+  if (counts.advisories) parts.push(`${plural(counts.advisories, "plan")} with readiness advisories`);
   if (counts.owed) parts.push(`${plural(counts.owed, "owed phase")}`);
   if (counts.repairs) parts.push(`${plural(counts.repairs, "unreviewed repair")}`);
   if (counts.stops) parts.push(`${plural(counts.stops, "lane")} stopped at the worktree cap`);

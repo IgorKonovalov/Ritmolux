@@ -217,6 +217,10 @@ function validate(o) {
       if (typeof o.detail !== "string" || !o.detail) return "parked.detail missing";
       return null;
     case "ready":
+      // Advisories never park: they are one-line notes the owner reads, carried beside the verdict.
+      if (o.advisories !== undefined && !(Array.isArray(o.advisories) && o.advisories.every((a) => typeof a === "string" && a.trim() && !a.includes("\n")))) {
+        return "ready.advisories is not a list of one-line strings";
+      }
       return null;
     case "repaired":
       if (!isShaList(o.commits) || o.commits.length === 0) return "repaired.commits is not a list of SHAs";

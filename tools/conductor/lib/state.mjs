@@ -27,7 +27,48 @@ export function statePaths(stateDir) {
     lockLog: join(stateDir, "locks.jsonl"),
     pause: join(stateDir, "pause.json"),
     resumeAsks: join(stateDir, "resume-asks.jsonl"),
+    readiness: join(stateDir, "readiness.jsonl"),
+    // The scratch record `conductor readiness NNNN` runs its session against: its own conductor.json,
+    // transcripts and prompts, so the command never writes the record a live run owns.
+    readinessScratch: join(stateDir, "readiness"),
   };
+}
+
+/**
+ * Appends one approval-time readiness verdict (`conductor readiness NNNN`) to state/readiness.jsonl:
+ * { plan, hash, verdict, detail, at }. Append-only, and its own file rather than a field of
+ * conductor.json, because it is written by a process that is not the run that owns that record.
+ */
+export function appendReadiness(stateDir, record) {
+  const { readiness } = statePaths(stateDir);
+  mkdirSync(dirname(readiness), { recursive: true });
+  appendFileSync(readiness, JSON.stringify(record) + "\n");
+}
+
+/** Every readiness record for `plan`, oldest first; a line that does not parse is skipped. */
+export function readinessRecords(stateDir, plan) {
+  const { readiness } = statePaths(stateDir);
+  if (!existsSync(readiness)) return [];
+  return readFileSync(readiness, "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => {
+      try {
+        return JSON.parse(l);
+      } catch {
+        return null;
+      }
+    })
+    .filter((r) => r && r.plan === plan);
+}
+
+/**
+ * The newest readiness record for `plan` whose contract hash is `hash`, or null. Only a `ready`
+ * verdict lets a lane skip its own readiness session; the caller decides that, since a newer
+ * `plan_wrong` on the same text is the answer that stands.
+ */
+export function readinessFor(stateDir, plan, hash) {
+  return readinessRecords(stateDir, plan).filter((r) => r.hash === hash).at(-1) ?? null;
 }
 
 /**

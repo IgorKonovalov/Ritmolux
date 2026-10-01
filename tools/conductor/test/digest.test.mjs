@@ -722,3 +722,26 @@ test("a red origin/main reading is one Needs you line that an unread reading kee
   assert.equal(needs(state({ "0201": merged("0201", red), "0202": merged("0202", unread) })).length, 2, "an unread reading does not clear it");
   assert.deepEqual(needs(state({ "0201": merged("0201", red), "0202": merged("0202", unread), "0203": merged("0203", green) })), []);
 });
+
+// Plan 0242 Phase 2: a readiness advisory is shown under its plan until the plan merges, and nowhere parks.
+test("a readiness advisory is listed under its plan in Needs you until the plan merges", () => {
+  const advisory = "Phase 3 (human) has no Blocks merge: no, and no later phase reads its output";
+  const rec = (status) => ({
+    plan: "0242", status, lane: "a", worktree: null, branch: "plan-0242-x", steps: [], park: null, parks: [], fixRounds: 0,
+    verdicts: [], fixes: [], gates: [], lockWaits: [], readiness: { hash: "a".repeat(40), at: "2026-09-15T10:00:00.000Z", advisories: [advisory] },
+    ...(status === "merged" ? { merge: { head: "0".repeat(40), remerged: false, at: "2026-09-15T11:00:00.000Z" } } : {}),
+  });
+  const state = (r) => ({ version: 1, runs: [{ started: "2026-09-15T09:00:00.000Z", ended: "2026-09-15T12:00:00.000Z", lanes: ["a"] }], lanes: {}, plans: { "0242": r } });
+  const page = (r) => renderDigest(state(r), { repo: tmp(), stateDir: tmp(), now: NOW });
+
+  const queued = page(rec("queued"));
+  assert.match(queued, /^1 plan with readiness advisories\.$/m);
+  const lines = queued.split("\n");
+  const at = lines.indexOf("- **0242 readiness advisory**, never a park: amend the plan or let it stand.");
+  assert.ok(at >= 0, queued);
+  assert.equal(lines[at + 1], `  - ${advisory}`);
+
+  const merged = page(rec("merged"));
+  assert.ok(!merged.includes(advisory), merged);
+  assert.match(merged, /^Nothing: no park, no lane stopped at the worktree cap, no open finding\.$/m);
+});
