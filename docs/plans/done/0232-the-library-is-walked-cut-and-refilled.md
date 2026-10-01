@@ -1,18 +1,20 @@
 # 0232 — The library is walked, cut and refilled
 
-> **Status:** in-progress
+> **Status:** done - Phase 7 owed, ADR-0249. Closed 2026-10-01 by a conductor close (round 1:
+> no blockers, no majors, three minors, two nits). Phases 1-6 landed (see the log); 35 presets
+> retired, four added; ADR-0253 accepted; backlog 0038 archived. Version 0.158.0.
 > **Created:** 2026-09-27
 > **Approved:** 2026-09-27 (user)
 > **Owner skill(s):** human (the `preset-author` lane and the owner), dev
-> **Related ADRs:** [0253](../adrs/0253-a-retirement-may-land-ahead-of-its-replacement-when-a-walk-convicts-it.md)
-> (proposed), [0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md),
-> [0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md),
-> [0227](../adrs/0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md),
-> [0228](../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)
+> **Related ADRs:** [0253](../../adrs/0253-a-retirement-may-land-ahead-of-its-replacement-when-a-walk-convicts-it.md)
+> (accepted), [0089](../../adrs/0089-the-library-renews-by-replacement-cohorts.md),
+> [0081](../../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md),
+> [0227](../../adrs/0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md),
+> [0228](../../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)
 > **Takes:** step 2 of design-backlog 0256 (the quality half). It does not close the entry:
 > Phase 7 decides whether step 3 is owed. Takes the six standing sittings in
-> [`docs/content-brief.md`](../content-brief.md).
-> **Sequenced with:** [Plan 0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md)
+> [`docs/content-brief.md`](../../content-brief.md).
+> **Sequenced with:** [Plan 0204](../0204-the-library-learns-from-the-corpus-it-will-not-ship.md)
 > (see Decision).
 
 ## TL;DR
@@ -638,6 +640,185 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
   24 live entries (4 unprobeable).
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
 - **Outstanding `human` phases:** 7 (`Blocks merge: no`).
+
+## Close review
+
+Round 1 of the conductor's review, graded clean at `e1b608dc`, is reproduced in full below. No
+earlier round raised a finding, so there is no fix-round line to add.
+
+**Phase 7 is owed (ADR-0249).** Nothing has yet answered backlog 0256 step 3: whether "ship less,
+better" needs a mechanism, a periodic walk at a stated cadence, or neither. The owner's second
+walk of the refill cohort and of the families that lost the most is also still to happen. Until the
+owner writes that verdict under `## The ledger`, backlog 0256 stays live, and the "Open" question in
+Risks (whether a family at its floor of two should ship) stays open.
+
+**What the close did with the findings.** M1, N1 and N2 were repaired in `0cde6dbe`. N2 took the
+second of its two routes: both comments now name the retired preset by display name. M2
+(`preset_check.rs`'s frozen `checked >= 50`) is test logic, so it stays open for `dev`. M3 is under
+`.claude/`, so it stays open for the owner to apply. The review carries its replacement text.
+
+**Close notes.**
+
+- **Curation (step 3b).** The set lands at 90 presets: 116 at Phase 1, less 35 retired, plus the
+  five `plexus` presets from `main` and Phase 6's four. The four new presets earn their place
+  against the gap table's rows 5-7, and the full suite's distinctness gate passed with them in. No
+  engine defect was fixed, so the sweep for stale workarounds has no trigger.
+- **Release notes.** Version 0.158.0 should list what was retired (plan Risks, ADR-0253):
+  `analytic_searchlight`, `attractor_cliffordgallery`, `attractor_dejonggallery`,
+  `attractor_fern`, `attractor_lorenzgallery`, `attractor_thomas`, `attractor_torusknot`,
+  `attractor_valentine`, `attractor_volute`, `attractor_walkknot`, `attractor_walkrho`,
+  `collage_nocturne`, `curve_loom`, `curve_nightbloom`, `emitter_emberjet`, `emitter_perseids`,
+  `emitter_petalfall`, `fragment_tiled`, `lsystem_bower`, `lsystem_coral`, `lsystem_vellum`,
+  `reaction_etching`, `shape_facet`, `shape_heartmono`, `shape_lion`, `shape_pulse`,
+  `spectrum_ridge`, `star_mandala_bordered`, `star_zellij`, `swarm_drift`, `swarm_shatter`,
+  `swarm_stipple`, `warp_cauldron`, `warp_millrace`, `warp_wellhead`. A favourite or hidden mark
+  on any of them stays in `marks.toml` and does nothing (ADR-0228).
+- **Backlog.** 0038 moved to the archive as closed, since content-brief §4 was answered by the walk.
+  0256 and 0248 stay live. 0248 should take the four `fill` readings as evidence (Followups).
+- **Upstream CI** read green at the close: run 36855310731 on `main` at `d8b79ce`.
+- **Translation advisory:** `how-it-works.ru.md`, `running.ru.md` and the foobar
+  `READ-ME-FIRST.ru.md` are behind their sources. This plan moved none of those sources.
+
+### Round 1 review, verbatim
+
+Graded at `e1b608dc7ae5713ab441c9df17bb6a8a01ef6b7c` on the lane
+`plan-0232-the-library-is-walked-cut-and-refilled` (`/home/igor/Work/rlx-plan-0232`), which already
+carries `main` (`604e306d`).
+
+**Verdict: Plan 0232 landed as written. No blockers and no majors; three minors and two nits.**
+Phases 1 to 6 are done and Phase 7 is correctly `owed` (`Blocks merge: no`, ADR-0249).
+
+#### Evidence
+
+- **Full suite.** `node .../with-lock.mjs suite -- cargo nextest run --workspace` did not re-run.
+  It printed this ledger record:
+  `with-lock: skipped cargo nextest run --workspace: tree 89ea149 is green in the suite ledger, run by gate 0232-pre-review at 2026-10-01T14:26:01.819Z: 1934 tests run: 1934 passed (8 slow), 8 skipped`.
+  That record is lens 1's full-suite evidence. It agrees with the log's Phase 6 note (1934 passed,
+  8 skipped).
+- **rustdoc.** `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` is clean.
+- **Node gates, run this session, all exit 0:** `check-doc-links`, `check-comment-hygiene`,
+  `toc --check`, `check-system-counts`, `check-reader-prose`, `check-claude-declarations` and
+  `check-backlog-claims` (58 reductions across 29 live entries, 4 unprobeable).
+- **Goldens.** `git diff --name-only main...HEAD` over `core/tests/fixtures` and the golden
+  directories shows only `core/tests/fixtures/README.md`, a prose edit. No baseline moved
+  (Phase 3's done-when).
+
+#### Lens 1: alignment
+
+- **Owner tags.** Each of the seven phases carries exactly one tag from the vocabulary. Only
+  Phase 7, a `human` phase, carries `Blocks merge: no`, and no later phase reads it.
+- **Phase 1 and Phase 2.** The ledger has 116 rows, and each row has a verdict. Each cut has a
+  reason, and each cut that is named in code also names its survivor. Backlog 0248's four presets
+  carry `fill` readings. Each of the six sittings has an answer.
+- **Phase 3.** There is one commit per family, as the log lists them. I ran the done-when grep
+  for all 35 cut stems: `git grep -n -w` with every stem, excluding `docs/plans/**`,
+  `docs/adrs/**`, `docs/design-backlog*.md`, `presets/proposed/ROSTER.md` and
+  `scripts/bench/results/**`. It hits three lines:
+  - `.claude/skills/architect/SKILL.md:650`, the step 3b historical example. It is a record, and it
+    stays.
+  - `core/tests/suite/geometry_extent.rs:451` and `presets/swarm_braid.toml:72`. Both are dated
+    measurement records, which is the done-when's intent, but neither path is on its list. See
+    nit N2.
+
+  Re-pointed tests were read. `Thomas` became `Thomas Gallery`, `Etching` became `Lichen`, and
+  `Drift` became `Braid`. The log discloses each one, and none weakens an assertion.
+- **Moved guards.** I checked the arithmetic. Each coverage floor in `core/tests/sanity.rs` is half
+  the new family minimum: FragmentField 0.4274/2 gives 0.21, Swarm 0.7403/2 gives 0.37, and
+  ShapeCollage 0.0556/2 gives 0.027. Each comment names the preset it was derived from.
+  `preset_schema.rs`'s two walks are now bounded by `EMBEDDED.len()`, which is a property.
+  `preset_check.rs` is bounded by a frozen `50` instead (minor M2).
+- **Phase 4.** Each `retune` row names its landing commit, except Lace Grid, which reads
+  `abandoned: <reason>`. `docs/content-brief.md` has no item above `## Done`. The log's list of
+  skill-reference replacements was applied: the lane's diff touches `SKILL.md`, `craft.md`,
+  `grammar.md` and `systems.md`, and no cut stem is left in `.claude/skills/preset-author/`.
+- **Phase 5.** `## Gaps` has seven rows, each routed `0204` or `native`. The one gap no system can
+  express is backlog 0274, as ADR-0017 requires.
+- **Phase 6.** Four keeps: `star_interlace`, `star_redpaper`, `shape_target` and
+  `lsystem_thicket`. That is four presets on three systems, inside the phase's "four to six,
+  spanning at least two systems". Each has a `CARDS` entry and a gallery PNG. The suite is green,
+  which includes the distinctness gate, so no new near-duplicate flag was raised. `ROSTER.md`
+  records the binned drafts, and its table is empty.
+- **The log** is shorter than the phases section. It is accurate, except for the close-triggers
+  block (minor M1).
+
+#### Lens 2 and lens 5: layering, real-time safety, seams
+
+These do not apply. The lane changes presets, tests, comments and docs, and no engine code:
+under `core/src` only comments and `#[cfg(test)]` files moved. No C ABI, protocol or `Scene`
+change was made.
+
+#### Lens 3: docs and bookkeeping
+
+- Reader docs were swept. Cut display names remain only in history sentences marked "since
+  retired" and in dated sample outputs (`docs/capturing.md:877-878,986`). No reader doc writes a
+  library count.
+- **The close owes these:**
+  - flip ADR-0253 from `proposed` to `accepted`;
+  - archive backlog 0038, which `content-brief.md` §4 and the log both say wants archiving;
+  - set `Status: done - Phase 7 owed, ADR-0249`, with the owed phase named in the index bullet and
+    in `## Close review`;
+  - **a version bump.** Phase 6 added four presets, so this is a content and feature close, not
+    docs-only. The close-triggers bullet understates this (M1);
+  - the studio's two version copies;
+  - the release notes should list the 35 retirements (plan Risks).
+- **Followup for the owner (no finding):** backlog 0248 should take the four `fill` readings as
+  evidence, as the plan's Followups section says.
+
+#### Lens 4: correctness
+
+There are no new numeric assertions beyond the re-derived floors above, and each states its
+derivation. `shape_target`'s punch cap is a content choice, recorded in its header.
+
+#### Findings
+
+##### Minor
+
+- **M1. `docs/plans/0232-the-library-is-walked-cut-and-refilled.md:622`: the close-triggers block
+  is wrong in three places.**
+  - It says "earlier phases deleted 30 presets (116 -> 86)". Phase 3 cut 30 and Phase 4 retired 5
+    more (Loom, Vellum, Pulse, Drift and Clifford Gallery), so 35 were deleted. The count reaches
+    86 only because the main merge brought in five `plexus` presets.
+  - "What shipped" says "content removal plus test and documentation re-pointing ... No engine
+    behaviour changed". It omits the four new presets Phase 6 added, and the close picks the
+    version level from that bullet.
+  - "Operator docs touched" omits `docs/presets.md` and the regenerated family gallery images and
+    `hero.png`.
+
+  Fix: state 35 deleted (30 at Phase 3, 5 at Phase 4) and 4 added, plus 5 `plexus` from `main`.
+  Name the Phase 6 additions under "What shipped", and complete the docs list. This is Markdown
+  prose, so the close may repair it.
+- **M2. `standalone/tests/suite/preset_check.rs:437`: the corpus-walk floor is a frozen
+  `checked >= 50`.** The sibling guards in `core/tests/suite/preset_schema.rs` were rebounded to
+  `rlx_core::preset::EMBEDDED.len()`, which follows every curation. `50` is a second constant that
+  the next large cull, or a `pending/` and `proposed/` shrink, will have to move again. Fix: bound it
+  by `EMBEDDED.len()` as `preset_schema.rs` does. This is test logic, so it is a `dev` edit and the
+  close cannot repair it.
+- **M3. `.claude/skills/preset-author/references/systems.md:144`: the line is now false.** It says
+  "no shipped world is a composite since Zellij ... was retired", but Phase 6's `star_redpaper`
+  is one: an `octagon` tiling plus `rings`. `grammar.md:104-105` is incomplete in the same way.
+  `.claude/` is owner-applied (ADR-0210). Replacement text:
+  - **`systems.md:144-145`:** replace
+    `` Shipped: `star_corona` (rings only); no shipped world is a composite since Zellij (rings plus an
+    8-fold interlace) was retired. `` with
+    `` Shipped: `star_corona` (rings only); `star_rosewindow` and `star_interlace` (interlace only);
+    `star_redpaper` (rings plus an 8-fold interlace, tiled edge to edge by `kaleido_tile`). ``
+  - **`grammar.md:104-105`:** replace
+    `` Shipped examples: `star_corona` (rings only) and
+    `star_rosewindow` (interlace only). `` with
+    `` Shipped examples: `star_corona` (rings only), `star_rosewindow` (interlace only) and
+    `star_redpaper` (rings plus an interlace). ``
+
+##### Nit
+
+- **N1. `docs/plans/0232-the-library-is-walked-cut-and-refilled.md:431`: the opening count of
+  `## Gaps` is stale.** It reads "81 presets on 14 systems", which predates the `plexus` merge and
+  Phase 6. The log already says so at line 602. A one-clause dated note in the section would stop
+  a later reader, such as Plan 0204, taking it as current.
+- **N2. `core/tests/suite/geometry_extent.rs:451` and `presets/swarm_braid.toml:72` name cut stems
+  (`lsystem_vellum`, `swarm_drift`) outside the record paths Phase 3's done-when lists.** Both are
+  dated measurement comments that already say "since retired", which is what the done-when meant.
+  There are two ways to settle it: leave them and note it in `## Close review`, or reword them to
+  display names, as the other measurement comments are. Either is comment text a close may repair.
 
 ## Followups (after this lands)
 

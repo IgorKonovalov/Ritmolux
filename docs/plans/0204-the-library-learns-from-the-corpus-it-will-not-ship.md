@@ -9,7 +9,7 @@
 > [0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md),
 > [0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md),
 > [0017](../adrs/0017-preset-author-skill-lane.md)
-> **Sequenced with:** [Plan 0232](0232-the-library-is-walked-cut-and-refilled.md) (added 2026-09-27):
+> **Sequenced with:** [Plan 0232](done/0232-the-library-is-walked-cut-and-refilled.md) (added 2026-09-27):
 > Phases 1-2 may run any time; Phase 2's cohort is chosen against 0232's `## Gaps`, and Phase 3
 > lands after 0232 Phase 3's cull.
 

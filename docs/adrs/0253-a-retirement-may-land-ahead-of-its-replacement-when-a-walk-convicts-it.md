@@ -1,8 +1,8 @@
 # ADR-0253 — A retirement may land ahead of its replacement when a walk convicts it
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-01 (Plan 0232)
 > **Date:** 2026-09-27
-> **Related plan(s):** [0232](../plans/0232-the-library-is-walked-cut-and-refilled.md)
+> **Related plan(s):** [0232](../plans/done/0232-the-library-is-walked-cut-and-refilled.md)
 > **Amends:** [ADR-0089](0089-the-library-renews-by-replacement-cohorts.md) (Decision item 1)
 
 ## Context

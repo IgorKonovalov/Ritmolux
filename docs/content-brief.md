@@ -3,7 +3,7 @@
 > **Maintained by:** `architect`. **Read by:** `preset-author`.
 > **Last consolidated:** 2026-08-13, from five `human` phases spread across five closed plans.
 
-**Taken by [Plan 0232](plans/0232-the-library-is-walked-cut-and-refilled.md) (approved 2026-09-27):**
+**Taken by [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md) (approved 2026-09-27):**
 every item below is answered in its walk (Phase 2) or its retunes (Phase 4), and leaves for `Done` there.
 
 This is the **one** copy. [`docs/plans/README.md`](plans/README.md)'s `Standing` section points here
@@ -26,7 +26,7 @@ row moves to `Done` at the bottom with a date.
 
 - **2026-09-30 — 1. The sky family** ([Plan 0077](plans/done/0077-the-quiet-sky.md),
   [Plan 0080](plans/done/0080-the-sky-gets-a-horizon.md), [Plan 0081](plans/done/0081-the-sky-gets-a-galaxy.md)).
-  Retired by the [Plan 0232](plans/0232-the-library-is-walked-cut-and-refilled.md) walk:
+  Retired by the [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md) walk:
   Perseids, the sky it named, was cut, and no sky world is owed. Vitrail's stale "the report is
   bloom-blind" reason for its onset flash is replaced; the flash stays for its look.
 - **2026-09-30 — 2. The ink worlds re-judge on `ink_gamma`** ([Plan 0078](plans/done/0078-the-ink-learns-to-bite.md)).
@@ -44,7 +44,7 @@ row moves to `Done` at the bottom with a date.
   to the beat): a `palette_steps` stepping every second beat reads as a response, and every beat
   strobes. A beat-driven band count is available to `shape_field` worlds at half the beat rate.
   Strata Heart is the shipped `shape_field` world and guide card.
-- **2026-09-30 — 4. The `occlude` retune, with [backlog 0038](design-backlog.md)** ([Plan 0071](plans/done/0071-light-that-adds-without-covering.md)).
+- **2026-09-30 — 4. The `occlude` retune, with [backlog 0038](design-backlog-archive.md)** ([Plan 0071](plans/done/0071-light-that-adds-without-covering.md)).
   Closed by the owner as answered by the Plan 0232 walk: every preset in its population was judged
   in motion, with "too dim" a verdict in use, and the dim ones were brightened at the retune. An
   `occlude` binding stays open authoring for any world that wants one, not an owed pass.

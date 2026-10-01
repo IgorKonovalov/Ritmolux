@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0232 - The library is walked, cut and refilled](#0232---the-library-is-walked-cut-and-refilled)
   - [0241 - The conductor parks only on what the owner must settle](#0241---the-conductor-parks-only-on-what-the-owner-must-settle)
   - [0235 - The plexus system, and a shared camera with depth of field](#0235---the-plexus-system-and-a-shared-camera-with-depth-of-field)
   - [0230 - The Russian slice becomes findable](#0230---the-russian-slice-becomes-findable)
@@ -274,6 +275,24 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0232 - The library is walked, cut and refilled](done/0232-the-library-is-walked-cut-and-refilled.md)
+
+- closed 2026-10-01 by a conductor close on the lane `plan-0232-the-library-is-walked-cut-and-refilled`.
+Phases 1-6 landed (the plan's log maps each to its commits); **Phase 7, the owner's verdict on
+backlog 0256 step 3, is owed** (`Blocks merge: no`, ADR-0249). Round 1 review: **no blockers, no
+majors, three minors, two nits.** M1, N1 and N2 were repaired at the close in `0cde6dbe`. M2 (a
+frozen corpus-walk floor in `preset_check.rs`) stays open for `dev`, and M3 (two preset-author
+skill lines made false by `star_redpaper`) stays open for the owner, with replacement text. Version:
+**0.158.0** (minor: four presets added, 35 retired). ADR-0253 accepted. Backlog 0038 closed to the
+archive. Upstream CI read green at the close. The full review is the plan's own `## Close review`.
+- **What landed.** A 116-row ledger with a verdict on every row; 35 retirements (30 at the cull, 5
+  at the retunes) with no family below two presets and two representatives; retunes across every
+  family; the six content-brief sittings moved to `Done`; a seven-row gap table that hands Plan 0204
+  rows 1-4; and a refill cohort of four (Interlace, Red Paper, Target, Thicket) on three systems.
+- **Open.** Phase 7. Backlog 0256 and 0248 stay live; 0248 should take the four `fill` readings.
+  The release notes for 0.158.0 should list the 35 retired presets, which the plan's `## Close
+  review` names.
 
 ### [0241 - The conductor parks only on what the owner must settle](done/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md)
 

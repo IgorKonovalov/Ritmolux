@@ -311,6 +311,7 @@ accepted cost" are different documents and only one of them is honest.
 - [0271 — the studio's missing-player banner says to edit a settings file without saying where it is](#0271--the-studios-missing-player-banner-says-to-edit-a-settings-file-without-saying-where-it-is)
 - [0272 — `npm run dev` leaves Vite and the esbuild watchers running after the studio window closes](#0272--npm-run-dev-leaves-vite-and-the-esbuild-watchers-running-after-the-studio-window-closes)
 - [0273 — a headless session's `Write` can create a file outside its lane, and nothing bounds it](#0273--a-headless-sessions-write-can-create-a-file-outside-its-lane-and-nothing-bounds-it)
+- [0038 — mid-tone-dominated presets lost ~8 % luminance to the tonemap knee, and the library has not been retuned](#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned)
 <!-- toc:end -->
 
 ## The ledger
@@ -382,6 +383,7 @@ live entry citing this one.
 | 0035 | `presets/README.md` listed 10 expression variables; the code had 19 | Fixed at [Plan 0048](plans/done/0048-analysis-v2-and-the-retune.md)'s close |
 | 0036 | Does the fold stop folding the backdrop, and does that lose a look? | [ADR-0055](adrs/0055-backdrop-leaves-the-post-chain.md) |
 | 0037 | The fold covers a disc, and on a field scene that reads worse | [ADR-0061](adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md) + [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md) |
+| 0038 | Mid-tone presets lost ~8 % luminance to the tonemap knee, and the library was not retuned | [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md) Phase 4 (content-brief §4, answered by the walk). **Closed 2026-10-01** |
 | 0039 | Four bind-group layouts are shared by pipelines live in one frame | [ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md) + [Plan 0053](plans/done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) |
 | 0040 | Additive light occludes by geometry, so a dim figure over a lit backdrop reads as dark speckle | [ADR-0085](adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) + [Plan 0071](plans/done/0071-light-that-adds-without-covering.md). **Closed 2026-08-09**; see 0038 |
 | 0041 | The line seam's lit-backdrop guard discriminates on ~5 pixels | [Plan 0053](plans/done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) |
@@ -16538,3 +16540,94 @@ and [ADR-0255](adrs/0255-a-conductor-session-writes-inside-its-lane-and-the-os-t
 nothing bare; the `--writes` probe recorded the lane's parent and `$HOME` DENIED on 2.1.283, and
 `settings.test.mjs` reads those refusals from the table. The macOS and Windows temp-directory rows are
 owed beside 0267.
+
+## 0038 — mid-tone-dominated presets lost ~8 % luminance to the tonemap knee, and the library has not been retuned
+
+- **STILL OPEN 2026-08-13, and a document that says otherwise is wrong.**
+  [`docs/plans/README.md`](plans/README.md)'s Plan 0080 Phase 7 write-up states that *"the
+  **tonemap-knee** half of that pairing is now measured away."* **It is not.** What Plan 0080 Phase 7
+  retired is a *different* suspicion raised at its own close — that `bg_bright = 0.85` was reaching
+  the tonemap's shoulder on the **backdrop ramp** — settled by finding 0 % of the scanned column
+  rail-pinned on any channel in any of the three probes. That measurement is about a backdrop
+  gradient. **This entry is about mid-tone figure luminance on attractor presets**, measured as
+  `attractor_clifford` 82.54 → 75.91 mean luma, and no backdrop measurement speaks to it. The two
+  were conflated because both mention the tonemap.
+- **Verified 2026-08-29** at the Plan 0104 close — **the "lever is unused" half of this entry is
+  falsified, and the retune it asks for is not.** The reduction that now stands for this entry is
+  that its own measured subject is still untouched:
+  `absent: ^exposure in: presets/attractor_clifford.toml` — red the day someone retunes the
+  preset whose −8.0 % opened this entry, which is exactly when it should be re-read. This entry said twice (2026-08-13, 2026-08-15)
+  that exactly **one** shipped preset binds `exposure` (`lsystem_vellum.toml:60`). **Sixteen do**,
+  and fifteen of them landed in [Plan 0104](plans/done/0104-the-library-stops-being-lopsided.md):
+  its Phase 2 found that a branching or line figure has too little area for a level term to
+  register on the stroke, and moved the level response to a whole-frame stage — `exposure` or
+  `bg_bright` — on cohort after cohort. So `exposure` is now a routine authoring lever rather
+  than an unused one, and any argument here resting on its rarity is void.
+- **What survives that correction is the whole of the ask.** None of the fifteen new binders is in
+  the population this entry names — *the attractor family, the softer `fragment_*`, `swarm_drift`*
+  — which is the set of presets with no over-range peak, and not one of them was touched by
+  Plan 0104. The measured −8.0 % on `attractor_clifford` is unaddressed. **The entry stays live.**
+- **Why no gate caught this, which is the reusable part.** The claim is carried as
+  `unprobeable: ... the grammar deliberately has no count verb (ADR-0108, Notes)`, so
+  `scripts/check-backlog-claims.mjs` reported green across every run of the plan that falsified it.
+  This is the case the close ceremony prints the `unprobeable:` roster for: the roster is the set of
+  claims nothing checks, and a claim in it decays silently until a human reads it against the tree.
+- **ROUTED, and now scheduled:** it is §4 of [`content-brief.md`](content-brief.md), paired with Plan
+  0071's standing `occlude` retune as one pass over the shipped set. That brief also records the
+  other correction this entry's routing carries — the plan text says to run it "with 0038 and 0058",
+  but **0058 closed by content on 2026-08-04**, five days before Plan 0071 reached Phase 5, so the
+  three-way pass is a two-way pass.
+- **Raised:** 2026-07-31, from `architect`, at Plan 0045's Mode 4 review.
+- **Verified against code:** yes — measured, not inferred (numbers below).
+- **Verified 2026-08-15, and its headline claim is superseded above — sixteen presets bind
+  `exposure`, not one.** What that dated check still establishes stands: the original binding is
+  present — `present: ^exposure in: presets/lsystem_vellum.toml`. The count around it never
+  reduced, and that is why the falsification went unseen for a whole plan:
+  `unprobeable: exactly one shipped preset binds exposure is a claim about how many files match,
+  and the grammar deliberately has no count verb (ADR-0108, Notes)`. The document this
+  entry corrects still carries the sentence it corrects: `present: tonemap-knee in: docs/plans/README.md`
+  — which goes red when that paragraph is next rewritten, and that is the moment to re-read whether
+  the correction is still owed.
+- **For:** `preset-author`. This is genuinely content-lane work; the engine behaved as designed.
+- **ROUTED 2026-08-01 → `preset-author`, as a content pass rather than a plan.** The user's
+  call at the Plan 0051 close: this needs no engine change and no ADR, so it goes to the lane
+  directly. It pairs naturally with [0040](design-backlog-archive.md) (**closed 2026-08-09**; its retune half is Plan 0071 Phase 5, which this should run with) — both are retunes of the same shipped set
+  against a composite whose behaviour has changed under them.
+
+The user's report was "clifford is really dim". Rendering `attractor_clifford` at an identical
+stimulus on `main` and on the Plan 0045 branch (640x360, 90 frames, hardware adapter):
+
+| preset | main | branch | |
+|---|---|---|---|
+| `attractor_clifford` | mean luma 82.54 | 75.91 | **-8.0 %** |
+| `attractor_leviathan` | mean luma 63.98 | 67.70 | **+5.8 %** |
+
+That is not drift. It is the tonemap knee's documented price, to the decimal: `tonemap.rs`'s
+`KNEE` docstring says a linear 0.8 mid-tone now presents at 0.733, which is -8.4 %. **The split is
+the whole story.** Clifford is a diffuse particle cloud living almost entirely in the mid range, so
+it pays the knee and collects none of the headroom above 1.0. Leviathan has genuinely over-range
+cores, so it gains. Plan 0045 chose to pay this on mid-tones rather than on highlights, deliberately
+and in writing — the consequence is simply that every preset shaped like Clifford now reads dimmer.
+
+**The lever already exists and is one line:** `exposure` (default 1.0) is a linear multiplier ahead
+of the tonemap, added by this same plan for exactly this. `exposure = "1.1"` restores Clifford's
+level without re-balancing a single element against its own background, which is what raising
+per-element `brightness` would force. The population to check is presets with no over-range peak —
+the attractor family, the softer `fragment_*`, `swarm_drift`.
+
+**A related record correction, since this is the entry about the luminance model.** This file's own
+`0034` section (the "why it works, mechanically" passage under the Supernova table, around line
+1561) still says "the frame clips per channel" in the present tense, and reasons from it. That
+premise retired with Plan 0045. The *conclusion* stands and is if anything stronger — geometry
+still has somewhere to go when luminance does not — but the mechanism is now a roll-off, not a
+clip. Per this file's append-only rule the passage is left standing; this paragraph is the
+correction.
+
+- **Moved to the archive 2026-10-01 on close**, by [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md)'s close.
+
+**CLOSED 2026-10-01** — [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md)
+Phase 4, as content-brief §4. The owner closed the sitting as answered by the walk: every preset in
+this entry's population was judged in motion with "too dim" a verdict in use, and the dim ones were
+brightened at the retune. Of the population named above, `swarm_drift` was retired and
+`attractor_clifford` was kept as it stands. An `occlude` binding stays open authoring for any world
+that wants one, not an owed pass.

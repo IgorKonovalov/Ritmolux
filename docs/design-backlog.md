@@ -17,7 +17,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0021 — an "even fall" is not reachable with a one-pole, in any ordering](#0021--an-even-fall-is-not-reachable-with-a-one-pole-in-any-ordering)
 - [Entry 0032 — from the Plan 0049 Phase 5 sample-rate sweep](#entry-0032--from-the-plan-0049-phase-5-sample-rate-sweep)
 - [0032 — both analysis windows are sized in **samples**, so a third of the band axis loses resolution at 96 kHz](#0032--both-analysis-windows-are-sized-in-samples-so-a-third-of-the-band-axis-loses-resolution-at-96-khz)
-- [0038 — mid-tone-dominated presets lost ~8 % luminance to the tonemap knee, and the library has not been retuned](#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned)
 - [0042 — the downbeat estimator locks on ~3 % of audible time, so the gated bar variables are almost always fallback](#0042--the-downbeat-estimator-locks-on-3--of-audible-time-so-the-gated-bar-variables-are-almost-always-fallback)
 - [Entry 0069 — from Plan 0070's close (2026-08-05)](#entry-0069--from-plan-0070s-close-2026-08-05)
 - [0069 — there is no way to draw a two-tone object (a fill with a contrasting outline), because the composite is additive](#0069--there-is-no-way-to-draw-a-two-tone-object-a-fill-with-a-contrasting-outline-because-the-composite-is-additive)
@@ -219,92 +218,6 @@ Low and honest about it. Nobody has reported it, the two rates that dominate (44
 clean, and the failure is a coarser low end rather than anything broken. Worth taking the day
 someone runs the standalone on a 96 kHz interface and says the sub-bass reads mushy — at which
 point this entry is the starting measurement rather than a fresh investigation.
-
----
-
----
-
-## 0038 — mid-tone-dominated presets lost ~8 % luminance to the tonemap knee, and the library has not been retuned
-
-- **STILL OPEN 2026-08-13, and a document that says otherwise is wrong.**
-  [`docs/plans/README.md`](plans/README.md)'s Plan 0080 Phase 7 write-up states that *"the
-  **tonemap-knee** half of that pairing is now measured away."* **It is not.** What Plan 0080 Phase 7
-  retired is a *different* suspicion raised at its own close — that `bg_bright = 0.85` was reaching
-  the tonemap's shoulder on the **backdrop ramp** — settled by finding 0 % of the scanned column
-  rail-pinned on any channel in any of the three probes. That measurement is about a backdrop
-  gradient. **This entry is about mid-tone figure luminance on attractor presets**, measured as
-  `attractor_clifford` 82.54 → 75.91 mean luma, and no backdrop measurement speaks to it. The two
-  were conflated because both mention the tonemap.
-- **Verified 2026-08-29** at the Plan 0104 close — **the "lever is unused" half of this entry is
-  falsified, and the retune it asks for is not.** The reduction that now stands for this entry is
-  that its own measured subject is still untouched:
-  `absent: ^exposure in: presets/attractor_clifford.toml` — red the day someone retunes the
-  preset whose −8.0 % opened this entry, which is exactly when it should be re-read. This entry said twice (2026-08-13, 2026-08-15)
-  that exactly **one** shipped preset binds `exposure` (`lsystem_vellum.toml:60`). **Sixteen do**,
-  and fifteen of them landed in [Plan 0104](plans/done/0104-the-library-stops-being-lopsided.md):
-  its Phase 2 found that a branching or line figure has too little area for a level term to
-  register on the stroke, and moved the level response to a whole-frame stage — `exposure` or
-  `bg_bright` — on cohort after cohort. So `exposure` is now a routine authoring lever rather
-  than an unused one, and any argument here resting on its rarity is void.
-- **What survives that correction is the whole of the ask.** None of the fifteen new binders is in
-  the population this entry names — *the attractor family, the softer `fragment_*`, `swarm_drift`*
-  — which is the set of presets with no over-range peak, and not one of them was touched by
-  Plan 0104. The measured −8.0 % on `attractor_clifford` is unaddressed. **The entry stays live.**
-- **Why no gate caught this, which is the reusable part.** The claim is carried as
-  `unprobeable: ... the grammar deliberately has no count verb (ADR-0108, Notes)`, so
-  `scripts/check-backlog-claims.mjs` reported green across every run of the plan that falsified it.
-  This is the case the close ceremony prints the `unprobeable:` roster for: the roster is the set of
-  claims nothing checks, and a claim in it decays silently until a human reads it against the tree.
-- **ROUTED, and now scheduled:** it is §4 of [`content-brief.md`](content-brief.md), paired with Plan
-  0071's standing `occlude` retune as one pass over the shipped set. That brief also records the
-  other correction this entry's routing carries — the plan text says to run it "with 0038 and 0058",
-  but **0058 closed by content on 2026-08-04**, five days before Plan 0071 reached Phase 5, so the
-  three-way pass is a two-way pass.
-- **Raised:** 2026-07-31, from `architect`, at Plan 0045's Mode 4 review.
-- **Verified against code:** yes — measured, not inferred (numbers below).
-- **Verified 2026-08-15, and its headline claim is superseded above — sixteen presets bind
-  `exposure`, not one.** What that dated check still establishes stands: the original binding is
-  present — `present: ^exposure in: presets/lsystem_vellum.toml`. The count around it never
-  reduced, and that is why the falsification went unseen for a whole plan:
-  `unprobeable: exactly one shipped preset binds exposure is a claim about how many files match,
-  and the grammar deliberately has no count verb (ADR-0108, Notes)`. The document this
-  entry corrects still carries the sentence it corrects: `present: tonemap-knee in: docs/plans/README.md`
-  — which goes red when that paragraph is next rewritten, and that is the moment to re-read whether
-  the correction is still owed.
-- **For:** `preset-author`. This is genuinely content-lane work; the engine behaved as designed.
-- **ROUTED 2026-08-01 → `preset-author`, as a content pass rather than a plan.** The user's
-  call at the Plan 0051 close: this needs no engine change and no ADR, so it goes to the lane
-  directly. It pairs naturally with [0040](design-backlog-archive.md) (**closed 2026-08-09**; its retune half is Plan 0071 Phase 5, which this should run with) — both are retunes of the same shipped set
-  against a composite whose behaviour has changed under them.
-
-The user's report was "clifford is really dim". Rendering `attractor_clifford` at an identical
-stimulus on `main` and on the Plan 0045 branch (640x360, 90 frames, hardware adapter):
-
-| preset | main | branch | |
-|---|---|---|---|
-| `attractor_clifford` | mean luma 82.54 | 75.91 | **-8.0 %** |
-| `attractor_leviathan` | mean luma 63.98 | 67.70 | **+5.8 %** |
-
-That is not drift. It is the tonemap knee's documented price, to the decimal: `tonemap.rs`'s
-`KNEE` docstring says a linear 0.8 mid-tone now presents at 0.733, which is -8.4 %. **The split is
-the whole story.** Clifford is a diffuse particle cloud living almost entirely in the mid range, so
-it pays the knee and collects none of the headroom above 1.0. Leviathan has genuinely over-range
-cores, so it gains. Plan 0045 chose to pay this on mid-tones rather than on highlights, deliberately
-and in writing — the consequence is simply that every preset shaped like Clifford now reads dimmer.
-
-**The lever already exists and is one line:** `exposure` (default 1.0) is a linear multiplier ahead
-of the tonemap, added by this same plan for exactly this. `exposure = "1.1"` restores Clifford's
-level without re-balancing a single element against its own background, which is what raising
-per-element `brightness` would force. The population to check is presets with no over-range peak —
-the attractor family, the softer `fragment_*`, `swarm_drift`.
-
-**A related record correction, since this is the entry about the luminance model.** This file's own
-`0034` section (the "why it works, mechanically" passage under the Supernova table, around line
-1561) still says "the frame clips per channel" in the present tense, and reasons from it. That
-premise retired with Plan 0045. The *conclusion* stands and is if anything stronger — geometry
-still has somewhere to go when luminance does not — but the mechanism is now a roll-off, not a
-clip. Per this file's append-only rule the passage is left standing; this paragraph is the
-correction.
 
 ---
 
@@ -1665,7 +1578,7 @@ the interesting half of the question has no statistic.
 - **Raised:** 2026-09-19 by `architect`, asked by the owner (*"do we have a plan to cut curated
   presets that are too similar to each other or lame?"*). **Owner if taken:** `human` for step 2,
   then `architect` for the ADR and plan.
-- **PARTLY PROMOTED 2026-09-27 -> [Plan 0232](plans/0232-the-library-is-walked-cut-and-refilled.md)**,
+- **PARTLY PROMOTED 2026-09-27 -> [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md)**,
   which takes **step 2** (the owner's walk, and the cull it convicts under ADR-0253). Step 3, whether a
   mechanism is owed, stays here until that plan's Phase 7 verdict answers it.
 - **Verified 2026-09-26** — the instrument half is discharged by
