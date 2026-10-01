@@ -383,9 +383,11 @@ pub(crate) fn link_presence(d: f32, link: f32) -> f32 {
 /// (cleared first) — at most `cap` of them, in index order.
 ///
 /// **Brute force, on purpose.** Every pair is tested, `N (N - 1) / 2` distance
-/// checks: at the tier's point cap of a few hundred that is under a hundred
-/// thousand subtractions a frame, well inside the budget, and a uniform grid
-/// would pay its own bookkeeping to save it. The squared distance is compared
+/// checks: about 180 thousand a frame at `Floor`'s cap of 600 points and 1.1
+/// million at `Rich`'s 1500, of which only the first is measured against the
+/// frame budget (`TierConfig::plexus_points`). A uniform grid would pay its own
+/// bookkeeping to save them, and is the replacement if a cap's measured cost
+/// stops fitting. The squared distance is compared
 /// first so the square root is only taken for a pair that links.
 ///
 /// Returns how many linking pairs were found, which exceeds `edges.len()` when
