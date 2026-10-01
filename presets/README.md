@@ -681,6 +681,8 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
 | `reseed` | `0` | `0` – `1` | Crossing zero throws every particle back onto a fresh start position. | motion |
 | `perspective` | `0` | `0` – `1` | How strongly depth shrinks a particle, turning a flat figure into a solid one. | shape |
+| `focus` | `0.5` | `0` – `1` | Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest. | light |
+| `aperture` | `0` | `0` – `40` | How strongly a 3D figure blurs away from its focal plane, in pixels; inert on the flat maps. | light |
 | `depth_fade` | `0` | `0` – `1` | How much depth dims a particle, which is what reads as air between the layers. | light |
 | `depth_hue` | `0` | `-1` – `1` | Shifts colour with depth, so far parts of the figure sit elsewhere on the palette. | colour |
 | `spin` | `0` | `-2` – `2` | Turns per second the figure rotates by about its vertical axis. | motion, main |

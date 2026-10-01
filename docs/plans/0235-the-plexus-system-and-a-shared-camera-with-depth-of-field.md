@@ -288,8 +288,8 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 | 1 — Walking skeleton | dev | done | 8b3a6d41 |
 | 2 — Depth of field on segments | dev | done | 6a52a633 |
 | 3 — Nodes: the 3D quad pipeline | dev | done | f7e09ec4 |
-| 4 — The sheet layout | dev | done | committed with this row |
-| 5 — The attractor takes the shared CoC | dev | not started | |
+| 4 — The sheet layout | dev | done | de309bfc |
+| 5 — The attractor takes the shared CoC | dev | done | committed with this row |
 | 6 — Tier caps, golden, determinism | dev | not started | |
 | 7 — Documentation and the references | dev | not started | |
 | 8 — The look, judged | human | not started | |
@@ -329,6 +329,14 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
   `PlexusLayout::ALL`. `scenes/mod.rs`'s `family_params` gained the `plexus` row so `wave` and
   `wave_scale` print as inert on `cloud`. The sheet's grazing default is the shared `pitch` default
   (0.25 rad); there is no per-layout default.
+- Phase 5, files beyond the phase list: `particles/encode.rs` (uniform packing),
+  `particles/projection_mirror.rs` (CPU mirror of the new terms), `particles/tests.rs` and
+  `scenes/mod.rs` (`AttractorScene::new` takes the tier's CoC cap). The lens rides the draw
+  uniform's padding lanes (`bh.w`, `bv.w`, `ctr.w`, `em.w`), so its size is unchanged. The shader's
+  own `project()` is renamed `project_figure()`, since `camera.wgsl` now declares one. The
+  attractor has no camera distance, so its `depth_norm` is laid on a fixed virtual lens
+  (distance 1, radius 0.5). All nine `core/tests/fixtures/attractor*.toml` rendered through `shot`
+  at 160x100 are byte-identical PNGs before and after, on llvmpipe.
 - Phase 2, `max_coc_px` is a `u32` (the tier struct derives `Eq`), provisional 12 / 24; Phase 6
   measures it.
 

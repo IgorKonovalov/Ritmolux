@@ -78,6 +78,14 @@ pub(super) struct UniformInputs {
     pub(super) zoom: f32,
     pub(super) pan: [f32; 2],
     pub(super) perspective: f32,
+    /// The lens (ADR-0257): `aperture` in pixels and `focus` normalized to the
+    /// figure's depth, both raw and sanitized where they are packed, and the
+    /// tier's cap on the circle of confusion.
+    pub(super) aperture: f32,
+    pub(super) focus: f32,
+    pub(super) max_coc: f32,
+    /// The height in pixels of the field the sprites are drawn into.
+    pub(super) field_height: u32,
     pub(super) depth_fade: f32,
     pub(super) depth_hue: f32,
     /// ADR-0087's last-map channel, at its two routes. Both reach the draw
@@ -226,8 +234,10 @@ pub(super) fn upload_uniforms(
                     0.0
                 },
             ],
-            bh: [hx, hy, hz, 0.0],
-            bv: [vx, vy, vz, 0.0],
+            // The lens rides the three padding lanes the basis and the centre
+            // rows already had, so the uniform keeps its size (ADR-0257).
+            bh: [hx, hy, hz, finite_or(inputs.aperture, 0.0).max(0.0)],
+            bv: [vx, vy, vz, finite_or(inputs.focus, 0.5).clamp(0.0, 1.0)],
             d: [
                 // Clamped here, silently, and not in the shader: this is the one
                 // place the value crosses into the GPU, so a preset asking for
@@ -243,7 +253,7 @@ pub(super) fn upload_uniforms(
                 inputs.depth_hue,
                 inputs.framing.inv_depth_extent(inputs.family),
             ],
-            ctr: [centre[0], centre[1], centre[2], 0.0],
+            ctr: [centre[0], centre[1], centre[2], inputs.max_coc.max(0.0)],
             // The four colour channels, unclamped for the same reason
             // `depth_hue` above is: the LUT sampler repeats, so any
             // palette-coordinate shift is legitimate, and the hue route takes
@@ -290,10 +300,15 @@ pub(super) fn upload_uniforms(
                     emergence_rate(inputs.emergence),
                     0.0,
                     palette::band_steps(inputs.palette_steps),
-                    0.0,
+                    inputs.field_height as f32,
                 ]
             } else {
-                [0.0, 1.0, palette::band_steps(inputs.palette_steps), 0.0]
+                [
+                    0.0,
+                    1.0,
+                    palette::band_steps(inputs.palette_steps),
+                    inputs.field_height as f32,
+                ]
             },
         }),
     );
@@ -462,4 +477,10 @@ pub(super) fn encode_present(
     pass.set_pipeline(&pipelines.present_pipeline);
     pass.set_bind_group(0, present_bg, &[]);
     pass.draw(0..3, 0..1);
+}
+
+/// `v` when it is finite, `fallback` when a binding evaluated to NaN or an
+/// infinity.
+fn finite_or(v: f32, fallback: f32) -> f32 {
+    if v.is_finite() { v } else { fallback }
 }

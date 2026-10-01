@@ -1280,6 +1280,7 @@ fn create_attractor(
             crate::render::SampleBudget::Offline => tier.attractor_particles_offline_ceiling,
         },
         tier.attractor_trail_cap,
+        tier.max_coc_px as f32,
     )
 }
 

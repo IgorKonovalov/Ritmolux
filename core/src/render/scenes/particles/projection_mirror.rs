@@ -8,7 +8,7 @@ pub(super) struct Projected {
     pub(super) depth: f32,
 }
 
-/// Mirrors `project()` in [`DRAW_SHADER`](super::DRAW_SHADER).
+/// Mirrors `project_figure()` in [`DRAW_SHADER`](super::DRAW_SHADER).
 ///
 /// Takes `cs`/`sn` rather than an angle, exactly as the WGSL does — which is
 /// also what lets a test state the mirror identity *exactly*: `cos` of an
@@ -175,4 +175,33 @@ pub(super) fn world(
     );
     let [sx, sy] = p.screen;
     [sx * scl * m, sy * scl * m]
+}
+
+/// Mirrors `FIGURE_DISTANCE` / `FIGURE_RADIUS` in
+/// [`DRAW_SHADER`](super::DRAW_SHADER): the virtual lens the figure's
+/// normalized depth is laid on (ADR-0257).
+const FIGURE_DISTANCE: f32 = 1.0;
+const FIGURE_RADIUS: f32 = 0.5;
+
+/// Mirrors `figure_coc()` in [`DRAW_SHADER`](super::DRAW_SHADER): the circle of
+/// confusion in pixels at normalized depth `dn`, through the shared
+/// [`Lens::coc`](crate::render::camera::Lens::coc).
+pub(super) fn figure_coc(dn: f32, aperture: f32, focus: f32, max_coc: f32, inv_extent: f32) -> f32 {
+    let focal = FIGURE_DISTANCE - FIGURE_RADIUS * (1.0 - 2.0 * focus);
+    let lens = crate::render::camera::Lens {
+        aperture,
+        focal_depth: focal,
+        max_coc,
+    };
+    let has_depth = if inv_extent != 0.0 { 1.0 } else { 0.0 };
+    lens.coc(FIGURE_DISTANCE - FIGURE_RADIUS * dn) * has_depth
+}
+
+/// Mirrors `blur_growth()` in [`DRAW_SHADER`](super::DRAW_SHADER).
+pub(super) fn blur_growth(r_px: f32, blur: f32) -> f32 {
+    if blur > 0.0 && r_px > 0.0 {
+        (r_px + blur) / r_px
+    } else {
+        1.0
+    }
 }

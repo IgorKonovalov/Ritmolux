@@ -214,6 +214,8 @@ const DEFAULT_PERSPECTIVE: f32 = default_of(PARAMS, "perspective");
 /// material is attenuated until it stops competing with near material, which is
 /// what reads as depth for a diffuse cloud that cannot hide anything.
 const DEFAULT_DEPTH_FADE: f32 = default_of(PARAMS, "depth_fade");
+const DEFAULT_FOCUS: f32 = default_of(PARAMS, "focus");
+const DEFAULT_APERTURE: f32 = default_of(PARAMS, "aperture");
 const DEFAULT_DEPTH_HUE: f32 = default_of(PARAMS, "depth_hue");
 /// ADR-0087's colour channels, all four inert at their default. `*_tint` adds an
 /// exact `0` to the palette coordinate; `*_hue` compares equal to literal `0.0`
@@ -850,6 +852,13 @@ pub struct AttractorScene {
     /// uniform is packed. `0` is the orthographic projection this scene shipped
     /// with, and it is inert on the 2D families whatever it is set to.
     perspective: f32,
+    /// The shared lens (ADR-0257): `focus` normalized to the figure's depth, 0
+    /// nearest, and `aperture` in pixels. Inert on the 2D families, and inert
+    /// everywhere at `aperture = 0`.
+    focus: f32,
+    aperture: f32,
+    /// The tier's cap on the circle of confusion, in pixels.
+    max_coc: f32,
     /// Atmospheric depth cues (ADR-0076), the substitute for occlusion:
     /// `depth_fade` attenuates a particle's brightness with distance (clamped to
     /// `[0, 1]` where the uniform is packed — past `1` the multiplier would go
@@ -935,6 +944,7 @@ impl AttractorScene {
         anchor: u32,
         ceiling: u32,
         trail_cap: (u32, u32),
+        max_coc: f32,
     ) -> Self {
         // A ceiling under the anchor would allocate less than the law's own floor
         // resolves to and index past the buffer; the law clamps the same way.
@@ -1002,6 +1012,9 @@ impl AttractorScene {
             hue_center: DEFAULT_HUE_CENTER,
             zoom: DEFAULT_ZOOM,
             perspective: DEFAULT_PERSPECTIVE,
+            focus: DEFAULT_FOCUS,
+            aperture: DEFAULT_APERTURE,
+            max_coc,
             depth_fade: DEFAULT_DEPTH_FADE,
             depth_hue: DEFAULT_DEPTH_HUE,
             map_tint: DEFAULT_CHANNEL_COLOUR,
@@ -1521,6 +1534,24 @@ pub const PARAMS: &[ParamSpec] = &[
         main: false,
     },
     ParamSpec {
+        name: "focus",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
+    },
+    ParamSpec {
+        name: "aperture",
+        default: 0.0,
+        range: Some([0.0, 40.0]),
+        doc: "How strongly a 3D figure blurs away from its focal plane, in pixels; inert on the flat maps.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
+    },
+    ParamSpec {
         name: "depth_fade",
         default: 0.0,
         range: Some([0.0, 1.0]),
@@ -1801,6 +1832,8 @@ impl Scene for AttractorScene {
         self.zoom = DEFAULT_ZOOM;
         self.perspective = DEFAULT_PERSPECTIVE;
         self.depth_fade = DEFAULT_DEPTH_FADE;
+        self.focus = DEFAULT_FOCUS;
+        self.aperture = DEFAULT_APERTURE;
         self.depth_hue = DEFAULT_DEPTH_HUE;
         self.map_tint = DEFAULT_CHANNEL_COLOUR;
         self.map_hue = DEFAULT_CHANNEL_COLOUR;
@@ -1836,6 +1869,8 @@ impl Scene for AttractorScene {
             "zoom" => self.zoom = value,
             "perspective" => self.perspective = value,
             "depth_fade" => self.depth_fade = value,
+            "focus" => self.focus = value,
+            "aperture" => self.aperture = value,
             "depth_hue" => self.depth_hue = value,
             "map_tint" => self.map_tint = value,
             "map_hue" => self.map_hue = value,
@@ -2066,6 +2101,10 @@ impl Scene for AttractorScene {
             zoom,
             pan,
             perspective,
+            focus,
+            aperture,
+            max_coc,
+            trail_h,
             depth_fade,
             depth_hue,
             map_tint,
@@ -2128,6 +2167,10 @@ impl Scene for AttractorScene {
                 zoom: *zoom,
                 pan: [pan.x, pan.y],
                 perspective: *perspective,
+                aperture: *aperture,
+                focus: *focus,
+                max_coc: *max_coc,
+                field_height: *trail_h,
                 depth_fade: *depth_fade,
                 depth_hue: *depth_hue,
                 map_tint: *map_tint,

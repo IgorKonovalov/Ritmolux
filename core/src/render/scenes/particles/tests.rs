@@ -1292,6 +1292,7 @@ impl Harness {
             // ceiling equal to it keeps the allocation exactly TEST_PARTICLES.
             TEST_PARTICLES,
             TierConfig::FLOOR.attractor_trail_cap,
+            TierConfig::FLOOR.max_coc_px as f32,
         );
         scene.configure(&crate::render::scenes::lines::GeneratorConfig::Particles {
             family,
@@ -3912,6 +3913,7 @@ fn law_scene(trail_cap: (u32, u32)) -> Option<(RenderContext, AttractorScene, wg
         LAW_ANCHOR,
         LAW_CEILING,
         trail_cap,
+        TierConfig::FLOOR.max_coc_px as f32,
     );
     scene.configure(&crate::render::scenes::lines::GeneratorConfig::Particles {
         family: AttractorFamily::DeJong,
@@ -4147,4 +4149,105 @@ fn field_light(ctx: &RenderContext, scene: &AttractorScene) -> f64 {
         .flat_map(|rgba| rgba.iter().take(3))
         .map(|c| f64::from(*c))
         .sum()
+}
+
+/// **A 3D figure's sprites blur with their distance from the focal depth** —
+/// wider and dimmer away from it, untouched on it (ADR-0257), read off the CPU
+/// transcription of the draw shader's depth-of-field terms.
+#[test]
+fn a_sprite_away_from_the_focal_depth_grows_and_dims() {
+    use projection_mirror as m;
+
+    for family in [AttractorFamily::Thomas, AttractorFamily::Lorenz] {
+        let inv = family.canonical_framing().inv_depth_extent(family);
+        assert!(inv > 0.0, "{family:?} has depth");
+        let r_px = 2.0;
+        // Focus at mid depth, `dn = 0`.
+        let at_focus = m::blur_growth(r_px, m::figure_coc(0.0, 20.0, 0.5, 40.0, inv));
+        assert_eq!(at_focus, 1.0, "in focus, a sprite keeps its size");
+        let mut prev = at_focus;
+        for dn in [-0.25, -0.5, -0.75, -1.0] {
+            let grow = m::blur_growth(r_px, m::figure_coc(dn, 20.0, 0.5, 40.0, inv));
+            let keep = 1.0 / (grow * grow);
+            assert!(grow > prev, "{family:?} at dn {dn}: no wider than {prev}");
+            assert!(keep < 1.0, "and dimmer");
+            prev = grow;
+        }
+        // Nearer than the focus blurs too.
+        assert!(m::figure_coc(0.8, 20.0, 0.5, 40.0, inv) > 0.0);
+        // A pinhole blurs nothing anywhere.
+        for dn in [-1.0, 0.0, 1.0] {
+            assert_eq!(m::figure_coc(dn, 0.0, 0.2, 40.0, inv), 0.0);
+        }
+    }
+    // The flat maps have no depth, so no aperture blurs them.
+    for family in [AttractorFamily::DeJong, AttractorFamily::Clifford] {
+        let inv = family.canonical_framing().inv_depth_extent(family);
+        assert_eq!(inv, 0.0);
+        for focus in [0.0, 0.3, 1.0] {
+            assert_eq!(m::figure_coc(0.0, 30.0, focus, 40.0, inv), 0.0);
+        }
+    }
+}
+
+/// **Through the whole engine**: an aperture changes a 3D figure's frame and
+/// spreads its light, and leaves a flat map's frame byte-identical, since a
+/// flat map has no depth to be out of focus at.
+#[test]
+fn an_aperture_blurs_a_3d_figure_and_leaves_a_flat_map_alone() {
+    use crate::preset::Preset;
+    use crate::render::metrics::{coverage, frame_diff};
+    use crate::render::{HeadlessOptions, RenderError, Renderer};
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: 160,
+        height: 100,
+        prefer_software: true,
+    }) {
+        Ok(r) => r,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    let capture = |renderer: &mut Renderer, family: &str, aperture: f32| {
+        let preset = Preset::from_toml_str(&format!(
+            "system = \"attractor\"\nname = \"dof_probe\"\n[particles]\nfamily = \"{family}\"\n\
+             [params]\nperspective = \"0.5\"\nfocus = \"0.0\"\naperture = \"{aperture}\"\n"
+        ))
+        .expect("the probe loads");
+        renderer.set_presets(vec![preset]);
+        renderer
+            .capture_preset("dof_probe", &AnalysisFrame::default(), 60)
+            .expect("capture the probe")
+    };
+    for family in ["thomas", "lorenz"] {
+        let sharp = capture(&mut renderer, family, 0.0);
+        let blurred = capture(&mut renderer, family, 30.0);
+        let (a, b) = (
+            coverage(&sharp, [0, 0, 0, 255], 4),
+            coverage(&blurred, [0, 0, 0, 255], 4),
+        );
+        println!(
+            "{family}: lit {a:.4} -> {b:.4}, diff {:.4}",
+            frame_diff(&sharp, &blurred)
+        );
+        assert!(
+            frame_diff(&sharp, &blurred) > 0.0,
+            "{family}: the aperture changed nothing"
+        );
+        assert!(
+            b > a,
+            "{family}: blurred sprites spread over more of the frame"
+        );
+    }
+    for family in ["de_jong", "clifford"] {
+        let sharp = capture(&mut renderer, family, 0.0);
+        let blurred = capture(&mut renderer, family, 30.0);
+        assert_eq!(
+            sharp.rgba, blurred.rgba,
+            "{family} is flat and must not blur"
+        );
+    }
 }

@@ -625,6 +625,8 @@
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
             "reseed": { "$ref": "#/definitions/param.reseed.attractor" },
             "perspective": { "$ref": "#/definitions/param.perspective" },
+            "focus": { "$ref": "#/definitions/param.focus.attractor" },
+            "aperture": { "$ref": "#/definitions/param.aperture.attractor" },
             "depth_fade": { "$ref": "#/definitions/param.depth_fade" },
             "depth_hue": { "$ref": "#/definitions/param.depth_hue" },
             "spin": { "$ref": "#/definitions/param.spin.attractor" },
@@ -1301,8 +1303,8 @@
             "pitch": { "$ref": "#/definitions/param.pitch" },
             "distance": { "$ref": "#/definitions/param.distance" },
             "fov": { "$ref": "#/definitions/param.fov" },
-            "focus": { "$ref": "#/definitions/param.focus" },
-            "aperture": { "$ref": "#/definitions/param.aperture" },
+            "focus": { "$ref": "#/definitions/param.focus.plexus" },
+            "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "hue_center": { "$ref": "#/definitions/param.hue_center.plexus" },
             "hue_spread": { "$ref": "#/definitions/param.hue_spread.plexus" },
@@ -1572,6 +1574,8 @@
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
             "reseed": { "$ref": "#/definitions/param.reseed.attractor" },
             "perspective": { "$ref": "#/definitions/param.perspective" },
+            "focus": { "$ref": "#/definitions/param.focus.attractor" },
+            "aperture": { "$ref": "#/definitions/param.aperture.attractor" },
             "depth_fade": { "$ref": "#/definitions/param.depth_fade" },
             "depth_hue": { "$ref": "#/definitions/param.depth_hue" },
             "spin": { "$ref": "#/definitions/param.spin.attractor" },
@@ -1863,8 +1867,8 @@
             "pitch": { "$ref": "#/definitions/param.pitch" },
             "distance": { "$ref": "#/definitions/param.distance" },
             "fov": { "$ref": "#/definitions/param.fov" },
-            "focus": { "$ref": "#/definitions/param.focus" },
-            "aperture": { "$ref": "#/definitions/param.aperture" },
+            "focus": { "$ref": "#/definitions/param.focus.plexus" },
+            "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "hue_center": { "$ref": "#/definitions/param.hue_center.plexus" },
             "hue_spread": { "$ref": "#/definitions/param.hue_spread.plexus" },
@@ -2864,6 +2868,16 @@
       "description": "How strongly depth shrinks a particle, turning a flat figure into a solid one.",
       "markdownDescription": "How strongly depth shrinks a particle, turning a flat figure into a solid one.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
+    "param.focus.attractor": {
+      "type": "string",
+      "description": "Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest.",
+      "markdownDescription": "Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.aperture.attractor": {
+      "type": "string",
+      "description": "How strongly a 3D figure blurs away from its focal plane, in pixels; inert on the flat maps.",
+      "markdownDescription": "How strongly a 3D figure blurs away from its focal plane, in pixels; inert on the flat maps.\n\n- default `0.0`\n- typical range `0.0` to `40.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
     "param.depth_fade": {
       "type": "string",
       "description": "How much depth dims a particle, which is what reads as air between the layers.",
@@ -3584,12 +3598,12 @@
       "description": "The camera's vertical field of view in radians; zoom divides it.",
       "markdownDescription": "The camera's vertical field of view in radians; zoom divides it.\n\n- default `0.8`\n- typical range `0.2` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.focus": {
+    "param.focus.plexus": {
       "type": "string",
       "description": "Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest.",
       "markdownDescription": "Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.aperture": {
+    "param.aperture.plexus": {
       "type": "string",
       "description": "How strongly lines blur away from the focal plane, in pixels; 0 keeps every line sharp, and wider costs fill.",
       "markdownDescription": "How strongly lines blur away from the focal plane, in pixels; 0 keeps every line sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `40.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."

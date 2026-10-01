@@ -43,6 +43,8 @@
         "pan_y": { "$ref": "#/definitions/param.pan_y" },
         "reseed": { "$ref": "#/definitions/param.reseed.attractor" },
         "perspective": { "$ref": "#/definitions/param.perspective" },
+        "focus": { "$ref": "#/definitions/param.focus.attractor" },
+        "aperture": { "$ref": "#/definitions/param.aperture.attractor" },
         "depth_fade": { "$ref": "#/definitions/param.depth_fade" },
         "depth_hue": { "$ref": "#/definitions/param.depth_hue" },
         "spin": { "$ref": "#/definitions/param.spin.attractor" },
@@ -844,6 +846,16 @@
       "type": "string",
       "description": "How strongly depth shrinks a particle, turning a flat figure into a solid one.",
       "markdownDescription": "How strongly depth shrinks a particle, turning a flat figure into a solid one.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.focus.attractor": {
+      "type": "string",
+      "description": "Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest.",
+      "markdownDescription": "Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.aperture.attractor": {
+      "type": "string",
+      "description": "How strongly a 3D figure blurs away from its focal plane, in pixels; inert on the flat maps.",
+      "markdownDescription": "How strongly a 3D figure blurs away from its focal plane, in pixels; inert on the flat maps.\n\n- default `0.0`\n- typical range `0.0` to `40.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.depth_fade": {
       "type": "string",

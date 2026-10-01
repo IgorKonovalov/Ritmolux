@@ -361,12 +361,15 @@ struct Draw {
     // u: x hue_spread, y hue_center, z palette_mix, w saturation
     // x: x zoom, yz pan (view transform, ADR-0018), w streak (ADR-0069:
     //    non-zero on a continuous family, so the quad spans prev -> pos)
-    // bh: xyz the axis the spin rotates x against (ADR-0068), w unused
-    // bv: xyz the vertical axis (ADR-0068), w unused
+    // bh: xyz the axis the spin rotates x against (ADR-0068), w the aperture
+    //    in pixels (ADR-0257)
+    // bv: xyz the vertical axis (ADR-0068), w the focus, 0 nearest to 1
+    //    farthest (ADR-0257)
     // d: x perspective, y depth_fade, z depth_hue, w the family's INVERSE depth
     //    half-extent (ADR-0076) - exactly 0 for a 2D family, which is what
     //    collapses every depth cue below to the identity with no branch
-    // ctr: xyz the world centre subtracted before projection, w unused. The four
+    // ctr: xyz the world centre subtracted before projection, w the largest
+    //    circle of confusion the tier draws, in pixels (ADR-0257). The four
     //    map families pass [0,0,0] or [0,0,25] - exactly what they passed when
     //    this was the scalar `w.z` - and subtracting a zero is exact.
     // ch: the two per-particle colour channels, two routes each -
@@ -393,6 +396,8 @@ struct Draw {
     //    z is `palette_steps` (ADR-0078) - it and w were FREE since Plan 0074
     //    Phase 3, when z stopped carrying the reciprocal of the longest
     //    reachable lifetime that only the retired age colour channel read.
+    //    w is the height in pixels of the field the sprites are drawn into,
+    //    which turns a circle of confusion in pixels into world units.
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
@@ -441,11 +446,14 @@ fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
 // structure carries no information about the direction of rotation, because the
 // image at rotation pi is the exact x-mirror of the image at 0.
 //
+// Named `project_figure` because the shared camera prepended to this module
+// declares a `project` of its own, for the 3D primitives that go through it.
+//
 // **This function and the two below are the SOURCE**; `projection_mirror` in the
 // Rust body transcribes them for the property test, the same discipline
 // `apply_saturation` follows against `palette.rs::desaturate`. Edit here, then
 // edit there.
-fn project(q: vec3<f32>, dim: f32, ctr: vec3<f32>, cs: f32, sn: f32) -> vec3<f32> {
+fn project_figure(q: vec3<f32>, dim: f32, ctr: vec3<f32>, cs: f32, sn: f32) -> vec3<f32> {
     if (dim < 2.5) {
         // 2D map: centre, then in-plane rotation. There is no third coordinate,
         // so the depth is zero here as well as via `draw.d.w` - belt and braces,
@@ -491,6 +499,38 @@ fn depth_norm(depth: f32) -> f32 {
 // At `perspective = 0` this is exactly 1.0 and every use of it is a no-op.
 fn magnify(dn: f32) -> f32 {
     return 1.0 / (1.0 - draw.d.x * dn);
+}
+
+// The figure's place on a virtual lens (ADR-0257). This scene has no camera
+// distance - `perspective` is a ratio - so its normalized depth is laid on a
+// lens whose orbit target sits FIGURE_DISTANCE away with the figure
+// FIGURE_RADIUS deep either side of it: the proportions of the plexus camera at
+// its defaults. `dn = 1` is nearest.
+const FIGURE_DISTANCE: f32 = 1.0;
+const FIGURE_RADIUS: f32 = 0.5;
+
+// The circle of confusion at normalized depth `dn`, in pixels, through the
+// shared `coc()`. `focus` 0 is the figure's nearest extent and 1 its farthest,
+// the scale the plexus focus is on.
+//
+// **Exactly 0 on a 2D family**, whatever the aperture: `dn` is identically 0
+// there, which would put every particle at one depth - in focus only when
+// `focus` is 0.5 - so the result is multiplied by whether the family has depth,
+// the same `draw.d.w != 0` guard `haze` uses. And exactly 0 at aperture 0.
+fn figure_coc(dn: f32) -> f32 {
+    var cam: Camera;
+    let focal = FIGURE_DISTANCE - FIGURE_RADIUS * (1.0 - 2.0 * draw.bv.w);
+    cam.lens = vec4<f32>(draw.bh.w, focal, draw.ctr.w, 0.0);
+    let has_depth = f32(draw.d.w != 0.0);
+    return coc(cam, FIGURE_DISTANCE - FIGURE_RADIUS * dn) * has_depth;
+}
+
+// How much a sprite of radius `r_px` pixels grows to cover a circle of
+// confusion `blur` pixels wide: `(r + blur) / r`. **Exactly 1.0 when there is
+// no blur**, chosen by `select` rather than computed, so an aperture of 0
+// multiplies every size and every light by a literal 1.0.
+fn blur_growth(r_px: f32, blur: f32) -> f32 {
+    return select(1.0, (r_px + blur) / r_px, blur > 0.0 && r_px > 0.0);
 }
 
 // Depth remapped to [0, 1] with **1 nearest**, which is the sense both
@@ -634,7 +674,7 @@ fn vs_main(
     let cs = cos(rot);
     let sn = sin(rot);
     let streak = draw.x.w;
-    let projected = project(center, dim, ctr, cs, sn);
+    let projected = project_figure(center, dim, ctr, cs, sn);
     let screen = projected.xy;
     // This particle's normalized depth, and the magnification it earns
     // (ADR-0076). Both are exactly 0 and exactly 1 for a 2D family.
@@ -644,6 +684,17 @@ fn vs_main(
     // size grading and parallax one mutually-consistent term rather than two
     // hand-tuned constants (the swarm needed two; ADR-0076 Alternative B).
     let sprite = psize * mag;
+
+    // Depth of field (ADR-0257): a sprite away from the focal depth grows by
+    // its circle of confusion and its light spreads over the larger disc. The
+    // field's height turns pixels into the world units the sprite is built in:
+    // one world unit is `zoom * height / 2` pixels.
+    let px_per_world = draw.x.x * draw.em.w * 0.5;
+    let blur = figure_coc(dn);
+    let grow = blur_growth(sprite * px_per_world, blur);
+    // Area factor `(r / (r + coc))^2` for a disc, `r / (r + coc)` for a
+    // capsule's light per unit length; both exactly 1.0 with no blur.
+    var keep = 1.0 / (grow * grow);
 
     // The sprite. A point is a `sprite` square about the projected position; a
     // segment is that square swept from `prev` to `pos` — a capsule (ADR-0069).
@@ -660,7 +711,7 @@ fn vs_main(
         // **Both endpoints are magnified independently**, so a trace receding
         // into the distance is drawn genuinely shorter - the strongest depth cue
         // a curve has, and free, because the capsule already projects both ends.
-        let pp = project(previous, dim, ctr, cs, sn);
+        let pp = project_figure(previous, dim, ctr, cs, sn);
         let dn_prev = depth_norm(pp.z);
         let a = pp.xy * scl * magnify(dn_prev);
         let b = screen * scl * mag;
@@ -679,13 +730,18 @@ fn vs_main(
         // A tapered stroke would mean interpolating a radius in the fragment's
         // distance function, which reworks ADR-0069's one-expression
         // point/segment unification - deliberately out of scope (ADR-0076).
-        let wid = psize * magnify((dn + dn_prev) * 0.5);
+        let dn_mid = (dn + dn_prev) * 0.5;
+        let wid_sharp = psize * magnify(dn_mid);
+        let grow_mid = blur_growth(wid_sharp * px_per_world, figure_coc(dn_mid));
+        let wid = wid_sharp * grow_mid;
+        keep = 1.0 / grow_mid;
         half_len = len / wid;
         // Extended by `wid` past each end so the round caps have room.
         world = mid + dir * (corner.x * (len + wid)) + nrm * (corner.y * wid);
         local = vec2<f32>(corner.x * (half_len + 1.0), corner.y);
     } else {
-        world = screen * scl * mag + corner * sprite;
+        let sprite_dof = sprite * grow;
+        world = screen * scl * mag + corner * sprite_dof;
         local = corner;
     }
 
@@ -783,7 +839,7 @@ fn vs_main(
     // trail field. Ramped from zero it deposits almost nothing until it has been
     // iterated enough to have spread. Exactly 1.0 on every non-IFS family.
     let emergence = min(1.0, age * draw.em.x + draw.em.y);
-    out.color = col * deposit * haze(dn) * emergence;
+    out.color = col * deposit * haze(dn) * emergence * keep;
     return out;
 }
 
