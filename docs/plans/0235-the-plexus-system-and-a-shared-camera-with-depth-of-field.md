@@ -1,6 +1,6 @@
 # 0235 — The plexus system, and a shared camera with depth of field
 
-> **Status:** in-progress (2026-09-30; run by hand in ordinary sessions, not queued for the conductor)
+> **Status:** in-progress (2026-09-30; run by hand in ordinary sessions, not queued for the conductor. Amended 2026-10-01: Phase 9 added after the first shipped set exposed the blur notice)
 > **Created:** 2026-09-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md) (proposed), [ADR-0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0256](../adrs/0256-a-parameter-declares-its-group-and-whether-it-is-main.md)
@@ -210,6 +210,68 @@ flowchart LR
   `preset-author` lane.
 - **Files touched:** none.
 - **Done when:** the owner records a keep, or a list of what is off, in this plan's log.
+
+### Phase 9 — The blur cap is a ceiling, and the first set joins the gates
+- **Owner skill:** dev
+- **Why:** the first shipped set (2ea44e40) made the running app print, on Rich, *"a blur of 520 px
+  is past this quality tier's cap of 24 px ... (lower aperture, or pin --tier rich)"* for Synapse,
+  whose look the owner signed off as drawn. That number is the bound at the near edge of the bounding
+  sphere. At `distance = 1.7` against the cloud's radius of `sqrt(3)`, the edge lies behind the eye
+  and is clamped to `NEAR`. ADR-0257, amended 2026-10-01, now defines the cap as the lens's ceiling
+  and judges only `aperture` against it. The repeats the owner saw are re-entries, not frames:
+  `AppState::poll_cap_overflow` triggers on a change in whether an overflow exists, and Synapse's
+  bound is over the cap at every focus and orientation. Each preset switch, dissolve settle and
+  hot-reload announced it again. Nothing in the poll changes.
+  Separately, the suite's only two reds after bbb12053 are this set's missing curation:
+  `every_family_carries_at_least_two_representatives` and the hygiene check that every shipped
+  preset has a gallery card.
+- **What:**
+  - **The notice judges `aperture`.** In `plexus` and in the attractor, the blur overflow is present
+    iff the sanitized `aperture` (finite, at least 0) exceeds the tier's `max_coc_px`, and carries
+    that aperture. The near-extent bound computed in `PlexusScene::render` and `asked_blur` is
+    removed, along with the dead code it leaves. The attractor's flat families stay at exactly 0
+    whatever the aperture. What is drawn does not change: `coc()` in `camera.wgsl` and the CPU
+    `Lens` already clamp to the cap, and no golden moves.
+  - **The Blur text says what was overridden.** It names the aperture rather than "a blur", and the
+    far field rather than "the depth of field", for example *"an aperture of 30 px is past this
+    quality tier's cap of 24 px; drawn at 24 px instead, so the background is sharper than the preset
+    asked (ask for 24 or fewer)"*. `Recovered` follows.
+  - **The remedy is tier-aware in every tier-clamp context.** Iterations, Grid, Radius, Points,
+    Edges and Blur offer `pin --tier rich` only when the tier the run is on is not Rich.
+    `CapOverflow` carries what it needs to decide this, the same way it carries `cap`. The mechanism
+    is dev's call. Mirror and Depth have no tier clause and keep their text.
+  - **The declared range ends at the top cap.** `aperture`'s `ParamSpec` range on both systems ends
+    at `TierConfig::RICH.max_coc_px` (24), and a test holds the two equal. `presets/README.md`'s
+    generated block, `presets/schema/` and `.taplo.toml` are regenerated.
+  - **The docs say what `aperture` is.** In `docs/presets.md`'s depth-of-field paragraph and the
+    preset-author `## plexus` row, it is the blur of the far background, in pixels. Nearer than the
+    focal plane the blur grows past it, and a close camera's near strands draw at the tier's ceiling
+    (12 px on Floor, 24 on Rich) with no notice. Only an aperture past the cap is announced. The
+    systems.md sentence "past about `14` the near edge of a default-framed network already clamps
+    there" goes. Synapse's header claim that it "draws as written on every tier" becomes the far
+    side only. This is a comment edit forced by an engine meaning change (ADR-0081).
+  - **The first set joins the gates.** Add `representative = true` to `plexus_synapse.toml` (cloud)
+    and `plexus_stormsea.toml` (sheet). Add five `CARDS` entries to `scripts/docs-shots.mjs`, with
+    the rendered cards under `docs/images/gallery/presets/`. Re-point the plexus system card, whose
+    comment says "UNJUDGED ... the system ships no preset yet", at Synapse, and rewrite that comment.
+- **Files touched:** `core/src/render/scenes/mod.rs`, `core/src/render/scenes/plexus/`,
+  `core/src/render/scenes/particles/`, the other tier-clamp producers that build a `CapOverflow`
+  (`analytic_field/`, `cellular/`), `core/tests/`, `presets/README.md`, `presets/schema/`,
+  `.taplo.toml`, `presets/plexus_synapse.toml`, `presets/plexus_stormsea.toml`,
+  `scripts/docs-shots.mjs`, `docs/images/gallery/`, `docs/presets.md`,
+  `.claude/skills/preset-author/references/systems.md`.
+- **Done when:**
+  - Synapse's camera (`distance` 1.7, `fov` 1.25, `aperture` 11, `focus` at 0.2, 0.5 and 0.8)
+    produces no overflow on either tier.
+  - `aperture` 13 on Floor produces a Blur overflow with cap 12 whose text contains
+    `pin --tier rich`.
+  - `aperture` 30 on Rich produces one whose text does not contain `--tier`.
+  - The same tier-clause property holds for at least one other tier-clamp context.
+  - The existing `Blur(40)` assertions in the particles tests follow the new rule.
+  - Every golden is unchanged.
+  - `every_family_carries_at_least_two_representatives` and the gallery-card hygiene test pass.
+  - `cargo nextest run --workspace` exits 0, and so do `node scripts/check-doc-links.mjs`,
+    `node scripts/check-system-counts.mjs` and `node scripts/toc.mjs --check`.
 
 ## Data shapes
 

@@ -1,7 +1,7 @@
 # ADR-0257 — A shared camera projects 3D primitives, and depth of field is a per-endpoint circle of confusion
 
 > **Status:** proposed
-> **Date:** 2026-09-30
+> **Date:** 2026-09-30, amended 2026-10-01 (the tier cap is a ceiling, before acceptance)
 > **Related plan(s):** [0235](../plans/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md)
 
 ## Context
@@ -50,6 +50,19 @@ divides the field of view, and `pan_x` / `pan_y` shift after projection, so both
 a 3D scene. The attractor adopts the shared **CoC** function on the view depth it already computes.
 Its projection stays, because its tuple rosters' framing is curated against it (ADR-0093).
 
+**The tier cap is the lens's ceiling, and only `aperture` is judged against it.** The thin-lens
+circle of confusion is asymmetric about the focal plane. Behind focus it rises toward `aperture` and
+never passes it, so `aperture` is the blur of the far background, in pixels. In front of focus it
+grows without bound as the depth shrinks: at a close camera, a point at depth `d` against a focal
+depth `f` blurs by `aperture * (f/d - 1)`. Any camera with near geometry and a nonzero aperture
+therefore meets the cap on every tier. The drawn response is defined as
+`min(aperture * |d - f| / d, max_coc_px)`: near-side saturation is that function behaving as
+specified, and nothing announces it. ADR-0007's notice fires on the authored value: **an `aperture`
+past the tier's `max_coc_px`**, which is the one case where the far field, the part the parameter
+names, draws shallower than the preset wrote. The notice names the remedy for the tier the run is
+on, and it never suggests pinning `--tier rich` to a run already on Rich. The parameter's declared
+range ends at the top tier's cap, so every value in it draws as written on Rich.
+
 ## Consequences
 
 ### Positive
@@ -72,6 +85,11 @@ Its projection stays, because its tuple rosters' framing is curated against it (
 - **The camera exists twice**: once in WGSL, and once in Rust for the CPU work of near-plane
   clipping and frustum culling that a scene does before upload. That is the
   `particles/projection_mirror.rs` hazard again, and it needs the same test pinning the two equal.
+- **The near side differs by tier, silently.** Floor saturates a close camera's near strands at
+  12 px and Rich at 24, and no notice says so. The engine already treats render quality that differs
+  by tier this way (`bloom_levels`, `post_cap`). The notice is kept for an authored value the tier
+  overrode. A preset author who needs the near blur identical on both tiers has no lever except
+  keeping the camera back.
 - The attractor gets depth of field without the real camera, so "shared" is only half true for it
   until a later plan moves its framing onto `Camera3d`.
 
@@ -96,6 +114,22 @@ Project each endpoint on the CPU and give `SegmentInstance` per-endpoint width a
 lost on two counts. Widening the instance changes the layout under every 2D line scene, including
 `warp_mesh`, whose softness pin is byte-sensitive. And the attractor runs on the GPU, so it could
 not use a CPU camera at all and would need a WGSL copy of the maths anyway.
+
+### Alternative D — announce the widest blur the volume could ask for
+This is what Plan 0235 first built. Its bound is evaluated at the near edge of the bounding sphere.
+When the camera sits inside that sphere, the edge lies behind the eye and is clamped to the near
+plane, so the number reported is `aperture * (f / NEAR - 1)`. For the first shipped cloud preset
+that was 520 px against an aperture of 11, on every tier and at every focus. It lost because it
+reports a structural property of a close camera as a fault. It tells the operator to lower a
+parameter that would have to fall under 0.3 to silence it, and it fires on a look the owner signed
+off.
+
+### Alternative E — keep the bound, and announce only below the top tier
+Treating Rich's cap as the engine ceiling and Floor's as a tier loss is honest about the near-side
+difference. It lost because every close-camera preset would then warn on every Floor load, with
+`pin --tier rich` as the only remedy, for a difference no parameter controls. A notice that cannot
+be acted on, short of changing tier, is noise. Warning once per load or judging the request at rest
+were rejected for the same reason: they make the wrong question quieter.
 
 ## Notes
 
