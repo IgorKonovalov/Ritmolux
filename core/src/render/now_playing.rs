@@ -29,6 +29,9 @@
 
 use std::borrow::Cow;
 
+use super::panel::Panel;
+use super::theme::THEME;
+
 /// Seconds the banner takes to reach full opacity.
 pub const FADE_IN_SECS: f32 = 0.5;
 /// Seconds the banner holds at full opacity.
@@ -55,10 +58,6 @@ const TITLE_SIZE: f32 = 32.0;
 /// Must match `text::LINE_HEIGHT_RATIO` — the vertical extent glyphon gives a
 /// run, which is what stacks the two lines without them overlapping.
 const LINE_HEIGHT_RATIO: f32 = 1.25;
-/// Dimmer than the title: an attribution, not the announcement itself.
-const ARTIST_COLOR: [f32; 3] = [0.72, 0.80, 0.92];
-/// Near-white, matching the preset name's weight in the corner.
-const TITLE_COLOR: [f32; 3] = [0.95, 0.97, 1.0];
 
 /// Mean glyph advance as a fraction of the font size, used only to pick a
 /// character budget for truncation. A sans-serif estimate, deliberately not a
@@ -96,6 +95,9 @@ pub struct NowPlaying {
     /// injected `dt` and clamped at [`TOTAL_SECS`] so it cannot grow unbounded
     /// across a long session.
     elapsed: f32,
+    /// Whether the envelope is a step rather than the theme's curve — the
+    /// shell's reduced-motion choice.
+    reduced: bool,
 }
 
 impl NowPlaying {
@@ -128,12 +130,23 @@ impl NowPlaying {
         self.elapsed = (self.elapsed + dt).min(TOTAL_SECS);
     }
 
+    /// Make the envelope a step (`true`) or the theme's eased fade (`false`,
+    /// the default). A step shows the banner at full opacity for its whole
+    /// lifetime and not at all after it.
+    pub fn set_reduced_motion(&mut self, reduced: bool) {
+        self.reduced = reduced;
+    }
+
     /// The current opacity in `0.0..=1.0`; zero when there is nothing to draw.
     pub fn alpha(&self) -> f32 {
         if self.text.is_empty() {
             return 0.0;
         }
-        alpha_at(self.elapsed)
+        if self.reduced {
+            step_at(self.elapsed)
+        } else {
+            alpha_at(self.elapsed)
+        }
     }
 
     /// The string currently announced (`""` when the banner is unset).
@@ -167,33 +180,72 @@ impl NowPlaying {
             x: INSET_X,
             y: title_y,
             size: TITLE_SIZE,
-            color: rgba(TITLE_COLOR, alpha),
+            // The title is primary text, matching the preset name's weight in
+            // the corner; the artist is an attribution and reads dimmer.
+            color: rgba(THEME.text.rgb(), alpha),
         });
         let artist_line = artist.map(|artist| BannerLine {
             text: fit(artist, budget(width, ARTIST_SIZE)),
             x: INSET_X,
             y: artist_y,
             size: ARTIST_SIZE,
-            color: rgba(ARTIST_COLOR, alpha),
+            color: rgba(THEME.text_dim.rgb(), alpha),
         });
 
         [artist_line, title_line]
     }
 }
 
-/// The envelope: ramp in, hold, ramp out, then nothing. A pure function of
-/// elapsed seconds, which is what makes it identical at any refresh rate and
-/// testable without a device.
+/// The panel the banner's lines sit on, given each line's measured width, or
+/// `None` while the banner is invisible.
+///
+/// It fades with the text: the panel's alpha is the envelope the lines carry,
+/// so the backdrop never lingers after the words, or arrives before them.
+pub fn backdrop(lines: &[Option<BannerLine<'_>>; 2], widths: [f32; 2]) -> Option<Panel> {
+    let mut bounds: Option<(f32, f32, f32, f32, f32)> = None;
+    for (line, width) in lines.iter().zip(widths) {
+        let Some(line) = line else { continue };
+        let (x0, y0) = (line.x, line.y);
+        let (x1, y1) = (line.x + width, line.y + line.size * LINE_HEIGHT_RATIO);
+        let [_, _, _, alpha] = line.color;
+        bounds = Some(match bounds {
+            None => (x0, y0, x1, y1, alpha),
+            Some((a, b, c, d, e)) => (a.min(x0), b.min(y0), c.max(x1), d.max(y1), e.max(alpha)),
+        });
+    }
+    let (x0, y0, x1, y1, alpha) = bounds?;
+    Some(Panel {
+        alpha,
+        ..Panel::around(x0, y0, x1, y1, THEME.space[1])
+    })
+}
+
+/// The envelope: ease in, hold, ease out, then nothing — both ramps on the
+/// theme's one curve, the fade-out its mirror so it leaves as it arrived. A pure
+/// function of elapsed seconds, which is what makes it identical at any refresh
+/// rate and testable without a device.
 pub fn alpha_at(elapsed: f32) -> f32 {
     if !elapsed.is_finite() || elapsed <= 0.0 {
         return 0.0;
     }
     if elapsed < FADE_IN_SECS {
-        elapsed / FADE_IN_SECS
+        THEME.ease.at(elapsed / FADE_IN_SECS)
     } else if elapsed < FADE_IN_SECS + HOLD_SECS {
         1.0
     } else if elapsed < TOTAL_SECS {
-        (TOTAL_SECS - elapsed) / FADE_OUT_SECS
+        1.0 - THEME
+            .ease
+            .at((elapsed - FADE_IN_SECS - HOLD_SECS) / FADE_OUT_SECS)
+    } else {
+        0.0
+    }
+}
+
+/// The reduced-motion envelope: full opacity for the banner's whole lifetime,
+/// nothing before or after it.
+pub fn step_at(elapsed: f32) -> f32 {
+    if elapsed.is_finite() && elapsed > 0.0 && elapsed < TOTAL_SECS {
+        1.0
     } else {
         0.0
     }
@@ -461,6 +513,49 @@ mod tests {
         // Clear of the top-left furniture the shell owns (the preset name at
         // y = 16 and the F3 panel below it).
         assert!(artist.y > h * 0.5, "the banner belongs in the lower half");
+    }
+
+    /// The fade takes the theme's ease-out: past halfway by a quarter of the
+    /// fade-in, where the linear ramp it replaces was at a quarter.
+    #[test]
+    fn the_fade_in_takes_the_theme_easing() {
+        let a = alpha_at(FADE_IN_SECS * 0.25);
+        assert!((a - THEME.ease.at(0.25)).abs() < 1e-6);
+        assert!(a > 0.5, "an ease-out is past halfway early, got {a}");
+    }
+
+    /// Reduced motion makes the envelope a step: full for the whole lifetime,
+    /// nothing after it.
+    #[test]
+    fn reduced_motion_makes_the_envelope_a_step() {
+        let mut np = NowPlaying::default();
+        np.set_reduced_motion(true);
+        np.set("Artist - Title");
+        np.advance(0.001);
+        assert_eq!(np.alpha(), 1.0, "a step is full from the first frame");
+        np.advance(TOTAL_SECS - 0.01);
+        assert_eq!(np.alpha(), 1.0, "and full to the last");
+        np.advance(1.0);
+        assert_eq!(np.alpha(), 0.0, "and gone after it");
+    }
+
+    #[test]
+    fn the_backdrop_holds_both_lines_and_fades_with_them() {
+        let mut np = NowPlaying::default();
+        np.set("Artist - Title");
+        assert!(backdrop(&np.layout(1920.0, 1080.0), [0.0; 2]).is_none());
+
+        np.advance(FADE_IN_SECS / 2.0);
+        let lines = np.layout(1920.0, 1080.0);
+        let panel = backdrop(&lines, [120.0, 200.0]).unwrap();
+        let (artist, title) = (lines[0].as_ref().unwrap(), lines[1].as_ref().unwrap());
+        assert!(panel.x < artist.x && panel.y < artist.y);
+        assert!(panel.x + panel.w >= title.x + 200.0);
+        assert!(panel.y + panel.h >= title.y + title.size * LINE_HEIGHT_RATIO);
+        assert!(
+            (panel.alpha - np.alpha()).abs() < 1e-6,
+            "the backdrop's alpha is the envelope's"
+        );
     }
 
     #[test]

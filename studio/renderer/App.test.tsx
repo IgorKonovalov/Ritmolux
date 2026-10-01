@@ -27,6 +27,7 @@ let info: {
   playerSource: string | undefined
   settingsFile: string
   playerMode: string
+  reducedMotion: boolean
 }
 
 beforeEach(() => {
@@ -40,6 +41,7 @@ beforeEach(() => {
     playerSource: 'PATH',
     settingsFile: SETTINGS_FILE,
     playerMode: 'windowed',
+    reducedMotion: false,
   }
   const api = {
     app: {

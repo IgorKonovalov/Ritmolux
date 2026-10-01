@@ -18,6 +18,13 @@ export interface StudioSettings {
   playerPath?: string
   /** Absent, or unreadable, means [`DEFAULT_PLAYER_MODE`]. */
   playerMode?: PlayerMode
+  /** How the window looks and moves; nothing in it reaches the player. */
+  ui?: UiSettings
+}
+
+export interface UiSettings {
+  /** Absent means `false`. Either this or the system's preference stops motion. */
+  reducedMotion?: boolean
 }
 
 export function settingsFile(userData: string): string {
@@ -27,6 +34,11 @@ export function settingsFile(userData: string): string {
 /** The mode to spawn with — the one place the default is applied. */
 export function playerModeOf(settings: StudioSettings): PlayerMode {
   return settings.playerMode ?? DEFAULT_PLAYER_MODE
+}
+
+/** Whether the studio's own motion is off — the one place its default is applied. */
+export function reducedMotionOf(settings: StudioSettings): boolean {
+  return settings.ui?.reducedMotion ?? false
 }
 
 export function readSettings(file: string): StudioSettings {
@@ -45,6 +57,11 @@ export function readSettings(file: string): StudioSettings {
     // A mode this build does not know reads as absent, not as an error: the
     // rest of the file is still usable, and the default is a working answer.
     if (isPlayerMode(record.playerMode)) settings.playerMode = record.playerMode
+    const ui = record.ui
+    if (typeof ui === 'object' && ui !== null && !Array.isArray(ui)) {
+      const reducedMotion = (ui as Record<string, unknown>).reducedMotion
+      if (typeof reducedMotion === 'boolean') settings.ui = { reducedMotion }
+    }
     return settings
   } catch {
     return {}

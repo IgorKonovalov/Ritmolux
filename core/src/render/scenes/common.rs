@@ -41,7 +41,7 @@
 )]
 
 use crate::render::palette;
-use crate::render::scenes::{ParamKind, ParamSpec};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec};
 
 /// `saturation` at rest: fully saturated, the palette's own colour.
 pub(crate) const DEFAULT_SATURATION: f32 = 1.0;
@@ -73,6 +73,8 @@ pub(crate) const SATURATION: ParamSpec = ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Colour,
+    main: false,
 };
 
 /// `palette_mix`, shared: the A/B palette crossfade position.
@@ -82,6 +84,8 @@ pub(crate) const PALETTE_MIX: ParamSpec = ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "Crossfades from the preset's palette to its second one; 0 is the first, 1 the second.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Colour,
+    main: false,
 };
 
 /// `palette_steps`, shared: how many flat bands the palette is cut into.
@@ -91,6 +95,8 @@ pub(crate) const PALETTE_STEPS: ParamSpec = ParamSpec {
     range: Some([0.0, 16.0]),
     doc: "Quantizes the palette into this many flat bands; 0 leaves it continuous.",
     kind: ParamKind::Structural,
+    group: ParamGroup::Colour,
+    main: false,
 };
 
 /// `palette_contour`, shared: the line drawn at each band edge.
@@ -100,6 +106,8 @@ pub(crate) const PALETTE_CONTOUR: ParamSpec = ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "Draws a line at each band edge when the palette is stepped; 0 draws none.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Colour,
+    main: false,
 };
 
 /// `palette_contour_style`, shared: which of the four lines the contour draws
@@ -111,6 +119,8 @@ pub(crate) const PALETTE_CONTOUR_STYLE: ParamSpec = ParamSpec {
     range: Some([0.0, palette::MAX_PALETTE_CONTOUR_STYLE]),
     doc: "Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink.",
     kind: ParamKind::Structural,
+    group: ParamGroup::Colour,
+    main: false,
 };
 
 /// `palette_contour_ink`, shared: where on the palette an ink contour takes its
@@ -121,6 +131,8 @@ pub(crate) const PALETTE_CONTOUR_INK: ParamSpec = ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "Where along the palette an ink contour takes its colour; unread by the two black styles.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Colour,
+    main: false,
 };
 
 /// `pan_x`, shared: the scene's horizontal offset.
@@ -130,6 +142,8 @@ pub(crate) const PAN_X: ParamSpec = ParamSpec {
     range: None,
     doc: "Slides the whole scene sideways, in the scene's own units rather than pixels.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Shape,
+    main: false,
 };
 
 /// `pan_y`, shared: the scene's vertical offset.
@@ -139,6 +153,8 @@ pub(crate) const PAN_Y: ParamSpec = ParamSpec {
     range: None,
     doc: "Slides the whole scene vertically, in the scene's own units rather than pixels.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Shape,
+    main: false,
 };
 
 /// `hue` at the scene's own resting coordinate. See the block docs above.
@@ -149,6 +165,8 @@ pub(crate) const fn hue(default: f32) -> ParamSpec {
         range: Some([0.0, 1.0]),
         doc: "Where this scene reads from the palette, as a coordinate along it rather than a colour.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: true,
     }
 }
 
@@ -160,6 +178,8 @@ pub(crate) const fn brightness(default: f32) -> ParamSpec {
         range: Some([0.0, 2.0]),
         doc: "The scene's overall light level, multiplying what it draws before the composite.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: true,
     }
 }
 
@@ -171,6 +191,8 @@ pub(crate) const fn zoom(default: f32) -> ParamSpec {
         range: Some([0.25, 4.0]),
         doc: "Scales the whole scene about its centre; above 1 fills more of the frame.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     }
 }
 

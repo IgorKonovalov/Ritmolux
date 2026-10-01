@@ -2,7 +2,7 @@
   display: grid;
   grid-template-columns: minmax(7rem, 11rem) 1fr auto;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-1);
   padding: 0.15rem 0;
 }
 
@@ -62,8 +62,8 @@
 /* An unbounded parameter: a field, not a slider. */
 .field {
   background: var(--bg);
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   color: var(--text);
   font-family: var(--mono);
   font-size: 0.75rem;

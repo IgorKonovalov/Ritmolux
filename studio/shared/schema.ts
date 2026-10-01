@@ -29,6 +29,13 @@ export const PARAM_KINDS = ['modal', 'structural'] as const
 export type ParamKind = (typeof PARAM_KINDS)[number]
 
 /**
+ * Which part of the look a parameter moves (ADR-0256), in the order the
+ * parameter panel lists its groups.
+ */
+export const PARAM_GROUPS = ['shape', 'motion', 'colour', 'light', 'post'] as const
+export type ParamGroup = (typeof PARAM_GROUPS)[number]
+
+/**
  * Where one parameter reads on one family of a family-bearing system.
  *
  * `family` is spelled exactly as a preset writes it in its own family table, and
@@ -57,6 +64,15 @@ export const paramSpecSchema = z.object({
    */
   range: z.tuple([z.number(), z.number()]).nullable(),
   doc: z.string(),
+  /**
+   * The group an unbound row is filed under, and whether it opens that group
+   * (ADR-0256). Both are required, unlike `kind` and `families`: the engine
+   * declares them on every parameter, `EXPECTED_PLAYER_VERSION` pins the player
+   * that does, and a panel with no groups to file under has nowhere to put the
+   * rows a preset does not bind.
+   */
+  group: z.enum(PARAM_GROUPS),
+  main: z.boolean(),
   /**
    * A kind this build does not know reads as `modal`, not as a refusal: a
    * continuous control for a quantized parameter is a worse widget, and a whole

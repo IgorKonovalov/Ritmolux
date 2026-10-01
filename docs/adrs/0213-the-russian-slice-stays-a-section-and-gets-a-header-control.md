@@ -1,8 +1,8 @@
 # ADR-0213 — The Russian slice stays a section, and gets a header control
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-30 (Plan 0230), Outcome
 > **Date:** 2026-09-17
-> **Related plan(s):** [0230](../plans/0230-the-russian-slice-becomes-findable.md)
+> **Related plan(s):** [0230](../plans/done/0230-the-russian-slice-becomes-findable.md)
 > **Amends:** [0185](0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)
 > (Alternative C, re-examined against the installed Starlight; the slice, the stamp and the
 > advisory are untouched)
@@ -171,3 +171,19 @@ The route counts were computed by running `splitDocument` over the `PUBLISHED` m
 which is the same code `scripts/check-site-routes.mjs` uses to enumerate routes without a build.
 ADR-0185 wrote 164 routes and this ADR writes 192; the corpus grew, and neither number is wrong for
 its date.
+
+## Outcome (2026-09-30, Plan 0230)
+
+**The decision stands as written, and the `lang` repair the Negative section left unverified was
+taken.** The `Head` override this ADR guessed at was not needed: Starlight 0.42.0's `routeMiddleware`
+option sets `lang`, `entryMeta.lang` and the `og:locale` head entry per route, so the six Russian
+routes (the five translations and the new `ru` entrance page) now render `<html lang="ru">` and
+`<main lang="ru">`, and each of the five twinned pairs carries `en`/`ru` `hreflang` alternates. The
+cost that came with it is a search split: Pagefind builds one index per `<html lang>`, measured at
+`en` 221 pages and `ru` 6, so a search from an English page no longer returns a Russian one.
+
+**"Links to the Russian section" became a page.** The section had no URL, so the plan added a site-owned
+entrance at route `ru` whose link list is generated from `PUBLISHED`; the control on an untwinned page
+points there. The twin rule now lives in one module, `site/src/plugins/twins.mjs`, which the control,
+the in-page link, the middleware and the entrance page all read. The deployed-base reading is owed by
+Plan 0230 Phase 4.

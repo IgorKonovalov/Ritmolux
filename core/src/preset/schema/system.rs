@@ -50,6 +50,11 @@ pub enum SystemKind {
     /// ADR-0012): every grid rule — birth/survival, larger neighbourhoods, the
     /// cyclic automaton — as a `[cellular] family` rather than a system each.
     Cellular,
+    /// Points in 3D joined by a line wherever two lie within a link distance,
+    /// seen through the shared perspective camera (ADR-0257): every
+    /// arrangement of the points as a `[plexus] layout` rather than a system
+    /// each.
+    Plexus,
 }
 
 /// **The** roster of built-in systems: every variant, its canonical name, its
@@ -153,6 +158,12 @@ const TABLE: [(SystemKind, &str, &str, &[ParamSpec]); SystemKind::VARIANT_COUNT]
             "cellular",
             scenes::cellular::PARAMS,
         ),
+        (
+            SystemKind::Plexus,
+            "plexus",
+            "plexus",
+            scenes::plexus::PARAMS,
+        ),
     ]
 };
 
@@ -240,7 +251,7 @@ impl SystemKind {
     /// typed off this count, so bumping the count without adding a row does not
     /// compile either. Both are module-private, so this names them rather than
     /// linking them.
-    pub const VARIANT_COUNT: usize = 14;
+    pub const VARIANT_COUNT: usize = 15;
 
     /// This variant's index into [`TABLE`].
     ///
@@ -264,6 +275,7 @@ impl SystemKind {
             SystemKind::ShapeCollage => 11,
             SystemKind::AnalyticField => 12,
             SystemKind::Cellular => 13,
+            SystemKind::Plexus => 14,
         }
     }
 

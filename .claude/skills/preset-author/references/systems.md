@@ -559,6 +559,33 @@ working range for that lever yet.
 
 ---
 
+## `plexus` — a 3D proximity network through a camera with depth of field
+*Networks, meshes, constellations, data-viz plexus.* Family `plexus` (`plexus_*.toml`). Points in
+3D, joined by a line wherever two are closer than `link_distance`, seen through the shared
+perspective camera (ADR-0257). **No preset ships yet**: the ranges below come from the teaching
+presets in `docs/examples/plexus/` and the plan's renders, not from a curated set, so treat them as
+a starting point and sweep. The `[plexus]` table chooses `layout` (`cloud` — points drifting in a
+cube two units across — or `sheet` — a rippled jittered grid), `points` and `seed`; it is in
+`docs/presets.md`.
+
+| Param | Typical | Controls / natural driver |
+|-------|---------|---------------------------|
+| `link_distance` | `0.28 – 0.45` (cube is 2 across, sheet 3.2) | **The main lever: how connected the network is.** The link count grows with roughly the cube of it on `cloud` and the square on `sheet`, so `0.35 → 0.5` nearly triples a cloud's lines. Past about `0.55` at 600 points the Floor tier's 6000-link cap bites and says so. Bass widening it knits the network on a hit. |
+| `link_alpha` | `0.7 – 1.0` | How strongly a link at its closest draws. Every link still fades to nothing at `link_distance`. |
+| `line_width` / `node_size` | `1.4 – 2.0` / `2 – 3` px | Pixels at the focal plane; nearer is wider. `node_size = "0"` draws no dots at all. |
+| `drift` | `0.1 – 0.3` | How fast the points ride their current (cloud) or the swell travels (sheet). Above `0.5` the network churns rather than breathes. |
+| `wave` / `wave_scale` | `0.12 – 0.25` / `0.8 – 1.4` | **`sheet` only**, inert on `cloud`. Swell height and breadth. |
+| `yaw` | `time * 0.02 – 0.05` | A slow orbit. Faster reads as a spinning object rather than a space. |
+| `pitch` | `0.2 – 0.35` | The default `0.25` looks across a sheet at a grazing angle, which is where its depth of field reads. |
+| `focus` | `0.35 – 0.5` | Where the focal plane sits, `0` nearest, `1` farthest. A slow `0.45 + 0.1 * sin(time * 0.2)` racks focus through the network. |
+| `aperture` | `8 – 12` px | **The far background's blur, in pixels, and it costs fill.** Behind focus a line never blurs past it; in front of focus it blurs more, the more so the closer the camera. The tier caps every blur (12 px Floor, 24 Rich), so a close camera's near strands draw at the cap and nothing is reported. Only an `aperture` past the cap is announced. At `12` or under it draws as written on every tier, and the declared range ends at `24`. |
+| `hue_center` / `hue_spread` | `0.5 – 0.6` / `0.4 – 0.6` | Colour runs along **depth**, near to far, so `hue_spread` tints distance and `palette_steps` bands it. |
+
+The same `focus` / `aperture` pair blurs the attractor's 3D families (`thomas`, `lorenz`), on the
+same 0-nearest scale, and does nothing on the flat maps.
+
+---
+
 ## Engine-wide stages (any system)
 
 | Param | Default | Note |

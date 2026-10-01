@@ -85,7 +85,9 @@ use super::{FeedbackSink, Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::{self, FeedbackConfig, PingPongField};
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{FamilyParam, FamilyRange, ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{
+    FamilyParam, FamilyRange, ParamGroup, ParamKind, ParamSpec, default_of,
+};
 
 /// Compute workgroup size (1D). 64 is a safe, portable default across DX12/Metal.
 const WORKGROUP: u32 = 64;
@@ -212,6 +214,8 @@ const DEFAULT_PERSPECTIVE: f32 = default_of(PARAMS, "perspective");
 /// material is attenuated until it stops competing with near material, which is
 /// what reads as depth for a diffuse cloud that cannot hide anything.
 const DEFAULT_DEPTH_FADE: f32 = default_of(PARAMS, "depth_fade");
+const DEFAULT_FOCUS: f32 = default_of(PARAMS, "focus");
+const DEFAULT_APERTURE: f32 = default_of(PARAMS, "aperture");
 const DEFAULT_DEPTH_HUE: f32 = default_of(PARAMS, "depth_hue");
 /// ADR-0087's colour channels, all four inert at their default. `*_tint` adds an
 /// exact `0` to the palette coordinate; `*_hue` compares equal to literal `0.0`
@@ -644,6 +648,13 @@ pub struct AttractorScene {
     /// work inside the hook (ADR-0030 condition 2).
     trail_w: u32,
     trail_h: u32,
+    /// The render target's height in pixels, as handed to
+    /// [`Scene::set_target_size`](crate::render::scenes::Scene::set_target_size)
+    /// — **not** the trail grid's. The lens states a circle of confusion in
+    /// pixels of the target (ADR-0257), and the trail grid is a resolution that
+    /// the grid scale and the tier cap shrink below the target (ADR-0037), so a
+    /// blur measured in its pixels would widen on screen as the grid shrank.
+    target_h: u32,
     /// The active tier's cap on the trail grid
     /// ([`TierConfig::attractor_trail_cap`](crate::render::TierConfig::attractor_trail_cap)),
     /// resolved once at construction. Read only in `set_target_size`, so the grid
@@ -848,6 +859,16 @@ pub struct AttractorScene {
     /// uniform is packed. `0` is the orthographic projection this scene shipped
     /// with, and it is inert on the 2D families whatever it is set to.
     perspective: f32,
+    /// The shared lens (ADR-0257): `focus` normalized to the figure's depth, 0
+    /// nearest, and `aperture` in pixels. Inert on the 2D families, and inert
+    /// everywhere at `aperture = 0`.
+    focus: f32,
+    aperture: f32,
+    /// The tier's cap on the circle of confusion, in pixels.
+    max_coc: f32,
+    /// This frame's blur clamp, if the lens asked past [`max_coc`](Self::max_coc),
+    /// for the renderer to announce (ADR-0007: a cap is never silent).
+    blur_clamp: Option<super::lines::CapOverflow>,
     /// Atmospheric depth cues (ADR-0076), the substitute for occlusion:
     /// `depth_fade` attenuates a particle's brightness with distance (clamped to
     /// `[0, 1]` where the uniform is packed — past `1` the multiplier would go
@@ -933,6 +954,7 @@ impl AttractorScene {
         anchor: u32,
         ceiling: u32,
         trail_cap: (u32, u32),
+        max_coc: f32,
     ) -> Self {
         // A ceiling under the anchor would allocate less than the law's own floor
         // resolves to and index past the buffer; the law clamps the same way.
@@ -966,6 +988,7 @@ impl AttractorScene {
             density: 1.0,
             trail_w: TRAIL_FALLBACK_W,
             trail_h: TRAIL_FALLBACK_H,
+            target_h: TRAIL_FALLBACK_H,
             seed_particles,
             needs_upload: true,
             pending_jitter: false,
@@ -1000,6 +1023,10 @@ impl AttractorScene {
             hue_center: DEFAULT_HUE_CENTER,
             zoom: DEFAULT_ZOOM,
             perspective: DEFAULT_PERSPECTIVE,
+            focus: DEFAULT_FOCUS,
+            aperture: DEFAULT_APERTURE,
+            max_coc,
+            blur_clamp: None,
             depth_fade: DEFAULT_DEPTH_FADE,
             depth_hue: DEFAULT_DEPTH_HUE,
             map_tint: DEFAULT_CHANNEL_COLOUR,
@@ -1416,6 +1443,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "First of the four family coefficients; what it means depends on the attractor family the tuple picked.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "b",
@@ -1423,6 +1452,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "Second family coefficient - see the roster's attractor essay for what each family does with it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "c",
@@ -1430,6 +1461,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "Third family coefficient, and on the IFS figures it means nothing at all.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "d",
@@ -1437,6 +1470,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "Fourth family coefficient; like the other three it is inert on the IFS figures.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "tuple",
@@ -1444,6 +1479,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: None,
         doc: "Picks a whole known-good figure - family, coefficients and framing together.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "size",
@@ -1451,6 +1488,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "Size of each particle's deposit into the accumulation.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),
     crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
@@ -1460,6 +1499,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much of the accumulation survives each second; near 1 the figure builds up for a long time.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "hue_spread",
@@ -1467,6 +1508,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How far across the palette the particle band reaches.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "hue_center",
@@ -1474,6 +1517,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Where that band sits along the palette.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,
@@ -1488,6 +1533,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Crossing zero throws every particle back onto a fresh start position.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "perspective",
@@ -1495,6 +1542,26 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How strongly depth shrinks a particle, turning a flat figure into a solid one.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
+    },
+    ParamSpec {
+        name: "focus",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
+    },
+    ParamSpec {
+        name: "aperture",
+        default: 0.0,
+        range: Some([0.0, crate::render::TierConfig::RICH.max_coc_px as f32]),
+        doc: "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "depth_fade",
@@ -1502,6 +1569,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much depth dims a particle, which is what reads as air between the layers.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "depth_hue",
@@ -1509,6 +1578,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Shifts colour with depth, so far parts of the figure sit elsewhere on the palette.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "spin",
@@ -1516,6 +1587,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-2.0, 2.0]),
         doc: "Turns per second the figure rotates by about its vertical axis.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "morph",
@@ -1523,6 +1596,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Travels between the tuple's figure and the next one; the visible rate is steepest near zero.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "curl",
@@ -1530,6 +1605,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-2.0, 2.0]),
         doc: "Adds a rotational term to the map, curling the trajectories.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "vigor",
@@ -1537,6 +1614,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "How far a particle moves per step, so higher spreads the figure and thins it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "lean",
@@ -1544,6 +1623,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Tilts the map, breaking the figure's symmetry.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "bias",
@@ -1551,6 +1632,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Offsets the map, sliding the figure within its own attractor.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "map_tint",
@@ -1558,6 +1641,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much a particle's colour follows which branch of the map produced it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "map_hue",
@@ -1565,6 +1650,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "How far apart on the palette those branches are placed.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "root_tint",
@@ -1572,6 +1659,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much a particle's colour follows the seed it started from.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "root_hue",
@@ -1579,6 +1668,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "How far apart on the palette those seeds are placed.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "emergence",
@@ -1586,6 +1677,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 60.0]),
         doc: "How many seconds the figure takes to settle out of its starting cloud.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "fb_zoom",
@@ -1593,6 +1686,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.9, 1.1]),
         doc: "Scale the attractor's own accumulation is grown by each second.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "fb_rotate",
@@ -1600,6 +1695,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Turns per second that accumulation is rotated by.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "fb_dx",
@@ -1607,6 +1704,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Sideways drift of that accumulation, in frame widths per second.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "fb_dy",
@@ -1614,6 +1713,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Vertical drift of that accumulation, in frame heights per second.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "fb_center_x",
@@ -1621,6 +1722,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "The horizontal point its zoom and rotation pivot about, in uv.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "fb_center_y",
@@ -1628,6 +1731,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "The vertical point its zoom and rotation pivot about, in uv.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "fb_warp",
@@ -1635,6 +1740,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 0.5]),
         doc: "Amplitude of a swirl added to its feedback sample, so the trail curls.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
 ];
 
@@ -1649,6 +1756,10 @@ impl FeedbackSink for AttractorScene {
 impl Scene for AttractorScene {
     fn name(&self) -> &'static str {
         "attractor"
+    }
+
+    fn mirror_overflow(&self) -> Option<&super::lines::CapOverflow> {
+        self.blur_clamp.as_ref()
     }
 
     fn as_feedback_sink(&mut self) -> Option<&mut dyn FeedbackSink> {
@@ -1692,6 +1803,7 @@ impl Scene for AttractorScene {
         let (w, h) = scaled_trail_grid_size(width, height, self.field_scale, self.trail_cap);
         self.trail_w = w;
         self.trail_h = h;
+        self.target_h = height.max(1);
         self.targeted = true;
         self.budget = attractor_budget(
             self.anchor,
@@ -1737,6 +1849,8 @@ impl Scene for AttractorScene {
         self.zoom = DEFAULT_ZOOM;
         self.perspective = DEFAULT_PERSPECTIVE;
         self.depth_fade = DEFAULT_DEPTH_FADE;
+        self.focus = DEFAULT_FOCUS;
+        self.aperture = DEFAULT_APERTURE;
         self.depth_hue = DEFAULT_DEPTH_HUE;
         self.map_tint = DEFAULT_CHANNEL_COLOUR;
         self.map_hue = DEFAULT_CHANNEL_COLOUR;
@@ -1772,6 +1886,8 @@ impl Scene for AttractorScene {
             "zoom" => self.zoom = value,
             "perspective" => self.perspective = value,
             "depth_fade" => self.depth_fade = value,
+            "focus" => self.focus = value,
+            "aperture" => self.aperture = value,
             "depth_hue" => self.depth_hue = value,
             "map_tint" => self.map_tint = value,
             "map_hue" => self.map_hue = value,
@@ -1970,6 +2086,10 @@ impl Scene for AttractorScene {
             Some(walk) => walk.framing_at(self.morph),
             None => self.entry().framing,
         };
+        self.blur_clamp = blur_overflow(
+            asked_blur(self.aperture, framing.inv_depth_extent(self.family) != 0.0),
+            self.max_coc,
+        );
         let Self {
             res,
             active_count,
@@ -2002,6 +2122,10 @@ impl Scene for AttractorScene {
             zoom,
             pan,
             perspective,
+            focus,
+            aperture,
+            max_coc,
+            target_h,
             depth_fade,
             depth_hue,
             map_tint,
@@ -2064,6 +2188,10 @@ impl Scene for AttractorScene {
                 zoom: *zoom,
                 pan: [pan.x, pan.y],
                 perspective: *perspective,
+                aperture: *aperture,
+                focus: *focus,
+                max_coc: *max_coc,
+                target_height: *target_h,
                 depth_fade: *depth_fade,
                 depth_hue: *depth_hue,
                 map_tint: *map_tint,
@@ -2108,6 +2236,41 @@ impl Scene for AttractorScene {
 // comments already marked, lifted out verbatim: same calls, same order, same
 // `swap()` placement. Free functions rather than methods because `render`
 // destructures `self` to borrow the resources and the params at once.
+
+/// Mirrors `FIGURE_DISTANCE` / `FIGURE_RADIUS` in [`DRAW_SHADER`]: the virtual
+/// lens a figure's normalized depth is laid on (ADR-0257), its orbit target one
+/// unit away and the figure half a unit deep either side of it. Only the
+/// shader's CPU transcription reads them; the scene judges the bare aperture.
+#[cfg(test)]
+pub(super) const FIGURE_DISTANCE: f32 = 1.0;
+#[cfg(test)]
+pub(super) const FIGURE_RADIUS: f32 = 0.5;
+
+/// The blur, in pixels, the tier's cap is judged against: the aperture, which
+/// is the circle of confusion of the far field — behind focus the lens rises
+/// toward it and never passes it. In front of focus the blur grows past it
+/// without bound and saturates at the cap by design, so that side is never
+/// judged (ADR-0257). `aperture` is the raw bound value, sanitized as the
+/// uniform packing sanitizes it.
+///
+/// **Exactly 0 on a family without depth**, which `figure_coc()` in the draw
+/// shader zeroes whatever the aperture, so a flat map never announces a blur.
+pub(super) fn asked_blur(aperture: f32, has_depth: bool) -> f32 {
+    if !has_depth || !aperture.is_finite() {
+        return 0.0;
+    }
+    aperture.max(0.0)
+}
+
+/// The overflow to announce when an aperture of `asked` pixels is past the tier's
+/// `cap`, or `None` when the cap does not bite.
+pub(super) fn blur_overflow(asked: f32, cap: f32) -> Option<super::lines::CapOverflow> {
+    (asked > cap).then(|| super::lines::CapOverflow {
+        dropped: 0,
+        context: super::OverflowContext::Blur(asked.ceil() as u32),
+        cap: cap.max(0.0) as usize,
+    })
+}
 
 #[cfg(test)]
 mod tests;

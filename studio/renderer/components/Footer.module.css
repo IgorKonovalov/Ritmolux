@@ -1,10 +1,10 @@
 .footer {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-2);
   padding: 6px 12px;
   border-top: 1px solid var(--panel-edge);
-  background: var(--panel);
+  background: var(--scanlines), var(--panel);
   color: var(--text-dim);
   font-family: var(--mono);
   font-size: 11px;

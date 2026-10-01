@@ -28,6 +28,7 @@ interface AppInfo {
   playerSource: string | undefined
   settingsFile: string
   playerMode: PlayerMode
+  reducedMotion: boolean
 }
 
 export function App(): JSX.Element {
@@ -41,9 +42,22 @@ export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [problemsOpen, setProblemsOpen] = useState(false)
 
+  /** `ui.reducedMotion` as the settings panel last set it, or as the file held it. */
+  const [reducedMotion, setReducedMotion] = useState<boolean>()
+
   useEffect(() => {
     void window.api.app.getInfo().then(setInfo)
   }, [])
+
+  // The stylesheet reads this attribute and zeroes every motion token under it,
+  // so the switch is one attribute on the root rather than a prop through every
+  // component.
+  const motionReduced = reducedMotion ?? info?.reducedMotion ?? false
+  useEffect(() => {
+    const root = document.documentElement
+    if (motionReduced) root.dataset.motion = 'reduced'
+    else delete root.dataset.motion
+  }, [motionReduced])
 
   const onStats = useCallback((next: PreviewStats) => setStats(next), [])
 
@@ -125,6 +139,8 @@ export function App(): JSX.Element {
             playerPath={info?.playerPath}
             playerSource={info?.playerSource}
             studioVersion={info?.studioVersion ?? '—'}
+            reducedMotion={motionReduced}
+            onReducedMotion={setReducedMotion}
             onClose={() => setSettingsOpen(false)}
           />
         )}

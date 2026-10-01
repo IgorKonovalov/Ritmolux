@@ -198,7 +198,11 @@ fn draws_segments(system: SystemKind) -> bool {
         | SystemKind::AnalyticField
         // The cellular system paints a grid of cells per pixel; its present has
         // no segment list either.
-        | SystemKind::Cellular => false,
+        | SystemKind::Cellular
+        // The plexus strokes 3D segments through the camera's own pipeline,
+        // which the extent diagnostic does not read: its frame is the camera's
+        // frustum, and an edge outside it is culled before it is drawn.
+        | SystemKind::Plexus => false,
     }
 }
 

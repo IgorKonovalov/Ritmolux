@@ -44,6 +44,11 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0261 — the thumbnail child picks its own GPU, and on a hybrid laptop the pass moved the show's frame-time tail](#0261--the-thumbnail-child-picks-its-own-gpu-and-on-a-hybrid-laptop-the-pass-moved-the-shows-frame-time-tail)
 - [0262 — the diffusion filter's cost page reads 2.5x what `quality` measured on Linux, and nothing says which profile a reader should start from](#0262--the-diffusion-filters-cost-page-reads-25x-what-quality-measured-on-linux-and-nothing-says-which-profile-a-reader-should-start-from)
 - [0267 — the conductor's `Remove-Item` deletion bound was never asked of the real CLI](#0267--the-conductors-remove-item-deletion-bound-was-never-asked-of-the-real-cli)
+- [0274 — the cellular scene cannot trace a route through the maze it grows, so a labyrinth never shows its longest path](#0274--the-cellular-scene-cannot-trace-a-route-through-the-maze-it-grows-so-a-labyrinth-never-shows-its-longest-path)
+- [0275 — Murmuration sits at zoom 0.78, under the swarm's measured seam-safe 0.84 and under the range the seam test says the shipped presets reach](#0275--murmuration-sits-at-zoom-078-under-the-swarms-measured-seam-safe-084-and-under-the-range-the-seam-test-says-the-shipped-presets-reach)
+- [0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen](#0276--a-collage-elements-own-drift-and-spin-are-too-slow-for-the-animation-gate-to-see-so-a-sparse-canvas-reads-as-frozen)
+- [0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`](#0277--the-owners-hotkey-walk-and-the-live-retune-loop-exist-only-as-scratch-scripts-under-target)
+- [0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated](#0278--plexus-lays-its-points-in-a-cube-or-on-a-plane-so-a-turning-wire-sphere-is-only-approximated)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1001,6 +1006,10 @@ takes exactly the re-census the paragraph above instructs, and nothing else: it 
 `docs/milkdrop-conversion.md` beside the earlier eras. The array lowering and the blank-render hunt
 are not taken, and the ranking against 0109 is unchanged. This entry stays live.
 
+**Moved 2026-10-01** - the re-census left Plan 0202 at its split and is now
+[Plan 0246](plans/0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) Phase 4,
+unchanged in scope. This entry stays live.
+
 ---
 
 ## 0109 — disk textures are 88.7 % of every MilkDrop conversion failure, and the exclusion's trigger condition is already met
@@ -1112,6 +1121,12 @@ else.
 re-runs the same seven pairs against the same rig as its Phase 5. **That verdict is this entry's
 trigger and the plan does not touch the reach question**: no ADR, no interview, no change to the
 disk-texture exclusion. This entry stays live and unpromoted until the gate reads.
+
+**Moved 2026-10-01** - Plan 0202 closed on its first three phases: the rate candidate was
+falsified and the echo orientation repaired. The per-mode waveform scale and the fourth look gate,
+this entry's trigger, are now
+[Plan 0246](plans/0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md)
+Phases 1-3, waiting on the Windows rig.
 
 Nothing in this entry's own arithmetic moved: 1 826 files, 88.7 % of every conversion failure, 25x
 the ~71 of
@@ -1801,3 +1816,97 @@ the `spike/README.md` table beside the Linux ones.
 - **Verified 2026-09-27** — the rule exists and the table says it was not asked:
   `present: PowerShell\(Remove-Item \*\$\*\) in: tools/conductor/settings.conductor.json`
 - **Verified 2026-09-27** — `present: Remove-Item -Recurse .*not asked in: tools/conductor/spike/README.md`
+
+## 0274 — the cellular scene cannot trace a route through the maze it grows, so a labyrinth never shows its longest path
+
+At the 0232 retune the owner asked for `cellular_labyrinth` to print, in red, the longest path through
+the maze the automaton is growing. The scene has no notion of a path. It holds each cell's state and,
+for a dead cell, how many generations ago it died, and it colours from those two numbers alone. So
+the red the retune could give it marks cells that changed recently, not a route. A route needs a
+search over the live grid: a breadth-first pass from one open cell, then a second from the farthest
+cell it reached, which finds the longest shortest path in a maze with no loops. It would have to run
+on the GPU, or on a readback of a grid of up to 1024 by 1024 cells, and be repeated as the maze
+changes. The drawn route could be one new overlay colour, or a distance a palette reads.
+
+- **Raised:** 2026-09-30 by the owner at the Plan 0232 Phase 4 retune, filed by `preset-author`.
+  **Owner if taken:** `architect` (does the route run on the GPU or on a readback, and how often
+  is it refreshed), then `dev`.
+- **Verified 2026-09-30** — the scene has no route search:
+  `absent: [Bb]readth|\bbfs\b|\bBFS\b|[Ll]ongest path in: core/src/render/scenes/cellular`
+
+## 0275 — Murmuration sits at zoom 0.78, under the swarm's measured seam-safe 0.84 and under the range the seam test says the shipped presets reach
+
+`presets/README.md` measures the swarm's wrap seam as usable down to about **`0.84`**. Below it, the
+near depth layer reaches the frame edge first. `swarm_murmuration.toml` binds `zoom = "0.78"`, a
+constant, so it sits under that bound for its whole run. The seam test in
+`core/src/render/scenes/swarm/tests.rs` takes its concrete zooms from `SHIPPED_ZOOMS`, which starts
+at `0.99` and whose doc says it is "the range the shipped presets actually reach". The test therefore
+never measures the shipped minimum, and nothing gates it. Two questions follow. Does Murmuration
+show the seam on screen? The walk kept it, and the seam was not what anyone was looking for. And
+should `SHIPPED_ZOOMS` be derived from the shipped set rather than written down?
+
+- **Raised:** 2026-09-30 by `preset-author`, found while re-pointing the seam test's comment off the
+  retired `swarm_drift` at Plan 0232 Phase 4. **Owner if taken:** the owner (a look at Murmuration
+  in the running app), then `dev` (widen `SHIPPED_ZOOMS`, or derive it).
+- **Verified 2026-09-30** — Murmuration binds the constant:
+  `present: ^zoom = "0\.78" in: presets/swarm_murmuration.toml`
+- **Verified 2026-09-30** — the test's shipped range starts above it:
+  `present: SHIPPED_ZOOMS: \[f32; 5\] = \[0\.99 in: core/src/render/scenes/swarm/tests.rs`
+
+## 0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen
+
+`shape_collage` moves an element at `DRIFT_SPEED` (0.035 canvas units a second at `drift = 1`,
+scaled by a per-element 0.3 to 1) and turns it at `SPIN_SPEED` (0.07 rad/s at `spin = 1`). The
+animation gate compares frames 24 and 48 of a 96x96 capture. In that 0.4 s an element travels about
+a pixel at most, so the gate cannot see the scene's own motion. A dense canvas passes anyway,
+because forty edges each moving a little add up. At Plan 0232 Phase 4, On White was cut from forty
+elements to five-to-seven and was convicted frozen (0.0018 against the 0.01 floor). Raising `drift`
+from 0.55 to 1.3 and `spin` from 0.35 to 0.8 moved that score by nothing measurable. It passed only
+once a constant `pump_size` of 0.9 made every form breathe. That pump is now part of its look,
+chosen by the gate rather than by the owner. The question is which side is wrong. Either a sparse
+collage is legitimately too still to ship, or the gate's window is too short for a scene whose
+motion is slow by design. If the gate is wrong, the fix is a longer window for this system, or a
+per-system note in `docs/testing.md`, not a faster `DRIFT_SPEED`.
+
+- **Raised:** 2026-09-30 by `preset-author`, at Plan 0232 Phase 4's On White retune.
+  **Owner if taken:** `architect` (is the gate or the scene wrong), then `dev`.
+- **Verified 2026-09-30** — the drift and spin rates:
+  `present: const DRIFT_SPEED: f32 = 0\.035; in: core/src/render/scenes/shape_collage/layout.rs`
+- **Verified 2026-09-30** — `present: const SPIN_SPEED: f32 = 0\.07; in: core/src/render/scenes/shape_collage/layout.rs`
+
+## 0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`
+
+Plan 0232's walk (Phase 2) and its retunes and sittings (Phase 4) ran on two throwaway scripts. They
+live in the gitignored `target/p0232/`. `walk.sh` loads one family into a player on its own
+`RLX_PRESET_DIR` and `XDG_DATA_HOME`, moves the window to a workspace and makes it fullscreen. The
+owner then marks keep and cut with F1 and F2, and `apply.py` folds that run's `marks.toml` into the
+ledger. `retune.sh` loads a named set of presets, which are edited in place while the player
+hot-reloads them. The owner called the hotkey walk a large speed-up, and every Phase 4 verdict came
+from it. Plan 0204 Phase 4 and 0232 Phase 6 both need the same loop, and a `cargo clean` deletes it.
+The window placement is Hyprland-specific, which is one reason it is not a script in `scripts/`
+today. The part worth keeping is portable: a preset set loaded into an isolated data directory,
+with marks read back afterwards.
+
+- **Raised:** 2026-09-30 by `preset-author`, at the end of Plan 0232 Phase 4. **Owner if taken:**
+  `architect` (does a judging loop belong in `scripts/`, and in what shape), then `dev`.
+- **Verified 2026-09-30** — nothing in the repository carries it:
+  `absent: walk\.sh|retune\.sh|apply\.py in: scripts`
+
+## 0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated
+
+Plan 0204 Phase 2 routed pick 12, a wire sphere made of ribbons turning on its axis, to `plexus`.
+That is the only system with a real 3-D camera and links that fade in and out. But `PlexusLayout`
+has two variants. `cloud` scatters points through a cube and `sheet` lays a jittered grid on a
+plane. Neither puts points on a closed surface, so the sphere's silhouette, the thing the look
+depends on, is not reachable. An orbiting cloud reads as a fuzzy ball at best. A `sphere` (or
+`shell`) layout is the obvious shape: points on a sphere, drifting on the surface, with the
+existing `link_distance` choosing how wired it looks. It would be a third variant behind the same
+`[plexus] layout` key, with no new parameter. **Low priority on purpose.** Pick 12 is not in the
+Phase 3 cohort, and only matters if Phase 4's verdict sends the remaining picks forward. Take this
+entry up then, or when a second look asks for a closed 3-D surface.
+
+- **Raised:** 2026-10-01 by `preset-author` at Plan 0204 Phase 2, checked by `architect` the same
+  day. **Owner if taken:** `architect` (is a third layout the right shape), then `dev`.
+- **Verified 2026-10-01** — the two layouts, and no third:
+  `present: ALL: \[PlexusLayout; 2\] in: core/src/render/scenes/plexus/mod.rs`
+- **Verified 2026-10-01** — `absent: Sphere|Shell in: core/src/render/scenes/plexus/mod.rs`

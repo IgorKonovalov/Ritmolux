@@ -32,6 +32,14 @@ export const IPC_CHANNELS = {
    */
   APP_SET_PLAYER_MODE: 'app:set-player-mode',
   /**
+   * Write `ui.reducedMotion` into the studio's settings file (ADR-0240).
+   *
+   * An OS channel for the same reason as the mode's: a file in the per-user
+   * directory. Unlike the mode it needs no relaunch — the renderer applies the
+   * choice itself the moment the write is answered.
+   */
+  APP_SET_REDUCED_MOTION: 'app:set-reduced-motion',
+  /**
    * The resolved player's `--schema` document, fetched once and cached.
    *
    * An OS channel and not a fourth domain one: it carries no message of the

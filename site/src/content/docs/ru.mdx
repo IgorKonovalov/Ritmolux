@@ -1,0 +1,26 @@
+---
+title: Ritmolux по-русски
+description: 'Часть документации Ritmolux, переведённая на русский: установка и работа с приложением.'
+---
+
+import { PUBLISHED } from '../../plugins/rewrite-links.mjs';
+import { langOf } from '../../plugins/twins.mjs';
+
+{/*
+  The Russian slice's front door (ADR-0213): the page the header control links
+  to from an English page with no twin. The list is generated from `PUBLISHED`
+  in map order, so a translation added there joins it with no edit here.
+*/}
+
+export const translations = Object.entries(PUBLISHED).filter(([source]) => langOf(source) === 'ru');
+
+Ниже — страницы документации, переведённые на русский. Остальная документация сайта — на
+английском.
+
+<ul>
+  {translations.map(([, { route, title }]) => (
+    <li>
+      <a href={`${import.meta.env.BASE_URL}${route}/`}>{title}</a>
+    </li>
+  ))}
+</ul>

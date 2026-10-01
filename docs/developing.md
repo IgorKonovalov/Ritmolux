@@ -139,6 +139,18 @@ behind by a system that no longer exists:
 RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test suite preset_schema::
 ```
 
+The same shape holds the interface's look (ADR-0252). `studio/renderer/tokens.css`, the studio's
+colour, type, spacing and motion custom properties, is **generated** from the theme table in
+`core/src/render/theme.rs`, which every engine-drawn surface also reads.
+`core/tests/suite/ui_tokens.rs` fails when the committed file differs from what the table renders.
+To change a colour anywhere, change it in the table and regenerate:
+
+```sh
+RLX_UPDATE_UI_TOKENS=1 cargo nextest run -p rlx-core --test suite ui_tokens::
+```
+
+Never hand-edit `tokens.css`: that is exactly the edit the test fails on.
+
 **Turn format-on-save off for TOML.** The extension ships a formatter, and this project does not
 format TOML: the presets carry deliberate local alignment that every formatter measured against them
 destroyed (ADR-0190). `.taplo.toml` carries no `[formatting]` table, but that cannot stop your

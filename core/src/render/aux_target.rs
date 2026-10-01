@@ -26,6 +26,7 @@
 use super::RenderError;
 use super::context::RenderContext;
 use super::gpu;
+use super::panel::Panel;
 use super::preview::{PreviewTarget, preview_rect};
 use super::text::{TextLayer, TextRun};
 
@@ -378,6 +379,7 @@ impl AuxTarget {
         &mut self,
         ctx: &RenderContext,
         runs: &[TextRun<'_>],
+        panels: &[Panel],
         preview: Option<&PreviewTarget>,
     ) -> Result<(), RenderError> {
         use wgpu::CurrentSurfaceTexture as C;
@@ -415,6 +417,7 @@ impl AuxTarget {
             });
 
         self.text.queue(runs);
+        self.text.queue_panels(panels);
         let (width, height) = (self.config.width, self.config.height);
         let drew = self.text.prepare(&ctx.device, &ctx.queue, width, height);
 
@@ -456,6 +459,7 @@ impl AuxTarget {
                 pass.draw(0..6, 0..1);
             }
             if drew {
+                self.text.render_panels(&mut pass);
                 self.text.render(&mut pass);
             }
         }

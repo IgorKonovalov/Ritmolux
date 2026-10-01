@@ -289,6 +289,12 @@ const CARDS = [
   "curve_prismscope",
   "curve_rosemono",
   "curve_turnabout",
+  // plexus (5)
+  "plexus_crystal",
+  "plexus_cyanotype",
+  "plexus_stormsea",
+  "plexus_synapse",
+  "plexus_wormhole",
   // reaction_diffusion (6)
   "reaction_fluxmono",
   "reaction_glaciermono",
@@ -422,6 +428,20 @@ const IMAGES = [
   {
     out: "docs/images/cellular/cyclic.png",
     presetFile: "presets/cellular_spiral_bloom.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+
+  // --- the plexus system's layouts beyond cloud ---------------------------
+  //
+  // UNJUDGED: the system ships no preset yet, so the sheet is drawn from the
+  // teaching preset the guide prints for it. Filed outside the gallery for the
+  // curves' reason.
+  {
+    out: "docs/images/plexus/sheet.png",
+    presetFile: "docs/examples/plexus/sheet.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
@@ -593,6 +613,17 @@ const IMAGES = [
     // before it through a teaching preset.
     out: "docs/images/gallery/cellular.png",
     presetFile: "presets/cellular_ember_life.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // plexus — Synapse, the cloud layout's declared representative and the
+    // look the owner signed off as drawn: the camera inside the network, focus
+    // racking through it.
+    out: "docs/images/gallery/plexus.png",
+    presetFile: "presets/plexus_synapse.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",

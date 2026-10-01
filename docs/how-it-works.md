@@ -156,6 +156,12 @@ frames, a screen-space kaleidoscope fold, a two-input dissolve that crossfades b
 preset and the incoming one, and a terminal ink tone-remap. A new rendering system inherits all of
 it — including dissolving into and out of every other preset — for free.
 
+A system that draws in three dimensions does it through one shared camera. Its points and lines are
+projected through a real perspective lens, and a line's blur is worked out separately at each of its
+ends, so one line can run sharp through the focal plane and soften toward both ends. A blur applied
+to the finished frame cannot do that, because a pixel of overlapping light has no single depth to
+blur by ([ADR-0257](adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md)).
+
 The stages are parameters like any other, so a preset tunes them by name. The
 [technique catalogue](generative-techniques-catalogue.md) is the survey the scene families came
 out of.

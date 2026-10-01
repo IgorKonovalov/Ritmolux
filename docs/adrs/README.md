@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0256.** *(0120 was reserved for
+**Next free number: 0262.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -234,7 +234,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0210](0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md) | A `.claude/` repair is the owner's, and a session that needs one parks with the edit | accepted 2026-09-16 (Plan 0190), supersedes 0209 in part |
 | [0211](0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md) | A green suite record serves a later tree when no deferred suite can read the diff | accepted 2026-09-16 (Plan 0191), amends 0207 |
 | [0212](0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md) | A converted preset gets its own vertex module, and the pipeline is chosen rather than branched | accepted 2026-09-16 (Plan 0180), Outcome |
-| [0213](0213-the-russian-slice-stays-a-section-and-gets-a-header-control.md) | The Russian slice stays a section, and gets a header control | proposed, amends 0185 |
+| [0213](0213-the-russian-slice-stays-a-section-and-gets-a-header-control.md) | The Russian slice stays a section, and gets a header control | accepted 2026-09-30 (Plan 0230), amends 0185, Outcome |
 | [0214](0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md) | The digest is a current-state page, and history is regenerated on demand | accepted 2026-09-18 (Plan 0193), amends 0205; amended by 0216 |
 | [0215](0215-the-analyzer-publishes-an-absolute-stereo-field.md) | The analyzer publishes an absolute stereo field, and the mono path does not move | accepted 2026-09-19, Plan 0194, extends 0199 |
 | [0216](0216-a-review-finding-is-closed-by-the-owner-and-the-page-stops-carrying-it.md) | A review finding is closed by the owner, and the page stops carrying it | accepted 2026-09-19 (Plan 0195), amends 0214 + 0209 |
@@ -273,8 +273,14 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0249](0249-a-human-phase-may-be-owed-after-the-merge.md) | A human phase marked as not blocking the merge is owed after it, not waited for | accepted 2026-09-24, Plan 0226; amends 0205 |
 | [0250](0250-the-conductor-stays-up-and-resumes-what-the-repository-shows-settled.md) | The conductor stays up, waits instead of stopping, and resumes what the repository shows settled | accepted 2026-09-24, Plan 0226; amends 0205, 0214, 0219 |
 | [0251](0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md) | A gated compile path has a named job, and the upstream reading is advisory | accepted 2026-09-24, Plan 0227; generalises 0181 |
-| [0252](0252-the-interfaces-look-is-declared-once-in-the-core-and-the-studios-stylesheet-is-generated-from-it.md) | The interface's look is declared once in the core, and the studio's stylesheet is generated from it | proposed 2026-09-27, Plan 0231 |
+| [0252](0252-the-interfaces-look-is-declared-once-in-the-core-and-the-studios-stylesheet-is-generated-from-it.md) | The interface's look is declared once in the core, and the studio's stylesheet is generated from it | accepted 2026-09-30, Plan 0231, Outcome |
 | [0253](0253-a-retirement-may-land-ahead-of-its-replacement-when-a-walk-convicts-it.md) | A retirement may land ahead of its replacement when a walk convicts it | proposed 2026-09-27, Plan 0232; amends 0089 |
 | [0254](0254-the-release-artifact-count-runs-on-every-release-run-and-proves-it-refuses.md) | The release artifact count runs on every release run, and proves it refuses | proposed 2026-09-28, Plan 0214 |
 | [0255](0255-a-conductor-session-writes-inside-its-lane-and-the-os-temp-directory.md) | A conductor session writes inside its lane and the OS temp directory | accepted 2026-09-29, Plan 0234, Outcome |
+| [0256](0256-a-parameter-declares-its-group-and-whether-it-is-main.md) | A parameter declares its group and whether it is main | accepted 2026-09-30, Plan 0231 |
+| [0257](0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md) | A shared camera projects 3D primitives, and depth of field is a per-endpoint circle of confusion | accepted 2026-10-01, Plan 0235 |
+| [0258](0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) | A system takes depth through one shared camera block, and its 3D mode forgoes what `seg3d` does not draw | proposed 2026-10-01, Plans 0236-0240 |
+| [0259](0259-the-swarm-projects-through-the-shared-camera-in-a-frustum-shaped-torus.md) | The swarm projects through the shared camera, in a frustum-shaped torus | proposed 2026-10-01, Plan 0239; supersedes 0044 in part |
+| [0260](0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md) | The attractor's 3D families project through the shared camera, and `perspective` retires | proposed 2026-10-01, Plan 0240; amends 0076, 0257 |
+| [0261](0261-the-conductor-parks-only-on-what-the-owner-must-settle.md) | The conductor parks only on what the owner must settle | accepted 2026-10-01, Plan 0241; amends 0207, 0209, 0248 |
 <!-- roster:end -->

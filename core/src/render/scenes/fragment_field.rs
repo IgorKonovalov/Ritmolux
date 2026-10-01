@@ -31,7 +31,7 @@ use super::common;
 use super::{Phase, Scene};
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// Parameter defaults — a calm idle field when nothing is bound.
 const DEFAULT_WARP: f32 = default_of(PARAMS, "warp");
@@ -388,6 +388,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.5]),
         doc: "Amplitude of the domain fold; 0 flattens the field into plain bands.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "field_speed",
@@ -395,6 +397,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "How fast the field itself drifts, as a multiple of its base rate.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "fold_speed",
@@ -402,6 +406,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "How fast the fold turns, independently of the field's own drift.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),
     crate::render::scenes::common::zoom(DEFAULT_ZOOM),
@@ -411,6 +417,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 2.0]),
         doc: "Overall light the field emits, before the composite sees it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: true,
     },
     ParamSpec {
         name: "flash",
@@ -418,6 +426,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Lifts the whole field toward white, for a beat-driven blink.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     crate::render::scenes::common::PAN_X,
     crate::render::scenes::common::PAN_Y,
@@ -427,6 +437,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much of the palette the field's range covers; 0 is one flat colour.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "color_center",
@@ -434,6 +446,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Shifts which part of the field's range lands in the middle of the palette.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,

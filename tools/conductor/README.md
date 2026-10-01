@@ -221,7 +221,7 @@ plan about to start `cli_contract` and pauses the run.
 ## Acting on a park
 
 **Five reasons resume themselves** inside a live run, once the tree shows them settled (ADR-0250):
-`human_phase` and `claude_dir` once the phase's log row reads `done`, or `owed` on a human phase
+`human_phase` and `claude_dir` once every phase they parked on reads `done` in the log, or `owed` on a human phase
 marked `Blocks merge: no` (in the lane, or on `main` when the lane is gone), `usage_limit` once the reset it recorded has passed, `main_dirty` once the main
 checkout is on `main` and clean, and `studio_install` an hour after it failed, three times at most.
 **None of them resumes over a dirty worktree.** Each self-resume prints a line and writes an inbox
@@ -229,8 +229,8 @@ entry. Every other reason is yours: `resume` it once you have acted.
 
 | Reason | What to do before `resume` |
 |---|---|
-| `human_phase` | Do the phase. Mark its row `done` in the plan's `## Implementation log` **in the lane** (`WORK/rlx-plan-NNNN`) and commit it there. `resume` checks the row, and a live run resumes it by itself. A phase marked `Blocks merge: no` settles with an `owed` row and does not need `done`; the conductor writes that row itself when it reaches the phase, so only a park from before the marker was added needs it written by hand: see below. |
-| `claude_dir` | The same, and for the same reason: the phase declares a file under `.claude/`, which the CLI will not let a session write (ADR-0210). **Nothing was run** — the park comes before the phase. The detail names the paths. Do the phase in the lane, mark its row `done`, commit; `resume` checks the row. |
+| `human_phase` | Do the phase. Mark its row `done` in the plan's `## Implementation log` **in the lane** (`WORK/rlx-plan-NNNN`) and commit it there. A run of consecutive human phases parks **once**, naming them all (`Phases 4-6 are owned by human`), and holds until **every** row in it is marked: `resume` names the ones still open (ADR-0261). `resume` checks the rows, and a live run resumes it by itself. A phase marked `Blocks merge: no` settles with an `owed` row and does not need `done`; the conductor writes that row itself when it reaches the phase, so only a park from before the marker was added needs it written by hand: see below. |
+| `claude_dir` | The same, and for the same reason: the phase declares a file under `.claude/`, which the CLI will not let a session write (ADR-0210). **Nothing was run** — the park comes before the phase. The detail names the paths. Do the phase in the lane, mark its row `done`, commit; `resume` checks the row. Or amend the plan so the phase no longer declares a `.claude/` path, merge that into the lane, and `resume`: the park settles once the phase names no such file. |
 | `studio_install` | The plan declares files under `studio/` and `npm --prefix studio ci` failed, so the gate's three studio checks could not run (ADR-0218). The detail carries the install's tail; the usual cause is no network. **Nothing was run** — the park comes before the first session. Install by hand in the lane, or wait and `resume`, which installs again: the trigger is a missing `studio/node_modules`, so the open lane the park left behind is installed into rather than skipped. |
 | `stop_condition`, `plan_wrong`, `question` | Read the transcript the inbox names. Settle it in a human-started `/architect` session. A `plan_wrong` from the readiness check names the phase and the contradiction, and nothing was implemented: edit the plan, or resume to overrule it. |
 | `gate_red` | The gate was red, a repair session ran, and the re-run was red too; or the plan had already run its three repairs. The park reads the second run's log. Fix the defect in the lane. |
@@ -377,6 +377,13 @@ node tools/conductor/conductor.mjs finding 0181 3 --wontfix "assertion message, 
   a judgement checked against nothing — so the sentence you type is the whole record of it.
 - **`<ref>` is the index the listing prints**, or the `file:line` exactly one finding carries. A ref
   that matches nothing, or more than one, is refused naming what it saw.
+- **A reopened finding is open too, whatever its severity** (ADR-0261). When a close marks a finding
+  repaired and `git` contradicts it — the `fixed_in` commit does not exist, is not on the branch, or
+  changes neither the finding's file nor a path that file had — the conductor drops the claim instead
+  of parking a clean close. The finding is recorded with `reopened` and the reason, the plan's record
+  lists it under `reopened`, the digest prints it under **Needs you** with `reopened: <reason>`, and
+  `finding NNNN` lists it with an index like any other. A merge can therefore carry one: read the
+  reason, then repair it and close it `--done`, or close it with whichever verb fits.
 - **Only a closed plan has findings.** A plan still in a fix round, or parked at one, carries verdicts
   that closed nothing — its blockers are the conductor's own work in flight — so `finding` refuses it
   either way and names where the plan stands.
@@ -486,11 +493,13 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   nobody thought of would be under-gated silently; an allowlist that forgets a path is merely slow.
   The diff is measured **against the green tree**, not against the stage's own commits, so a
   `git merge main` that brought in another lane's render change re-arms the suite by construction.
-- **A served run never becomes a green record.** Its ledger line carries `served: true` and a `cmd`
-  that is not the one the key names, so neither lookup can read it back: the next stage leans on the
-  full-suite record again, and one `-P fast` never chains off another. The run terminal prints a
-  served step's own line naming the tier and the tree it leaned on, and the history's Totals counts
-  served runs apart from full ones.
+- **A served run is a green record for its own tree and for no other** (ADR-0261). Its ledger line
+  carries `served: true` and a `cmd` that is not the one the key names. The exact-tree lookup reads a
+  green served line back, so a later stage on that same tree skips rather than serving again — it
+  would compute the same serving from the same record. The forward lookup never reads one, so a
+  served line serves no other tree and one `-P fast` never chains off another. The run terminal
+  prints a served step's own line naming the tier and the tree it leaned on, and the history's
+  Totals counts served runs apart from full ones.
 - **The locks.** `with-lock.mjs` holds two machine-wide locks. The **suite** lock stops two lanes
   running the GPU suites at once. The **close** lock runs from before the close session until `main` has
   fast-forwarded, so a version bump and its tag always land on the `main` they were computed against.
@@ -501,7 +510,8 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   the close marks repaired (`fixed_in`, ADR-0209) must name a commit on the branch that changes that
   finding's file, under the path the finding names or the path it had at that commit, following
   every rename git pairs between the commit and the tip and, whatever the similarity, the plan's own
-  move to `done/`.
+  move to `done/`. One that does not is **reopened** rather than parked (ADR-0261): the claim is
+  dropped, the close proceeds, and the finding is open on the digest with the reason.
 
 ## The gate
 
@@ -520,9 +530,10 @@ tiers, and the list they rest on, are in *How it stays safe* above).
 naming the run it relied on and one per served run naming the tree it leaned on and the diff that
 served. The gate and `with-lock.mjs` both consult it: every session is handed
 the ledger in `RLX_SUITE_LEDGER`. They skip on a green record for the exact tree and print that
-record, and the digest counts every skip. **Only the gate serves a record forward**: a session's
-wrapped suite keeps the exact-tree lookup, so the lanes' `## Conductor mode` instructions stay true
-as written. Any change to a tracked file, a doc included, is a new
+record, and the digest counts every skip. **Both serve a record forward the same way**: a session's
+wrapped `cargo nextest run --workspace` on a tree a green record serves runs `-P fast` under the same
+lock and writes a served line, so a close whose diff from the reviewed tree is docs and a version
+bump pays the narrowed suite, and the `post-close` gate then skips on that line (ADR-0261). Any change to a tracked file, a doc included, is a new
 tree. A red run is recorded and never skipped on. Any argument vector other than the ledger's own
 (`SUITE_COMMAND` in `lib/ledger.mjs`) neither skips nor records, and outside the conductor the
 wrapper never reads the ledger.

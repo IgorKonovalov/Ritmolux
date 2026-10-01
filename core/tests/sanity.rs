@@ -521,6 +521,13 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // it, past the 2.2x slack this file allows. Half that minimum, like
         // every floor above.
         SystemKind::Cellular => 0.30,
+        // **Derived from the distribution on 2026-10-01**, when the system's
+        // first five presets shipped, from a `0.02` guess set while it shipped
+        // none. The lowest shipped member is `Storm Sea` at 0.4391 — a sheet
+        // seen from the waterline leaves the sky above the swell dark — and the
+        // guess sat 21.96x under it, past the 2.2x slack this file allows. Half
+        // that minimum, like every floor above.
+        SystemKind::Plexus => 0.22,
     }
 }
 
@@ -655,6 +662,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::ShapeCollage => "shape_collage",
         SystemKind::AnalyticField => "analytic_field",
         SystemKind::Cellular => "cellular",
+        SystemKind::Plexus => "plexus",
     }
 }
 

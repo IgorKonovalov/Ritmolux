@@ -24,6 +24,7 @@ analysis is deterministic too, so a render is reproducible and diff-able.
 <!-- toc:begin depth=3 -->
 - [Captures pin the floor tier](#captures-pin-the-floor-tier)
 - [The `shot` CLI](#the-shot-cli)
+  - [Interface captures: `--ui`](#interface-captures---ui)
   - [The horizon: does a world still look like itself after minutes?](#the-horizon-does-a-world-still-look-like-itself-after-minutes)
   - [`--render`: a music video from a track](#--render-a-music-video-from-a-track)
   - [The three calibration traps](#the-three-calibration-traps)
@@ -128,7 +129,7 @@ Flags:
 | `--size <WxH>` | render size (default 1280x720) |
 | `--out <path>` | output PNG (single shot) or dir/file (`--all`) |
 | `--all` | contact sheet of every preset, labeled (needs `--out`) |
-| `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage, the [transient probe](#the-transient-columns) and an advisory [frame cost](#the-frame-cost-block); `family=` takes any `system` name — every one the scene registry carries: `analytic_field`, `attractor`, `cellular`, `emitter`, `fragment_field`, `lsystem`, `parametric_curve`, `reaction_diffusion`, `shape_collage`, `shape_field`, `spectrum`, `star_pattern`, `swarm`, `warp_mesh` |
+| `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage, the [transient probe](#the-transient-columns) and an advisory [frame cost](#the-frame-cost-block); `family=` takes any `system` name — every one the scene registry carries: `analytic_field`, `attractor`, `cellular`, `emitter`, `fragment_field`, `lsystem`, `parametric_curve`, `plexus`, `reaction_diffusion`, `shape_collage`, `shape_field`, `spectrum`, `star_pattern`, `swarm`, `warp_mesh` |
 | `--json` | emit the report as JSON instead of a text table |
 | `--signal <kind:param>` | synth-audio filmstrip (see below) |
 | `--signal-secs <s>` | how long to synthesize that signal for (default `4`). The clip's length is what decides **which hops exist**, so a late `--frame-at` needs a longer one — [photographing a world that is still assembling](#a-late-hop-photographs-a-world-that-is-still-assembling). Needs `--signal`: `--audio` and `--render` take their length from the file |
@@ -143,10 +144,52 @@ Flags:
 | `--fps <n\|num/den>` | the render mode's frame rate (default 60). A decimal is rejected: write `30000/1001`, not `29.97` |
 | `--ffmpeg <path>` | spawn this encoder and wire the pipe, so one command produces a file. Needs `--out <file>`. No encoder ships and there is no fallback |
 | `--crf <0-51>` | the encoder's rate-quality setting (default 18, archival). Higher is smaller; `+6` is about half the size. Needs `--ffmpeg` — [the one argument you may move](#the-one-canonical-ffmpeg-invocation) |
+| `--ui <state>,...\|all` | [interface captures](#interface-captures---ui) — one `<out>/<state>.png` per state, each state's overlay text composed from fixed fixture data over the preset's frame. System-font text, so a capture and never a golden. Needs `--out <dir>`; not combinable with `--all`, `--report`, `--horizon`, `--render`, `--signal` or `--audio` |
 | `--bar-grid <path>` | also write the render's bar starts, in frames, as JSON — [the file a filter stage places a timeline on](#the-bar-grid---bar-grid). The frame stream is unchanged. Needs `--render` |
 | `--help`, `-h` | print the usage text and exit 0 |
 
 Bad arguments and unknown presets exit non-zero with a message.
+
+### Interface captures: `--ui`
+
+`--ui` photographs the app's own interface — the browser, the settings menu, the corner name, the
+console, the now-playing banner and the diagnostics panel — without a window, a keyboard or a live
+track. Each state is built by the same functions the running app draws with, fed fixed data rather
+than the machine's: a fixed browser roster with two marks and a truncated name, a fixed filter
+string, a fixed banner string and a fixed settings view. So two runs differ only where the code
+does.
+
+```bash
+# Every state, at the two sizes an aspect mistake shows up between (ADR-0037)
+cargo run -p standalone --example shot -- --ui all --size 1920x1080 --out target/ui-audit/1080
+cargo run -p standalone --example shot -- --ui all --size 1280x800 --out target/ui-audit/800
+
+# One state, over a preset of your choosing
+cargo run -p standalone --example shot -- --ui settings --preset "Whorl" --out target/ui-audit
+```
+
+| state | what it shows |
+|-------|---------------|
+| `hud` | the corner preset name carrying a favourite mark, and the rotation countdown under it |
+| `browse` | the browser freshly opened, highlight on the playing preset, the preview pane's placeholder |
+| `browse-filtered` | the browser narrowed by a typed filter, the header naming it |
+| `browse-thumbs` | the browser with a picture in the preview pane — the scene itself, shrunk to the thumbnail cache's size |
+| `settings` | the settings menu freshly opened |
+| `console` | the operator console's header, transport labels and staging line, scaled to the capture as a console window of that size scales them |
+| `banner` | the now-playing banner at full opacity, under the corner name |
+| `diagnostics` | the F3 panel and the audio line under it |
+| `help` | the key help sheet `?` opens on the show, drawn from the table the keys are dispatched from |
+| `all` | every state above, in this order |
+
+The scene is `Nebula` unless `--preset` names another; a library without it falls back to its first
+preset and says so on stderr. `--frames`, `--set`, `--size` and `--tier` mean what they mean for a
+single shot.
+
+**A capture, never a golden.** Text is shaped on the machine's system sans-serif font, so the same
+command draws different glyphs on two machines. Compare captures taken on one machine. Two states
+are approximations of what the app shows. The `console` capture draws the scene full-frame behind
+the lines, where the real console window shows a letterboxed preview. The diagnostics panel's frame
+times read zero, because a capture measures no frames.
 
 ### The horizon: does a world still look like itself after minutes?
 

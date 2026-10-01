@@ -72,6 +72,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
             include_str!("fixtures/analytic_field.toml"),
         ),
         SystemKind::Cellular => ("cellular", include_str!("fixtures/cellular.toml")),
+        SystemKind::Plexus => ("plexus", include_str!("fixtures/plexus.toml")),
     }
 }
 
@@ -135,13 +136,18 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// - `cellular_cyclic` — every other cellular fixture holds a binary state, so
 ///   the colour seed, the cycle's advance and the state-index palette
 ///   coordinate are unreached. The only baseline that runs `cyclic`.
+/// - `plexus_sheet` — the rostered `plexus.toml` draws the `cloud` layout through
+///   a pinhole, so the sheet's grid and height field are unreached, and so is
+///   every blurred branch of the two 3D pipelines: the widened trapezoid, the
+///   per-fragment energy ratio and the node area factor. The only baseline with
+///   an open aperture.
 ///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 14] = [
+const EXTRA_FIXTURES: [(&str, &str); 15] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -180,6 +186,7 @@ const EXTRA_FIXTURES: [(&str, &str); 14] = [
         "cellular_cyclic",
         include_str!("fixtures/cellular_cyclic.toml"),
     ),
+    ("plexus_sheet", include_str!("fixtures/plexus_sheet.toml")),
 ];
 
 /// The stroke fixture's text, named once so the roster entry above and the guard

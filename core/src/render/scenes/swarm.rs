@@ -23,7 +23,7 @@ use super::marks;
 use super::{FALLBACK_DT, Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 // The ASCII bytes of "LMV_SWRM" read as a number. Re-spelling them to
 // match a renamed prefix changes every particle's start state and moves
@@ -609,6 +609,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "How hard the flow field pushes each particle, so higher is faster and straighter.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "spin",
@@ -616,6 +618,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-2.0, 2.0]),
         doc: "Rotational bias added to the flow, curling the paths into vortices.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "burst",
@@ -623,6 +627,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 2.0]),
         doc: "An outward impulse from the centre, for a beat to throw the swarm apart.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),
     crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
@@ -632,6 +638,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "Size of each particle's mark.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "field_freq",
@@ -639,6 +647,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.5, 8.0]),
         doc: "Spatial frequency of the flow field; higher makes smaller, busier eddies.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     crate::render::scenes::common::zoom(DEFAULT_ZOOM),
     crate::render::scenes::common::PAN_X,
@@ -649,6 +659,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How far across the palette the particle band reaches.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "hue_center",
@@ -656,6 +668,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Where that band sits along the palette.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,
@@ -667,6 +681,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Per-particle brightness flicker, seeded so it is reproducible.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "size_spread",
@@ -674,6 +690,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much particle sizes vary about `size`; 0 makes them uniform.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "reseed",
@@ -681,6 +699,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Crossing zero throws every particle back to a fresh start position.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     crate::render::scenes::marks::SHAPE,
     crate::render::scenes::marks::POINTS,

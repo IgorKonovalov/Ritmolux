@@ -102,7 +102,7 @@ use super::marks;
 use crate::dsp::AnalysisFrame;
 use crate::preset::path::{MAX_ARC_PIECES, MAX_SAMPLES};
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// How many `vec4` one arc piece occupies: its circle, its sector test, its two
 /// endpoints, and its signed sweep. See the WGSL's `arc_chain_sd` for what each
@@ -1211,6 +1211,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.05, 2.0]),
         doc: "Size of the shape within the frame.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     crate::render::scenes::common::PAN_X,
     crate::render::scenes::common::PAN_Y,
@@ -1220,6 +1222,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much of the palette the field's range covers.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "color_center",
@@ -1227,6 +1231,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Shifts which part of that range lands in the middle of the palette.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,
@@ -1240,6 +1246,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.25, 4.0]),
         doc: "Shapes the falloff from the shape's edge; below 1 it bites sooner.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "coord_mode",
@@ -1250,6 +1258,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([MIN_COORD_MODE, MAX_COORD_MODE]),
         doc: "Which coordinate frame the distance is measured in, which changes the shape's whole geometry.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "rotation",
@@ -1257,6 +1267,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, std::f32::consts::TAU]),
         doc: "Turns the shape, in radians.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "stroke",
@@ -1264,6 +1276,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Draws the outline instead of the filled figure, at this half-width; 0 fills.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "morph",
@@ -1271,6 +1285,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Travels the authored path towards its morph_to silhouette; inert without one.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
 ];
 

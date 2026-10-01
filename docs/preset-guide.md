@@ -66,7 +66,7 @@ Four things are worth naming, because they are the whole model:
 
 Some systems also take a **structural table** — `[curve]` here, `[generator]` for the two generator
 systems, `[particles]` for the attractor, `[spectrum]` for the readout, `[field]` for the analytic
-field, `[cellular]` for the automaton. Those are declarative
+field, `[cellular]` for the automaton, `[plexus]` for the network. Those are declarative
 configuration read once when the preset loads, **not** expressions: they choose *which figure*, and
 the params then animate it.
 
@@ -387,6 +387,42 @@ rotating spirals, and a cell's colour is simply its place in the cycle laid roun
 hold their history. The grid is a count of cells, not a resolution — a larger grid draws every
 pattern smaller — and the families' own parameters are in the
 [`[cellular]` table](presets.md#the-cellular-table).
+
+### `plexus`
+
+![A loose cube of fine blue lines on black, seen in perspective: a few hundred small dots, each joined
+by thin straight lines to its nearest neighbours, the network densest at the centre and fraying into
+single strands toward the edges](images/gallery/plexus.png)
+
+*`layout = "cloud"` — the teaching preset
+[`docs/examples/plexus/cloud.toml`](examples/plexus/cloud.toml); the system ships no preset yet*
+
+A **network in three dimensions**: a few hundred points, each joined by a line to every other point
+closer than `link_distance`, seen through a camera that orbits the network's centre. A line fades in
+as its two points drift together and out as they part, so the network rewires smoothly and never
+pops. `link_distance` is the main lever: a little longer and every point grows more links, and the
+network fills in. Bind it to the bass and the network knits together on every hit.
+
+The camera is real, with a focal plane. `focus` places it in the network's depth and `aperture`
+decides how strongly everything off it blurs, so one line can run sharp across the focal plane and
+soften toward both of its ends.
+
+![A rippled sheet of linked points seen across at a low angle: a band of crisp pale-blue triangles
+through the middle distance, the near edge widening into soft out-of-focus strokes and the far edge
+dissolving into haze](images/plexus/sheet.png)
+
+*`layout = "sheet"` — the teaching preset
+[`docs/examples/plexus/sheet.toml`](examples/plexus/sheet.toml)*
+
+The **sheet** lays the points on a flat square instead and ripples it with a slow swell. Every point
+keeps its place in the grid, so the mesh moves like cloth rather than rearranging itself. Seen across
+at a grazing angle with the aperture open, the depth of field does the rest: a sharp band where the
+focal plane cuts the sheet, softness before and behind it.
+
+**Reach for this when** the look is a network, a mesh or a constellation with depth to it, and the
+music should move the camera, the focus or how much of it is connected. Wide blur costs drawing time,
+so the quality tier caps it. The layouts and every structural key are in the
+[`[plexus]` table](presets.md#the-plexus-table).
 
 ---
 

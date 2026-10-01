@@ -655,7 +655,7 @@ mod rings;
 pub use motif::{MIN_SCALLOP_LOBES, Motif};
 pub use rings::{DEFAULT_RING_SCALE, MAX_RING_COUNT, RingSpec};
 
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 use motif::*;
 use rings::*;
 
@@ -669,6 +669,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Moves the construction's contact angle, continuously: this is an angle offset \
                rather than an index into a list.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "rotation",
@@ -676,6 +678,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, TAU]),
         doc: "Turns the whole pattern, in radians.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),
     crate::render::scenes::lines::hue_spread(DEFAULT_HUE_SPREAD),
@@ -701,6 +705,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Rotates each concentric ring against its neighbour.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "ring_spread",
@@ -708,6 +714,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 2.0]),
         doc: "How far apart the rings sit radially.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "ring_scale",
@@ -715,6 +723,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.25, 4.0]),
         doc: "How much each ring grows over the one inside it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
 ];
 

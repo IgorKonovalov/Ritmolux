@@ -40,7 +40,7 @@ use super::{FamilyParam, FamilyRange, Scene};
 use crate::dsp::AnalysisFrame;
 use crate::render::gpu;
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// Which closed-form world the field draws (ADR-0180 rule 1).
 ///
@@ -307,6 +307,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "The plate's first mode number: how many nodal lines cross one axis. Equal to \
               `mode_m`, the two waves cancel and the plate is blank.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "mode_m",
@@ -314,6 +316,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([1.0, MAX_MODE]),
         doc: "The plate's second mode number: how many nodal lines cross the other axis.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "line_width",
@@ -322,6 +326,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How wide a band around the nodal lines lights, in plate units (the plate is 2 \
               across); 0 is a one-pixel line.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "plate_mix",
@@ -330,6 +336,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Blends from the nodal lines alone toward the whole signed wave, which reads as a \
               standing wave rather than as sand.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "iterations",
@@ -338,6 +346,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How many steps an orbit is followed before it is called part of the set; more \
               resolves finer boundary detail. Capped by the quality tier.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "c_re",
@@ -346,6 +356,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "The real part of the Julia constant: the lever that reshapes the set, from one \
               connected piece to dust. Inert on the `mandelbrot` map.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "c_im",
@@ -353,6 +365,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "The imaginary part of the Julia constant. Inert on the `mandelbrot` map.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "escape_radius",
@@ -361,6 +375,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How far an orbit must travel to count as escaped; larger smooths the colour \
               bands' spacing.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "power",
@@ -369,6 +385,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "The exponent in z -> z^power + c: 2 is the classic set, higher whole powers add \
               lobes, and a fractional power tears along the negative real axis.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "interior",
@@ -376,6 +394,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much light the set itself emits; 0 is the textbook black interior.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "trap_radius",
@@ -384,6 +404,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How far the orbit trap sits from the origin — the circle's radius, the line's \
               offset, the point's and the cross's distance. Inert with no `trap`.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "trap_rotate",
@@ -392,6 +414,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Turns the orbit trap about the origin, in whole turns. Inert on a `circle` and \
               with no `trap`.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "color_span",
@@ -399,6 +423,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "How much of the palette the field's level covers; 0 is one flat colour.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: true,
     },
     ParamSpec {
         name: "color_center",
@@ -406,6 +432,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Shifts which part of the palette the field's level starts from.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     common::brightness(common::DEFAULT_BRIGHTNESS),
     common::hue(DEFAULT_HUE),

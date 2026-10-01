@@ -14,7 +14,19 @@ const MINIMAL = JSON.stringify({
   v: 1,
   hash: '0123456789abcdef',
   systems: [
-    { name: 'spectrum', params: [{ name: 'warp', default: 0.4, range: [0, 1.5], doc: 'A fold.' }] },
+    {
+      name: 'spectrum',
+      params: [
+        {
+          name: 'warp',
+          default: 0.4,
+          range: [0, 1.5],
+          doc: 'A fold.',
+          group: 'shape',
+          main: true,
+        },
+      ],
+    },
   ],
   stages: [{ name: 'bloom', params: [] }],
   tables: [{ name: 'preset', doc: 'The document.', keys: [] }],
@@ -30,6 +42,8 @@ describe('parsing a document', () => {
       default: 0.4,
       range: [0, 1.5],
       doc: 'A fold.',
+      group: 'shape',
+      main: true,
       // A document from before the engine declared kinds still reads, and its
       // parameters read as continuous — the answer every parameter had then.
       kind: 'modal',
@@ -51,6 +65,22 @@ describe('parsing a document', () => {
     const older = JSON.stringify({ ...JSON.parse(MINIMAL), v: 2 })
     expect(() => parseSchemaDocument(older)).toThrow(SchemaError)
     expect(() => parseSchemaDocument(older)).toThrow(/v/)
+  })
+
+  it('refuses a parameter that declares no group or no main flag (ADR-0256)', () => {
+    for (const drop of ['group', 'main']) {
+      const without = JSON.parse(MINIMAL) as Record<string, unknown>
+      const systems = without.systems as { params: Record<string, unknown>[] }[]
+      delete systems[0].params[0][drop]
+      expect(() => parseSchemaDocument(JSON.stringify(without))).toThrow(SchemaError)
+    }
+  })
+
+  it('refuses a group this build does not file under', () => {
+    const unknown = JSON.parse(MINIMAL) as Record<string, unknown>
+    const systems = unknown.systems as { params: Record<string, unknown>[] }[]
+    systems[0].params[0].group = 'sound'
+    expect(() => parseSchemaDocument(JSON.stringify(unknown))).toThrow(SchemaError)
   })
 
   it('refuses something that is not JSON at all, with what the parser said', () => {

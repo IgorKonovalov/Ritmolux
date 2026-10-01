@@ -781,6 +781,22 @@ test("a disposition is refused with no reason, with a ref matching nothing, and 
   assert.equal(readFileSync(statePaths(p.stateDir).file, "utf8"), untouched, "no refusal wrote state");
 });
 
+// ADR-0261: a finding the close claimed and git contradicted is listed as open, so a verb applies to it.
+test("finding lists a reopened finding with its index and reason, and closes it like any other", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  const reason = "fixed_in 1234567 does not exist";
+  seedPlan(p, "0182", {
+    verdicts: verdictOf([{ severity: "nit", file: "docs/a.md", line: 2, what: "a stale row", reopened: { fixed_in: "1234567", reason } }]),
+    reopened: [{ finding: 0, fixed_in: "1234567", reason }],
+  });
+  const listed = await cli("finding", "0182");
+  assert.equal(listed.code, 0, listed.err.join("\n"));
+  assert.deepEqual(listed.out, ["conductor: plan 0182, closing verdict round 2, 1 finding:", `  [0] nit docs/a.md:2 - a stale row - reopened: ${reason}`]);
+  const closed = await cli("finding", "0182", "0", "--filed", "backlog 0300");
+  assert.equal(closed.code, 0, closed.err.join("\n"));
+  assert.equal(loadState(p.stateDir).plans["0182"].verdicts.at(-1).findings[0].disposition.verb, "filed");
+});
+
 test("a second disposition overwrites the first, and the first survives in the finding's history", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
   seedPlan(p, "0181", { verdicts: verdictOf([{ severity: "nit", file: "core/src/a.rs", line: 3, what: "a latent regex" }]) });

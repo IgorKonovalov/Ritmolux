@@ -142,8 +142,9 @@ window, which is what they are for.
 | ------------ | ----------------------------- | ---------------------------------------------------------------- |
 | `playerPath` | path                          | An explicit player binary, second in the resolution order above  |
 | `playerMode` | `windowed` or `windowless`    | Which sink the player is spawned with, read at spawn (ADR-0186)  |
+| `ui`         | `{ "reducedMotion": bool }`   | `reducedMotion` (default `false`) stops the window's transitions; applied at once |
 
-Both are optional, and a file that is missing, is not JSON, or carries a key of
+All are optional, and a file that is missing, is not JSON, or carries a key of
 the wrong shape degrades to "no setting" rather than failing the launch — the
 resolution order has two other roots and the mode has a default.
 
@@ -162,6 +163,16 @@ describe.
 npm run build
 npx electron . --capture ../target/studio-shots/now.png --capture-after 10000
 ```
+
+`npm run ui-shots` captures every view and modal instead: the five editor tabs
+(the library is one of them), Settings, the problems list and the fork prompt,
+at the window's default size and at 1280x800, into `target/ui-audit/<size>/`.
+It builds the studio, finds a built player the way the tests do (or takes
+`-- --player <path>`), and runs it windowless against a scratch preset directory
+holding `presets/curve_phosphor.toml` and two broken presets, so the problems
+list has rows. Nothing of the user's is read or written except, on macOS, the
+player's own data directory. Captures use the machine's fonts and a live
+picture, so they are for looking at, never for comparing.
 
 ## What the studio may and may not do
 

@@ -246,6 +246,8 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => state.redraw(),
+            // The launch hint comes back when someone reaches for the window.
+            WindowEvent::CursorMoved { .. } => state.pointer_moved(),
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
                 button: MouseButton::Left,

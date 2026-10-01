@@ -1,0 +1,60 @@
+# Storm Sea - a sheet of linked points seen from just above the waterline,
+# heaving under the bass. `wave` is the swell height and it rides the BASS, so
+# a quiet passage is a gentle chop and a drop lifts the whole mesh into
+# rollers that tower over the camera; a fine `wave_scale` keeps it a sea
+# rather than a single hill. MID drives the current, so busy music churns the
+# surface. A shallow focal band sits in the near-middle distance: the near
+# swell is soft and huge, the horizon dissolves into haze.
+#
+# ONSETS are lightning. The nodes jump past 1.0 on a hit and the bloom stage,
+# held at a threshold the resting sea never reaches, flares only then - the
+# crests light up white for a moment and fall back into navy.
+system = "plexus"
+name = "Storm Sea"
+representative = true
+
+[plexus]
+layout = "sheet"
+points = 600
+seed   = 5
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#020814" },
+  { at = 0.3,  color = "#0b2a5a" },
+  { at = 0.6,  color = "#1d7fbf" },
+  { at = 0.85, color = "#8fe3ff" },
+  { at = 1.0,  color = "#ffffff" },
+]
+
+[params]
+link_distance   = "0.26"
+link_alpha      = "0.85"
+line_width      = "1.5"
+node_size       = "2.0 + clamp(onset * 2.5, 0, 1.5)"
+node_glow       = "1.0 + clamp(onset * 5, 0, 3)"
+drift           = "0.2 + clamp(mid * 0.3, 0, 0.25)"
+wave            = "0.1 + clamp(bass * 0.4, 0, 0.34)"
+wave_scale      = "0.6 + noise(time * 0.05) * 0.3"
+yaw             = "0.6 + time * 0.015"
+pitch           = "0.12"
+distance        = "2.0"
+fov             = "1.1"
+focus           = "0.3"
+aperture        = "11"
+hue_center      = "0.6"
+hue_spread      = "0.55"
+brightness      = "1.0"
+bg_bright       = "0.3"
+bg_hue          = "0.05"
+bg_hue_span     = "0.2"
+bg_vignette     = "0.5"
+bloom_amount    = "0.7"
+bloom_threshold = "1.0"
+bloom_radius    = "2.0"
+
+[smoothing]
+wave      = 0.25
+drift     = 0.4
+node_glow = 0.05
+node_size = 0.05

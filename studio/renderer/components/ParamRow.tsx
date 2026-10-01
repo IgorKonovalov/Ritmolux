@@ -102,7 +102,7 @@ export function ParamRow({
 
   if (binding?.kind === 'expr') {
     return (
-      <div className={styles.row} title={spec.doc}>
+      <div className={styles.row} title={spec.doc} data-param={spec.name}>
         <span className={styles.name}>{spec.name}</span>
         <code className={styles.expr}>{binding.text}</code>
         <span className={styles.note}>expression</span>
@@ -112,7 +112,7 @@ export function ParamRow({
 
   if (binding?.kind === 'opaque') {
     return (
-      <div className={styles.row} title={spec.doc}>
+      <div className={styles.row} title={spec.doc} data-param={spec.name}>
         <span className={styles.name}>{spec.name}</span>
         <code className={styles.expr}>{binding.text}</code>
         <span className={styles.note}>not editable here</span>
@@ -127,7 +127,7 @@ export function ParamRow({
   // this row sits in names the family it is inert on.
   if (inert) {
     return (
-      <div className={styles.row} title={spec.doc}>
+      <div className={styles.row} title={spec.doc} data-param={spec.name}>
         <span className={styles.name}>{spec.name}</span>
         <span className={styles.inert}>{binding === undefined ? '' : String(binding.value)}</span>
         <span className={styles.note}>not read here</span>
@@ -162,7 +162,7 @@ export function ParamRow({
   const step = spec.kind === 'structural' ? 1 : (hi - lo) / STEPS
 
   return (
-    <div className={styles.row} title={spec.doc}>
+    <div className={styles.row} title={spec.doc} data-param={spec.name}>
       <label className={styles.name} htmlFor={id}>
         {spec.name}
       </label>

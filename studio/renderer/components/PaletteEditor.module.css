@@ -1,8 +1,8 @@
 .palette {
   border: 1px solid var(--panel-edge);
-  border-radius: 4px;
-  background: var(--panel);
-  padding: 0.5rem 0.75rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--scanlines), var(--panel);
+  padding: var(--space-1) 0.75rem 0.75rem;
 }
 
 .heading {
@@ -19,7 +19,7 @@
   display: grid;
   grid-template-columns: minmax(5rem, 7rem) 1fr;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-1);
   padding: 0.15rem 0;
 }
 
@@ -30,8 +30,8 @@
 
 .select {
   background: var(--bg);
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   color: var(--text);
   font-family: inherit;
   font-size: 0.78rem;
@@ -39,15 +39,20 @@
   width: 100%;
 }
 
+.select:hover:enabled {
+  border-color: var(--accent);
+}
+
 .select:disabled {
   opacity: 0.5;
 }
 
+/* The ramp is the picture of a palette, so it keeps a neutral frame. */
 .ramp {
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   height: 1.25rem;
-  margin: 0.5rem 0 0.35rem;
+  margin: var(--space-1) 0 0.35rem;
 }
 
 .note {

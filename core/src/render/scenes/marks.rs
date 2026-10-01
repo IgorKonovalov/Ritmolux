@@ -166,7 +166,7 @@
 )]
 
 use crate::render::gpu;
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// The `shape` roster, in the order the numeric parameter positions along.
 ///
@@ -407,6 +407,283 @@ impl InstancedQuads {
     }
 }
 
+// --- The 3D quad: sprites through the shared camera (ADR-0257) ---------------
+
+/// One sprite in **3D**: a world centre, a radius in pixels at the camera's
+/// focal plane, and its light.
+///
+/// Drawn by [`InstancedQuads3d`], beside [`InstancedQuads`] rather than as a
+/// branch of it, so the swarm and the emitter keep their pipeline and their
+/// bytes.
+///
+/// **Field order is shader-location order**: a field inserted anywhere but the
+/// end re-points every attribute after it, the hazard [`QuadInstance::attr`]
+/// records.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct Quad3dInstance {
+    /// Centre, world space, in front of the near plane.
+    pub center: [f32; 3],
+    /// Radius in pixels of the render target at the focal plane; carried to
+    /// the sprite's own depth by perspective.
+    pub radius: f32,
+    /// Premultiplied light (ADR-0056), before the glow multiplier.
+    pub color: [f32; 3],
+}
+
+/// The `quad3d` sprite uniform: `[glow, unused, unused, unused]`.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct Sprite3dUniform {
+    v: [f32; 4],
+}
+
+/// The `quad3d` WGSL, after the shared camera.
+///
+/// A sprite is projected through `project()`, takes the camera's circle of
+/// confusion at its own depth from `coc()` — **the one function the 3D segment
+/// pipeline calls too**, so a node and an edge ending at it blur by the same
+/// amount — and is drawn as a disc of radius `r + coc` pixels. Its light is
+/// scaled by the area factor `(r / (r + coc))^2`, so a blurred node spreads its
+/// light over the larger disc instead of adding to it.
+///
+/// A radius under half a pixel is floored there and its light scaled by the
+/// same area ratio, so a far node fades rather than shimmering.
+///
+/// The falloff is the round mark's own, `max(0, 1 - d)^2` (ADR-0084's `disc`
+/// arm).
+const QUAD3D_SHADER: &str = r#"
+struct Sprite {
+    // x: glow multiplier, yzw: unused
+    v: vec4<f32>,
+}
+
+@group(0) @binding(0) var<uniform> cam: Camera;
+@group(0) @binding(1) var<uniform> sprite: Sprite;
+
+struct Quad3dOut {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) local: vec2<f32>,
+    @location(1) color: vec3<f32>,
+}
+
+const MIN_RADIUS_PX: f32 = 0.5;
+
+@vertex
+fn vs_main(
+    @builtin(vertex_index) vi: u32,
+    @location(0) center: vec3<f32>,
+    @location(1) radius: f32,
+    @location(2) color: vec3<f32>,
+) -> Quad3dOut {
+    var corners = array<vec2<f32>, 6>(
+        vec2<f32>(-1.0, -1.0), vec2<f32>(1.0, -1.0), vec2<f32>(-1.0, 1.0),
+        vec2<f32>(-1.0, 1.0), vec2<f32>(1.0, -1.0), vec2<f32>(1.0, 1.0),
+    );
+    let c = corners[vi];
+    let clip = project(cam, center);
+    let r = at_depth(cam, radius, clip.w);
+    let blur = coc(cam, clip.w);
+    let wide = r + blur;
+    let drawn = max(wide, MIN_RADIUS_PX);
+    // The area factor: the sharp disc's area over the drawn one's.
+    let keep = select(0.0, (r / drawn) * (r / drawn), drawn > 0.0);
+
+    var out: Quad3dOut;
+    out.pos = vec4<f32>(px_to_ndc(cam, clip_to_px(cam, clip) + c * drawn), 0.0, 1.0);
+    out.local = c;
+    out.color = color * keep;
+    return out;
+}
+
+@fragment
+fn fs_main(in: Quad3dOut) -> @location(0) vec4<f32> {
+    let falloff = max(0.0, 1.0 - length(in.local));
+    let g = falloff * falloff;
+    // Premultiplied (ADR-0056): the glow scales the light, not the coverage.
+    return vec4<f32>(in.color * g * sprite.v.x, g);
+}
+"#;
+
+/// The 3D sprite pipeline (ADR-0257): its instance buffer, its two uniforms and
+/// the draw. Built only by a scene that draws 3D sprites — every 2D mark scene
+/// keeps [`InstancedQuads`] and creates nothing new.
+pub(crate) struct InstancedQuads3d {
+    pipeline: wgpu::RenderPipeline,
+    instances: wgpu::Buffer,
+    camera: wgpu::Buffer,
+    sprite: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
+    capacity: usize,
+}
+
+impl InstancedQuads3d {
+    /// The pipeline and a `capacity`-sprite instance buffer.
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        stem: &str,
+        capacity: usize,
+        target_format: wgpu::TextureFormat,
+    ) -> Self {
+        use crate::render::camera::{CAMERA_WGSL, CameraUniform};
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(&format!("{stem}-quad3d-shader")),
+            source: wgpu::ShaderSource::Wgsl(format!("{CAMERA_WGSL}\n{QUAD3D_SHADER}").into()),
+        });
+        let instances = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(&format!("{stem}-quad3d-instances")),
+            size: (capacity * std::mem::size_of::<Quad3dInstance>()) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let camera = gpu::uniform_buffer(
+            device,
+            &format!("{stem}-quad3d-camera"),
+            std::mem::size_of::<CameraUniform>(),
+        );
+        let sprite = gpu::uniform_buffer(
+            device,
+            &format!("{stem}-quad3d-sprite"),
+            std::mem::size_of::<Sprite3dUniform>(),
+        );
+        // A shape of its own — the camera for the vertex stage, the glow for
+        // the fragment, both sized — so no other live layout matches it, the
+        // `seg3d` one included (ADR-0058).
+        let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some(&format!("{stem}-quad3d-bind-layout")),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(
+                            std::mem::size_of::<CameraUniform>() as u64,
+                        ),
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(
+                            std::mem::size_of::<Sprite3dUniform>() as u64,
+                        ),
+                    },
+                    count: None,
+                },
+            ],
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(&format!("{stem}-quad3d-bind-group")),
+            layout: &bind_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: sprite.as_entire_binding(),
+                },
+            ],
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some(&format!("{stem}-quad3d-pipeline-layout")),
+            bind_group_layouts: &[Some(&bind_layout)],
+            immediate_size: 0,
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some(&format!("{stem}-quad3d-pipeline")),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[Some(wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Quad3dInstance>() as u64,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &wgpu::vertex_attr_array![
+                        0 => Float32x3,
+                        1 => Float32,
+                        2 => Float32x3,
+                    ],
+                })],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: target_format,
+                    // The seam every additive mark draws through (ADR-0056).
+                    blend: Some(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+        Self {
+            pipeline,
+            instances,
+            camera,
+            sprite,
+            bind_group,
+            capacity,
+        }
+    }
+
+    /// Draw `sprites` through `camera`, **loading** over what is already in
+    /// `view`, in one additive pass. Sprites beyond the capacity are dropped
+    /// defensively; an empty slice encodes the pass and draws nothing.
+    pub(crate) fn draw(
+        &self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        camera: &crate::render::camera::CameraUniform,
+        glow: f32,
+        sprites: &[Quad3dInstance],
+    ) {
+        let mut pass = gpu::color_pass(encoder, "quad3d-pass", view, wgpu::LoadOp::Load);
+        let count = sprites.len().min(self.capacity);
+        let drawn = sprites.get(..count).unwrap_or(&[]);
+        if drawn.is_empty() {
+            return;
+        }
+        queue.write_buffer(&self.instances, 0, bytemuck::cast_slice(drawn));
+        queue.write_buffer(&self.camera, 0, bytemuck::bytes_of(camera));
+        queue.write_buffer(
+            &self.sprite,
+            0,
+            bytemuck::bytes_of(&Sprite3dUniform {
+                v: [glow, 0.0, 0.0, 0.0],
+            }),
+        );
+        pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(0, &self.bind_group, &[]);
+        pass.set_vertex_buffer(0, self.instances.slice(..));
+        pass.draw(0..6, 0..count as u32);
+    }
+}
+
+/// The 3D sprite pipeline's WGSL, as compiled: the shared camera, then
+/// [`QUAD3D_SHADER`]. For a test asserting both 3D pipelines take their blur
+/// from the one `coc()`.
+#[cfg(test)]
+pub(crate) fn quad3d_shader_source() -> String {
+    format!("{}\n{QUAD3D_SHADER}", crate::render::camera::CAMERA_WGSL)
+}
+
 // --- The silhouette constants the WGSL is templated with -----------------------
 //
 // Substituted into [`SDF_WGSL`] rather than written twice: a second copy in a
@@ -578,6 +855,8 @@ pub(crate) const SHAPE: ParamSpec = ParamSpec {
           a whole number is that figure exactly and a value between two travels from one to \
           the other.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Shape,
+    main: true,
 };
 
 /// `points`, shared by the three shaped-mark scenes: the silhouette's count.
@@ -587,6 +866,8 @@ pub(crate) const POINTS: ParamSpec = ParamSpec {
     range: Some([3.0, 16.0]),
     doc: "How many points or sides the silhouette has, where the shape has a count at all.",
     kind: ParamKind::Structural,
+    group: ParamGroup::Shape,
+    main: true,
 };
 
 /// `star_valley`, shared: how deep a star's notches cut.
@@ -596,6 +877,8 @@ pub(crate) const STAR_VALLEY: ParamSpec = ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "How deep the notches between a star's points cut; near 1 the star becomes a disc.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Shape,
+    main: false,
 };
 
 /// `star_curve`, shared: how far a star's edges bow.
@@ -605,6 +888,8 @@ pub(crate) const STAR_CURVE: ParamSpec = ParamSpec {
     range: Some([-1.0, 1.0]),
     doc: "Bows a star's edges inward or outward instead of leaving them straight.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Shape,
+    main: false,
 };
 
 /// `star_jitter`, shared: the seeded variation in point length.
@@ -614,6 +899,8 @@ pub(crate) const STAR_JITTER: ParamSpec = ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "Randomises each point's length by a seeded amount, so the star reads as hand-drawn.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Shape,
+    main: false,
 };
 
 /// `star_seed`, shared: which arrangement the jitter and the wobble draw.
@@ -624,6 +911,8 @@ pub(crate) const STAR_SEED: ParamSpec = ParamSpec {
     doc: "Picks a different arrangement of the same amount of jitter and wobble - a whole number, \
           and every value is as rough as every other.",
     kind: ParamKind::Structural,
+    group: ParamGroup::Shape,
+    main: false,
 };
 
 /// `star_wobble`, shared: how far a star's edges wander between tip and valley.
@@ -634,6 +923,8 @@ pub(crate) const STAR_WOBBLE: ParamSpec = ParamSpec {
     doc: "Waves each edge in and out along its length, leaving the points where they are - the \
           wander a hand-drawn outline has.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Motion,
+    main: false,
 };
 
 /// `star_wobble_freq`, shared: how many waves fit along one edge.
@@ -644,6 +935,8 @@ pub(crate) const STAR_WOBBLE_FREQ: ParamSpec = ParamSpec {
     doc: "How many waves the edge wander fits between a point and the notch beside it. Does \
           nothing while star_wobble is 0.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Motion,
+    main: false,
 };
 
 pub(crate) const PARAMS: &[ParamSpec] = &[

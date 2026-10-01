@@ -174,6 +174,23 @@ still holding `delta` on this date and removed. So under `settings.conductor.jso
 session's `Write` reached a path outside its lane. Nothing in the settings bounds the `Write` tool to
 the worktree; the deletion bound in `settings.test.mjs` covers `rm` and `Remove-Item` only.
 
+## Re-verified on 2.1.284, on Linux
+
+- **Date:** 2026-09-30
+- **CLI:** `claude --version` -> `2.1.284 (Claude Code)`
+- **Machine:** Arch Linux (Omarchy, Hyprland), Node v26.8.2, worktree at `~/Work/rlx-probe-0187`
+- **Run:** `node tools/conductor/spike/probe.mjs --model haiku`, all four sessions: $0.098 (A) +
+  $0.061 (B) + $0.067 (C) + $0.071 (D). Raw output under `target/conductor-spike/<stamp>/`.
+
+Every row holds. Session A: `result/success` after 8 turns; the hook saw `RLX_CONDUCTOR=1` and the
+run's own `RLX_PROBE_TOKEN` on all four `Bash` calls (`git add -A`, `cargo --version`, `node -e`,
+`git status --short`), and `probe-out.txt` reads back `beta`. Session B ends exit 1,
+`error_max_budget_usd`, after 2 turns. `result` carries 25 keys on a success and 20 on the budget
+stop, the same counts as 2.1.283. C and D: the `Read` of `.claude/skills/probe-scratch/NOTES.md`
+returned the file, the `Edit` of it and the `Write` beside it were refused with the dontAsk denial,
+`NOTES.md` still holds `alpha`, `NEW.md` does not exist, and the control `Write` in the worktree root
+holds `delta`. `git worktree remove` exits 0 and leaves no directory.
+
 ## What the probe does
 
 Four sessions. Two of them, A and B, are `claude -p "/dev implement plan 9999"` with the worktree as cwd, and with

@@ -28,7 +28,7 @@ the one place it is maintained; this document does not duplicate it.
 
 > **Accurate as of 2026-09-11**, against the curated set in
 > [`presets/`](../presets/) and the v2 expression grammar. Most built-in systems ship
-> at least one preset; `analytic_field` and `cellular` are the newest and ship none
+> at least one preset; `analytic_field`, `cellular` and `plexus` are the newest and ship none
 > yet, so their pictures come from the teaching presets under
 > [`docs/examples/`](examples/). The number of presets is deliberately not written
 > down here: it moves constantly, and a count in this line is a line that goes
@@ -158,6 +158,8 @@ summarised [below](#the-path-table)),
 its map and orbit trap — [below](#the-field-table)),
 `[cellular]` (which automaton the cellular system runs, on how large a grid, and
 whether its edges wrap — [below](#the-cellular-table)),
+`[plexus]` (how the plexus system's points are arranged, how many there are and what
+they are seeded from — [below](#the-plexus-table)),
 `[spectrum]` (the readout's element count, layout and per-element easing —
 summarised [below](#the-spectrum-table)), `[feedback]` (how an accumulation reads
 its own past — [below](#the-feedback-table)), `[smoothing]` (per-parameter
@@ -211,6 +213,7 @@ that table is maintained alongside the presets and is the authoritative list.
 | `shape_collage` | Flat opaque elements on their own off-white paper, composited in painter order — the only system in which one object is genuinely *in front of* another, and the only one that draws a graphic rather than light. |
 | `analytic_field` | A fullscreen closed-form function of position from one of two families — the Chladni plate's nodal lines, or an escape-time Julia or Mandelbrot set with optional orbit traps ([below](#the-field-table)). |
 | `cellular` | A discrete cellular automaton on a grid of cells, from one of three families — Conway's Life and every birth/survival rule, Larger than Life's wide neighbourhoods, or the cyclic automaton's spirals — painted with the history of each cell ([below](#the-cellular-table)). |
+| `plexus` | A few hundred points in 3D, joined by a line wherever two come close, seen through a perspective camera with a real focal plane: lines and dots blur with their distance from focus. The points drift through a cube or ripple on a sheet ([below](#the-plexus-table)). |
 
 **There is deliberately no per-system preset count here.** A count re-drifts every time
 a preset is added and nothing fails when it does. `presets/` is the list; `ls presets/*.toml`
@@ -513,6 +516,58 @@ tier demotion. Author against the Floor caps.
 
 The range that reads for each parameter, and the families it is inert on, is printed in the
 `cellular` table of [`presets/README.md`](../presets/README.md).
+
+### The `[plexus]` table
+
+A `plexus` preset draws a network: points in 3D, and a line between every two that lie closer than
+`link_distance`. A link fades in as its two points approach and out as they part, so the network
+rewires smoothly and never pops. `[plexus]` decides how the points are arranged:
+
+```toml
+system = "plexus"
+
+[plexus]
+layout = "sheet"   # "cloud" (the default) or "sheet"
+points = 400       # 16..=4096; the default is 300
+seed   = 3         # optional; absent, the preset's own [generator] seed
+```
+
+All three keys are read once, at load, and are **not bindable**. An unknown layout, or a point count
+outside `16..=4096`, is a load error.
+
+| `layout` | The points | Reads |
+|---|---|---|
+| `cloud` | Scattered through a cube two units across, drifting on a smooth seeded current. A point fades out as it reaches a face and fades back in on the opposite one. | `drift` |
+| `sheet` | A jittered grid on a flat square, rippled up and down by a seeded swell. A point keeps its place in the grid, so the mesh ripples rather than rewiring. | `drift`, `wave`, `wave_scale` |
+
+**The camera orbits the network's centre.** `yaw` turns it round, `pitch` raises it, `distance`
+moves it in and out and `fov` is its field of view; the engine-wide `zoom` narrows the field of view
+and `pan_x` / `pan_y` slide the picture. A slow orbit is `yaw = "time * 0.05"`. A sheet reads best
+seen across at a grazing angle, which is what the default `pitch` of `0.25` gives.
+
+**Depth of field.** `focus` places the focal plane in the network's depth, `0` at its nearest point
+and `1` at its farthest, so it means the same whatever the camera's distance. `aperture` is how
+strongly anything off that plane blurs: `0` keeps every line sharp. One line can cross the
+focal plane sharp and soften toward both ends, and a blurred line **dims as it spreads**, so the
+light it carries stays the same. In pixels, `aperture` is the blur of the far background: behind the
+focal plane a line approaches it and never passes it. In front of the focal plane the blur grows
+past it, and grows faster the closer the camera is. Wide blur costs fill, so the quality tier caps it
+at 12 px on Floor and 24 on Rich, and a close camera's near strands draw at that cap on either tier.
+That is the lens's ceiling and is not reported. An `aperture` past the cap, where the background
+itself draws sharper than asked, draws at the cap and **says so**. The same pair of parameters
+blurs the attractor's 3D families.
+
+`line_width` and `node_size` are pixels **at the focal plane**: nearer lines are wider and farther
+ones thinner. `node_size = "0"` draws no dots at all. Lines and dots take their colour from their
+depth, near to far, through `hue_center` and `hue_spread`, so `palette_steps` bands the network by
+distance.
+
+**`points` and the number of links are capped by the quality tier**: the Floor tier draws 600
+points and 6000 links, the Rich tier 1500 and 20000. A preset past either runs at the cap and says
+so. Author against the Floor caps.
+
+The range that reads for each parameter, and the layouts it is inert on, is printed in the `plexus`
+table of [`presets/README.md`](../presets/README.md).
 
 ### The `[path]` table
 
@@ -1715,9 +1770,10 @@ that merely waste a line. Neither ever crashes a running visual (NFR 10).
 - An expression that fails to compile — an unknown identifier, a bad number, a
   wrong argument count, an unbalanced parenthesis, a stray character.
 - An invalid structural table (`[curve]`, `[generator]`, `[particles]`, `[path]`,
-  `[spectrum]`, `[field]`, `[cellular]`, `[palette]`, `[smoothing]`, `[latch]`) - including a
-  `[path] d` the parser refuses, which names the character offset it stopped at, a `[field] map`
-  or `trap` on a family that has no orbit, and a `[cellular] grid` outside `16..=1024`.
+  `[spectrum]`, `[field]`, `[cellular]`, `[plexus]`, `[palette]`, `[smoothing]`, `[latch]`) -
+  including a `[path] d` the parser refuses, which names the character offset it stopped at, a
+  `[field] map` or `trap` on a family that has no orbit, a `[cellular] grid` outside `16..=1024`,
+  and a `[plexus] points` outside `16..=4096`.
 
 **Warnings — the preset still loads and renders:**
 

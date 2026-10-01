@@ -590,6 +590,7 @@ fn descriptor_pairs() -> Vec<DescriptorPair> {
         (&raw::MESH, serde_fields::<raw::RawMesh>()),
         (&raw::FIELD, serde_fields::<raw::RawField>()),
         (&raw::CELLULAR, serde_fields::<raw::RawCellular>()),
+        (&raw::PLEXUS, serde_fields::<raw::RawPlexus>()),
         (&raw::MILK, serde_fields::<raw::RawMilk>()),
         (&raw::MILK_ELEMENT, serde_fields::<raw::RawMilkElement>()),
         (&raw::FEEDBACK, serde_fields::<raw::RawFeedback>()),
@@ -701,7 +702,7 @@ fn every_roster_value_parses_through_its_owners_parser() {
     /// A roster beside the parser that owns it.
     type RosterCheck = (Roster, fn(&str) -> bool);
 
-    let checks: [RosterCheck; 16] = [
+    let checks: [RosterCheck; 17] = [
         (Roster::System, |n| SystemKind::from_name(n).is_some()),
         (Roster::CurveFamily, |n| CurveFamily::from_name(n).is_some()),
         (Roster::AttractorFamily, |n| {
@@ -728,6 +729,9 @@ fn every_roster_value_parses_through_its_owners_parser() {
         (Roster::TrapShape, |n| TrapShape::from_name(n).is_some()),
         (Roster::CellularFamily, |n| {
             CellularFamily::from_name(n).is_some()
+        }),
+        (Roster::PlexusLayout, |n| {
+            PlexusLayout::from_name(n).is_some()
         }),
     ];
 

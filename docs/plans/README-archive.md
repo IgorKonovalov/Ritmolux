@@ -18,6 +18,10 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0241 - The conductor parks only on what the owner must settle](#0241---the-conductor-parks-only-on-what-the-owner-must-settle)
+  - [0235 - The plexus system, and a shared camera with depth of field](#0235---the-plexus-system-and-a-shared-camera-with-depth-of-field)
+  - [0230 - The Russian slice becomes findable](#0230---the-russian-slice-becomes-findable)
+  - [0231 - The interface is audited, then learns one look](#0231---the-interface-is-audited-then-learns-one-look)
   - [0233 - The close reviews' small findings are repaired](#0233---the-close-reviews-small-findings-are-repaired)
   - [0234 - A conductor session writes only where it works](#0234---a-conductor-session-writes-only-where-it-works)
   - [0212 - The diffused render gains a timeline](#0212---the-diffused-render-gains-a-timeline)
@@ -270,6 +274,80 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0241 - The conductor parks only on what the owner must settle](done/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md)
+
+- closed 2026-10-01, run by hand on `main` (no lane). Phases 1-4 landed: `c1a17bf7`, `7991c87e`,
+`3171cf30`, `a5a52e4a`. Mode 4 review: **no blockers, no majors, three minors (two repaired at the
+close in `2378cad8`, one accepted as recorded), one nit (repaired).** Version: **0.157.0** (minor: the
+conductor's and the pre-push hook's behaviour change). ADR-0261 accepted. Closes no backlog entry.
+Upstream CI read green at the close. The full review is the plan's own `## Close review` section.
+- **What landed.** A session's wrapped full suite is served `-P fast` the way the gate is, and a green
+  served line skips its own tree only; a run of human phases parks once and settles when every phase
+  does; a false `fixed_in` reopens its finding into the digest's Needs you instead of parking; one
+  diagnosed flake (backlog 0219's `a_preset_datagram_selects_by_name`) retries by exact name, and the
+  ledger and history digest name the flaky pass.
+- **Open.** The flaky names print on the history page only, not the current-state page. Backlog 0219
+  stays live and does not yet record the retry; when it closes, its test leaves `.config/nextest.toml`.
+
+### [0235 - The plexus system, and a shared camera with depth of field](done/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md)
+
+- closed 2026-10-01, run by hand on `main` (no lane). Phases 1-7 and 9 landed: `8b3a6d41`,
+`6a52a633`, `f7e09ec4`, `de309bfc`, `f43f1dd7`, `0c23e166`, `2ad353bc`, `695b41cb`. Phase 8, the
+owner's look judgement, recorded as a **keep** at the close. Three review rounds: round 1 two majors
+(fixed `25c9519e`, `7cdf291e`), round 2 one major and one minor (fixed `75c80fee`, `1222b4b6`), round
+3 after Phase 9 **no blockers, no majors, two minors (repaired at the close), two nits** (one open by
+design). Version: **0.156.0** (minor: a feature plan). ADR-0257 accepted, carrying its 2026-10-01
+amendment. Closes no backlog entry. Upstream CI read green at the close. The full round-3 review is the
+plan's own `## Close review` section.
+- **What landed.** `SystemKind::Plexus` with `cloud` and `sheet` layouts; the shared `Camera3d` and
+  `camera.wgsl`; the `seg3d` and `quad3d` pipelines with a per-endpoint circle of confusion; `focus`
+  and `aperture` on the attractor's 3D families; tier caps `plexus_points`, `plexus_edges`,
+  `max_coc_px` that announce. Phase 9 made the cap the lens's ceiling: only an `aperture` past it is
+  announced, and `pin --tier rich` is offered only below Rich.
+- **Curation.** The first five plexus presets (2ea44e40, content lane) all kept; Synapse and Storm
+  Sea are the representatives. No near-duplicate; none binds treble.
+- **Open.** The plexus goldens were blessed on llvmpipe, so Windows CI's golden job is their first
+  WARP reading. Nit 2: the Blur notice's far-field wording is asymptotic. Translation advisory at the
+  close: `how-it-works.ru.md` (moved by this plan's Phase 7), `running.ru.md` and the foobar
+  `READ-ME-FIRST.ru.md`.
+
+### [0230 - The Russian slice becomes findable](done/0230-the-russian-slice-becomes-findable.md)
+
+- closed 2026-09-30, conductor-run close of lane `plan-0230-the-russian-slice-becomes-findable`.
+Phases 1-3 landed: `bc09b3d0`, `d9160208`, `8c931753`. **Phase 4 is owed** (ADR-0249): the reading of
+the deployed site under `/Ritmolux/`. Round 1 review: **no blockers, no majors, no minors, two nits**,
+both left open. Version: **0.155.0** (minor: a feature plan, `site/` only). ADR-0213 accepted with an
+`Outcome` (the `lang` repair was taken; Pagefind splits en 221 / ru 6). Closes no backlog entry.
+Upstream CI read green at the close. The full review is the plan's own `## Close review` section.
+- **What landed.** A header `LanguageSelect` override linking every page to its twin or to a new `ru`
+  entrance page; the twin rule in one module, `site/src/plugins/twins.mjs`; a route middleware giving
+  the Russian routes `lang="ru"`, `og:locale` and `hreflang` alternates; a `По-русски` button on the
+  landing page and links on three *Start here* cards.
+- **Open.** Nit 1: `ru.mdx`'s paragraph hard-codes the count of translations (owner-approved Russian
+  prose). Nit 2: the *Start here* `По-русски` links carry no `lang`/`hreflang`, `dev` work. Translation
+  advisory at the close: `how-it-works.ru.md`, `running.ru.md` and the foobar `READ-ME-FIRST.ru.md`,
+  none moved by this plan.
+
+### [0231 - The interface is audited, then learns one look](done/0231-the-interface-is-audited-then-learns-one-look.md)
+
+- closed 2026-09-30, conductor-run close of lane `plan-0231-the-interface-is-audited-then-learns-one-look`.
+Phases 1-11 landed: `21f261cb`, `98e4d4e7`, `9907f1b5` (the owner's audit, look A), `6202a083`,
+`4d82db06`, `697fafc4`, `fb237a6c`, `d9ddfe12`, `b548dedc`, `7a4996aa`, `cfc7ed95`. **Phase 12 is
+owed** (ADR-0249): the before-and-after judgement on devices, including the foobar panel on Windows.
+Round 1 review: **no blockers, no majors, two minors, two nits**. Both minors and N2 were repaired at
+the close in `dad17147` (comment text only). Version: **0.154.0** (minor: a feature plan).
+ADR-0252 accepted with an `Outcome` (the type scale is declared but no engine surface reads it yet);
+ADR-0256 accepted. Closes no backlog entry. Upstream CI read green at the close. The full review is the
+plan's own `## Close review` section.
+- **What landed.** One `THEME` table in the core, with the studio's `tokens.css` generated from it and
+  gated; panels with the amber edge and width-measured text; overlay motion with a reduced-motion key;
+  one binding table read by dispatch and by the `?` help sheet; parameter `group` and `main` in the
+  schema export, and a studio parameter panel that lists bound rows first and groups the rest.
+- **Open.** N1: the help sheet's mid-group column break drops the group heading
+  (`standalone/src/overlay.rs`), code the close cannot repair. Phase 9's plugin build is owed to CI's
+  `foobar` job after the push. Translation advisory at the close: `running.ru.md` (moved by this
+  plan), `how-it-works.ru.md` and the foobar `READ-ME-FIRST.ru.md`.
 
 ### [0233 - The close reviews' small findings are repaired](done/0233-the-close-reviews-small-findings-are-repaired.md)
 

@@ -135,6 +135,9 @@ const CASES = [
   // Write and Edit are path-scoped (ADR-0255): the lane (`./`, the session's cwd), the OS temp
   // directory, and state/reviews/ beside this settings file. The model reads the path as the command;
   // the refusals below are also asserted against the recorded write table.
+  // These allowed cases are written in the rules' own spellings, so the model never sees the absolute
+  // lane path a session most often writes. That shape's evidence is the write table's row "`Write` an
+  // absolute path in the lane" in spike/README.md, observed WROTE under the shipped rules.
   { tool: "Write", command: "./core/src/lib.rs", allowed: true },
   { tool: "Edit", command: "./core/src/lib.rs", allowed: true },
   { tool: "Write", command: "//tmp/rlx-scratch.txt", allowed: true },

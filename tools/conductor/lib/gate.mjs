@@ -7,7 +7,9 @@
 //
 // Commands run in order and stop at the first failure. Each one's output is kept under
 // state/gates/. `nextest` runs under the machine-wide suite lock. The gate never retries a red: a
-// flake is a defect to fix (ADR-0193), and a retry would bury it.
+// flake is a defect to fix (ADR-0193), and a retry would bury it. The one retry in a gate run is
+// nextest's own, by exact test name in .config/nextest.toml, while a live backlog entry diagnoses that
+// test as a flake (ADR-0261); a pass on that retry is recorded green with the name under `flaky`.
 //
 // A step marked `ledger` is the full workspace suite, and it resolves to one of three states
 // (ADR-0211, lib/ledger.mjs). A green record for this exact tree `skipped`s it and nothing runs
@@ -21,7 +23,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { gatesFor } from "../../../scripts/gates.manifest.mjs";
-import { appendRecord, appendServed, appendSkip, cleanTree, failingTests, greenRecord, SERVED_SUITE_ARGS, servingRecord, summaryLine } from "./ledger.mjs";
+import { appendRecord, appendServed, appendSkip, cleanTree, failingTests, flakyTests, greenRecord, SERVED_SUITE_ARGS, servingRecord, summaryLine } from "./ledger.mjs";
 import { SUITE, withLock } from "./locks.mjs";
 
 /**
@@ -208,7 +210,7 @@ export async function runGate({
     timed.push({ name: c.name, code: r.code, ms, ...(suite ? { suite: true } : {}), ...(serving ? { served: true, by: serving.record.by } : {}) });
     const tests = failingTests(r.output);
     if (suite && startTree && cleanTree(cwd) === startTree) {
-      const record = { tree: startTree, exit: r.code, summary: summaryLine(r.output), failed: tests, by: `gate ${label}`, ms };
+      const record = { tree: startTree, exit: r.code, summary: summaryLine(r.output), failed: tests, flaky: flakyTests(r.output), by: `gate ${label}`, ms };
       if (serving) appendServed(ledger, { ...record, green: serving.record, paths: serving.paths });
       else appendRecord(ledger, record);
     }

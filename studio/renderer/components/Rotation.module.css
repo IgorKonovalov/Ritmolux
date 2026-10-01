@@ -7,6 +7,7 @@
 
 .state {
   color: var(--text-dim);
+  transition: color var(--motion-short) var(--ease);
 }
 
 .rotation[data-held='true'] .state {
@@ -15,13 +16,13 @@
 
 .resume {
   background: none;
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   color: var(--text-dim);
   cursor: pointer;
   font-family: inherit;
   font-size: 10px;
-  padding: 2px 8px;
+  padding: 2px var(--space-1);
 }
 
 .resume:hover {

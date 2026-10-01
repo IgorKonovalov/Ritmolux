@@ -26,7 +26,7 @@
 .rowHidden {
   align-items: center;
   display: flex;
-  gap: 0.25rem;
+  gap: var(--space-0);
 }
 
 /* Marked hidden: still listed here, and visibly not part of the show. */
@@ -43,7 +43,7 @@
 .markOn {
   background: none;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: var(--control-radius);
   color: var(--text-dim);
   cursor: pointer;
   font-family: inherit;
@@ -54,18 +54,22 @@
 
 .mark:hover,
 .markOn:hover {
-  border-color: var(--panel-edge);
+  border-color: var(--control-edge);
+  color: var(--text);
 }
 
 .markOn {
-  color: var(--accent);
+  color: var(--favourite);
 }
 
+/* The rows read like the standalone's browser: the current one carries the
+   highlight fill and the accent bar at its left edge. */
 .entry,
 .entryOn {
   background: none;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-left: var(--space-0) solid transparent;
+  border-radius: var(--control-radius);
   color: var(--text);
   cursor: pointer;
   display: block;
@@ -75,7 +79,7 @@
   /* Without this the name refuses to shrink and pushes the marks off the row. */
   min-width: 0;
   overflow: hidden;
-  padding: 0.25rem 0.4rem;
+  padding: var(--space-0) 0.4rem;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -87,8 +91,8 @@
 }
 
 .entryOn {
-  background: var(--panel);
-  border-color: var(--accent);
+  background: var(--highlight);
+  border-left-color: var(--accent);
   color: var(--accent);
 }
 
@@ -97,17 +101,17 @@
   color: var(--text-dim);
   font-size: 0.72rem;
   line-height: 1.4;
-  padding: 0.25rem 0.4rem;
+  padding: var(--space-0) 0.4rem;
 }
 
 .new {
   border: 1px solid var(--panel-edge);
-  border-radius: 4px;
-  background: var(--panel);
+  border-radius: var(--radius);
+  background: var(--scanlines), var(--panel);
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  padding: 0.5rem 0.75rem 0.7rem;
+  padding: var(--space-1) 0.75rem 0.7rem;
 }
 
 .heading {
@@ -123,8 +127,8 @@
 .name,
 .system {
   background: var(--bg);
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   color: var(--text);
   font-family: inherit;
   font-size: 0.78rem;
@@ -135,19 +139,23 @@
 .create {
   background: none;
   border: 1px solid var(--accent);
-  border-radius: 3px;
+  border-radius: var(--control-radius);
   color: var(--accent);
   cursor: pointer;
   font-family: inherit;
   font-size: 0.75rem;
   overflow: hidden;
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-0) var(--space-1);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.create:hover:enabled {
+  background: var(--highlight);
+}
+
 .create:disabled {
-  border-color: var(--panel-edge);
+  border-color: var(--control-edge);
   color: var(--text-dim);
   cursor: default;
 }

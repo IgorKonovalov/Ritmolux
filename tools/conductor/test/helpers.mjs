@@ -184,6 +184,103 @@ export const RED_NEXTEST_OUTPUT = [
   "",
 ].join("\n");
 
+/**
+ * A flaky pass, recorded verbatim on cargo-nextest 0.9.143: a scratch crate whose
+ * `a_preset_datagram_selects_by_name` fails its first try and passes its second under a
+ * `retries = 1` override, beside one steady test. The first try prints `TRY 1 FAIL`, the retry
+ * `TRY 2 PASS`, the summary counts it `(1 flaky)`, and a closing `FLAKY 2/2` line names it.
+ * Re-record it rather than edit it when nextest's shape moves.
+ */
+export const FLAKY_NEXTEST_OUTPUT = [
+  "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s",
+  "────────────",
+  " Nextest run ID 687ede7f-9c50-4459-98f5-8f57bd819cc8 with nextest profile: default",
+  "    Starting 2 tests across 2 binaries",
+  "        PASS [   0.005s] (1/2) flaky-scratch::control_loopback steady",
+  "  TRY 1 FAIL [   0.005s] (───) flaky-scratch::control_loopback a_preset_datagram_selects_by_name",
+  "  stdout ───",
+  "",
+  "    running 1 test",
+  "    test a_preset_datagram_selects_by_name ... FAILED",
+  "",
+  "    failures:",
+  "",
+  "    failures:",
+  "        a_preset_datagram_selects_by_name",
+  "",
+  "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s",
+  "",
+  "  stderr ───",
+  "",
+  "    thread 'a_preset_datagram_selects_by_name' (1878477) panicked at tests/control_loopback.rs:6:9:",
+  "    datagram lost",
+  "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+  "",
+  "  TRY 2 PASS [   0.006s] (2/2) flaky-scratch::control_loopback a_preset_datagram_selects_by_name",
+  "────────────",
+  "     Summary [   0.014s] 2 tests run: 2 passed (1 flaky), 0 skipped",
+  "   FLAKY 2/2 [   0.006s] (2/2) flaky-scratch::control_loopback a_preset_datagram_selects_by_name",
+  "",
+].join("\n");
+
+/**
+ * The same scratch crate on cargo-nextest 0.9.143 with the test failing both tries: each failure is
+ * printed `TRY n FAIL`, and the closing summary repeats the last as `TRY 2 FAIL`, never as a bare
+ * `FAIL`. Re-record it rather than edit it when nextest's shape moves.
+ */
+export const RETRIED_RED_NEXTEST_OUTPUT = [
+  "   Compiling flaky-scratch v0.0.0 (/tmp/claude-1000/-home-igor-Work-Ritmolux/19835313-9815-4d90-8317-bac9b1d917c0/scratchpad/flaky-scratch)",
+  "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s",
+  "────────────",
+  " Nextest run ID da9e0676-8472-4194-9a8d-4844cba76524 with nextest profile: default",
+  "    Starting 2 tests across 2 binaries",
+  "        PASS [   0.006s] (1/2) flaky-scratch::control_loopback steady",
+  "  TRY 1 FAIL [   0.006s] (───) flaky-scratch::control_loopback a_preset_datagram_selects_by_name",
+  "  stdout ───",
+  "",
+  "    running 1 test",
+  "    test a_preset_datagram_selects_by_name ... FAILED",
+  "",
+  "    failures:",
+  "",
+  "    failures:",
+  "        a_preset_datagram_selects_by_name",
+  "",
+  "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s",
+  "",
+  "  stderr ───",
+  "",
+  "    thread 'a_preset_datagram_selects_by_name' (1878718) panicked at tests/control_loopback.rs:6:9:",
+  "    datagram lost",
+  "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+  "",
+  "  TRY 2 FAIL [   0.005s] (2/2) flaky-scratch::control_loopback a_preset_datagram_selects_by_name",
+  "  stdout ───",
+  "",
+  "    running 1 test",
+  "    test a_preset_datagram_selects_by_name ... FAILED",
+  "",
+  "    failures:",
+  "",
+  "    failures:",
+  "        a_preset_datagram_selects_by_name",
+  "",
+  "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s",
+  "",
+  "  stderr ───",
+  "",
+  "    thread 'a_preset_datagram_selects_by_name' (1878720) panicked at tests/control_loopback.rs:6:9:",
+  "    datagram lost",
+  "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+  "",
+  "  Cancelling due to test failure: ",
+  "────────────",
+  "     Summary [   0.013s] 2 tests run: 1 passed, 1 failed, 0 skipped",
+  "  TRY 2 FAIL [   0.005s] (2/2) flaky-scratch::control_loopback a_preset_datagram_selects_by_name",
+  "error: test run failed",
+  "",
+].join("\n");
+
 export function outcomeBlock(obj) {
   return "Done.\n\n```rlx-outcome\n" + JSON.stringify(obj) + "\n```\n";
 }

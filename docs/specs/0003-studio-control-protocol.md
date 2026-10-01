@@ -147,6 +147,12 @@ Adding an event or a field is additive under the same `v`; changing or removing 
   the two and take a slider's ends from the family on screen; a second spelling would be a lookup
   that silently finds nothing. It is `null` for a system whose parameters read the same on every
   family it draws. ([ADR-0194](../adrs/0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md))
+- Every parameter object in the schema document MUST carry `group`, one of `"shape"`, `"motion"`,
+  `"colour"`, `"light"` and `"post"`, and `main`, a boolean, beside `name`, `default`, `range`, `doc`
+  and `kind`. Both are read from the parameter's own declaration, so a parent groups its panel by
+  the engine's grouping rather than by one of its own. Like `kind` and `families` they are additive
+  under the same `"v"`: a parent that does not know them ignores them.
+  ([ADR-0256](../adrs/0256-a-parameter-declares-its-group-and-whether-it-is-main.md))
 - `preset` MUST be re-emitted when the on-screen preset's **name, system or family** changes, not
   only its name. A reload rewrites a preset in place, so a file whose family or system was edited
   comes back under the name it already had. A parent that receives a `preset` naming the preset it

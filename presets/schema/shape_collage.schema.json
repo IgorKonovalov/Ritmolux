@@ -30,7 +30,7 @@
         "angle_bias": { "$ref": "#/definitions/param.angle_bias" },
         "roster": { "$ref": "#/definitions/param.roster" },
         "density": { "$ref": "#/definitions/param.density" },
-        "drift": { "$ref": "#/definitions/param.drift" },
+        "drift": { "$ref": "#/definitions/param.drift.shape_collage" },
         "spin": { "$ref": "#/definitions/param.spin.shape_collage" },
         "recompose": { "$ref": "#/definitions/param.recompose" },
         "recompose_blend": { "$ref": "#/definitions/param.recompose_blend" },
@@ -164,6 +164,10 @@
       "$ref": "#/definitions/cellular",
       "description": "Which automaton the cellular system runs, and on how large a grid."
     },
+    "plexus": {
+      "$ref": "#/definitions/plexus",
+      "description": "The arrangement, count and seed of the plexus system's points."
+    },
     "milk": {
       "$ref": "#/definitions/milk",
       "description": "A converted MilkDrop preset's compiled programs and shaders."
@@ -197,7 +201,7 @@
       "properties": {
         "system": {
           "type": "string",
-          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular"],
+          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus"],
           "description": "Which built-in scene the layer draws. Required."
         },
         "join": {
@@ -281,6 +285,10 @@
         "cellular": {
           "$ref": "#/definitions/cellular",
           "description": "The layer's automaton family and grid."
+        },
+        "plexus": {
+          "$ref": "#/definitions/plexus",
+          "description": "The layer's plexus arrangement, point count and seed."
         }
       }
     },
@@ -540,6 +548,28 @@
         }
       }
     },
+    "plexus": {
+      "description": "Which arrangement the plexus system's points take, how many there are, and what they are seeded from.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "type": "string",
+          "enum": ["cloud", "sheet"],
+          "description": "The arrangement of the points.",
+          "markdownDescription": "The arrangement of the points.\n\nDefault `cloud`."
+        },
+        "points": {
+          "type": "integer",
+          "description": "How many points; the quality tier may draw fewer, and says so.",
+          "markdownDescription": "How many points; the quality tier may draw fewer, and says so.\n\nDefault `300`."
+        },
+        "seed": {
+          "type": "integer",
+          "description": "What the points and their drift are drawn from; absent, the preset's own seed."
+        }
+      }
+    },
     "milk": {
       "description": "A converted MilkDrop preset's compiled programs, its two shaders, and the frame-level choices that ride with them. Produced by the converter, not hand-authored.",
       "type": "object",
@@ -760,7 +790,7 @@
       "description": "How much of the frame the arrangement fills.",
       "markdownDescription": "How much of the frame the arrangement fills.\n\n- default `1.0`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.drift": {
+    "param.drift.shape_collage": {
       "type": "string",
       "description": "How far the elements wander from their placed positions.",
       "markdownDescription": "How far the elements wander from their placed positions.\n\n- default `0.0`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."

@@ -109,6 +109,64 @@ fn the_player_schema_snapshot_is_current() {
     );
 }
 
+/// **Every parameter `ritmolux --schema` exports carries its group and whether
+/// it is main** (ADR-0256), with the values its declaration states.
+///
+/// Walked roster by roster over the document itself, in declaration order, so a
+/// parameter the export dropped the fields from — or wrote another's into — is
+/// named.
+#[test]
+fn every_exported_parameter_carries_its_group_and_main() {
+    let document = export::document();
+    for (label, specs) in export::param_rosters() {
+        let head = format!("{{\"name\":\"{label}\",\"params\":[");
+        let mut rest = document
+            .split_once(head.as_str())
+            .unwrap_or_else(|| panic!("the schema has no roster `{label}`"))
+            .1;
+        for spec in specs {
+            let open = format!("{{\"name\":\"{}\",\"default\":", spec.name);
+            let (_, after) = rest
+                .split_once(open.as_str())
+                .unwrap_or_else(|| panic!("`{label}` exports no `{}`", spec.name));
+            // The parameter's own object: up to the next parameter's opening.
+            let object = after.split("{\"name\":\"").next().unwrap_or(after);
+            let fields = format!(
+                ",\"group\":\"{}\",\"main\":{},\"kind\":\"{}\"",
+                spec.group.as_str(),
+                spec.main,
+                spec.kind.as_str()
+            );
+            assert!(
+                object.contains(&fields),
+                "`{label}.{}` does not export `{fields}`: {object}",
+                spec.name
+            );
+            rest = after;
+        }
+    }
+}
+
+/// **Every system has at least one main parameter** (ADR-0256), so an editor
+/// that opens a system's groups has something to lead with in at least one of
+/// them. The engine-wide stages are not systems and are not held to it.
+///
+/// This cannot fail for a system built from the shared blocks: `hue` and
+/// `brightness` there are declared main, so it holds whether or not a system
+/// marks any of its own parameters main. Which of a system's own parameters are
+/// main is a judgement read from the declarations, not something this guards.
+#[test]
+fn every_system_has_a_main_parameter() {
+    for kind in SystemKind::ALL {
+        let specs = kind.param_specs();
+        assert!(
+            specs.iter().any(|spec| spec.main),
+            "`{}` declares no main parameter",
+            kind.as_str()
+        );
+    }
+}
+
 /// **A family-dependent parameter's hover names each family's own range**
 /// (ADR-0194 point 5), asserted on the committed file an editor actually reads.
 ///

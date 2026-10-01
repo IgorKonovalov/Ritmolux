@@ -1,0 +1,26 @@
+# The `cloud` layout of the plexus system, for the illustrated guide's picture
+# of it. Teaching material, not a shipped preset: a few hundred points drifting
+# in a cube, linked wherever two come within `link_distance`, the camera
+# orbiting slowly.
+system = "plexus"
+name = "Plexus Cloud"
+
+[plexus]
+layout = "cloud"
+points = 320
+seed   = 11
+
+[palette]
+name = "ice"
+
+[params]
+link_distance = "0.38"
+link_alpha    = "0.8"
+line_width    = "1.4"
+drift         = "0.12"
+yaw           = "time * 0.05"
+pitch         = "0.3"
+distance      = "3.4"
+hue_center    = "0.55"
+hue_spread    = "0.5"
+brightness    = "1.1"

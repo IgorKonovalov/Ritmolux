@@ -1,16 +1,68 @@
-/* The studio's tokens. One dark surface: the thing being judged is a picture,
-   and a bright chrome around it changes how its colour reads. */
+/* The studio's look is the core's: every colour, size, radius and motion value
+   comes from tokens.css, which is generated from core/src/render/theme.rs
+   (ADR-0252) and never hand-edited. This file only names what the studio
+   derives from those tokens. One dark surface: the thing being judged is a
+   picture, and a bright chrome around it changes how its colour reads. */
+@import './tokens.css';
+
 :root {
-  --bg: #101014;
-  --panel: #17171d;
-  --panel-edge: #26262f;
-  --text: #e6e6ea;
-  --text-dim: #8b8b98;
-  --accent: #6ee7d0;
-  --warn: #f0b429;
-  --error: #f2686c;
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, monospace;
+
+  /* The lit edge belongs to a panel. A control or a divider inside one takes
+     the quieter trough, so the only amber lines on screen are panel edges,
+     focus and the thing that is selected. */
+  --control-edge: var(--trough);
+  --control-radius: calc(var(--radius) / 2);
+
+  /* The core's panel scanline, in CSS: one dark line every pitch, over the
+     panel fill. Laid as the first background layer, with the fill under it. */
+  --scanlines: repeating-linear-gradient(
+    to bottom,
+    transparent 0 calc(var(--scanline-pitch) - 1px),
+    var(--scanline) calc(var(--scanline-pitch) - 1px) var(--scanline-pitch)
+  );
+
+  /* Hover and focus take the short duration; a view or a modal the long one.
+     Both go to zero under reduced motion, below, so every transition and
+     animation that reads them becomes a step. */
+  --transition-control: color var(--motion-short) var(--ease),
+    border-color var(--motion-short) var(--ease), background-color var(--motion-short) var(--ease);
+}
+
+/* The studio's own setting (`ui.reducedMotion` in settings.json) and the
+   system's preference each stop the motion; either is enough. */
+:root[data-motion='reduced'] {
+  --motion-short: 0ms;
+  --motion-long: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-short: 0ms;
+    --motion-long: 0ms;
+  }
+}
+
+/* A view or a modal arriving: a fade and a short rise, on the core's curve. */
+@keyframes rlx-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-0));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rlx-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 * {
@@ -30,4 +82,16 @@ body {
   font-family: var(--font);
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
+}
+
+/* One focus ring for every control: the accent, outside the border. */
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+button,
+input,
+select {
+  transition: var(--transition-control);
 }

@@ -148,7 +148,7 @@
 
 use crate::render::gpu;
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// Parameter defaults — a black backdrop when nothing is bound, so the composite
 /// is byte-neutral against the pre-Phase-3 per-scene clears.
@@ -737,6 +737,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Where the backdrop starts in the preset's palette, as a coordinate along it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: true,
     },
     ParamSpec {
         name: "bg_bright",
@@ -744,6 +746,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How lit the backdrop is; 0 is black and the scene draws on nothing.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: true,
     },
     ParamSpec {
         name: "bg_vignette",
@@ -751,6 +755,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Darkens the backdrop toward the corners, pulling the eye to the middle.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_angle",
@@ -758,6 +764,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, std::f32::consts::TAU]),
         doc: "Direction the backdrop ramp runs in, in radians; 0 runs bottom to top.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_hue_span",
@@ -765,6 +773,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-0.5, 0.5]),
         doc: "How far along the palette the ramp travels from `bg_hue`; 0 is a flat colour.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_coord_mode",
@@ -773,6 +783,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Which way the backdrop ramp is measured: 0 straight across the frame, 1 around a \
               point, which turns its bands into a fan converging on that point.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_center_x",
@@ -781,6 +793,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Horizontal point the angular ramp's bands converge on; 0 is the frame's middle and \
               1 its right edge. Does nothing while bg_coord_mode is 0.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_center_y",
@@ -789,6 +803,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Vertical point the angular ramp's bands converge on; 0 is the frame's middle and \
               -1 its bottom edge. Does nothing while bg_coord_mode is 0.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_shade",
@@ -796,6 +812,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Brightness multiplier at the ramp's start, so a sky can be dark at one edge.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_shade_end",
@@ -803,6 +821,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Brightness multiplier at the ramp's far end.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_ramp_gamma",
@@ -810,6 +830,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.25, 4.0]),
         doc: "Bends the ramp's progress: below 1 the far colour arrives early, above 1 it holds off.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_band_amount",
@@ -817,6 +839,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Strength of a second colour band laid across the ramp; 0 removes it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_band_angle",
@@ -824,6 +848,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, std::f32::consts::TAU]),
         doc: "Direction the band runs in, independently of the ramp, in radians.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_band_pos",
@@ -831,6 +857,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Where across the frame the band sits.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_band_width",
@@ -838,6 +866,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.02, 1.0]),
         doc: "How wide the band is; narrow reads as a horizon, wide as a wash.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_band_curve",
@@ -845,6 +875,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Bows the band into an arc instead of a straight line.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_band_hue",
@@ -852,6 +884,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Where the band's own colour is picked from the palette.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bg_band_hue_span",
@@ -859,6 +893,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-0.5, 0.5]),
         doc: "How far the band's colour travels along the palette across its width.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
 ];
 

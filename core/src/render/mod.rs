@@ -33,6 +33,7 @@
 pub mod aux_target;
 pub(crate) mod background;
 pub(crate) mod bloom;
+pub mod camera;
 pub mod capture;
 // The `capture_*` entry points themselves — a continuation of `impl Renderer`
 // (Plan 0061 Phase 3). Private, because it adds no path of its own: every method
@@ -66,6 +67,9 @@ pub mod now_playing;
 pub mod overlay;
 mod overlay_font;
 pub mod palette;
+// The interface's backdrops. The rectangle type is in every build; the pass
+// that draws them is behind `text`, inside the text layer that records it.
+pub mod panel;
 // `pub(crate)` for the same reason the stage modules are: the preset loader's
 // typo check unions every global vocabulary, and since ADR-0085 one of them —
 // `occlude` — belongs to the chain rather than to a stage inside it.
@@ -73,6 +77,9 @@ pub(crate) mod post;
 pub mod scenes;
 #[cfg(feature = "text")]
 pub mod text;
+// The interface's look (ADR-0252). Not behind `text`: the diagnostics panel
+// and the banner read it in every build.
+pub mod theme;
 pub mod tier;
 pub(crate) mod tonemap;
 pub(crate) mod trails;
@@ -103,13 +110,14 @@ use ink::Ink;
 use now_playing::NowPlaying;
 use overlay::Overlay;
 use palette::Palette;
+pub use panel::{Panel, PanelKind};
 use post::PostChain;
 use scenes::Scene;
 pub use scenes::lines::CapOverflow;
 #[cfg(feature = "text")]
 use text::TextLayer;
 #[cfg(feature = "text")]
-pub use text::TextRun;
+pub use text::{TextMeasure, TextRun, fit_width};
 pub use tier::{GridScale, REFERENCE_PX, Tier, TierConfig, attractor_budget};
 use tonemap::Tonemap;
 use transition::{Blend, DEFAULT_DURATION_SECS, Transition, TransitionKind};
@@ -1198,9 +1206,13 @@ impl Renderer {
     /// [`aux_counts`](Self::aux_counts) is what makes such a reading
     /// distinguishable from a console that never presented at all.
     #[cfg(feature = "text")]
-    pub fn present_aux(&mut self, runs: &[TextRun<'_>]) -> Result<(), RenderError> {
+    pub fn present_aux(
+        &mut self,
+        runs: &[TextRun<'_>],
+        panels: &[Panel],
+    ) -> Result<(), RenderError> {
         match self.aux.as_mut() {
-            Some(aux) => aux.present(&self.ctx, runs, self.preview.target()),
+            Some(aux) => aux.present(&self.ctx, runs, panels, self.preview.target()),
             None => Ok(()),
         }
     }
@@ -1212,6 +1224,21 @@ impl Renderer {
     #[cfg(feature = "text")]
     pub fn queue_text(&mut self, runs: &[TextRun<'_>]) {
         self.text_layer.queue(runs);
+    }
+
+    /// Queue the panels the next frame's text sits on; replaced by each call
+    /// and cleared after each `render`, like [`queue_text`](Self::queue_text).
+    /// All of a frame's panels are one draw, under the picture and the text.
+    #[cfg(feature = "text")]
+    pub fn queue_panels(&mut self, panels: &[Panel]) {
+        self.text_layer.queue_panels(panels);
+    }
+
+    /// The laid-out width of `text` at `size` device pixels, shaped with the
+    /// same fonts the output's text is drawn with.
+    #[cfg(feature = "text")]
+    pub fn measure_text(&mut self, text: &str, size: f32) -> f32 {
+        self.text_layer.measure(text, size)
     }
 
     /// Set the one picture the shell may draw over the frame, or clear it with
@@ -1265,6 +1292,13 @@ impl Renderer {
         self.now_playing.set(text);
     }
 
+    /// Make the banner's fade a step (`true`) or the theme's eased envelope
+    /// (`false`, the default) — the shell's reduced-motion choice reaching the
+    /// one envelope the core owns.
+    pub fn set_reduced_motion(&mut self, reduced: bool) {
+        self.now_playing.set_reduced_motion(reduced);
+    }
+
     /// Append the banner's lines to this frame's text queue, after whatever the
     /// frontend queued — [`queue_text`](Self::queue_text) *replaces* the queue,
     /// so the core's own furniture has to go in afterwards or a shell that draws
@@ -1280,7 +1314,15 @@ impl Renderer {
             ..
         } = self;
         let (width, height) = (ctx.config.width as f32, ctx.config.height as f32);
-        for line in now_playing.layout(width, height).into_iter().flatten() {
+        let lines = now_playing.layout(width, height);
+        let widths = lines.each_ref().map(|line| {
+            line.as_ref()
+                .map_or(0.0, |l| text_layer.measure(&l.text, l.size))
+        });
+        if let Some(panel) = now_playing::backdrop(&lines, widths) {
+            text_layer.push_panel(panel);
+        }
+        for line in lines.into_iter().flatten() {
             text_layer.push(TextRun {
                 text: &line.text,
                 x: line.x,
@@ -1414,6 +1456,7 @@ impl Renderer {
             GeneratorConfig::Particles { family, .. } => Some(family.as_str()),
             GeneratorConfig::Field(config) => Some(config.family.as_str()),
             GeneratorConfig::Cellular(config) => Some(config.family.as_str()),
+            GeneratorConfig::Plexus(config) => Some(config.layout.as_str()),
             // Exhaustive rather than a wildcard, so a system that grows a family
             // has to answer here as well as in `family_params`.
             GeneratorConfig::LSystem { .. }
