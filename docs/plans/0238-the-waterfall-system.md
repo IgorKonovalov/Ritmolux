@@ -1,6 +1,6 @@
 # 0238 — The waterfall system
 
-> **Status:** draft (2026-10-01). Runs after Plan 0236 closes.
+> **Status:** approved (2026-10-01). Runs after Plan 0236 closes.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0040](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md), [ADR-0019](../adrs/0019-eased-parameters.md)

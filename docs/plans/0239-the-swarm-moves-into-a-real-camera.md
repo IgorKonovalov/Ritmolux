@@ -1,6 +1,6 @@
 # 0239 — The swarm moves into a real camera
 
-> **Status:** draft (2026-10-01). Runs after Plan 0236 closes.
+> **Status:** approved (2026-10-01). Runs after Plan 0236 closes.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0259](../adrs/0259-the-swarm-projects-through-the-shared-camera-in-a-frustum-shaped-torus.md) (proposed), [ADR-0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md), [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed), [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)

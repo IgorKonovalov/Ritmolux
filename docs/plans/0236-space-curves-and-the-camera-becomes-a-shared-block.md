@@ -1,6 +1,6 @@
 # 0236 — Space curves, and the camera becomes a shared block
 
-> **Status:** draft (2026-10-01). Runs after Plan 0235 closes.
+> **Status:** approved (2026-10-01). Runs after Plan 0235 closes.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed), [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md), [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md)
