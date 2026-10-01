@@ -240,6 +240,24 @@ footprint so the vendor spread is on record.
       scene, so the dissolve holds the outgoing picture still while the incoming one runs
       ([ADR-0198](adrs/0198-a-scene-advances-after-its-frames-bindings.md)), and on this system that
       shows as a frozen automaton fading out — say whether it reads as a defect.
+- [ ] **The plexus system at the Floor caps, on the low-end box, 1080p.** Plan 0235 added
+      `plexus`, whose cost is a pairwise test of every point on the CPU plus the fill of its lines,
+      which an open `aperture` widens. Its Floor caps — `plexus_points` **600**, `plexus_edges`
+      **6000**, `max_coc_px` **12** — were measured on the development box's integrated GPU
+      (under 4 ms a frame headless, release build), not on the low-end box. No shipped preset draws
+      the system yet, so point `RLX_PRESET_DIR` at `docs/examples/plexus/` and load
+      **`sheet.toml`**; then write the heaviest frame the caps allow beside it — the same file with
+      `points = 600`, `link_distance = "0.6"` and `aperture = "40"`. Overlay on (`F3`), report
+      **(a)** whether fps holds ≥ 60 @ 1080p on both, **(b)** the p99, and **(c)** what the
+      standalone prints about the clamps. **If the heavy frame misses, the levers are the three
+      caps**, and lowering `plexus_points` or `max_coc_px` changes what a preset looks like, so it
+      routes to `architect` with the numbers.
+- [ ] **The plexus system's look, any box.** Load `cloud.toml` and `sheet.toml` from
+      `docs/examples/plexus/` and say, for each, whether the depth reads: whether lines visibly
+      soften away from the focal plane, whether links fade in and out rather than popping as the
+      points drift, and, on the sheet, whether the ripple reads as cloth rather than as a mesh
+      rewiring. Then bind `aperture` to a live control and sweep it, and say whether a blurred line
+      dims as it spreads rather than flaring.
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
       behind a `PostStage` trait, so a rendered frame now costs ~4 vtable calls plus ~4 `TextureView`
       Arc bumps it did not before. Expected to be unmeasurable against a render pass, but it was

@@ -129,7 +129,7 @@ Flags:
 | `--size <WxH>` | render size (default 1280x720) |
 | `--out <path>` | output PNG (single shot) or dir/file (`--all`) |
 | `--all` | contact sheet of every preset, labeled (needs `--out`) |
-| `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage, the [transient probe](#the-transient-columns) and an advisory [frame cost](#the-frame-cost-block); `family=` takes any `system` name — every one the scene registry carries: `analytic_field`, `attractor`, `cellular`, `emitter`, `fragment_field`, `lsystem`, `parametric_curve`, `reaction_diffusion`, `shape_collage`, `shape_field`, `spectrum`, `star_pattern`, `swarm`, `warp_mesh` |
+| `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage, the [transient probe](#the-transient-columns) and an advisory [frame cost](#the-frame-cost-block); `family=` takes any `system` name — every one the scene registry carries: `analytic_field`, `attractor`, `cellular`, `emitter`, `fragment_field`, `lsystem`, `parametric_curve`, `plexus`, `reaction_diffusion`, `shape_collage`, `shape_field`, `spectrum`, `star_pattern`, `swarm`, `warp_mesh` |
 | `--json` | emit the report as JSON instead of a text table |
 | `--signal <kind:param>` | synth-audio filmstrip (see below) |
 | `--signal-secs <s>` | how long to synthesize that signal for (default `4`). The clip's length is what decides **which hops exist**, so a late `--frame-at` needs a longer one — [photographing a world that is still assembling](#a-late-hop-photographs-a-world-that-is-still-assembling). Needs `--signal`: `--audio` and `--render` take their length from the file |

@@ -710,6 +710,7 @@ unknown on the rest.
 | `attractor` | per particle, **vertex** stage | ✅ | ❌ `palette_contour` inert, the other two unknown |
 | `swarm` | per particle, on the CPU | ✅ | ❌ same |
 | `emitter` | per particle, on the CPU | ✅ | ❌ same |
+| `plexus` | per line and per dot, on the CPU, along view depth | ✅ | ❌ unknown — not declared |
 | `spectrum`, `parametric_curve`, `lsystem`, `star_pattern` | per segment, on the CPU | ✅ | ❌ same |
 
 A point sprite or a stroke segment carries **one** palette coordinate for its whole

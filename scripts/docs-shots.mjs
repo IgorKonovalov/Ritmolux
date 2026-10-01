@@ -464,6 +464,20 @@ const IMAGES = [
     tier: "rich",
   },
 
+  // --- the plexus system's layouts beyond cloud ---------------------------
+  //
+  // UNJUDGED: the system ships no preset yet, so the sheet is drawn from the
+  // teaching preset the guide prints for it. Filed outside the gallery for the
+  // curves' reason.
+  {
+    out: "docs/images/plexus/sheet.png",
+    presetFile: "docs/examples/plexus/sheet.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+
   // --- the gallery: one per SystemKind ------------------------------------
 
   {

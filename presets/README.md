@@ -90,6 +90,7 @@ such flag and always draws at the full scale).
   - [System: `shape_collage`](#system-shape_collage)
   - [System: `analytic_field`](#system-analytic_field)
   - [System: `cellular`](#system-cellular)
+  - [System: `plexus`](#system-plexus)
   - [Engine stage: `background`](#engine-stage-background)
   - [Engine stage: `trails`](#engine-stage-trails)
   - [Engine stage: `kaleidoscope`](#engine-stage-kaleidoscope)
@@ -3307,7 +3308,7 @@ the figure is *dim*. A few shipped presets bind it: `attractor_lorenzknot`,
 `fragment_etchingplate` and `shape_strataheart` state the default `1.0`.
 
 **The additive families are already unoccluded when no post stage is active.**
-The swarm, line and emitter scenes blend colour `One`/`One`, so with an empty
+The swarm, line, emitter and plexus scenes blend colour `One`/`One`, so with an empty
 chain their backdrop survives in full whatever `occlude` says — there is no
 occlusion at that seam for it to scale. It reaches them through the chain's last
 stage instead, which every shipped preset in those families has. The scenes that

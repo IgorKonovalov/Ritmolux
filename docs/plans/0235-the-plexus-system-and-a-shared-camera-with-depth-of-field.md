@@ -290,8 +290,8 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 | 3 — Nodes: the 3D quad pipeline | dev | done | f7e09ec4 |
 | 4 — The sheet layout | dev | done | de309bfc |
 | 5 — The attractor takes the shared CoC | dev | done | f43f1dd7 |
-| 6 — Tier caps, golden, determinism | dev | done | committed with this row |
-| 7 — Documentation and the references | dev | not started | |
+| 6 — Tier caps, golden, determinism | dev | done | 0c23e166 |
+| 7 — Documentation and the references | dev | done | committed with this row |
 | 8 — The look, judged | human | not started | |
 
 ### Notes
@@ -348,6 +348,13 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
   `Edges` and `Blur` per frame), which is a `scenes/mod.rs` edit outside the phase list.
 - Phase 6, two intra-doc links to the private `CAMERA_WGSL` (from Phases 1-2) broke the public
   `cargo doc --workspace` run and are unlinked here.
+- Phase 7, docs beyond the phase list, each a hand-kept roster plexus made false:
+  `docs/capturing.md` (the `--report family=` list), `docs/preset-palettes.md` (the per-scene
+  palette table) and the hand-written additive-scenes sentence in `presets/README.md`. Also
+  `docs/examples/plexus/sheet.toml`, a `docs/images/plexus/sheet.png` manifest entry in
+  `scripts/docs-shots.mjs`, and `docs/images/gallery/plexus.png` re-rendered now that nodes draw.
+  `presets/README.md`'s contents block had been stale since Phase 1 (`toc.mjs --check` was not run
+  per phase) and is regenerated here.
 - Phase 2, `max_coc_px` is a `u32` (the tier struct derives `Eq`), provisional 12 / 24; Phase 6
   measures it.
 
