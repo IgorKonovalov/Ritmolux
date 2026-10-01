@@ -1,7 +1,8 @@
-# nextest configuration. Three concerns: keep the reporting tests audible, define
+# nextest configuration. Its concerns: keep the reporting tests audible, define
 # the narrowed test set as a profile (ADR-0156) so one file says what the
 # pre-push hook, CI's `check` job and the `dev` lane's per-phase gate all run,
-# and schedule the tests that read the clock alone (ADR-0193).
+# schedule the tests that read the clock alone (ADR-0193), and give a diagnosed
+# flake one more try by name (ADR-0261).
 #
 # --- job 1: the reporting tests ---
 #
@@ -117,3 +118,18 @@ default-filter = 'not (binary(golden) + binary(attractor) + binary(reaction_diff
 [[profile.default.overrides]]
 filter = 'binary(/_cost$/) + binary(help_cli) + binary(stream_pipe) + (binary(dsp) & test(=one_hop_analyzes_well_under_the_hop_interval))'
 threads-required = "num-test-threads"
+
+# --- job 5: a diagnosed flake gets one more try, by exact name ---
+#
+# A test may retry once only while a live `docs/design-backlog.md` entry diagnoses it as a flake, and
+# only by `test(=exact_name)` - never a pattern, never profile-wide. It leaves this block when its
+# entry closes. A pass on the retry is still reported: nextest prints it `FLAKY`, the conductor's
+# suite ledger records the name and its digest prints it (ADR-0261). A red test with no live entry is
+# never retried, whatever it looks like: a retry would have passed the `Show::reload` race twice.
+#
+# Backlog 0219: a `ctl/preset` datagram on loopback lost in 3 of 79 loaded runs.
+#
+# `profile.fast` inherits this block, like the ones above.
+[[profile.default.overrides]]
+filter = 'test(=a_preset_datagram_selects_by_name)'
+retries = 1

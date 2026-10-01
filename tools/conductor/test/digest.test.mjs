@@ -440,6 +440,21 @@ test("a reopened finding is listed under Needs you with the reason it was reopen
   assert.match(renderDigest(state, { repo, stateDir, now: NOW }), /^- \*\*0185 merged with 2 open findings\*\*:/m);
 });
 
+// ADR-0261: a pass on retry stays visible, next to the plan's own entry in the history.
+test("the history names a plan's flaky tests from the suite ledger, and a hand run's under no plan", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = pilotState(repo, head, stateDir);
+  const at = state.plans["0185"].merge.at;
+  const line = (by, extra = {}) => JSON.stringify({ tree: "a".repeat(40), cmd: "cargo nextest run --workspace", exit: 0, summary: "2 tests run", flaky: ["rlx-standalone::control_loopback a_preset_datagram_selects_by_name"], by, at, ms: 1, ...extra });
+  writeFileSync(join(stateDir, "suite-ledger.jsonl"), [line("gate 0185-pre-review"), line("0185-close", { served: true, cmd: "cargo nextest run --workspace -P fast" }), line("hand")].join("\n") + "\n");
+  const text = renderHistory(state, { repo, stateDir });
+  const closed = text.slice(text.indexOf("### Closed"), text.indexOf("### Failed and parked"));
+  assert.ok(closed.includes("  - flaky, passed on retry in `gate 0185-pre-review`: `rlx-standalone::control_loopback a_preset_datagram_selects_by_name`"), closed);
+  assert.ok(closed.includes("  - flaky, passed on retry in `0185-close` (served -P fast): `rlx-standalone::control_loopback a_preset_datagram_selects_by_name`"), closed);
+  assert.equal((text.match(/flaky, passed on retry/g) ?? []).length, 2, "the hand run belongs to no plan");
+});
+
 test("an empty worklist is one line, and says what it found nothing of", () => {
   const state = {
     version: 1,

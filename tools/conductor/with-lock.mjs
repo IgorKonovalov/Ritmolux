@@ -44,6 +44,7 @@ import {
   appendSkip,
   cleanTree,
   failingTests,
+  flakyTests,
   greenRecord,
   isFullSuite,
   SERVED_SUITE_ARGS,
@@ -372,7 +373,7 @@ export async function runWrapped(argv, { env = process.env, cwd = process.cwd(),
   lock.release();
   const heldMs = Date.now() - lock.acquiredAt;
   if (suite && startTree && cleanTree(cwd) === startTree) {
-    const record = { tree: startTree, exit: code, summary: summaryLine(output), failed: failingTests(output), by: ledger.by, ms: heldMs };
+    const record = { tree: startTree, exit: code, summary: summaryLine(output), failed: failingTests(output), flaky: flakyTests(output), by: ledger.by, ms: heldMs };
     if (serving) appendServed(ledger.path, { ...record, green: serving.record, paths: serving.paths });
     else appendRecord(ledger.path, record);
   }

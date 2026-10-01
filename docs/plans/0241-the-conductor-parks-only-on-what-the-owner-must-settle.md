@@ -171,8 +171,8 @@ flowchart LR
 |---|---|---|---|
 | 1 — The close's suite is served | dev | done | `c1a17bf7` |
 | 2 — A run of human phases parks once | dev | done | `7991c87e` |
-| 3 — A false repair claim reopens its finding | dev | committed with this row | |
-| 4 — A diagnosed flake retries by name, and says so | dev | not started | |
+| 3 — A false repair claim reopens its finding | dev | done | `3171cf30` |
+| 4 — A diagnosed flake retries by name, and says so | dev | committed with this row | |
 
 ### Notes
 
@@ -182,5 +182,19 @@ flowchart LR
 - Phase 3 also edits `tools/conductor/test/lane.test.mjs`, outside its `Files touched`: its two
   tests that a wrong-file and an off-branch `fixed_in` park `disagreement` now assert the finding is
   reopened and the plan merges. `verifyClose` now returns `{ problems, reopened }` rather than a list.
+- Phase 4, the flaky shape on cargo-nextest 0.9.143, recorded from a scratch crate: the first try
+  prints `  TRY 1 FAIL [   0.005s] (───) <binary> <name>`, the retry `  TRY 2 PASS [...] (2/2) ...`,
+  the summary `2 tests run: 2 passed (1 flaky), 0 skipped`, then `   FLAKY 2/2 [   0.006s] (2/2)
+  <binary> <name>`. A test failing both tries prints `TRY 2 FAIL` under the summary and never a bare
+  `FAIL`. Both runs are fixtures in `test/helpers.mjs`.
+- Phase 4 also changes `failingTests` in `lib/ledger.mjs`: it now accepts the `TRY n` prefix and the
+  `(───)` counter, and leaves out a name `flakyTests` reports. Without that, the retried test failing
+  both tries would have left a red record with no name.
+- Phase 4 edits files outside its `Files touched`. `lib/gate.mjs` and `with-lock.mjs` each pass
+  `flaky: flakyTests(output)` to the record they write, since they are the ledger's two writers.
+  `test/digest.test.mjs` gains the test for the digest's flaky lines.
+- Phase 4 prints flaky names in the history page, under the plan's `### Closed` entry, or under
+  `### Failed and parked` for a plan that did not merge in that run. They are read from the ledger
+  by its `by` label. The current-state page does not print them.
 
 ### Close triggers

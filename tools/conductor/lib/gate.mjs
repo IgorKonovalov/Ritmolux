@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { gatesFor } from "../../../scripts/gates.manifest.mjs";
-import { appendRecord, appendServed, appendSkip, cleanTree, failingTests, greenRecord, SERVED_SUITE_ARGS, servingRecord, summaryLine } from "./ledger.mjs";
+import { appendRecord, appendServed, appendSkip, cleanTree, failingTests, flakyTests, greenRecord, SERVED_SUITE_ARGS, servingRecord, summaryLine } from "./ledger.mjs";
 import { SUITE, withLock } from "./locks.mjs";
 
 /**
@@ -208,7 +208,7 @@ export async function runGate({
     timed.push({ name: c.name, code: r.code, ms, ...(suite ? { suite: true } : {}), ...(serving ? { served: true, by: serving.record.by } : {}) });
     const tests = failingTests(r.output);
     if (suite && startTree && cleanTree(cwd) === startTree) {
-      const record = { tree: startTree, exit: r.code, summary: summaryLine(r.output), failed: tests, by: `gate ${label}`, ms };
+      const record = { tree: startTree, exit: r.code, summary: summaryLine(r.output), failed: tests, flaky: flakyTests(r.output), by: `gate ${label}`, ms };
       if (serving) appendServed(ledger, { ...record, green: serving.record, paths: serving.paths });
       else appendRecord(ledger, record);
     }

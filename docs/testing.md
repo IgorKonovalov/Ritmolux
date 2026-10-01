@@ -104,6 +104,14 @@ Three things follow that matter when you are reading a red run:
   — renders the whole library plus the per-family shape and distinctness tests,
   which are never sampled. ADR-0081's curation gate therefore still sees the
   whole library.
+- **A test retries only by exact name, and only while a live backlog entry
+  diagnoses it as a flake.** `.config/nextest.toml` gives such a test one more
+  try under `test(=name)`, never a pattern and never profile-wide, and the test
+  leaves the list when its entry closes. A pass on the retry still shows:
+  nextest prints it `FLAKY`, and the conductor's ledger and digest name it. A red
+  test with no live entry is never retried. Today the list is
+  `a_preset_datagram_selects_by_name`, for backlog 0219
+  ([ADR-0261](adrs/0261-the-conductor-parks-only-on-what-the-owner-must-settle.md)).
 
 Individual tests (add `-- --nocapture` to see the printed diagnostics):
 

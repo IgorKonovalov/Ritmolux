@@ -3,6 +3,7 @@
 //
 //   { tree, cmd, exit, summary, by, at, ms }                     a run
 //   { ..., failed: [names], failed_count? }                      a red run that named its failures
+//   { ..., flaky: [names] }                                      a run in which a test passed on retry
 //   { tree, cmd, skip: true, by, at, green: { by, at } }         a skip, and the run it relied on
 //   { tree, cmd, served: true, exit, ..., green, diff }          a `-P fast` run a record served
 //
@@ -225,11 +226,31 @@ export const FAILED_CAP = 20;
  * failure twice — as it happens and again under its closing `Summary` — so the second sighting is
  * dropped rather than counted.
  *
+ * A test with a nextest `retries` override prints each attempt as `TRY n FAIL`, so the prefix is
+ * accepted; a test whose later try passed is flaky rather than failing and is left out
+ * (`flakyTests`). A `TRY 1` line carries `(───)` where the counter would be.
+ *
  * Trap: this is keyed to nextest's `FAIL [` shape. If that changes the list comes back empty and the
  * record merely loses its names; the recorded fixture in test/helpers.mjs is what makes that visible.
  */
 export function failingTests(output) {
-  const names = [...String(output ?? "").matchAll(/^\s*(?:FAIL|TIMEOUT|SIGSEGV|SIGABRT) \[[^\]]*\]\s+(?:\(\s*\d+\/\d+\)\s+)?(.+?)\s*$/gm)].map((m) => m[1]);
+  const text = String(output ?? "");
+  const names = [...text.matchAll(/^\s*(?:TRY \d+ )?(?:FAIL|TIMEOUT|SIGSEGV|SIGABRT) \[[^\]]*\]\s+(?:\((?:\s*\d+\/\d+|─+)\)\s+)?(.+?)\s*$/gm)].map((m) => m[1]);
+  const flaky = new Set(flakyTests(text));
+  return [...new Set(names)].filter((n) => !flaky.has(n));
+}
+
+/**
+ * The tests nextest reports as passing on a retry, each once: its closing `FLAKY 2/2 [   0.006s]
+ * (2/2) binary name` lines, with the attempt count and progress counter dropped. Only a test a
+ * `retries` override in .config/nextest.toml names can produce one (ADR-0261).
+ *
+ * Trap: keyed to nextest's `FLAKY n/m [` shape, like `failingTests` is to `FAIL [`. If it changes
+ * the list comes back empty and a record loses the names without going red; the recorded fixture in
+ * test/helpers.mjs is what makes that visible.
+ */
+export function flakyTests(output) {
+  const names = [...String(output ?? "").matchAll(/^\s*FLAKY \d+\/\d+ \[[^\]]*\]\s+(?:\(\s*\d+\/\d+\)\s+)?(.+?)\s*$/gm)].map((m) => m[1]);
   return [...new Set(names)];
 }
 
@@ -239,9 +260,12 @@ function failedKeys(exit, failed) {
   return failed.length > FAILED_CAP ? { failed: failed.slice(0, FAILED_CAP), failed_count: failed.length } : { failed: [...failed] };
 }
 
-export function appendRecord(path, { tree, exit, summary, failed, by, ms, at = new Date().toISOString() }) {
+/** The `flaky` key a record carries: present only when some test passed on a retry. */
+const flakyKeys = (flaky) => (flaky?.length ? { flaky: [...flaky] } : {});
+
+export function appendRecord(path, { tree, exit, summary, failed, flaky, by, ms, at = new Date().toISOString() }) {
   mkdirSync(dirname(path), { recursive: true });
-  appendFileSync(path, JSON.stringify({ tree, cmd: SUITE_COMMAND, exit, summary: summary ?? null, ...failedKeys(exit, failed), by, at, ms }) + "\n");
+  appendFileSync(path, JSON.stringify({ tree, cmd: SUITE_COMMAND, exit, summary: summary ?? null, ...failedKeys(exit, failed), ...flakyKeys(flaky), by, at, ms }) + "\n");
 }
 
 /**
@@ -250,7 +274,7 @@ export function appendRecord(path, { tree, exit, summary, failed, by, ms, at = n
  * `greenRecord` reads it back for `tree` alone, and `servingRecord` never does, so one `-P fast`
  * never serves another.
  */
-export function appendServed(path, { tree, exit, summary, failed, by, ms, green, paths, at = new Date().toISOString() }) {
+export function appendServed(path, { tree, exit, summary, failed, flaky, by, ms, green, paths, at = new Date().toISOString() }) {
   mkdirSync(dirname(path), { recursive: true });
   const line = {
     tree,
@@ -259,6 +283,7 @@ export function appendServed(path, { tree, exit, summary, failed, by, ms, green,
     exit,
     summary: summary ?? null,
     ...failedKeys(exit, failed),
+    ...flakyKeys(flaky),
     by,
     at,
     ms,

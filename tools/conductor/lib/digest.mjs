@@ -165,6 +165,22 @@ function timeInRun(rec, run, inRun) {
   return { active, wall: end - start };
 }
 
+/**
+ * One line per suite run of `plan` in the run that passed a test only on its retry (ADR-0261), read
+ * off the ledger's `flaky` key. A ledger line belongs to a plan by its `by`: `gate NNNN-<stage>` for
+ * the conductor's gate and `NNNN-<step>` for a session's wrapped suite. A hand run names no plan.
+ */
+function flakyLines(ledger, plan, inRun, indent) {
+  const out = [];
+  for (const e of ledger) {
+    if (!e.flaky?.length || !inRun(e.at)) continue;
+    if (/^(?:gate )?(\d{4})-/.exec(e.by ?? "")?.[1] !== plan) continue;
+    const names = e.flaky.map((n) => `\`${n}\``).join(", ");
+    out.push(`${indent}flaky, passed on retry in \`${e.by}\`${e.served ? " (served -P fast)" : ""}: ${names}`);
+  }
+  return out;
+}
+
 function closedFindings(rec) {
   const lines = [];
   for (const v of rec.verdicts) {
@@ -552,6 +568,7 @@ export function renderHistory(state, opts) {
           `${usd(spendInRun(rec, inRun))} this run, ${usd(totalSpend(rec))} total. Review: \`${rel ?? rec.plan}\` \`## Close review\`.`,
       );
       out.push(...closedFindings(rec));
+      out.push(...flakyLines(ledger, rec.plan, inRun, "  - "));
     }
     out.push("");
 
@@ -559,6 +576,8 @@ export function renderHistory(state, opts) {
     out.push("### Failed and parked", "");
     const failed = [];
     for (const rec of plans) {
+      // A merged plan's flaky passes sit under its Closed bullet; any other plan's sit here.
+      if (!closed.includes(rec)) failed.push(...flakyLines(ledger, rec.plan, inRun, `- **${rec.plan}** `));
       for (const g of (rec.gates ?? []).filter((x) => !x.ok && inRun(x.at))) {
         const tests = g.failed.tests?.length ? ` - failing: ${g.failed.tests.join(", ")}` : "";
         failed.push(`- **${rec.plan}** gate red at \`${g.label}\`: ${g.failed.name} exited ${g.failed.code}${tests}. Log: \`${g.failed.log}\``);

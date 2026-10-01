@@ -15,6 +15,7 @@ import {
   diffPaths,
   FAILED_CAP,
   failingTests,
+  flakyTests,
   greenRecord,
   isFullSuite,
   readLedger,
@@ -29,7 +30,7 @@ import {
   treeOf,
 } from "../lib/ledger.mjs";
 import { defaultGate } from "../lib/gate.mjs";
-import { RED_NEXTEST_OUTPUT, tmp } from "./helpers.mjs";
+import { FLAKY_NEXTEST_OUTPUT, RED_NEXTEST_OUTPUT, RETRIED_RED_NEXTEST_OUTPUT, tmp } from "./helpers.mjs";
 
 function repo() {
   const dir = tmp("rlx-ledger-repo-");
@@ -352,4 +353,29 @@ test("a record keeps the first FAILED_CAP failing names and the total past them"
   const [red] = readLedger(file);
   assert.deepEqual(red.failed, names.slice(0, FAILED_CAP));
   assert.equal(red.failed_count, FAILED_CAP + 5);
+});
+
+// ADR-0261: a test passing on its retry is named as flaky, and is never a failure.
+test("a recorded flaky pass yields exactly the one retried name, and no failing test", () => {
+  assert.deepEqual(flakyTests(FLAKY_NEXTEST_OUTPUT), ["flaky-scratch::control_loopback a_preset_datagram_selects_by_name"]);
+  assert.deepEqual(failingTests(FLAKY_NEXTEST_OUTPUT), [], "its TRY 1 FAIL is not a failure once TRY 2 passed");
+  assert.equal(summaryLine(FLAKY_NEXTEST_OUTPUT), "2 tests run: 2 passed (1 flaky), 0 skipped");
+  assert.deepEqual(flakyTests(RED_NEXTEST_OUTPUT), [], "a run with no retry names none");
+});
+
+test("a retried test that fails every try is still named failing, once", () => {
+  assert.deepEqual(failingTests(RETRIED_RED_NEXTEST_OUTPUT), ["flaky-scratch::control_loopback a_preset_datagram_selects_by_name"]);
+  assert.deepEqual(flakyTests(RETRIED_RED_NEXTEST_OUTPUT), []);
+});
+
+test("a record and a served line carry flaky only when a test passed on retry", () => {
+  const file = join(tmp("rlx-ledger-flaky-"), "suite-ledger.jsonl");
+  const names = flakyTests(FLAKY_NEXTEST_OUTPUT);
+  appendRecord(file, { tree: "a".repeat(40), exit: 0, summary: "2 tests run", flaky: names, by: "gate 0101-pre-review", ms: 1 });
+  appendRecord(file, { tree: "b".repeat(40), exit: 0, summary: "2 tests run", flaky: [], by: "gate 0101-pre-review", ms: 1 });
+  appendServed(file, { tree: "c".repeat(40), exit: 0, summary: "2 tests run", flaky: names, by: "0101-close", ms: 1, green: { tree: "a".repeat(40), by: "x", at: "y" }, paths: ["docs/a.md"] });
+  const [flaky, steady, served] = readLedger(file);
+  assert.deepEqual(flaky.flaky, names);
+  assert.equal("flaky" in steady, false);
+  assert.deepEqual(served.flaky, names);
 });
