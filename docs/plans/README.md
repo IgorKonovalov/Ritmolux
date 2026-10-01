@@ -53,7 +53,6 @@ place. The plan file carries the real link.
 | [0240](0240-the-attractor-projects-through-the-shared-camera.md) | The attractor projects through the shared camera | approved | dev, human | ADR-0260 (proposed): `perspective` retires, presets migrate by exact mapping, re-curation owed after merge. After 0236. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
 | [0244](0244-sessions-start-lighter.md) | Sessions start lighter | approved | dev, human | Moves, deletes nothing: CLAUDE.md to <=25 KB, plans index keeps 15 closes, architect Mode 4 to a reference. |
-| [0245](0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) | A gate that runs a built binary checks it is current | approved | dev | The sd-filter suite takes the newer `shot` and skips with a notice when it predates the source. |
 | [0247](0247-the-studio-renders-a-neural-clip.md) | The studio renders a neural clip | approved | dev, studio-builder, human | ADR-0262 (proposed). Player gains `--render`/`--bars`; the studio pipes player, sd_filter and ffmpeg, MP3/FLAC via transcode, prompts on a bar strip. |
 <!-- roster:end -->
 
@@ -1042,6 +1041,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0245 - A gate that runs a built binary checks it is current](done/0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) - closed 2026-10-01. Review: **two rounds; 1 major, 3 minors (all fixed).** Version: **0.160.1**. [Write-up](README-archive.md).
 - [0242 - Readiness is read when the plan is approved](done/0242-readiness-is-read-when-the-plan-is-approved.md) - closed 2026-10-01, Phase 3 owed. Review: **no blockers, no majors, one minor, one nit (both open).** Version: **0.160.0**. [Write-up](README-archive.md).
 - [0204 - The library learns from the corpus it will not ship](done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) - closed 2026-10-01. Review: **no blockers, no majors, one minor (fixed), one nit.** Version: **0.159.0**. ADR-0227 accepted, Outcome. [Write-up](README-archive.md).
 - [0232 - The library is walked, cut and refilled](done/0232-the-library-is-walked-cut-and-refilled.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (one fixed), two nits (fixed).** Version: **0.158.0**. ADR-0253 accepted. Closed 0038. [Write-up](README-archive.md).

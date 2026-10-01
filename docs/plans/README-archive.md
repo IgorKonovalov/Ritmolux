@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0245 - A gate that runs a built binary checks it is current](#0245---a-gate-that-runs-a-built-binary-checks-it-is-current)
   - [0242 - Readiness is read when the plan is approved](#0242---readiness-is-read-when-the-plan-is-approved)
   - [0204 - The library learns from the corpus it will not ship](#0204---the-library-learns-from-the-corpus-it-will-not-ship)
   - [0232 - The library is walked, cut and refilled](#0232---the-library-is-walked-cut-and-refilled)
@@ -278,6 +279,22 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0245 - A gate that runs a built binary checks it is current](done/0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md)
+
+- closed 2026-10-01 by a conductor close on the lane
+`plan-0245-a-gate-that-runs-a-built-binary-checks-it-is-current`. Phase 1 `6526f9f8`; fix round
+`063059af`. Round 1 review: **no blockers, one major, two minors**, all resolved in `063059af`. Round 2
+review: **no blockers, no majors, one minor**, repaired at the close (`docs/developing.md`'s sd-filter
+row now states the arrival-dated rule). Version: **0.160.1** (patch: a fix in a test script, shipping
+in no artifact). No ADR to accept; closes no backlog entry. Upstream CI read green. The full review is
+the plan's own `## Close review`.
+- **What landed.** The sd-filter suite takes the newer of the release and debug `shot`, and skips its
+  end-to-end group with a rebuild notice when that binary predates the last change to `core/`,
+  `standalone/`, `Cargo.toml` or `Cargo.lock` to reach the checkout - dated by the later of the commit
+  time and the newest `HEAD` reflog move that changed those paths.
+- **Falsified and corrected.** The plan's Risks claim of "never a false pass" was false for a
+  fast-forward or merge under commit-time dating; round 1 caught it and the arrival dating fixed it.
 
 ### [0242 - Readiness is read when the plan is approved](done/0242-readiness-is-read-when-the-plan-is-approved.md)
 
