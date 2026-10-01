@@ -291,7 +291,7 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 | 4 — The sheet layout | dev | done | de309bfc |
 | 5 — The attractor takes the shared CoC | dev | done | f43f1dd7 |
 | 6 — Tier caps, golden, determinism | dev | done | 0c23e166 |
-| 7 — Documentation and the references | dev | done | committed with this row |
+| 7 — Documentation and the references | dev | done | 2ad353bc |
 | 8 — The look, judged | human | not started | |
 
 ### Notes
@@ -360,13 +360,22 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** yes: `presets/README.md` (generated params block, contents block, one
+  hand-written sentence), `presets/preset.schema.json` and every `presets/schema/*.schema.json`,
+  including the new `plexus.schema.json`. No preset `.toml` added or changed.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature: `SystemKind::Plexus` with `cloud` and `sheet` layouts, the shared
+  `Camera3d` / `camera.wgsl`, the `seg3d` and `quad3d` pipelines, and `focus` / `aperture` on the
+  attractor.
+- **Operator docs touched:** `docs/presets.md`, `docs/preset-guide.md`, `docs/how-it-works.md`,
+  `docs/on-device-validation.md`, `docs/capturing.md`, `docs/preset-palettes.md`,
+  `.claude/skills/preset-author/references/systems.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0.
+- **Full suite:** `cargo nextest run --workspace` at 2ad353bc: exit 0, 1937 passed, 8 skipped
+  (llvmpipe; the golden comparisons skip-and-print off WARP, reading `plexus` and `plexus_sheet`
+  at max outlier 0).
+- **Outstanding `human` phases:** Phase 8 (the look, judged against the reference),
+  `Blocks merge: no`.
 
 ## Followups (after this lands)
 
