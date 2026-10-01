@@ -1,6 +1,6 @@
 # 0230 — The Russian slice becomes findable
 
-> **Status:** done - Phase 4 owed, ADR-0249. Phases 1-3 landed in `bc09b3d0`, `d9160208`,
+> **Status:** done (Phase 4 read on the live site 2026-10-01). Phases 1-3 landed in `bc09b3d0`, `d9160208`,
 > `8c931753`; conductor close review round 1 graded `d14eb621` with no blockers, no majors, no minors
 > and two nits, both left open. Full suite (1907 passed), rustdoc, both site gates and the doc gates
 > verified by the review. Version 0.155.0.
@@ -345,7 +345,7 @@ export const onRequest = defineRouteMiddleware((context) => {
 | 1 — The header control, and a Russian entrance for it to point at | dev | done | bc09b3d0 |
 | 2 — The Russian pages say they are Russian | dev | done | d9160208 |
 | 3 — The front door names the Russian pages | dev | done | 8c931753 |
-| 4 — The live site, read after the push | human | owed | |
+| 4 — The live site, read after the push | human | done | committed with this row |
 
 ### Notes
 
@@ -371,6 +371,21 @@ export const onRequest = defineRouteMiddleware((context) => {
   interception, at a 375x800 viewport. It read `scrollWidth` 375 = `clientWidth` 375, and the row
   wraps to two lines: `Download` and `Start here` at top 252, `The repository` and `По-русски` at
   top 336, rightmost edge 270. `site.css` is unchanged.
+
+- **Phase 4, 2026-10-01** (read by an agent session against the deployed site after the push of
+  `13c7582f`; the owner accepted a markup reading for the two placement checks). Every done-when holds:
+  - **The switch control.** It renders twice, in the header and in the phone menu's footer, with the
+    same target in both. On `use/running/` it reads `Русский` and goes to `/Ritmolux/ru/running/`. On
+    the untwinned `guide/expression-language/` it goes to `/Ritmolux/ru/`. `English` on `ru/running/`
+    goes to `/Ritmolux/use/running/`, and on `ru/` it goes to `/Ritmolux/`.
+  - **The landing page** carries `По-русски` as a button to `/Ritmolux/ru/`.
+  - **`ru/running/`** has `<html lang="ru"` and two `hreflang` alternates, both under `/Ritmolux/`.
+  - **Search** is split by language in `pagefind-entry.json`, with an `ru` index of 6 pages and an
+    `en` index of 226. Pagefind loads the index matching the page's `lang`, so a search from either
+    side returns only that side's pages.
+  - **Read from markup, not looked at:** the control sitting beside the theme toggle on desktop, and
+    the phone menu footer showing it.
+  - **Nothing read wrong.**
 
 ### Close triggers
 
