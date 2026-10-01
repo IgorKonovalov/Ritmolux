@@ -574,7 +574,7 @@
       "properties": {
         "layout": {
           "type": "string",
-          "enum": ["cloud"],
+          "enum": ["cloud", "sheet"],
           "description": "The arrangement of the points.",
           "markdownDescription": "The arrangement of the points.\n\nDefault `cloud`."
         },

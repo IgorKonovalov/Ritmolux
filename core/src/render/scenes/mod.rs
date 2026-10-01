@@ -295,6 +295,7 @@ pub fn family_params(label: &str) -> &'static [FamilyParam] {
         "parametric_curve" => lines::parametric::FAMILY_PARAMS,
         "analytic_field" => analytic_field::FAMILY_PARAMS,
         "cellular" => cellular::FAMILY_PARAMS,
+        "plexus" => plexus::FAMILY_PARAMS,
         "attractor" => particles::FAMILY_PARAMS,
         _ => &[],
     }

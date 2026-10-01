@@ -1295,6 +1295,8 @@
             "node_size": { "$ref": "#/definitions/param.node_size" },
             "node_glow": { "$ref": "#/definitions/param.node_glow" },
             "drift": { "$ref": "#/definitions/param.drift.plexus" },
+            "wave": { "$ref": "#/definitions/param.wave" },
+            "wave_scale": { "$ref": "#/definitions/param.wave_scale" },
             "yaw": { "$ref": "#/definitions/param.yaw" },
             "pitch": { "$ref": "#/definitions/param.pitch" },
             "distance": { "$ref": "#/definitions/param.distance" },
@@ -1855,6 +1857,8 @@
             "node_size": { "$ref": "#/definitions/param.node_size" },
             "node_glow": { "$ref": "#/definitions/param.node_glow" },
             "drift": { "$ref": "#/definitions/param.drift.plexus" },
+            "wave": { "$ref": "#/definitions/param.wave" },
+            "wave_scale": { "$ref": "#/definitions/param.wave_scale" },
             "yaw": { "$ref": "#/definitions/param.yaw" },
             "pitch": { "$ref": "#/definitions/param.pitch" },
             "distance": { "$ref": "#/definitions/param.distance" },
@@ -2235,7 +2239,7 @@
       "properties": {
         "layout": {
           "type": "string",
-          "enum": ["cloud"],
+          "enum": ["cloud", "sheet"],
           "description": "The arrangement of the points.",
           "markdownDescription": "The arrangement of the points.\n\nDefault `cloud`."
         },
@@ -3549,6 +3553,16 @@
       "type": "string",
       "description": "How fast the points drift on their flow; 0 holds the network still.",
       "markdownDescription": "How fast the points drift on their flow; 0 holds the network still.\n\n- default `0.15`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.wave": {
+      "type": "string",
+      "description": "How far a sheet ripples above and below its plane, in the layout's own units; 0 lies flat.",
+      "markdownDescription": "How far a sheet ripples above and below its plane, in the layout's own units; 0 lies flat.\n\n- default `0.15`\n- typical range depends on the family: `sheet` `0.0` to `0.6` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cloud` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.wave_scale": {
+      "type": "string",
+      "description": "How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop.",
+      "markdownDescription": "How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop.\n\n- default `1.0`\n- typical range depends on the family: `sheet` `0.3` to `3.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cloud` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.yaw": {
       "type": "string",

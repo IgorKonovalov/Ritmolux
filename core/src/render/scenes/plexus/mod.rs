@@ -45,7 +45,9 @@ use crate::render::palette::{self, Palette};
 use crate::render::scenes::common::{PaletteParams, PanParams};
 use crate::render::scenes::lines::{GeneratorConfig, LineRenderer, Segment3dInstance};
 use crate::render::scenes::marks::{InstancedQuads3d, Quad3dInstance};
-use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, Scene, default_of};
+use crate::render::scenes::{
+    FamilyParam, FamilyRange, ParamGroup, ParamKind, ParamSpec, Scene, default_of,
+};
 
 /// Which arrangement the points take — the `[plexus] layout` family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -53,12 +55,15 @@ pub enum PlexusLayout {
     /// Points scattered through a cube, drifting on a seeded flow.
     #[default]
     Cloud,
+    /// A jittered grid on a plane, rippled along its normal by a seeded height
+    /// field.
+    Sheet,
 }
 
 impl PlexusLayout {
     /// Every layout, in roster order — the closed set, and the list the schema
     /// export renders rather than restating.
-    pub const ALL: [PlexusLayout; 1] = [PlexusLayout::Cloud];
+    pub const ALL: [PlexusLayout; 2] = [PlexusLayout::Cloud, PlexusLayout::Sheet];
 
     /// Parse a `[plexus] layout` name, or `None` if unknown.
     pub fn from_name(name: &str) -> Option<Self> {
@@ -69,6 +74,7 @@ impl PlexusLayout {
     pub fn as_str(self) -> &'static str {
         match self {
             PlexusLayout::Cloud => "cloud",
+            PlexusLayout::Sheet => "sheet",
         }
     }
 }
@@ -121,6 +127,8 @@ const DEFAULT_LINK_DISTANCE: f32 = default_of(PARAMS, "link_distance");
 const DEFAULT_LINK_ALPHA: f32 = default_of(PARAMS, "link_alpha");
 const DEFAULT_LINE_WIDTH: f32 = default_of(PARAMS, "line_width");
 const DEFAULT_DRIFT: f32 = default_of(PARAMS, "drift");
+const DEFAULT_WAVE: f32 = default_of(PARAMS, "wave");
+const DEFAULT_WAVE_SCALE: f32 = default_of(PARAMS, "wave_scale");
 const DEFAULT_YAW: f32 = default_of(PARAMS, "yaw");
 const DEFAULT_PITCH: f32 = default_of(PARAMS, "pitch");
 const DEFAULT_DISTANCE: f32 = default_of(PARAMS, "distance");
@@ -190,6 +198,24 @@ pub const PARAMS: &[ParamSpec] = &[
         kind: ParamKind::Modal,
         group: ParamGroup::Motion,
         main: true,
+    },
+    ParamSpec {
+        name: "wave",
+        default: 0.15,
+        range: Some([0.0, 0.6]),
+        doc: "How far a sheet ripples above and below its plane, in the layout's own units; 0 lies flat.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
+    },
+    ParamSpec {
+        name: "wave_scale",
+        default: 1.0,
+        range: Some([0.3, 3.0]),
+        doc: "How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "yaw",
@@ -272,6 +298,37 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::common::PAN_Y,
 ];
 
+/// Every parameter only some layouts read (ADR-0180 rule 4), with the range
+/// that reads there. A parameter missing from here reads the same on both.
+pub const FAMILY_PARAMS: &[FamilyParam] = &[
+    FamilyParam {
+        name: "wave",
+        ranges: &[
+            FamilyRange {
+                family: "cloud",
+                range: None,
+            },
+            FamilyRange {
+                family: "sheet",
+                range: Some([0.0, 0.6]),
+            },
+        ],
+    },
+    FamilyParam {
+        name: "wave_scale",
+        ranges: &[
+            FamilyRange {
+                family: "cloud",
+                range: None,
+            },
+            FamilyRange {
+                family: "sheet",
+                range: Some([0.3, 3.0]),
+            },
+        ],
+    },
+];
+
 /// The plexus scene: the point set, its graph, and the 3D line renderer it
 /// draws through.
 pub struct PlexusScene {
@@ -283,7 +340,7 @@ pub struct PlexusScene {
     edges_cap: usize,
     /// The tier's cap on the circle of confusion, in pixels.
     max_coc: f32,
-    cloud: sim::Cloud,
+    points: sim::Points,
     edges: Vec<sim::Edge>,
     instances: Vec<Segment3dInstance>,
     node_instances: Vec<Quad3dInstance>,
@@ -298,6 +355,8 @@ pub struct PlexusScene {
     node_size: f32,
     node_glow: f32,
     drift: f32,
+    wave: f32,
+    wave_scale: f32,
     yaw: f32,
     pitch: f32,
     distance: f32,
@@ -329,7 +388,7 @@ impl PlexusScene {
             points_cap,
             edges_cap,
             max_coc,
-            cloud: sim::Cloud::seeded(config.seed, count, points_cap),
+            points: sim::Points::seeded(config.layout, config.seed, count, points_cap),
             edges: Vec::with_capacity(edges_cap),
             instances: Vec::with_capacity(edges_cap),
             node_instances: Vec::with_capacity(points_cap),
@@ -342,6 +401,8 @@ impl PlexusScene {
             node_size: DEFAULT_NODE_SIZE,
             node_glow: DEFAULT_NODE_GLOW,
             drift: DEFAULT_DRIFT,
+            wave: DEFAULT_WAVE,
+            wave_scale: DEFAULT_WAVE_SCALE,
             yaw: DEFAULT_YAW,
             pitch: DEFAULT_PITCH,
             distance: DEFAULT_DISTANCE,
@@ -406,7 +467,7 @@ impl Scene for PlexusScene {
         // A switch starts the incoming preset from its own seed, with the
         // point count held to the tier.
         let count = (config.points as usize).min(self.points_cap);
-        self.cloud = sim::Cloud::seeded(config.seed, count, self.points_cap);
+        self.points = sim::Points::seeded(config.layout, config.seed, count, self.points_cap);
         self.edges.clear();
         None
     }
@@ -418,6 +479,8 @@ impl Scene for PlexusScene {
         self.node_size = DEFAULT_NODE_SIZE;
         self.node_glow = DEFAULT_NODE_GLOW;
         self.drift = DEFAULT_DRIFT;
+        self.wave = DEFAULT_WAVE;
+        self.wave_scale = DEFAULT_WAVE_SCALE;
         self.yaw = DEFAULT_YAW;
         self.pitch = DEFAULT_PITCH;
         self.distance = DEFAULT_DISTANCE;
@@ -444,6 +507,8 @@ impl Scene for PlexusScene {
             "node_size" => self.node_size = value,
             "node_glow" => self.node_glow = value,
             "drift" => self.drift = value,
+            "wave" => self.wave = value,
+            "wave_scale" => self.wave_scale = value,
             "yaw" => self.yaw = value,
             "pitch" => self.pitch = value,
             "distance" => self.distance = value,
@@ -458,10 +523,11 @@ impl Scene for PlexusScene {
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {
-        self.cloud.step(self.dt, self.drift);
+        self.points
+            .step(self.dt, self.drift, self.wave, self.wave_scale);
         sim::link(
-            &self.cloud.pos,
-            &self.cloud.fade,
+            self.points.pos(),
+            self.points.fade(),
             self.link_distance,
             self.edges_cap,
             &mut self.edges,
@@ -478,7 +544,7 @@ impl Scene for PlexusScene {
         // The aspect is the render target's, handed in here (ADR-0037).
         let camera = self.camera();
         let cam = camera.view(aspect, self.zoom, [self.pan.x, self.pan.y]);
-        let radius = self.cloud.bounding_radius();
+        let radius = self.points.bounding_radius();
         let near_extent = cam.distance - radius;
         let far_extent = cam.distance + radius;
         let span = far_extent - near_extent;
@@ -505,8 +571,8 @@ impl Scene for PlexusScene {
         instances.clear();
         for edge in &self.edges {
             let (Some(&pa), Some(&pb)) = (
-                self.cloud.pos.get(edge.a as usize),
-                self.cloud.pos.get(edge.b as usize),
+                self.points.pos().get(edge.a as usize),
+                self.points.pos().get(edge.b as usize),
             ) else {
                 continue;
             };
@@ -543,8 +609,8 @@ impl Scene for PlexusScene {
         let mut nodes = std::mem::take(&mut self.node_instances);
         node_instances(
             &mut nodes,
-            &self.cloud.pos,
-            &self.cloud.fade,
+            self.points.pos(),
+            self.points.fade(),
             &cam,
             margin,
             self.node_size,

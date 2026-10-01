@@ -309,3 +309,88 @@ fn banding_and_the_crossfade_act_on_the_depth_coordinate() {
     assert_eq!(b, expect(1.0), "mix 1 is palette B");
     assert_ne!(a, b, "the two palettes differ at this depth");
 }
+
+/// A sheet advanced for a second at `drift` 0.5 with `wave` and `wave_scale`,
+/// and its edge count at `link`.
+fn rippled(wave: f32, link: f32) -> (sim::Sheet, usize) {
+    let mut sheet = sim::Sheet::seeded(9, 400, 400);
+    for _ in 0..60 {
+        sheet.step(1.0 / 60.0, 0.5, wave, 1.0);
+    }
+    let mut edges = Vec::with_capacity(20_000);
+    let found = sim::link(&sheet.pos, &sheet.fade, link, 20_000, &mut edges);
+    (sheet, found)
+}
+
+fn rms_height(sheet: &sim::Sheet) -> f32 {
+    let sum: f32 = sheet.pos.iter().map(|p| p[1] * p[1]).sum();
+    (sum / sheet.pos.len() as f32).sqrt()
+}
+
+/// At `wave = 0` every sheet point lies on the plane, and raising `wave`
+/// raises the RMS displacement of the point set monotonically.
+#[test]
+fn the_sheet_lies_flat_at_zero_wave_and_rises_with_it() {
+    let (flat, _) = rippled(0.0, 0.3);
+    assert!(flat.pos.iter().all(|p| p[1] == 0.0), "wave 0 is the plane");
+    let mut prev = 0.0;
+    for k in 1..=8 {
+        let (sheet, _) = rippled(0.075 * k as f32, 0.3);
+        let rms = rms_height(&sheet);
+        assert!(
+            rms > prev,
+            "wave {}: rms {rms} after {prev}",
+            0.075 * k as f32
+        );
+        prev = rms;
+    }
+}
+
+/// **The ripple changes the mesh gradually**: at a fixed link distance, the
+/// edge count at `wave = 0` and at a small wave differ by less than the count
+/// at `wave = 0` and at a large one.
+#[test]
+fn a_small_ripple_moves_the_edge_count_less_than_a_large_one() {
+    let link = 0.3;
+    let (_, still) = rippled(0.0, link);
+    let (_, small) = rippled(0.03, link);
+    let (_, large) = rippled(0.6, link);
+    println!("edges at wave 0 / 0.03 / 0.6: {still} / {small} / {large}");
+    assert!(still > 0, "the flat sheet links");
+    assert!(
+        still.abs_diff(small) < still.abs_diff(large),
+        "{still} / {small} / {large}"
+    );
+}
+
+/// Only the displacement moves: every point keeps its place in the plane, so
+/// neighbours stay neighbours.
+#[test]
+fn the_sheet_ripples_rather_than_rewires() {
+    let mut sheet = sim::Sheet::seeded(4, 100, 100);
+    let plane: Vec<[f32; 2]> = sheet.pos.iter().map(|p| [p[0], p[2]]).collect();
+    for _ in 0..120 {
+        sheet.step(1.0 / 60.0, 1.0, 0.4, 0.7);
+    }
+    let after: Vec<[f32; 2]> = sheet.pos.iter().map(|p| [p[0], p[2]]).collect();
+    assert_eq!(plane, after);
+    assert!(sheet.pos.iter().any(|p| p[1] != 0.0), "and it did ripple");
+}
+
+/// A `[plexus] layout` the loader does not know is rejected, and the message
+/// lists the layouts it does.
+#[test]
+fn an_unknown_layout_is_rejected_with_the_roster() {
+    let err = match Preset::from_toml_str(
+        "system = \"plexus\"\nname = \"bad\"\n[plexus]\nlayout = \"torus\"\n",
+    ) {
+        Ok(_) => panic!("an unknown layout loaded"),
+        Err(e) => e.to_string(),
+    };
+    assert!(err.contains("torus"), "{err}");
+    assert!(err.contains("cloud, sheet"), "{err}");
+    assert!(
+        Preset::from_toml_str("system = \"plexus\"\nname = \"ok\"\n[plexus]\nlayout = \"sheet\"\n")
+            .is_ok()
+    );
+}

@@ -999,6 +999,8 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `node_size` | `2.5` | `0` – `12` | Radius of the dot at every point, in pixels at the focal plane; 0 draws no dots. | shape, main |
 | `node_glow` | `1` | `0` – `4` | Brightness of the dots relative to the lines. | light |
 | `drift` | `0.15` | `0` – `1` | How fast the points drift on their flow; 0 holds the network still. | motion, main |
+| `wave` | `0.15` | `sheet` `0` – `0.6`; inert on `cloud` | How far a sheet ripples above and below its plane, in the layout's own units; 0 lies flat. | shape, main |
+| `wave_scale` | `1` | `sheet` `0.3` – `3`; inert on `cloud` | How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop. | shape |
 | `yaw` | `0` | `-3.1415927` – `3.1415927` | Turns the camera around the network, in radians; bind it to a slow clock to orbit. | motion |
 | `pitch` | `0.25` | `-1.55` – `1.55` | Raises the camera above the network, in radians; negative looks up from below. | motion |
 | `distance` | `3.5` | `1.5` – `8` | How far the camera sits from the network's centre; nearer exaggerates the perspective. | motion |
