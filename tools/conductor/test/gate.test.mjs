@@ -159,10 +159,11 @@ test("a served tree runs the suite command plus -P fast, under the same lock, an
   assert.equal(line.green.by, "gate 0101-pre-review");
   assert.deepEqual(line.diff, ["docs.md"]);
 
-  // The served line is not a green record for its own tree, and it serves no later tree: the next
-  // stage leans on the full-suite record again, never on one `-P fast` pass off another.
+  // The served line is the green record for its own tree and for no other (ADR-0261): it serves no
+  // later tree, so the next stage leans on the full-suite record again, never on one `-P fast` pass
+  // off another.
   const servedTree = line.tree;
-  assert.equal(greenRecord(s.ledger, servedTree), null);
+  assert.equal(greenRecord(s.ledger, servedTree).served, true);
   writeFileSync(join(s.repo, "docs.md"), "docs, and one more repair\n");
   s.sh("commit", "-q", "-am", "docs: one more");
   await s.gate("remerge");

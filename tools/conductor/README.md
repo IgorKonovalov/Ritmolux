@@ -486,11 +486,13 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   nobody thought of would be under-gated silently; an allowlist that forgets a path is merely slow.
   The diff is measured **against the green tree**, not against the stage's own commits, so a
   `git merge main` that brought in another lane's render change re-arms the suite by construction.
-- **A served run never becomes a green record.** Its ledger line carries `served: true` and a `cmd`
-  that is not the one the key names, so neither lookup can read it back: the next stage leans on the
-  full-suite record again, and one `-P fast` never chains off another. The run terminal prints a
-  served step's own line naming the tier and the tree it leaned on, and the history's Totals counts
-  served runs apart from full ones.
+- **A served run is a green record for its own tree and for no other** (ADR-0261). Its ledger line
+  carries `served: true` and a `cmd` that is not the one the key names. The exact-tree lookup reads a
+  green served line back, so a later stage on that same tree skips rather than serving again — it
+  would compute the same serving from the same record. The forward lookup never reads one, so a
+  served line serves no other tree and one `-P fast` never chains off another. The run terminal
+  prints a served step's own line naming the tier and the tree it leaned on, and the history's
+  Totals counts served runs apart from full ones.
 - **The locks.** `with-lock.mjs` holds two machine-wide locks. The **suite** lock stops two lanes
   running the GPU suites at once. The **close** lock runs from before the close session until `main` has
   fast-forwarded, so a version bump and its tag always land on the `main` they were computed against.
@@ -520,9 +522,10 @@ tiers, and the list they rest on, are in *How it stays safe* above).
 naming the run it relied on and one per served run naming the tree it leaned on and the diff that
 served. The gate and `with-lock.mjs` both consult it: every session is handed
 the ledger in `RLX_SUITE_LEDGER`. They skip on a green record for the exact tree and print that
-record, and the digest counts every skip. **Only the gate serves a record forward**: a session's
-wrapped suite keeps the exact-tree lookup, so the lanes' `## Conductor mode` instructions stay true
-as written. Any change to a tracked file, a doc included, is a new
+record, and the digest counts every skip. **Both serve a record forward the same way**: a session's
+wrapped `cargo nextest run --workspace` on a tree a green record serves runs `-P fast` under the same
+lock and writes a served line, so a close whose diff from the reviewed tree is docs and a version
+bump pays the narrowed suite, and the `post-close` gate then skips on that line (ADR-0261). Any change to a tracked file, a doc included, is a new
 tree. A red run is recorded and never skipped on. Any argument vector other than the ledger's own
 (`SUITE_COMMAND` in `lib/ledger.mjs`) neither skips nor records, and outside the conductor the
 wrapper never reads the ledger.

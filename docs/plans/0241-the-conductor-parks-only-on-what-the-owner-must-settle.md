@@ -1,6 +1,6 @@
 # 0241 — The conductor parks only on what the owner must settle
 
-> **Status:** approved (2026-10-01).
+> **Status:** in-progress (2026-10-01).
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0261](../adrs/0261-the-conductor-parks-only-on-what-the-owner-must-settle.md) (proposed), [ADR-0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md), [ADR-0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md), [ADR-0248](../adrs/0248-the-pipeline-repairs-before-it-parks.md), [ADR-0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)
@@ -165,15 +165,19 @@ flowchart LR
 
 ## Implementation log
 
-**Lane:**
+**Lane:** `main` directly, in the main checkout.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The close's suite is served | dev | not started | |
+| 1 — The close's suite is served | dev | committed with this row | |
 | 2 — A run of human phases parks once | dev | not started | |
 | 3 — A false repair claim reopens its finding | dev | not started | |
 | 4 — A diagnosed flake retries by name, and says so | dev | not started | |
 
 ### Notes
+
+- Phase 1 also edits `tools/conductor/test/gate.test.mjs`, outside its `Files touched`: the
+  served-tier test asserted `greenRecord` returns null for a served line's own tree, the invariant
+  this phase changes. The assertion now expects the served line back.
 
 ### Close triggers

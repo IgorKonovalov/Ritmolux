@@ -11,13 +11,14 @@
 // tree has exit 0: a red run is recorded, and a tree whose latest run was red is never skipped on.
 // Skip lines are the record of what was not re-run; a lookup never reads them.
 //
-// A served line is a `-P fast` run the conductor's gate made in the full suite's place because a
-// green record for another tree served this one (ADR-0211). It carries `served: true` AND a `cmd`
-// that is not `SUITE_COMMAND`, so neither lookup below can read it back as a full-suite green: one
-// `-P fast` never chains off another.
+// A served line is a `-P fast` run made in the full suite's place because a green record for another
+// tree served this one (ADR-0211, ADR-0261). It carries `served: true` AND a `cmd` that is not
+// `SUITE_COMMAND`. `greenRecord` reads a green served line back for its own exact tree only, since a
+// later lookup on that tree would compute the same serving from the same record. `servingRecord`
+// never reads one, so a served line serves no other tree: one `-P fast` never chains off another.
 //
 // Two writers and two readers: the conductor's gate, and the suite wrapper in a conductor-run session
-// (RLX_SUITE_LEDGER names the file). A third reader, `suite-record.mjs`, answers the pre-push hook
+// (RLX_SUITE_LEDGER names the file). Both write served lines. A third reader, `suite-record.mjs`, answers the pre-push hook
 // through `greenRecord` and writes nothing. Nothing else reads or writes it.
 //
 // The key leaves out everything outside the tree: gitignored files, the GPU adapter, the installed
@@ -65,11 +66,15 @@ export function readLedger(path) {
     .filter((e) => e && typeof e.tree === "string");
 }
 
-/** The green record a full suite on `tree` may skip on, or null. */
+/**
+ * The green record a full suite on `tree` may skip on, or null: the newest full run or served line
+ * on exactly `tree`, when it is green. A served line counts here and nowhere else: it never serves
+ * another tree, which is `servingRecord`'s filter.
+ */
 export function greenRecord(path, tree) {
   if (!tree) return null;
   const latest = readLedger(path)
-    .filter((e) => e.tree === tree && e.cmd === SUITE_COMMAND && !e.skip)
+    .filter((e) => e.tree === tree && !e.skip && (e.cmd === SUITE_COMMAND || (e.served === true && e.cmd === SERVED_COMMAND)))
     .at(-1);
   return latest && latest.exit === 0 ? latest : null;
 }
@@ -241,8 +246,9 @@ export function appendRecord(path, { tree, exit, summary, failed, by, ms, at = n
 
 /**
  * Records a `-P fast` run made in the full suite's place on `tree`, naming the record it leaned on
- * and the diff that served. The line's `cmd` is `SERVED_COMMAND` and it carries `served: true`, so
- * neither `greenRecord` nor `servingRecord` can read it back: one `-P fast` never serves another.
+ * and the diff that served. The line's `cmd` is `SERVED_COMMAND` and it carries `served: true`:
+ * `greenRecord` reads it back for `tree` alone, and `servingRecord` never does, so one `-P fast`
+ * never serves another.
  */
 export function appendServed(path, { tree, exit, summary, failed, by, ms, green, paths, at = new Date().toISOString() }) {
   mkdirSync(dirname(path), { recursive: true });
