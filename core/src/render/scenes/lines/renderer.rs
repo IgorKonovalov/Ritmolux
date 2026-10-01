@@ -694,7 +694,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// 3D stroke and a 2D one fall off across their width by one definition.
 ///
 /// Runs once per [`LineRenderer::new_3d`] (pipeline build, not the hot path).
-fn seg3d_shader_source() -> String {
+pub(crate) fn seg3d_shader_source() -> String {
     format!(
         "{PROFILE_WGSL}
 {}

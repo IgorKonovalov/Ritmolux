@@ -26,6 +26,8 @@
         "link_distance": { "$ref": "#/definitions/param.link_distance" },
         "link_alpha": { "$ref": "#/definitions/param.link_alpha" },
         "line_width": { "$ref": "#/definitions/param.line_width.plexus" },
+        "node_size": { "$ref": "#/definitions/param.node_size" },
+        "node_glow": { "$ref": "#/definitions/param.node_glow" },
         "drift": { "$ref": "#/definitions/param.drift.plexus" },
         "yaw": { "$ref": "#/definitions/param.yaw" },
         "pitch": { "$ref": "#/definitions/param.pitch" },
@@ -780,6 +782,16 @@
       "type": "string",
       "description": "Line width in pixels at the focal plane; nearer lines are wider and farther ones thinner.",
       "markdownDescription": "Line width in pixels at the focal plane; nearer lines are wider and farther ones thinner.\n\n- default `1.5`\n- typical range `0.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.node_size": {
+      "type": "string",
+      "description": "Radius of the dot at every point, in pixels at the focal plane; 0 draws no dots.",
+      "markdownDescription": "Radius of the dot at every point, in pixels at the focal plane; 0 draws no dots.\n\n- default `2.5`\n- typical range `0.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.node_glow": {
+      "type": "string",
+      "description": "Brightness of the dots relative to the lines.",
+      "markdownDescription": "Brightness of the dots relative to the lines.\n\n- default `1.0`\n- typical range `0.0` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.drift.plexus": {
       "type": "string",

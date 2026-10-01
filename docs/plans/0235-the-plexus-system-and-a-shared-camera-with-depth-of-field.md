@@ -286,8 +286,8 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Walking skeleton | dev | done | 8b3a6d41 |
-| 2 — Depth of field on segments | dev | done | committed with this row |
-| 3 — Nodes: the 3D quad pipeline | dev | not started | |
+| 2 — Depth of field on segments | dev | done | 6a52a633 |
+| 3 — Nodes: the 3D quad pipeline | dev | done | committed with this row |
 | 4 — The sheet layout | dev | not started | |
 | 5 — The attractor takes the shared CoC | dev | not started | |
 | 6 — Tier caps, golden, determinism | dev | not started | |
@@ -321,6 +321,10 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
   the pinhole reading keeps Phase 1's interpolated coordinate (byte identity) and reads about 7 %
   under them at the probe's far column. `aperture = 0` byte identity was checked against Phase 1's
   `plexus.png` on llvmpipe: max outlier 0.
+- Phase 3, `core/tests/golden/plexus.png` re-blessed on llvmpipe the same way, because nodes draw
+  by default (`node_size = 2.5`). The swarm's llvmpipe reading is unchanged.
+- Phase 3, "a node and an edge endpoint blur by the same CoC" is asserted structurally: each 3D
+  pipeline's compiled WGSL holds exactly one `coc()`, the camera's text, and calls it.
 - Phase 2, `max_coc_px` is a `u32` (the tier struct derives `Eq`), provisional 12 / 24; Phase 6
   measures it.
 

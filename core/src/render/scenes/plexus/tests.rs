@@ -190,3 +190,122 @@ brightness = "1.2"
         "two frames a second apart must differ"
     );
 }
+
+/// **A node and the end of an edge at the same point blur by the same amount,
+/// because both take it from one function.** Each 3D pipeline's compiled WGSL
+/// holds exactly one `coc` definition — the shared camera's — and calls it; a
+/// second, local copy would be what let the two drift.
+#[test]
+fn nodes_and_edges_blur_through_the_one_circle_of_confusion() {
+    use crate::render::camera::CAMERA_WGSL;
+    use crate::render::scenes::lines::renderer::seg3d_shader_source;
+    use crate::render::scenes::marks::quad3d_shader_source;
+
+    let shared = CAMERA_WGSL
+        .split("fn coc(")
+        .nth(1)
+        .expect("the camera defines coc()");
+    for (name, source) in [
+        ("seg3d", seg3d_shader_source()),
+        ("quad3d", quad3d_shader_source()),
+    ] {
+        assert_eq!(
+            source.matches("fn coc(").count(),
+            1,
+            "{name} must compile exactly one coc(), the camera's"
+        );
+        assert!(
+            source.contains(shared),
+            "{name}'s coc() is not the camera's text"
+        );
+        assert!(source.contains("coc(cam, "), "{name} never calls coc()");
+    }
+}
+
+fn camera_view() -> crate::render::camera::CameraView {
+    crate::render::camera::Camera3d {
+        yaw: 0.3,
+        pitch: 0.25,
+        distance: 3.5,
+        fov: 0.8,
+        focus: 0.5,
+        aperture: 0.0,
+    }
+    .view(16.0 / 9.0, 1.0, [0.0, 0.0])
+}
+
+/// `node_size = 0` issues **no** sprites, rather than sprites of zero size; a
+/// positive size issues one per visible point, coloured from its depth and
+/// dimmed by its face fade.
+#[test]
+fn a_zero_node_size_draws_no_nodes() {
+    let cloud = sim::Cloud::seeded(5, 50, 50);
+    let cam = camera_view();
+    let mut out = Vec::with_capacity(50);
+    super::node_instances(&mut out, &cloud.pos, &cloud.fade, &cam, 0.05, 0.0, |_| {
+        [1.0; 3]
+    });
+    assert!(out.is_empty());
+    super::node_instances(&mut out, &cloud.pos, &cloud.fade, &cam, 0.05, -1.0, |_| {
+        [1.0; 3]
+    });
+    assert!(out.is_empty(), "a negative size is no size");
+    super::node_instances(&mut out, &cloud.pos, &cloud.fade, &cam, 0.05, 2.5, |_| {
+        [1.0; 3]
+    });
+    let lit = cloud.fade.iter().filter(|f| **f > 0.0).count();
+    assert!(
+        !out.is_empty() && out.len() <= lit,
+        "{} nodes of {lit} lit points",
+        out.len()
+    );
+    for node in &out {
+        assert_eq!(node.radius, 2.5);
+        assert!(node.color[0] <= 1.0 && node.color[0] > 0.0);
+    }
+}
+
+/// **The palette surface behaves on the depth coordinate as on every other
+/// scene**: `palette_steps` cuts the near-to-far ramp into that many flat bands,
+/// and `palette_mix` crossfades from palette A at 0 to palette B at 1.
+#[test]
+fn banding_and_the_crossfade_act_on_the_depth_coordinate() {
+    use crate::render::palette::{NamedPalette, Palette, PaletteConfig};
+    use crate::render::scenes::common::PaletteParams;
+
+    let palette = Palette::bake_pair(
+        &PaletteConfig::Named(NamedPalette::Ember),
+        &PaletteConfig::Named(NamedPalette::Ice),
+    );
+    let mut colour = PaletteParams::new(0.0, 1.0);
+    let sweep = |colour: &PaletteParams| -> Vec<[f32; 3]> {
+        (0..=200)
+            .map(|k| super::depth_colour(&palette, colour, 0.5, 0.9, k as f32 / 200.0))
+            .collect()
+    };
+
+    let continuous = sweep(&colour);
+    let mut distinct: Vec<[f32; 3]> = continuous.clone();
+    distinct.dedup();
+    assert!(distinct.len() > 50, "unbanded, depth is a smooth ramp");
+
+    assert!(colour.set("palette_steps", 4.0));
+    let mut banded = sweep(&colour);
+    banded.dedup();
+    assert!(
+        (2..=5).contains(&banded.len()),
+        "four steps band the ramp into about four colours, got {}",
+        banded.len()
+    );
+
+    let mut colour = PaletteParams::new(0.0, 1.0);
+    colour.set("palette_mix", 0.0);
+    let a = super::depth_colour(&palette, &colour, 0.5, 0.9, 0.3);
+    colour.set("palette_mix", 1.0);
+    let b = super::depth_colour(&palette, &colour, 0.5, 0.9, 0.3);
+    let coord = 0.5 + (0.3 - 0.5) * 0.9;
+    let expect = |mix: f32| crate::render::palette::desaturate(palette.sample(coord, mix), 1.0);
+    assert_eq!(a, expect(0.0), "mix 0 is palette A");
+    assert_eq!(b, expect(1.0), "mix 1 is palette B");
+    assert_ne!(a, b, "the two palettes differ at this depth");
+}

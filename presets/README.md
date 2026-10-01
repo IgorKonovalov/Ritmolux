@@ -996,6 +996,8 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `link_distance` | `0.35` | `0.05` – `1` | How close two points must be to be joined, in the layout's own units; the cube is 2 across. | shape, main |
 | `link_alpha` | `0.7` | `0` – `1` | How strongly a link at its closest is drawn; a link always fades to nothing at link_distance. | shape |
 | `line_width` | `1.5` | `0.5` – `8` | Line width in pixels at the focal plane; nearer lines are wider and farther ones thinner. | shape, main |
+| `node_size` | `2.5` | `0` – `12` | Radius of the dot at every point, in pixels at the focal plane; 0 draws no dots. | shape, main |
+| `node_glow` | `1` | `0` – `4` | Brightness of the dots relative to the lines. | light |
 | `drift` | `0.15` | `0` – `1` | How fast the points drift on their flow; 0 holds the network still. | motion, main |
 | `yaw` | `0` | `-3.1415927` – `3.1415927` | Turns the camera around the network, in radians; bind it to a slow clock to orbit. | motion |
 | `pitch` | `0.25` | `-1.55` – `1.55` | Raises the camera above the network, in radians; negative looks up from below. | motion |

@@ -11,7 +11,9 @@
 //! [`Camera3d`] view from the render target's aspect (ADR-0037), clips each edge
 //! against the near plane, drops the ones wholly off one edge of the frame,
 //! colours each by its depth, and hands the rest to the shared line renderer's
-//! `seg3d` pipeline.
+//! `seg3d` pipeline. A node is drawn at every point through the 3D sprite
+//! pipeline beside the marks (`marks::InstancedQuads3d`), coloured the same way
+//! and blurred by the same `coc()`.
 //!
 //! # What is structural and what is bound
 //!
@@ -42,6 +44,7 @@ use crate::render::camera::{Camera3d, CameraUniform, Lens};
 use crate::render::palette::{self, Palette};
 use crate::render::scenes::common::{PaletteParams, PanParams};
 use crate::render::scenes::lines::{GeneratorConfig, LineRenderer, Segment3dInstance};
+use crate::render::scenes::marks::{InstancedQuads3d, Quad3dInstance};
 use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, Scene, default_of};
 
 /// Which arrangement the points take — the `[plexus] layout` family.
@@ -122,6 +125,8 @@ const DEFAULT_YAW: f32 = default_of(PARAMS, "yaw");
 const DEFAULT_PITCH: f32 = default_of(PARAMS, "pitch");
 const DEFAULT_DISTANCE: f32 = default_of(PARAMS, "distance");
 const DEFAULT_FOV: f32 = default_of(PARAMS, "fov");
+const DEFAULT_NODE_SIZE: f32 = default_of(PARAMS, "node_size");
+const DEFAULT_NODE_GLOW: f32 = default_of(PARAMS, "node_glow");
 const DEFAULT_FOCUS: f32 = default_of(PARAMS, "focus");
 const DEFAULT_APERTURE: f32 = default_of(PARAMS, "aperture");
 const DEFAULT_BRIGHTNESS: f32 = default_of(PARAMS, "brightness");
@@ -158,6 +163,24 @@ pub const PARAMS: &[ParamSpec] = &[
         kind: ParamKind::Modal,
         group: ParamGroup::Shape,
         main: true,
+    },
+    ParamSpec {
+        name: "node_size",
+        default: 2.5,
+        range: Some([0.0, 12.0]),
+        doc: "Radius of the dot at every point, in pixels at the focal plane; 0 draws no dots.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
+    },
+    ParamSpec {
+        name: "node_glow",
+        default: 1.0,
+        range: Some([0.0, 4.0]),
+        doc: "Brightness of the dots relative to the lines.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "drift",
@@ -253,6 +276,7 @@ pub const PARAMS: &[ParamSpec] = &[
 /// draws through.
 pub struct PlexusScene {
     lines: LineRenderer,
+    nodes: InstancedQuads3d,
     /// The tier's point cap, the most points this scene will ever hold.
     points_cap: usize,
     /// The tier's edge cap.
@@ -262,6 +286,7 @@ pub struct PlexusScene {
     cloud: sim::Cloud,
     edges: Vec<sim::Edge>,
     instances: Vec<Segment3dInstance>,
+    node_instances: Vec<Quad3dInstance>,
     palette: Palette,
     dt: f32,
     /// The render target's size in pixels, handed in every frame.
@@ -270,6 +295,8 @@ pub struct PlexusScene {
     link_distance: f32,
     link_alpha: f32,
     line_width: f32,
+    node_size: f32,
+    node_glow: f32,
     drift: f32,
     yaw: f32,
     pitch: f32,
@@ -298,18 +325,22 @@ impl PlexusScene {
         let count = (config.points as usize).min(points_cap);
         Self {
             lines: LineRenderer::new_3d(device, surface_format, edges_cap, "plexus"),
+            nodes: InstancedQuads3d::new(device, "plexus", points_cap, surface_format),
             points_cap,
             edges_cap,
             max_coc,
             cloud: sim::Cloud::seeded(config.seed, count, points_cap),
             edges: Vec::with_capacity(edges_cap),
             instances: Vec::with_capacity(edges_cap),
+            node_instances: Vec::with_capacity(points_cap),
             palette: Palette::default_spectrum(),
             dt: super::FALLBACK_DT,
             target: (1, 1),
             link_distance: DEFAULT_LINK_DISTANCE,
             link_alpha: DEFAULT_LINK_ALPHA,
             line_width: DEFAULT_LINE_WIDTH,
+            node_size: DEFAULT_NODE_SIZE,
+            node_glow: DEFAULT_NODE_GLOW,
             drift: DEFAULT_DRIFT,
             yaw: DEFAULT_YAW,
             pitch: DEFAULT_PITCH,
@@ -341,16 +372,13 @@ impl PlexusScene {
     /// volume's nearest extent and `1` at its farthest (ADR-0059: a scene
     /// colours along its own generator's axis, and depth is this one's).
     fn colour_at(&self, depth01: f32) -> [f32; 3] {
-        let coord = self.hue_center + (depth01 - 0.5) * self.hue_spread;
-        let rgb = palette::desaturate(
-            self.palette.sample(
-                palette::band_coord(coord, self.colour.steps),
-                self.colour.mix,
-            ),
-            self.colour.saturation,
-        );
-        let b = self.colour.brightness;
-        [rgb[0] * b, rgb[1] * b, rgb[2] * b]
+        depth_colour(
+            &self.palette,
+            &self.colour,
+            self.hue_center,
+            self.hue_spread,
+            depth01,
+        )
     }
 }
 
@@ -387,6 +415,8 @@ impl Scene for PlexusScene {
         self.link_distance = DEFAULT_LINK_DISTANCE;
         self.link_alpha = DEFAULT_LINK_ALPHA;
         self.line_width = DEFAULT_LINE_WIDTH;
+        self.node_size = DEFAULT_NODE_SIZE;
+        self.node_glow = DEFAULT_NODE_GLOW;
         self.drift = DEFAULT_DRIFT;
         self.yaw = DEFAULT_YAW;
         self.pitch = DEFAULT_PITCH;
@@ -411,6 +441,8 @@ impl Scene for PlexusScene {
             "link_distance" => self.link_distance = value,
             "link_alpha" => self.link_alpha = value,
             "line_width" => self.line_width = value,
+            "node_size" => self.node_size = value,
+            "node_glow" => self.node_glow = value,
             "drift" => self.drift = value,
             "yaw" => self.yaw = value,
             "pitch" => self.pitch = value,
@@ -507,6 +539,92 @@ impl Scene for PlexusScene {
         self.lines
             .draw_3d(queue, encoder, view, &uniform, 1.0, SOFTNESS, &instances);
         self.instances = instances;
+
+        let mut nodes = std::mem::take(&mut self.node_instances);
+        node_instances(
+            &mut nodes,
+            &self.cloud.pos,
+            &self.cloud.fade,
+            &cam,
+            margin,
+            self.node_size,
+            |depth| self.colour_at(((depth - near_extent) / span).clamp(0.0, 1.0)),
+        );
+        self.nodes.draw(
+            queue,
+            encoder,
+            view,
+            &uniform,
+            if self.node_glow.is_finite() {
+                self.node_glow.max(0.0)
+            } else {
+                DEFAULT_NODE_GLOW
+            },
+            &nodes,
+        );
+        self.node_instances = nodes;
+    }
+}
+
+/// The colour at normalized depth `depth01`, `0` at the volume's nearest extent
+/// and `1` at its farthest (ADR-0059: a scene colours along its own generator's
+/// axis, and depth is this one's). Edges and nodes both take it, so a node is
+/// the colour of the lines that meet at it.
+///
+/// The palette coordinate is `hue_center + (depth01 - 0.5) * hue_spread`, then
+/// banded by `palette_steps` and crossfaded by `palette_mix` through the shared
+/// `palette::band_coord` and `Palette::sample` — the arithmetic every
+/// CPU-coloured scene uses.
+pub(crate) fn depth_colour(
+    palette: &Palette,
+    colour: &PaletteParams,
+    hue_center: f32,
+    hue_spread: f32,
+    depth01: f32,
+) -> [f32; 3] {
+    let coord = hue_center + (depth01 - 0.5) * hue_spread;
+    let rgb = palette::desaturate(
+        palette.sample(palette::band_coord(coord, colour.steps), colour.mix),
+        colour.saturation,
+    );
+    let b = colour.brightness;
+    [rgb[0] * b, rgb[1] * b, rgb[2] * b]
+}
+
+/// A node at every visible point into `out` (cleared first): each point in
+/// front of the near plane and not outside the frame by more than `margin`, of
+/// radius `node_size` pixels at the focal plane and coloured by `colour` of its
+/// view depth, dimmed by its face fade.
+///
+/// **`node_size <= 0` leaves `out` empty**, so a preset without dots issues no
+/// sprites at all rather than drawing invisible ones.
+pub(crate) fn node_instances(
+    out: &mut Vec<Quad3dInstance>,
+    pos: &[[f32; 3]],
+    fade: &[f32],
+    cam: &crate::render::camera::CameraView,
+    margin: f32,
+    node_size: f32,
+    colour: impl Fn(f32) -> [f32; 3],
+) {
+    out.clear();
+    if !node_size.is_finite() || node_size <= 0.0 {
+        return;
+    }
+    for (p, f) in pos.iter().zip(fade) {
+        if *f <= 0.0 {
+            continue;
+        }
+        let depth = cam.depth(*p);
+        if depth < crate::render::camera::NEAR || cam.outside(*p, *p, margin) {
+            continue;
+        }
+        let [r, g, b] = colour(depth);
+        out.push(Quad3dInstance {
+            center: *p,
+            radius: node_size,
+            color: [r * f, g * f, b * f],
+        });
     }
 }
 
