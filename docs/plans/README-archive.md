@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0242 - Readiness is read when the plan is approved](#0242---readiness-is-read-when-the-plan-is-approved)
   - [0204 - The library learns from the corpus it will not ship](#0204---the-library-learns-from-the-corpus-it-will-not-ship)
   - [0232 - The library is walked, cut and refilled](#0232---the-library-is-walked-cut-and-refilled)
   - [0241 - The conductor parks only on what the owner must settle](#0241---the-conductor-parks-only-on-what-the-owner-must-settle)
@@ -277,6 +278,23 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0242 - Readiness is read when the plan is approved](done/0242-readiness-is-read-when-the-plan-is-approved.md)
+
+- closed 2026-10-01 by a conductor close on the lane
+`plan-0242-readiness-is-read-when-the-plan-is-approved`. Phase 1 `7c3dbffe`, Phase 2 `47b75ecf`;
+**Phase 3, the owner's two `.claude/` edits, is owed** (`Blocks merge: no`, ADR-0249). Round 1
+review: **no blockers, no majors, one minor, one nit.** Both stay open: m1 (the architect skill's
+conductor-mode readiness paragraph does not know about advisories or the main-checkout case) is under
+`.claude/` and carries replacement text for the owner; n1 (no test that `cmdReadiness` prints
+advisories) is code for `dev`. Version: **0.160.0** (minor: a new conductor command). No ADR to
+accept; closes no backlog entry. The full review is the plan's own `## Close review`.
+- **What landed.** `conductor readiness NNNN` runs the readiness session from the main checkout at
+  approval and appends its verdict to `state/readiness.jsonl` against the plan's contract hash; a lane
+  that finds a `ready` record on the same hash skips its own readiness session. A `ready` may carry
+  advisories that never park, shown by the command, in `live.log` and in the digest's Needs you.
+- **Open.** Phase 3 and m1, both owner edits under `.claude/`, best applied in one sitting. Plan 0244
+  waited on this close because both edit the architect skill.
 
 ### [0204 - The library learns from the corpus it will not ship](done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md)
 

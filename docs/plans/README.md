@@ -51,7 +51,6 @@ place. The plan file carries the real link.
 | [0238](0238-the-waterfall-system.md) | The waterfall system | approved | dev, human | ADR-0258, ADR-0180 rule 1: a new `SystemKind`, spectrum history as a receding landscape. After 0236. |
 | [0239](0239-the-swarm-moves-into-a-real-camera.md) | The swarm moves into a real camera | approved | dev, human | ADR-0259 (proposed) supersedes 0044's depth model. After 0236. Every swarm preset changes look; Phase 6 (owner's judgement) blocks the merge. |
 | [0240](0240-the-attractor-projects-through-the-shared-camera.md) | The attractor projects through the shared camera | approved | dev, human | ADR-0260 (proposed): `perspective` retires, presets migrate by exact mapping, re-curation owed after merge. After 0236. |
-| [0242](0242-readiness-is-read-when-the-plan-is-approved.md) | Readiness is read when the plan is approved | approved | dev, human | `conductor readiness NNNN` at approval, verdict reused by the lane; advisories never park; judgement phases default to owed. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
 | [0244](0244-sessions-start-lighter.md) | Sessions start lighter | approved | dev, human | Moves, deletes nothing: CLAUDE.md to <=25 KB, plans index keeps 15 closes, architect Mode 4 to a reference. |
 | [0245](0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) | A gate that runs a built binary checks it is current | approved | dev | The sd-filter suite takes the newer `shot` and skips with a notice when it predates the source. |
@@ -1043,6 +1042,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0242 - Readiness is read when the plan is approved](done/0242-readiness-is-read-when-the-plan-is-approved.md) - closed 2026-10-01, Phase 3 owed. Review: **no blockers, no majors, one minor, one nit (both open).** Version: **0.160.0**. [Write-up](README-archive.md).
 - [0204 - The library learns from the corpus it will not ship](done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) - closed 2026-10-01. Review: **no blockers, no majors, one minor (fixed), one nit.** Version: **0.159.0**. ADR-0227 accepted, Outcome. [Write-up](README-archive.md).
 - [0232 - The library is walked, cut and refilled](done/0232-the-library-is-walked-cut-and-refilled.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (one fixed), two nits (fixed).** Version: **0.158.0**. ADR-0253 accepted. Closed 0038. [Write-up](README-archive.md).
 - [0241 - The conductor parks only on what the owner must settle](done/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (two fixed), one nit (fixed).** Version: **0.157.0**. ADR-0261 accepted. [Write-up](README-archive.md).

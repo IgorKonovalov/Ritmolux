@@ -1,9 +1,9 @@
 # 0242 — Readiness is read when the plan is approved, and a judgement phase defaults to owed
 
-> **Status:** in-progress (approved 2026-10-01). Builds on Plan 0241, whose phases landed on `main` on 2026-10-01; it needs that code, not 0241's close.
+> **Status:** done - Phase 3 owed, ADR-0249 (closed 2026-10-01 by a conductor close). Phase 1 `7c3dbffe`, Phase 2 `47b75ecf`; Phase 3, the owner's two `.claude/` edits, is owed after the merge. Round 1 review: no blockers, no majors, one minor (open, under `.claude/`), one nit (open). Full suite green via the suite ledger. Version 0.160.0.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0248](../adrs/0248-the-pipeline-repairs-before-it-parks.md), [ADR-0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md), [ADR-0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
+> **Related ADRs:** [ADR-0248](../../adrs/0248-the-pipeline-repairs-before-it-parks.md), [ADR-0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md), [ADR-0210](../../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
 
 ## TL;DR
 
@@ -199,3 +199,144 @@ sequenceDiagram
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
   `node --test tools/conductor/test/*.test.mjs` passed at both phases.
 - **Outstanding `human` phases:** Phase 3, which is marked `Blocks merge: no`
+
+## Close review
+
+Round 1 is the only round, and no earlier round raised a finding that a fix round resolved. **Phase 3
+is owed** (ADR-0249). It has not yet put the readiness step into the architect skill's Mode 1, and it
+has not made `Blocks merge: no` the template's default for a judgement phase. Until the owner applies
+both edits on `main`, nothing tells an architect session to run `conductor readiness NNNN`.
+Neither finding below was repairable at the close. m1 is under `.claude/` (ADR-0210), and n1 asks
+for a test, which is code. Both stay open.
+
+The review, verbatim:
+
+> # Plan 0242 — close review, round 1
+>
+> Graded at tip `92646fbe8004085fce0674da478c9b6f374c564a` on the lane
+> `plan-0242-readiness-is-read-when-the-plan-is-approved` (`/home/igor/Work/rlx-plan-0242`). The lane
+> already contains `main`.
+>
+> **Verdict: Plan 0242 landed cleanly. There are no blockers and no majors, one minor (under `.claude/`,
+> so the owner applies it) and one nit.** Phase 3 is a `human` phase marked `Blocks merge: no`. It is
+> correctly logged as `owed` and does not block the close.
+>
+> ## Evidence
+>
+> - **Full suite:**
+>   `node ".../with-lock.mjs" suite -- cargo nextest run --workspace` printed
+>   `with-lock: skipped cargo nextest run --workspace: tree 54a4d6f is green in the suite ledger, run by gate 0242-pre-review at 2026-10-01T19:06:30.555Z: 1858 tests run: 1858 passed (5 slow), 84 skipped`.
+>   That ledger record is the full-suite evidence for this tip (ADR-0207). The plan touches no Rust.
+> - **`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`:** clean.
+> - **`node --test tools/conductor/test/`:** 505 tests, 503 pass, 0 fail, 2 skipped. The two skips are
+>   Windows-only.
+> - **`node scripts/check-doc-links.mjs`:** OK. **`node scripts/check-claude-declarations.mjs`:** OK.
+>   Phase 3 declares both of its `.claude/` paths.
+>
+> ## Lens 1 — Alignment with the plan
+>
+> The implementation log maps Phase 1 to `7c3dbffe` and Phase 2 to `47b75ecf`, and lists Phase 3 as
+> owed. Its notes are accurate when checked against the diff. The log is shorter than the phases
+> section. Every phase has a single owner tag from the allowed set.
+>
+> **Phase 1:**
+> - `cmdReadiness` in `tools/conductor/conductor.mjs` is registered in `COMMANDS` and the usage string.
+> - It refuses a plan that is untracked, via `ls-files --error-unmatch`. It also refuses one that is
+>   dirty or only staged, via a pathspec'd `status --porcelain`.
+> - It runs the lane's own `session()` through `approvalReadiness`. That session runs against a scratch
+>   record under `state/readiness/`, so the live `conductor.json` is never written. This is why the
+>   command may run beside a live `run`.
+> - It compares `HEAD` and `status --porcelain --untracked-files=all` before and after the session, and
+>   appends `{plan, hash, verdict, detail, at}` to `state/readiness.jsonl`.
+> - `readiness()` in `lib/lane.mjs` now uses the newest record on the matching hash first. Only a
+>   `ready` record skips the session, so a newer `plan_wrong` on the same text still forces one.
+> - The five done-when tests exist and assert the claims the plan makes:
+>   - `cli.test.mjs`: one `ready` line on the plan's hash, and no `conductor.json` written.
+>   - `cli.test.mjs`: a dirty plan exits non-zero and records nothing.
+>   - `cli.test.mjs`: a stray file left by the session is a disagreement and records nothing.
+>   - `lane.test.mjs`: a matching hash makes `kinds()` exactly implement, review, close.
+>   - `lane.test.mjs`: an amended, committed plan runs the readiness step first, and its record has no
+>     `approval` flag.
+>
+> **Phase 2:**
+> - `lib/outcome.mjs` accepts `advisories` on a `ready` outcome only as an array of non-empty strings
+>   with no newline. `outcome.test.mjs` covers acceptance and rejection, including `""`, a multi-line
+>   string, `null` and a non-array.
+> - `prompts/readiness.md` asks for exactly the two advisory kinds and says an advisory never parks.
+> - The command prints advisories. The lane prints them to `live.log`.
+> - The digest shows them in their own `## Needs you` bullet, and counts them, until the plan merges.
+>   `digest.test.mjs` asserts the bullet, the sub-line, and that they are gone after the merge.
+> - **Does not block:** `lane.test.mjs` asserts that a `ready` with an advisory runs the same steps and
+>   still parks `human_phase` at the human phase.
+> - `lane.test.mjs` is touched although Phase 2's *Files touched* does not list it. The log says so,
+>   and Phase 1 already lists the file. Nothing is owed for this.
+>
+> **Phase 3** is owed after the merge (ADR-0249). Its replacement text is written out in the plan.
+>
+> ## Lens 2 — Layering, coupling, real-time safety
+>
+> The plan changes conductor tooling only. It touches no core, ABI or protocol code, and no new
+> dependency. `approvalReadiness` reuses `session()` rather than a second session path, which is what
+> the plan's Decision chose.
+>
+> Spend from an approval-time session lands in the scratch record, not the run's record. So it is
+> bounded by `budget_usd.readiness` per session, not by `run_budget_usd`. That matches the plan's
+> "spend moves earlier" risk and is not a finding.
+>
+> ## Lens 3 — Docs and bookkeeping
+>
+> - `tools/conductor/README.md` gains the Commands row and the paragraph under "Before the first run".
+> - The architect skill's conductor-mode `readiness` paragraph has not been updated (finding m1).
+> - **Version bump owed at close:** this is a feature plan (a new conductor command), so a minor bump is
+>   likely. The level is the close's call.
+> - Phase 3 is owed. The `Status:` line, the `## Close review` and the plans index bullet must name it
+>   (ADR-0249).
+>
+> ## Lens 4 — Correctness
+>
+> **The hash keys the same text in both places.** `planContractHash` is computed on the committed
+> main-checkout file at approval. It is computed again on the lane's copy, which a lane branched from
+> `main` holds byte-identical. A plan amended on `main` and merged into the lane gets a new hash and is
+> read again, as the plan intends.
+>
+> **A `disagreement` is never recorded, and nothing else is ever trusted.** A non-`ready` outcome kind
+> and a moved checkout both return without appending. A parked session's reason is recorded, but the
+> lane trusts only `ready`. This is safe, including for `budget`/`api` parks.
+>
+> ## Lens 5 — Design integrity
+>
+> The design is sound. The approval-time path and the lane path share `session()`, the prompt and the
+> outcome validator. The only new state is an append-only file with its own reader.
+>
+> ## Findings
+>
+> ### minor
+>
+> **m1 — `.claude/skills/architect/SKILL.md:958`: the skill's conductor-mode `readiness` section does
+> not know about advisories or the main-checkout case.**
+> - **What is missing:** the paragraph still describes readiness as running only "before the plan's first
+>   implement session", and its outcome as `ready` or `plan_wrong`. A session started by
+>   `conductor readiness NNNN` learns about the main checkout and the two advisory kinds only from
+>   `prompts/readiness.md`.
+> - **Why it matters:** the skill and the prompt describe one session in two places, and right now only
+>   the prompt is current.
+> - **Fix:** headless sessions cannot edit `.claude/` (ADR-0210), so the owner applies it, ideally in the
+>   same interactive sitting as Phase 3. After the line ending "Your verdict is the owner's to overrule:
+>   they edit the plan or resume.", insert this new paragraph:
+>
+>   > The same session also runs at approval, from the main checkout, under
+>   > `conductor readiness NNNN`. There the tree may carry the owner's uncommitted changes: leave every
+>   > one exactly as you found it, because the conductor compares `HEAD` and `git status --porcelain`
+>   > before and after. A `ready` may carry `advisories`, one-line notes that never park, of exactly two
+>   > kinds: a `human` phase without `**Blocks merge:** no` whose output no later phase reads, and two
+>   > or more adjacent `human` phases. Name the phase in each.
+>
+> ### nit
+>
+> **n1 — `tools/conductor/conductor.mjs:741`: nothing tests that `cmdReadiness` prints advisories.**
+> - **What is missing:** the `for (const a of r.advisories) o.log(...)` line has no test. The
+>   implementation log records this as a known gap.
+> - **Fix:** add a `cli.test.mjs` case that uses a wrapped scenario module, in the same pattern as the
+>   "Moved checkout" test, to emit a `ready` with one advisory. Assert that the output contains
+>   `advisory (never parks):`. A wrapper written by the test means `lane-scenario.mjs` itself does not
+>   need to change.
