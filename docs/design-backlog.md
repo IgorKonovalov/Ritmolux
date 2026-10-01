@@ -1005,6 +1005,10 @@ takes exactly the re-census the paragraph above instructs, and nothing else: it 
 `docs/milkdrop-conversion.md` beside the earlier eras. The array lowering and the blank-render hunt
 are not taken, and the ranking against 0109 is unchanged. This entry stays live.
 
+**Moved 2026-10-01** - the re-census left Plan 0202 at its split and is now
+[Plan 0246](plans/0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) Phase 4,
+unchanged in scope. This entry stays live.
+
 ---
 
 ## 0109 — disk textures are 88.7 % of every MilkDrop conversion failure, and the exclusion's trigger condition is already met
@@ -1116,6 +1120,12 @@ else.
 re-runs the same seven pairs against the same rig as its Phase 5. **That verdict is this entry's
 trigger and the plan does not touch the reach question**: no ADR, no interview, no change to the
 disk-texture exclusion. This entry stays live and unpromoted until the gate reads.
+
+**Moved 2026-10-01** - Plan 0202 closed on its first three phases: the rate candidate was
+falsified and the echo orientation repaired. The per-mode waveform scale and the fourth look gate,
+this entry's trigger, are now
+[Plan 0246](plans/0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md)
+Phases 1-3, waiting on the Windows rig.
 
 Nothing in this entry's own arithmetic moved: 1 826 files, 88.7 % of every conversion failure, 25x
 the ~71 of
