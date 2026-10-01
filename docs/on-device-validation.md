@@ -58,6 +58,8 @@ footprint so the vendor spread is on record.
 
 ## Checklist
 
+### The stereo field, by ear
+
 - [x] **The stereo field against what a person hears (Plan 0194 Phase 6).** Every number behind
       `balance` and `spread` was measured on synthetic stimuli, where the answer is known by
       construction; nothing yet says the quantity tracks what a listener hears. With the standalone
@@ -85,6 +87,8 @@ footprint so the vendor spread is on record.
         average and not the excursions; and `spread` **averages `0.16`..`0.33`** even on wide
         material rather than hovering near `0.5`. A hard pan carries no `spread` at all, so the
         two quantities are independent and a preset must not gate colour on `spread`.
+### Frame cost and look, on the low-end box
+
 - [ ] **Low-end / older Windows iGPU box (§9), 1080p.** Run the current release standalone, let
       it reach steady state, capture `diagnostics.log`. Report **(a)** fps holds ≥ 60 @ 1080p, and
       **(b)** steady-state working set + private commit. _(This is Plan 0012 Phase 3, extracted; it
@@ -258,6 +262,8 @@ footprint so the vendor spread is on record.
       points drift, and, on the sheet, whether the ripple reads as cloth rather than as a mesh
       rewiring. Then bind `aperture` to a live control and sweep it, and say whether a blurred line
       dims as it spreads rather than flaring.
+### Displays, inputs and outputs
+
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
       behind a `PostStage` trait, so a rendered frame now costs ~4 vtable calls plus ~4 `TextureView`
       Arc bumps it did not before. Expected to be unmeasurable against a render pass, but it was
