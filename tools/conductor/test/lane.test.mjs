@@ -1796,6 +1796,22 @@ test("a ready recorded at approval on the plan's contract hash skips the lane's 
   assert.deepEqual(rec.readiness, { hash, at: "2026-10-01T10:00:00.000Z", approval: true });
 });
 
+// Plan 0242 Phase 2: an advisory is printed and carried, and the plan's steps are what they are without one.
+test("a ready carrying advisories runs the same steps as a ready with none, and prints each advisory to the run terminal", async () => {
+  const advisory = "Phase 2 (human) has no Blocks merge: no, and no later phase reads its output";
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1"), human("2")] }], lanes: { a: ["0101"] } });
+  const printed = [];
+  ctx.live = (line) => printed.push(line);
+  const hash = planContractHash(readFileSync(join(repo, "docs", "plans", "0101-fixture.md"), "utf8"));
+  appendReadiness(ctx.stateDir, { plan: "0101", hash, verdict: "ready", detail: null, advisories: [advisory], at: "2026-10-01T10:00:00.000Z" });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.deepEqual(kinds(rec), ["implement:dev"], "the implement session started, as with no advisory");
+  assert.equal(rec.park.reason, "human_phase", "Phase 2 still parks as a human phase would; the advisory changed nothing");
+  assert.deepEqual(rec.readiness.advisories, [advisory]);
+  assert.ok(printed.some((l) => l.includes(`readiness advisory (never parks): ${advisory}`)), printed.join("\n"));
+});
+
 test("a ready recorded at approval on text the plan has since changed runs the readiness session as before", async () => {
   const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
   const planPath = join(repo, "docs", "plans", "0101-fixture.md");

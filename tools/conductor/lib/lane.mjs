@@ -704,8 +704,9 @@ async function readiness(ctx, rec, file) {
   if (!rec.readiness && rec.steps.some((s) => s.kind === "implement")) return null;
   const approved = readinessFor(ctx.stateDir, rec.plan, hash);
   if (approved?.verdict === "ready") {
-    rec.readiness = { hash, at: approved.at, approval: true };
+    rec.readiness = { hash, at: approved.at, approval: true, ...advisoriesOf(approved) };
     live(ctx, rec.plan, `  lane   readiness read ready at approval (${approved.at}) on this contract; no session`);
+    liveAdvisories(ctx, rec);
     save(ctx);
     return null;
   }
@@ -722,9 +723,18 @@ async function readiness(ctx, rec, file) {
   if (head(wt) !== before || !isClean(wt)) {
     return { reason: "disagreement", detail: "the readiness session changed the lane; it reads and changes nothing", read: r.transcript };
   }
-  rec.readiness = { hash, at: now() };
+  rec.readiness = { hash, at: now(), ...advisoriesOf(r.outcome) };
+  liveAdvisories(ctx, rec);
   save(ctx);
   return null;
+}
+
+/** `{ advisories }` when a ready verdict carries any, else nothing: the key is absent on a plain ready. */
+const advisoriesOf = (v) => (v?.advisories?.length ? { advisories: [...v.advisories] } : {});
+
+/** One live line per readiness advisory. An advisory is shown and never acted on: it parks nothing. */
+function liveAdvisories(ctx, rec) {
+  for (const a of rec.readiness?.advisories ?? []) live(ctx, rec.plan, `  lane   readiness advisory (never parks): ${a}`);
 }
 
 /** `git status --porcelain` of `cwd`, untracked files included, or null when git failed. */
@@ -743,7 +753,7 @@ function porcelain(cwd) {
  *
  * `ctx`: { repo, stateDir, promptsDir, settingsFile, withLockPath, claude, local, queue, live? }; the
  * caller has already checked that the plan file is committed and clean. Resolves to
- * { verdict, detail, phase, hash, transcript, recorded }: `ready` and every park reason the session
+ * { verdict, detail, phase, hash, transcript, advisories, recorded }: `ready` and every park reason the session
  * ends on are appended to state/readiness.jsonl; a `disagreement` is not.
  */
 export async function approvalReadiness(ctx, plan) {
@@ -776,8 +786,9 @@ export async function approvalReadiness(ctx, plan) {
   }
   const verdict = r.status === "parked" ? r.reason : "ready";
   const detail = r.status === "parked" ? r.detail : null;
-  appendReadiness(ctx.stateDir, { plan, hash, verdict, detail, at: now() });
-  return { ...base, verdict, detail, recorded: true };
+  const advisories = r.status === "parked" ? {} : advisoriesOf(r.outcome);
+  appendReadiness(ctx.stateDir, { plan, hash, verdict, detail, ...advisories, at: now() });
+  return { ...base, verdict, detail, advisories: advisories.advisories ?? [], recorded: true };
 }
 
 function planFileIn(cwd, plan) {

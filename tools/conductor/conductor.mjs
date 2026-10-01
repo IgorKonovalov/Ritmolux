@@ -737,6 +737,8 @@ async function cmdReadiness(args, o) {
   const where = r.transcript ? ` (transcript: ${r.transcript})` : "";
   if (r.verdict === "ready") {
     o.log(`conductor: plan ${plan} is ready; recorded against contract ${r.hash.slice(0, 12)}, so its lane runs no readiness session unless the plan changes`);
+    // Advisories never park and never fail the command; they are for the author to answer now.
+    for (const a of r.advisories) o.log(`conductor: advisory (never parks): ${a}`);
     return 0;
   }
   if (!r.recorded) {

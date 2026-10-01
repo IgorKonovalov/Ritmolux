@@ -39,10 +39,22 @@ Park on a contradiction a phase cannot be implemented around, never on a matter 
 something an implementer resolves in a minute. Name the phase and quote both sides of the
 contradiction, so the owner can settle it by editing the plan or overrule you by resuming.
 
+A `ready` plan may also carry **advisories**: one-line notes for the owner. **An advisory never
+parks**, and nothing the conductor does next depends on one. Give exactly these two kinds and no other:
+
+- **A `human` phase with no `**Blocks merge:** no` whose output no later phase reads.** It is a
+  candidate for `Blocks merge: no` (ADR-0249), which lets the plan merge without waiting for it. Name
+  the phase and say that nothing after it reads what it produces.
+- **Two or more adjacent `human` phases.** The conductor parks once for the whole run and asks for them
+  together (ADR-0261). Name the phases, so the owner knows they will be asked for at the same time.
+
+Write each as one line naming the phase, such as `Phase 3 (human) has no Blocks merge: no, and no
+later phase reads its output`. A plan with neither gets no advisories.
+
 The last thing you print is exactly one fenced block tagged `rlx-outcome` holding one JSON object:
 
 ```rlx-outcome
-{"kind": "ready", "plan": "{{plan}}"}
+{"kind": "ready", "plan": "{{plan}}", "advisories": ["<one line per advisory; omit the key when there is none>"]}
 ```
 
 or

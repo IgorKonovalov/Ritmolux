@@ -166,8 +166,8 @@ sequenceDiagram
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `conductor readiness NNNN` runs the check at approval | dev | committed with this row | |
-| 2 — Readiness prints advisories that never park | dev | not started | |
+| 1 — `conductor readiness NNNN` runs the check at approval | dev | done | `7c3dbffe` |
+| 2 — Readiness prints advisories that never park | dev | committed with this row | |
 | 3 — The architect runs it, and the template defaults judgement phases to owed | human | not started | |
 
 ### Notes
