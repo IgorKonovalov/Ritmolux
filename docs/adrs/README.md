@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0261.** *(0120 was reserved for
+**Next free number: 0262.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -282,4 +282,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0258](0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) | A system takes depth through one shared camera block, and its 3D mode forgoes what `seg3d` does not draw | proposed 2026-10-01, Plans 0236-0240 |
 | [0259](0259-the-swarm-projects-through-the-shared-camera-in-a-frustum-shaped-torus.md) | The swarm projects through the shared camera, in a frustum-shaped torus | proposed 2026-10-01, Plan 0239; supersedes 0044 in part |
 | [0260](0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md) | The attractor's 3D families project through the shared camera, and `perspective` retires | proposed 2026-10-01, Plan 0240; amends 0076, 0257 |
+| [0261](0261-the-conductor-parks-only-on-what-the-owner-must-settle.md) | The conductor parks only on what the owner must settle | proposed 2026-10-01, Plan 0241; amends 0207, 0209, 0248 |
 <!-- roster:end -->
