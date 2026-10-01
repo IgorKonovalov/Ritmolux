@@ -1,17 +1,19 @@
 # 0202 — The three mechanisms get their gate
 
-> **Status:** in-progress
+> **Status:** in-progress. **Split 2026-10-01:** Phases 4-7 moved to
+> [Plan 0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md), because
+> each needs the Windows rig or the corpus and the lane should not wait on them. This plan closes at
+> Phase 3.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
 > (its third `Outcome` is this plan's brief),
 > [0199](../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)
-> (whose inference Phase 5 tests), [0019](../adrs/0019-eased-parameters.md) (the injected `dt` a
+> (whose inference Plan 0246 Phase 2 now tests), [0019](../adrs/0019-eased-parameters.md) (the injected `dt` a
 > per-second rate is converted against)
-> **Takes:** design-backlog 0108 (its re-census instruction, Phase 7) and 0109 (the evidence its
-> go/no-go waits on). **Neither entry is closed by this plan** — both stay live, each with a dated
-> bullet naming what this plan recorded.
+> **Takes:** nothing since the split. Design-backlog 0108 and 0109 went to Plan 0246 with the
+> phases that serve them, and neither entry is closed by this plan.
 
 ## TL;DR
 
@@ -98,7 +100,7 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
   flipped copy and never feeds back. At the preset's `fVideoEchoAlpha = 1.0` the reference cannot
   draw a nested weave either, and our present pass already does the same `mix` from the same
   per-frame outputs. What the reading did find is **one divergence**, and this phase repairs that and
-  nothing else. The weave stays **unattributed**. Phase 6 says so for its pair, and its three
+  nothing else. The weave stays **unattributed**. Plan 0246's look gate says so for its pair, and its three
   remaining candidates are a followup below, not work here.
 - **What:** `echo_orientation` in `core/src/render/scenes/warp_mesh/mod.rs` **rounds** the bound
   value, and the reference takes `(int)v % 4`, which **truncates**. *Songflower*'s
@@ -120,65 +122,16 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
   re-blessed with the move named in the log. A hand-written preset binding a whole-number
   `echo_orient` (`warp_cauldron`'s `"1"`) cannot move.
 
-### Phase 4 — The eight modes are captured on the rig
-- **Owner skill:** human
-- **What:** On the rig ADR-0199 names — `foo_vis_milk2` 0.2.0.0 (DX11) under foobar2000 — capture each
-  of the eight wave modes at unit `fWaveScale` from a stimulus whose sample value at the draw call is
-  known (a full-scale sine, as Plan 0127's mode-6 capture used), so the per-mode host factor Phase 5
-  fits has a measurement behind every mode. Modes 6 and 0 already have captures; re-take them in the
-  same session so all eight share one host version and one stimulus.
-- **Files touched:** the implementation log (one row per mode: host, version, mode, stimulus, date,
-  and the peak-to-peak reading), and the capture files wherever the owner keeps the corpus.
-- **Done when:** all eight modes have a recorded capture in the log with the five fields above, in
-  one session on one host version.
-
-### Phase 5 — The waveform scale is measured per mode
-- **Owner skill:** dev
-- **What:** ADR-0199 inferred that modes 0-5 share mode 6's `0.158` gap; the mode-0 capture reads
-  `0.068`, a ratio of `0.43`. Measure the factor for each of the eight modes against the source's own
-  construction and carry a per-mode value rather than one fitted constant.
-- **Files touched:** `core/src/render/scenes/warp_mesh/draw.rs`,
-  `core/src/render/scenes/warp_mesh/tests.rs`, `docs/milkdrop-conversion.md`
-- **Done when:** each mode's factor is measured against its Phase 4 capture and recorded in the
-  log with that capture named; the draw carries the per-mode values; a test asserts each mode's drawn extent against its
-  measured factor as a ratio of like quantities (ADR-0074), not as a pixel figure; and the plan's log
-  states plainly that ADR-0199's inference was falsified on mode 0, which is what the close records
-  as that ADR's `Outcome`.
-
-### Phase 6 — The fourth look gate
-- **Owner skill:** human
-- **What:** the same seven pairs, the same rig — `foo_vis_milk2` 0.2.0.0 (DX11), both renderers fed
-  one track through foobar2000, judged live — re-converted at this plan's tip, with the per-pair
-  reading written into the implementation log in the shape Plan 0100 Phase 7, Plan 0109 Phase 5 and
-  Plan 0142 Phase 4 each used, so the four are comparable.
-- **Files touched:** the implementation log.
-- **Done when:** seven per-pair readings are recorded, each naming better / good / fixed / washed /
-  wrong-on-structure as the previous three gates did; and the log says which of the three mechanisms
-  each remaining bad pair is now attributed to, or that it is unattributed.
-
-### Phase 7 — The corpus census is present-day
-- **Owner skill:** human
-- **What:** re-run `milkconv --report` and `milkconv --render` over `WORK/milkdrop-corpus` at this
-  plan's tip, and record the conversion rate, the non-blank rate and the rejection ranking. Backlog
-  0108's numbers (71, 218, 80.1 %) are a 2026-08-16 measurement taken before five plans changed what
-  a converted preset renders, and both 0108 and 0109 instruct whoever takes them to re-measure first.
-- **Files touched:** `docs/milkdrop-conversion.md` (its measured corpus tables), the implementation
-  log.
-- **Done when:** the operator doc's tables carry the present-day run with its date and machine
-  beside the earlier eras rather than replacing them; the blank-render count is re-counted; and the
-  log states whether the rejection ranking still puts disk textures at 88.7 % of failures.
-
 ## Risks & open questions
 
 - **Phase 1 may falsify its own candidate**, and then two washed pairs have no named mechanism and
-  Phase 6's verdict will say so. That is the plan working, and it is why Phase 2 carries a
+  Plan 0246's look gate will say so. That is the plan working, and it is why Phase 2 carries a
   do-not-run condition rather than an assumption.
 - **Phase 3 is the least-scoped phase here.** The reference's echo is a composite stage this engine
   approximates; if reading `d4c843a` shows it is a larger divergence than a binding that does not
   reach the composite, the phase should stop and report rather than grow.
-- **Phases 4, 6 and 7 are `human` and all need the rig or the corpus**, which live outside this
-  checkout. Under the conductor the plan parks in front of Phase 4, after Phases 1-3, and again
-  in front of Phase 6; that is expected and correct.
+- **The rig and corpus phases left with the split.** Phases 4-7 need the Windows rig or the corpus,
+  which live outside this checkout, and are Plan 0246's now.
 - **A fourth "not better" is a real possibility.** The plan's value does not depend on the verdict
   going the other way: three mechanisms settled and a present-day census are worth having whichever
   way the gate reads, and a fourth no-go with all three attributed is a much stronger statement than
@@ -188,7 +141,7 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 
 - It does not buy reach. Backlog 0109 wants an ADR and an interview and its trigger is the verdict
   this plan produces; writing that ADR now would be deciding against yesterday's evidence.
-- It does not lower HLSL arrays or hunt the blank-render list (backlog 0108's own work). Phase 7
+- It does not lower HLSL arrays or hunt the blank-render list (backlog 0108's own work). Plan 0246's census
   re-measures both so whoever takes them is working from today's numbers.
 - It does not touch the disk-texture exclusion in `milkconv/src/shader/emit.rs`, which stays a named
   rejection class.
@@ -203,10 +156,10 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 | 1 — Settle the rate candidate | dev | done | 7027a97c |
 | 2 — Repair what Phase 1 convicted | dev | done - not run: Phase 1 falsified the candidate | 09be6b65 |
 | 3 — The echo's orientation truncates like the reference | dev | done (first run parked at ece8b14c, phase amended) | committed with this row |
-| 4 — The eight modes are captured on the rig | human | not started | |
-| 5 — The waveform scale is measured per mode | dev | not started | |
-| 6 — The fourth look gate | human | not started | |
-| 7 — The corpus census is present-day | human | not started | |
+| 4 — The eight modes are captured on the rig | human | not run - moved to Plan 0246 on 2026-10-01 | |
+| 5 — The waveform scale is measured per mode | dev | not run - moved to Plan 0246 on 2026-10-01 | |
+| 6 — The fourth look gate | human | not run - moved to Plan 0246 on 2026-10-01 | |
+| 7 — The corpus census is present-day | human | not run - moved to Plan 0246 on 2026-10-01 | |
 
 ### Notes
 
@@ -292,7 +245,7 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 - **Where *Songflower (Moss Posy)*'s nested weave comes from is unattributed.** Phase 3's reading
   took the echo off the list. The three candidates left are the field's own: `fDecay = 1`,
   `bTexWrap = 1`, and a per-pixel `zoom` that falls below 1. Take them in a probe with a stop
-  condition, the way Phase 1 took the rate candidate, if Phase 6 still reads that pair as wrong.
+  condition, the way Phase 1 took the rate candidate, if Plan 0246's look gate still reads that pair as wrong.
 
-- The reach decision (backlog 0109) — an interview and an ADR, triggered by Phase 6's verdict.
-- ADR-0199 gains an `Outcome` at this plan's close recording Phase 5's per-mode measurement.
+- The reach decision (backlog 0109) — an interview and an ADR, triggered by Plan 0246's look gate.
+- ADR-0199's `Outcome` for the per-mode measurement is owed at Plan 0246's close, not this one.
