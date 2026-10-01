@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0246** (ADRs are a separate sequence — next free there is **0262**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0247** (ADRs are a separate sequence — next free there is **0262**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -43,7 +43,8 @@ place. The plan file carries the real link.
 | [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | approved | human | 0103's Phases 5-6 plus the release they stand on. v0.143.0-v0.146.0 each shipped six artifacts, `foobar` green; v0.146.1 and v0.147.x lost the macOS pair to ADR-0251's break, repaired in 0227. |
 | [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | approved | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four are `human`. Unblocked: 0120 closed 2026-09-22. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
-| [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | approved | dev, human | ADR-0113's third Outcome is the brief: the rate candidate, the echo, the per-mode wave scale, then a fourth look gate. Phases 4, 6 and 7 need the rig or the corpus; the conductor parks there. |
+| [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | in-progress | dev | Split 2026-10-01: closes on Phases 1-3 (rate candidate falsified, echo orientation fixed); the rig and corpus phases moved to 0246. |
+| [0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) | The rig session measures the wave modes and judges the fourth gate | approved | human, dev | 0202's Phases 4-7. Not queued until the owner has the Windows rig; commit Phase 1's eight rows on main, then queue. |
 | [0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md) | The library learns from the corpus it will not ship | approved | human | ADR-0227 (proposed): a borrowed look authored natively, reference outside. A 4-6 cohort of 21 picks. Its cohort reads 0232's gap table; its Phase 3 lands after 0232 Phase 3. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0232](0232-the-library-is-walked-cut-and-refilled.md) | The library is walked, cut and refilled | approved | human, dev | ADR-0253 (proposed): report, owner's walk, cull without replacement down to a two-per-family floor, retunes, gap brief, refill. Takes backlog 0256 step 2 and the six content-brief sittings. |
