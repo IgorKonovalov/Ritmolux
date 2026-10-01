@@ -244,10 +244,10 @@ footprint so the vendor spread is on record.
       `plexus`, whose cost is a pairwise test of every point on the CPU plus the fill of its lines,
       which an open `aperture` widens. Its Floor caps — `plexus_points` **600**, `plexus_edges`
       **6000**, `max_coc_px` **12** — were measured on the development box's integrated GPU
-      (under 4 ms a frame headless, release build), not on the low-end box. No shipped preset draws
-      the system yet, so point `RLX_PRESET_DIR` at `docs/examples/plexus/` and load
-      **`sheet.toml`**; then write the heaviest frame the caps allow beside it — the same file with
-      `points = 600`, `link_distance = "0.6"` and `aperture = "40"`. Overlay on (`F3`), report
+      (under 4 ms a frame headless, release build), not on the low-end box. Load the shipped
+      **Synapse** (cloud) and **Storm Sea** (sheet); then write the heaviest frame the caps allow
+      beside them — `docs/examples/plexus/sheet.toml` with `points = 600`, `link_distance = "0.6"`
+      and `aperture = "24"`, the top of its declared range. Overlay on (`F3`), report
       **(a)** whether fps holds ≥ 60 @ 1080p on both, **(b)** the p99, and **(c)** what the
       standalone prints about the clamps. **If the heavy frame misses, the levers are the three
       caps**, and lowering `plexus_points` or `max_coc_px` changes what a preset looks like, so it

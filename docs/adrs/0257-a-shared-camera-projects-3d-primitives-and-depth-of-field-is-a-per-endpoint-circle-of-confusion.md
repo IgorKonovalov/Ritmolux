@@ -1,8 +1,8 @@
 # ADR-0257 — A shared camera projects 3D primitives, and depth of field is a per-endpoint circle of confusion
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-01 (Plan 0235 closed)
 > **Date:** 2026-09-30, amended 2026-10-01 (the tier cap is a ceiling, before acceptance)
-> **Related plan(s):** [0235](../plans/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md)
+> **Related plan(s):** [0235](../plans/done/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md)
 
 ## Context
 

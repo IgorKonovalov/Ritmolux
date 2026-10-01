@@ -1,9 +1,9 @@
 # 0235 — The plexus system, and a shared camera with depth of field
 
-> **Status:** in-progress (2026-09-30; run by hand in ordinary sessions, not queued for the conductor. Amended 2026-10-01: Phase 9 added after the first shipped set exposed the blur notice)
+> **Status:** done (2026-10-01; run by hand on `main`, not queued for the conductor. Phases 1-7 and 9 landed 8b3a6d41..695b41cb, Phase 8 recorded as a keep. Mode 4 close review, round 3: no blockers, no majors, two minors (both repaired at the close), two nits. Full suite and `cargo doc` re-run green at d58d9950)
 > **Created:** 2026-09-30
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md) (proposed), [ADR-0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0256](../adrs/0256-a-parameter-declares-its-group-and-whether-it-is-main.md)
+> **Related ADRs:** [ADR-0257](../../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md) (accepted), [ADR-0044](../../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md), [ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0256](../../adrs/0256-a-parameter-declares-its-group-and-whether-it-is-main.md)
 
 ## TL;DR
 
@@ -354,7 +354,7 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 | 5 — The attractor takes the shared CoC | dev | done | f43f1dd7 |
 | 6 — Tier caps, golden, determinism | dev | done | 0c23e166 |
 | 7 — Documentation and the references | dev | done | 2ad353bc |
-| 8 — The look, judged | human | not started | |
+| 8 — The look, judged | human | done | (verdict below) |
 | 9 — The blur cap is a ceiling; the first set joins the gates | dev | done | 695b41cb |
 
 ### Notes
@@ -442,6 +442,9 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 - Phase 9, outside the file list: `docs/specs/player-schema.json` is regenerated, since it carries
   the `aperture` range. `.taplo.toml` did not change. The systems.md `aperture` working range moved
   from `8 – 18` to `8 – 12`, the values that draw as written on Floor.
+- Phase 8, the owner's verdict (recorded at the close, 2026-10-01): **keep.** The geometry looks
+  right against the reference, audio-bound scratch variants react, and the first shipped set
+  (2ea44e40) was judged live on the Arch box, Synapse signed off as drawn.
 - Phase 9: a plain `cargo build -p rlx-core` warns that `PreviewService::target` is never used
   (`core/src/render/preview.rs:96`, last touched a8eab67d). This phase does not touch that file, and
   clippy is clean.
@@ -467,8 +470,34 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
   --workspace --no-deps` under `-D warnings` clean.
   After fix round 2, at 1222b4b6: exit 0, 1939 passed, 8 skipped; `cargo doc` clean.
   After Phase 9, on its tree: exit 0, 1946 passed, 8 skipped; `cargo doc` clean.
-- **Outstanding `human` phases:** Phase 8 (the look, judged against the reference),
-  `Blocks merge: no`.
+- **Outstanding `human` phases:** none; Phase 8 recorded as a keep at the close.
+
+## Close review
+
+Round 3, 2026-10-01, a fresh `architect` session against d58d9950, after Phase 9. Verdict: **no
+blockers, no majors, two minors, two nits.**
+
+- **Evidence re-run, not read from the log:** `cargo nextest run --workspace` exit 0, 1946 passed,
+  8 skipped (llvmpipe); `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` clean; the doc
+  links, system counts, backlog probes, index rows, reader prose, comment hygiene and contents
+  gates pass; upstream CI green. Phase 9's tests were opened and match its done-whens: Synapse's
+  camera at three foci on both tiers is quiet, 13 px on Floor names `pin --tier rich`, 30 on Rich
+  does not, every tier-clamp context is held to the same clause, and the range test ties `aperture`
+  to Rich's cap on both systems. No golden moved in Phase 9.
+- **Minor 1, repaired at the close:** `docs/on-device-validation.md`'s plexus Floor check said no
+  preset shipped and sized its heavy frame at `aperture = "40"`, past the new range. It now names
+  Synapse and Storm Sea and uses `24`.
+- **Minor 2, repaired at the close:** Phase 8's verdict was unrecorded; the owner's keep is now in
+  the log.
+- **Nit 1, repaired:** the plans index row read `approved` while the plan read `in-progress`; the row left the roster at the close.
+- **Nit 2, open by design:** the Blur notice's "the background is sharper than the preset asked" is
+  the asymptotic far field. With focus near the far extent the farthest lines blur well under
+  `aperture`, so an aperture just past the cap can be announced with nothing behind focus clamped.
+  ADR-0257 judges the authored value deliberately; recorded for Plans 0236-0240.
+- **Earlier rounds:** round 1's two majors fixed in 25c9519e and 7cdf291e; round 2's major fixed
+  in 75c80fee and its minor in 1222b4b6.
+- **Curation:** keep all five. `--report family=plexus`: no near-duplicate below shape 0.08, every
+  branch taken, no clamp at its bound, 1.6-5.0 ms a frame at Floor. No preset binds treble.
 
 ## Followups (after this lands)
 

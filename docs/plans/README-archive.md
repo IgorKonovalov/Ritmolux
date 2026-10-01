@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0235 - The plexus system, and a shared camera with depth of field](#0235---the-plexus-system-and-a-shared-camera-with-depth-of-field)
   - [0230 - The Russian slice becomes findable](#0230---the-russian-slice-becomes-findable)
   - [0231 - The interface is audited, then learns one look](#0231---the-interface-is-audited-then-learns-one-look)
   - [0233 - The close reviews' small findings are repaired](#0233---the-close-reviews-small-findings-are-repaired)
@@ -272,6 +273,28 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0235 - The plexus system, and a shared camera with depth of field](done/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md)
+
+- closed 2026-10-01, run by hand on `main` (no lane). Phases 1-7 and 9 landed: `8b3a6d41`,
+`6a52a633`, `f7e09ec4`, `de309bfc`, `f43f1dd7`, `0c23e166`, `2ad353bc`, `695b41cb`. Phase 8, the
+owner's look judgement, recorded as a **keep** at the close. Three review rounds: round 1 two majors
+(fixed `25c9519e`, `7cdf291e`), round 2 one major and one minor (fixed `75c80fee`, `1222b4b6`), round
+3 after Phase 9 **no blockers, no majors, two minors (repaired at the close), two nits** (one open by
+design). Version: **0.156.0** (minor: a feature plan). ADR-0257 accepted, carrying its 2026-10-01
+amendment. Closes no backlog entry. Upstream CI read green at the close. The full round-3 review is the
+plan's own `## Close review` section.
+- **What landed.** `SystemKind::Plexus` with `cloud` and `sheet` layouts; the shared `Camera3d` and
+  `camera.wgsl`; the `seg3d` and `quad3d` pipelines with a per-endpoint circle of confusion; `focus`
+  and `aperture` on the attractor's 3D families; tier caps `plexus_points`, `plexus_edges`,
+  `max_coc_px` that announce. Phase 9 made the cap the lens's ceiling: only an `aperture` past it is
+  announced, and `pin --tier rich` is offered only below Rich.
+- **Curation.** The first five plexus presets (2ea44e40, content lane) all kept; Synapse and Storm
+  Sea are the representatives. No near-duplicate; none binds treble.
+- **Open.** The plexus goldens were blessed on llvmpipe, so Windows CI's golden job is their first
+  WARP reading. Nit 2: the Blur notice's far-field wording is asymptotic. Translation advisory at the
+  close: `how-it-works.ru.md` (moved by this plan's Phase 7), `running.ru.md` and the foobar
+  `READ-ME-FIRST.ru.md`.
 
 ### [0230 - The Russian slice becomes findable](done/0230-the-russian-slice-becomes-findable.md)
 
