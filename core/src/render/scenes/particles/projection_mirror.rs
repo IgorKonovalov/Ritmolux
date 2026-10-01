@@ -177,11 +177,9 @@ pub(super) fn world(
     [sx * scl * m, sy * scl * m]
 }
 
-/// Mirrors `FIGURE_DISTANCE` / `FIGURE_RADIUS` in
-/// [`DRAW_SHADER`](super::DRAW_SHADER): the virtual lens the figure's
-/// normalized depth is laid on (ADR-0257).
-const FIGURE_DISTANCE: f32 = 1.0;
-const FIGURE_RADIUS: f32 = 0.5;
+// The virtual lens the figure's normalized depth is laid on (ADR-0257): the
+// scene's own CPU copy, so the announce check and this transcription share it.
+use super::{FIGURE_DISTANCE, FIGURE_RADIUS};
 
 /// Mirrors `figure_coc()` in [`DRAW_SHADER`](super::DRAW_SHADER): the circle of
 /// confusion in pixels at normalized depth `dn`, through the shared

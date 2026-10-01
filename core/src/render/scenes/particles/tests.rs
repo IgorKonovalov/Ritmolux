@@ -4190,6 +4190,75 @@ fn a_sprite_away_from_the_focal_depth_grows_and_dims() {
     }
 }
 
+/// **A blur past the tier's cap is announced** (ADR-0007): the lens's widest
+/// circle of confusion over a 3D figure is checked against `max_coc_px` every
+/// frame, and a flat map, which no aperture blurs, never reports one.
+#[test]
+fn a_blur_past_the_tier_cap_is_announced() {
+    use crate::render::scenes::OverflowContext;
+
+    let cap = TierConfig::FLOOR.max_coc_px as f32;
+    // In focus at mid depth, the figure's two extents sit at depths 0.5 and
+    // 1.5 against a focal depth of 1: the near one asks for `aperture` pixels.
+    assert_eq!(super::asked_blur(40.0, 0.5, true), 40.0);
+    assert_eq!(
+        super::asked_blur(0.0, 0.5, true),
+        0.0,
+        "a pinhole asks nothing"
+    );
+    assert_eq!(
+        super::asked_blur(40.0, 0.5, false),
+        0.0,
+        "a flat map asks nothing"
+    );
+    assert!(
+        super::blur_overflow(cap, cap).is_none(),
+        "at the cap is not past it"
+    );
+    let over = super::blur_overflow(40.0, cap).expect("40 px is past the Floor cap");
+    assert_eq!(over.context, OverflowContext::Blur(40));
+    assert_eq!(over.cap, cap as usize);
+    // The scene's lens is the shader's: the CPU copy of the virtual lens names
+    // the constants the draw shader declares.
+    for (name, value) in [
+        ("FIGURE_DISTANCE", super::FIGURE_DISTANCE),
+        ("FIGURE_RADIUS", super::FIGURE_RADIUS),
+    ] {
+        assert!(
+            super::DRAW_SHADER.contains(&format!("const {name}: f32 = {value:?};")),
+            "the draw shader's {name} is not {value:?}"
+        );
+    }
+
+    // Through the scene: a 3D figure reports it per frame, a flat map never.
+    let Some(mut h) = Harness::new(AttractorFamily::Thomas) else {
+        return;
+    };
+    h.scene.set_param("aperture", 40.0);
+    h.run(1);
+    let reported = h
+        .scene
+        .mirror_overflow()
+        .expect("thomas announces the clamp");
+    assert_eq!(reported.context, OverflowContext::Blur(40));
+    h.scene.set_param("aperture", 0.0);
+    h.run(1);
+    assert!(
+        h.scene.mirror_overflow().is_none(),
+        "the clamp lifts with the aperture"
+    );
+
+    let Some(mut flat) = Harness::new(AttractorFamily::DeJong) else {
+        return;
+    };
+    flat.scene.set_param("aperture", 40.0);
+    flat.run(1);
+    assert!(
+        flat.scene.mirror_overflow().is_none(),
+        "de_jong has no depth to blur"
+    );
+}
+
 /// **Through the whole engine**: an aperture changes a 3D figure's frame and
 /// spreads its light, and leaves a flat map's frame byte-identical, since a
 /// flat map has no depth to be out of focus at.

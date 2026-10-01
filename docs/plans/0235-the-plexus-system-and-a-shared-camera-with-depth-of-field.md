@@ -357,6 +357,11 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
   per phase) and is regenerated here.
 - Phase 2, `max_coc_px` is a `u32` (the tier struct derives `Eq`), provisional 12 / 24; Phase 6
   measures it.
+- Close-review fix, major 1 (the attractor clamped its blur silently): the attractor now reports
+  `OverflowContext::Blur` through `mirror_overflow` per frame, from the lens's widest circle of
+  confusion over the figure, and never on a family without depth. `FIGURE_DISTANCE` /
+  `FIGURE_RADIUS` move from `projection_mirror.rs` into `particles/mod.rs`, which both read; a test
+  holds them to the draw shader's text. Commit: the `fix(core)` commit carrying this line.
 
 ### Close triggers
 
