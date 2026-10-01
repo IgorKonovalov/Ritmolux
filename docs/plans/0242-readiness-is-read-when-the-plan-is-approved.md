@@ -168,7 +168,7 @@ sequenceDiagram
 |---|---|---|---|
 | 1 — `conductor readiness NNNN` runs the check at approval | dev | done | `7c3dbffe` |
 | 2 — Readiness prints advisories that never park | dev | done | `47b75ecf` |
-| 3 — The architect runs it, and the template defaults judgement phases to owed | human | not started | |
+| 3 — The architect runs it, and the template defaults judgement phases to owed | human | owed | |
 
 ### Notes
 
