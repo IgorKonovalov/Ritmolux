@@ -1,0 +1,39 @@
+# Sprout - a branching plant that draws itself on over a phrase, then regrows.
+# The classic bracketed plant grammar, expanded to depth six, is revealed by
+# draw_progress riding a four-bar ramp: it starts as a stem, branches out, and
+# at the top of the next phrase starts again from the root. Crisp opaque
+# strokes, bone white on black; the red end of the palette lands on the main
+# stems, so the plant's spine reads warm under its pale foliage. The bass
+# lengthens each push of growth; onsets sway the angle a touch.
+system = "lsystem"
+name = "Sprout"
+
+[generator]
+axiom     = "X"
+rules     = { X = "F+[[X]-X]-F[-FX]+X", F = "FF" }
+angle_deg = 25
+max_depth = 6
+
+[palette]
+stops = [
+  { at = 0.0, color = "#e0141e" },
+  { at = 0.3, color = "#f4f1ea" },
+  { at = 1.0, color = "#f4f1ea" },
+]
+
+[params]
+visible_depth = "6"
+draw_progress = "min(1, (mod(bar_index, 4) + bar_phase) / 3.2 + clamp(bass * 0.06, 0, 0.05))"
+rotation      = "0.03 * sin(time * 0.7) + clamp(onset * 0.04, 0, 0.03)"
+thickness     = "5"
+softness      = "0"
+stroke_blend  = "1"
+glow          = "1.0"
+hue           = "0"
+hue_spread    = "1"
+scale         = "1.0"
+zoom          = "1.0"
+
+[smoothing]
+draw_progress = 0.08
+rotation      = 0.2

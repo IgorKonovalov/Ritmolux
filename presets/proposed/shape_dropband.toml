@@ -1,0 +1,43 @@
+# Drop Band - a five-point star whose offset contours fill the frame in hard
+# black, white and red.
+# The palette is three flat zones with hard edges, so however the field is
+# quantized every band is exactly one of the three colours, and a hard black
+# contour sits on every band edge. coord_mode 1 keeps each ring a scaled copy
+# of the star, so the points stay sharp all the way to the frame edge.
+# What the music moves is the structure, never the light. color_span sets how
+# many bands the frame holds; it is re-picked every second beat and held in
+# between, stepping between three densities, so a loud passage makes the wall
+# re-cut itself rather than flash. The bands travel outward on a slow clock,
+# the star swells with the bass, and an onset sharpens its points.
+system = "shape_field"
+name = "Drop Band"
+
+[palette]
+stops = [
+  { at = 0.0,   color = "#000000" },
+  { at = 0.333, color = "#000000" },
+  { at = 0.334, color = "#f2f2f2" },
+  { at = 0.666, color = "#f2f2f2" },
+  { at = 0.667, color = "#d0101a" },
+  { at = 1.0,   color = "#d0101a" },
+]
+
+[params]
+shape                 = "3"
+points                = "5"
+star_valley           = "0.42 - clamp(onset * 0.25, 0, 0.15)"
+scale                 = "0.36 + clamp(bass * 0.18, 0, 0.15)"
+rotation              = "0"
+coord_mode            = "1"
+palette_steps         = "12"
+palette_contour       = "1"
+palette_contour_style = "1"
+color_span            = "0.3 + 0.15 * mod(floor(beat_index / 2), 3)"
+color_center          = "-0.12 * time"
+
+[hold]
+color_span = "beat"
+
+[smoothing]
+scale       = { attack = 0.03, release = 0.35 }
+star_valley = 0.1

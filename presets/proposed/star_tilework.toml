@@ -1,0 +1,55 @@
+# Tilework - an edge-to-edge eightfold wallpaper, charcoal ink on white paper.
+# One octagon rosette carries four rings of ornament (a boss, diamonds,
+# trefoils, a chevron border) and is scaled to about three times its cell, so
+# the mirrored kaleido_tile grid cuts it at every cell wall and welds the
+# neighbours into one continuous lattice. The Hankin interlace itself lies
+# outside the cell at this scale; the rings are the pattern. Hard opaque
+# strokes (softness 0, stroke_blend 1) sized for the tiling, which shrinks the
+# source by the cell count. The ink remap turns the white strokes into dark
+# marks on paper, and ink_gamma 0.3 pushes them close to black. Nothing rotates.
+# The bass swells every motif, the mids push the rings apart, an onset
+# thickens the line, and on roughly one beat in four the wall re-lays itself
+# from three cells to four and back, held between hits.
+system = "star_pattern"
+name = "Tilework"
+
+[generator]
+tiling = "octagon"
+contact_angle_deg = 67.5
+rings = [
+  { motif = "circle",  count = 1,  radius = 0.00, scale = 0.18 },
+  { motif = "diamond", count = 8,  radius = 0.30, scale = 0.24 },
+  { motif = "trefoil", count = 8,  radius = 0.55, scale = 0.16, phase = 0.3927 },
+  { motif = "chevron", count = 16, radius = 0.80, scale = 0.12 },
+]
+
+[palette]
+stops = [
+  { at = 0.0, color = "#ffffff" },
+  { at = 1.0, color = "#ffffff" },
+]
+
+[params]
+variant       = "1"
+rotation      = "0"
+draw_progress = "1"
+ring_scale    = "0.9 + clamp(bass * 0.29, 0, 0.25)"
+ring_spread   = "0.95 + clamp(mid * 0.12, 0, 0.1) + 0.05 * noise(time * 0.4)"
+thickness     = "24 + clamp(onset * 13, 0, 8)"
+softness      = "0"
+stroke_blend  = "1"
+glow          = "1.0"
+brightness    = "1.0"
+scale         = "3.2"
+hue           = "0.5"
+kaleido_tile  = "select(hash(beat_index) > 0.75, 4, 3)"
+ink_amount    = "1"
+ink_gamma     = "0.3"
+
+[hold]
+kaleido_tile = "beat"
+
+[smoothing]
+ring_scale  = { attack = 0.03, release = 0.35 }
+ring_spread = 0.2
+thickness   = { attack = 0.02, release = 0.25 }
