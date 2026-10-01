@@ -1,6 +1,6 @@
 # 0245 — A gate that runs a built binary checks that it is current
 
-> **Status:** draft
+> **Status:** approved (2026-10-01).
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md), [ADR-0122](../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)

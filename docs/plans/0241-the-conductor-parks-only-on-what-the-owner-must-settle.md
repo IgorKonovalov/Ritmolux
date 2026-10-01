@@ -1,6 +1,6 @@
 # 0241 — The conductor parks only on what the owner must settle
 
-> **Status:** draft
+> **Status:** approved (2026-10-01).
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0261](../adrs/0261-the-conductor-parks-only-on-what-the-owner-must-settle.md) (proposed), [ADR-0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md), [ADR-0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md), [ADR-0248](../adrs/0248-the-pipeline-repairs-before-it-parks.md), [ADR-0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)

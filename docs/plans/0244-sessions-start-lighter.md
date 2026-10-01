@@ -1,6 +1,6 @@
 # 0244 — Sessions start lighter: standing context moves to where it is read on demand
 
-> **Status:** draft
+> **Status:** approved (2026-10-01). Runs after Plan 0242 closes (both edit the architect skill).
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md), [ADR-0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)

@@ -1,6 +1,6 @@
 # 0243 — The full suite gets faster: measure the contention and the tail, then apply what wins
 
-> **Status:** draft. **Run human-started, not under the conductor.** Phase 1 sweeps an environment
+> **Status:** approved (2026-10-01). **Run human-started, not under the conductor.** Phase 1 sweeps an environment
 > variable across whole-suite runs. The conductor allowlist names no environment prefix for it, and
 > the suite-lock hook does not allow a wrapper script around `cargo nextest`.
 > **Created:** 2026-10-01

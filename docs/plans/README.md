@@ -53,11 +53,11 @@ place. The plan file carries the real link.
 | [0238](0238-the-waterfall-system.md) | The waterfall system | approved | dev, human | ADR-0258, ADR-0180 rule 1: a new `SystemKind`, spectrum history as a receding landscape. After 0236. |
 | [0239](0239-the-swarm-moves-into-a-real-camera.md) | The swarm moves into a real camera | approved | dev, human | ADR-0259 (proposed) supersedes 0044's depth model. After 0236. Every swarm preset changes look; Phase 6 (owner's judgement) blocks the merge. |
 | [0240](0240-the-attractor-projects-through-the-shared-camera.md) | The attractor projects through the shared camera | approved | dev, human | ADR-0260 (proposed): `perspective` retires, presets migrate by exact mapping, re-curation owed after merge. After 0236. |
-| [0241](0241-the-conductor-parks-only-on-what-the-owner-must-settle.md) | The conductor parks only on what the owner must settle | draft | dev | ADR-0261 (proposed): close suite served, a human run parks once, a false `fixed_in` reopens, one diagnosed flake retries by name. |
-| [0242](0242-readiness-is-read-when-the-plan-is-approved.md) | Readiness is read when the plan is approved | draft | dev, human | `conductor readiness NNNN` at approval, verdict reused by the lane; advisories never park; judgement phases default to owed. |
-| [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | draft | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
-| [0244](0244-sessions-start-lighter.md) | Sessions start lighter | draft | dev, human | Moves, deletes nothing: CLAUDE.md to <=25 KB, plans index keeps 15 closes, architect Mode 4 to a reference. |
-| [0245](0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) | A gate that runs a built binary checks it is current | draft | dev | The sd-filter suite takes the newer `shot` and skips with a notice when it predates the source. |
+| [0241](0241-the-conductor-parks-only-on-what-the-owner-must-settle.md) | The conductor parks only on what the owner must settle | approved | dev | ADR-0261 (proposed): close suite served, a human run parks once, a false `fixed_in` reopens, one diagnosed flake retries by name. |
+| [0242](0242-readiness-is-read-when-the-plan-is-approved.md) | Readiness is read when the plan is approved | approved | dev, human | `conductor readiness NNNN` at approval, verdict reused by the lane; advisories never park; judgement phases default to owed. |
+| [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
+| [0244](0244-sessions-start-lighter.md) | Sessions start lighter | approved | dev, human | Moves, deletes nothing: CLAUDE.md to <=25 KB, plans index keeps 15 closes, architect Mode 4 to a reference. |
+| [0245](0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) | A gate that runs a built binary checks it is current | approved | dev | The sd-filter suite takes the newer `shot` and skips with a notice when it predates the source. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
