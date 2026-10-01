@@ -38,7 +38,7 @@
 pub(crate) mod sim;
 
 use crate::dsp::AnalysisFrame;
-use crate::render::camera::{Camera3d, CameraUniform, NEAR};
+use crate::render::camera::{Camera3d, CameraUniform, Lens};
 use crate::render::palette::{self, Palette};
 use crate::render::scenes::common::{PaletteParams, PanParams};
 use crate::render::scenes::lines::{GeneratorConfig, LineRenderer, Segment3dInstance};
@@ -109,10 +109,6 @@ impl Default for PlexusConfig {
 /// since the look this system is for is a fine luminous line.
 const SOFTNESS: f32 = 0.5;
 
-/// Where the reference depth sits in the layout's volume, `0` at its nearest
-/// extent and `1` at its farthest: the depth `line_width` is stated at.
-const REFERENCE_DEPTH: f32 = 0.5;
-
 /// How far past the frame an edge may lie before it is culled, in normalized
 /// device units — room for the stroke's own width, so a line whose centre has
 /// left the frame does not take its visible edge with it.
@@ -126,6 +122,8 @@ const DEFAULT_YAW: f32 = default_of(PARAMS, "yaw");
 const DEFAULT_PITCH: f32 = default_of(PARAMS, "pitch");
 const DEFAULT_DISTANCE: f32 = default_of(PARAMS, "distance");
 const DEFAULT_FOV: f32 = default_of(PARAMS, "fov");
+const DEFAULT_FOCUS: f32 = default_of(PARAMS, "focus");
+const DEFAULT_APERTURE: f32 = default_of(PARAMS, "aperture");
 const DEFAULT_BRIGHTNESS: f32 = default_of(PARAMS, "brightness");
 const DEFAULT_HUE_CENTER: f32 = default_of(PARAMS, "hue_center");
 const DEFAULT_HUE_SPREAD: f32 = default_of(PARAMS, "hue_spread");
@@ -156,7 +154,7 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "line_width",
         default: 1.5,
         range: Some([0.5, 8.0]),
-        doc: "Line width in pixels at the middle of the volume; nearer lines are wider and farther ones thinner.",
+        doc: "Line width in pixels at the focal plane; nearer lines are wider and farther ones thinner.",
         kind: ParamKind::Modal,
         group: ParamGroup::Shape,
         main: true,
@@ -206,6 +204,24 @@ pub const PARAMS: &[ParamSpec] = &[
         group: ParamGroup::Motion,
         main: false,
     },
+    ParamSpec {
+        name: "focus",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: true,
+    },
+    ParamSpec {
+        name: "aperture",
+        default: 0.0,
+        range: Some([0.0, 40.0]),
+        doc: "How strongly lines blur away from the focal plane, in pixels; 0 keeps every line sharp, and wider costs fill.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: true,
+    },
     crate::render::scenes::common::brightness(1.0),
     ParamSpec {
         name: "hue_center",
@@ -241,6 +257,8 @@ pub struct PlexusScene {
     points_cap: usize,
     /// The tier's edge cap.
     edges_cap: usize,
+    /// The tier's cap on the circle of confusion, in pixels.
+    max_coc: f32,
     cloud: sim::Cloud,
     edges: Vec<sim::Edge>,
     instances: Vec<Segment3dInstance>,
@@ -257,6 +275,8 @@ pub struct PlexusScene {
     pitch: f32,
     distance: f32,
     fov: f32,
+    focus: f32,
+    aperture: f32,
     hue_center: f32,
     hue_spread: f32,
     zoom: f32,
@@ -266,12 +286,13 @@ pub struct PlexusScene {
 
 impl PlexusScene {
     /// Build the scene with buffers for `points_cap` points and `edges_cap`
-    /// edges, the tier's caps.
+    /// edges, and blur held to `max_coc` pixels — the tier's caps.
     pub(crate) fn new(
         device: &wgpu::Device,
         surface_format: wgpu::TextureFormat,
         points_cap: usize,
         edges_cap: usize,
+        max_coc: f32,
     ) -> Self {
         let config = PlexusConfig::default();
         let count = (config.points as usize).min(points_cap);
@@ -279,6 +300,7 @@ impl PlexusScene {
             lines: LineRenderer::new_3d(device, surface_format, edges_cap, "plexus"),
             points_cap,
             edges_cap,
+            max_coc,
             cloud: sim::Cloud::seeded(config.seed, count, points_cap),
             edges: Vec::with_capacity(edges_cap),
             instances: Vec::with_capacity(edges_cap),
@@ -293,6 +315,8 @@ impl PlexusScene {
             pitch: DEFAULT_PITCH,
             distance: DEFAULT_DISTANCE,
             fov: DEFAULT_FOV,
+            focus: DEFAULT_FOCUS,
+            aperture: DEFAULT_APERTURE,
             hue_center: DEFAULT_HUE_CENTER,
             hue_spread: DEFAULT_HUE_SPREAD,
             zoom: DEFAULT_ZOOM,
@@ -308,6 +332,8 @@ impl PlexusScene {
             pitch: self.pitch,
             distance: self.distance,
             fov: self.fov,
+            focus: self.focus,
+            aperture: self.aperture,
         }
     }
 
@@ -366,6 +392,8 @@ impl Scene for PlexusScene {
         self.pitch = DEFAULT_PITCH;
         self.distance = DEFAULT_DISTANCE;
         self.fov = DEFAULT_FOV;
+        self.focus = DEFAULT_FOCUS;
+        self.aperture = DEFAULT_APERTURE;
         self.hue_center = DEFAULT_HUE_CENTER;
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.zoom = DEFAULT_ZOOM;
@@ -388,6 +416,8 @@ impl Scene for PlexusScene {
             "pitch" => self.pitch = value,
             "distance" => self.distance = value,
             "fov" => self.fov = value,
+            "focus" => self.focus = value,
+            "aperture" => self.aperture = value,
             "hue_center" => self.hue_center = value,
             "hue_spread" => self.hue_spread = value,
             "zoom" => self.zoom = value,
@@ -414,14 +444,24 @@ impl Scene for PlexusScene {
         aspect: f32,
     ) {
         // The aspect is the render target's, handed in here (ADR-0037).
-        let cam = self
-            .camera()
-            .view(aspect, self.zoom, [self.pan.x, self.pan.y]);
+        let camera = self.camera();
+        let cam = camera.view(aspect, self.zoom, [self.pan.x, self.pan.y]);
         let radius = self.cloud.bounding_radius();
         let near_extent = cam.distance - radius;
         let far_extent = cam.distance + radius;
         let span = far_extent - near_extent;
-        let reference = (near_extent + REFERENCE_DEPTH * span).max(NEAR);
+        let lens = Lens::new(
+            camera.aperture,
+            cam.focal_depth(camera.focus, radius),
+            self.max_coc,
+        );
+        // A blurred stroke reaches past its centreline by up to the cap, so
+        // the cull keeps that much more of the frame's surround.
+        let margin = if lens.aperture > 0.0 {
+            CULL_MARGIN + 2.0 * lens.max_coc / self.target.1.max(1) as f32
+        } else {
+            CULL_MARGIN
+        };
         let link_alpha = self.link_alpha.clamp(0.0, 1.0);
         let width = if self.line_width.is_finite() {
             self.line_width.max(0.0)
@@ -445,7 +485,7 @@ impl Scene for PlexusScene {
             let Some((a, b)) = cam.clip_near(pa, pb) else {
                 continue;
             };
-            if cam.outside(a, b, CULL_MARGIN) {
+            if cam.outside(a, b, margin) {
                 continue;
             }
             let mid = [
@@ -463,7 +503,7 @@ impl Scene for PlexusScene {
             });
         }
 
-        let uniform = CameraUniform::new(&cam, self.target.0, self.target.1, reference);
+        let uniform = CameraUniform::new(&cam, self.target.0, self.target.1, lens);
         self.lines
             .draw_3d(queue, encoder, view, &uniform, 1.0, SOFTNESS, &instances);
         self.instances = instances;

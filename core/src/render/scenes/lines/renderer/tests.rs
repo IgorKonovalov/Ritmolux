@@ -2181,3 +2181,262 @@ fn the_stroke_is_as_thick_across_as_it_is_along_whatever_the_orientation() {
         }
     }
 }
+
+// -----------------------------------------------------------------------
+// Depth of field on 3D segments (ADR-0257)
+// -----------------------------------------------------------------------
+
+mod seg3d {
+    use super::super::{LineRenderer, Segment3dInstance};
+    use crate::render::RenderError;
+    use crate::render::camera::{Camera3d, CameraUniform, CameraView, Lens};
+    use crate::render::context::RenderContext;
+    use crate::render::gpu;
+
+    /// The probe target: wide enough that the segment spans most of a row,
+    /// and `256 * 8` bytes a row is already the copy alignment.
+    const W: u32 = 256;
+    const H: u32 = 128;
+    /// A float target, so a blurred stroke's light is summed without the
+    /// 8-bit floor eating its tails or the ceiling clipping its core.
+    const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+    /// The focal plane's depth: the segment's near end sits on it.
+    const FOCAL: f32 = 4.0;
+    /// The stroke width in pixels at the focal plane for the energy sweep —
+    /// wide enough that the sharp far end is not under-read by pixel sampling.
+    const WIDE: f32 = 16.0;
+    /// The stroke width the shape test draws, narrow enough that a blur of a
+    /// few pixels is the larger part of the far end's width.
+    const NARROW: f32 = 8.0;
+    /// The largest blur the probe allows, above anything the sweep asks for.
+    const CAP: f32 = 40.0;
+
+    fn view() -> CameraView {
+        Camera3d {
+            yaw: 0.0,
+            pitch: 0.0,
+            distance: FOCAL,
+            fov: 0.8,
+            focus: 0.5,
+            aperture: 0.0,
+        }
+        .view(W as f32 / H as f32, 1.0, [0.0, 0.0])
+    }
+
+    /// One horizontal segment from the focal plane (depth 4) to twice that
+    /// (depth 8), `width` pixels wide at the focal plane and drawn grey at
+    /// `aperture`, as the red channel of the target.
+    fn render(ctx: &RenderContext, aperture: f32, width: f32) -> Vec<f32> {
+        let device = &ctx.device;
+        let mut lines = LineRenderer::new_3d(device, FORMAT, 4, "seg3d-probe");
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("seg3d-probe-target"),
+            size: wgpu::Extent3d {
+                width: W,
+                height: H,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let target = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let bytes_per_row = W * 8;
+        let readback = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("seg3d-probe-readback"),
+            size: u64::from(bytes_per_row * H),
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let segment = Segment3dInstance {
+            a: [-1.5, 0.0, 0.0],
+            b: [1.5, 0.0, -FOCAL],
+            color: [0.25, 0.25, 0.25],
+            width,
+            alpha: 1.0,
+        };
+        let uniform = CameraUniform::new(&view(), W, H, Lens::new(aperture, FOCAL, CAP));
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("seg3d-probe-encoder"),
+        });
+        drop(gpu::color_pass(
+            &mut encoder,
+            "seg3d-probe-clear",
+            &target,
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+        ));
+        lines.draw_3d(
+            &ctx.queue,
+            &mut encoder,
+            &target,
+            &uniform,
+            1.0,
+            0.5,
+            &[segment],
+        );
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &readback,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(bytes_per_row),
+                    rows_per_image: Some(H),
+                },
+            },
+            wgpu::Extent3d {
+                width: W,
+                height: H,
+                depth_or_array_layers: 1,
+            },
+        );
+        ctx.queue.submit([encoder.finish()]);
+        let slice = readback.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |res| {
+            let _ = tx.send(res);
+        });
+        device
+            .poll(wgpu::PollType::Wait {
+                submission_index: None,
+                timeout: Some(std::time::Duration::from_secs(30)),
+            })
+            .expect("poll the probe readback");
+        rx.recv().expect("map callback").expect("map the readback");
+        let data = slice.get_mapped_range().expect("mapped").to_vec();
+        readback.unmap();
+        data.chunks_exact(8)
+            .map(|px| f16_to_f32(u16::from_le_bytes([px[0], px[1]])))
+            .collect()
+    }
+
+    /// An IEEE half to `f32` — enough of it for a readback: normals,
+    /// subnormals and zero. The probe writes no infinities.
+    fn f16_to_f32(h: u16) -> f32 {
+        let sign = if h & 0x8000 != 0 { -1.0 } else { 1.0 };
+        let exp = i32::from((h >> 10) & 0x1f);
+        let frac = f32::from(h & 0x3ff);
+        sign * if exp == 0 {
+            frac * 2f32.powi(-24)
+        } else {
+            (1.0 + frac / 1024.0) * 2f32.powi(exp - 15)
+        }
+    }
+
+    /// The pixel column `t` of the way along the segment on screen, from its
+    /// near end to its far end.
+    fn column_at(t: f32) -> u32 {
+        let v = view();
+        let px = |p: [f32; 3]| {
+            let c = v.clip(p);
+            (c[0] / c[3] * 0.5 + 0.5) * W as f32
+        };
+        let (a, b) = (px([-1.5, 0.0, 0.0]), px([1.5, 0.0, -FOCAL]));
+        (a + (b - a) * t).round() as u32
+    }
+
+    /// One column's cross-section: its peak, its summed light, and its width at
+    /// half the peak, in pixels.
+    fn cross_section(image: &[f32], x: u32) -> (f32, f32, usize) {
+        let column: Vec<f32> = (0..H).map(|y| image[(y * W + x) as usize]).collect();
+        let peak = column.iter().copied().fold(0.0, f32::max);
+        let sum = column.iter().sum();
+        let half = column.iter().filter(|v| **v >= 0.5 * peak).count();
+        (peak, sum, half)
+    }
+
+    fn context() -> Option<RenderContext> {
+        match RenderContext::new_headless(16, 16, true) {
+            Ok(ctx) => Some(ctx),
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                None
+            }
+            Err(e) => panic!("headless context build failed: {e}"),
+        }
+    }
+
+    /// **The width varies along one line**: a segment running from the focal
+    /// plane to twice its depth is wider and softer at its far end than at its
+    /// near one once the aperture opens — where with a pinhole, perspective
+    /// alone makes the far end the *narrower*.
+    #[test]
+    fn a_segment_blurs_along_its_length_away_from_the_focal_plane() {
+        let Some(ctx) = context() else {
+            return;
+        };
+        let (near_x, far_x) = (column_at(0.1), column_at(0.9));
+        let sharp = render(&ctx, 0.0, NARROW);
+        let blurred = render(&ctx, 16.0, NARROW);
+        let (sharp_near, sharp_far) = (cross_section(&sharp, near_x), cross_section(&sharp, far_x));
+        let (near, far) = (
+            cross_section(&blurred, near_x),
+            cross_section(&blurred, far_x),
+        );
+        println!("pinhole near {sharp_near:?} far {sharp_far:?}");
+        println!("aperture 16 near {near:?} far {far:?}");
+        assert!(sharp_far.2 <= sharp_near.2, "perspective thins the far end");
+        assert!(
+            far.2 > near.2,
+            "blurred, the far end is the wider: {near:?} -> {far:?}"
+        );
+        assert!(far.0 < near.0, "and the softer: {near:?} -> {far:?}");
+        assert!(
+            far.2 > sharp_far.2,
+            "the widening is the blur's, not the perspective's"
+        );
+    }
+
+    /// **A blurred line dims as it spreads and keeps its light.** Across a
+    /// sweep of the aperture, the far end's peak falls monotonically while its
+    /// summed cross-section shows no monotone trend (a property, per ADR-0071,
+    /// rather than a tolerance).
+    ///
+    /// The sum is judged over the blurred readings. The pinhole reading is a
+    /// sharp stroke, which keeps the corner-interpolated across-the-stroke
+    /// coordinate the energy factor replaces on a blurred one — that is what
+    /// keeps an aperture of `0` byte-identical to a camera without a lens — and
+    /// pixel sampling reads it a few percent low here.
+    #[test]
+    fn a_widening_aperture_lowers_the_peak_and_keeps_the_energy() {
+        let Some(ctx) = context() else {
+            return;
+        };
+        let far_x = column_at(0.9);
+        let readings: Vec<(f32, (f32, f32, usize))> = (0..=16)
+            .map(|k| {
+                let aperture = 2.0 * k as f32;
+                (
+                    aperture,
+                    cross_section(&render(&ctx, aperture, WIDE), far_x),
+                )
+            })
+            .collect();
+        println!("far cross-section (aperture, (peak, sum, half-width)): {readings:?}");
+        for pair in readings.windows(2) {
+            assert!(
+                pair[1].1.0 < pair[0].1.0,
+                "the peak must fall: {readings:?}"
+            );
+        }
+        let blurred: Vec<f32> = readings
+            .iter()
+            .filter(|(aperture, _)| *aperture > 0.0)
+            .map(|(_, (_, sum, _))| *sum)
+            .collect();
+        let rising = blurred.windows(2).all(|p| p[1] >= p[0]);
+        let falling = blurred.windows(2).all(|p| p[1] <= p[0]);
+        assert!(
+            !rising && !falling,
+            "the summed light trends with the aperture, so the energy is not kept: {blurred:?}"
+        );
+    }
+}

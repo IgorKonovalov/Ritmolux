@@ -1297,6 +1297,8 @@
             "pitch": { "$ref": "#/definitions/param.pitch" },
             "distance": { "$ref": "#/definitions/param.distance" },
             "fov": { "$ref": "#/definitions/param.fov" },
+            "focus": { "$ref": "#/definitions/param.focus" },
+            "aperture": { "$ref": "#/definitions/param.aperture" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "hue_center": { "$ref": "#/definitions/param.hue_center.plexus" },
             "hue_spread": { "$ref": "#/definitions/param.hue_spread.plexus" },
@@ -1853,6 +1855,8 @@
             "pitch": { "$ref": "#/definitions/param.pitch" },
             "distance": { "$ref": "#/definitions/param.distance" },
             "fov": { "$ref": "#/definitions/param.fov" },
+            "focus": { "$ref": "#/definitions/param.focus" },
+            "aperture": { "$ref": "#/definitions/param.aperture" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "hue_center": { "$ref": "#/definitions/param.hue_center.plexus" },
             "hue_spread": { "$ref": "#/definitions/param.hue_spread.plexus" },
@@ -3524,8 +3528,8 @@
     },
     "param.line_width.plexus": {
       "type": "string",
-      "description": "Line width in pixels at the middle of the volume; nearer lines are wider and farther ones thinner.",
-      "markdownDescription": "Line width in pixels at the middle of the volume; nearer lines are wider and farther ones thinner.\n\n- default `1.5`\n- typical range `0.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Line width in pixels at the focal plane; nearer lines are wider and farther ones thinner.",
+      "markdownDescription": "Line width in pixels at the focal plane; nearer lines are wider and farther ones thinner.\n\n- default `1.5`\n- typical range `0.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.drift.plexus": {
       "type": "string",
@@ -3551,6 +3555,16 @@
       "type": "string",
       "description": "The camera's vertical field of view in radians; zoom divides it.",
       "markdownDescription": "The camera's vertical field of view in radians; zoom divides it.\n\n- default `0.8`\n- typical range `0.2` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.focus": {
+      "type": "string",
+      "description": "Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest.",
+      "markdownDescription": "Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.aperture": {
+      "type": "string",
+      "description": "How strongly lines blur away from the focal plane, in pixels; 0 keeps every line sharp, and wider costs fill.",
+      "markdownDescription": "How strongly lines blur away from the focal plane, in pixels; 0 keeps every line sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `40.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.hue_center.plexus": {
       "type": "string",

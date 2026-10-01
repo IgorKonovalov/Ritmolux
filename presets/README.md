@@ -995,12 +995,14 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 |---|---|---|---|---|
 | `link_distance` | `0.35` | `0.05` – `1` | How close two points must be to be joined, in the layout's own units; the cube is 2 across. | shape, main |
 | `link_alpha` | `0.7` | `0` – `1` | How strongly a link at its closest is drawn; a link always fades to nothing at link_distance. | shape |
-| `line_width` | `1.5` | `0.5` – `8` | Line width in pixels at the middle of the volume; nearer lines are wider and farther ones thinner. | shape, main |
+| `line_width` | `1.5` | `0.5` – `8` | Line width in pixels at the focal plane; nearer lines are wider and farther ones thinner. | shape, main |
 | `drift` | `0.15` | `0` – `1` | How fast the points drift on their flow; 0 holds the network still. | motion, main |
 | `yaw` | `0` | `-3.1415927` – `3.1415927` | Turns the camera around the network, in radians; bind it to a slow clock to orbit. | motion |
 | `pitch` | `0.25` | `-1.55` – `1.55` | Raises the camera above the network, in radians; negative looks up from below. | motion |
 | `distance` | `3.5` | `1.5` – `8` | How far the camera sits from the network's centre; nearer exaggerates the perspective. | motion |
 | `fov` | `0.8` | `0.2` – `2` | The camera's vertical field of view in radians; zoom divides it. | motion |
+| `focus` | `0.5` | `0` – `1` | Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest. | light, main |
+| `aperture` | `0` | `0` – `40` | How strongly lines blur away from the focal plane, in pixels; 0 keeps every line sharp, and wider costs fill. | light, main |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
 | `hue_center` | `0.5` | `0` – `1` | Where along the palette the middle of the volume's depth is coloured. | colour |
 | `hue_spread` | `0.5` | `0` – `1` | How far along the palette the colour travels from the nearest part of the volume to the farthest. | colour |

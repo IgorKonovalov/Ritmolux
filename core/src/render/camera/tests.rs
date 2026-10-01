@@ -2,7 +2,7 @@
 // hot-path pragma — this is not the render path.
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
-use super::{CAMERA_WGSL, Camera3d, CameraUniform, CameraView, NEAR};
+use super::{CAMERA_WGSL, Camera3d, CameraUniform, CameraView, Lens, NEAR};
 use crate::render::RenderError;
 use crate::render::context::RenderContext;
 
@@ -14,6 +14,8 @@ fn level(fov: f32) -> Camera3d {
         pitch: 0.0,
         distance: 4.0,
         fov,
+        focus: 0.5,
+        aperture: 0.0,
     }
 }
 
@@ -49,6 +51,8 @@ fn mirror_views() -> [CameraView; 3] {
             pitch: 0.35,
             distance: 3.5,
             fov: 0.8,
+            focus: 0.5,
+            aperture: 0.0,
         }
         .view(1.6, 1.3, [0.12, -0.07]),
         Camera3d {
@@ -56,6 +60,8 @@ fn mirror_views() -> [CameraView; 3] {
             pitch: -1.2,
             distance: 6.0,
             fov: 1.4,
+            focus: 0.5,
+            aperture: 0.0,
         }
         .view(0.75, 0.6, [0.0, 0.2]),
         level(0.9).view(16.0 / 9.0, 1.0, [0.0, 0.0]),
@@ -82,7 +88,12 @@ fn the_wgsl_projection_is_the_cpu_projection() {
         Err(e) => panic!("headless context build failed: {e}"),
     };
     for (v, view) in mirror_views().iter().enumerate() {
-        let gpu = project_on_gpu(&ctx, view, &MIRROR_POINTS);
+        let uniform = CameraUniform::new(view, 1920, 1080, Lens::new(12.0, 4.0, 20.0));
+        let inputs: Vec<[f32; 4]> = MIRROR_POINTS
+            .iter()
+            .map(|p| [p[0], p[1], p[2], 1.0])
+            .collect();
+        let gpu = eval_on_gpu(&ctx, &uniform, &inputs, "project(cam, input[i].xyz)");
         for (p, (point, got)) in MIRROR_POINTS.iter().zip(&gpu).enumerate() {
             let want = view.clip(*point);
             for axis in 0..4 {
@@ -98,20 +109,74 @@ fn the_wgsl_projection_is_the_cpu_projection() {
     }
 }
 
-/// `project()` from [`CAMERA_WGSL`], evaluated on the GPU for each point.
-fn project_on_gpu(ctx: &RenderContext, view: &CameraView, points: &[[f32; 3]]) -> Vec<[f32; 4]> {
+/// **The WGSL `coc()` and [`Lens::coc`] agree**, and neither ever exceeds the
+/// tier's cap — at any aperture, including absurd ones, and at any depth in
+/// front of the eye.
+///
+/// Needs a GPU adapter, so it skips on a runner without one (ADR-0016).
+#[test]
+fn the_circle_of_confusion_is_mirrored_and_never_exceeds_its_cap() {
+    let ctx = match RenderContext::new_headless(16, 16, true) {
+        Ok(ctx) => ctx,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless context build failed: {e}"),
+    };
+    let view = level(0.8).view(1.6, 1.0, [0.0, 0.0]);
+    let depths: Vec<f32> = (0..64).map(|k| NEAR + k as f32 * 0.25).collect();
+    let inputs: Vec<[f32; 4]> = depths.iter().map(|d| [*d, 0.0, 0.0, 0.0]).collect();
+    for aperture in [0.0, 1.0, 12.0, 40.0, 1.0e6] {
+        for focal in [NEAR, 1.0, 4.0, 9.0] {
+            let lens = Lens::new(aperture, focal, 12.0);
+            let uniform = CameraUniform::new(&view, 1920, 1080, lens);
+            let gpu = eval_on_gpu(&ctx, &uniform, &inputs, "vec4<f32>(coc(cam, input[i].x))");
+            for (depth, got) in depths.iter().zip(&gpu) {
+                let want = lens.coc(*depth);
+                assert!(
+                    (got[0] - want).abs() <= 1e-4 * want.max(1.0),
+                    "aperture {aperture}, focus {focal}, depth {depth}: WGSL {} vs CPU {want}",
+                    got[0]
+                );
+                assert!(
+                    want <= 12.0 && got[0] <= 12.0,
+                    "past the cap: {want} / {}",
+                    got[0]
+                );
+                assert!(want >= 0.0, "a negative circle at depth {depth}");
+            }
+            if aperture == 0.0 {
+                assert!(gpu.iter().all(|c| c[0] == 0.0), "a pinhole blurs nothing");
+            }
+        }
+    }
+    // Exactly sharp at the focal plane, whatever the aperture.
+    assert_eq!(Lens::new(30.0, 4.0, 12.0).coc(4.0), 0.0);
+}
+
+/// `expr`, a WGSL expression of `cam` and `input[i]` evaluating to a `vec4`,
+/// run on the GPU once per input with [`CAMERA_WGSL`] prepended exactly as a
+/// pipeline prepends it.
+fn eval_on_gpu(
+    ctx: &RenderContext,
+    uniform: &CameraUniform,
+    points: &[[f32; 4]],
+    expr: &str,
+) -> Vec<[f32; 4]> {
     use wgpu::util::DeviceExt;
 
     let device = &ctx.device;
     let source = format!(
         "{CAMERA_WGSL}
 @group(0) @binding(0) var<uniform> cam: Camera;
-@group(0) @binding(1) var<storage, read> points: array<vec4<f32>>;
+@group(0) @binding(1) var<storage, read> input: array<vec4<f32>>;
 @group(0) @binding(2) var<storage, read_write> projected: array<vec4<f32>>;
 
 @compute @workgroup_size(1)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {{
-    projected[id.x] = project(cam, points[id.x].xyz);
+    let i = id.x;
+    projected[i] = {expr};
 }}
 "
     );
@@ -119,19 +184,17 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {{
         label: Some("camera-mirror-shader"),
         source: wgpu::ShaderSource::Wgsl(source.into()),
     });
-    let uniform = CameraUniform::new(view, 1920, 1080, 4.0);
     let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("camera-mirror-uniform"),
-        contents: bytemuck::bytes_of(&uniform),
+        contents: bytemuck::bytes_of(uniform),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    let padded: Vec<[f32; 4]> = points.iter().map(|p| [p[0], p[1], p[2], 1.0]).collect();
     let points_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("camera-mirror-points"),
-        contents: bytemuck::cast_slice(&padded),
+        contents: bytemuck::cast_slice(points),
         usage: wgpu::BufferUsages::STORAGE,
     });
-    let bytes = (points.len() * std::mem::size_of::<[f32; 4]>()) as u64;
+    let bytes = std::mem::size_of_val(points) as u64;
     let out_buf = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("camera-mirror-out"),
         size: bytes,
@@ -259,6 +322,8 @@ fn the_orbit_target_projects_to_the_target_centre_at_every_aspect() {
                 pitch: -0.4,
                 distance: 2.5,
                 fov: 1.2,
+                focus: 0.5,
+                aperture: 0.0,
             },
         ] {
             let [x, y] = ndc(&cam.view(aspect, 1.0, [0.0, 0.0]), [0.0, 0.0, 0.0]);
@@ -379,6 +444,8 @@ fn a_non_finite_camera_still_projects() {
         pitch: f32::INFINITY,
         distance: f32::NAN,
         fov: f32::NEG_INFINITY,
+        focus: f32::NAN,
+        aperture: f32::NAN,
     };
     let view = cam.view(f32::NAN, f32::NAN, [f32::NAN, 0.0]);
     for column in view.view_proj {

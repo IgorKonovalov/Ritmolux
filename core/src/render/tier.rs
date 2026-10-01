@@ -683,6 +683,15 @@ pub struct TierConfig {
     /// A preset whose link distance reaches past this has its graph truncated
     /// in index order.
     pub plexus_edges: u32,
+
+    /// The largest circle of confusion a 3D primitive is blurred by, as a
+    /// radius in pixels (ADR-0257).
+    ///
+    /// A blurred stroke costs fill in proportion to how far it is widened, so
+    /// this is the lever that keeps a wide-open aperture inside the frame
+    /// budget: past it a line stops spreading, and an operator on a lower tier
+    /// sees a shallower blur rather than a slower frame.
+    pub max_coc_px: u32,
 }
 
 impl TierConfig {
@@ -706,6 +715,7 @@ impl TierConfig {
         cellular_grid: 512,
         plexus_points: 600,
         plexus_edges: 6_000,
+        max_coc_px: 12,
     };
 
     /// The midrange-discrete tier.
@@ -735,6 +745,7 @@ impl TierConfig {
         cellular_grid: 1024,
         plexus_points: 1_500,
         plexus_edges: 20_000,
+        max_coc_px: 24,
     };
 
     /// The config for `tier`.

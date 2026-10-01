@@ -717,12 +717,46 @@ fn seg3d_shader_source() -> String {
 /// the same ratio**, so a stroke too thin to rasterize fades rather than
 /// breaking into a dotted line, and keeps the light it would have had.
 ///
+/// # Depth of field, per endpoint (ADR-0257)
+///
+/// Each end takes the camera's circle of confusion at its own depth, `coc`, and
+/// its half-width grows from `w` to `w + coc`. Its edge softness widens with
+/// it, from the stroke's own `s0` toward `1` by `coc / (w + coc)`, so a blurred
+/// end has no hard edge. Both are interpolated along the quad, so one line is
+/// sharp where it crosses the focal plane and soft at either end.
+///
+/// **The light is divided down so the stroke's integrated cross-section keeps
+/// its energy.** The profile integrates across a half-width `h` to
+/// `h * (1 - 2s/3)` — a solid core of `1 - s` plus a quadratic ramp worth
+/// `s / 3` — so each fragment's light is scaled by
+///
+/// ```text
+/// w * (1 - 2 s0 / 3)  /  ((w + coc) * (1 - 2 s / 3))
+/// ```
+///
+/// from the interpolated sharp half-width `w`, blurred half-width `w + coc` and
+/// softness `s`. It is evaluated per fragment rather than at the two ends and
+/// interpolated: the energy is a product of interpolated quantities, and a
+/// linear blend of the end factors overshoots it everywhere between them.
+///
+/// **A blurred stroke reads its across-the-stroke coordinate exactly.** A
+/// trapezoid is drawn as two triangles, and the corner coordinate `side`
+/// interpolated affinely over each of them bends wherever the two ends'
+/// widths differ — which a blurred end makes them do by a factor of several.
+/// The perpendicular pixel offset is affine over the whole quad, and so is the
+/// half-width along it, so their ratio is the true coordinate at every
+/// fragment.
+///
+/// A sharp stroke skips both the factor and the exact coordinate on a flat
+/// flag, so an aperture of `0` draws the bytes a pinhole camera drew.
+///
 /// The position leaves the vertex shader already divided (`w = 1`). The quad is
 /// a screen-space shape, and interpolating its varyings perspective-correctly
 /// against the endpoints' depths would bend the across-the-stroke coordinate.
 const SEG3D_SHADER: &str = r#"
 struct Stroke {
-    // x: glow multiplier, y: softness (ADR-0124), zw: unused
+    // x: glow multiplier, y: softness (ADR-0124), zw: unused. The vertex
+    // stage reads the softness too, to widen it toward a blurred end.
     v: vec4<f32>,
 }
 
@@ -734,6 +768,22 @@ struct Seg3dOut {
     @location(0) side: f32,
     @location(1) color: vec3<f32>,
     @location(2) alpha: f32,
+    // The edge softness, widened by the circle of confusion toward each end.
+    @location(3) soft: f32,
+    // The half-width the stroke would have with no blur, and the blurred one,
+    // in pixels - the two sides of the energy ratio.
+    @location(5) sharp_hw: f32,
+    @location(6) wide_hw: f32,
+    // The fragment's perpendicular offset from the centreline, in pixels.
+    @location(7) offset: f32,
+    // 1 when either end is blurred, 0 otherwise. Flat, so a sharp stroke reads
+    // the uniform softness itself rather than an interpolation of copies of it.
+    @location(4) @interpolate(flat) blurred: f32,
+}
+
+// The profile's integral across a unit half-width at softness `s`.
+fn profile_mass(s: f32) -> f32 {
+    return 1.0 - 2.0 * clamp(s, 0.0, 1.0) / 3.0;
 }
 
 // Half a pixel: the narrowest half-width a stroke is rasterized at.
@@ -762,8 +812,21 @@ fn vs_main(
 
     let hw_a = at_depth(cam, 0.5 * width, ca.w);
     let hw_b = at_depth(cam, 0.5 * width, cb.w);
-    let hw_true = mix(hw_a, hw_b, c.x);
+    let coc_a = coc(cam, ca.w);
+    let coc_b = coc(cam, cb.w);
+    let s0 = stroke.v.y;
+
+    // The blurred half-width at each end, and `c.x` is exactly 0 or 1 at every
+    // corner, so `mix` picks one end exactly.
+    let hw_true = mix(hw_a + coc_a, hw_b + coc_b, c.x);
     let hw = max(hw_true, MIN_HALF_PX);
+
+    // Each end's softness, widened toward 1 by its share of blur. Guarded
+    // against a zero width, where there is no stroke to soften.
+    let wide_a = hw_a + coc_a;
+    let wide_b = hw_b + coc_b;
+    let soft_a = mix(s0, 1.0, select(0.0, coc_a / wide_a, wide_a > 0.0));
+    let soft_b = mix(s0, 1.0, select(0.0, coc_b / wide_b, wide_b > 0.0));
 
     var dir = sb - sa;
     let len = length(dir);
@@ -780,6 +843,11 @@ fn vs_main(
     out.side = c.y;
     out.color = color * (hw_true / hw);
     out.alpha = alpha;
+    out.soft = mix(soft_a, soft_b, c.x);
+    out.sharp_hw = mix(hw_a, hw_b, c.x);
+    out.wide_hw = hw_true;
+    out.offset = c.y * hw;
+    out.blurred = select(0.0, 1.0, max(coc_a, coc_b) > 0.0);
     return out;
 }
 
@@ -787,10 +855,20 @@ fn vs_main(
 fn fs_main(in: Seg3dOut) -> @location(0) vec4<f32> {
     // The shared profile, read off `side` rather than `|side|` for the reason
     // the 2D fragment gives.
-    let inward = max(0.0, 1.0 - abs(in.side));
-    let g = stroke_coverage(inward, fwidth(in.side), stroke.v.y) * in.alpha;
+    let blurred = in.blurred > 0.5;
+    let side = select(in.side, in.offset / max(in.wide_hw, 1e-6), blurred);
+    let inward = max(0.0, 1.0 - abs(side));
+    let soft = select(stroke.v.y, in.soft, blurred);
+    let g = stroke_coverage(inward, fwidth(side), soft) * in.alpha;
+    // The energy ratio, exactly 1 for a sharp stroke.
+    let spread = in.wide_hw * profile_mass(soft);
+    let keep = select(
+        1.0,
+        (in.sharp_hw * profile_mass(stroke.v.y)) / spread,
+        blurred && spread > 0.0,
+    );
     // Premultiplied (ADR-0056): the glow scales the light, not the coverage.
-    return vec4<f32>(in.color * g * stroke.v.x, g);
+    return vec4<f32>(in.color * g * stroke.v.x * keep, g);
 }
 "#;
 
@@ -841,8 +919,9 @@ impl Seg3d {
             &format!("{label}-seg3d-stroke"),
             std::mem::size_of::<Stroke3dUniform>(),
         );
-        // A shape of its own — two uniforms, split by stage, each with a size
-        // — so no other live layout matches it (ADR-0058).
+        // A shape of its own — two sized uniforms, the camera for the vertex
+        // stage and the stroke for both — so no other live layout matches it
+        // (ADR-0058).
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some(&format!("{label}-seg3d-bind-layout")),
             entries: &[
@@ -860,7 +939,7 @@ impl Seg3d {
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,

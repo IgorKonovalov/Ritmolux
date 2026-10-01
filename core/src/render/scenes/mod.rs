@@ -1252,6 +1252,7 @@ fn create(
             surface_format,
             tier.plexus_points as usize,
             tier.plexus_edges as usize,
+            tier.max_coc_px as f32,
         )),
     }
 }

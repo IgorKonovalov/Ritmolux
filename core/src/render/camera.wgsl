@@ -13,8 +13,11 @@ struct Camera {
     // after the projection, so it moves the picture and not the eye.
     view_proj: mat4x4<f32>,
     // x: render-target width in pixels, y: its height, z: the reference depth
-    // a pixel width is stated at, w: unused.
+    // a pixel width is stated at - the focal plane - w: unused.
     viewport: vec4<f32>,
+    // x: aperture in pixels, y: the focal depth, z: the largest circle of
+    // confusion the tier draws, in pixels, w: unused.
+    lens: vec4<f32>,
 }
 
 // A world point to clip space. `w` is the view depth; the caller guarantees it
@@ -34,6 +37,14 @@ fn clip_to_px(cam: Camera, clip: vec4<f32>) -> vec2<f32> {
 // Pixels from the target's centre back to normalized device coordinates.
 fn px_to_ndc(cam: Camera, px: vec2<f32>) -> vec2<f32> {
     return px / (0.5 * cam.viewport.xy);
+}
+
+// The thin-lens circle of confusion at view depth `depth`, as a radius in
+// pixels: `aperture * |depth - focus| / depth`, clamped to the tier's cap.
+// Exactly 0 at aperture 0, and at the focal depth whatever the aperture.
+fn coc(cam: Camera, depth: f32) -> f32 {
+    let blur = cam.lens.x * abs(depth - cam.lens.y) / depth;
+    return clamp(blur, 0.0, cam.lens.z);
 }
 
 // A length stated in pixels at the reference depth, carried to `depth` by

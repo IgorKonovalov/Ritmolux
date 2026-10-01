@@ -285,8 +285,8 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton | dev | done | committed with this row |
-| 2 — Depth of field on segments | dev | not started | |
+| 1 — Walking skeleton | dev | done | 8b3a6d41 |
+| 2 — Depth of field on segments | dev | done | committed with this row |
 | 3 — Nodes: the 3D quad pipeline | dev | not started | |
 | 4 — The sheet layout | dev | not started | |
 | 5 — The attractor takes the shared CoC | dev | not started | |
@@ -313,6 +313,16 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
   Phase 3); points carry a face fade so a wrap at the cube's faces never pops an edge.
 - Phase 1, the `plexus_points` / `plexus_edges` tier values are provisional arithmetic; Phase 6
   measures them. The tier clamp is silent until Phase 6 announces it.
+- Phase 2, energy: besides `w / (w + coc)` the factor divides by the profile's own integral at the
+  widened softness, and it is evaluated per fragment from interpolated sharp and blurred
+  half-widths; a blurred stroke also reads its across-the-stroke coordinate as offset over
+  half-width rather than the corner-interpolated one. The 2D renderer is untouched.
+- Phase 2, the energy sweep judges the summed light over the blurred readings (aperture 2..32):
+  the pinhole reading keeps Phase 1's interpolated coordinate (byte identity) and reads about 7 %
+  under them at the probe's far column. `aperture = 0` byte identity was checked against Phase 1's
+  `plexus.png` on llvmpipe: max outlier 0.
+- Phase 2, `max_coc_px` is a `u32` (the tier struct derives `Eq`), provisional 12 / 24; Phase 6
+  measures it.
 
 ### Close triggers
 

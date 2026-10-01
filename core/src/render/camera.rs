@@ -20,6 +20,15 @@
 //! no 3D pipeline has a depth attachment, because additive light needs no
 //! occlusion (ADR-0044).
 //!
+//! # Depth of field is per primitive, not per pixel
+//!
+//! [`Lens::coc`] is the thin-lens circle of confusion at a view depth,
+//! `aperture * |depth - focus| / depth`, in pixels and clamped to the tier's
+//! cap. A pipeline evaluates it at each endpoint of what it draws and widens the
+//! primitive by it, so one line can be sharp at the focal plane and soft at both
+//! ends (ADR-0257). The additive scenes this serves have no single depth per
+//! pixel for a post-process blur to read.
+//!
 //! # The framing controls keep their meaning
 //!
 //! The aspect is the **render target's**, handed in by the caller, never an
@@ -74,6 +83,13 @@ pub struct Camera3d {
     pub distance: f32,
     /// The vertical field of view, in radians, before `zoom` divides it.
     pub fov: f32,
+    /// Where the focal plane sits in the scene's volume: `0` at its nearest
+    /// extent, `1` at its farthest. Normalized so an author never deals in world
+    /// units; [`CameraView::focal_depth`] resolves it against the volume.
+    pub focus: f32,
+    /// The lens's aperture, as the circle of confusion in pixels a point would
+    /// have at infinite depth. `0` is a pinhole and blurs nothing.
+    pub aperture: f32,
 }
 
 impl Camera3d {
@@ -174,6 +190,20 @@ impl CameraView {
         out
     }
 
+    /// The view depth of the focal plane, for a volume of bounding radius
+    /// `radius` about the orbit target and a normalized `focus`: `0` the
+    /// volume's nearest extent, `1` its farthest. Never nearer than [`NEAR`].
+    ///
+    /// Written as `near + focus * (far - near)` and not as
+    /// `near + 2 * focus * radius`: the two differ in the last bit, and a
+    /// reference depth that moves by a bit moves every stroke width with it.
+    pub fn focal_depth(&self, focus: f32, radius: f32) -> f32 {
+        let near = self.distance - radius;
+        let far = self.distance + radius;
+        let focus = if focus.is_finite() { focus } else { 0.5 };
+        (near + focus * (far - near)).max(NEAR)
+    }
+
     /// The view depth of `p`: its distance in front of the eye along the view
     /// axis. Negative behind the eye.
     pub fn depth(&self, p: [f32; 3]) -> f32 {
@@ -220,6 +250,37 @@ impl CameraView {
     }
 }
 
+/// A lens: the CPU half of `coc()` in [`CAMERA_WGSL`], with its inputs made
+/// safe once.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Lens {
+    /// Aperture in pixels, finite and non-negative.
+    pub aperture: f32,
+    /// The focal plane's view depth.
+    pub focal_depth: f32,
+    /// The largest circle of confusion drawn, in pixels — the tier's cap.
+    pub max_coc: f32,
+}
+
+impl Lens {
+    /// A lens with `aperture` and `max_coc` held finite and non-negative.
+    pub fn new(aperture: f32, focal_depth: f32, max_coc: f32) -> Self {
+        let safe = |v: f32| if v.is_finite() { v.max(0.0) } else { 0.0 };
+        Self {
+            aperture: safe(aperture),
+            focal_depth: focal_depth.max(NEAR),
+            max_coc: safe(max_coc),
+        }
+    }
+
+    /// The circle of confusion at view depth `depth`, as a radius in pixels.
+    /// **Mirrors `coc()` in [`CAMERA_WGSL`]**, term for term.
+    pub fn coc(&self, depth: f32) -> f32 {
+        let blur = self.aperture * (depth - self.focal_depth).abs() / depth;
+        blur.clamp(0.0, self.max_coc)
+    }
+}
+
 /// The `Camera` uniform [`CAMERA_WGSL`] declares, as it is uploaded.
 ///
 /// **Field order is the WGSL struct's**, and both are `vec4`-aligned, so the
@@ -231,20 +292,23 @@ pub struct CameraUniform {
     pub view_proj: [[f32; 4]; 4],
     /// `[target width px, target height px, reference depth, unused]`.
     pub viewport: [f32; 4],
+    /// `[aperture px, focal depth, max circle of confusion px, unused]`.
+    pub lens: [f32; 4],
 }
 
 impl CameraUniform {
-    /// The uniform for `view` on a `width` x `height` target, with pixel widths
-    /// stated at `reference_depth`.
-    pub fn new(view: &CameraView, width: u32, height: u32, reference_depth: f32) -> Self {
+    /// The uniform for `view` on a `width` x `height` target through `lens`,
+    /// with pixel widths stated at the lens's focal plane.
+    pub fn new(view: &CameraView, width: u32, height: u32, lens: Lens) -> Self {
         Self {
             view_proj: view.view_proj,
             viewport: [
                 width.max(1) as f32,
                 height.max(1) as f32,
-                reference_depth.max(NEAR),
+                lens.focal_depth,
                 0.0,
             ],
+            lens: [lens.aperture, lens.focal_depth, lens.max_coc, 0.0],
         }
     }
 }
