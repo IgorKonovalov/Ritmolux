@@ -430,13 +430,17 @@ fn the_corpus_holds_to_the_engine_and_to_the_house_style() {
     }
 
     // A walk that stopped reading the tree would otherwise pass by finding
-    // nothing, which is the one way a corpus gate fails quietly. The floor sits
-    // near half the corpus (99 files at Plan 0232 Phase 4), so a curation that
-    // retires presets does not trip it and a walk that reads one directory does.
+    // nothing, which is the one way a corpus gate fails quietly. The walk reads
+    // `presets/` plus `pending/` and `proposed/`, and the embedded set is
+    // exactly `presets/`, so `EMBEDDED.len()` is a floor that follows every
+    // curation: a cull lowers it, and a walk that skips the top directory
+    // falls under it.
+    let embedded = rlx_core::preset::EMBEDDED.len();
     assert!(
-        checked >= 50,
-        "the corpus walk found only {checked} files, which means it stopped \
-         reading the tree rather than that the library shrank"
+        checked >= embedded,
+        "the corpus walk found only {checked} files against {embedded} embedded \
+         presets, which means it stopped reading the tree rather than that the \
+         library shrank"
     );
 
     // Printed, never asserted: `pending/` is where a warning is allowed to

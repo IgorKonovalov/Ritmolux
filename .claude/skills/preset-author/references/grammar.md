@@ -101,8 +101,8 @@ negative outside a `select`) becomes broken geometry, not an error. You clamp; t
   (no interlace — a rings-only composition); `contact_angle_deg` finite (default 30). `rings` is a
   list of `{ motif, count, radius, … }` entries that fill the rosette's interior with concentric rings
   of repeated motifs (ADR-0079); `tiling = "none"` with no `rings` is a load error, since there would
-  be no figure. The motif roster is closed. Shipped examples: `star_corona` (rings only) and
-  `star_rosewindow` (interlace only).
+  be no figure. The motif roster is closed. Shipped examples: `star_corona` (rings only), `star_rosewindow` (interlace only) and
+  `star_redpaper` (rings plus an interlace).
 - **`[particles]`** — `attractor` only. `family` is a map family (`de_jong|clifford|thomas|lorenz`,
   default `de_jong`) **or** an IFS figure from the same namespace (`fern|tree|dragon|sierpinski|spiral`).
 - **`[path]`** — `shape_field` only, and the one structural table carrying **geometry**. `d` is

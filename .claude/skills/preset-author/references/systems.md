@@ -141,8 +141,8 @@ same radius and there is no range to walk — `[palette]` itself works. (2) A ba
 interior empty: the strokes live in an outer annulus. **`rings` is the answer to both** — it puts
 segments at several radii, so the ramp spans the combined figure and the interior fills. On a
 composite (rings *plus* a tiling) the interlace sits at one end of the ramp and the ornament spreads
-along the rest. Shipped: `star_corona` (rings only); no shipped world is a composite since Zellij (rings plus an
-8-fold interlace) was retired. **Animate a mandala on `ring_spread` / `ring_scale`, not spin
+along the rest. Shipped: `star_corona` (rings only); `star_rosewindow` and `star_interlace` (interlace only);
+`star_redpaper` (rings plus an 8-fold interlace, tiled edge to edge by `kaleido_tile`). **Animate a mandala on `ring_spread` / `ring_scale`, not spin
 alone** — a many-fold ring figure turned by any angle lands almost on itself, so rotation reads as
 frozen to the `animation` gate and, at a distance, to the eye; spend `ring_phase` on the
 counter-rotation as ornament.
