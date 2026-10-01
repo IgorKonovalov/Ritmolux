@@ -69,7 +69,7 @@ stops = [
 # at bass 0.6 / mid 0.45 took coverage from 0.5647 to 0.0002 and peak/mean from
 # 6.7 to 4608 - the whole population converged onto the field's attracting
 # streamlines, then onto points on them, and the frame went empty. The then-shipped
-# `swarm_drift` (since retired), run identically as a control, held coverage 0.910
+# Drift (since retired), run identically as a control, held coverage 0.910
 # to 0.948, so the collapse was this world's and not the family's. What separated
 # them is that Drift's two structural params both TRAVELLED: its field breathed and its
 # `spin` crossed zero and reversed. A high `field_freq` converges faster than a

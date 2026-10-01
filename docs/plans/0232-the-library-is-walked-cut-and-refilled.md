@@ -435,7 +435,8 @@ the set after the cull and the retunes: 81 presets on 14 systems. `fragment_fiel
 thin families. The second is the verdict the walk and the retunes returned most often: "boring",
 with the fixes that worked making a look bolder, faster or more graphic, never softer. The third
 is what the owner asked for by name at the retunes: crisp thick lines, black-white-red, and no
-kaleidoscope rotation.
+kaleidoscope rotation. (The count is dated 2026-09-30: the `plexus` merge and Phase 6 since took
+the set to 90 presets on 15 systems.)
 
 | # | system | the look | why the set needs it | route |
 |---|---|---|---|---|
@@ -620,16 +621,19 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 ### Close triggers
 
 - **`presets/` touched:** yes — Phase 6 added four (`star_interlace`, `star_redpaper`,
-  `shape_target`, `lsystem_thicket`); earlier phases deleted 30 presets (116 -> 86), `representative = true` added to 11
-  survivors, header comments edited on 13 survivors, `presets/README.md` and
-  `presets/pending/README.md` edited.
+  `shape_target`, `lsystem_thicket`); earlier phases deleted 35 presets (30 at Phase 3, 5 at
+  Phase 4), and the main merge brought in five `plexus` presets, so 116 -> 90;
+  `representative = true` added to 11 survivors, header comments edited on 13 survivors,
+  `presets/README.md` and `presets/pending/README.md` edited.
 - **Plan header `Closes:`** none (takes backlog 0256 step 2)
-- **What shipped:** content removal plus test and documentation re-pointing; two sanity coverage
-  floors re-derived and one schema-walk guard re-bounded. No engine behaviour changed.
-- **Operator docs touched:** `docs/preset-guide.md` (four gallery pictures re-rendered),
-  `docs/capturing.md`, `docs/preset-palettes.md`, `docs/content-brief.md`, `presets/README.md`,
-  `presets/pending/README.md`; images under `docs/images/gallery/` (four re-rendered, 30 cards
-  deleted).
+- **What shipped:** content removal plus test and documentation re-pointing, and four new presets
+  (Phase 6's refill cohort); three sanity coverage floors re-derived, one schema-walk guard
+  re-bounded and one corpus-walk floor lowered. No engine behaviour changed.
+- **Operator docs touched:** `docs/preset-guide.md` (gallery pictures re-rendered),
+  `docs/capturing.md`, `docs/preset-palettes.md`, `docs/presets.md`, `docs/content-brief.md`,
+  `presets/README.md`, `presets/pending/README.md`; images under `docs/images/gallery/` (family
+  gallery pictures and retuned cards re-rendered, the cut presets' cards deleted, four new cards)
+  and `docs/images/hero.png`.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 50 reductions hold across
   24 live entries (4 unprobeable).
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
