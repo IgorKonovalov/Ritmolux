@@ -273,10 +273,11 @@ const CARDS = [
   "fragment_tunnel",
   "fragment_vitrail",
   "fragment_whorl",
-  // lsystem (3)
+  // lsystem (4)
   "lsystem_icecrystal",
   "lsystem_rime",
   "lsystem_sumimono",
+  "lsystem_thicket",
   // parametric_curve (12)
   "curve_blueprint",
   "curve_broadside",
@@ -306,19 +307,22 @@ const CARDS = [
   "collage_mono",
   "collage_onwhite",
   "collage_suprematist",
-  // shape_field (5)
+  // shape_field (6)
   "shape_aperture",
   "shape_contourmono",
   "shape_maple",
   "shape_ringmono",
   "shape_strataheart",
+  "shape_target",
   // spectrum (4)
   "spectrum_anemone",
   "spectrum_metermono",
   "spectrum_radialbloom",
   "spectrum_skyline",
-  // star_pattern (2)
+  // star_pattern (4)
   "star_corona",
+  "star_interlace",
+  "star_redpaper",
   "star_rosewindow",
   // swarm (2)
   "swarm_braid",

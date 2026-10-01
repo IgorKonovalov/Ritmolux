@@ -509,7 +509,7 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 | 3 — The cull | dev | done | `bcdd5892` (last of the family commits listed in Notes) |
 | 4 — The retunes and the sittings | human | done | many, one per family: see Notes |
 | 5 — The gap brief | human | done | 2619581b |
-| 6 — The first refill cohort | human | not started | |
+| 6 — The first refill cohort | human | done | committed with this row |
 | 7 — The verdict | human | not started | |
 
 ### Notes
@@ -595,9 +595,32 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
   moved). The full `cargo nextest run --workspace` the done-when names was not run here; the
   conductor's pre-review gate runs it.
 
+- **Phase 6, 2026-10-01** (an agent session in the `preset-author` lane, judged by the owner in the
+  running app). Main was merged into the lane first (`604e306d`). The conflicts were two comment-only
+  overlay edits, where main's version was taken, and the `CARDS` list, which keeps main's `plexus`
+  cards and drops `reaction_etching`, a preset Phase 3 cut. That merge brought main's five `plexus`
+  presets into a set the walk never saw, so the 81-presets-on-14-systems count in `## Gaps` predates
+  them.
+  - **The cohort is four presets on three systems**: Interlace and Red Paper (gap 5,
+    `star_pattern`), Target (gap 6, `shape_field`) and Thicket (gap 7, `lsystem`). A first pass of
+    four drafts (`50e58a33`) was binned by the owner as a set. A second pass of nine variants, three
+    per gap, was judged the same way, cycled in a fixed order, and these four were kept.
+  - **Gap 5 departs from its row's wording.** A `star_pattern` draws one rosette at the frame's
+    centre, so an edge-to-edge wall needs `kaleido_tile`. It mirrors frame-shaped cells, so a round
+    figure leaves seams at the cell walls. The owner judged two fixes, one fitting each figure inside
+    its cell and one dropping the tiling, and kept the seamed originals.
+  - **Two keeps were retuned for the gates after the owner's verdict, and the owner re-judged both.**
+    At its first cut Target was a sanity blot on the loud frame, because the bass swelled the disc
+    into one flat band. Its scale punch is now capped. Thicket changed only on beats and was frozen
+    on both animation readings, so it now sways and its line swells with the bass.
+  - Gallery cards rendered for all four. `cargo nextest run --workspace`: 1934 passed, 8 skipped.
+    The distinctness gate passes for every family, so no new near-duplicate flag. The binned drafts
+    left `presets/proposed/`, and `ROSTER.md` records the verdicts.
+
 ### Close triggers
 
-- **`presets/` touched:** yes — 30 presets deleted (116 -> 86), `representative = true` added to 11
+- **`presets/` touched:** yes — Phase 6 added four (`star_interlace`, `star_redpaper`,
+  `shape_target`, `lsystem_thicket`); earlier phases deleted 30 presets (116 -> 86), `representative = true` added to 11
   survivors, header comments edited on 13 survivors, `presets/README.md` and
   `presets/pending/README.md` edited.
 - **Plan header `Closes:`** none (takes backlog 0256 step 2)
@@ -610,7 +633,7 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 50 reductions hold across
   24 live entries (4 unprobeable).
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
-- **Outstanding `human` phases:** 4, 5, 6, 7 (7 is `Blocks merge: no`).
+- **Outstanding `human` phases:** 7 (`Blocks merge: no`).
 
 ## Followups (after this lands)
 

@@ -7,10 +7,20 @@ going for, so a verdict is a comparison rather than a general impression.
 
 | preset | system / family | pass | what to look at |
 |--------|-----------------|------|-----------------|
-| `star_tilework` Tilework | star_pattern / star | 0232 P6, gap 5 | An eightfold wallpaper edge to edge in near-black ink on white; does the wall read as one lattice, and does the 3-to-4 cell re-lay land as a hit or a jolt? |
-| `star_redlattice` Red Lattice | star_pattern / star | 0232 P6, gap 5 | The sixfold sibling in hard red on black; does the slow cell drift read as life or as wobble, and is red-on-black too close to Tilework's shape? |
-| `shape_dropband` Drop Band | shape_field / shape | 0232 P6, gap 6 | Black, white and red star bands; on a loud passage does the band re-cut every second beat read as the drop, without any flash? |
-| `lsystem_sprout` Sprout | lsystem / lsystem | 0232 P6, gap 7 | A plant drawing itself over four bars, then regrowing; is the regrowth a satisfying arc, and do the strokes read crisp at full size? |
+
+## Owner verdicts (2026-10-01, Plan 0232 Phase 6)
+
+The first pass for gaps 5-7 (Tilework, Red Lattice, Drop Band, Sprout) was judged in the running
+app and binned as a set: "quite lame". A second pass of nine variants, three per gap, was judged
+the same way, cycled in a fixed order. Four shipped straight to `presets/`, each as it was judged:
+**Interlace** and **Red Paper** (gap 5, edge-to-edge `star_pattern` wallpapers). The owner judged
+two fixes for the mirror seams where a round figure meets its cell wall, one fitting each figure
+inside its cell and one dropping the tiling, and preferred the original seamed wall to both.
+**Target** (gap 6, a bass-punched disc target in black, white and red, "stays def") and
+**Thicket** (gap 7, a stick plant whose visible depth re-picks on each beat). The other five
+variants were binned unnamed: a hexagon wall that drew itself on after each beat, two other
+drop-world shapes (a beat-stepped star, square and heart, and a three-point shard), a red ink
+plant on white paper, and a sixfold mirrored bush.
 
 ## Owner verdicts (2026-09-11)
 

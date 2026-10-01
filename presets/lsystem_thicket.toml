@@ -1,0 +1,39 @@
+# Thicket - a stick plant that re-grows to a new depth on every beat.
+# A bushy bracketed grammar expanded to depth four is drawn whole, and its
+# visible generation is re-picked on each beat between the second and the
+# fourth, held between hits, so the plant thins to bare sticks and thickens
+# back into a thicket with the rhythm. Crisp opaque strokes (softness 0,
+# stroke_blend 1); the palette walks generation depth from bone white at the
+# trunk to red at the outer twigs. Between hits the plant sways on a
+# slow clock and its line swells with the bass, so it is never frozen.
+system = "lsystem"
+name = "Thicket"
+
+[generator]
+axiom     = "F"
+rules     = { F = "FF-[-F+F+F]+[+F-F-F]" }
+angle_deg = 22.5
+max_depth = 4
+
+[palette]
+stops = [
+  { at = 0.0, color = "#e0141e" },
+  { at = 0.5, color = "#f4f1ea" },
+  { at = 1.0, color = "#f4f1ea" },
+]
+
+[params]
+visible_depth = "2 + floor(hash(beat_index) * 3)"
+draw_progress = "1"
+rotation      = "0.07 * sin(time * 1.3) + 0.03 * noise(time * 0.7)"
+thickness     = "6 + clamp(bass * 2.4, 0, 2)"
+softness      = "0"
+stroke_blend  = "1"
+glow          = "1.2"
+hue_spread    = "1"
+
+[hold]
+visible_depth = "beat"
+
+[smoothing]
+thickness = { attack = 0.03, release = 0.3 }

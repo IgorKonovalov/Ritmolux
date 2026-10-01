@@ -1,0 +1,29 @@
+# Interlace - a twelvefold Hankin star wallpaper, hard white line on black.
+# One dodecagon rosette, drawn at about its cell's height, is repeated by a
+# two-cell mirrored kaleido_tile grid, so the frame holds a wall of stars that
+# kiss at every cell border. The strokes are thick and opaque (softness 0,
+# stroke_blend 1) and nothing rotates. The bass drives the Hankin contact
+# angle across most of its range: quiet, the rays cross into sharp stars;
+# loud, they open out until each star rounds into a ring. An onset thickens
+# the line on the hit.
+system = "star_pattern"
+name = "Interlace"
+
+[generator]
+tiling = "dodecagon"
+contact_angle_deg = 60
+
+[params]
+variant       = "0.3 + clamp(bass * 1.9, 0, 1.6)"
+rotation      = "0"
+draw_progress = "1"
+thickness     = "16 + clamp(onset * 10, 0, 6)"
+softness      = "0"
+stroke_blend  = "1"
+glow          = "1.2"
+scale         = "1.05"
+saturation    = "0"
+kaleido_tile  = "2"
+
+[smoothing]
+variant = { attack = 0.02, release = 0.3 }
