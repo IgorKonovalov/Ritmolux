@@ -249,8 +249,8 @@ that needs one, that is a feedback note to `architect`, not a phase of this plan
 |---|---|---|---|
 | 1 — The reference sheet | human | done | committed with this row |
 | 2 — The routing table and the cohort | human | done | committed with this row |
-| 3 — The cohort is authored | human | not started | |
-| 4 — The verdict, in the live app | human | not started | |
+| 3 — The cohort is authored | human | done, a cohort of one | committed with this row |
+| 4 — The verdict, in the live app | human | done: not worth it, swarm excepted | committed with this row |
 
 ### Notes
 
@@ -298,15 +298,51 @@ that needs one, that is a feedback note to `architect`, not a phase of this plan
   - **Phase 3 still waits on Plan 0232's cull reaching main**: on 2026-10-01 it was done in that
     plan's lane (`72f29c96`) but not merged.
 
+- **Phase 3, 2026-10-01** (an agent session in the `preset-author` lane, after Plan 0232 merged at
+  v0.158.0). The four cohort picks were drafted as native presets, rendered at 300 frames of
+  `--signal dynamic:110` beside a frame of each reference, and tuned over three passes:
+  Furnace (`warp_mesh`, pick 02), Flare (`emitter`, 17), Maelstrom (`swarm`, 15) and Streamer
+  (`parametric_curve`, 08). The owner then judged all four in the running app.
+  - **Only Maelstrom was kept.** It is a dense, fast swarm curled into eddies by a high spin bias,
+    drawn in long dotted trails and kicked outward on every beat. Its header names its own mechanism
+    and no third-party preset (ADR-0227). It shipped as `presets/swarm_maelstrom.toml` with a gallery
+    card, under the suite (see the close triggers below). Furnace, Flare and Streamer were binned as
+    "lame" and deleted from `presets/proposed/` before any commit.
+  - **This departs from the done-when.** The phase names a cohort of four to six across at least three
+    systems, and one preset on one system shipped. The owner chose to land the one keep and write the
+    verdict rather than run a further round of variants.
+  - **What each binned reading lacked, against its reference:**
+    - **Furnace:** `warp_mesh` resamples the past frame every frame, which blurs. Its shipped worlds are
+      smooth gradients or contour prints, so the fire field's fine molten streaks were unreachable. The
+      best reading was a smooth fire swirl with dark corners. `palette_steps` made no visible
+      difference in light mode.
+    - **Flare:** `spread` fans only part of a circle, so the radial burst was one wedge folded sixfold
+      by `kaleido_order`, which read as stylised rather than as a starburst.
+    - **Streamer:** the reference's smoky bundle of filaments became one clean ribbon with a curl of
+      smoke behind it.
+    - **Maelstrom:** it does not centre either, because the swarm's world is a torus with no fixed
+      point, and it still read well.
+- **Phase 4, 2026-10-01 — the verdict (the owner's): not worth it, the swarm excepted.** Judged in the
+  running app against the reference sheet, from `RLX_PRESET_DIR`. The verdict is that a native reading
+  of these borrowed looks is weaker than the original wherever the look depends on the source engine's
+  own texture or draw layer, which was three of the four cohort picks. Picks 7-21 are abandoned on that
+  reason, and the route does not become a standing sitting, so `docs/content-brief.md` is untouched.
+  The swarm is the exception: a look made of motion rather than of texture survived the translation.
+  This is the plan's named negative outcome, not a failure of it. Neither engine limit it met (the
+  mesh's blur and the emitter's partial fan) is filed as a backlog entry, because no second look asks
+  for either; this log is their record.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** yes. One preset added (`swarm_maelstrom.toml`) with its gallery card and
+  `CARDS` entry. Nothing removed.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** content only, one preset.
+- **Operator docs touched:** none besides the gallery card.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 57 reductions across 28 live
+  entries (4 unprobeable).
+- **Full suite:** `cargo nextest run --workspace` on main with Maelstrom embedded: 1934 passed, 8 skipped.
+- **Outstanding `human` phases:** none.
 
 ## Followups (after this lands)
 

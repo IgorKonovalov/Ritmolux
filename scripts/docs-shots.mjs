@@ -324,8 +324,9 @@ const CARDS = [
   "star_interlace",
   "star_redpaper",
   "star_rosewindow",
-  // swarm (2)
+  // swarm (3)
   "swarm_braid",
+  "swarm_maelstrom",
   "swarm_murmuration",
   // warp_mesh (4)
   "warp_ladder",
