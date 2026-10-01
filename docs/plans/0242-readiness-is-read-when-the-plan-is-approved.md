@@ -1,6 +1,6 @@
 # 0242 — Readiness is read when the plan is approved, and a judgement phase defaults to owed
 
-> **Status:** approved (2026-10-01). Builds on Plan 0241, whose phases landed on `main` on 2026-10-01; it needs that code, not 0241's close.
+> **Status:** in-progress (approved 2026-10-01). Builds on Plan 0241, whose phases landed on `main` on 2026-10-01; it needs that code, not 0241's close.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0248](../adrs/0248-the-pipeline-repairs-before-it-parks.md), [ADR-0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md), [ADR-0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
@@ -162,11 +162,11 @@ sequenceDiagram
 
 ## Implementation log
 
-**Lane:**
+**Lane:** `plan-0242-readiness-is-read-when-the-plan-is-approved` in `/home/igor/Work/rlx-plan-0242`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `conductor readiness NNNN` runs the check at approval | dev | not started | |
+| 1 — `conductor readiness NNNN` runs the check at approval | dev | committed with this row | |
 | 2 — Readiness prints advisories that never park | dev | not started | |
 | 3 — The architect runs it, and the template defaults judgement phases to owed | human | not started | |
 

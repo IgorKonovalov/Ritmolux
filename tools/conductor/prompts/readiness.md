@@ -13,6 +13,11 @@ itself and against the tree before any money is spent on it, and you change noth
 commit, no merge, no tag.** The conductor checks that `HEAD` and the tree are exactly as it handed them
 to you, and parks a session that moved either.
 
+The lane named above may be the main checkout itself rather than a worktree: the owner runs this check
+at approval with `conductor readiness NNNN`, before any lane exists, and the lane later reuses a `ready`
+verdict on the same plan text. The rule is the same there. The main checkout is where the owner works,
+so it may carry their uncommitted changes; leave every one of them exactly as you found it.
+
 Grade **consistency, not the design.** The plan was approved; whether it is a good idea is not the
 question. The question is whether an implementer can do what each phase says, with the files it names,
 and prove it with the done-when it names. Check, phase by phase:

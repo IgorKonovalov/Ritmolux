@@ -14,7 +14,7 @@ import { gateDetail, parkStillTrue, runLanes } from "../lib/lane.mjs";
 import { readLedger } from "../lib/ledger.mjs";
 import { findPlan, nextStep, readPlanFile } from "../lib/plan.mjs";
 import { validateQueue } from "../lib/queue.mjs";
-import { askResume, loadState, planRecord, statePaths } from "../lib/state.mjs";
+import { appendReadiness, askResume, loadState, planContractHash, planRecord, statePaths } from "../lib/state.mjs";
 import { FAKE, REPO, TEST_DIR, TOOL_DIR, tmp, writePlan } from "./helpers.mjs";
 
 const SCENARIO = join(TEST_DIR, "lane-scenario.mjs");
@@ -1781,4 +1781,33 @@ test("resuming a plan that parked after readiness, its contract unchanged, runs 
     "review:architect",
     "close:architect",
   ]);
+});
+
+// Plan 0242 Phase 1: a `ready` recorded at approval on the same contract stands in for the session.
+
+test("a ready recorded at approval on the plan's contract hash skips the lane's readiness session", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  const hash = planContractHash(readFileSync(join(repo, "docs", "plans", "0101-fixture.md"), "utf8"));
+  appendReadiness(ctx.stateDir, { plan: "0101", hash, verdict: "ready", detail: null, at: "2026-10-01T10:00:00.000Z" });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect", "close:architect"], "no readiness step");
+  assert.deepEqual(rec.readiness, { hash, at: "2026-10-01T10:00:00.000Z", approval: true });
+});
+
+test("a ready recorded at approval on text the plan has since changed runs the readiness session as before", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  const planPath = join(repo, "docs", "plans", "0101-fixture.md");
+  const approved = planContractHash(readFileSync(planPath, "utf8"));
+  appendReadiness(ctx.stateDir, { plan: "0101", hash: approved, verdict: "ready", detail: null, at: "2026-10-01T10:00:00.000Z" });
+  // The plan is amended on main after the check, as an architect fixing it would.
+  writeFileSync(planPath, readFileSync(planPath, "utf8").replace("- **What:** phase 1.", "- **What:** phase 1, amended."));
+  sh(["commit", "-q", "-am", "docs(plans): amend Phase 1"], repo);
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(kinds(rec), ["readiness:architect", "implement:dev", "review:architect", "close:architect"]);
+  assert.notEqual(rec.readiness.hash, approved);
+  assert.equal(rec.readiness.approval, undefined);
 });

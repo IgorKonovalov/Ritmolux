@@ -52,6 +52,16 @@ The decision and its rejected alternatives are ADR-0205. The plan that built it 
    notice rather than refusing to start. That holds on a fresh clone and after a wiped `state/`,
    because the judgement is the plan file's location and not the gitignored run record. `prune` is
    what takes the entry off the list.
+
+   **Read a plan for readiness when it is approved**, with `readiness NNNN`, from the main checkout
+   and while its author is still in the session that wrote it. It runs the same read-only session a
+   lane runs before its first implement session (ADR-0248), so a `plan_wrong` costs a one-minute edit
+   rather than a park found hours later. The plan file must be committed and clean, because the
+   verdict is recorded against its contract hash in `state/readiness.jsonl`. A lane that finds a
+   `ready` there on the same hash runs no readiness session of its own. A plan edited since runs one,
+   as before. The command writes no `conductor.json`, so it may run beside a live `run`. It does
+   compare `HEAD` and `git status` before and after, and records nothing when either moved, which
+   includes an unrelated edit made in the checkout meanwhile; re-run it.
 3. **Run the preflight:** `node tools/conductor/conductor.mjs check`. It refuses when `local.json` is
    missing, when `queue.json` names a plan that is not approved or depends on a plan it cannot reach,
    or when `claude --version` is not a version the conductor was verified on and not a patch above one.
@@ -68,6 +78,7 @@ All of them run from the main checkout.
 | `run [--lane a\|b] [--once \| --until-idle]` | Runs the queue: both lanes, or one, until `pause`, `abort` or Ctrl+C. `--until-idle` ends the run once no lane can move; `--once` stops a lane after one plan. A second conductor is refused while one runs. |
 | `status` | Per lane: the plan, the step, the time in it, the spend so far. Then every parked plan with its reason, and whether the repository has already settled it. Regenerates the digest and ends with its path. |
 | `digest [--history]` | Rewrites `digest.md`. `--history` writes the per-run account to `digest-history.md` instead, and is the only thing that ever writes that file. |
+| `readiness NNNN` | Runs the readiness check on a committed, clean plan from the main checkout, prints the verdict, and appends it to `state/readiness.jsonl` against the plan's contract hash. A `ready` there spares the lane its own readiness session until the plan changes. Exits non-zero on anything but `ready`. Allowed while a run is live. |
 | `resume NNNN` | Queues a parked plan again. Refused while the park's reason still holds, e.g. a `human` phase the plan's log does not yet mark done. While a run is live, it leaves the resume for that run, which takes it on its next look. |
 | `park NNNN` | Parks a plan that has not merged, with an inbox entry. |
 | `finding NNNN [<ref> --done\|--wontfix\|--filed <reason>]` | With no verb, lists that plan's closing verdict with an index per finding. With one, records your disposition against the finding `<ref>` names, and the digest stops carrying it. |
