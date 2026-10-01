@@ -1,6 +1,6 @@
 # 0247 — The studio renders a neural clip
 
-> **Status:** draft
+> **Status:** approved (2026-10-01)
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, studio-builder, human
 > **Related ADRs:** [0262](../adrs/0262-the-studio-renders-a-clip-by-piping-three-children-and-transcodes-what-the-player-cannot-read.md)

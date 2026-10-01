@@ -55,7 +55,7 @@ place. The plan file carries the real link.
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
 | [0244](0244-sessions-start-lighter.md) | Sessions start lighter | approved | dev, human | Moves, deletes nothing: CLAUDE.md to <=25 KB, plans index keeps 15 closes, architect Mode 4 to a reference. |
 | [0245](0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) | A gate that runs a built binary checks it is current | approved | dev | The sd-filter suite takes the newer `shot` and skips with a notice when it predates the source. |
-| [0247](0247-the-studio-renders-a-neural-clip.md) | The studio renders a neural clip | draft | dev, studio-builder, human | ADR-0262 (proposed). Player gains `--render`/`--bars`; the studio pipes player, sd_filter and ffmpeg, MP3/FLAC via transcode, prompts on a bar strip. |
+| [0247](0247-the-studio-renders-a-neural-clip.md) | The studio renders a neural clip | approved | dev, studio-builder, human | ADR-0262 (proposed). Player gains `--render`/`--bars`; the studio pipes player, sd_filter and ffmpeg, MP3/FLAC via transcode, prompts on a bar strip. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
