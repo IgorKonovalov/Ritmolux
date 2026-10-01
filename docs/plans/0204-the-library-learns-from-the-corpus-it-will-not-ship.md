@@ -40,7 +40,7 @@ through `RLX_PRESET_DIR`. The picks that came back, with the theme they were fou
 |---|---|---|---|
 | 1 | Reaction | `$$$ Royal - Mashup (157)` — molten gold, black veining on cream | `warp_mesh` - a radial zoom whose feedback advects the orange, black and cream veining outward, a streaked tunnel |
 | 2 | Reaction | `$$$ Royal - Mashup (275)` — fire field, red into orange, black cracks | `warp_mesh` - a rotation-plus-zoom vortex churning yellow into red round a hot eye; the swirl is the look |
-| 3 | Reaction | `A HD ADAMFX Creation !!FT Martin + flexi + …INFECTIONFX A` — dark, faint blue streaks | `cellular` (`larger_than_life`) - white blobs crawling on black; its whole-frame flip to white has no native home |
+| 3 | Reaction | `A HD ADAMFX Creation !!FT Martin + flexi + …INFECTIONFX A` — dark, faint blue streaks | `cellular` (`larger_than_life`) - white blobs crawling on black; the flip to white is `ink_amount` stepped to `1` on a held edge |
 | 4 | Reaction | `A Remixed Digital Echasketch Again 2 martin …mstress + 4` — vertical bands, olive into teal | `warp_mesh` - a downward drift with per-column stretch carries the drips and the vertical bands |
 | 5 | Reaction | `AdamFX 2 Geiss - Mash-Up Sphere Xibit Graffiti Warp me Tydye4` — blue field, green cellular veins | `fragment_field` - a blue ripple field folded eightfold by the engine-wide `kaleido_*` |
 | 6 | Reaction | `Flexi - alien web bouncer [39]` — yellow and orange, black-cored red webbing | `reaction_diffusion` - black-cored Gray-Scott spots ringed in red, on a fire palette |
@@ -53,7 +53,7 @@ through `RLX_PRESET_DIR`. The picks that came back, with the theme they were fou
 | 13 | Sparkle | `Serge + martin - crystal palace001d` — deep blue, white streak | `fragment_field` - a busy cyan field with circular filigree, mirrored by `kaleido_*` |
 | 14 | Sparkle | `Waltra - Square Party` — green field, yellow square spray | `emitter` - spawned squares folded into a diamond lattice by `kaleido_*` |
 | 15 | Particles | `EoS - more waveforms 5` — orange diagonal on black | `swarm` - point trails orbiting a hot ring core in a vortex flow |
-| 16 | Particles | `amandio c - pulse - we are going to need your permission` — dense grain, red form | **no native home** - dense grain with a solid red form sweeping over it is two layers, and a preset is one system |
+| 16 | Particles | `amandio c - pulse - we are going to need your permission` — dense grain, red form | `fragment_field` + `[layer]` `shape_field` - a grain ground with the solid red form joined `over` it (ADR-0090) |
 | 17 | Supernova | `Geiss - 3D - Luz` — monochrome diagonal streaking | `emitter` - monochrome streaks thrown radially from a dark disc |
 | 18 | Hypnotic | `Flexi - alien complex 02` — blue gradient | `fragment_field` - a slow magenta-to-green domain-warped gradient with one wandering filament |
 | 19 | Hypnotic | `TonyMilkdrop - Nuclear [Flexi - help out + multiverse] --- Isosceles edit1` — amber marble, red veins | `fragment_field` - amber marbling with red veins (0232's gap table routes it to `warp_mesh`) |
@@ -290,6 +290,11 @@ that needs one, that is a feedback note to `architect`, not a phase of this plan
     only the `cloud` and `sheet` layouts. All three go to `architect` as feedback. This session
     filed no backlog entry itself, because one needs a probe and the backlog is not this lane's
     file.
+  - **Corrected by `architect` 2026-10-01: two of the three gaps are not gaps.** Pick 16 has a
+    native home. The `[layer]` table (ADR-0090) composes a second system, and its `over` join puts
+    a solid form on a field. Pick 03's flip is `ink_amount = "1"`, which already draws black marks
+    on a white field, so binding it on a held edge flips the frame. Only 12's sphere is a real gap,
+    filed as backlog 0278 and deliberately low priority. The routing table carries the corrections.
   - **Phase 3 still waits on Plan 0232's cull reaching main**: on 2026-10-01 it was done in that
     plan's lane (`72f29c96`) but not merged.
 

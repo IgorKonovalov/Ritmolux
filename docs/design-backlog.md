@@ -48,6 +48,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0275 — Murmuration sits at zoom 0.78, under the swarm's measured seam-safe 0.84 and under the range the seam test says the shipped presets reach](#0275--murmuration-sits-at-zoom-078-under-the-swarms-measured-seam-safe-084-and-under-the-range-the-seam-test-says-the-shipped-presets-reach)
 - [0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen](#0276--a-collage-elements-own-drift-and-spin-are-too-slow-for-the-animation-gate-to-see-so-a-sparse-canvas-reads-as-frozen)
 - [0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`](#0277--the-owners-hotkey-walk-and-the-live-retune-loop-exist-only-as-scratch-scripts-under-target)
+- [0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated](#0278--plexus-lays-its-points-in-a-cube-or-on-a-plane-so-a-turning-wire-sphere-is-only-approximated)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1890,3 +1891,22 @@ with marks read back afterwards.
   `architect` (does a judging loop belong in `scripts/`, and in what shape), then `dev`.
 - **Verified 2026-09-30** — nothing in the repository carries it:
   `absent: walk\.sh|retune\.sh|apply\.py in: scripts`
+
+## 0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated
+
+Plan 0204 Phase 2 routed pick 12, a wire sphere made of ribbons turning on its axis, to `plexus`.
+That is the only system with a real 3-D camera and links that fade in and out. But `PlexusLayout`
+has two variants. `cloud` scatters points through a cube and `sheet` lays a jittered grid on a
+plane. Neither puts points on a closed surface, so the sphere's silhouette, the thing the look
+depends on, is not reachable. An orbiting cloud reads as a fuzzy ball at best. A `sphere` (or
+`shell`) layout is the obvious shape: points on a sphere, drifting on the surface, with the
+existing `link_distance` choosing how wired it looks. It would be a third variant behind the same
+`[plexus] layout` key, with no new parameter. **Low priority on purpose.** Pick 12 is not in the
+Phase 3 cohort, and only matters if Phase 4's verdict sends the remaining picks forward. Take this
+entry up then, or when a second look asks for a closed 3-D surface.
+
+- **Raised:** 2026-10-01 by `preset-author` at Plan 0204 Phase 2, checked by `architect` the same
+  day. **Owner if taken:** `architect` (is a third layout the right shape), then `dev`.
+- **Verified 2026-10-01** — the two layouts, and no third:
+  `present: ALL: \[PlexusLayout; 2\] in: core/src/render/scenes/plexus/mod.rs`
+- **Verified 2026-10-01** — `absent: Sphere|Shell in: core/src/render/scenes/plexus/mod.rs`
