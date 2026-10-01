@@ -364,8 +364,7 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
   holds them to the draw shader's text. Commit 25c9519e.
 - Close-review fix, major 2 (the energy test passed on a two-reading dip): the summed light is now
   held to a ratio, a relative spread under a tenth of the peak's relative fall over the blurred
-  sweep. Reads 0.0070 against 0.6013 on llvmpipe. Commit: the `test(core)` commit carrying this
-  line.
+  sweep. Reads 0.0070 against 0.6013 on llvmpipe. Commit 7cdf291e.
 
 ### Close triggers
 
@@ -383,6 +382,8 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 - **Full suite:** `cargo nextest run --workspace` at 2ad353bc: exit 0, 1937 passed, 8 skipped
   (llvmpipe; the golden comparisons skip-and-print off WARP, reading `plexus` and `plexus_sheet`
   at max outlier 0).
+  After the two close-review fixes, at 7cdf291e: exit 0, 1938 passed, 8 skipped; `cargo doc
+  --workspace --no-deps` under `-D warnings` clean.
 - **Outstanding `human` phases:** Phase 8 (the look, judged against the reference),
   `Blocks merge: no`.
 
