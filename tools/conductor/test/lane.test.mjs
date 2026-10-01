@@ -783,24 +783,32 @@ test("a close that repairs one minor and leaves one open shows exactly the open 
   assert.ok(history("### Closed").includes(`  - minor \`phase-0101-1.txt:1\` a comment the plan made false - repaired by the close in \`${repaired.fixed_in.slice(0, 7)}\``));
 });
 
-test("a fixed_in commit that does not change the finding's file parks as a disagreement", async () => {
-  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "wrongFile" } } });
+// ADR-0261: a false `fixed_in` reopens its finding and the close proceeds; it is never recorded repaired.
+test("a fixed_in commit that does not change the finding's file reopens the finding, and the plan merges", async () => {
+  const { ctx, repo, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "wrongFile" } } });
   const mainBefore = resolveCommit("main", repo);
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
-  assert.equal(rec.status, "parked");
-  assert.equal(rec.park.reason, "disagreement");
-  assert.match(rec.park.detail, /finding 0 is fixed_in [0-9a-f]{7}, which does not change phase-0101-1\.txt/);
-  assert.equal(resolveCommit("main", repo), mainBefore);
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.notEqual(resolveCommit("main", repo), mainBefore);
+  assert.equal(rec.reopened.length, 1);
+  assert.equal(rec.reopened[0].finding, 0);
+  assert.match(rec.reopened[0].reason, /^fixed_in [0-9a-f]{7} does not change phase-0101-1\.txt$/);
+  const f = rec.verdicts.at(-1).findings[0];
+  assert.equal("fixed_in" in f, false, "the claim git contradicts is never recorded");
+  assert.equal(f.reopened.reason, rec.reopened[0].reason);
+  assert.ok(
+    digest("## Needs you").includes(`  - minor \`phase-0101-1.txt:1\` a comment the plan made false - reopened: ${rec.reopened[0].reason}`),
+    digest("## Needs you"),
+  );
 });
 
-test("a fixed_in commit that is not on the branch parks as a disagreement", async () => {
+test("a fixed_in commit that is not on the branch reopens the finding, and the plan merges", async () => {
   const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "offBranch" } } });
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
-  assert.equal(rec.status, "parked");
-  assert.equal(rec.park.reason, "disagreement");
-  assert.match(rec.park.detail, /finding 0 is fixed_in [0-9a-f]{40}, which is not on the branch/);
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.match(rec.reopened[0].reason, /^fixed_in [0-9a-f]{40} is not on the branch$/);
 });
 
 test("with no fix round and an unmoved main, a plan executes the full suite twice and skips it twice", async () => {

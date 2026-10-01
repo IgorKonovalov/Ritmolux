@@ -425,6 +425,21 @@ test("a live run's Now names each lane's plan, step and spend so far", () => {
   assert.match(text, /^- run started 2026-09-15 08:30, 1 h 10 min ago\.$/m);
 });
 
+// ADR-0261: a finding whose repair claim git contradicted is open, whatever its severity, and says why.
+test("a reopened finding is listed under Needs you with the reason it was reopened", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = pilotState(repo, head, stateDir);
+  const reason = "fixed_in abc1234 does not change a.rs";
+  state.plans["0185"].verdicts.at(-1).findings.push({ severity: "major", file: "c.rs", line: 9, what: "a race", reopened: { fixed_in: "abc1234", reason } });
+  state.plans["0185"].reopened = [{ finding: 2, fixed_in: "abc1234", reason }];
+  const text = renderDigest(state, { repo, stateDir, now: NOW });
+  assert.match(text, /^- \*\*0185 merged with 3 open findings\*\*:\n {2}- minor `a\.rs:3` stale comment\n {2}- nit `b\.md` typo\n {2}- major `c\.rs:9` a race - reopened: fixed_in abc1234 does not change a\.rs$/m);
+  // Disposing of it takes it off the page like any other open finding.
+  state.plans["0185"].verdicts.at(-1).findings[2].disposition = { verb: "done", reason: "repaired in 0186", at: "2026-09-16T00:00:00.000Z" };
+  assert.match(renderDigest(state, { repo, stateDir, now: NOW }), /^- \*\*0185 merged with 2 open findings\*\*:/m);
+});
+
 test("an empty worklist is one line, and says what it found nothing of", () => {
   const state = {
     version: 1,

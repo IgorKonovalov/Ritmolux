@@ -111,20 +111,24 @@ function planTitle(repo, plan) {
   return { title: readPlanFile(found.path).title ?? `Plan ${plan}`, rel: relative(repo, found.path).replace(/\\/g, "/") };
 }
 
+/** Why a finding the close claimed to repair is open after all (ADR-0261), or nothing. */
+const reopenedText = (f) => (f.reopened ? ` - reopened: ${f.reopened.reason}` : "");
+
 function findingLine(f, resolvedIn) {
   const fixed = resolvedIn ? ` - resolved in \`${short(resolvedIn)}\`` : f.fixed_in ? ` - repaired by the close in \`${short(f.fixed_in)}\`` : "";
   const d = f.disposition;
   const closed = d ? ` - closed ${d.at.slice(0, 10)} (${d.verb}): ${d.reason}` : "";
-  return `  - ${f.severity} \`${findingWhere(f)}\` ${f.what}${fixed}${closed}`;
+  return `  - ${f.severity} \`${findingWhere(f)}\` ${f.what}${fixed}${reopenedText(f)}${closed}`;
 }
 
 /**
- * The minors and nits the closing verdict merged with that its close did not repair (ADR-0209) and
- * the owner has not disposed of (ADR-0216). `fixed_in` is evidence checked against the branch; a
- * disposition is a judgement checked against nothing, and both take a finding off the worklist.
+ * The minors and nits the closing verdict merged with that its close did not repair (ADR-0209), and
+ * every finding whose repair claim `git` contradicted (ADR-0261), that the owner has not disposed of
+ * (ADR-0216). `fixed_in` is evidence checked against the branch; a disposition is a judgement checked
+ * against nothing, and both take a finding off the worklist.
  */
 function openFindings(rec) {
-  return (rec.verdicts.at(-1)?.findings ?? []).filter((f) => (f.severity === "minor" || f.severity === "nit") && !f.fixed_in && !f.disposition);
+  return (rec.verdicts.at(-1)?.findings ?? []).filter((f) => (f.severity === "minor" || f.severity === "nit" || f.reopened) && !f.fixed_in && !f.disposition);
 }
 
 /** How many of a plan's closing findings the owner has closed with a verb and a reason. */
@@ -371,7 +375,7 @@ function needsYou(view) {
     if (open.length === 0) continue;
     counts.findings += 1;
     lines.push(`- **${rec.plan} merged with ${plural(open.length, "open finding")}**:`);
-    for (const f of open) lines.push(`  - ${f.severity} \`${findingWhere(f)}\` ${f.what}`);
+    for (const f of open) lines.push(`  - ${f.severity} \`${findingWhere(f)}\` ${f.what}${reopenedText(f)}`);
   }
   // One line for every finding the owner has closed, never a per-plan breakdown: that is the
   // accumulation this page was rid of, one indent further in (ADR-0216). It is left out entirely at
@@ -498,7 +502,7 @@ export function renderHistory(state, opts) {
         const open = openFindings(rec);
         if (open.length > 0) {
           minorsMerged.push(`- **${rec.plan} merged with ${plural(open.length, "open finding")}**:`);
-          for (const f of open) minorsMerged.push(`  - ${f.severity} \`${findingWhere(f)}\` ${f.what}`);
+          for (const f of open) minorsMerged.push(`  - ${f.severity} \`${findingWhere(f)}\` ${f.what}${reopenedText(f)}`);
         }
       }
     }

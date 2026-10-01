@@ -170,8 +170,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The close's suite is served | dev | done | `c1a17bf7` |
-| 2 — A run of human phases parks once | dev | committed with this row | |
-| 3 — A false repair claim reopens its finding | dev | not started | |
+| 2 — A run of human phases parks once | dev | done | `7991c87e` |
+| 3 — A false repair claim reopens its finding | dev | committed with this row | |
 | 4 — A diagnosed flake retries by name, and says so | dev | not started | |
 
 ### Notes
@@ -179,5 +179,8 @@ flowchart LR
 - Phase 1 also edits `tools/conductor/test/gate.test.mjs`, outside its `Files touched`: the
   served-tier test asserted `greenRecord` returns null for a served line's own tree, the invariant
   this phase changes. The assertion now expects the served line back.
+- Phase 3 also edits `tools/conductor/test/lane.test.mjs`, outside its `Files touched`: its two
+  tests that a wrong-file and an off-branch `fixed_in` park `disagreement` now assert the finding is
+  reopened and the plan merges. `verifyClose` now returns `{ problems, reopened }` rather than a list.
 
 ### Close triggers

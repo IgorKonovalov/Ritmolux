@@ -377,6 +377,13 @@ node tools/conductor/conductor.mjs finding 0181 3 --wontfix "assertion message, 
   a judgement checked against nothing — so the sentence you type is the whole record of it.
 - **`<ref>` is the index the listing prints**, or the `file:line` exactly one finding carries. A ref
   that matches nothing, or more than one, is refused naming what it saw.
+- **A reopened finding is open too, whatever its severity** (ADR-0261). When a close marks a finding
+  repaired and `git` contradicts it — the `fixed_in` commit does not exist, is not on the branch, or
+  changes neither the finding's file nor a path that file had — the conductor drops the claim instead
+  of parking a clean close. The finding is recorded with `reopened` and the reason, the plan's record
+  lists it under `reopened`, the digest prints it under **Needs you** with `reopened: <reason>`, and
+  `finding NNNN` lists it with an index like any other. A merge can therefore carry one: read the
+  reason, then repair it and close it `--done`, or close it with whichever verb fits.
 - **Only a closed plan has findings.** A plan still in a fix round, or parked at one, carries verdicts
   that closed nothing — its blockers are the conductor's own work in flight — so `finding` refuses it
   either way and names where the plan stands.
@@ -503,7 +510,8 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   the close marks repaired (`fixed_in`, ADR-0209) must name a commit on the branch that changes that
   finding's file, under the path the finding names or the path it had at that commit, following
   every rename git pairs between the commit and the tip and, whatever the similarity, the plan's own
-  move to `done/`.
+  move to `done/`. One that does not is **reopened** rather than parked (ADR-0261): the claim is
+  dropped, the close proceeds, and the finding is open on the digest with the reason.
 
 ## The gate
 

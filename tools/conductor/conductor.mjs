@@ -447,6 +447,7 @@ function findingText(f, index) {
   return (
     `  [${index}] ${f.severity} ${findingWhere(f)} - ${f.what}` +
     (f.fixed_in ? ` - repaired by the close in ${f.fixed_in.slice(0, 7)}` : "") +
+    (f.reopened ? ` - reopened: ${f.reopened.reason}` : "") +
     (d ? ` - closed ${d.at.slice(0, 10)} (${d.verb}): ${d.reason}` : "")
   );
 }
@@ -558,7 +559,7 @@ function cmdAdoptClose(args, o) {
     o.err(`conductor: no close to adopt in ${rec.worktree} - plan ${plan} is not under docs/plans/done/ with Status done and a ## Close review`);
     return 1;
   }
-  const problems = verifyClose({ cwd: rec.worktree, plan, outcome: adopted });
+  const { problems } = verifyClose({ cwd: rec.worktree, plan, outcome: adopted });
   if (problems.length) {
     o.err(`conductor: the close in ${rec.worktree} does not verify, so nothing was recorded:`);
     for (const problem of problems) o.err(`  - ${problem}`);

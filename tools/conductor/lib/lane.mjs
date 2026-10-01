@@ -31,7 +31,7 @@ import { join, relative } from "node:path";
 
 import { describe as describeUpstream, readUpstream, redSubject } from "../../../scripts/check-upstream-ci.mjs";
 
-import { adoptedClose, verifyClose, verifyFix, verifyImplement, verifyMerge, verifyRepair } from "./close.mjs";
+import { adoptedClose, verifyClose, verifyFix, verifyImplement, verifyMerge, verifyRepair, withReopened } from "./close.mjs";
 import { removeLane, laneNames, openLane } from "./cleanup.mjs";
 import { AFTER_CLOSE_STAGES, defaultGate, gateForStage, runGate } from "./gate.mjs";
 import { currentBranch, git, head, isAncestor, isClean, resolveCommit } from "./git.mjs";
@@ -1026,7 +1026,8 @@ export async function runPlan(ctx, lane, plan) {
   if (!rec.closed) {
     const adopted = adoptedClose({ cwd: wt, plan, round: rec.verdicts.length + 1 });
     if (adopted) {
-      const problems = verifyClose({ cwd: wt, plan, outcome: adopted });
+      // An adopted close carries no findings, so it has nothing to reopen.
+      const { problems } = verifyClose({ cwd: wt, plan, outcome: adopted });
       if (problems.length) {
         return park(ctx, rec, { reason: "disagreement", detail: `close found on the branch: ${problems.join("; ")}`, read: adopted.verdict.review_path });
       }
@@ -1200,13 +1201,15 @@ export async function runPlan(ctx, lane, plan) {
         return park(ctx, rec, { reason: r.reason, detail: r.detail, read: r.transcript, resetsAt: r.resetsAt });
       }
       const o = r.outcome;
-      const problems = o.kind === "closed" ? verifyClose({ cwd: wt, plan, outcome: o }) : [`the close returned a ${o.kind} outcome`];
+      const { problems, reopened } = o.kind === "closed" ? verifyClose({ cwd: wt, plan, outcome: o }) : { problems: [`the close returned a ${o.kind} outcome`], reopened: [] };
       if (problems.length) {
         lock.release();
         return park(ctx, rec, { reason: "disagreement", detail: `close: ${problems.join("; ")}`, read: r.transcript });
       }
-      // The close's verdict is the review's, with `fixed_in` on what the close repaired.
-      rec.verdicts[rec.verdicts.length - 1] = { ...verdict, ...o.verdict, round: verdict.round, graded: verdict.graded };
+      // The close's verdict is the review's, with `fixed_in` on what the close repaired and dropped
+      // from what `git` says it did not: those findings are reopened, and the digest carries them.
+      rec.verdicts[rec.verdicts.length - 1] = withReopened({ ...verdict, ...o.verdict, round: verdict.round, graded: verdict.graded }, reopened);
+      if (reopened.length) rec.reopened = reopened;
       rec.closed = { version: o.version, tag: o.tag, head: head(wt), at: now() };
       ctx.held.set(plan, lock);
       event(ctx, "closed", { plan, tag: o.tag });

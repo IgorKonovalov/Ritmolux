@@ -8,7 +8,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { adoptedClose, closeOnBranch, verifyClose } from "../lib/close.mjs";
+import { adoptedClose, closeOnBranch, verifyClose, withReopened } from "../lib/close.mjs";
 import { findPlan } from "../lib/plan.mjs";
 import { adoptClose } from "../lib/state.mjs";
 import { planText, tmp, writePlan } from "./helpers.mjs";
@@ -69,7 +69,7 @@ test("a finished close on the branch is found, and read back as the outcome it w
   // `## Close review` is not machine-readable, so the verdict carries the path and no findings.
   assert.deepEqual(o.verdict.findings, []);
   assert.equal(o.verdict.review_path, found.path);
-  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: o }), []);
+  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: o }), { problems: [], reopened: [] });
 });
 
 test("each thing a close must leave behind is separately required", () => {
@@ -89,7 +89,7 @@ test("a close whose tree is dirty is found but does not verify, so it is never a
   const repo = lane({ dirty: true });
   const o = adoptedClose({ cwd: repo, plan: "0101" });
   assert.ok(o, "the close is on the branch");
-  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: o }), ["the worktree is not clean"]);
+  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: o }), { problems: ["the worktree is not clean"], reopened: [] });
 });
 
 test("a docs-only close carries no tag and no version, and still verifies", () => {
@@ -97,7 +97,7 @@ test("a docs-only close carries no tag and no version, and still verifies", () =
   const o = adoptedClose({ cwd: repo, plan: "0101" });
   assert.equal(o.tag, null);
   assert.equal(o.version, null);
-  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: o }), []);
+  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: o }), { problems: [], reopened: [] });
 });
 
 test("a lightweight tag on the tip is not read as the close's tag", () => {
@@ -106,7 +106,7 @@ test("a lightweight tag on the tip is not read as the close's tag", () => {
   const repo = lane({ tag: "lightweight" });
   const o = adoptedClose({ cwd: repo, plan: "0101" });
   assert.equal(o.tag, null);
-  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: o }), []);
+  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: o }), { problems: [], reopened: [] });
 });
 
 test("a tag that is not on the tip is not read as the close's tag", () => {
@@ -179,12 +179,12 @@ function renameRows(repo, from) {
 test("a repair of the plan file verifies under the path the close moved it to", () => {
   const { repo, repair } = repairLane();
   assert.match(renameRows(repo, repair), /^R\d+\tdocs\/plans\/0101-fixture\.md\tdocs\/plans\/done\/0101-fixture\.md$/m);
-  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: repairedClose(DONE, repair) }), []);
+  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: repairedClose(DONE, repair) }), { problems: [], reopened: [] });
 });
 
 test("a repair of the plan file named by its pre-move path still verifies", () => {
   const { repo, repair } = repairLane();
-  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: repairedClose(PLAN, repair) }), []);
+  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: repairedClose(PLAN, repair) }), { problems: [], reopened: [] });
 });
 
 test("the plan's own move is followed even when the close grew it past git's rename similarity", () => {
@@ -192,21 +192,48 @@ test("the plan's own move is followed even when the close grew it past git's ren
   const rows = renameRows(repo, repair);
   assert.doesNotMatch(rows, /^R\d+\t/m, "git pairs no rename, so only the plan's own pre-move path can match");
   assert.match(rows, /^D\tdocs\/plans\/0101-fixture\.md$/m);
-  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: repairedClose(DONE, repair) }), []);
+  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: repairedClose(DONE, repair) }), { problems: [], reopened: [] });
 });
 
 test("a repair of a file that main renamed verifies under its new path", () => {
   const { repo, repair } = repairLane({ renameOnMain: true });
   assert.match(renameRows(repo, repair), /^R\d+\tdocs\/guide\.md\tdocs\/guide-renamed\.md$/m);
-  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: repairedClose("docs/guide-renamed.md", repair) }), []);
+  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: repairedClose("docs/guide-renamed.md", repair) }), { problems: [], reopened: [] });
 });
 
-test("a fixed_in commit that does not change the file, under any of its paths, is still a problem", () => {
+// ADR-0261: a false `fixed_in` reopens its finding; it never parks the close and is never recorded.
+test("a fixed_in commit that does not change the file, under any of its paths, reopens the finding", () => {
   const { repo, mainCommit } = repairLane();
-  const problems = verifyClose({ cwd: repo, plan: "0101", outcome: repairedClose(DONE, mainCommit) });
-  assert.equal(problems.length, 1, problems.join("\n"));
-  assert.match(problems[0], /^finding 0 is fixed_in [0-9a-f]+, which does not change docs\/plans\/done\/0101-fixture\.md/);
-  assert.match(problems[0], /docs\/plans\/0101-fixture\.md/, "the path the rename was followed to is named too");
+  const { problems, reopened } = verifyClose({ cwd: repo, plan: "0101", outcome: repairedClose(DONE, mainCommit) });
+  assert.deepEqual(problems, []);
+  assert.equal(reopened.length, 1);
+  assert.equal(reopened[0].finding, 0);
+  assert.equal(reopened[0].fixed_in, mainCommit);
+  assert.match(reopened[0].reason, /^fixed_in [0-9a-f]+ does not change docs\/plans\/done\/0101-fixture\.md/);
+  assert.match(reopened[0].reason, /docs\/plans\/0101-fixture\.md/, "the path the rename was followed to is named too");
+});
+
+test("a fixed_in sha that does not exist reopens the finding, naming the sha, and is no problem", () => {
+  const { repo } = repairLane();
+  const ghost = "deadbeef".repeat(5);
+  const { problems, reopened } = verifyClose({ cwd: repo, plan: "0101", outcome: repairedClose(DONE, ghost) });
+  assert.deepEqual(problems, []);
+  assert.deepEqual(reopened, [{ finding: 0, fixed_in: ghost, reason: `fixed_in ${ghost} does not exist` }]);
+});
+
+test("every other close problem still parks, whatever the findings claim", () => {
+  const repo = lane({ closeReview: false, done: true });
+  const o = { kind: "closed", plan: "0101", version: null, tag: null, verdict: { round: 1, findings: [] } };
+  assert.deepEqual(verifyClose({ cwd: repo, plan: "0101", outcome: o }).problems, ["plan 0101 has no ## Close review section"]);
+});
+
+test("a reopened finding drops its claim and keeps why, and the verdict it came from is not touched", () => {
+  const verdict = repairedClose(DONE, "abc1234").verdict;
+  const out = withReopened(verdict, [{ finding: 0, fixed_in: "abc1234", reason: "fixed_in abc1234 does not exist" }]);
+  assert.equal("fixed_in" in out.findings[0], false);
+  assert.deepEqual(out.findings[0].reopened, { fixed_in: "abc1234", reason: "fixed_in abc1234 does not exist" });
+  assert.equal(verdict.findings[0].fixed_in, "abc1234", "the input is not mutated");
+  assert.equal(withReopened(verdict, []), verdict);
 });
 
 // ADR-0248: the review records its verdict before the close runs, so an adopted close keeps it.
