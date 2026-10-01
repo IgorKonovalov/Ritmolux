@@ -172,7 +172,7 @@ flowchart LR
 | 1 — The close's suite is served | dev | done | `c1a17bf7` |
 | 2 — A run of human phases parks once | dev | done | `7991c87e` |
 | 3 — A false repair claim reopens its finding | dev | done | `3171cf30` |
-| 4 — A diagnosed flake retries by name, and says so | dev | committed with this row | |
+| 4 — A diagnosed flake retries by name, and says so | dev | done | `a5a52e4a` |
 
 ### Notes
 
@@ -198,3 +198,14 @@ flowchart LR
   by its `by` label. The current-state page does not print them.
 
 ### Close triggers
+
+- **`presets/` touched:** no.
+- **Closes:** the plan header carries no `Closes:` entry.
+- **Shipped:** feature (conductor tooling, plus one `.config/nextest.toml` override).
+- **Operator docs moved:** `tools/conductor/README.md` (Acting on a park, Closing a finding, the
+  checks, the served tier and the gate's ledger account), `docs/testing.md` (one bullet on the
+  retry rule).
+- **`node scripts/check-backlog-claims.mjs`:** exit 0.
+- **`human` phases remaining:** none; the plan has none.
+- **Full suite:** `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace` at
+  `a5a52e4a`, exit 0, `1946 tests run: 1946 passed (15 slow), 8 skipped`, no flaky pass.
