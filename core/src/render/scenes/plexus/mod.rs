@@ -340,6 +340,9 @@ pub struct PlexusScene {
     edges_cap: usize,
     /// The tier's cap on the circle of confusion, in pixels.
     max_coc: f32,
+    /// This frame's per-frame clamp — the edge cap or the blur cap — if one
+    /// bit, for the renderer to announce (ADR-0007: a cap is never silent).
+    clamp: Option<super::CapOverflow>,
     points: sim::Points,
     edges: Vec<sim::Edge>,
     instances: Vec<Segment3dInstance>,
@@ -388,6 +391,7 @@ impl PlexusScene {
             points_cap,
             edges_cap,
             max_coc,
+            clamp: None,
             points: sim::Points::seeded(config.layout, config.seed, count, points_cap),
             edges: Vec::with_capacity(edges_cap),
             instances: Vec::with_capacity(edges_cap),
@@ -465,11 +469,18 @@ impl Scene for PlexusScene {
             return None;
         };
         // A switch starts the incoming preset from its own seed, with the
-        // point count held to the tier.
-        let count = (config.points as usize).min(self.points_cap);
+        // point count held to the tier and the clamp returned for the renderer
+        // to announce with the preset.
+        let (count, overflow) = points_clamp(config.points, self.points_cap);
         self.points = sim::Points::seeded(config.layout, config.seed, count, self.points_cap);
         self.edges.clear();
-        None
+        // The outgoing preset's per-frame clamp is not this one's to report.
+        self.clamp = None;
+        overflow
+    }
+
+    fn mirror_overflow(&self) -> Option<&super::CapOverflow> {
+        self.clamp.as_ref()
     }
 
     fn reset_params(&mut self) {
@@ -525,13 +536,18 @@ impl Scene for PlexusScene {
     fn update(&mut self, _frame: &AnalysisFrame) {
         self.points
             .step(self.dt, self.drift, self.wave, self.wave_scale);
-        sim::link(
+        let linked = sim::link(
             self.points.pos(),
             self.points.fade(),
             self.link_distance,
             self.edges_cap,
             &mut self.edges,
         );
+        self.clamp = (linked > self.edges.len()).then(|| super::CapOverflow {
+            dropped: linked - self.edges.len(),
+            context: super::OverflowContext::Edges(linked as u32),
+            cap: self.edges_cap,
+        });
     }
 
     fn render(
@@ -553,6 +569,23 @@ impl Scene for PlexusScene {
             cam.focal_depth(camera.focus, radius),
             self.max_coc,
         );
+        // The widest blur the lens would draw, at whichever extent of the
+        // volume is farther from focus; past the cap it is drawn at the cap,
+        // and that is announced unless the graph's own cap already is.
+        let widest = Lens {
+            max_coc: f32::INFINITY,
+            ..lens
+        };
+        let asked = widest
+            .coc(near_extent.max(crate::render::camera::NEAR))
+            .max(widest.coc(far_extent));
+        if self.clamp.is_none() && asked > lens.max_coc {
+            self.clamp = Some(super::CapOverflow {
+                dropped: 0,
+                context: super::OverflowContext::Blur(asked.ceil() as u32),
+                cap: lens.max_coc as usize,
+            });
+        }
         // A blurred stroke reaches past its centreline by up to the cap, so
         // the cull keeps that much more of the frame's surround.
         let margin = if lens.aperture > 0.0 {
@@ -630,6 +663,23 @@ impl Scene for PlexusScene {
         );
         self.node_instances = nodes;
     }
+}
+
+/// `asked` points held to the tier's `cap`, and the overflow to announce when
+/// the cap bit.
+pub(crate) fn points_clamp(asked: u32, cap: usize) -> (usize, Option<super::CapOverflow>) {
+    let asked_n = asked as usize;
+    if asked_n <= cap {
+        return (asked_n, None);
+    }
+    (
+        cap,
+        Some(super::CapOverflow {
+            dropped: asked_n - cap,
+            context: super::OverflowContext::Points(asked),
+            cap,
+        }),
+    )
 }
 
 /// The colour at normalized depth `depth01`, `0` at the volume's nearest extent

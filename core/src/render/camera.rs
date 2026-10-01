@@ -1,7 +1,7 @@
 //! The shared 3D camera (ADR-0257): an orbit camera that projects world points
 //! through a perspective lens, for every pipeline that draws a 3D primitive.
 //!
-//! Two halves, one function. [`CAMERA_WGSL`] is prepended to each 3D pipeline's
+//! Two halves, one function. `CAMERA_WGSL` is prepended to each 3D pipeline's
 //! shader and projects on the GPU; [`CameraView`] is the same matrix on the CPU,
 //! where a scene clips its primitives against the near plane and culls what
 //! lies outside the frustum before anything is uploaded. The two are held equal
@@ -164,7 +164,7 @@ impl Camera3d {
     }
 }
 
-/// One frame's projection: the matrix [`CAMERA_WGSL`] multiplies by, and what
+/// One frame's projection: the matrix `CAMERA_WGSL` multiplies by, and what
 /// the CPU needs to clip against it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CameraView {
@@ -177,7 +177,7 @@ pub struct CameraView {
 }
 
 impl CameraView {
-    /// `p` in clip space. **The CPU mirror of `project()` in [`CAMERA_WGSL`]**,
+    /// `p` in clip space. **The CPU mirror of `project()` in `CAMERA_WGSL`**,
     /// the same four dot products in the same order: a column-major matrix times
     /// `(p, 1)`.
     pub fn clip(&self, p: [f32; 3]) -> [f32; 4] {
@@ -250,7 +250,7 @@ impl CameraView {
     }
 }
 
-/// A lens: the CPU half of `coc()` in [`CAMERA_WGSL`], with its inputs made
+/// A lens: the CPU half of `coc()` in `CAMERA_WGSL`, with its inputs made
 /// safe once.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Lens {
@@ -274,14 +274,14 @@ impl Lens {
     }
 
     /// The circle of confusion at view depth `depth`, as a radius in pixels.
-    /// **Mirrors `coc()` in [`CAMERA_WGSL`]**, term for term.
+    /// **Mirrors `coc()` in `CAMERA_WGSL`**, term for term.
     pub fn coc(&self, depth: f32) -> f32 {
         let blur = self.aperture * (depth - self.focal_depth).abs() / depth;
         blur.clamp(0.0, self.max_coc)
     }
 }
 
-/// The `Camera` uniform [`CAMERA_WGSL`] declares, as it is uploaded.
+/// The `Camera` uniform `CAMERA_WGSL` declares, as it is uploaded.
 ///
 /// **Field order is the WGSL struct's**, and both are `vec4`-aligned, so the
 /// Rust layout is the uniform layout with no padding to keep in step.

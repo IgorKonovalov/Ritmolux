@@ -289,8 +289,8 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 | 2 — Depth of field on segments | dev | done | 6a52a633 |
 | 3 — Nodes: the 3D quad pipeline | dev | done | f7e09ec4 |
 | 4 — The sheet layout | dev | done | de309bfc |
-| 5 — The attractor takes the shared CoC | dev | done | committed with this row |
-| 6 — Tier caps, golden, determinism | dev | not started | |
+| 5 — The attractor takes the shared CoC | dev | done | f43f1dd7 |
+| 6 — Tier caps, golden, determinism | dev | done | committed with this row |
 | 7 — Documentation and the references | dev | not started | |
 | 8 — The look, judged | human | not started | |
 
@@ -337,6 +337,17 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
   attractor has no camera distance, so its `depth_norm` is laid on a fixed virtual lens
   (distance 1, radius 0.5). All nine `core/tests/fixtures/attractor*.toml` rendered through `shot`
   at 160x100 are byte-identical PNGs before and after, on llvmpipe.
+- Phase 6, measured frame cost (`shot --report family=plexus --tier floor`, release profile,
+  1920x1080, AMD Radeon Graphics RADV RENOIR iGPU, Mesa 26.2.2): 600 points, `link_distance 0.6`
+  (saturating the 6000-edge cap), `node_size 3`: cloud 2.764 ms at `aperture 0`, 3.969 ms at
+  `aperture 40` (past the 12 px cap); sheet 1.221 / 2.039 ms. Against NFR section 1's 16.67 ms;
+  the `Floor` values 600 / 6000 / 12 stand unchanged. RENOIR (2020) is newer than the ~2015 iGPU
+  the floor names. `Rich` (1500 / 20000 / 24) was not measured.
+- Phase 6, `core/tests/golden/plexus_sheet.png` blessed on llvmpipe the same way as `plexus.png`.
+  Clamps reach the renderer through three new `OverflowContext` variants (`Points` at load,
+  `Edges` and `Blur` per frame), which is a `scenes/mod.rs` edit outside the phase list.
+- Phase 6, two intra-doc links to the private `CAMERA_WGSL` (from Phases 1-2) broke the public
+  `cargo doc --workspace` run and are unlinked here.
 - Phase 2, `max_coc_px` is a `u32` (the tier struct derives `Eq`), provisional 12 / 24; Phase 6
   measures it.
 

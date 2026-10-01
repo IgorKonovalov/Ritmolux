@@ -1,0 +1,37 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The plexus `sheet` layout under an open aperture, for the suite's 60 frames
+# from a fixed grazing camera.
+#
+#  - `[plexus] seed` pinned, so the grid jitter and the height field are this
+#    file's own.
+#  - `aperture` open and `focus` off-centre, so the blurred path of both 3D
+#    pipelines - the widened trapezoid, the per-fragment energy ratio and the
+#    node area factor - reaches the pixels. The rostered `plexus.toml` keeps a
+#    pinhole camera and takes none of it.
+#  - Every camera param bound, so a change of default cannot move this baseline.
+system = "plexus"
+name   = "fixture_plexus_sheet"
+
+[plexus]
+layout = "sheet"
+points = 300
+seed   = 3
+
+[params]
+link_distance = "0.32"
+link_alpha    = "1.0"
+line_width    = "2.0"
+node_size     = "2.5"
+drift         = "0.3"
+wave          = "0.2"
+wave_scale    = "1.0"
+yaw           = "0.5"
+pitch         = "0.3"
+distance      = "3.2"
+fov           = "0.8"
+focus         = "0.35"
+aperture      = "8"
+hue_center    = "0.5"
+hue_spread    = "0.6"
+brightness    = "1.2"

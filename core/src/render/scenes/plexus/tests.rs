@@ -394,3 +394,117 @@ fn an_unknown_layout_is_rejected_with_the_roster() {
             .is_ok()
     );
 }
+
+/// One run of a layout: seeded, then stepped `frames` times on a parameter
+/// schedule that moves `drift`, `wave` and `link_distance` the way bound
+/// audio would, returning the final point set and edge list.
+fn run(layout: PlexusLayout, frames: usize) -> (Vec<[f32; 3]>, Vec<Edge>) {
+    let mut points = sim::Points::seeded(layout, 0xC0FFEE, 400, 600);
+    let mut edges = Vec::with_capacity(6_000);
+    for k in 0..frames {
+        let t = k as f32 / 60.0;
+        let pulse = 0.5 + 0.5 * (t * 3.1).sin();
+        points.step(1.0 / 60.0, 0.1 + 0.4 * pulse, 0.05 + 0.2 * pulse, 1.0);
+        sim::link(
+            points.pos(),
+            points.fade(),
+            0.25 + 0.1 * pulse,
+            6_000,
+            &mut edges,
+        );
+    }
+    (points.pos().to_vec(), edges)
+}
+
+/// **Determinism**: the same seed and the same frames give the same point set
+/// and the same edge list, exactly, after 600 frames, on both layouts.
+#[test]
+fn the_same_seed_and_frames_give_the_same_network_after_600_frames() {
+    for layout in PlexusLayout::ALL {
+        let (pos_a, edges_a) = run(layout, 600);
+        let (pos_b, edges_b) = run(layout, 600);
+        assert!(!edges_a.is_empty(), "{layout:?} linked nothing");
+        assert_eq!(pos_a, pos_b, "{layout:?}: the points diverged");
+        assert_eq!(edges_a, edges_b, "{layout:?}: the graph diverged");
+    }
+}
+
+/// And through the whole engine: two captures of the same preset after 600
+/// frames are the same bytes, on both layouts.
+#[test]
+fn two_captures_of_one_preset_are_identical() {
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: 96,
+        height: 64,
+        prefer_software: true,
+    }) {
+        Ok(r) => r,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    for layout in PlexusLayout::ALL {
+        let preset = Preset::from_toml_str(&format!(
+            "system = \"plexus\"\nname = \"twice\"\n[plexus]\nlayout = \"{}\"\nseed = 5\n\
+             [params]\naperture = \"10\"\ndrift = \"0.4\"\nyaw = \"time * 0.1\"\n",
+            layout.as_str()
+        ))
+        .expect("the probe loads");
+        renderer.set_presets(vec![preset]);
+        let frame = AnalysisFrame::default();
+        let a = renderer
+            .capture_preset("twice", &frame, 600)
+            .expect("first");
+        let b = renderer
+            .capture_preset("twice", &frame, 600)
+            .expect("second");
+        assert_eq!(a.rgba, b.rgba, "{layout:?}: two captures differ");
+    }
+}
+
+/// A `[plexus] points` past the tier's cap is drawn at the cap **and says
+/// so**, through the renderer's cap overflow, rather than silently thinning.
+#[test]
+fn an_over_tier_point_count_is_clamped_with_a_notice() {
+    use crate::render::TierConfig;
+    use crate::render::scenes::OverflowContext;
+
+    let cap = TierConfig::FLOOR.plexus_points as usize;
+    assert_eq!(super::points_clamp(cap as u32, cap), (cap, None));
+    let (count, overflow) = super::points_clamp(cap as u32 + 100, cap);
+    assert_eq!(count, cap);
+    let overflow = overflow.expect("a clamp is announced");
+    assert_eq!(overflow.context, OverflowContext::Points(cap as u32 + 100));
+    assert!(
+        overflow.to_string().contains("pin --tier rich"),
+        "{overflow}"
+    );
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: 64,
+        height: 64,
+        prefer_software: true,
+    }) {
+        Ok(r) => r,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    let preset = Preset::from_toml_str(&format!(
+        "system = \"plexus\"\nname = \"dense\"\n[plexus]\npoints = {}\n",
+        cap + 100
+    ))
+    .expect("the loader accepts it; the tier is what holds it");
+    renderer.set_presets(vec![preset]);
+    renderer
+        .capture_preset("dense", &AnalysisFrame::default(), 2)
+        .expect("capture");
+    let notice = renderer
+        .cap_overflow()
+        .expect("the clamp reaches the renderer");
+    assert_eq!(notice.context, OverflowContext::Points(cap as u32 + 100));
+}

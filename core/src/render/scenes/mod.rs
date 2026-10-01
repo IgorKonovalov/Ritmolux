@@ -591,6 +591,21 @@ pub enum OverflowContext {
     /// [`cellular_radius`](crate::render::TierConfig::cellular_radius) — per
     /// frame, since the radius is bindable. Carries what was asked.
     Radius(u32),
+    /// A `[plexus] points` asked for past the tier's
+    /// [`plexus_points`](crate::render::TierConfig::plexus_points) — at preset
+    /// load, since the count is structural. Carries what was asked. A clamp of
+    /// content: fewer points is a sparser network.
+    Points(u32),
+    /// A plexus graph that linked more pairs than the tier's
+    /// [`plexus_edges`](crate::render::TierConfig::plexus_edges) — per frame,
+    /// since `link_distance` is bindable. Carries how many linked; the surplus
+    /// is dropped in index order.
+    Edges(u32),
+    /// A blur asked for past the tier's
+    /// [`max_coc_px`](crate::render::TierConfig::max_coc_px) — per frame, since
+    /// `aperture` is bindable. Carries the widest circle of confusion asked, in
+    /// whole pixels; the drawn blur stops at the cap.
+    Blur(u32),
 }
 
 impl std::fmt::Display for OverflowContext {
@@ -604,6 +619,9 @@ impl std::fmt::Display for OverflowContext {
             OverflowContext::Iterations(asked) => write!(f, "iterations {asked}"),
             OverflowContext::Grid(asked) => write!(f, "grid {asked}"),
             OverflowContext::Radius(asked) => write!(f, "radius {asked}"),
+            OverflowContext::Points(asked) => write!(f, "points {asked}"),
+            OverflowContext::Edges(linked) => write!(f, "{linked} links"),
+            OverflowContext::Blur(asked) => write!(f, "a blur of {asked} px"),
         }
     }
 }
@@ -651,6 +669,26 @@ impl std::fmt::Display for CapOverflow {
                  instead, which runs a different rule than the preset asked \
                  (ask for {} or fewer, or pin --tier rich)",
                 self.context, self.cap, self.cap, self.cap
+            ),
+            OverflowContext::Points(_) => write!(
+                f,
+                "{} is past this quality tier's cap of {}; the network is drawn with {} \
+                 points instead, so it is sparser than the preset asked \
+                 (ask for {} or fewer, or pin --tier rich)",
+                self.context, self.cap, self.cap, self.cap
+            ),
+            OverflowContext::Edges(_) => write!(
+                f,
+                "{} exceeded this quality tier's {}-link cap (dropped {}); lower \
+                 link_distance or the point count, or pin --tier rich",
+                self.context, self.cap, self.dropped
+            ),
+            OverflowContext::Blur(_) => write!(
+                f,
+                "{} is past this quality tier's cap of {} px; drawn at {} px instead, so \
+                 the depth of field is shallower than the preset asked \
+                 (lower aperture, or pin --tier rich)",
+                self.context, self.cap, self.cap
             ),
             OverflowContext::Mirror(_) | OverflowContext::Depth(_) => write!(
                 f,
@@ -702,6 +740,15 @@ impl std::fmt::Display for Recovered<'_> {
                     f,
                     "the neighbourhood is back within this tier's cap of {cap}"
                 )
+            }
+            OverflowContext::Points(_) => {
+                write!(f, "the point count is back within this tier's cap of {cap}")
+            }
+            OverflowContext::Edges(_) => {
+                write!(f, "the links are back within this tier's cap of {cap}")
+            }
+            OverflowContext::Blur(_) => {
+                write!(f, "the blur is back within this tier's cap of {cap} px")
             }
         }
     }
@@ -1336,6 +1383,9 @@ mod tests {
             (OverflowContext::Iterations(600), "iteration budget"),
             (OverflowContext::Grid(512), "grid"),
             (OverflowContext::Radius(7), "neighbourhood"),
+            (OverflowContext::Points(900), "point count"),
+            (OverflowContext::Edges(30_000), "links"),
+            (OverflowContext::Blur(30), "blur"),
         ] {
             let overflow = CapOverflow {
                 dropped: 0,
@@ -1356,6 +1406,9 @@ mod tests {
                 OverflowContext::Iterations(_)
                     | OverflowContext::Grid(_)
                     | OverflowContext::Radius(_)
+                    | OverflowContext::Points(_)
+                    | OverflowContext::Edges(_)
+                    | OverflowContext::Blur(_)
             );
             if structural {
                 assert!(
