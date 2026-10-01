@@ -1,6 +1,6 @@
 # 0245 — A gate that runs a built binary checks that it is current
 
-> **Status:** approved (2026-10-01).
+> **Status:** in-progress (2026-10-01).
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md), [ADR-0122](../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)
@@ -91,11 +91,11 @@ flowchart LR
 
 ## Implementation log
 
-**Lane:**
+**Lane:** `plan-0245-a-gate-that-runs-a-built-binary-checks-it-is-current` in `/home/igor/Work/rlx-plan-0245`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The sd-filter suite takes a current `shot` or skips | dev | not started | |
+| 1 — The sd-filter suite takes a current `shot` or skips | dev | done | committed with this row |
 
 ### Notes
 

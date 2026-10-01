@@ -232,7 +232,7 @@ It stops at the first failure and names the step that failed:
 | Claude declarations (self-test) | `node scripts/check-claude-declarations.mjs --self-test` |
 | Gate carriers | `node scripts/check-gate-carriers.mjs` |
 | Gate carriers (self-test) | `node scripts/check-gate-carriers.mjs --self-test` |
-| Diffusion filter | `python3 tools/sd-filter/test_sd_filter.py` (skips with no `python3`) |
+| Diffusion filter | `python3 tools/sd-filter/test_sd_filter.py` (skips with no `python3`; its end-to-end group skips when no built `shot` is newer than the last commit to `core/` or `standalone/`) |
 | Studio typecheck | `npm --prefix studio run typecheck` (skips with no `studio/node_modules`) |
 | Studio lint | `npm --prefix studio run lint` (same guard) |
 | Studio tests | `npm --prefix studio test` (same guard) |

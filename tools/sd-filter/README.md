@@ -64,3 +64,10 @@ python tools/sd-filter/test_sd_filter.py
 Standard library plus `numpy`, no GPU and no weights. It is the one part of this
 feature that can be gated at all, it runs in CI, and what it covers is described
 on the canonical page.
+
+Its end-to-end group runs a built `shot`, the newer of
+`target/release/examples/` and `target/debug/examples/`, and never builds one. It
+skips with a notice naming the build command when there is none, and when the
+one it finds is older than the last commit to `core/`, `standalone/`,
+`Cargo.toml` or `Cargo.lock`. Commit time, not source mtime, because a checkout
+rewrites mtimes.

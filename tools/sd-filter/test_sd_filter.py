@@ -8,9 +8,12 @@ which is the property that makes this stage, alone in this feature, gateable.
 
 The end-to-end half needs a built `shot` and nothing else - it synthesizes its
 own WAV from the standard library, so it RUNS on any checkout rather than
-depending on a file that exists on one machine. Without a built `shot` it SKIPS
-with a printed notice rather than passing quietly (ADR-0016), because a check
-that reports success when it did not run is worse than one that is absent.
+depending on a file that exists on one machine. It takes the newer of the
+release and debug `shot`. Without one, or with one built before the last commit
+to the source that builds it, it SKIPS with a printed notice rather than passing
+quietly (ADR-0016), because a check that reports success when it did not run is
+worse than one that is absent - and one that fails on a stale build blames the
+code for the build directory.
 
 One group has a dependency: the colour-table pin needs `numpy`, because the
 conversions it pins are array functions. It skips with the same notice when
@@ -89,6 +92,56 @@ def synth_wav(path, seconds=0.5, rate=48000, channels=2):
             pcm += struct.pack("<" + "h" * channels, *([level] * channels))
         w.writeframes(bytes(pcm))
     return path
+
+
+# What builds `shot`: a commit touching any of these can change what it does.
+SHOT_SOURCES = ("core", "standalone", "Cargo.toml", "Cargo.lock")
+
+
+def find_shot(repo):
+    """The newer of the release and debug `shot` by modification time, or None.
+
+    A tie keeps release, the same rule as the studio's player lookup.
+    """
+    name = "shot.exe" if os.name == "nt" else "shot"
+    best = None
+    for profile in ("release", "debug"):
+        path = os.path.join(repo, "target", profile, "examples", name)
+        if os.path.isfile(path) and (
+                best is None or os.path.getmtime(path) > os.path.getmtime(best)):
+            best = path
+    return best
+
+
+def last_source_commit(repo):
+    """(committer time, short sha) of the newest commit touching SHOT_SOURCES.
+
+    None when git is absent or cannot answer, e.g. outside a repository. Commit
+    time and not source mtime, because a checkout rewrites every mtime it touches.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "log", "-1", "--format=%ct %h", "--"] + list(SHOT_SOURCES),
+            cwd=repo, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    except OSError:
+        return None
+    fields = out.stdout.decode("ascii", "replace").split()
+    if out.returncode != 0 or len(fields) != 2 or not fields[0].isdigit():
+        return None
+    return int(fields[0]), fields[1]
+
+
+def shot_is_current(path, repo, last_commit=last_source_commit):
+    """(current, last) for the binary at `path`.
+
+    Current means built no earlier than the newest commit to what builds it;
+    `last` is that commit as `last_commit` returns it. When git cannot date the
+    sources, `last` is None and the binary is taken as current.
+    """
+    last = last_commit(repo)
+    if last is None:
+        return True, None
+    return os.path.getmtime(path) >= last[0], last
 
 
 def pump(data, stage=None):
@@ -749,17 +802,74 @@ with tempfile.TemporaryDirectory() as td:
           sd_filter.resolve(parser.parse_args(shlex.split(techo))) == tcfg, techo)
 
 print()
+print("the end-to-end group runs only a current `shot`:")
+
+# The group below runs whatever binary sits in target/ and never rebuilds it,
+# so a binary older than the source it is tested against would fail it for no
+# reason in the code. Checked here on temporary files with set mtimes and a
+# stubbed commit time, so none of it needs a build or a repository.
+with tempfile.TemporaryDirectory() as td:
+    exe = "shot.exe" if os.name == "nt" else "shot"
+    rel = os.path.join(td, "target", "release", "examples", exe)
+    dbg = os.path.join(td, "target", "debug", "examples", exe)
+
+    def place(path, mtime):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb"):
+            pass
+        os.utime(path, (mtime, mtime))
+
+    check("no binary at all finds none", find_shot(td) is None)
+    place(dbg, 1000000000)
+    check("only a debug binary finds it", find_shot(td) == dbg, "got %r" % find_shot(td))
+    place(rel, 1000000500)
+    check("the newer of two binaries is chosen (release)", find_shot(td) == rel,
+          "got %r" % find_shot(td))
+    place(dbg, 1000000900)
+    check("the newer of two binaries is chosen (debug)", find_shot(td) == dbg,
+          "got %r" % find_shot(td))
+    place(rel, 1000000900)
+    check("a tie keeps release", find_shot(td) == rel, "got %r" % find_shot(td))
+
+    def stub(ct):
+        return lambda repo: (ct, "abc1234")
+
+    current, last = shot_is_current(rel, td, last_commit=stub(1000001000))
+    check("a binary older than the last source commit is stale",
+          not current and last == (1000001000, "abc1234"), "got %r" % ((current, last),))
+    current, _ = shot_is_current(rel, td, last_commit=stub(1000000100))
+    check("a binary newer than the last source commit is current", current)
+    current, last = shot_is_current(rel, td, last_commit=lambda repo: None)
+    check("with no commit time to compare, the binary is taken as current",
+          current and last is None, "got %r" % ((current, last),))
+    check("outside a repository the sources have no commit time",
+          last_source_commit(td) is None, "got %r" % (last_source_commit(td),))
+
+print()
 print("end to end, as a subprocess (Phase 3's done-when as written):")
 
-shot = os.path.join(REPO, "target", "release", "examples", "shot.exe")
-if not os.path.exists(shot):
-    shot = os.path.join(REPO, "target", "release", "examples", "shot")
+shot = find_shot(REPO)
+if shot is not None:
+    shot_current, shot_last = shot_is_current(shot, REPO)
+    shot_rel = os.path.relpath(shot, REPO).replace(os.sep, "/")
+    shot_build = "cargo build -p standalone%s --example shot" % (
+        " --release" if os.sep + "release" + os.sep in shot else "")
+    shot_sources = " ".join(s + "/" if os.path.isdir(os.path.join(REPO, s)) else s
+                            for s in SHOT_SOURCES)
 
-if not os.path.exists(shot):
-    print("  SKIPPED: no built `shot` at target/release/examples/")
+if shot is None:
+    print("  SKIPPED: no built `shot` at target/release/examples/ or target/debug/examples/")
     print("  build it with: cargo build -p standalone --release --example shot")
     print("  (the in-process checks above still ran and are the same property)")
+elif not shot_current:
+    print("  SKIPPED: stale shot at %s (built before %s touched %s)"
+          % (shot_rel, shot_last[1], shot_sources))
+    print("  rebuild it with: %s" % shot_build)
+    print("  (the in-process checks above still ran and are the same property)")
 else:
+    if shot_last is None:
+        print("  note: git could not date %s, so %s is taken as current"
+              % (shot_sources, shot_rel))
     with tempfile.TemporaryDirectory() as td:
         wav = synth_wav(os.path.join(td, "clip.wav"))
         args = [
