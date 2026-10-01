@@ -104,6 +104,9 @@ flowchart LR
   build. It printed `SKIPPED: stale shot at target/debug/examples/shot (built before 51c7d433
   touched core/ standalone/ Cargo.toml Cargo.lock)` and the debug rebuild command.
 - **numpy absent on this machine:** the colour-table group skipped in every run here.
+- **Review round 1, finding 0 (major), 063059af:** sources are dated by the later of the commit
+  time and the newest HEAD reflog move that changed them, so the Risks claim of no false pass now
+  holds for a fast-forward or merge; findings 1 and 2 (minors) rode in the same commit, same block.
 
 ### Close triggers
 
