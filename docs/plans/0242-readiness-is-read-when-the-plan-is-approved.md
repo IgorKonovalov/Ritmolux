@@ -167,9 +167,35 @@ sequenceDiagram
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `conductor readiness NNNN` runs the check at approval | dev | done | `7c3dbffe` |
-| 2 — Readiness prints advisories that never park | dev | committed with this row | |
+| 2 — Readiness prints advisories that never park | dev | done | `47b75ecf` |
 | 3 — The architect runs it, and the template defaults judgement phases to owed | human | not started | |
 
 ### Notes
 
+- Phase 1: `readiness NNNN` runs its session against a scratch record under `state/readiness/`
+  (`statePaths().readinessScratch`): that record has its own `conductor.json`, transcripts, prompts
+  and hook logs. The live run's `state/conductor.json` is never written.
+- Phase 1, **Moved checkout**: the test runs a scenario module that the test writes into its own
+  scratch tool directory. The module wraps `lane-scenario.mjs` and leaves an untracked file behind.
+  `lane-scenario.mjs` itself is unchanged.
+- Phase 2: `tools/conductor/test/lane.test.mjs` is touched although Phase 2's `Files touched` does not
+  list it. **Does not block** is a lane test there: a `ready` with an advisory, recorded at approval,
+  runs the same steps. It also checks that the lane prints the advisory to the run terminal.
+- Phase 2: the readiness command's printing of advisories has no test of its own. A test would need
+  the fake session in `lane-scenario.mjs`, which neither phase lists, to emit them.
+- Phase 2: in the digest, advisories are a bullet of their own per plan in `## Needs you`, named by the
+  plan number and counted in the summary line. They do not sit inside the park bullet or the `## Now`
+  lane line.
+
 ### Close triggers
+
+- **`presets/` touched:** no
+- **Plan header `Closes:`** none (the header has no `Closes:` line)
+- **What shipped:** feature (conductor tooling: a new `readiness` command and readiness advisories)
+- **Operator docs touched:** `tools/conductor/README.md` (Commands table row, plus a paragraph under
+  "Before the first run")
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 55 reductions hold across
+  27 live entries, 3 unprobeable; no entry named as failing
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+  `node --test tools/conductor/test/*.test.mjs` passed at both phases.
+- **Outstanding `human` phases:** Phase 3, which is marked `Blocks merge: no`
