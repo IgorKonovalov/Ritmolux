@@ -510,7 +510,7 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 | 4 — The retunes and the sittings | human | done | many, one per family: see Notes |
 | 5 — The gap brief | human | done | 2619581b |
 | 6 — The first refill cohort | human | done | committed with this row |
-| 7 — The verdict | human | not started | |
+| 7 — The verdict | human | owed | |
 
 ### Notes
 
