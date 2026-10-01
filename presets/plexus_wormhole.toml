@@ -1,0 +1,63 @@
+# Wormhole - a sparse network seen from inside, fed back through itself until
+# it becomes a spiral galaxy. The camera sits close with a wide lens so the
+# cloud surrounds it; the feedback stage keeps 98.5 % of every frame, growing
+# it outward and turning it, so every bright node draws a streak that curls
+# out toward the frame edge - a warp-speed vortex with the network at its eye.
+# The nodes carry the light (`node_glow` 3) and the links are kept faint, so
+# the streaks read as rays rather than as smeared sheets.
+#
+# BASS pushes the camera into the cloud and spins the vortex up, both eased
+# (a quarter and a half second) so a hit swells the galaxy rather than
+# jerking it - at this trail length any snap reads as chaos. MID curls the
+# arms (`fb_warp`); ONSETS brighten and swell the nodes so a transient fires
+# a ring of brighter rays outward.
+#
+# Luminance is held low on purpose: at trails 0.985 some sixty frames of light
+# stack on one another, so `brightness` sits well under what a bare cloud
+# wants or the eye of the vortex washes to white.
+#
+# Horizon verdict (shot --horizon 5, 96x96, bass 0.6 mid 0.45, Floor): the
+# feedback warms up over the first 30 s (coverage 0.16 -> 0.46) and then
+# holds between 0.44 and 0.51 for the rest of the run, monotone 0.60 on
+# coverage and peak/mean - breathing, no grind into a corner, no flood. The
+# static star_pattern control read delta 0.0000 on all three statistics.
+system = "plexus"
+name = "Wormhole"
+
+[plexus]
+layout = "cloud"
+points = 260
+seed   = 23
+
+[palette]
+name = "ember"
+
+[params]
+link_distance = "0.3 + clamp(bass * 0.16, 0, 0.14)"
+link_alpha    = "0.45"
+line_width    = "1.0"
+node_size     = "2.6 + clamp(onset * 3, 0, 1.8)"
+node_glow     = "2.4 + clamp(onset * 2, 0, 1.2)"
+drift         = "0.12"
+yaw           = "time * 0.05"
+pitch         = "0.35 * sin(time * 0.05)"
+distance      = "1.9 - clamp(bass * 0.3, 0, 0.25)"
+fov           = "1.9"
+aperture      = "1.5"
+focus         = "0.45"
+hue_center    = "0.7"
+hue_spread    = "0.6"
+brightness    = "0.6"
+trails        = "0.985"
+fb_zoom       = "1.1"
+fb_rotate     = "0.03 + clamp(bass * 0.14, 0, 0.12)"
+fb_warp       = "0.02 + clamp(mid * 0.05, 0, 0.04)"
+bg_vignette   = "0.5"
+
+[smoothing]
+node_size     = 0.06
+link_distance = 0.15
+fb_warp       = 0.3
+fb_rotate     = 0.6
+distance      = 0.25
+node_glow     = 0.05

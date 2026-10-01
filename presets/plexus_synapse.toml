@@ -1,0 +1,56 @@
+# Synapse - the camera pressed up against a cloud of neurons, close enough that
+# the network fills the frame and runs past its edges. Five hundred points
+# drift on a slow current; the BASS knits them, lengthening `link_distance` so
+# every hit grows a burst of new connections that unravel as it decays. ONSETS
+# fire the nodes: `node_glow` jumps past 1.0 on a hit and the bloom stage finds
+# exactly that over-range light, so a transient reads as a flash of signal
+# through the web rather than a gain change on the whole picture. The lines
+# themselves stay nearly flat in luminance - peak energy goes to structure.
+#
+# Focus racks slowly through the depth on a noise wander, so the sharp plane
+# slides from the near strands to the far ones and back; aperture sits under
+# the Floor tier's 12 px blur cap so it draws as written on every tier.
+#
+# Link budget: 500 points in the 2-unit cube, the knit peaking at 0.42, is
+# about 5200 links - under the Floor cap of 6000, so the tier never clips it.
+system = "plexus"
+name = "Synapse"
+
+[plexus]
+layout = "cloud"
+points = 500
+seed   = 7
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#5a1a9e" },
+  { at = 0.3,  color = "#b02ad0" },
+  { at = 0.55, color = "#ff2e88" },
+  { at = 0.8,  color = "#6ff3ff" },
+  { at = 1.0,  color = "#f4ffff" },
+]
+
+[params]
+link_distance   = "0.29 + clamp(bass * 0.15, 0, 0.13)"
+link_alpha      = "0.85"
+line_width      = "1.4"
+node_size       = "2.4 + clamp(onset * 2.5, 0, 1.5)"
+node_glow       = "1.0 + clamp(onset * 4, 0, 2.4)"
+drift           = "0.16 + clamp(mid * 0.18, 0, 0.15)"
+yaw             = "time * 0.04 + noise(time * 0.05) * 1.5"
+pitch           = "-0.35 + noise(time * 0.04 + 20) * 0.7"
+distance        = "1.7"
+fov             = "1.25"
+focus           = "0.2 + noise(time * 0.12 + 50) * 0.6"
+aperture        = "11"
+hue_center      = "0.55"
+hue_spread      = "0.8"
+brightness      = "1.1"
+bloom_amount    = "0.6"
+bloom_threshold = "1.0"
+bloom_radius    = "1.6"
+
+[smoothing]
+link_distance = 0.12
+node_glow     = 0.06
+node_size     = 0.06
