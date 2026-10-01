@@ -2875,8 +2875,8 @@
     },
     "param.aperture.attractor": {
       "type": "string",
-      "description": "How strongly a 3D figure blurs away from its focal plane, in pixels; inert on the flat maps.",
-      "markdownDescription": "How strongly a 3D figure blurs away from its focal plane, in pixels; inert on the flat maps.\n\n- default `0.0`\n- typical range `0.0` to `40.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.",
+      "markdownDescription": "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.depth_fade": {
       "type": "string",
@@ -3605,8 +3605,8 @@
     },
     "param.aperture.plexus": {
       "type": "string",
-      "description": "How strongly lines blur away from the focal plane, in pixels; 0 keeps every line sharp, and wider costs fill.",
-      "markdownDescription": "How strongly lines blur away from the focal plane, in pixels; 0 keeps every line sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `40.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "The blur of the far background, in pixels; lines nearer than the focal plane blur more, up to the tier's cap. 0 keeps every line sharp, and wider costs fill.",
+      "markdownDescription": "The blur of the far background, in pixels; lines nearer than the focal plane blur more, up to the tier's cap. 0 keeps every line sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.hue_center.plexus": {
       "type": "string",

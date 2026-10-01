@@ -573,7 +573,7 @@ cube two units across — or `sheet` — a rippled jittered grid), `points` and 
 | `yaw` | `time * 0.02 – 0.05` | A slow orbit. Faster reads as a spinning object rather than a space. |
 | `pitch` | `0.2 – 0.35` | The default `0.25` looks across a sheet at a grazing angle, which is where its depth of field reads. |
 | `focus` | `0.35 – 0.5` | Where the focal plane sits, `0` nearest, `1` farthest. A slow `0.45 + 0.1 * sin(time * 0.2)` racks focus through the network. |
-| `aperture` | `8 – 18` px | **How much blurs, and it costs fill.** A blurred stroke covers many times the pixels of a sharp one, so the tier caps the blur (12 px Floor, 24 Rich) and announces when a preset asks past it. Author against Floor: past about `14` the near edge of a default-framed network already clamps there. |
+| `aperture` | `8 – 12` px | **The far background's blur, in pixels, and it costs fill.** Behind focus a line never blurs past it; in front of focus it blurs more, the more so the closer the camera. The tier caps every blur (12 px Floor, 24 Rich), so a close camera's near strands draw at the cap and nothing is reported. Only an `aperture` past the cap is announced. At `12` or under it draws as written on every tier, and the declared range ends at `24`. |
 | `hue_center` / `hue_spread` | `0.5 – 0.6` / `0.4 – 0.6` | Colour runs along **depth**, near to far, so `hue_spread` tints distance and `palette_steps` bands it. |
 
 The same `focus` / `aperture` pair blurs the attractor's 3D families (`thomas`, `lorenz`), on the

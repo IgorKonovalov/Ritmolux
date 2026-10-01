@@ -11,6 +11,7 @@
 # crests light up white for a moment and fall back into navy.
 system = "plexus"
 name = "Storm Sea"
+representative = true
 
 [plexus]
 layout = "sheet"

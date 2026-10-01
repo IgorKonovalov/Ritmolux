@@ -508,3 +508,141 @@ fn an_over_tier_point_count_is_clamped_with_a_notice() {
         .expect("the clamp reaches the renderer");
     assert_eq!(notice.context, OverflowContext::Points(cap as u32 + 100));
 }
+
+/// The blur notice a plexus scene built at `tier`'s caps reports after a few
+/// frames of a cloud seen through Synapse's camera at `aperture` and `focus`,
+/// or `None` with a printed skip on a runner with no GPU adapter (ADR-0016).
+///
+/// Built directly rather than through a [`Renderer`]: a headless renderer is
+/// `Tier::Floor` by construction, and Rich's cap is half of what is asked.
+fn blur_notice(
+    tier: crate::render::TierConfig,
+    aperture: f32,
+    focus: f32,
+) -> Option<Option<super::super::CapOverflow>> {
+    use crate::render::context::RenderContext;
+    use crate::render::scenes::{GeneratorConfig, Scene};
+
+    let ctx = match RenderContext::new_headless(64, 64, true) {
+        Ok(ctx) => ctx,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+        Err(e) => panic!("headless context build failed: {e}"),
+    };
+    let mut scene = super::PlexusScene::new(
+        &ctx.device,
+        crate::render::COMPOSITE_FORMAT,
+        tier.plexus_points as usize,
+        tier.plexus_edges as usize,
+        tier.max_coc_px as f32,
+    );
+    scene.configure(&GeneratorConfig::Plexus(PlexusConfig {
+        layout: PlexusLayout::Cloud,
+        points: 500,
+        seed: 7,
+    }));
+    scene.set_target_size(64, 64);
+    for (name, value) in [
+        ("distance", 1.7),
+        ("fov", 1.25),
+        ("link_distance", 0.29),
+        ("aperture", aperture),
+        ("focus", focus),
+    ] {
+        scene.set_param(name, value);
+    }
+    let target = ctx
+        .device
+        .create_texture(&wgpu::TextureDescriptor {
+            label: Some("plexus-blur-target"),
+            size: wgpu::Extent3d {
+                width: 64,
+                height: 64,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: crate::render::COMPOSITE_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        })
+        .create_view(&wgpu::TextureViewDescriptor::default());
+    for _ in 0..3 {
+        scene.advance(1.0 / 60.0);
+        scene.update(&AnalysisFrame::default());
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        scene.render(&ctx.queue, &mut encoder, &target, 16.0 / 9.0);
+        ctx.queue.submit(std::iter::once(encoder.finish()));
+    }
+    Some(scene.mirror_overflow().copied())
+}
+
+/// **The blur cap is the lens's ceiling, and only the aperture is judged
+/// against it** (ADR-0257). Synapse's camera sits inside the cloud's bounding
+/// sphere, where the near side's circle of confusion runs to hundreds of
+/// pixels at any focus; with an aperture under both caps nothing is
+/// announced on either tier. An aperture past the cap is, and names the
+/// remedy for the tier the run is on.
+#[test]
+fn only_an_aperture_past_the_cap_is_announced() {
+    use crate::render::TierConfig;
+    use crate::render::scenes::OverflowContext;
+
+    for tier in [TierConfig::FLOOR, TierConfig::RICH] {
+        for focus in [0.2, 0.5, 0.8] {
+            let Some(notice) = blur_notice(tier, 11.0, focus) else {
+                return;
+            };
+            assert!(
+                notice.is_none(),
+                "{:?} at focus {focus}: Synapse's aperture of 11 is under the cap, \
+                 and its saturated near side is not an overflow: {notice:?}",
+                tier.tier
+            );
+        }
+    }
+
+    let floor_cap = TierConfig::FLOOR.max_coc_px;
+    let Some(floor) = blur_notice(TierConfig::FLOOR, floor_cap as f32 + 1.0, 0.5) else {
+        return;
+    };
+    let floor = floor.expect("an aperture past Floor's cap is announced");
+    assert_eq!(floor.context, OverflowContext::Blur(floor_cap + 1));
+    assert_eq!(floor.cap, floor_cap as usize);
+    assert!(floor.to_string().contains("pin --tier rich"), "{floor}");
+
+    let Some(rich) = blur_notice(TierConfig::RICH, 30.0, 0.5) else {
+        return;
+    };
+    let rich = rich.expect("an aperture past Rich's cap is announced");
+    assert_eq!(rich.context, OverflowContext::Blur(30));
+    assert_eq!(rich.cap, TierConfig::RICH.max_coc_px as usize);
+    assert!(
+        !rich.to_string().contains("--tier"),
+        "a run on Rich is not told to pin Rich: {rich}"
+    );
+}
+
+/// **Every value in `aperture`'s declared range draws as written on the top
+/// tier**: the range ends at Rich's cap, on both systems that read it.
+#[test]
+fn the_aperture_range_ends_at_the_top_tier_cap() {
+    use crate::render::TierConfig;
+
+    let top = TierConfig::RICH.max_coc_px as f32;
+    for (system, params) in [
+        ("plexus", super::PARAMS),
+        ("attractor", crate::render::scenes::particles::PARAMS),
+    ] {
+        let spec = params
+            .iter()
+            .find(|p| p.name == "aperture")
+            .unwrap_or_else(|| panic!("{system} declares aperture"));
+        assert_eq!(spec.range, Some([0.0, top]), "{system}");
+    }
+}

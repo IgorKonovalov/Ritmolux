@@ -601,10 +601,16 @@ pub enum OverflowContext {
     /// since `link_distance` is bindable. Carries how many linked; the surplus
     /// is dropped in index order.
     Edges(u32),
-    /// A blur asked for past the tier's
+    /// An `aperture` asked for past the tier's
     /// [`max_coc_px`](crate::render::TierConfig::max_coc_px) — per frame, since
-    /// `aperture` is bindable. Carries the widest circle of confusion asked, in
-    /// whole pixels; the drawn blur stops at the cap.
+    /// `aperture` is bindable. Carries the aperture, in whole pixels: the blur
+    /// of the far field, which the drawn blur stops short of.
+    ///
+    /// **Not the widest blur the lens draws.** In front of the focal plane the
+    /// circle of confusion grows without bound as depth shrinks, so a close
+    /// camera saturates the cap on every tier with any aperture at all; that
+    /// saturation is the lens's ceiling, not an overflow, and is never
+    /// announced (ADR-0257).
     Blur(u32),
 }
 
@@ -621,7 +627,7 @@ impl std::fmt::Display for OverflowContext {
             OverflowContext::Radius(asked) => write!(f, "radius {asked}"),
             OverflowContext::Points(asked) => write!(f, "points {asked}"),
             OverflowContext::Edges(linked) => write!(f, "{linked} links"),
-            OverflowContext::Blur(asked) => write!(f, "a blur of {asked} px"),
+            OverflowContext::Blur(asked) => write!(f, "an aperture of {asked} px"),
         }
     }
 }
@@ -646,6 +652,14 @@ pub struct CapOverflow {
 
 impl std::fmt::Display for CapOverflow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Pinning the top tier is offered only where it would lift the cap: on
+        // Rich it is the cap that bit, and a remedy naming the tier the run is
+        // already on sends the operator nowhere.
+        let pin = if self.top_tier_lifts() {
+            ", or pin --tier rich"
+        } else {
+            ""
+        };
         match self.context {
             // A clamp, not a cut: nothing is dropped, the picture is drawn at
             // the cap, and the operator is told which lever gets it back.
@@ -653,42 +667,42 @@ impl std::fmt::Display for CapOverflow {
                 f,
                 "{} is past this quality tier's cap of {}; drawn at {} instead, so the \
                  set's boundary resolves less detail than the preset asked for \
-                 (ask for {} or fewer, or pin --tier rich)",
+                 (ask for {} or fewer{pin})",
                 self.context, self.cap, self.cap, self.cap
             ),
             OverflowContext::Grid(_) => write!(
                 f,
                 "{} is past this quality tier's cap of {}; the automaton runs on a {}-cell \
                  grid instead, so every pattern draws larger than the preset asked \
-                 (ask for {} or fewer, or pin --tier rich)",
+                 (ask for {} or fewer{pin})",
                 self.context, self.cap, self.cap, self.cap
             ),
             OverflowContext::Radius(_) => write!(
                 f,
                 "{} is past this quality tier's cap of {}; the neighbourhood is drawn at {} \
                  instead, which runs a different rule than the preset asked \
-                 (ask for {} or fewer, or pin --tier rich)",
+                 (ask for {} or fewer{pin})",
                 self.context, self.cap, self.cap, self.cap
             ),
             OverflowContext::Points(_) => write!(
                 f,
                 "{} is past this quality tier's cap of {}; the network is drawn with {} \
                  points instead, so it is sparser than the preset asked \
-                 (ask for {} or fewer, or pin --tier rich)",
+                 (ask for {} or fewer{pin})",
                 self.context, self.cap, self.cap, self.cap
             ),
             OverflowContext::Edges(_) => write!(
                 f,
                 "{} exceeded this quality tier's {}-link cap (dropped {}); lower \
-                 link_distance or the point count, or pin --tier rich",
+                 link_distance or the point count{pin}",
                 self.context, self.cap, self.dropped
             ),
             OverflowContext::Blur(_) => write!(
                 f,
                 "{} is past this quality tier's cap of {} px; drawn at {} px instead, so \
-                 the depth of field is shallower than the preset asked \
-                 (lower aperture, or pin --tier rich)",
-                self.context, self.cap, self.cap
+                 the background is sharper than the preset asked \
+                 (ask for {} or fewer{pin})",
+                self.context, self.cap, self.cap, self.cap
             ),
             OverflowContext::Mirror(_) | OverflowContext::Depth(_) => write!(
                 f,
@@ -701,6 +715,27 @@ impl std::fmt::Display for CapOverflow {
 }
 
 impl CapOverflow {
+    /// Whether the top tier's cap for this context is above the one that bit,
+    /// so that pinning it would draw more of what the preset asked.
+    ///
+    /// Read off [`TierConfig::RICH`](crate::render::TierConfig::RICH) rather
+    /// than carried, so no producer has to know which tier it runs on: a cap
+    /// below Rich's can only have come from a lower tier, and a cap equal to it
+    /// is the top tier's own.
+    pub fn top_tier_lifts(&self) -> bool {
+        let rich = crate::render::TierConfig::RICH;
+        let top = match self.context {
+            OverflowContext::Mirror(_) | OverflowContext::Depth(_) => rich.max_segments,
+            OverflowContext::Iterations(_) => rich.field_iterations as usize,
+            OverflowContext::Grid(_) => rich.cellular_grid as usize,
+            OverflowContext::Radius(_) => rich.cellular_radius as usize,
+            OverflowContext::Points(_) => rich.plexus_points as usize,
+            OverflowContext::Edges(_) => rich.plexus_edges as usize,
+            OverflowContext::Blur(_) => rich.max_coc_px as usize,
+        };
+        self.cap < top
+    }
+
     /// The clearing of this overflow, worded in the same terms its onset was.
     ///
     /// Three of the five contexts clamp a structural parameter rather than
@@ -748,7 +783,7 @@ impl std::fmt::Display for Recovered<'_> {
                 write!(f, "the links are back within this tier's cap of {cap}")
             }
             OverflowContext::Blur(_) => {
-                write!(f, "the blur is back within this tier's cap of {cap} px")
+                write!(f, "the aperture is back within this tier's cap of {cap} px")
             }
         }
     }
@@ -1370,6 +1405,44 @@ mod tests {
     use crate::preset::SystemKind;
     use crate::render::context::{RenderContext, RenderError};
 
+    /// **`pin --tier rich` is offered only where Rich would lift the cap.** At
+    /// a cap below the top tier's the remedy names it; at the top tier's own
+    /// cap it does not, in every context that offers it.
+    #[test]
+    fn the_tier_remedy_is_offered_only_below_the_top_tier() {
+        let rich = crate::render::TierConfig::RICH;
+        for (context, top) in [
+            (
+                OverflowContext::Iterations(5000),
+                rich.field_iterations as usize,
+            ),
+            (OverflowContext::Grid(4096), rich.cellular_grid as usize),
+            (OverflowContext::Radius(40), rich.cellular_radius as usize),
+            (OverflowContext::Points(9000), rich.plexus_points as usize),
+            (OverflowContext::Edges(90_000), rich.plexus_edges as usize),
+            (OverflowContext::Blur(30), rich.max_coc_px as usize),
+        ] {
+            let below = CapOverflow {
+                dropped: 1,
+                context,
+                cap: top / 2,
+            };
+            assert!(
+                below.to_string().contains("pin --tier rich"),
+                "{context} under a lower tier's cap: {below}"
+            );
+            let at_top = CapOverflow {
+                dropped: 1,
+                context,
+                cap: top,
+            };
+            assert!(
+                !at_top.to_string().contains("--tier"),
+                "{context} at the top tier's cap: {at_top}"
+            );
+        }
+    }
+
     /// **Each context's recovery is worded in that context's own terms.** Three
     /// of the five clamp a structural parameter rather than cutting geometry, so
     /// a line telling an operator that "geometry is back within the segment cap"
@@ -1385,7 +1458,7 @@ mod tests {
             (OverflowContext::Radius(7), "neighbourhood"),
             (OverflowContext::Points(900), "point count"),
             (OverflowContext::Edges(30_000), "links"),
-            (OverflowContext::Blur(30), "blur"),
+            (OverflowContext::Blur(30), "aperture"),
         ] {
             let overflow = CapOverflow {
                 dropped: 0,

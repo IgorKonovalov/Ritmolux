@@ -547,10 +547,14 @@ seen across at a grazing angle, which is what the default `pitch` of `0.25` give
 
 **Depth of field.** `focus` places the focal plane in the network's depth, `0` at its nearest point
 and `1` at its farthest, so it means the same whatever the camera's distance. `aperture` is how
-strongly anything off that plane blurs, in pixels: `0` keeps every line sharp. One line can cross the
+strongly anything off that plane blurs: `0` keeps every line sharp. One line can cross the
 focal plane sharp and soften toward both ends, and a blurred line **dims as it spreads**, so the
-light it carries stays the same. Wide blur costs fill, so the quality tier caps it: 12 px on Floor,
-24 on Rich. An aperture past the cap draws at the cap and **says so**. The same pair of parameters
+light it carries stays the same. In pixels, `aperture` is the blur of the far background: behind the
+focal plane a line approaches it and never passes it. In front of the focal plane the blur grows
+past it, and grows faster the closer the camera is. Wide blur costs fill, so the quality tier caps it
+at 12 px on Floor and 24 on Rich, and a close camera's near strands draw at that cap on either tier.
+That is the lens's ceiling and is not reported. An `aperture` past the cap, where the background
+itself draws sharper than asked, draws at the cap and **says so**. The same pair of parameters
 blurs the attractor's 3D families.
 
 `line_width` and `node_size` are pixels **at the focal plane**: nearer lines are wider and farther

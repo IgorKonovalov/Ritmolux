@@ -8,13 +8,16 @@
 # themselves stay nearly flat in luminance - peak energy goes to structure.
 #
 # Focus racks slowly through the depth on a noise wander, so the sharp plane
-# slides from the near strands to the far ones and back; aperture sits under
-# the Floor tier's 12 px blur cap so it draws as written on every tier.
+# slides from the near strands to the far ones and back. The aperture sits
+# under the Floor tier's 12 px cap, so the far side draws as written on every
+# tier; the camera is close enough that the near strands blur to the tier's
+# ceiling, which is part of the look.
 #
 # Link budget: 500 points in the 2-unit cube, the knit peaking at 0.42, is
 # about 5200 links - under the Floor cap of 6000, so the tier never clips it.
 system = "plexus"
 name = "Synapse"
+representative = true
 
 [plexus]
 layout = "cloud"

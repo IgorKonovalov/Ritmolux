@@ -265,8 +265,8 @@ pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
         name: "aperture",
         default: 0.0,
-        range: Some([0.0, 40.0]),
-        doc: "How strongly lines blur away from the focal plane, in pixels; 0 keeps every line sharp, and wider costs fill.",
+        range: Some([0.0, crate::render::TierConfig::RICH.max_coc_px as f32]),
+        doc: "The blur of the far background, in pixels; lines nearer than the focal plane blur more, up to the tier's cap. 0 keeps every line sharp, and wider costs fill.",
         kind: ParamKind::Modal,
         group: ParamGroup::Light,
         main: true,
@@ -569,20 +569,15 @@ impl Scene for PlexusScene {
             cam.focal_depth(camera.focus, radius),
             self.max_coc,
         );
-        // The widest blur the lens would draw, at whichever extent of the
-        // volume is farther from focus; past the cap it is drawn at the cap,
-        // and that is announced unless the graph's own cap already is.
-        let widest = Lens {
-            max_coc: f32::INFINITY,
-            ..lens
-        };
-        let asked = widest
-            .coc(near_extent.max(crate::render::camera::NEAR))
-            .max(widest.coc(far_extent));
-        if self.clamp.is_none() && asked > lens.max_coc {
+        // The aperture is the far field's blur, the one the lens approaches
+        // and never passes behind focus; past the cap that is what draws
+        // shallower, and it is announced unless the graph's own cap already
+        // is. The near side is unbounded and saturates at the cap by design,
+        // so it is never judged (ADR-0257).
+        if self.clamp.is_none() && lens.aperture > lens.max_coc {
             self.clamp = Some(super::CapOverflow {
                 dropped: 0,
-                context: super::OverflowContext::Blur(asked.ceil() as u32),
+                context: super::OverflowContext::Blur(lens.aperture.ceil() as u32),
                 cap: lens.max_coc as usize,
             });
         }

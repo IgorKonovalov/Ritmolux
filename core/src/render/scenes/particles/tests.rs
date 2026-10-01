@@ -4190,24 +4190,24 @@ fn a_sprite_away_from_the_focal_depth_grows_and_dims() {
     }
 }
 
-/// **A blur past the tier's cap is announced** (ADR-0007): the lens's widest
-/// circle of confusion over a 3D figure is checked against `max_coc_px` every
-/// frame, and a flat map, which no aperture blurs, never reports one.
+/// **An aperture past the tier's cap is announced** (ADR-0007, ADR-0257): the
+/// aperture, the far side's blur, is checked against `max_coc_px` every frame;
+/// the near side's blur, which grows past it and saturates at the cap, is not
+/// judged. A flat map, which no aperture blurs, never reports one.
 #[test]
 fn a_blur_past_the_tier_cap_is_announced() {
     use crate::render::scenes::OverflowContext;
 
     let cap = TierConfig::FLOOR.max_coc_px as f32;
-    // In focus at mid depth, the figure's two extents sit at depths 0.5 and
-    // 1.5 against a focal depth of 1: the near one asks for `aperture` pixels.
-    assert_eq!(super::asked_blur(40.0, 0.5, true), 40.0);
+    assert_eq!(super::asked_blur(40.0, true), 40.0);
+    assert_eq!(super::asked_blur(0.0, true), 0.0, "a pinhole asks nothing");
     assert_eq!(
-        super::asked_blur(0.0, 0.5, true),
+        super::asked_blur(f32::NAN, true),
         0.0,
-        "a pinhole asks nothing"
+        "a non-finite aperture is sanitized as the uniform packing does"
     );
     assert_eq!(
-        super::asked_blur(40.0, 0.5, false),
+        super::asked_blur(40.0, false),
         0.0,
         "a flat map asks nothing"
     );
@@ -4218,6 +4218,9 @@ fn a_blur_past_the_tier_cap_is_announced() {
     let over = super::blur_overflow(40.0, cap).expect("40 px is past the Floor cap");
     assert_eq!(over.context, OverflowContext::Blur(40));
     assert_eq!(over.cap, cap as usize);
+    // Focus moves the near side's blur and never the notice: an aperture under
+    // the cap stays quiet at whichever depth is sharp.
+    assert!(super::blur_overflow(super::asked_blur(cap - 1.0, true), cap).is_none());
     // The scene's lens is the shader's: the CPU copy of the virtual lens names
     // the constants the draw shader declares.
     for (name, value) in [

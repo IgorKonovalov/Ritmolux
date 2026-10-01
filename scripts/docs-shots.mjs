@@ -310,6 +310,12 @@ const CARDS = [
   "curve_prismscope",
   "curve_rosemono",
   "curve_turnabout",
+  // plexus (5)
+  "plexus_crystal",
+  "plexus_cyanotype",
+  "plexus_stormsea",
+  "plexus_synapse",
+  "plexus_wormhole",
   // reaction_diffusion (7)
   "reaction_etching",
   "reaction_fluxmono",
@@ -654,12 +660,11 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // plexus — UNJUDGED, and not a choice: the system ships no preset yet, so
-    // its slot renders the teaching preset the guide prints for the cloud
-    // layout, the system's first. Swap it for a shipped world when the content
-    // lane lands one.
+    // plexus — Synapse, the cloud layout's declared representative and the
+    // look the owner signed off as drawn: the camera inside the network, focus
+    // racking through it.
     out: "docs/images/gallery/plexus.png",
-    presetFile: "docs/examples/plexus/cloud.toml",
+    presetFile: "presets/plexus_synapse.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",

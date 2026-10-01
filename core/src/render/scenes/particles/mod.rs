@@ -1557,8 +1557,8 @@ pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
         name: "aperture",
         default: 0.0,
-        range: Some([0.0, 40.0]),
-        doc: "How strongly a 3D figure blurs away from its focal plane, in pixels; inert on the flat maps.",
+        range: Some([0.0, crate::render::TierConfig::RICH.max_coc_px as f32]),
+        doc: "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.",
         kind: ParamKind::Modal,
         group: ParamGroup::Light,
         main: false,
@@ -2087,11 +2087,7 @@ impl Scene for AttractorScene {
             None => self.entry().framing,
         };
         self.blur_clamp = blur_overflow(
-            asked_blur(
-                self.aperture,
-                self.focus,
-                framing.inv_depth_extent(self.family) != 0.0,
-            ),
+            asked_blur(self.aperture, framing.inv_depth_extent(self.family) != 0.0),
             self.max_coc,
         );
         let Self {
@@ -2243,41 +2239,30 @@ impl Scene for AttractorScene {
 
 /// Mirrors `FIGURE_DISTANCE` / `FIGURE_RADIUS` in [`DRAW_SHADER`]: the virtual
 /// lens a figure's normalized depth is laid on (ADR-0257), its orbit target one
-/// unit away and the figure half a unit deep either side of it.
+/// unit away and the figure half a unit deep either side of it. Only the
+/// shader's CPU transcription reads them; the scene judges the bare aperture.
+#[cfg(test)]
 pub(super) const FIGURE_DISTANCE: f32 = 1.0;
+#[cfg(test)]
 pub(super) const FIGURE_RADIUS: f32 = 0.5;
 
-/// The widest circle of confusion, in pixels, the lens asks for anywhere on a
-/// figure, before the tier's cap: `coc()` at the figure's nearest and farthest
-/// depth, whichever is farther from focus. `aperture` and `focus` are the raw
-/// bound values, sanitized as the uniform packing sanitizes them.
+/// The blur, in pixels, the tier's cap is judged against: the aperture, which
+/// is the circle of confusion of the far field — behind focus the lens rises
+/// toward it and never passes it. In front of focus the blur grows past it
+/// without bound and saturates at the cap by design, so that side is never
+/// judged (ADR-0257). `aperture` is the raw bound value, sanitized as the
+/// uniform packing sanitizes it.
 ///
 /// **Exactly 0 on a family without depth**, which `figure_coc()` in the draw
 /// shader zeroes whatever the aperture, so a flat map never announces a blur.
-pub(super) fn asked_blur(aperture: f32, focus: f32, has_depth: bool) -> f32 {
-    if !has_depth {
+pub(super) fn asked_blur(aperture: f32, has_depth: bool) -> f32 {
+    if !has_depth || !aperture.is_finite() {
         return 0.0;
     }
-    let aperture = if aperture.is_finite() {
-        aperture.max(0.0)
-    } else {
-        0.0
-    };
-    let focus = if focus.is_finite() {
-        focus.clamp(0.0, 1.0)
-    } else {
-        0.5
-    };
-    let lens = crate::render::camera::Lens {
-        aperture,
-        focal_depth: FIGURE_DISTANCE - FIGURE_RADIUS * (1.0 - 2.0 * focus),
-        max_coc: f32::INFINITY,
-    };
-    lens.coc(FIGURE_DISTANCE - FIGURE_RADIUS)
-        .max(lens.coc(FIGURE_DISTANCE + FIGURE_RADIUS))
+    aperture.max(0.0)
 }
 
-/// The overflow to announce when a blur of `asked` pixels is past the tier's
+/// The overflow to announce when an aperture of `asked` pixels is past the tier's
 /// `cap`, or `None` when the cap does not bite.
 pub(super) fn blur_overflow(asked: f32, cap: f32) -> Option<super::lines::CapOverflow> {
     (asked > cap).then(|| super::lines::CapOverflow {

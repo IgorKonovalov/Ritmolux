@@ -683,7 +683,7 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `reseed` | `0` | `0` – `1` | Crossing zero throws every particle back onto a fresh start position. | motion |
 | `perspective` | `0` | `0` – `1` | How strongly depth shrinks a particle, turning a flat figure into a solid one. | shape |
 | `focus` | `0.5` | `0` – `1` | Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest. | light |
-| `aperture` | `0` | `0` – `40` | How strongly a 3D figure blurs away from its focal plane, in pixels; inert on the flat maps. | light |
+| `aperture` | `0` | `0` – `24` | The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps. | light |
 | `depth_fade` | `0` | `0` – `1` | How much depth dims a particle, which is what reads as air between the layers. | light |
 | `depth_hue` | `0` | `-1` – `1` | Shifts colour with depth, so far parts of the figure sit elsewhere on the palette. | colour |
 | `spin` | `0` | `-2` – `2` | Turns per second the figure rotates by about its vertical axis. | motion, main |
@@ -1009,7 +1009,7 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `distance` | `3.5` | `1.5` – `8` | How far the camera sits from the network's centre; nearer exaggerates the perspective. | motion |
 | `fov` | `0.8` | `0.2` – `2` | The camera's vertical field of view in radians; zoom divides it. | motion |
 | `focus` | `0.5` | `0` – `1` | Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest. | light, main |
-| `aperture` | `0` | `0` – `40` | How strongly lines blur away from the focal plane, in pixels; 0 keeps every line sharp, and wider costs fill. | light, main |
+| `aperture` | `0` | `0` – `24` | The blur of the far background, in pixels; lines nearer than the focal plane blur more, up to the tier's cap. 0 keeps every line sharp, and wider costs fill. | light, main |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
 | `hue_center` | `0.5` | `0` – `1` | Where along the palette the middle of the volume's depth is coloured. | colour |
 | `hue_spread` | `0.5` | `0` – `1` | How far along the palette the colour travels from the nearest part of the volume to the farthest. | colour |

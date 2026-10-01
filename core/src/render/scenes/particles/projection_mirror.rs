@@ -178,7 +178,7 @@ pub(super) fn world(
 }
 
 // The virtual lens the figure's normalized depth is laid on (ADR-0257): the
-// scene's own CPU copy, so the announce check and this transcription share it.
+// scene's own CPU copy of the draw shader's constants.
 use super::{FIGURE_DISTANCE, FIGURE_RADIUS};
 
 /// Mirrors `figure_coc()` in [`DRAW_SHADER`](super::DRAW_SHADER): the circle of

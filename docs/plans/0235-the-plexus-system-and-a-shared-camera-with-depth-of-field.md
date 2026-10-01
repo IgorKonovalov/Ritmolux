@@ -355,6 +355,7 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 | 6 — Tier caps, golden, determinism | dev | done | 0c23e166 |
 | 7 — Documentation and the references | dev | done | 2ad353bc |
 | 8 — The look, judged | human | not started | |
+| 9 — The blur cap is a ceiling; the first set joins the gates | dev | committed with this row | |
 
 ### Notes
 
@@ -434,12 +435,23 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 - Close-review fix round 2, minor: the pairing comment in `plexus/sim.rs` states 180k checks at
   Floor and 1.1M at Rich, and says only Floor is measured. Rich's cost is still unmeasured.
   Commit 1222b4b6.
+- Phase 9, mechanism: the tier clause is decided by `CapOverflow::top_tier_lifts`, which compares
+  `cap` with `TierConfig::RICH`'s value for the context rather than carrying the tier, so the
+  Mirror/Depth producers are untouched. `FIGURE_DISTANCE` / `FIGURE_RADIUS` are now
+  `#[cfg(test)]`: only the shader transcription reads them.
+- Phase 9, outside the file list: `docs/specs/player-schema.json` is regenerated, since it carries
+  the `aperture` range. `.taplo.toml` did not change. The systems.md `aperture` working range moved
+  from `8 – 18` to `8 – 12`, the values that draw as written on Floor.
+- Phase 9: a plain `cargo build -p rlx-core` warns that `PreviewService::target` is never used
+  (`core/src/render/preview.rs:96`, last touched a8eab67d). This phase does not touch that file, and
+  clippy is clean.
 
 ### Close triggers
 
 - **`presets/` touched:** yes: `presets/README.md` (generated params block, contents block, one
   hand-written sentence), `presets/preset.schema.json` and every `presets/schema/*.schema.json`,
-  including the new `plexus.schema.json`. No preset `.toml` added or changed.
+  including the new `plexus.schema.json`. Phase 9: `representative = true` on
+  `plexus_synapse.toml` and `plexus_stormsea.toml`, and Synapse's header comment.
 - **Plan header `Closes:`** none
 - **What shipped:** feature: `SystemKind::Plexus` with `cloud` and `sheet` layouts, the shared
   `Camera3d` / `camera.wgsl`, the `seg3d` and `quad3d` pipelines, and `focus` / `aperture` on the
@@ -454,6 +466,7 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
   After the two close-review fixes, at 7cdf291e: exit 0, 1938 passed, 8 skipped; `cargo doc
   --workspace --no-deps` under `-D warnings` clean.
   After fix round 2, at 1222b4b6: exit 0, 1939 passed, 8 skipped; `cargo doc` clean.
+  After Phase 9, on its tree: exit 0, 1946 passed, 8 skipped; `cargo doc` clean.
 - **Outstanding `human` phases:** Phase 8 (the look, judged against the reference),
   `Blocks merge: no`.
 
