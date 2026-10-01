@@ -7,7 +7,9 @@
 //
 // Commands run in order and stop at the first failure. Each one's output is kept under
 // state/gates/. `nextest` runs under the machine-wide suite lock. The gate never retries a red: a
-// flake is a defect to fix (ADR-0193), and a retry would bury it.
+// flake is a defect to fix (ADR-0193), and a retry would bury it. The one retry in a gate run is
+// nextest's own, by exact test name in .config/nextest.toml, while a live backlog entry diagnoses that
+// test as a flake (ADR-0261); a pass on that retry is recorded green with the name under `flaky`.
 //
 // A step marked `ledger` is the full workspace suite, and it resolves to one of three states
 // (ADR-0211, lib/ledger.mjs). A green record for this exact tree `skipped`s it and nothing runs

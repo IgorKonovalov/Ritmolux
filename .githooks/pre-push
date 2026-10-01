@@ -413,9 +413,11 @@ run_step "cargo doc --workspace --no-deps (RUSTDOCFLAGS=-D warnings)" env "RUSTD
 #
 # The step is served, not run, when the suite ledger holds a green `cargo nextest run --workspace`
 # for this exact tree (ADR-0237): the full suite is a superset of `-P fast`, and the ledger records a
-# run only on a tree that was clean when it started and when it ended. A dirty worktree, a tree with
-# only a `-P fast` record, or a red newest record runs the step. suite-record.mjs answers exit 0 only
-# for a record, so a missing node or a crash there runs the step too.
+# run only on a tree that was clean when it started and when it ended. A green served line - the
+# `-P fast` a ledger record served in the full suite's place on this exact tree (ADR-0261) - serves the
+# step too, since it is this step's own run. A dirty worktree, a tree with only a hand `-P fast` run,
+# or a red newest record runs the step. suite-record.mjs answers exit 0 only for a record, so a
+# missing node or a crash there runs the step too.
 if command -v node >/dev/null 2>&1 && suite_record=$(node tools/conductor/suite-record.mjs); then
     echo "pre-push: serving cargo nextest run -P fast from the suite ledger: $suite_record"
 else
