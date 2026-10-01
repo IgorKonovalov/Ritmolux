@@ -648,6 +648,13 @@ pub struct AttractorScene {
     /// work inside the hook (ADR-0030 condition 2).
     trail_w: u32,
     trail_h: u32,
+    /// The render target's height in pixels, as handed to
+    /// [`Scene::set_target_size`](crate::render::scenes::Scene::set_target_size)
+    /// — **not** the trail grid's. The lens states a circle of confusion in
+    /// pixels of the target (ADR-0257), and the trail grid is a resolution that
+    /// the grid scale and the tier cap shrink below the target (ADR-0037), so a
+    /// blur measured in its pixels would widen on screen as the grid shrank.
+    target_h: u32,
     /// The active tier's cap on the trail grid
     /// ([`TierConfig::attractor_trail_cap`](crate::render::TierConfig::attractor_trail_cap)),
     /// resolved once at construction. Read only in `set_target_size`, so the grid
@@ -981,6 +988,7 @@ impl AttractorScene {
             density: 1.0,
             trail_w: TRAIL_FALLBACK_W,
             trail_h: TRAIL_FALLBACK_H,
+            target_h: TRAIL_FALLBACK_H,
             seed_particles,
             needs_upload: true,
             pending_jitter: false,
@@ -1795,6 +1803,7 @@ impl Scene for AttractorScene {
         let (w, h) = scaled_trail_grid_size(width, height, self.field_scale, self.trail_cap);
         self.trail_w = w;
         self.trail_h = h;
+        self.target_h = height.max(1);
         self.targeted = true;
         self.budget = attractor_budget(
             self.anchor,
@@ -2120,7 +2129,7 @@ impl Scene for AttractorScene {
             focus,
             aperture,
             max_coc,
-            trail_h,
+            target_h,
             depth_fade,
             depth_hue,
             map_tint,
@@ -2186,7 +2195,7 @@ impl Scene for AttractorScene {
                 aperture: *aperture,
                 focus: *focus,
                 max_coc: *max_coc,
-                field_height: *trail_h,
+                target_height: *target_h,
                 depth_fade: *depth_fade,
                 depth_hue: *depth_hue,
                 map_tint: *map_tint,

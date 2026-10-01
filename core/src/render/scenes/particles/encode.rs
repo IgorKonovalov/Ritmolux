@@ -84,8 +84,10 @@ pub(super) struct UniformInputs {
     pub(super) aperture: f32,
     pub(super) focus: f32,
     pub(super) max_coc: f32,
-    /// The height in pixels of the field the sprites are drawn into.
-    pub(super) field_height: u32,
+    /// The render target's height in pixels — never the trail grid's, which
+    /// the grid scale and the tier cap shrink — so a circle of confusion stated
+    /// in pixels is a width on screen (ADR-0257, ADR-0037).
+    pub(super) target_height: u32,
     pub(super) depth_fade: f32,
     pub(super) depth_hue: f32,
     /// ADR-0087's last-map channel, at its two routes. Both reach the draw
@@ -300,14 +302,14 @@ pub(super) fn upload_uniforms(
                     emergence_rate(inputs.emergence),
                     0.0,
                     palette::band_steps(inputs.palette_steps),
-                    inputs.field_height as f32,
+                    inputs.target_height as f32,
                 ]
             } else {
                 [
                     0.0,
                     1.0,
                     palette::band_steps(inputs.palette_steps),
-                    inputs.field_height as f32,
+                    inputs.target_height as f32,
                 ]
             },
         }),

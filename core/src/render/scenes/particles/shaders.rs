@@ -396,8 +396,9 @@ struct Draw {
     //    z is `palette_steps` (ADR-0078) - it and w were FREE since Plan 0074
     //    Phase 3, when z stopped carrying the reciprocal of the longest
     //    reachable lifetime that only the retired age colour channel read.
-    //    w is the height in pixels of the field the sprites are drawn into,
-    //    which turns a circle of confusion in pixels into world units.
+    //    w is the render target's height in pixels - not the trail field's,
+    //    which the grid scale shrinks - and turns a circle of confusion in
+    //    pixels of the screen into world units.
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
@@ -687,8 +688,9 @@ fn vs_main(
 
     // Depth of field (ADR-0257): a sprite away from the focal depth grows by
     // its circle of confusion and its light spreads over the larger disc. The
-    // field's height turns pixels into the world units the sprite is built in:
-    // one world unit is `zoom * height / 2` pixels.
+    // render target's height turns pixels into the world units the sprite is
+    // built in: one world unit is `zoom * height / 2` pixels of the screen,
+    // whatever size the trail field is drawn at.
     let px_per_world = draw.x.x * draw.em.w * 0.5;
     let blur = figure_coc(dn);
     let grow = blur_growth(sprite * px_per_world, blur);

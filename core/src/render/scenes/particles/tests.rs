@@ -4259,6 +4259,51 @@ fn a_blur_past_the_tier_cap_is_announced() {
     );
 }
 
+/// **The blur is a width on screen, whatever size the trail field is drawn
+/// at** (ADR-0257, ADR-0037): the draw shader turns a circle of confusion in
+/// pixels into world units through the height it is handed, and that height is
+/// the render target's. At a grid scale of `0.5` the trail field is half the
+/// target, so a blur measured in its pixels would come out twice as wide on
+/// screen; here the same figure, lens and target give the same on-screen
+/// sprite at both scales.
+#[test]
+fn the_blur_is_in_target_pixels_whatever_the_grid_scale() {
+    use crate::render::tier::GridScale;
+    use projection_mirror as m;
+
+    let Some(mut h) = Harness::new(AttractorFamily::Thomas) else {
+        return;
+    };
+    let inv = AttractorFamily::Thomas
+        .canonical_framing()
+        .inv_depth_extent(AttractorFamily::Thomas);
+    let (zoom, sprite_world, (w, ht)) = (1.0f32, 0.004f32, (1920u32, 1080u32));
+    // The on-screen radius, in target pixels, of a sprite at the figure's far
+    // extent through a lens focused at its near one: the shader's
+    // `sprite * grow`, carried to pixels by the same height it is handed.
+    let mut reading = |scale: f32| {
+        h.scene
+            .set_grid_scale(GridScale::new(scale).expect("a valid grid scale"));
+        h.scene.set_target_size(w, ht);
+        let px_per_world = zoom * h.scene.target_h as f32 * 0.5;
+        let r_px = sprite_world * px_per_world;
+        let grow = m::blur_growth(r_px, m::figure_coc(-1.0, 12.0, 0.0, 40.0, inv));
+        ((h.scene.trail_w, h.scene.trail_h), r_px * grow)
+    };
+    let (full_grid, full) = reading(1.0);
+    let (half_grid, half) = reading(0.5);
+    assert_ne!(
+        full_grid, half_grid,
+        "the grid has to shrink with the scale, or this compares nothing"
+    );
+    assert!(full > 1.0, "the far sprite is blurred: {full} px");
+    assert_eq!(
+        full, half,
+        "the on-screen blur moved with the grid: {full} px at 1.0, {half} px at 0.5"
+    );
+    assert_eq!(h.scene.target_h, ht, "the lens reads the target's height");
+}
+
 /// **Through the whole engine**: an aperture changes a 3D figure's frame and
 /// spreads its light, and leaves a flat map's frame byte-identical, since a
 /// flat map has no depth to be out of focus at.
