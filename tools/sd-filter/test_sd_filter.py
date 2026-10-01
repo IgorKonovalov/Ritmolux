@@ -9,8 +9,8 @@ which is the property that makes this stage, alone in this feature, gateable.
 The end-to-end half needs a built `shot` and nothing else - it synthesizes its
 own WAV from the standard library, so it RUNS on any checkout rather than
 depending on a file that exists on one machine. It takes the newer of the
-release and debug `shot`. Without one, or with one built before the last commit
-to the source that builds it, it SKIPS with a printed notice rather than passing
+release and debug `shot`. Without one, or with one built before the source that
+builds it last changed in this checkout, it SKIPS with a printed notice rather than passing
 quietly (ADR-0016), because a check that reports success when it did not run is
 worse than one that is absent - and one that fails on a stale build blames the
 code for the build directory.
@@ -113,7 +113,7 @@ def find_shot(repo):
     return best
 
 
-def last_source_commit(repo):
+def newest_source_commit(repo):
     """(committer time, short sha) of the newest commit touching SHOT_SOURCES.
 
     None when git is absent or cannot answer, e.g. outside a repository. Commit
@@ -129,6 +129,73 @@ def last_source_commit(repo):
     if out.returncode != 0 or len(fields) != 2 or not fields[0].isdigit():
         return None
     return int(fields[0]), fields[1]
+
+
+# How many HEAD moves source_arrival reads back before giving up.
+REFLOG_DEPTH = 100
+
+
+def source_arrival(repo, depth=REFLOG_DEPTH):
+    """Unix time of the newest HEAD move in this checkout that changed SHOT_SOURCES.
+
+    A commit's time is when it was written, wherever that was: a commit that
+    reaches this checkout later by fast-forward, merge or branch switch is older
+    than its arrival, and so is any binary built in between. Each reflog entry
+    is a move to its sha from the sha of the entry after it; the first move whose
+    two trees differ under SHOT_SOURCES is the arrival. None when git cannot
+    answer, or when no such move is in the newest `depth` entries and the
+    reflog runs past them.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "log", "-g", "-n", str(depth), "--date=unix",
+             "--format=%H %gd", "HEAD"],
+            cwd=repo, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    except OSError:
+        return None
+    if out.returncode != 0:
+        return None
+    moves = []
+    for line in out.stdout.decode("ascii", "replace").splitlines():
+        fields = line.split()
+        # %gd under --date=unix reads HEAD@{<unix time>}.
+        if len(fields) != 2 or not fields[1].endswith("}") or "@{" not in fields[1]:
+            return None
+        stamp = fields[1][fields[1].index("@{") + 2:-1]
+        if not stamp.isdigit():
+            return None
+        moves.append((fields[0], int(stamp)))
+    for (new, when), (old, _) in zip(moves, moves[1:]):
+        if new == old:
+            continue
+        diff = subprocess.run(
+            ["git", "diff", "--quiet", old, new, "--"] + list(SHOT_SOURCES),
+            cwd=repo, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if diff.returncode == 1:
+            return when
+        if diff.returncode != 0:
+            return None
+    # The whole reflog was read and no move changed the sources: they are as
+    # its oldest entry found them, which a new worktree or clone writes when
+    # the sources arrive. Never earlier than the truth, so at worst a false skip.
+    if moves and len(moves) < depth:
+        return moves[-1][1]
+    return None
+
+
+def last_source_commit(repo, commit=newest_source_commit, arrival=source_arrival):
+    """(time, short sha): the newest source commit, dated by when it reached here.
+
+    The time is the later of that commit's committer time and the newest HEAD
+    move that changed the sources, so a binary built before a fast-forward that
+    brought in an older commit is still older than its sources. None when the
+    commit cannot be read; a missing arrival falls back to the commit time.
+    """
+    last = commit(repo)
+    if last is None:
+        return None
+    came = arrival(repo)
+    return (max(last[0], came) if came is not None else last[0]), last[1]
 
 
 def shot_is_current(path, repo, last_commit=last_source_commit):
@@ -844,6 +911,25 @@ with tempfile.TemporaryDirectory() as td:
           current and last is None, "got %r" % ((current, last),))
     check("outside a repository the sources have no commit time",
           last_source_commit(td) is None, "got %r" % (last_source_commit(td),))
+    check("outside a repository the sources have no arrival",
+          source_arrival(td) is None, "got %r" % (source_arrival(td),))
+
+    # Written at 1000000100, fast-forwarded in at 1000001000; built between.
+    def written(repo):
+        return 1000000100, "abc1234"
+
+    last = last_source_commit(td, commit=written, arrival=lambda repo: 1000001000)
+    check("a later arrival dates the sources", last == (1000001000, "abc1234"),
+          "got %r" % (last,))
+    current, _ = shot_is_current(rel, td, last_commit=lambda repo: last_source_commit(
+        repo, commit=written, arrival=lambda r: 1000001000))
+    check("a binary built between commit and arrival is stale", not current)
+    last = last_source_commit(td, commit=written, arrival=lambda repo: None)
+    check("with no arrival the commit time stands", last == (1000000100, "abc1234"),
+          "got %r" % (last,))
+    last = last_source_commit(td, commit=written, arrival=lambda repo: 1000000000)
+    check("an arrival older than the commit does not backdate it",
+          last == (1000000100, "abc1234"), "got %r" % (last,))
 
 print()
 print("end to end, as a subprocess (Phase 3's done-when as written):")
@@ -853,7 +939,7 @@ if shot is not None:
     shot_current, shot_last = shot_is_current(shot, REPO)
     shot_rel = os.path.relpath(shot, REPO).replace(os.sep, "/")
     shot_build = "cargo build -p standalone%s --example shot" % (
-        " --release" if os.sep + "release" + os.sep in shot else "")
+        " --release" if shot_rel.startswith("target/release/") else "")
     shot_sources = " ".join(s + "/" if os.path.isdir(os.path.join(REPO, s)) else s
                             for s in SHOT_SOURCES)
 
@@ -862,7 +948,8 @@ if shot is None:
     print("  build it with: cargo build -p standalone --release --example shot")
     print("  (the in-process checks above still ran and are the same property)")
 elif not shot_current:
-    print("  SKIPPED: stale shot at %s (built before %s touched %s)"
+    print("  SKIPPED: stale shot at %s (built before %s, the last commit to %s,"
+          " reached this checkout)"
           % (shot_rel, shot_last[1], shot_sources))
     print("  rebuild it with: %s" % shot_build)
     print("  (the in-process checks above still ran and are the same property)")
