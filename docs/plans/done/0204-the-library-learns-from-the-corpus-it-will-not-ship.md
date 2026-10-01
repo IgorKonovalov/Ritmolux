@@ -1,15 +1,18 @@
 # 0204 — The library learns from the corpus it will not ship
 
-> **Status:** approved
+> **Status:** done - closed 2026-10-01 by an architect review in a fresh session: phases 1-4 landed
+> (`66ce9350`, `b97ca31b`, `c235225a`, `dd1ed3ac`); no blockers, no majors, one minor (repaired at
+> the close), one nit. Verified: full `cargo nextest run --workspace` 1934 passed, 8 skipped;
+> `cargo doc -D warnings` clean; Maelstrom distinct in `shot --report family=swarm`. Version 0.159.0.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** human (the `preset-author` lane throughout)
-> **Related ADRs:** [0227](../adrs/0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md)
-> (proposed), [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md),
-> [0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md),
-> [0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md),
-> [0017](../adrs/0017-preset-author-skill-lane.md)
-> **Sequenced with:** [Plan 0232](done/0232-the-library-is-walked-cut-and-refilled.md) (added 2026-09-27):
+> **Related ADRs:** [0227](../../adrs/0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md)
+> (proposed), [0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md),
+> [0081](../../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md),
+> [0089](../../adrs/0089-the-library-renews-by-replacement-cohorts.md),
+> [0017](../../adrs/0017-preset-author-skill-lane.md)
+> **Sequenced with:** [Plan 0232](0232-the-library-is-walked-cut-and-refilled.md) (added 2026-09-27):
 > Phases 1-2 may run any time; Phase 2's cohort is chosen against 0232's `## Gaps`, and Phase 3
 > lands after 0232 Phase 3's cull.
 
@@ -25,11 +28,11 @@ decides whether the remaining picks are worth doing at all.
 ## Context & problem
 
 **The content gap is real and the import route is closed.**
-[ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
+[ADR-0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
 sized it honestly: this engine's library is measured in the low hundreds, the MilkDrop lineage's in
 the tens of thousands. It built `milkconv` and the `warp_mesh` idiom, and then declined to decide
 whether anything converted may ship —
-[Plan 0100](done/0100-the-engine-speaks-milkdrop.md) Phase 8 still owns that, and its standing
+[Plan 0100](0100-the-engine-speaks-milkdrop.md) Phase 8 still owns that, and its standing
 answer is *nothing third-party in the repository or a release*.
 
 **So the corpus became a catalogue instead of a source.** On 2026-09-19 the `cream-of-the-crop`
@@ -66,13 +69,13 @@ to fix.
 
 **Three constraints make this a plan rather than a sitting.** The looks must be reached natively,
 with nothing from the corpus entering the tree, including renders — that is
-[ADR-0227](../adrs/0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md).
+[ADR-0227](../../adrs/0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md).
 The picks are warp-idiom in origin but not all warp-idiom in nature, so each needs routing to a
 system rather than a blanket assignment. And
-[ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md) says the library renews by
+[ADR-0089](../../adrs/0089-the-library-renews-by-replacement-cohorts.md) says the library renews by
 cohorts, so twenty-one presets is not a thing to author before anyone has seen whether one works.
 
-**It sits behind [Plan 0201](done/0201-the-warp-surface-stops-lying.md), and that ordering is
+**It sits behind [Plan 0201](0201-the-warp-surface-stops-lying.md), and that ordering is
 load-bearing.** That plan's own TL;DR says `warp_mesh`'s `zoom` doc *"says the opposite of what its
 shader does and four generated surfaces carry the lie"* — and that the lie has **already produced a
 false paragraph in shipped content**. Any pick that routes to `warp_mesh` would be authored against
@@ -127,10 +130,10 @@ never copied across the boundary.
 ## Implementation phases
 
 Every phase here is `human` — this is content-lane work throughout, in the sense
-[ADR-0017](../adrs/0017-preset-author-skill-lane.md) established and the standing sittings in
-[`docs/content-brief.md`](../content-brief.md) already use. There is no Rust or C++ in this plan.
+[ADR-0017](../../adrs/0017-preset-author-skill-lane.md) established and the standing sittings in
+[`docs/content-brief.md`](../../content-brief.md) already use. There is no Rust or C++ in this plan.
 A conductor run would park at Phase 1 and stay parked, per
-[ADR-0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md);
+[ADR-0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md);
 that is correct, not a defect.
 
 **This plan's `human` phases may write to the routing table above.** That is a scoped exception to
@@ -160,7 +163,7 @@ working surface, and Phase 2's output has nowhere better to live.
   carries the look — `warp` for a drifting-sinusoid churn, the reaction-diffusion field for a
   veined skin, `analytic_field` for a banded interference, and so on. A pick with **no** native
   home is recorded as such rather than forced into one: that is an engine-gap finding for
-  [`docs/design-backlog.md`](../design-backlog.md), and routing it to the nearest system anyway
+  [`docs/design-backlog.md`](../../design-backlog.md), and routing it to the nearest system anyway
   would bury exactly the signal this plan is best placed to produce. The cohort named for Phase 3
   is four to six picks and **spans at least three distinct systems** — a cohort routed to one
   system tests the idiom, not the routing, and the routing is this plan's claim.
@@ -173,11 +176,11 @@ working surface, and Phase 2's output has nowhere better to live.
   generated editor schema applies), and `presets/README.md` only if a hand-written structural or
   palette table needs it.
 - **Done when:** every preset in the cohort passes the behavioral suite and lands through the
-  [ADR-0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) route;
+  [ADR-0081](../../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) route;
   each carries a header stating its own mechanism and **naming no third-party preset**, per
   ADR-0227; and each was rendered and looked at before it was committed. Note what the gate is
   worth while leaning on it: of the five, only `reactivity` drives PCM through the real analyzer
-  ([`docs/testing.md`](../testing.md) carries the table), so a green suite says these presets are
+  ([`docs/testing.md`](../../testing.md) carries the table), so a green suite says these presets are
   *sound*, never that they are *good*.
 
 ### Phase 4 — The verdict, in the live app
@@ -229,10 +232,10 @@ that needs one, that is a feedback note to `architect`, not a phase of this plan
   no render of either, in the repository or a release.
 - **It does not touch engine Rust.** No new scene, param, expression function, curve family or
   shader. Anything a look needs that the preset surface cannot express routes to `architect` as a
-  backlog entry — that is the [ADR-0017](../adrs/0017-preset-author-skill-lane.md) boundary and
+  backlog entry — that is the [ADR-0017](../../adrs/0017-preset-author-skill-lane.md) boundary and
   this plan does not bend it.
 - **It does not author picks 7–21.** Only the Phase 2 cohort. The rest wait on Phase 4's verdict.
-- **It does not fix the warp surface.** [Plan 0201](done/0201-the-warp-surface-stops-lying.md) owns
+- **It does not fix the warp surface.** [Plan 0201](0201-the-warp-surface-stops-lying.md) owns
   that; this plan consumes it.
 - **It does not add a copy key to the app.** Collecting preset names by watching the window title
   from outside was sufficient; a clipboard binding would be a `dev` plan and a new dependency
@@ -350,3 +353,7 @@ that needs one, that is a feedback note to `architect`, not a phase of this plan
   cohorts, per that verdict.
 - Any engine gap Phase 2 records as "no native home", as a `docs/design-backlog.md` entry with a
   probe.
+
+**Both settled at the close, 2026-10-01.** Phase 4's verdict abandoned picks 7-21, so the first
+followup does not run. The one real gap Phase 2 found, pick 12's sphere, is backlog 0278 and stays
+live; the two limits Phase 3 met are recorded in the log and filed nowhere, by that verdict.

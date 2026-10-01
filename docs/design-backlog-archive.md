@@ -16679,7 +16679,7 @@ used as designed, rather than the pure addition the set has grown by since. ADR-
 already recorded the symptom at 41 presets: *"~55 % of the library is one template per family with
 different numbers."* The library is now 114 and nobody has re-read that figure.
 
-[Plan 0204](plans/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) makes it live. It
+[Plan 0204](plans/done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) makes it live. It
 adds a cohort and its Phase 4 asks whether to add fifteen more, and the system those picks most
 plausibly route to — `warp_mesh` — is one of the five nothing checks.
 

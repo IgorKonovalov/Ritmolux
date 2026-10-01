@@ -45,7 +45,6 @@ place. The plan file carries the real link.
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | in-progress | dev | Split 2026-10-01: closes on Phases 1-3 (rate candidate falsified, echo orientation fixed); the rig and corpus phases moved to 0246. |
 | [0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) | The rig session measures the wave modes and judges the fourth gate | approved | human, dev | 0202's Phases 4-7. Not queued until the owner has the Windows rig; commit Phase 1's eight rows on main, then queue. |
-| [0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md) | The library learns from the corpus it will not ship | approved | human | ADR-0227 (proposed). Phases 1-2 done: 21 picks routed, cohort 02, 17, 15, 08 fills 0232 gap rows 1-4. 0232 closed 2026-10-01, so Phase 3 may land. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0236](0236-space-curves-and-the-camera-becomes-a-shared-block.md) | Space curves, and the camera becomes a shared block | approved | dev, human | ADR-0258 (proposed). 0235 closed 2026-10-01. Its Phase 1 extracts the camera block that 0237-0240 splice, and its Phase 4 measures `seg3d_segments`. |
 | [0237](0237-the-l-system-turtle-turns-in-space.md) | The L-system turtle turns in space, and can grow without end | approved | dev, human | ADR-0258. After 0236. `turtle = "space"` and `growth = "endless"` (a streamed vine the camera follows), both opt-in; shipped L-systems keep their bytes. |
@@ -371,19 +370,11 @@ behind them, and the dated-evidence rule inside it is why that cost nothing.
 [0215]: done/0215-the-wide-seams-narrow-and-a-guard-holds-them.md
 
 
-**Added 2026-09-19 - [0204] is approved, it sits behind [0201], and it is not a conductor plan.**
-Every one of its phases is `human` - content-lane sittings the owner starts - so a conductor run
-would park at Phase 1 and stay there, and it is deliberately not in `queue.json`. Only its Phase 3
-waits on [0201]: the reference sheet and the routing table need nothing, and `warp_mesh` is the one
-system whose parameter reference is false today. It also jumps no queue - the six standing sittings
-in [`content-brief.md`](../content-brief.md) are unaffected, and whether the remaining picks join
-them is [0204]'s own Phase 4 verdict.
-**The [0201] half is spent 2026-09-20**, when that plan closed: the `zoom` direction is corrected in
-both declarations and the parameter reference is regenerated from them, so [0204] Phase 3 no longer
-waits on anything and `warp_mesh`'s reference is no longer the false one. The rest of this note
-stands - every phase is still `human` and it is still deliberately out of `queue.json`.
+~~**Added 2026-09-19 - [0204] is approved, it sits behind [0201], and it is not a conductor plan.**~~
+— **spent 2026-10-01**, when 0204 closed. Moved verbatim to
+[README-archive.md](README-archive.md)'s `## Prior sequencing notes (superseded)`.
 
-[0204]: 0204-the-library-learns-from-the-corpus-it-will-not-ship.md
+[0204]: done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md
 
 **Added 2026-09-19 - a backlog round promoted seven plans, [0196] through [0203], and the order is
 infrastructure first because three of the others need it.** Seventeen live entries left the file for
@@ -1051,6 +1042,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0204 - The library learns from the corpus it will not ship](done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) - closed 2026-10-01. Review: **no blockers, no majors, one minor (fixed), one nit.** Version: **0.159.0**. ADR-0227 accepted, Outcome. [Write-up](README-archive.md).
 - [0232 - The library is walked, cut and refilled](done/0232-the-library-is-walked-cut-and-refilled.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (one fixed), two nits (fixed).** Version: **0.158.0**. ADR-0253 accepted. Closed 0038. [Write-up](README-archive.md).
 - [0241 - The conductor parks only on what the owner must settle](done/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (two fixed), one nit (fixed).** Version: **0.157.0**. ADR-0261 accepted. [Write-up](README-archive.md).
 - [0235 - The plexus system, and a shared camera with depth of field](done/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md) - closed 2026-10-01. Review: **three rounds; 3 majors, 3 minors (all fixed), two nits.** Version: **0.156.0**. ADR-0257 accepted. [Write-up](README-archive.md).

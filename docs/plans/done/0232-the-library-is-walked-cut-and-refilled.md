@@ -14,7 +14,7 @@
 > **Takes:** step 2 of design-backlog 0256 (the quality half). It does not close the entry:
 > Phase 7 decides whether step 3 is owed. Takes the six standing sittings in
 > [`docs/content-brief.md`](../../content-brief.md).
-> **Sequenced with:** [Plan 0204](../0204-the-library-learns-from-the-corpus-it-will-not-ship.md)
+> **Sequenced with:** [Plan 0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md)
 > (see Decision).
 
 ## TL;DR

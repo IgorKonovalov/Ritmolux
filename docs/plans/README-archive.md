@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0204 - The library learns from the corpus it will not ship](#0204---the-library-learns-from-the-corpus-it-will-not-ship)
   - [0232 - The library is walked, cut and refilled](#0232---the-library-is-walked-cut-and-refilled)
   - [0241 - The conductor parks only on what the owner must settle](#0241---the-conductor-parks-only-on-what-the-owner-must-settle)
   - [0235 - The plexus system, and a shared camera with depth of field](#0235---the-plexus-system-and-a-shared-camera-with-depth-of-field)
@@ -242,6 +243,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-10-01 from `README.md` — the 0204-behind-0201 note, spent](#moved-2026-10-01-from-readmemd--the-0204-behind-0201-note-spent)
   - [Moved 2026-09-26 from `README.md` — the 0223-after-0214 note, spent](#moved-2026-09-26-from-readmemd--the-0223-after-0214-note-spent)
   - [Moved 2026-09-23 from `README.md` — the 0215-runs-last note, spent](#moved-2026-09-23-from-readmemd--the-0215-runs-last-note-spent)
   - [Moved 2026-09-23 from `README.md` — the 0224-before-0223 note, spent](#moved-2026-09-23-from-readmemd--the-0224-before-0223-note-spent)
@@ -275,6 +277,23 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0204 - The library learns from the corpus it will not ship](done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md)
+
+- closed 2026-10-01 by an architect review in a fresh session on `main`. All four phases are `human`
+(content-lane sittings, outside the conductor); commits `66ce9350`, `b97ca31b`, `c235225a`,
+`dd1ed3ac`. Review: **no blockers, no majors, one minor, one nit.** The minor (the plan's
+`## Followups` still read as open after Phase 4 settled both) was repaired at the close; the nit
+(a misaligned `bg_vignette` in `swarm_maelstrom.toml`) is left to the content lane. Full
+`nextest --workspace` 1934 passed, 8 skipped; `cargo doc -D warnings` clean. Version: **0.159.0**
+(minor: one preset added). ADR-0227 accepted with an Outcome. Upstream CI read green.
+- **What landed.** A 21-pick reference sheet outside the repository; a routing table across
+the picks; a cohort of four drafted on four systems; one keep, Maelstrom (`swarm`).
+- **The verdict.** Not worth it, swarm excepted: a borrowed look made of motion survives a
+native reading, and one made of the source engine's texture does not. Picks 7-21 are abandoned.
+Phase 3 shipped one preset on one system against a done-when of four to six across three - the
+owner's recorded call, accepted at the review because the routing claim was tested by the drafts.
+- **Open.** Backlog 0278 (pick 12's sphere) stays live and low priority.
 
 ### [0232 - The library is walked, cut and refilled](done/0232-the-library-is-walked-cut-and-refilled.md)
 
@@ -10539,6 +10558,25 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Moved 2026-10-01 from `README.md` — the 0204-behind-0201 note, spent
+
+Spent when [Plan 0204](done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) closed on 2026-10-01.
+
+**Added 2026-09-19 - [0204] is approved, it sits behind [0201], and it is not a conductor plan.**
+Every one of its phases is `human` - content-lane sittings the owner starts - so a conductor run
+would park at Phase 1 and stay there, and it is deliberately not in `queue.json`. Only its Phase 3
+waits on [0201]: the reference sheet and the routing table need nothing, and `warp_mesh` is the one
+system whose parameter reference is false today. It also jumps no queue - the six standing sittings
+in [`content-brief.md`](../content-brief.md) are unaffected, and whether the remaining picks join
+them is [0204]'s own Phase 4 verdict.
+**The [0201] half is spent 2026-09-20**, when that plan closed: the `zoom` direction is corrected in
+both declarations and the parameter reference is regenerated from them, so [0204] Phase 3 no longer
+waits on anything and `warp_mesh`'s reference is no longer the false one. The rest of this note
+stands - every phase is still `human` and it is still deliberately out of `queue.json`.
+
+[0204]: done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md
+[0201]: done/0201-the-warp-surface-stops-lying.md
 
 ### Moved 2026-09-26 from `README.md` — the 0223-after-0214 note, spent
 

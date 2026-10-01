@@ -248,7 +248,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0224](0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md) | Level mode gets a coverage threshold, and the ink class stays this scene's | accepted 2026-09-20 (Plan 0201), extends 0197 |
 | [0225](0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md) | The backdrop ramp gets an angular coordinate, and the floor stays out of the chain | accepted 2026-09-20, Plan 0203, Outcome |
 | [0226](0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md) | The mark roster travels by blending its fields, and an integer index is an identity | accepted 2026-09-20, Plan 0203, Outcome |
-| [0227](0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md) | A borrowed look is authored natively, and the reference never enters the repository | proposed |
+| [0227](0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md) | A borrowed look is authored natively, and the reference never enters the repository | accepted 2026-10-01, Plan 0204, Outcome |
 | [0228](0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md) | A preset mark is user state, keyed by name, in its own file | accepted 2026-09-20, Plan 0205 |
 | [0229](0229-the-studio-marks-a-preset-over-the-control-protocol.md) | The studio marks a preset over the control protocol, never by opening the file | accepted 2026-09-20, Plan 0205 |
 | [0230](0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md) | Thumbnails are rendered by a subprocess of the player itself | accepted 2026-09-26, Plan 0206, Outcome |
