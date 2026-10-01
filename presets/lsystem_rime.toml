@@ -7,8 +7,8 @@
 # WHAT DRIVES WHAT. Treble buys detail: the crystal gains a whole iteration on a
 # bright passage, 768 segments of boundary at rest to 3072 at peak, which is the
 # edge going from visibly faceted to visibly furred. Bass breathes the size,
-# onset ticks the stroke, and the figure turns slowly on its own axis - a
-# rotation of the FIGURE, not of the camera.
+# onset ticks the stroke, and a long trail zoomed outward each frame lets every
+# past crystal expand away from the live one as rings of frost.
 #
 # SEGMENT BUDGET AND WHY max_depth STOPS AT 5. The rewrite `F -> F+F--F+F`
 # quadruples, so the drawn count is 3 * 4^n: depth 3 = 192, depth 4 = 768,
@@ -54,24 +54,25 @@ stops = [
 # on arrival, ten-odd time constants later, long after the transient. Mid-glide crossings land.
 visible_depth = "4.5 + floor(clamp(treb * 1.83, 0, 1.1))"
 
-# The crystal turns slowly in place and breathes with the low end. Both are
-# small: a still figure on an empty ground shows every bit of motion it has.
-rotation = "time * 0.043"
-scale    = "0.93 + clamp(bass * 0.118, 0, 0.1) + sin(time * 0.11) * 0.02"
-# The boundary is never quite closed - the last two percent of it draws and
-# undraws continuously, so the growing edge stays alive through a silence
-# without the figure ever visibly restarting.
-draw_progress = "0.975 + noise(time * 0.31) * 0.025"
+# The crystal holds still - it never rotates - and breathes with the low end.
+# It is drawn small so the trail has room: `trails` 0.9 keeps each frame and
+# `fb_zoom` grows the kept image outward, about 6 % a second at rest and up to
+# 10 % on an onset, so the frost rings spread faster on a hit.
+scale    = "0.62 + clamp(bass * 0.35, 0, 0.3)"
+trails   = "0.9"
+fb_zoom  = "1.06 + clamp(onset * 0.08, 0, 0.04)"
+# The boundary is always drawn whole: a closed crystal, never an open line.
+draw_progress = "1"
 
-# A CRISP STROKE, WHICH IS THE POINT OF THE WHOLE WORLD. `softness` 0.08 is a
-# solid core with barely more than the one-pixel antialiased edge, so the
+# A CRISP STROKE, WHICH IS THE POINT OF THE WHOLE WORLD. `softness` 0 is a
+# solid core with only the one-pixel antialiased edge, so the
 # boundary reads as ETCHED rather than as a lit filament - the opposite
-# judgement from `lsystem_coral`, on the same param, for the same reason
-# (the figure decides the stroke, not the library). Thickness stays low because
+# judgement from the soft lit branching of the retired Coral, on the same
+# param, for the same reason (the figure decides the stroke, not the library). Thickness stays low because
 # a Koch edge doubles back on itself constantly and a wide nib fills its own
 # notches: measured, 3.0 closed the depth-5 facets entirely.
 thickness  = "1.7 + clamp(onset * 0.83, 0, 0.5)"
-softness   = "0.08"
+softness   = "0"
 glow       = "1.0"
 # A crisp stroke reads brighter at the same level than a soft one does - more of
 # the footprint sits at full coverage - so this is trimmed against the soft
@@ -108,22 +109,12 @@ bg_shade     = "0.4"
 bg_shade_end = "1.0"
 bg_vignette  = "0.62"
 
-# THE INTERIOR IS EMPTY AND IT STAYS EMPTY - `trails` IS OFF DELIBERATELY. The
-# obvious way to fill a hollow boundary is the feedback stage, and three
-# settings of it were rendered and rejected here, each failing the same way for
-# a different reason. `fb_zoom` below 1 with a long tail pulls ghosts inward and
-# they merge into a solid petal blob (the void filling in). Shortening the tail
-# turns the ghosts into a radial veil that buries the etched line under a smear.
-# `fb_zoom` above 1 inverts the world entirely - a dark silhouette inside an
-# outward burst, striking and no longer a crystal. All three destroy the one
-# thing this world is: a single crisp closed line. So the negative space is the
-# composition, and the figure is scaled to nearly fill the frame so that space
-# reads as the inside of a large form rather than as slack around a small one.
-#
-# The consequence to expect in `shot --report`: this world's `cover` is low by
-# construction, lower than any other lsystem in the library. That is the figure,
-# not a defect - a Koch boundary at depth 5 is 3072 segments of a curve with no
-# area at all.
+# THE TRAIL GROWS OUTWARD, NEVER INWARD. `fb_zoom` below 1 with a long tail
+# pulls the ghosts inward, where they merge into a solid petal blob and bury the
+# crisp line; a short tail turns them into a radial veil. Above 1 the ghosts leave
+# the live crystal instead of piling onto it, so the one sharp line stays on top
+# and the rings around it read as its history. The figure is drawn small (scale
+# 0.62 at rest) because the rings need the frame's outer half to travel through.
 
 # The one stage that gets an onset, and it is bloom rather than level: a crisp
 # stroke puts real fuel above the threshold, so a hit frosts a halo around the

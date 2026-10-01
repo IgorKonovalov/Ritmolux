@@ -396,7 +396,7 @@ fn a_truncated_run_reports_itself_where_the_table_would_be() {
     // exercised at the scale it was written for.
     const RSS_AT_FAILURE: u64 = 4_402 * 1024 * 1024;
     let died = TruncatedRun {
-        preset: "Etching".to_string(),
+        preset: "Lichen".to_string(),
         minutes: 10.0,
         interval_secs: 30.0,
         requested_frames: 36_001,

@@ -1,0 +1,62 @@
+# Crystal - a sharp network folded six ways into a turning gem. The cloud is
+# drawn in focus edge to edge (no aperture), its colour quantized into six flat
+# jewel bands by depth - sapphire nearest, through emerald, gold and ruby, to
+# amethyst at the back - and the kaleidoscope mirrors it into a hexagonal
+# facet. The fold itself never turns; the camera orbiting INSIDE it is what
+# moves, so the facets re-cut themselves continuously while the symmetry axes
+# stay put. A slow spiral term twists the wedges in and out of a pinwheel.
+#
+# BASS lengthens the links so the gem densifies into a lattice on a hit; ONSET
+# swells the nodes into beads at every junction. Bands shift with depth as the
+# camera turns, so colour moves without any hue binding at all.
+#
+# The strokes are heavy (4.2 px) and they GLOW: the lines alone never cross
+# the default bloom threshold, so it sits at 0.1 and the bright-pass takes
+# every stroke. Loud frames stack lines at the junctions, so the halo is
+# strongest exactly where the lattice is densest. `brightness` is held under
+# 1 to leave that stacking headroom.
+system = "plexus"
+name = "Crystal"
+
+[plexus]
+layout = "cloud"
+points = 300
+seed   = 41
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#1b3fa8" },
+  { at = 0.25, color = "#16b08f" },
+  { at = 0.5,  color = "#f2c14e" },
+  { at = 0.75, color = "#e2456b" },
+  { at = 1.0,  color = "#9a5bff" },
+]
+
+[params]
+palette_steps  = "6"
+link_distance  = "0.38 + clamp(bass * 0.2, 0, 0.17)"
+link_alpha     = "0.9"
+line_width     = "4.2"
+node_size      = "2.5 + clamp(onset * 4, 0, 2.5)"
+node_glow      = "1.2"
+drift          = "0.12"
+yaw            = "time * 0.07"
+pitch          = "0.5 + 0.3 * sin(time * 0.045)"
+distance       = "2.6"
+aperture       = "0"
+hue_center     = "0.5"
+hue_spread     = "1"
+brightness     = "0.75"
+kaleido_order  = "6"
+kaleido_edge   = "1"
+kaleido_inner  = "0.02"
+kaleido_spiral = "0.3 * sin(time * 0.06)"
+bg_bright      = "0.04"
+bg_vignette    = "0.7"
+bloom_amount    = "1"
+bloom_threshold = "0.1"
+bloom_radius    = "3"
+
+[smoothing]
+link_distance = 0.1
+node_size     = 0.08

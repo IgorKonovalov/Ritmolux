@@ -209,6 +209,7 @@ visuals react. A Linux build needs pkg-config and libpulse's headers.
 
 | Key       | Action                                                      |
 |-----------|-------------------------------------------------------------|
+| `?`       | The help sheet: every key, for wherever you are             |
 | `Space`   | Next preset — dissolves (and restarts the auto-rotate timer) |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
 | `R`       | Switch the rotation order — shuffled (default) or alphabetical |

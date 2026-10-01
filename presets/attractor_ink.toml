@@ -1,13 +1,18 @@
-# Ink on Paper - a De Jong attractor drawn as black lines on a warm white page,
+# Ink on Paper - a Thomas attractor drawn as black lines on a warm white page,
+# turning in depth and gliding from one figure of the Thomas roster to the next,
 # the look that motivated the final-stage tone remap (ADR-0028, Plan 0027).
 #
 # The scenes draw additively, so this is NOT a colour choice: `ink_amount = 1`
 # turns on the last composite stage, which repaints the finished frame between
 # `paper_*` (where the frame was dark) and `ink_*` (where it was bright). The
-# glowing point cloud becomes wet ink; the black void becomes the page. This
-# version keeps the original's careful blot discipline and adds the motion it
-# was missing - the old one held its coefficients nearly still, so the drawing
-# barely evolved across a track.
+# glowing point cloud becomes wet ink; the black void becomes the page.
+#
+# THE MUSIC MOVES THE FIGURE, IT NEVER BREAKS IT. Judged at the Plan 0232
+# sitting: in silence the walk reads as a solid 3D drawing, and every term that
+# DISTURBED the cloud - an onset reseed, a bass zoom pump, a beat on the nib, a
+# bass-shortened trail - turned it into noise the moment music started. So the
+# bands only drive rates and depth: bass speeds the turn, mid pushes the far
+# strands back into the page. Both are eased. Do not add a `reseed` back.
 #
 # The whole preset is a balancing act around ONE trap: the remap keys on
 # luminance, so anything that pushes the accumulated field past white turns the
@@ -19,66 +24,52 @@
 # Deliberately NO `bg_*` and NO `kaleido_*` here. A lit backdrop raises the
 # frame's floor luminance, which the remap reads as ink and greys the whole
 # page; the kaleidoscope re-samples the attractor's accumulation, and a softer
-# source blots where a crisp one hatches. Since Plan 0033 that stage follows the
-# render target rather than a fixed 1280x720, so the cost is far smaller than it
-# was - but the two caps still differ (2560x1440 for the attractor's own grid,
-# 1920x1080 for the post stages), so the fold still costs this preset some bite.
+# source blots where a crisp one hatches.
 #
-# HORIZON VERDICT, 2026-08-15 (Plan 0085 Phase 2, `shot --horizon 10`): THE
-# DRAWING DRIES OUT. Coverage falls 0.199 -> 0.006 between minute one and minute
-# two and keeps falling to 0.002 by minute ten, while concentration (peak/mean)
-# climbs 23.8 -> 1161. Rendered either side of it, the silhouette is UNCHANGED
-# and the density is gone: a dense hatched figure at 10 s, scattered specks at
-# 150 s. So this is not the coefficients collapsing the attractor - the shape
-# survives - it is the deposit failing to keep the page inked.
-#
-# Reproduced at 96x96 and 256x256, and under silence as well as a held loud
-# stimulus, so it is neither a capture-size artifact nor stimulus-driven: the
-# only thing left moving is this preset's own slow coefficient sines (periods
-# ~200-410 s), and the collapse lands inside their first cycle.
-#
-# NOT FIXED HERE. Plan 0085 records findings and repairs none - the fix is a
-# content pass or its own plan, and it should start by asking whether `fade`
-# 0.857 (its value at the measured stimulus) is simply too short to hold a
-# drawing whose points are being redistributed by a moving coefficient set.
-# Nothing about this is a gate; see docs/capturing.md on reading a horizon.
+# HORIZON VERDICT, 2026-08-15 (Plan 0085 Phase 2, `shot --horizon 10`),
+# MEASURED ON THE DE JONG FIGURE THIS PRESET DREW BEFORE THE PLAN 0232 SITTING,
+# and not re-measured on the Thomas walk: THE DRAWING DRIES OUT. Coverage fell
+# 0.199 -> 0.006 between minute one and minute two and kept falling to 0.002 by
+# minute ten, while concentration (peak/mean) climbed 23.8 -> 1161. Rendered
+# either side of it, the silhouette was UNCHANGED and the density gone: a dense
+# hatched figure at 10 s, scattered specks at 150 s. So it was not the
+# coefficients collapsing the attractor - the shape survived - it was the
+# deposit failing to keep the page inked. Reproduced at 96x96 and 256x256, and
+# under silence as well as a held loud stimulus. Nothing about this is a gate;
+# see docs/capturing.md on reading a horizon.
 system = "attractor"
 name = "Ink on Paper"
 
 [particles]
-family = "de_jong"
+family = "thomas"
 
 [params]
-# SHAPE - four incommensurate slow sines (periods ~200/260/330/410 s) so the
-# drawing is redrawn continuously and never repeats, with a small clamped band
-# term on top. Chaotic maps cut rather than morph if you shove them.
-a = "1.641 + sin(time * 0.0314) * 0.075 + clamp(bass * 0.175, 0, 0.140)"
-b = "1.902 + cos(time * 0.0241) * 0.065 + clamp(mid * 0.082, 0, 0.070)"
-c = "0.316 + sin(time * 0.0190) * 0.085 + clamp(treb * 0.055, 0, 0.034)"
-d = "1.525 + cos(time * 0.0153) * 0.070 - clamp(bass * 0.053, 0, 0.045)"
+# THE WALK. `tuple` picks a whole Thomas figure from the 13-entry roster and
+# `morph` travels from it to the next, so `floor` and the fractional part of the
+# same 10 s clock step the roster and glide between entries: one figure every
+# 10 s, never a cut. Thomas Gallery steps the same roster hard every 3 s; this
+# is its slow, continuous twin.
+tuple = "mod(floor(time * 0.1), 13)"
+morph = "time * 0.1 - floor(time * 0.1)"
 
-# THE NIB. Fine on purpose - the trail grid is surface-sized (Plan 0027 Phase
-# 2), so a point that looked right on the old soft 640x360 field blots here.
-# Note the sign: the nib gets FINER as the mix gets louder, so a drop sharpens
-# the hatching. The beat adds the only positive term - a single wet stroke.
-size = "0.60 - clamp((bass + mid) * 0.094, 0, 0.16) + beat * 0.14"
+# DEPTH. The turn and the perspective are what make it read as a solid object
+# rather than a flat hatch. Bass speeds the turn; mid dims the far strands
+# further, which on a two-pole remap is the only depth cue there is.
+spin = "0.6 + clamp(bass * 0.5, 0, 0.4)"
+perspective = "0.2"
+depth_fade = "0.4 + clamp(mid * 0.4, 0, 0.3)"
+
+# THE NIB. Fine and constant - the trail grid is surface-sized (Plan 0027 Phase
+# 2), so a fat point blots, and a nib that answered the beat read as noise.
+size = "0.45"
 
 # TRAIL LENGTH - the ink has to accumulate before it reads as a drawn line, but
-# this is the knob that blots. Ceiling 0.89, and it falls under bass.
-fade = "0.885 - clamp(bass * 0.047, 0, 0.040)"
+# this is the knob that blots. Held constant for the same reason as the nib.
+fade = "0.885"
 
-# A hard transient DISTURBS the cloud - it bulges through the standing trails
-# and settles back as the fade catches up. Gated above the typical level so
-# quiet passages keep one continuous drawing rather than being nudged nonstop.
-# MEASURED. Read 0.45 and never fired - `onset` was then raw spectral flux
-# peaking at 0.016, not a 0..1 envelope. Then 0.56, which was chosen while a
-# reseed still RE-SCATTERED the whole cloud (a wipe worth being reluctant
-# about); Plan 0057 Phase 3 / ADR-0066 made it a bounded in-place jitter, so
-# the reluctance now only costs accents. Onset means measured 0.033
-# (click:120) / 0.153 (dynamic:110) / 0.391 (chord), ~0.20 real music, all
-# against a 1.000 peak - so 0.32 is crossed by transients and not by the body
-# of a passage. Rank preserved within the family.
-reseed = "onset > 0.32"
+# Off. A reseed throws the cloud back onto fresh start positions, and on a
+# walking figure that is a visible collapse on every hit (see the header).
+reseed = "0"
 
 # Nearly neutral. The remap discards hue anyway, and a desaturated source keeps
 # the luminance ramp - and so the ink density - honest across the frame.
@@ -86,17 +77,20 @@ saturation = "0.35"
 hue_spread = "0.05"
 hue_center = "0.5"
 
-# VIEW - a slow drift and a per-bar breath, so the composition reframes over a
-# track rather than sitting dead centre for the whole show.
-zoom  = "1.12 + bar * 0.07 + clamp(bass * 0.212, 0, 0.18)"
+# VIEW - a slow drift so the composition reframes over a track rather than
+# sitting dead centre, and a fixed crop: a zoom on the music was the pump the
+# sitting removed.
+zoom  = "1.12"
 pan_x = "sin(time * 0.0230) * 0.07"
 pan_y = "cos(time * 0.0170) * 0.055"
 
 # THE REMAP - full, and held at the pole. A partial amount lets the near-black
 # source frame bleed through and greys the paper, which reads as a dirty page
-# rather than a faint drawing. Sparseness at low energy comes from the drawing.
-# The page is a warm off-white rather than pure #fff, and the ink a very dark
-# blue-black rather than pure #000 - both read as real ink on real stock.
+# rather than a faint drawing. The page is a warm off-white rather than pure
+# #fff, and the ink a very dark blue-black rather than pure #000 - both read as
+# real ink on real stock. `ink_gamma` below 1 inks the mid-tones heavier, so a
+# sparse strand bites rather than greying out (ADR-0092, whose rider says a
+# sparse figure's bite lives below 1).
 ink_amount   = "1"
 paper_hue    = "0.11"
 paper_sat    = "0.055"
@@ -104,26 +98,10 @@ paper_bright = "0.985"
 ink_hue      = "0.62"
 ink_sat      = "0.35"
 ink_bright   = "0.055"
+ink_gamma    = "0.6"
 
 [smoothing]
-# The nib should swell, not flicker - a bare `beat` term on `size` would snap.
-size = { attack = 0.02, release = 0.26 }
-fade = 0.25
-zoom = 0.18
-# THE SHAPE EASING, RE-DERIVED 2026-08-03. These read 0.8, which is why the
-# drawing did not visibly answer a drum hit: measured against the library,
-# this preset's transient columns were rise 19+ / fall 30+ where Fern Grow -
-# named by the user as reacting correctly - reads 6+ / 9+, the slowest pair in
-# the whole set. A hit's band energy lasts ~100 ms and an 0.8 s ease delivers
-# about 12% of the step in that window, so a term worth 4% of the coefficient
-# arrives as 0.5% and reads as nothing.
-#
-# 0.45 rather than something fast: the constraint in the header is real - a
-# chaotic map CUTS rather than morphs if a coefficient is moved abruptly - so
-# this buys response without letting the figure jump. The magnitudes above are
-# deliberately NOT raised in the same pass; speed and travel are separate
-# levers and moving both at once means neither can be judged.
-a    = 0.45
-b    = 0.45
-c    = 0.45
-d    = 0.45
+# The turn and the depth ease so a loud passage leans on the figure rather
+# than jolting it.
+spin = 0.6
+depth_fade = 0.5

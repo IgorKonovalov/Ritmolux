@@ -66,7 +66,7 @@ Four things are worth naming, because they are the whole model:
 
 Some systems also take a **structural table** — `[curve]` here, `[generator]` for the two generator
 systems, `[particles]` for the attractor, `[spectrum]` for the readout, `[field]` for the analytic
-field, `[cellular]` for the automaton. Those are declarative
+field, `[cellular]` for the automaton, `[plexus]` for the network. Those are declarative
 configuration read once when the preset loads, **not** expressions: they choose *which figure*, and
 the params then animate it.
 
@@ -98,10 +98,10 @@ plasma, oil-on-water.
 
 ### `swarm`
 
-![Thousands of small coloured marks — teal, amber, violet — banked into a broad wave crest across a
-dark navy field, sparse above it and dense below](images/gallery/swarm.png)
+![Thousands of small teal marks gathered into two parallel wavy ribbons running across a black
+field, each ribbon twisting through a bright seam at every turn](images/gallery/swarm.png)
 
-*`presets/swarm_shatter.toml`*
+*`presets/swarm_braid.toml`*
 
 Around ten thousand CPU-simulated particles drifting through a flow field, drawn as instanced
 additive marks. Their world is a torus, so nothing ever leaves the frame — the field stays populated
@@ -112,10 +112,10 @@ this is the system a still photograph serves worst, for exactly that reason.
 
 ### `parametric_curve`
 
-![A pink and white star-web on a dark olive field: two nested many-pointed stars traced from
-straight interlacing chords](images/gallery/parametric_curve.png)
+![Crisp red and cream straight chords on black, interlaced into an eight-pointed star with bowed
+sides: a Maurer rose drawn as one continuous line](images/gallery/parametric_curve.png)
 
-*`presets/curve_nightbloom.toml`*
+*`presets/curve_broadside.toml`*
 
 One continuous line, sampled every frame from a closed-form `t → (x, y)` curve and drawn as thick
 glowing strokes. Because it is resampled per frame rather than cached, audio can sweep the *shape*
@@ -163,10 +163,10 @@ from the outside in.
 
 ### `lsystem`
 
-![A gold interlocking maze on deep navy: a dense space-filling curve of hexagonal turns forming a
-rough diamond](images/gallery/lsystem.png)
+![A pale ice-blue Koch snowflake outline on a dark slate ground: one closed crystalline edge, its
+facets furred by a faint outward trail](images/gallery/lsystem.png)
 
-*`presets/lsystem_vellum.toml`*
+*`presets/lsystem_rime.toml`*
 
 A turtle walking a string produced by rewriting an axiom with production rules. The expansion happens
 once when the preset loads — one cached segment buffer per depth — so per frame the scene only picks
@@ -219,9 +219,9 @@ figures. It has by far the largest parameter surface, and much of it is family-s
 
 ### `spectrum`
 
-![A radial spectrum readout: a ring of spokes around an empty centre on black, each spoke's length
-and thickness its own band, long magenta spokes to the upper left, short violet ones to the right
-and warm orange ones below](images/gallery/spectrum.png)
+![A radial spectrum readout: a ring of thin spokes of one width around an empty centre on black,
+each spoke's length its own band, long magenta spokes to the upper left, short violet ones to the
+upper right and warm orange ones below](images/gallery/spectrum.png)
 
 *`presets/spectrum_radialbloom.toml`*
 
@@ -234,10 +234,10 @@ readout renders as its inert resting comb; use `--signal` or `--audio`.
 
 ### `emitter`
 
-![A meteor shower: pale blue-white dashed streaks flying up and to the right in a broad fan across a
-dark navy field](images/gallery/emitter.png)
+![Dozens of soft charcoal hearts scattered across a white page at every angle, some upright, some
+tumbling, a few overlapping into dark clusters near the top](images/gallery/emitter.png)
 
-*`presets/emitter_perseids.toml`*
+*`presets/emitter_heartfall.toml`*
 
 Objects that spawn, follow an analytic ballistic path, age, and are retired. It is the only system
 whose population is not fixed — which is precisely what the swarm's wrap-around torus cannot express.
@@ -247,10 +247,11 @@ that should be triggered by a beat rather than modulated by a band.
 
 ### `shape_field`
 
-![Concentric heart-shaped bands in crimson, rose and peach on black, nested around a black heart at
-the centre and drawing out into fine parallel striations at the corners](images/gallery/shape_field.png)
+![Concentric heart-shaped bands in plum, crimson, orange and cream, each a scaled copy of the heart
+nested down to a tiny plum heart at the centre, with fine parallel striations at the
+corners](images/gallery/shape_field.png)
 
-*`presets/shape_pulse.toml`*
+*`presets/shape_strataheart.toml`*
 
 It draws one
 of five silhouettes — `disc`, `ring`, `polygon`, `star`, `heart` — as a **fullscreen distance
@@ -261,8 +262,7 @@ hairline at each band edge.
 It is also the one system where the figure itself can be **authored rather than selected**. A
 `[path]` table takes inline SVG path data — one closed contour, pasted out of a design tool and
 rendered as the same distance field, so `palette_steps` and `palette_contour` band an outline nobody
-put in the roster. `presets/shape_maple.toml` and `presets/shape_lion.toml` are that: a leaf and a
-lion mask, each 54 commands. A second contour in `morph_to` gives the bindable `morph`, so a figure
+put in the roster. `presets/shape_maple.toml` is that: a maple leaf, 54 commands. A second contour in `morph_to` gives the bindable `morph`, so a figure
 can *become* another figure on the beat.
 
 **Reach for this when** the subject is a **figure and its echoes**: nested outlines, a breathing
@@ -272,10 +272,10 @@ recipes are in [`../presets/README.md`](../presets/README.md).
 
 ### `warp_mesh`
 
-![A soft teal and steel-blue field with a black star-shaped aperture at its centre, ringed by a pale
-glow that reads as depth receding into the hole](images/gallery/warp_mesh.png)
+![Seven rounded lobes in a ring around a dark centre on black, each lobe a whorl of concentric
+cream and crimson contour lines like a cut agate, the ring haloed in a soft red glow](images/gallery/warp_mesh.png)
 
-*`presets/warp_wellhead.toml`*
+*`presets/warp_tracery.toml`*
 
 It covers the frame
 with a grid of cells and resamples the **previous** frame through it, giving every grid vertex its
@@ -373,7 +373,7 @@ Left alone they settle too, into still rings within a minute, so the preset pict
 disc of soup on every hard onset and at least every five seconds; the speckled blobs above are those
 discs, organising.
 
-![Interlocking spirals of three flat colours — coral, cornflower blue and sage green — covering the
+![Interlocking spirals of three flat colours — deep maroon, coral red and bone white — covering the
 whole frame, their arms curling round dozens of small cores](images/cellular/cyclic.png)
 
 *`family = "cyclic"` — `presets/cellular_spiral_bloom.toml`; the teaching preset is
@@ -387,6 +387,42 @@ rotating spirals, and a cell's colour is simply its place in the cycle laid roun
 hold their history. The grid is a count of cells, not a resolution — a larger grid draws every
 pattern smaller — and the families' own parameters are in the
 [`[cellular]` table](presets.md#the-cellular-table).
+
+### `plexus`
+
+![A loose cube of fine blue lines on black, seen in perspective: a few hundred small dots, each joined
+by thin straight lines to its nearest neighbours, the network densest at the centre and fraying into
+single strands toward the edges](images/gallery/plexus.png)
+
+*`layout = "cloud"` — the teaching preset
+[`docs/examples/plexus/cloud.toml`](examples/plexus/cloud.toml); the system ships no preset yet*
+
+A **network in three dimensions**: a few hundred points, each joined by a line to every other point
+closer than `link_distance`, seen through a camera that orbits the network's centre. A line fades in
+as its two points drift together and out as they part, so the network rewires smoothly and never
+pops. `link_distance` is the main lever: a little longer and every point grows more links, and the
+network fills in. Bind it to the bass and the network knits together on every hit.
+
+The camera is real, with a focal plane. `focus` places it in the network's depth and `aperture`
+decides how strongly everything off it blurs, so one line can run sharp across the focal plane and
+soften toward both of its ends.
+
+![A rippled sheet of linked points seen across at a low angle: a band of crisp pale-blue triangles
+through the middle distance, the near edge widening into soft out-of-focus strokes and the far edge
+dissolving into haze](images/plexus/sheet.png)
+
+*`layout = "sheet"` — the teaching preset
+[`docs/examples/plexus/sheet.toml`](examples/plexus/sheet.toml)*
+
+The **sheet** lays the points on a flat square instead and ripples it with a slow swell. Every point
+keeps its place in the grid, so the mesh moves like cloth rather than rearranging itself. Seen across
+at a grazing angle with the aperture open, the depth of field does the rest: a sharp band where the
+focal plane cuts the sheet, softness before and behind it.
+
+**Reach for this when** the look is a network, a mesh or a constellation with depth to it, and the
+music should move the camera, the focus or how much of it is connected. Wide blur costs drawing time,
+so the quality tier caps it. The layouts and every structural key are in the
+[`[plexus]` table](presets.md#the-plexus-table).
 
 ---
 

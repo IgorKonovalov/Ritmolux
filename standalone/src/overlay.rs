@@ -8,6 +8,56 @@
 
 use std::borrow::Cow;
 
+use rlx_core::render::theme::THEME;
+
+use crate::console::Line;
+use crate::keymap;
+use crate::settings::{SettingsState, SettingsView};
+
+// ---------------------------------------------------------------------------
+// The corner name plate (device px)
+// ---------------------------------------------------------------------------
+
+/// On-canvas active-preset-name label: top-left inset (device px) and font
+/// size. Drawn in the theme's primary text role.
+pub const NAME_INSET: f32 = 16.0;
+pub const NAME_SIZE: f32 = 28.0;
+
+/// The rotation countdown sits directly under the preset name, smaller and in
+/// the dim text role: it is a status line about the show's cadence, not part of
+/// the show.
+pub const NEXT_TOP: f32 = NAME_INSET + NAME_SIZE + 6.0;
+pub const NEXT_SIZE: f32 = 18.0;
+
+/// How the corner name reports the marks the preset on screen carries.
+///
+/// Suffixed rather than prefixed so the name still starts at the same x on
+/// every preset, and spelled out rather than glyphed: the browser's single
+/// character has a column of them to be read against, and one floating in a
+/// corner does not.
+pub fn mark_suffix(favourite: bool, hidden: bool) -> &'static str {
+    match (favourite, hidden) {
+        (true, true) => "  (favourite, hidden)",
+        (true, false) => "  (favourite)",
+        (false, true) => "  (hidden)",
+        (false, false) => "",
+    }
+}
+
+/// The countdown line, or `None` when there is nothing to count down to.
+///
+/// `remaining` is the director's own answer and is already `None` while
+/// auto-rotate is off, so "says nothing when it is off" is that `None` rather
+/// than a second rule here. `enabled` is the operator's switch.
+///
+/// Whole seconds, rounded up, so the line reaches `1 s` and then the rotation
+/// happens — a line that showed `0 s` for most of a second would read as a
+/// stalled timer.
+pub fn next_rotation_line(remaining: Option<f32>, enabled: bool) -> Option<String> {
+    let secs = remaining.filter(|_| enabled)?;
+    Some(format!("next in {} s", secs.ceil().max(0.0) as u32))
+}
+
 // ---------------------------------------------------------------------------
 // List geometry (device px)
 // ---------------------------------------------------------------------------
@@ -29,37 +79,34 @@ pub const ROW_SIZE: f32 = 22.0;
 /// Top of the first row — the header occupies the band above it.
 pub const ROWS_TOP: f32 = LIST_TOP + ROW_H;
 
-/// **Column width is an estimate, not a measurement**, and deliberately.
+/// A row is three pieces at fixed offsets from its column's left edge: the
+/// marker and mark glyph at `0`, the name at [`NAME_X`], the family at
+/// [`FAMILY_X`]. Fixed offsets rather than space padding, because the font is
+/// proportional and a padded name column is ragged.
 ///
-/// glyphon shapes a proportional system font and `core` exposes no
-/// text-measurement API; adding one to place a list is out of proportion to the
-/// problem (ADR-0009 would need a supplement). So the width is derived from the
-/// font size and a character budget, and [`fit`] truncates a name that overruns
-/// the budget — which makes an **under**estimate cosmetic rather than a
-/// collision, and an overestimate merely wasted horizontal space.
-///
-/// `0.62` is a conservative advance-per-character ratio for a proportional face
-/// at this size: real lowercase Latin averages nearer `0.5`, and the roster's
-/// names are mixed case with spaces.
-const CHAR_W: f32 = ROW_SIZE * 0.62;
-/// Characters a column reserves, matching [`row_text`] term for term: the
-/// two-character `"> "` marker, the mark glyph, a space, the name, a space and
-/// the family.
-const COL_CHARS: usize = 2 + 1 + 1 + NAME_CHARS + 1 + FAMILY_CHARS;
-/// Characters of the **name** a column can show before [`fit`] truncates it.
-/// Every shipped name fits but one — `Star Mandala Bordered` is 21 characters
-/// and draws as `Star Mandala Bo...` — so truncation is a case the embedded set
-/// reaches, not only a custom `RLX_PRESET_DIR`.
-pub const NAME_CHARS: usize = 18;
-/// Characters the family label reserves. The longest system family is
-/// `attractor` at nine, and [`SystemKind::family`](rlx_core::preset::SystemKind::family)
-/// is a closed roster — so this is a measurement of that roster, not a budget a
-/// longer one would be truncated to.
-const FAMILY_CHARS: usize = 9;
-/// Gap between columns, so two full-width names do not touch.
-const COL_GUTTER: f32 = 24.0;
+/// **The name and the family are measured, not estimated.** Each is cut by
+/// [`fit_width`](rlx_core::render::fit_width) against the caller's measurement
+/// of the drawn font, so a name is shortened only when it really overruns its
+/// slot — never by a per-character guess.
+pub const NAME_X: f32 = 40.0;
+/// The widest a drawn name may be.
+pub const NAME_W: f32 = 290.0;
+/// Left edge of the family label, a small gap past the name slot.
+pub const FAMILY_X: f32 = NAME_X + NAME_W + 12.0;
+/// The widest a drawn family label may be. `attractor`, the longest of the
+/// closed roster [`SystemKind::family`](rlx_core::preset::SystemKind::family)
+/// returns, fits it at [`ROW_SIZE`] on any common sans-serif.
+pub const FAMILY_W: f32 = 100.0;
+/// Gap between columns, so two full-width rows do not touch.
+pub const COL_GUTTER: f32 = 24.0;
 /// Horizontal pitch between columns.
-pub const COL_W: f32 = CHAR_W * COL_CHARS as f32 + COL_GUTTER;
+pub const COL_W: f32 = FAMILY_X + FAMILY_W + COL_GUTTER;
+
+/// Measures a run of text: `(text, font size in device px) -> width in device
+/// px`, as the surface that draws it would lay it out. The shell passes the
+/// renderer's own measurement; a test passes any function it likes, since
+/// every property here holds for any measurement.
+pub type Measure<'a> = dyn FnMut(&str, f32) -> f32 + 'a;
 
 // ---------------------------------------------------------------------------
 // The F3 capture line (Plan 0083)
@@ -75,23 +122,6 @@ pub const COL_W: f32 = CHAR_W * COL_CHARS as f32 + COL_GUTTER;
 /// audio verdict and the frame-time block readable as one screenshot.
 pub const CAPTURE_TOP: f32 = 252.0;
 pub const CAPTURE_SIZE: f32 = 18.0;
-/// Dimmer than the preset name, brighter than a browse row: a diagnostics line,
-/// not part of the show.
-pub const CAPTURE_COLOR: [f32; 4] = [0.72, 0.80, 0.90, 0.95];
-
-/// Browse-overlay row colors, beside the **geometry** above that they paint —
-/// the insets, pitch, font size and column width the pure layout function
-/// reasons about. One module owns both halves, so the pixels drawn and the
-/// arithmetic tested cannot drift apart.
-pub const ROW_COLOR: [f32; 4] = [0.72, 0.78, 0.88, 0.95];
-pub const ROW_HL_COLOR: [f32; 4] = [1.0, 0.88, 0.35, 1.0];
-/// A favourite's row. Warm against `ROW_COLOR`'s cool grey and darker than the
-/// cursor's yellow, so a column of forty reads as marked-or-not at a glance
-/// while the highlight still wins on the row it is on — the one-character `*`
-/// does not survive that scan, which is what this colour is for.
-pub const FAV_COLOR: [f32; 4] = [0.95, 0.80, 0.60, 0.95];
-/// The filter-echo header sits above the list; dimmer than the rows.
-pub const HEADER_COLOR: [f32; 4] = [0.6, 0.66, 0.76, 0.9];
 
 // ---------------------------------------------------------------------------
 // The preview pane (ADR-0230)
@@ -104,8 +134,6 @@ pub const PANE_IMAGE_H: f32 = 180.0;
 const PANE_CAPTION_GAP: f32 = 8.0;
 /// The caption under the image, and the placeholder inside it.
 pub const PANE_TEXT_SIZE: f32 = 18.0;
-pub const PANE_CAPTION_COLOR: [f32; 4] = HEADER_COLOR;
-pub const PANE_PLACEHOLDER_COLOR: [f32; 4] = [0.5, 0.55, 0.64, 0.85];
 /// What the pane says for a preset with no picture yet. A normal state on a
 /// first launch, so it reads as "not yet" rather than as a fault.
 pub const PANE_PLACEHOLDER: &str = "no picture yet";
@@ -216,21 +244,14 @@ pub fn capture_line(token: &str) -> String {
     format!("audio  {token}")
 }
 
-/// A name shortened to fit one column, with an ASCII ellipsis.
+/// `text` at [`ROW_SIZE`], shortened to fit `max_width` as `measure` lays it
+/// out, with an ASCII ellipsis — `...` rather than `…`, because the overlay's
+/// font coverage is not something this module can check.
 ///
-/// Borrowed when it already fits, which is every shipped preset but the one
-/// [`NAME_CHARS`] names — so the common case allocates nothing beyond what the
-/// caller was doing anyway. ASCII `...`
-/// rather than `…` because the overlay's font coverage is not something this
-/// module can check.
-pub fn fit(name: &str) -> Cow<'_, str> {
-    if name.chars().count() <= NAME_CHARS {
-        return Cow::Borrowed(name);
-    }
-    let keep = NAME_CHARS.saturating_sub(3);
-    let mut out: String = name.chars().take(keep).collect();
-    out.push_str("...");
-    Cow::Owned(out)
+/// Borrowed when it already fits, which is every shipped preset, so the common
+/// case allocates nothing beyond what the caller was doing anyway.
+pub fn fit<'a>(text: &'a str, max_width: f32, measure: &mut Measure<'_>) -> Cow<'a, str> {
+    rlx_core::render::fit_width(text, max_width, |s| measure(s, ROW_SIZE))
 }
 
 /// How the visible rows are placed on screen: a column-major flow, as many
@@ -331,20 +352,42 @@ pub fn mark_glyph(row: &Row<'_>) -> char {
     }
 }
 
-/// One drawn row: the highlight marker, the mark glyph, the name padded to the
-/// column, and the family.
+/// One drawn row whose column's left edge is `x`: the highlight marker and the
+/// mark glyph, then the name and the family, each in its own slot and each cut
+/// to that slot's measured width.
 ///
-/// Built here rather than at the draw site so the format and the column
-/// arithmetic above live together — a name column that outgrew [`COL_CHARS`]
-/// would collide with the next column's text, and nothing on screen would say
-/// why.
-pub fn row_text(row: &Row<'_>, marker: &str) -> String {
-    format!(
-        "{marker}{} {:<NAME_CHARS$} {}",
-        mark_glyph(row),
-        fit(row.name),
-        row.family
-    )
+/// Built here rather than at the draw site so the pieces and the column
+/// arithmetic above live together — a name that outgrew [`NAME_W`] would
+/// collide with its family, and nothing on screen would say why.
+pub fn row_lines(
+    row: &Row<'_>,
+    highlighted: bool,
+    (x, y): (f32, f32),
+    measure: &mut Measure<'_>,
+    out: &mut Vec<Line>,
+) {
+    let (marker, color) = browse_row_style(highlighted, row.favourite);
+    out.push(Line::new(
+        format!("{marker}{}", mark_glyph(row)),
+        x,
+        y,
+        ROW_SIZE,
+        color,
+    ));
+    out.push(Line::new(
+        fit(row.name, NAME_W, measure).into_owned(),
+        x + NAME_X,
+        y,
+        ROW_SIZE,
+        color,
+    ));
+    out.push(Line::new(
+        fit(row.family, FAMILY_W, measure).into_owned(),
+        x + FAMILY_X,
+        y,
+        ROW_SIZE,
+        color,
+    ));
 }
 
 /// The browser's header: what is typed, and every narrowing currently applied.
@@ -369,6 +412,319 @@ pub fn header_text(state: &OverlayState) -> String {
         parts.push("+hidden".to_owned());
     }
     parts.join("   ")
+}
+
+// ---------------------------------------------------------------------------
+// Composition: the lines a frame draws
+// ---------------------------------------------------------------------------
+//
+// Pure functions of state, window size and fixed geometry. The shell calls them
+// once per frame and `shot --ui` calls them against fixture state, so a headless
+// capture of a modal is built by exactly the code the window draws with.
+
+/// The marker and colour one **browse-list** row is drawn with.
+///
+/// **The cursor wins.** A highlighted row is the theme's `accent` whether or
+/// not it is a favourite, so there is never a frame in which two rows could be
+/// read as the one the keys act on. Below that, a favourite is the warm
+/// `favourite` role — so a column of forty reads as marked-or-not at a glance,
+/// which the one-character `*` does not survive — and everything else is plain
+/// `text`.
+///
+/// Hidden rows have no colour of their own and keep `text` behind their `-`
+/// glyph, so a preset carrying both marks draws warm with a `-` — the glyph's
+/// own precedence rule meeting a colour that says otherwise. A third colour to
+/// disambiguate a state this rare costs more than it returns.
+///
+/// The settings menu's rows are deliberately not routed through here: they carry
+/// no marks, so a shared function would take a parameter that is always `false`.
+pub fn browse_row_style(highlighted: bool, favourite: bool) -> (&'static str, [f32; 4]) {
+    match (highlighted, favourite) {
+        (true, _) => ("> ", THEME.accent.rgba()),
+        (false, true) => ("  ", THEME.favourite.rgba()),
+        (false, false) => ("  ", THEME.text.rgba()),
+    }
+}
+
+/// The corner name plate: the active preset's name carrying its marks, and the
+/// countdown under it when there is one.
+///
+/// The marks ride on the name rather than on a line of their own: marking is
+/// worthless if you cannot see what is marked without opening the browser, and
+/// a second line for two words is furniture the show does not need.
+pub fn corner_lines(
+    name: &str,
+    favourite: bool,
+    hidden: bool,
+    countdown: Option<String>,
+    measure: &mut Measure<'_>,
+    out: &mut Vec<Line>,
+) {
+    let from = out.len();
+    out.push(Line::new(
+        format!("{name}{}", mark_suffix(favourite, hidden)),
+        NAME_INSET,
+        NAME_INSET,
+        NAME_SIZE,
+        THEME.text.rgba(),
+    ));
+    if let Some(text) = countdown {
+        out.push(Line::new(
+            text,
+            NAME_INSET,
+            NEXT_TOP,
+            NEXT_SIZE,
+            THEME.text_dim.rgba(),
+        ));
+    }
+    push_backdrop(out, from, measure);
+}
+
+/// Append the backdrop that holds the text lines `out[from..]`, if any.
+///
+/// Appended **after** the lines it backs rather than before: the panels are one
+/// draw under all of a frame's text whatever their place in the list, and a
+/// block's first line stays the first line a reader of the list finds.
+pub fn push_backdrop(out: &mut Vec<Line>, from: usize, measure: &mut Measure<'_>) {
+    let backdrop = out
+        .get(from..)
+        .and_then(|block| Line::backdrop_around(block, |text, size| measure(text, size)));
+    if let Some(backdrop) = backdrop {
+        out.push(backdrop);
+    }
+}
+
+/// The F3 capture line, placed under the core's diagnostics panel, in the dim
+/// text role: a diagnostics line, not part of the show.
+pub fn capture_verdict_line(token: &str) -> Line {
+    Line::new(
+        capture_line(token),
+        NAME_INSET,
+        CAPTURE_TOP,
+        CAPTURE_SIZE,
+        THEME.text_dim.rgba(),
+    )
+}
+
+/// The settings menu: its key-hint header, then one row per setting with the
+/// highlight marker on [`SettingsState::row`].
+///
+/// One column, always: the rows start at [`ROWS_TOP`] with a [`ROW_H`] pitch,
+/// which fits any window this app opens in, and a settings menu that reflowed
+/// would move a row out from under the operator's hand mid-edit.
+pub fn settings_lines(
+    state: &SettingsState,
+    view: &SettingsView,
+    measure: &mut Measure<'_>,
+    out: &mut Vec<Line>,
+) {
+    let from = out.len();
+    out.push(Line::new(
+        "settings  -  up/down  left/right  esc".to_owned(),
+        LIST_INSET,
+        LIST_TOP,
+        ROW_SIZE,
+        THEME.text_dim.rgba(),
+    ));
+    for (row, (label, value)) in state.lines(view).into_iter().enumerate() {
+        let (marker, color) = if row == state.row() {
+            ("> ", THEME.accent.rgba())
+        } else {
+            ("  ", THEME.text.rgba())
+        };
+        let text = format!("{marker}{label:<14}{value}");
+        let y = ROWS_TOP + row as f32 * ROW_H;
+        if row == state.row() {
+            let w = measure(&text, ROW_SIZE);
+            out.push(highlight_at(LIST_INSET, y, w));
+        }
+        out.push(Line::new(text, LIST_INSET, y, ROW_SIZE, color));
+    }
+    push_backdrop(out, from, measure);
+}
+
+/// The browser: the header naming the query and every narrowing, then the
+/// `visible` rows placed by `layout`, on one backdrop.
+///
+/// Every placement decision is [`layout`]'s, so this only turns `(column, row)`
+/// into pixels. Rows the layout scrolls off answer `None` and are skipped.
+pub fn browse_lines(
+    state: &OverlayState,
+    visible: &[(usize, Row<'_>)],
+    layout: &ListLayout,
+    measure: &mut Measure<'_>,
+    out: &mut Vec<Line>,
+) {
+    let from = out.len();
+    out.push(Line::new(
+        header_text(state),
+        LIST_INSET,
+        LIST_TOP,
+        ROW_SIZE,
+        THEME.text_dim.rgba(),
+    ));
+    for (row, (_abs, entry)) in visible.iter().enumerate() {
+        let Some((col, r)) = layout.place(row) else {
+            continue;
+        };
+        let (x, y) = (LIST_INSET + col as f32 * COL_W, ROWS_TOP + r as f32 * ROW_H);
+        let highlighted = row == state.highlight();
+        row_lines(entry, highlighted, (x, y), measure, out);
+        if highlighted {
+            out.push(highlight_at(x, y, COL_W - COL_GUTTER));
+        }
+    }
+    push_backdrop(out, from, measure);
+}
+
+/// Width the help sheet gives a row's keys before its label.
+const HELP_KEY_W: f32 = 150.0;
+/// Horizontal pitch between the help sheet's columns.
+const HELP_COL_W: f32 = 560.0;
+
+/// The help sheet for `ctx`: a header, then every row [`keymap::sheet`] lists
+/// for that context — the rows the dispatch reads — under its group's heading,
+/// flowed top-down into as many columns as a surface `height` px tall needs.
+///
+/// A heading never ends a column: it moves to the next one with its first row.
+pub fn help_lines(ctx: keymap::Ctx, height: f32, measure: &mut Measure<'_>, out: &mut Vec<Line>) {
+    let from = out.len();
+    out.push(Line::new(
+        format!("{}  -  ? or esc closes", ctx.title()),
+        LIST_INSET,
+        LIST_TOP,
+        ROW_SIZE,
+        THEME.text_dim.rgba(),
+    ));
+    let bottom = (height - LIST_INSET).max(ROWS_TOP + 2.0 * ROW_H);
+    let (mut x, mut y) = (LIST_INSET, ROWS_TOP);
+    for (group, rows) in keymap::sheet(ctx) {
+        // The heading and its first row go together, or both to the next column.
+        if y + 2.0 * ROW_H > bottom && y > ROWS_TOP {
+            x += HELP_COL_W;
+            y = ROWS_TOP;
+        }
+        out.push(Line::new(
+            group.title().to_owned(),
+            x,
+            y,
+            ROW_SIZE,
+            THEME.text_dim.rgba(),
+        ));
+        y += ROW_H;
+        for row in rows {
+            // A group broken across columns repeats its heading atop the new one,
+            // so no row stands in a column with nothing naming its group.
+            if y + ROW_H > bottom {
+                x += HELP_COL_W;
+                y = ROWS_TOP;
+                out.push(Line::new(
+                    group.title().to_owned(),
+                    x,
+                    y,
+                    ROW_SIZE,
+                    THEME.text_dim.rgba(),
+                ));
+                y += ROW_H;
+            }
+            out.push(Line::new(
+                row.shown.to_owned(),
+                x,
+                y,
+                ROW_SIZE,
+                THEME.accent.rgba(),
+            ));
+            out.push(Line::new(
+                fit(row.label, HELP_COL_W - HELP_KEY_W - COL_GUTTER, measure).into_owned(),
+                x + HELP_KEY_W,
+                y,
+                ROW_SIZE,
+                THEME.text.rgba(),
+            ));
+            y += ROW_H;
+        }
+    }
+    push_backdrop(out, from, measure);
+}
+
+/// The launch hint, bottom-right on a `width` x `height` surface, on its own
+/// backdrop and at opacity `alpha`.
+pub fn hint_lines(
+    text: &str,
+    width: f32,
+    height: f32,
+    alpha: f32,
+    measure: &mut Measure<'_>,
+    out: &mut Vec<Line>,
+) {
+    if alpha <= 0.0 {
+        return;
+    }
+    let from = out.len();
+    let w = measure(text, CAPTURE_SIZE);
+    let x = (width - LIST_INSET - w).max(LIST_INSET);
+    let y = height - LIST_INSET - CAPTURE_SIZE * rlx_core::render::text::LINE_HEIGHT_RATIO;
+    out.push(Line::new(
+        text.to_owned(),
+        x,
+        y,
+        CAPTURE_SIZE,
+        THEME.text.rgba(),
+    ));
+    push_backdrop(out, from, measure);
+    for line in out.get_mut(from..).unwrap_or_default() {
+        line.color[3] *= alpha;
+    }
+}
+
+/// Horizontal room a row highlight takes left of the row's text: the accent
+/// bar and a gap before the marker.
+const HIGHLIGHT_LEAD: f32 = 8.0;
+
+/// The selection highlight under a row whose text starts at `(x, y)` and runs
+/// `w` device px.
+fn highlight_at(x: f32, y: f32, w: f32) -> Line {
+    Line::highlight(x - HIGHLIGHT_LEAD, y - 1.0, w + HIGHLIGHT_LEAD, ROW_H)
+}
+
+/// The preview pane's text: the placeholder inside the image's rectangle while
+/// `shown` is false, and the highlighted preset's name under it either way —
+/// on one backdrop that also frames the image.
+pub fn pane_lines(
+    pane: &Pane,
+    name: &str,
+    shown: bool,
+    measure: &mut Measure<'_>,
+    out: &mut Vec<Line>,
+) {
+    let caption_w = measure(name, PANE_TEXT_SIZE);
+    let backdrop = rlx_core::render::Panel::around(
+        pane.x,
+        pane.y,
+        pane.x + pane.w.max(caption_w),
+        pane.caption_y + PANE_TEXT_SIZE * rlx_core::render::text::LINE_HEIGHT_RATIO,
+        THEME.space[1],
+    );
+    out.push(Line::backdrop(
+        backdrop.x, backdrop.y, backdrop.w, backdrop.h,
+    ));
+    if !shown {
+        let (x, y) = pane.placeholder_at();
+        out.push(Line::new(
+            PANE_PLACEHOLDER.to_owned(),
+            x,
+            y,
+            PANE_TEXT_SIZE,
+            THEME.text_faint.rgba(),
+        ));
+    }
+    out.push(Line::new(
+        name.to_owned(),
+        pane.x,
+        pane.caption_y,
+        PANE_TEXT_SIZE,
+        THEME.text_dim.rgba(),
+    ));
 }
 
 /// A key the overlay reacts to, decoded from the platform's input upstream so

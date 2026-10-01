@@ -61,7 +61,7 @@ in the shell and it never did.
 
 Sixteen approved plans sit ahead of this one, and three land on exactly this code:
 **[0206](0206-the-browser-shows-the-look.md)** adds another consumer to the preview surface,
-**[0209](../0209-a-system-joins-the-instruments-by-existing.md)** derives a roster from `SystemKind`,
+**[0209](0209-a-system-joins-the-instruments-by-existing.md)** derives a roster from `SystemKind`,
 and **[0203](0203-the-figure-gains-the-levers-it-was-measured-to-lack.md)** touches scene params. Every
 count, file list and call-site table in this plan and in ADR-0238 was read on **2026-09-20** and will
 be wrong by the time the plan runs.

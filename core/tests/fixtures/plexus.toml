@@ -1,0 +1,30 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `plexus` scene's drift baseline: a seeded cloud drifting for the suite's
+# 60 frames, seen from a fixed off-axis camera.
+#
+#  - `[plexus] seed` pinned, so the point set and its flow are this file's own.
+#  - Every camera param bound although some equal the defaults, so a change of
+#    default cannot move this baseline.
+#  - `line_width = 2` so a stroke is wide enough at the 128 capture for its
+#    profile to reach the pixels rather than the half-pixel floor.
+system = "plexus"
+name   = "fixture_plexus"
+
+[plexus]
+layout = "cloud"
+points = 200
+seed   = 7
+
+[params]
+link_distance = "0.45"
+link_alpha    = "1.0"
+line_width    = "2.0"
+drift         = "0.3"
+yaw           = "0.4"
+pitch         = "0.3"
+distance      = "3.5"
+fov           = "0.8"
+hue_center    = "0.4"
+hue_spread    = "0.6"
+brightness    = "1.2"

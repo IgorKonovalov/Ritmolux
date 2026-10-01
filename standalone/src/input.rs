@@ -1,14 +1,15 @@
 //! Keyboard and pointer routing.
 //!
-//! One rule decides everything here: whichever modal owns the keyboard sees a
-//! key first, and while it is open every key it does not claim is **swallowed**
-//! rather than falling through. `AppState::modal` is the single place that fact
-//! is decided, so routing and drawing cannot disagree about which menu is on
-//! screen.
+//! One rule decides everything here: whichever surface owns the keyboard sees a
+//! key first, and while a menu is open every key it does not claim is
+//! **swallowed** rather than falling through. `AppState::modal` is the single
+//! place that fact is decided, so routing and drawing cannot disagree about
+//! which menu is on screen; [`standalone::keymap`] is the single place a key is
+//! given a meaning, so the dispatch and the help sheet cannot disagree about it.
 
 use winit::event::KeyEvent;
 use winit::event_loop::ActiveEventLoop;
-use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::keyboard::{Key as LogicalKey, PhysicalKey};
 
 use std::time::Instant;
 
@@ -18,262 +19,190 @@ use crate::hud::Modal;
 use crate::overlay::{OverlayAction, OverlayKey};
 use crate::settings::{SettingsAction, SettingsKey};
 use rlx_core::render::Tier;
+use standalone::keymap::{self, Action, Ctx, Press};
 use standalone::marks::Mark;
 
 /// How close two left-button presses have to be to read as a double-click
 /// (fullscreen toggle) rather than two separate clicks.
 pub(crate) const DOUBLE_CLICK: std::time::Duration = std::time::Duration::from_millis(400);
 
-/// Map a physical key to the settings modal's abstract key, or `None` for keys
-/// the modal does not own (which are then swallowed while it is open).
-pub(crate) fn decode_settings_key(code: KeyCode) -> Option<SettingsKey> {
-    Some(match code {
-        KeyCode::KeyS => SettingsKey::Toggle,
-        KeyCode::ArrowUp => SettingsKey::Up,
-        KeyCode::ArrowDown => SettingsKey::Down,
-        KeyCode::ArrowLeft => SettingsKey::Left,
-        KeyCode::ArrowRight => SettingsKey::Right,
-        KeyCode::Escape => SettingsKey::Escape,
-        _ => return None,
-    })
-}
-
-/// The favourite `1`-`9` selects, as a zero-based position, or `None` for every
-/// other key.
-///
-/// The **top row and the numpad both**, because a key labelled `3` means `3`
-/// wherever it is on the board; `0` is deliberately not in the set, since a
-/// tenth slot would have to be either "the tenth" (reading `0` as ten) or a
-/// hole, and nine slots with no ambiguity is the better of the three.
-pub(crate) fn favourite_slot(code: KeyCode) -> Option<usize> {
-    Some(match code {
-        KeyCode::Digit1 | KeyCode::Numpad1 => 0,
-        KeyCode::Digit2 | KeyCode::Numpad2 => 1,
-        KeyCode::Digit3 | KeyCode::Numpad3 => 2,
-        KeyCode::Digit4 | KeyCode::Numpad4 => 3,
-        KeyCode::Digit5 | KeyCode::Numpad5 => 4,
-        KeyCode::Digit6 | KeyCode::Numpad6 => 5,
-        KeyCode::Digit7 | KeyCode::Numpad7 => 6,
-        KeyCode::Digit8 | KeyCode::Numpad8 => 7,
-        KeyCode::Digit9 | KeyCode::Numpad9 => 8,
-        _ => return None,
-    })
-}
-
-/// Map a physical key to the overlay's abstract key, or `None` for keys the
-/// overlay does not own (which then reach the shell's own bindings).
-pub(crate) fn decode_overlay_key(code: KeyCode) -> Option<OverlayKey> {
-    Some(match code {
-        KeyCode::Tab => OverlayKey::Toggle,
-        KeyCode::ArrowUp => OverlayKey::Up,
-        KeyCode::ArrowDown => OverlayKey::Down,
-        KeyCode::ArrowLeft => OverlayKey::Left,
-        KeyCode::ArrowRight => OverlayKey::Right,
-        KeyCode::Enter | KeyCode::NumpadEnter => OverlayKey::Enter,
-        KeyCode::Escape => OverlayKey::Escape,
-        KeyCode::Backspace => OverlayKey::Backspace,
-        // The three narrowings. Function keys because **letters and digits are
-        // filter input while the browser is open** and this app binds no
-        // modifier combination anywhere — so `Ctrl`-anything would be new input
-        // plumbing rather than a free choice, and a letter would be swallowed by
-        // the query. `F3` was already a toggle, so the row is established.
-        KeyCode::F4 => OverlayKey::FavouritesOnly,
-        KeyCode::F5 => OverlayKey::Family,
-        KeyCode::F6 => OverlayKey::ShowHidden,
-        _ => return None,
-    })
+/// The press a key event carries: its physical key, and the one character the
+/// layout made of it — which is what `?` is matched by.
+fn press_of(event: &KeyEvent) -> Press {
+    let code = match event.physical_key {
+        PhysicalKey::Code(code) => Some(code),
+        PhysicalKey::Unidentified(_) => None,
+    };
+    let ch = match &event.logical_key {
+        LogicalKey::Character(s) => {
+            let mut chars = s.chars();
+            chars.next().filter(|_| chars.next().is_none())
+        }
+        _ => None,
+    };
+    Press { code, ch }
 }
 
 impl AppState {
-    /// Route a pressed key. Overlay control keys (toggle / nav / enter / esc /
-    /// backspace) go through its state machine first; while the overlay is open,
-    /// printable characters narrow the type-to-filter query and every other key
-    /// is swallowed. When it is closed, non-overlay keys fall through to the
-    /// shell's own bindings — Space-cycle and the F3 diagnostics toggle.
+    /// Which surface owns the keyboard, as the keymap names it.
+    pub(crate) fn key_context(&self) -> Ctx {
+        match self.modal() {
+            Some(Modal::Help) => Ctx::Help,
+            Some(Modal::Settings) => Ctx::Settings,
+            Some(Modal::Browse) => Ctx::Browse,
+            None => Ctx::Show,
+        }
+    }
+
+    /// Route a pressed key through [`keymap::KEYMAP`].
+    ///
+    /// The row the key fires in the current context is the whole decision. A
+    /// key no row claims is swallowed, except in the browser, where a printable
+    /// character narrows the type-to-filter query — that is the one binding not
+    /// keyed to a key, and it has a row of its own for the help sheet.
+    ///
+    /// **OS key repeat fires a row only when the row says so** (Plan 0050 Phase
+    /// 2): moving a cursor and stepping a value. A held `Space` would
+    /// machine-gun preset switches through a ~1 s dissolve each, and a held `F`
+    /// would thrash fullscreen.
     pub(crate) fn handle_key(&mut self, event_loop: &ActiveEventLoop, event: &KeyEvent) {
-        let PhysicalKey::Code(code) = event.physical_key else {
-            return;
-        };
-
-        // --- the settings modal owns the keyboard while it is open ---
-        if self.modal() == Some(Modal::Settings) {
-            // `Tab` hands over rather than stacking: one modal at a time.
-            if code == KeyCode::Tab && !event.repeat {
-                self.apply_settings_action(SettingsAction::OpenBrowse);
-                return;
+        let ctx = self.key_context();
+        let press = press_of(event);
+        match keymap::lookup(ctx, &press) {
+            Some(row) => {
+                if event.repeat && !row.repeat {
+                    return;
+                }
+                self.dispatch(ctx, row.action, press, event_loop);
             }
-            // Anything the modal does not own is swallowed, so `Space` cannot
-            // cycle a preset out from under an open menu.
-            let Some(key) = decode_settings_key(code) else {
-                return;
-            };
-            if event.repeat && !key.is_nav() {
-                return;
-            }
-            let view = self.settings_view();
-            let action = self.hud.settings.handle_key(key, &view);
-            self.apply_settings_action(action);
-            return;
-        }
-
-        // **OS key repeat is honoured for modal navigation keys only** (Plan 0050
-        // Phase 2). An event loop that drops every repeat before it gets here
-        // makes holding an arrow in the browser do nothing. Widening this to "all
-        // keys" is what must not happen: a held `Space` would machine-gun preset
-        // switches through a ~1 s dissolve each, and a held `F` would thrash
-        // fullscreen. So the gate is here, where the key's role is known, rather
-        // than at the event site, where it is not.
-        let overlay_key = decode_overlay_key(code);
-        if event.repeat
-            && !(self.hud.browse.is_open() && overlay_key.is_some_and(OverlayKey::is_nav))
-        {
-            return;
-        }
-
-        // `Escape` leaves fullscreen (Plan 0096 Phase 2) — checked here, *after*
-        // the modal branches, because a menu on screen owns the key first.
-        //
-        // It has to be intercepted before the overlay dispatch below:
-        // `decode_overlay_key` maps `Escape` unconditionally, so with the browser
-        // **closed** it lands on `OverlayAction::None => return` and never reaches
-        // the shell's own match. Widening that `None` arm to fall through would
-        // route `Enter`, `Backspace` and the arrows out here too — a much broader
-        // change than one binding.
-        //
-        // Windowed it does nothing, and it **never quits**: one stray keypress
-        // ending a running show is the failure mode this binding is worth
-        // avoiding. Fullscreen goes through the existing toggle so the
-        // `[output] fullscreen` write stays on one path with `F`.
-        if code == KeyCode::Escape && self.modal().is_none() {
-            if self.window.fullscreen().is_some() {
-                self.toggle_fullscreen();
-            }
-            return;
-        }
-
-        // A step backwards through what was actually shown, intercepted here for
-        // `Escape`'s reason: `decode_overlay_key` maps `Backspace`
-        // unconditionally, so with the browser **closed** the dispatch below
-        // would land on `OverlayAction::None => return` and this would never
-        // reach the shell's own match. With the browser open it stays the filter
-        // key it has always been, because the dispatch runs first.
-        if code == KeyCode::Backspace && self.modal().is_none() {
-            self.step_previous();
-            return;
-        }
-
-        // Marking, before the overlay dispatch so the **same key** works with
-        // the browser open and closed (ADR-0228). A function key is never a
-        // filter character, which is what lets one binding serve both contexts
-        // without introducing modifier handling this app has nowhere else.
-        if code == KeyCode::F1 {
-            self.toggle_mark(Mark::Favourite);
-            return;
-        }
-        if code == KeyCode::F2 {
-            self.toggle_mark(Mark::Hidden);
-            return;
-        }
-
-        if let Some(key) = overlay_key {
-            let names = self.roster_names();
-            let rows = self.browse_rows(&names);
-            let active = self.renderer.active_index();
-            let layout = self.list_layout(self.hud.browse.visible(&rows).len());
-            match self.hud.browse.handle_key(key, &rows, active, &layout) {
-                OverlayAction::None => return, // closed + non-toggle: let it fall away
-                OverlayAction::Redraw | OverlayAction::Close => {}
-                OverlayAction::Select(index) => {
-                    self.renderer.select_preset(index);
-                    self.on_preset_switched(Trail::Record);
+            None if ctx == Ctx::Browse && !event.repeat => {
+                if let Some(text) = &event.text {
+                    self.filter_browser(text);
                 }
             }
-            self.window.request_redraw();
-            return;
+            None => {}
         }
+    }
 
-        // While open, printable characters filter the list; anything else is
-        // consumed so it can't reach Space-cycle / F3.
-        if self.hud.browse.is_open() {
-            if let Some(text) = &event.text {
-                let names = self.roster_names();
-                let rows = self.browse_rows(&names);
-                let active = self.renderer.active_index();
-                let layout = self.list_layout(self.hud.browse.visible(&rows).len());
-                let mut changed = false;
-                for c in text
-                    .chars()
-                    .filter(|c| !c.is_control() && !c.is_whitespace())
-                {
-                    self.hud
-                        .browse
-                        .handle_key(OverlayKey::Char(c), &rows, active, &layout);
-                    changed = true;
-                }
-                if changed {
-                    self.window.request_redraw();
-                }
-            }
-            return;
-        }
-
-        match code {
-            KeyCode::Space => {
+    /// Carry out one row's action, pressed in `ctx`.
+    fn dispatch(&mut self, ctx: Ctx, action: Action, press: Press, event_loop: &ActiveEventLoop) {
+        match action {
+            Action::NextPreset => {
                 // Manual next scene: reset the director's dwell so the auto
                 // timer restarts from this moment.
                 self.show.director.force_next();
                 self.rotate_to_next();
             }
-            KeyCode::KeyA => self.toggle_auto_rotate(),
-            // The two rotation switches, out here only like `A`: with the
-            // browser open both letters are filter characters and the branch
-            // above has already returned.
-            KeyCode::KeyR => self.toggle_rotate_order(),
-            KeyCode::KeyL => self.cycle_rotate_source(),
-            KeyCode::F3 => self.toggle_diagnostics(),
-            // `S` opens settings only out here — while the browser is open it is
-            // a filter character, and the branch above returns before reaching
-            // this match.
-            KeyCode::KeyS => {
+            Action::PreviousPreset => self.step_previous(),
+            // `1`-`9` land on the first nine favourites, in the browser's own
+            // order.
+            Action::SelectFavourite => {
+                if let Some(nth) = press.code.and_then(keymap::favourite_slot) {
+                    self.select_favourite(nth);
+                }
+            }
+            Action::AbCompare => self.flip_ab(),
+            // One binding marks the highlighted row inside the browser and the
+            // preset on screen outside it (ADR-0228).
+            Action::MarkFavourite => self.toggle_mark(Mark::Favourite),
+            Action::MarkHidden => self.toggle_mark(Mark::Hidden),
+            Action::ToggleAuto => self.toggle_auto_rotate(),
+            Action::ToggleOrder => self.toggle_rotate_order(),
+            Action::CycleSource => self.cycle_rotate_source(),
+            // Quality, live (ADR-0054).
+            Action::TierFloor => self.swap_tier(Tier::Floor),
+            Action::TierRich => self.swap_tier(Tier::Rich),
+            Action::Fullscreen => self.toggle_fullscreen(),
+            // Windowed it does nothing, and it **never quits**: one stray
+            // keypress ending a running show is the failure mode this binding
+            // is worth avoiding (Plan 0096 Phase 2).
+            Action::LeaveFullscreen => {
+                if self.window.fullscreen().is_some() {
+                    self.toggle_fullscreen();
+                }
+            }
+            Action::CycleDisplay => self.cycle_display(),
+            Action::Diagnostics => self.toggle_diagnostics(),
+            Action::OpenSettings => {
                 // One of the two refresh points (the other is a mode change).
                 // Enumeration is COM, so it happens on the keypress that makes
                 // the roster visible, not on the frames that draw it. The
                 // adapter roster is refreshed on the same keypress for the
                 // same reason: it builds a graphics instance.
-                if !self.hud.settings.is_open() {
-                    self.refresh_input_roster();
-                    self.refresh_adapter_roster();
-                }
+                self.refresh_input_roster();
+                self.refresh_adapter_roster();
                 let view = self.settings_view();
                 let action = self.hud.settings.handle_key(SettingsKey::Toggle, &view);
                 self.apply_settings_action(action);
             }
-            KeyCode::KeyF => self.toggle_fullscreen(),
-            KeyCode::KeyD => self.cycle_display(),
-            // A/B compare. Out here only, like `S`, `C` and `F`: while the
-            // browser is open `b` is a filter character and the branch above
-            // has already returned.
-            KeyCode::KeyB => self.flip_ab(),
-            // The operator console. Out here only, like `S`: while the browser
-            // is open `C` is a filter character and the branch above has already
-            // returned.
-            // Not on repeat: holding the key would flap a window open and shut
-            // rather than scroll a list, and creating a swapchain per repeat is
-            // the most expensive thing any binding here can do.
-            KeyCode::KeyC if !event.repeat => self.toggle_console(event_loop, true),
-            // Quality, live (ADR-0054). `[` down a tier, `]` up — the bracket
-            // pair reads as a range with the floor on the left.
-            KeyCode::BracketLeft => self.swap_tier(Tier::Floor),
-            KeyCode::BracketRight => self.swap_tier(Tier::Rich),
-            // `1`-`9` land on the first nine favourites, in the browser's own
-            // order. Digits are filter characters while the browser is open,
-            // exactly as letters are, so this binding applies outside it — the
-            // branch above has already returned by here.
-            other => {
-                if let Some(nth) = favourite_slot(other) {
-                    self.select_favourite(nth);
-                }
+            Action::Console => self.toggle_console(event_loop, true),
+            // The sheet lists the context it was opened from, and closing it
+            // hands the keyboard back to that context's menu, still open under
+            // it.
+            Action::Help => {
+                self.hud.help = Some(ctx);
+                self.window.request_redraw();
             }
+            Action::CloseHelp => {
+                self.hud.help = None;
+                self.window.request_redraw();
+            }
+            Action::Browse(key) => self.browse_key(key),
+            // Reached only through the typed text; see `handle_key`.
+            Action::Filter => {}
+            Action::Settings(key) => {
+                let view = self.settings_view();
+                let action = self.hud.settings.handle_key(key, &view);
+                self.apply_settings_action(action);
+            }
+            // Hands over rather than stacking: one menu at a time.
+            Action::SettingsToBrowse => self.apply_settings_action(SettingsAction::OpenBrowse),
+        }
+    }
+
+    /// Feed one key to the browser's state machine and act on what it says.
+    fn browse_key(&mut self, key: OverlayKey) {
+        let names = self.roster_names();
+        let rows = self.browse_rows(&names);
+        let active = self.renderer.active_index();
+        let layout = self.list_layout(self.hud.browse.visible(&rows).len());
+        match self.hud.browse.handle_key(key, &rows, active, &layout) {
+            OverlayAction::None => return,
+            OverlayAction::Redraw | OverlayAction::Close => {}
+            OverlayAction::Select(index) => {
+                let incoming = self.renderer.select_preset(index).to_owned();
+                self.on_preset_selected(&incoming);
+            }
+        }
+        self.window.request_redraw();
+    }
+
+    /// Narrow the open browser by the printable characters of `text`.
+    fn filter_browser(&mut self, text: &str) {
+        let names = self.roster_names();
+        let rows = self.browse_rows(&names);
+        let active = self.renderer.active_index();
+        let layout = self.list_layout(self.hud.browse.visible(&rows).len());
+        let mut changed = false;
+        for c in text
+            .chars()
+            .filter(|c| !c.is_control() && !c.is_whitespace())
+        {
+            self.hud
+                .browse
+                .handle_key(OverlayKey::Char(c), &rows, active, &layout);
+            changed = true;
+        }
+        if changed {
+            self.window.request_redraw();
+        }
+    }
+
+    /// The pointer moved over the show's window: bring the launch hint back,
+    /// when `[ui] hints` wants it.
+    pub(crate) fn pointer_moved(&mut self) {
+        if self.config.ui.hints {
+            self.hud.hint_secs = standalone::motion::HINT_SECS;
         }
     }
 
@@ -337,8 +266,8 @@ impl AppState {
                 if let Some(index) =
                     console::random_index(count, self.renderer.active_index(), seed)
                 {
-                    self.renderer.select_preset(index);
-                    self.on_preset_switched(Trail::Record);
+                    let incoming = self.renderer.select_preset(index).to_owned();
+                    self.on_preset_selected(&incoming);
                 }
             }
             // The director's own reset comes with it, so the dwell restarts from
@@ -408,86 +337,5 @@ impl AppState {
         } else {
             self.last_click = Some(now);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{decode_overlay_key, favourite_slot};
-    use crate::overlay::OverlayKey;
-    use winit::keyboard::KeyCode;
-
-    /// **Nine slots, both number rows, and nothing else.** A key past the ninth
-    /// must not wrap onto a favourite: a key that means a different preset
-    /// depending on how many are marked is worse than a key that means nothing.
-    #[test]
-    fn the_number_keys_map_to_nine_slots_and_no_more() {
-        let digits = [
-            KeyCode::Digit1,
-            KeyCode::Digit2,
-            KeyCode::Digit3,
-            KeyCode::Digit4,
-            KeyCode::Digit5,
-            KeyCode::Digit6,
-            KeyCode::Digit7,
-            KeyCode::Digit8,
-            KeyCode::Digit9,
-        ];
-        for (nth, code) in digits.into_iter().enumerate() {
-            assert_eq!(favourite_slot(code), Some(nth), "{code:?}");
-        }
-        // The numpad's `3` is a `3`, wherever it is on the board.
-        assert_eq!(favourite_slot(KeyCode::Numpad3), Some(2));
-        assert_eq!(favourite_slot(KeyCode::Numpad9), Some(8));
-
-        assert_eq!(
-            favourite_slot(KeyCode::Digit0),
-            None,
-            "`0` would be a tenth slot or a hole; nine with no ambiguity is better"
-        );
-        for code in [KeyCode::KeyB, KeyCode::Space, KeyCode::F1, KeyCode::Minus] {
-            assert_eq!(favourite_slot(code), None, "{code:?} is not a slot");
-        }
-    }
-
-    /// The three narrowing keys reach the browser and **no letter does**, which
-    /// is the binding constraint the whole set was chosen under: letters and
-    /// digits are filter input while it is open.
-    #[test]
-    fn the_browser_keys_are_function_keys_and_never_letters() {
-        assert_eq!(
-            decode_overlay_key(KeyCode::F4),
-            Some(OverlayKey::FavouritesOnly)
-        );
-        assert_eq!(decode_overlay_key(KeyCode::F5), Some(OverlayKey::Family));
-        assert_eq!(
-            decode_overlay_key(KeyCode::F6),
-            Some(OverlayKey::ShowHidden)
-        );
-
-        for code in [
-            KeyCode::KeyF,
-            KeyCode::KeyH,
-            KeyCode::KeyS,
-            KeyCode::KeyB,
-            // The two rotation switches: inert while the browser is open, for
-            // the same reason every other letter is.
-            KeyCode::KeyR,
-            KeyCode::KeyL,
-            KeyCode::Digit1,
-        ] {
-            assert_eq!(
-                decode_overlay_key(code),
-                None,
-                "{code:?} would be swallowed as a filter character"
-            );
-        }
-
-        // `F1` and `F2` are deliberately **not** overlay keys: the shell
-        // intercepts them before the dispatch so one binding marks the
-        // highlighted row inside the browser and the preset on screen outside
-        // it.
-        assert_eq!(decode_overlay_key(KeyCode::F1), None);
-        assert_eq!(decode_overlay_key(KeyCode::F2), None);
     }
 }

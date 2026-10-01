@@ -1,12 +1,12 @@
 use super::{
-    DWELL_CEILING, DWELL_FLOOR, DWELL_STEP, GridScale, GridScaleChoice, InputMode, RotateOrder,
-    RotateSource, SettingsAction, SettingsKey, SettingsRow, SettingsState, SettingsView, Tier,
-    TierState, step_grid_scale,
+    DWELL_CEILING, DWELL_FLOOR, DWELL_STEP, GridScale, GridScaleChoice, InputMode, Motion,
+    RotateOrder, RotateSource, SettingsAction, SettingsKey, SettingsRow, SettingsState,
+    SettingsView, Tier, TierState, step_grid_scale,
 };
 
 use std::path::Path;
 
-use standalone::config::Config;
+use crate::config::Config;
 
 fn view() -> SettingsView {
     SettingsView {
@@ -35,6 +35,8 @@ fn view() -> SettingsView {
         next_rotation: true,
         console: false,
         thumbnails: true,
+        motion: Motion::Full,
+        hints: true,
         adapter_index: 1,
         adapter_count: 2,
         adapter_name: "NVIDIA GeForce RTX 3080 Laptop GPU".to_owned(),
@@ -118,10 +120,23 @@ fn each_row_emits_the_action_its_table_row_names() {
             SettingsAction::ToggleThumbnails
         );
         assert_eq!(
+            edit_at(SettingsRow::Hints, right, &v),
+            SettingsAction::ToggleHints
+        );
+        assert_eq!(
             edit_at(SettingsRow::InputDevice, right, &v),
             SettingsAction::CycleInputDevice
         );
     }
+    // The motion row is a switch too, `full` on the left.
+    assert_eq!(
+        edit_at(SettingsRow::Motion, false, &v),
+        SettingsAction::SetMotion(Motion::Full)
+    );
+    assert_eq!(
+        edit_at(SettingsRow::Motion, true, &v),
+        SettingsAction::SetMotion(Motion::Reduced)
+    );
     // The two rotation rows are switches for the same reason the mode row is.
     assert_eq!(
         edit_at(SettingsRow::Order, false, &v),
@@ -373,6 +388,8 @@ fn the_rows_are_the_ones_the_menu_promises_in_order() {
             SettingsRow::NowPlaying,
             SettingsRow::NextRotation,
             SettingsRow::Console,
+            SettingsRow::Motion,
+            SettingsRow::Hints,
             SettingsRow::Thumbnails,
             SettingsRow::Presets,
         ]

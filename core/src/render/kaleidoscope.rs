@@ -187,7 +187,7 @@
 use crate::render::gpu;
 
 use super::post::{Fold, PostGrid, PostStage};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// `kaleido_order` default — 1 = identity, so an unbound preset is unaffected.
 const DEFAULT_ORDER: f32 = default_of(PARAMS, "kaleido_order");
@@ -923,6 +923,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([1.0, 16.0]),
         doc: "How many mirrored wedges the frame is folded into; 1 is no fold at all.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Post,
+        main: true,
     },
     ParamSpec {
         name: "kaleido_angle",
@@ -930,6 +932,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, std::f32::consts::TAU]),
         doc: "Rotates the whole fold, in radians.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "kaleido_center_x",
@@ -937,6 +941,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "The horizontal point the wedges radiate from, in uv.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "kaleido_center_y",
@@ -944,6 +950,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "The vertical point the wedges radiate from, in uv.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "kaleido_edge",
@@ -951,6 +959,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Softens the seam between mirrored wedges; 1 is a hard edge.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Post,
+        main: false,
     },
     // ADR-0077's composed map, in the order it is applied
     // (destination-to-source): tile -> fold -> radial -> spiral, with `zoom` and
@@ -961,6 +971,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([1.0, 8.0]),
         doc: "Repeats the source across the frame before it is folded, so one wedge shows several copies.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "kaleido_radial",
@@ -968,6 +980,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.25, 4.0]),
         doc: "Scales distance from the centre when sampling, pulling detail inward or pushing it out.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "kaleido_spiral",
@@ -975,6 +989,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-2.0, 2.0]),
         doc: "Rotates the sample by an amount that grows with radius, turning the wedges into a spiral.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "kaleido_zoom",
@@ -982,6 +998,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Shifts the sampled radius inward or outward, riding on the radial term.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "kaleido_inner",
@@ -989,6 +1007,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 0.5]),
         doc: "Radius of the untouched disc at the centre, which keeps the pivot from smearing.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
 ];
 

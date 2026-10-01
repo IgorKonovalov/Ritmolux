@@ -165,9 +165,8 @@ These are engine-wide and bindable, so treat them as instruments, not decoration
   literally nothing — measured, a draft holding `brightness` under 1.0 rendered **pixel-identical**
   with bloom on and at `bloom_amount = 0`. Something must deliberately cross 1.0, and the cheapest
   fuel is **`glow`**, because it drives the stroke's core rather than its width (raising `thickness`
-  spreads the same light over a bigger quad and can move the peak the wrong way). Shipped headers
-  that record the choice: `presets/attractor_lorenzgallery.toml` ("over 1.0 deliberately") and
-  `presets/attractor_clifford.toml` (only the densest filaments cross it).
+  spreads the same light over a bigger quad and can move the peak the wrong way). A shipped header
+  that records the choice: `presets/attractor_clifford.toml` (only the densest filaments cross it).
   **And verify it on a moving stimulus, never on a `--set` still.** A held `--set bass=1` flatters
   every stage, but the threshold makes this one a cliff rather than a slope: at `bass = 1` the
   figure sits far over range and the halo is enormous, while real material spends most of its time

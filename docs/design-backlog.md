@@ -17,7 +17,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0021 — an "even fall" is not reachable with a one-pole, in any ordering](#0021--an-even-fall-is-not-reachable-with-a-one-pole-in-any-ordering)
 - [Entry 0032 — from the Plan 0049 Phase 5 sample-rate sweep](#entry-0032--from-the-plan-0049-phase-5-sample-rate-sweep)
 - [0032 — both analysis windows are sized in **samples**, so a third of the band axis loses resolution at 96 kHz](#0032--both-analysis-windows-are-sized-in-samples-so-a-third-of-the-band-axis-loses-resolution-at-96-khz)
-- [0038 — mid-tone-dominated presets lost ~8 % luminance to the tonemap knee, and the library has not been retuned](#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned)
 - [0042 — the downbeat estimator locks on ~3 % of audible time, so the gated bar variables are almost always fallback](#0042--the-downbeat-estimator-locks-on-3--of-audible-time-so-the-gated-bar-variables-are-almost-always-fallback)
 - [Entry 0069 — from Plan 0070's close (2026-08-05)](#entry-0069--from-plan-0070s-close-2026-08-05)
 - [0069 — there is no way to draw a two-tone object (a fill with a contrasting outline), because the composite is additive](#0069--there-is-no-way-to-draw-a-two-tone-object-a-fill-with-a-contrasting-outline-because-the-composite-is-additive)
@@ -31,7 +30,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0094 — the `frame_ms_p99` tail is not switch-correlated, so the steady-state column does not remove it](#0094--the-frame_ms_p99-tail-is-not-switch-correlated-so-the-steady-state-column-does-not-remove-it)
 - [0108 — the conversion tail: HLSL arrays (~71 files) and 218 MD2 presets that convert but render blank](#0108--the-conversion-tail-hlsl-arrays-71-files-and-218-md2-presets-that-convert-but-render-blank)
 - [0109 — disk textures are 88.7 % of every MilkDrop conversion failure, and the exclusion's trigger condition is already met](#0109--disk-textures-are-887--of-every-milkdrop-conversion-failure-and-the-exclusions-trigger-condition-is-already-met)
-- [0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution](#0125--every-diffused-frame-is-an-upscale-both-profiles-diffuse-well-below-the-streams-own-resolution)
 - [0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device](#0154--a-swap-spawns-a-thread-that-creates-a-com-object-and-one-activation-in-22-failed-with-regdb_e_classnotreg-where-the-retry-budget-cannot-tell-that-from-a-dead-device)
 - [0165 - the windowed app cannot ask for the discrete GPU, so every windowed frame-time figure this project has quoted is an integrated-GPU figure](#0165---the-windowed-app-cannot-ask-for-the-discrete-gpu-so-every-windowed-frame-time-figure-this-project-has-quoted-is-an-integrated-gpu-figure)
 - [0187 — two measurements of the same console on the same adapter class disagree by 2x, and nothing explains which one the machine actually does](#0187--two-measurements-of-the-same-console-on-the-same-adapter-class-disagree-by-2x-and-nothing-explains-which-one-the-machine-actually-does)
@@ -39,10 +37,16 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen](#0220--a-headless-walk-of-the-system-roster-stalls-at-emitter-the-ping-sent-with-the-ask-is-answered-and-the-preset-never-reaches-the-screen)
 - [Entries 0227-0235 — from the Plan 0189 Phase 8 watched runs (2026-09-15), all archived](#entries-0227-0235--from-the-plan-0189-phase-8-watched-runs-2026-09-15-all-archived)
 - [0248 — nothing in this repo asks whether a groundless luminous field is a composition or a fill, and four shipped presets are the open cases](#0248--nothing-in-this-repo-asks-whether-a-groundless-luminous-field-is-a-composition-or-a-fill-and-four-shipped-presets-are-the-open-cases)
-- [0256 — the only report that asks whether two presets look alike covers nine of fourteen families, and both places naming the absent ones are stale](#0256--the-only-report-that-asks-whether-two-presets-look-alike-covers-nine-of-fourteen-families-and-both-places-naming-the-absent-ones-are-stale)
 - [0259 — the attractor rasterizes 600 000 sprites a frame, and a compute scatter would cut that term tenfold at the price of the look](#0259--the-attractor-rasterizes-600-000-sprites-a-frame-and-a-compute-scatter-would-cut-that-term-tenfold-at-the-price-of-the-look)
 - [0260 — a thumbnail's stamp carries no build identity, so an upgrade never re-renders a picture the engine now draws differently](#0260--a-thumbnails-stamp-carries-no-build-identity-so-an-upgrade-never-re-renders-a-picture-the-engine-now-draws-differently)
 - [0261 — the thumbnail child picks its own GPU, and on a hybrid laptop the pass moved the show's frame-time tail](#0261--the-thumbnail-child-picks-its-own-gpu-and-on-a-hybrid-laptop-the-pass-moved-the-shows-frame-time-tail)
+- [0262 — the diffusion filter's cost page reads 2.5x what `quality` measured on Linux, and nothing says which profile a reader should start from](#0262--the-diffusion-filters-cost-page-reads-25x-what-quality-measured-on-linux-and-nothing-says-which-profile-a-reader-should-start-from)
+- [0267 — the conductor's `Remove-Item` deletion bound was never asked of the real CLI](#0267--the-conductors-remove-item-deletion-bound-was-never-asked-of-the-real-cli)
+- [0274 — the cellular scene cannot trace a route through the maze it grows, so a labyrinth never shows its longest path](#0274--the-cellular-scene-cannot-trace-a-route-through-the-maze-it-grows-so-a-labyrinth-never-shows-its-longest-path)
+- [0275 — Murmuration sits at zoom 0.78, under the swarm's measured seam-safe 0.84 and under the range the seam test says the shipped presets reach](#0275--murmuration-sits-at-zoom-078-under-the-swarms-measured-seam-safe-084-and-under-the-range-the-seam-test-says-the-shipped-presets-reach)
+- [0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen](#0276--a-collage-elements-own-drift-and-spin-are-too-slow-for-the-animation-gate-to-see-so-a-sparse-canvas-reads-as-frozen)
+- [0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`](#0277--the-owners-hotkey-walk-and-the-live-retune-loop-exist-only-as-scratch-scripts-under-target)
+- [0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated](#0278--plexus-lays-its-points-in-a-cube-or-on-a-plane-so-a-turning-wire-sphere-is-only-approximated)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -213,92 +217,6 @@ Low and honest about it. Nobody has reported it, the two rates that dominate (44
 clean, and the failure is a coarser low end rather than anything broken. Worth taking the day
 someone runs the standalone on a 96 kHz interface and says the sub-bass reads mushy — at which
 point this entry is the starting measurement rather than a fresh investigation.
-
----
-
----
-
-## 0038 — mid-tone-dominated presets lost ~8 % luminance to the tonemap knee, and the library has not been retuned
-
-- **STILL OPEN 2026-08-13, and a document that says otherwise is wrong.**
-  [`docs/plans/README.md`](plans/README.md)'s Plan 0080 Phase 7 write-up states that *"the
-  **tonemap-knee** half of that pairing is now measured away."* **It is not.** What Plan 0080 Phase 7
-  retired is a *different* suspicion raised at its own close — that `bg_bright = 0.85` was reaching
-  the tonemap's shoulder on the **backdrop ramp** — settled by finding 0 % of the scanned column
-  rail-pinned on any channel in any of the three probes. That measurement is about a backdrop
-  gradient. **This entry is about mid-tone figure luminance on attractor presets**, measured as
-  `attractor_clifford` 82.54 → 75.91 mean luma, and no backdrop measurement speaks to it. The two
-  were conflated because both mention the tonemap.
-- **Verified 2026-08-29** at the Plan 0104 close — **the "lever is unused" half of this entry is
-  falsified, and the retune it asks for is not.** The reduction that now stands for this entry is
-  that its own measured subject is still untouched:
-  `absent: ^exposure in: presets/attractor_clifford.toml` — red the day someone retunes the
-  preset whose −8.0 % opened this entry, which is exactly when it should be re-read. This entry said twice (2026-08-13, 2026-08-15)
-  that exactly **one** shipped preset binds `exposure` (`lsystem_vellum.toml:60`). **Sixteen do**,
-  and fifteen of them landed in [Plan 0104](plans/done/0104-the-library-stops-being-lopsided.md):
-  its Phase 2 found that a branching or line figure has too little area for a level term to
-  register on the stroke, and moved the level response to a whole-frame stage — `exposure` or
-  `bg_bright` — on cohort after cohort. So `exposure` is now a routine authoring lever rather
-  than an unused one, and any argument here resting on its rarity is void.
-- **What survives that correction is the whole of the ask.** None of the fifteen new binders is in
-  the population this entry names — *the attractor family, the softer `fragment_*`, `swarm_drift`*
-  — which is the set of presets with no over-range peak, and not one of them was touched by
-  Plan 0104. The measured −8.0 % on `attractor_clifford` is unaddressed. **The entry stays live.**
-- **Why no gate caught this, which is the reusable part.** The claim is carried as
-  `unprobeable: ... the grammar deliberately has no count verb (ADR-0108, Notes)`, so
-  `scripts/check-backlog-claims.mjs` reported green across every run of the plan that falsified it.
-  This is the case the close ceremony prints the `unprobeable:` roster for: the roster is the set of
-  claims nothing checks, and a claim in it decays silently until a human reads it against the tree.
-- **ROUTED, and now scheduled:** it is §4 of [`content-brief.md`](content-brief.md), paired with Plan
-  0071's standing `occlude` retune as one pass over the shipped set. That brief also records the
-  other correction this entry's routing carries — the plan text says to run it "with 0038 and 0058",
-  but **0058 closed by content on 2026-08-04**, five days before Plan 0071 reached Phase 5, so the
-  three-way pass is a two-way pass.
-- **Raised:** 2026-07-31, from `architect`, at Plan 0045's Mode 4 review.
-- **Verified against code:** yes — measured, not inferred (numbers below).
-- **Verified 2026-08-15, and its headline claim is superseded above — sixteen presets bind
-  `exposure`, not one.** What that dated check still establishes stands: the original binding is
-  present — `present: ^exposure in: presets/lsystem_vellum.toml`. The count around it never
-  reduced, and that is why the falsification went unseen for a whole plan:
-  `unprobeable: exactly one shipped preset binds exposure is a claim about how many files match,
-  and the grammar deliberately has no count verb (ADR-0108, Notes)`. The document this
-  entry corrects still carries the sentence it corrects: `present: tonemap-knee in: docs/plans/README.md`
-  — which goes red when that paragraph is next rewritten, and that is the moment to re-read whether
-  the correction is still owed.
-- **For:** `preset-author`. This is genuinely content-lane work; the engine behaved as designed.
-- **ROUTED 2026-08-01 → `preset-author`, as a content pass rather than a plan.** The user's
-  call at the Plan 0051 close: this needs no engine change and no ADR, so it goes to the lane
-  directly. It pairs naturally with [0040](design-backlog-archive.md) (**closed 2026-08-09**; its retune half is Plan 0071 Phase 5, which this should run with) — both are retunes of the same shipped set
-  against a composite whose behaviour has changed under them.
-
-The user's report was "clifford is really dim". Rendering `attractor_clifford` at an identical
-stimulus on `main` and on the Plan 0045 branch (640x360, 90 frames, hardware adapter):
-
-| preset | main | branch | |
-|---|---|---|---|
-| `attractor_clifford` | mean luma 82.54 | 75.91 | **-8.0 %** |
-| `attractor_leviathan` | mean luma 63.98 | 67.70 | **+5.8 %** |
-
-That is not drift. It is the tonemap knee's documented price, to the decimal: `tonemap.rs`'s
-`KNEE` docstring says a linear 0.8 mid-tone now presents at 0.733, which is -8.4 %. **The split is
-the whole story.** Clifford is a diffuse particle cloud living almost entirely in the mid range, so
-it pays the knee and collects none of the headroom above 1.0. Leviathan has genuinely over-range
-cores, so it gains. Plan 0045 chose to pay this on mid-tones rather than on highlights, deliberately
-and in writing — the consequence is simply that every preset shaped like Clifford now reads dimmer.
-
-**The lever already exists and is one line:** `exposure` (default 1.0) is a linear multiplier ahead
-of the tonemap, added by this same plan for exactly this. `exposure = "1.1"` restores Clifford's
-level without re-balancing a single element against its own background, which is what raising
-per-element `brightness` would force. The population to check is presets with no over-range peak —
-the attractor family, the softer `fragment_*`, `swarm_drift`.
-
-**A related record correction, since this is the entry about the luminance model.** This file's own
-`0034` section (the "why it works, mechanically" passage under the Supernova table, around line
-1561) still says "the frame clips per channel" in the present tense, and reasons from it. That
-premise retired with Plan 0045. The *conclusion* stands and is if anything stronger — geometry
-still has somewhere to go when luminance does not — but the mechanism is now a roll-off, not a
-clip. Per this file's append-only rule the passage is left standing; this paragraph is the
-correction.
 
 ---
 
@@ -1000,6 +918,10 @@ takes exactly the re-census the paragraph above instructs, and nothing else: it 
 `docs/milkdrop-conversion.md` beside the earlier eras. The array lowering and the blank-render hunt
 are not taken, and the ranking against 0109 is unchanged. This entry stays live.
 
+**Moved 2026-10-01** - the re-census left Plan 0202 at its split and is now
+[Plan 0246](plans/0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) Phase 4,
+unchanged in scope. This entry stays live.
+
 ---
 
 ## 0109 — disk textures are 88.7 % of every MilkDrop conversion failure, and the exclusion's trigger condition is already met
@@ -1112,6 +1034,12 @@ re-runs the same seven pairs against the same rig as its Phase 5. **That verdict
 trigger and the plan does not touch the reach question**: no ADR, no interview, no change to the
 disk-texture exclusion. This entry stays live and unpromoted until the gate reads.
 
+**Moved 2026-10-01** - Plan 0202 closed on its first three phases: the rate candidate was
+falsified and the echo orientation repaired. The per-mode waveform scale and the fourth look gate,
+this entry's trigger, are now
+[Plan 0246](plans/0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md)
+Phases 1-3, waiting on the Windows rig.
+
 Nothing in this entry's own arithmetic moved: 1 826 files, 88.7 % of every conversion failure, 25x
 the ~71 of
 [0108](#0108--the-conversion-tail-hlsl-arrays-71-files-and-218-md2-presets-that-convert-but-render-blank).
@@ -1119,52 +1047,6 @@ the ~71 of
 interview rather than a phase.
 
 ---
-
-## 0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution
-
-**Raised by:** the user, at Plan 0106's Phase 6 human gate (2026-08-25), on a full-track render of
-`star_rosewindow` — *"it would obviously be great if resolution would be higher"*. **Owner if
-taken:** `architect` — it reopens a clause ADR-0121 recorded as deliberately rejected, so it is an
-ADR question before it is a code one.
-
-- **Verified 2026-08-25** — the shipping `quality` profile diffuses at a 589,824 px budget, which is
-  28 % of a 1920x1080 frame, so every output pixel is resampled up:
-  `present: "size": "589824" in: tools/sd-filter/sd_filter.py`
-
-### The finding
-
-The clip that drew the verdict was rendered at **`fast`** — a 262,144 px budget, **680x384** at
-16:9 — and resampled to 1920x1080. `quality` is 1024x576, **2.25x the pixels**, and *has never been
-rendered on a real track*. So an unknown and possibly large share of this complaint is a profile
-choice rather than a wall, and **the cheap first move is a side-by-side still at both budgets**, not
-a design.
-
-What is genuinely walled, and why this is not simply "raise the budget":
-
-- **SD1.5 duplicates or mirrors content above roughly 768²** — its native-resolution artifact, named
-  in Plan 0106 Phase 1's traps. Raising the budget does not scale smoothly into it.
-- **SDXL plus ControlNet is ~7.5 GB against an 8 GB card**, and the spike already peaks at 5.68 GB
-  with two ControlNets loaded. Offloading fixes the memory and ruins the throughput over thousands
-  of frames, which Phase 1 also measured.
-- **Cost scales with pixels.** Phase 2b measured 2.721 s/frame at 589,824 px against roughly a third
-  of that at 262,144. A 4-minute track at `quality` already measures ~5.9 h *before* the 1.406x
-  scope correction Plan 0106 Phase 7d applies to that figure.
-
-**The tension worth surfacing before anyone designs.**
-[ADR-0121](adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)'s
-Alternative C is *diffuse at a smaller budget and upscale*, measured as the cheaper route and
-**rejected by this same user in the design interview**, on the ground that generated detail is worth
-its price against inferred detail. This verdict does not obviously overturn that — the ask is for
-*more* detail, and an upscaler infers rather than generates — but it does mean the rejection was
-made before anyone had watched five minutes of output. A tiled or multi-pass approach that
-*generates* at higher resolution is the option neither the ADR nor the plan has costed.
-- **PARTLY TAKEN 2026-09-19 -> [Plan 0211](plans/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)**,
-  which takes the *measurement* this entry asks for before any design: a matched pair of the same clip
-  at both budgets, then the owner's verdict. **This entry stays live because the verdict is what
-  decides whether anything is owed** — if `quality` answers the ask, what was filed as a wall was a
-  profile default and the residue is a documentation change; if it does not, the tiled route nobody has
-  costed is Phase 3 and an ADR reopening ADR-0121's Alternative C follows the plan rather than
-  preceding it.
 
 ## 0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device
 
@@ -1470,6 +1352,14 @@ gate does not retry (ADR-0193), so while this entry is open every full suite car
 
 **Medium.** It is a loopback datagram lost on the control path the studio uses. It is intermittent
 and has so far been seen only under heavy concurrent GPU load.
+- **Corrected 2026-09-29: two red conductor gates first recorded here were not this entry.**
+  `standalone::stream_show a_headless_run_emits_the_roster_the_preset_and_a_preset_error` failed
+  Plan 0211's close gate (2026-09-27) and Plan 0212's post-close gate (2026-09-29), both under load,
+  and was first noted here as this entry's flake. Plan 0212's repair session found the cause elsewhere
+  and fixed it in `1afa2e9`: `Show::reload` re-baselined the preset directory's signature *after* the
+  load that emits `roster`, so a file the test's parent wrote on reading that event could land inside
+  the new baseline and never be reported. The baseline is now taken before the load. This entry, a
+  lost `ctl/preset` datagram, is unaffected by that and stays as it was.
 
 ## 0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen
 
@@ -1620,102 +1510,6 @@ diagnosis three ADRs and three plans have now worked on, and because the instrum
 statistic that reads a full frame's *internal* organization rather than its departure from a ground —
 is the one shape this line has never tabled.
 
-## 0256 — the only report that asks whether two presets look alike covers nine of fourteen families, and both places naming the absent ones are stale
-
-The `distinctness` report is the one instrument in this repository that asks whether two shipped
-presets have converged. It reads its roster from a hand-written array — `const FAMILIES:
-[(SystemKind, &str); 9]` in `core/tests/distinctness.rs` — and
-[`docs/testing.md`](testing.md) states the consequence plainly: *"a new `SystemKind` does not
-appear in it on its own and nothing fails when one is missing."*
-
-**Five shipped families are missing, not three.** By filename family over `presets/*.toml`:
-
-| family | shipped | in the array |
-|---|---|---|
-| `analytic_field` | 12 | **no** |
-| `shape_field` | 9 | **no** |
-| `warp_mesh` | 7 | **no** |
-| `shape_collage` | 4 | **no** |
-| `cellular` | 3 | **no** |
-
-That is **35 of 114 presets — most of a third of the library — with no similarity check of any
-kind**, and `analytic_field` is the third-largest family in the set.
-
-**Both carriers that name the absent families name three of the five.** `docs/testing.md` says
-*"nine of the twelve"* and lists `shape_field`, `warp_mesh` and `shape_collage`; the doc comment
-above the array at `core/tests/distinctness.rs:62` lists the same three. `analytic_field` and
-`cellular` shipped afterwards and neither carrier noticed, because nothing makes them.
-
-**The comment predicted this exact failure and then suffered it.** Its closing line, about the
-count that had previously gone stale: *"A count is a fine reason to leave a family out and a
-terrible one to leave written down, because it stops being true silently."* The sentence is
-correct, it is four lines below a written-down list, and that list is now wrong in the same way.
-
-**The other half has no instrument at all, and that is the more important half.** `distinctness`
-measures *similarity* — whether two presets look alike. Nothing in this repository asks whether one
-is any *good*. Backlog 0248 above is a narrow slice of that question (four
-`fragment_field` presets, composition or fill) and records the same absence in its own words:
-*"no statistic in this repository decides between the two readings."*
-
-### Why it matters now, and what the owner's aim is
-
-The stated goal is **to ship less but better** — which is
-[ADR-0089](adrs/0089-the-library-renews-by-replacement-cohorts.md)'s replacement-cohort mechanism
-used as designed, rather than the pure addition the set has grown by since. ADR-0089's own Context
-already recorded the symptom at 41 presets: *"~55 % of the library is one template per family with
-different numbers."* The library is now 114 and nobody has re-read that figure.
-
-[Plan 0204](plans/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) makes it live. It
-adds a cohort and its Phase 4 asks whether to add fifteen more, and the system those picks most
-plausibly route to — `warp_mesh` — is one of the five nothing checks.
-
-### The route, and its order is the point
-
-**The owner set this sequence deliberately, and it is not the obvious one:**
-
-1. **This entry** — record the gap. Done.
-2. **A human smoke sitting.** The owner walks the shipped library in the running app and marks, by
-   eye, what reads as *lame* and what reads as a *duplicate*. That produces evidence.
-3. **Then design the mechanism on that evidence** — an ADR and a plan, argued from what a person
-   actually convicted rather than from what is easy to compute.
-
-**Building the mechanism before step 2 is the thing to not do.** Similarity is measurable and
-quality is not, so a mechanism designed first would measure similarity, call it curation, and
-retire the wrong presets with a number behind it. The evidence has to come first precisely because
-the interesting half of the question has no statistic.
-
-- **Raised:** 2026-09-19 by `architect`, asked by the owner (*"do we have a plan to cut curated
-  presets that are too similar to each other or lame?"*). **Owner if taken:** `human` for step 2,
-  then `architect` for the ADR and plan.
-- **Verified 2026-09-19** — the roster is a hand-written array of nine:
-  `present: const FAMILIES: \[\(SystemKind, &str\); 9\] in: core/tests/distinctness.rs`
-- **Verified 2026-09-19** — the third-largest shipped family is named nowhere in it:
-  `absent: analytic_field in: core/tests/distinctness.rs`
-- **Verified 2026-09-19** — nor is `cellular`:
-  `absent: cellular in: core/tests/distinctness.rs`
-- **Verified 2026-09-19** — and the doc still reports the pre-`analytic_field` denominator:
-  `present: nine of the twelve in: docs/testing.md`
-- **Verified 2026-09-19** — the quality half has no instrument, which is an absence no probe can
-  assert:
-  `unprobeable: whether a shipped preset is worth shipping is a look judgement; this repository has
-  no statistic for it, which is the finding rather than a gap in the probe`
-- **PARTLY PROMOTED 2026-09-19 -> [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md)**,
-  which takes the **instrument half** only: the roster derives from `SystemKind` so all fourteen
-  families are reported and a new variant fails the build, and the two stale prose carriers stop naming
-  a list ([ADR-0234](adrs/0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md)).
-  **This entry stays live for the half that matters more** — whether the library should ship less and
-  better — which needs a person, an evening and the app, and whose evidence is the favourite/hidden
-  marks [Plan 0205](plans/done/0205-the-library-becomes-navigable.md) builds. Plan 0209 Phase 2 reads the
-  widened report and is forbidden from tuning a threshold to quiet it, so its output is input here.
-
-### Priority
-
-**Medium, and it rises with every preset landed.** Nothing is broken and no gate is red — the cost
-is that the set grows in the dark on a third of its families, and that the one decision the owner
-wants to make (ship less, better) has no evidence under it. Step 2 is cheap: it needs a person, an
-evening and the app, and it is the only step that cannot be skipped or automated.
-
-
 ## 0259 — the attractor rasterizes 600 000 sprites a frame, and a compute scatter would cut that term tenfold at the price of the look
 
 The attractor draws each particle as a six-vertex instanced quad, about five texels a side at
@@ -1792,3 +1586,140 @@ designed; the first is the cheaper question to answer.
   **Owner if taken:** `dev`, after `architect` picks the move.
 - **Verified 2026-09-26** — the child command carries no adapter flag:
   `absent: --gpu in: standalone/src/thumbs.rs`
+
+## 0262 — the diffusion filter's cost page reads 2.5x what `quality` measured on Linux, and nothing says which profile a reader should start from
+
+[Plan 0211](plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)
+measured the pair backlog 0125 asked for, and the owner's verdict was that `quality` answers the ask
+for more resolution. What was filed as a wall was a profile choice. Two things are left, and both
+are documentation:
+
+- **Which profile the page leads with.** `docs/diffusion-filter.md`'s worked example passes
+  `--profile quality`, and the sidecar has no default profile. So the page makes the choice by
+  example, and it gives no cost argument. On Plan 0211's clip, `quality` cost about 5.5x `fast` per
+  emitted frame: 3.065 s against 0.554 s, or about 6.1 h against 66 min for a 4-minute track.
+- **Which machine the cost table describes.** The page's `What it costs` table was measured on
+  Windows with `attractor_leviathan` and reads 7.781 s per emitted frame at `quality`. Plan 0211
+  measured 3.065 s on the same GPU model on Linux with `star_rosewindow`. Both are honest
+  measurements that name their machine. But a reader choosing a profile from the page sees roughly
+  2.5x the cost this box measured, and nothing says whether the operating system or the preset is
+  responsible for the difference.
+
+- **Raised:** 2026-09-27 by `architect`, at Plan 0211's close (review round 1, minor 1), as the
+  residue of backlog 0125. **Owner if taken:** `architect` for what the page recommends; `dev` for
+  a re-measurement if the page's table is to be re-taken.
+- **Verified 2026-09-27** — the page's cost table was measured on Windows with a different preset:
+  `present: rendering .attractor_leviathan. at 1920x1080 in: docs/diffusion-filter.md`
+- **Verified 2026-09-27** — the page leads with `quality` by example:
+  `present: --profile quality --prompt in: docs/diffusion-filter.md`
+
+## 0267 — the conductor's `Remove-Item` deletion bound was never asked of the real CLI
+
+[Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) put the allowlist's
+refusals on a recorded transcript (ADR-0233), and the probe ran on Linux. The PowerShell tool exists
+only on Windows, so every `Remove-Item` deny rule, including `PowerShell(Remove-Item *$*)` and the
+quoted-absolute-path twins added at the close, rests on the `decide` model rather than on what the
+CLI did. The shape the plan named, `Remove-Item -Recurse $env:USERPROFILE\WORK`, is one of them.
+`node tools/conductor/spike/matcher-probe.mjs` on a Windows box answers it, and the verdicts go in
+the `spike/README.md` table beside the Linux ones.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0208's close review finding 0 (minor), also
+  recorded in ADR-0233's Outcome. **Owner if taken:** `human` (a Windows run of the probe) then
+  `dev` (moving the cases onto the table).
+- **Verified 2026-09-27** — the rule exists and the table says it was not asked:
+  `present: PowerShell\(Remove-Item \*\$\*\) in: tools/conductor/settings.conductor.json`
+- **Verified 2026-09-27** — `present: Remove-Item -Recurse .*not asked in: tools/conductor/spike/README.md`
+
+## 0274 — the cellular scene cannot trace a route through the maze it grows, so a labyrinth never shows its longest path
+
+At the 0232 retune the owner asked for `cellular_labyrinth` to print, in red, the longest path through
+the maze the automaton is growing. The scene has no notion of a path. It holds each cell's state and,
+for a dead cell, how many generations ago it died, and it colours from those two numbers alone. So
+the red the retune could give it marks cells that changed recently, not a route. A route needs a
+search over the live grid: a breadth-first pass from one open cell, then a second from the farthest
+cell it reached, which finds the longest shortest path in a maze with no loops. It would have to run
+on the GPU, or on a readback of a grid of up to 1024 by 1024 cells, and be repeated as the maze
+changes. The drawn route could be one new overlay colour, or a distance a palette reads.
+
+- **Raised:** 2026-09-30 by the owner at the Plan 0232 Phase 4 retune, filed by `preset-author`.
+  **Owner if taken:** `architect` (does the route run on the GPU or on a readback, and how often
+  is it refreshed), then `dev`.
+- **Verified 2026-09-30** — the scene has no route search:
+  `absent: [Bb]readth|\bbfs\b|\bBFS\b|[Ll]ongest path in: core/src/render/scenes/cellular`
+
+## 0275 — Murmuration sits at zoom 0.78, under the swarm's measured seam-safe 0.84 and under the range the seam test says the shipped presets reach
+
+`presets/README.md` measures the swarm's wrap seam as usable down to about **`0.84`**. Below it, the
+near depth layer reaches the frame edge first. `swarm_murmuration.toml` binds `zoom = "0.78"`, a
+constant, so it sits under that bound for its whole run. The seam test in
+`core/src/render/scenes/swarm/tests.rs` takes its concrete zooms from `SHIPPED_ZOOMS`, which starts
+at `0.99` and whose doc says it is "the range the shipped presets actually reach". The test therefore
+never measures the shipped minimum, and nothing gates it. Two questions follow. Does Murmuration
+show the seam on screen? The walk kept it, and the seam was not what anyone was looking for. And
+should `SHIPPED_ZOOMS` be derived from the shipped set rather than written down?
+
+- **Raised:** 2026-09-30 by `preset-author`, found while re-pointing the seam test's comment off the
+  retired `swarm_drift` at Plan 0232 Phase 4. **Owner if taken:** the owner (a look at Murmuration
+  in the running app), then `dev` (widen `SHIPPED_ZOOMS`, or derive it).
+- **Verified 2026-09-30** — Murmuration binds the constant:
+  `present: ^zoom = "0\.78" in: presets/swarm_murmuration.toml`
+- **Verified 2026-09-30** — the test's shipped range starts above it:
+  `present: SHIPPED_ZOOMS: \[f32; 5\] = \[0\.99 in: core/src/render/scenes/swarm/tests.rs`
+
+## 0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen
+
+`shape_collage` moves an element at `DRIFT_SPEED` (0.035 canvas units a second at `drift = 1`,
+scaled by a per-element 0.3 to 1) and turns it at `SPIN_SPEED` (0.07 rad/s at `spin = 1`). The
+animation gate compares frames 24 and 48 of a 96x96 capture. In that 0.4 s an element travels about
+a pixel at most, so the gate cannot see the scene's own motion. A dense canvas passes anyway,
+because forty edges each moving a little add up. At Plan 0232 Phase 4, On White was cut from forty
+elements to five-to-seven and was convicted frozen (0.0018 against the 0.01 floor). Raising `drift`
+from 0.55 to 1.3 and `spin` from 0.35 to 0.8 moved that score by nothing measurable. It passed only
+once a constant `pump_size` of 0.9 made every form breathe. That pump is now part of its look,
+chosen by the gate rather than by the owner. The question is which side is wrong. Either a sparse
+collage is legitimately too still to ship, or the gate's window is too short for a scene whose
+motion is slow by design. If the gate is wrong, the fix is a longer window for this system, or a
+per-system note in `docs/testing.md`, not a faster `DRIFT_SPEED`.
+
+- **Raised:** 2026-09-30 by `preset-author`, at Plan 0232 Phase 4's On White retune.
+  **Owner if taken:** `architect` (is the gate or the scene wrong), then `dev`.
+- **Verified 2026-09-30** — the drift and spin rates:
+  `present: const DRIFT_SPEED: f32 = 0\.035; in: core/src/render/scenes/shape_collage/layout.rs`
+- **Verified 2026-09-30** — `present: const SPIN_SPEED: f32 = 0\.07; in: core/src/render/scenes/shape_collage/layout.rs`
+
+## 0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`
+
+Plan 0232's walk (Phase 2) and its retunes and sittings (Phase 4) ran on two throwaway scripts. They
+live in the gitignored `target/p0232/`. `walk.sh` loads one family into a player on its own
+`RLX_PRESET_DIR` and `XDG_DATA_HOME`, moves the window to a workspace and makes it fullscreen. The
+owner then marks keep and cut with F1 and F2, and `apply.py` folds that run's `marks.toml` into the
+ledger. `retune.sh` loads a named set of presets, which are edited in place while the player
+hot-reloads them. The owner called the hotkey walk a large speed-up, and every Phase 4 verdict came
+from it. Plan 0204 Phase 4 and 0232 Phase 6 both need the same loop, and a `cargo clean` deletes it.
+The window placement is Hyprland-specific, which is one reason it is not a script in `scripts/`
+today. The part worth keeping is portable: a preset set loaded into an isolated data directory,
+with marks read back afterwards.
+
+- **Raised:** 2026-09-30 by `preset-author`, at the end of Plan 0232 Phase 4. **Owner if taken:**
+  `architect` (does a judging loop belong in `scripts/`, and in what shape), then `dev`.
+- **Verified 2026-09-30** — nothing in the repository carries it:
+  `absent: walk\.sh|retune\.sh|apply\.py in: scripts`
+
+## 0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated
+
+Plan 0204 Phase 2 routed pick 12, a wire sphere made of ribbons turning on its axis, to `plexus`.
+That is the only system with a real 3-D camera and links that fade in and out. But `PlexusLayout`
+has two variants. `cloud` scatters points through a cube and `sheet` lays a jittered grid on a
+plane. Neither puts points on a closed surface, so the sphere's silhouette, the thing the look
+depends on, is not reachable. An orbiting cloud reads as a fuzzy ball at best. A `sphere` (or
+`shell`) layout is the obvious shape: points on a sphere, drifting on the surface, with the
+existing `link_distance` choosing how wired it looks. It would be a third variant behind the same
+`[plexus] layout` key, with no new parameter. **Low priority on purpose.** Pick 12 is not in the
+Phase 3 cohort, and only matters if Phase 4's verdict sends the remaining picks forward. Take this
+entry up then, or when a second look asks for a closed 3-D surface.
+
+- **Raised:** 2026-10-01 by `preset-author` at Plan 0204 Phase 2, checked by `architect` the same
+  day. **Owner if taken:** `architect` (is a third layout the right shape), then `dev`.
+- **Verified 2026-10-01** — the two layouts, and no third:
+  `present: ALL: \[PlexusLayout; 2\] in: core/src/render/scenes/plexus/mod.rs`
+- **Verified 2026-10-01** — `absent: Sphere|Shell in: core/src/render/scenes/plexus/mod.rs`

@@ -12,13 +12,18 @@
 # build packages, run this, upload the tarball.
 #
 # The verification lives HERE rather than in the workflow, so a local run is
-# held to the same bar as CI. Every check is fatal.
+# held to the same bar as CI. Every check is fatal except the size measurement,
+# which prints and at most warns (ADR-0231, on ADR-0159's terms).
 #
-#   Usage:  packaging/linux/stage.sh [--skip-build]
+#   Usage:  packaging/linux/stage.sh [--skip-build] [--warn-bytes=<n>]
 #
 #   --skip-build   Reuse <target-dir>/release/ritmolux on disk. For iterating on
 #                  the layout without paying for a `lto = "fat"` rebuild; never
 #                  used by CI.
+#   --warn-bytes   Lower the size warning's threshold. Its default sits well
+#                  above what the binary measures today, so this is how that
+#                  branch is exercised without waiting for the binary to grow
+#                  into it.
 #
 # Building needs pkg-config and libpulse's headers (libpulse-dev on Ubuntu,
 # libpulse on Arch), plus the xkbcommon and wayland headers winit links.
@@ -31,20 +36,35 @@ set -euo pipefail
 
 BIN_NAME="ritmolux"
 
+# NFR section 4: the exe's soft cap, and 90% of it. A size is a MEASUREMENT
+# (ADR-0071): printed on every build, warned on above the threshold, and NEVER
+# fatal - every other check here is a property of a correct artifact, and a
+# release must not fail on a byte count. The same two figures sit in
+# packaging/windows/stage.ps1 and packaging/macos/bundle.sh, and
+# core/tests/suite/hygiene.rs holds all of them to docs/nfr.md.
+EXE_CAP_BYTES=16777216
+EXE_WARN_BYTES=15099494
+
 script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 
 skip_build=0
+warn_bytes="$EXE_WARN_BYTES"
 for arg in "$@"; do
     case "$arg" in
         --skip-build) skip_build=1 ;;
+        --warn-bytes=*) warn_bytes="${arg#--warn-bytes=}" ;;
         *) echo "stage.sh: unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
+case "$warn_bytes" in
+    ''|*[!0-9]*) echo "stage.sh: --warn-bytes takes a whole number of bytes, got '$warn_bytes'" >&2; exit 2 ;;
+esac
 
 die() { echo "stage.sh: FAILED: $*" >&2; exit 1; }
 step() { echo ""; echo "==> $*"; }
 check() { echo "    ok: $*"; }
+warn() { echo "    WARNING: $*" >&2; }
 
 # --- Where cargo writes, which is not necessarily "${repo_root}/target" -------
 #
@@ -100,6 +120,28 @@ fi
 
 bin="${target_dir}/release/${BIN_NAME}"
 [ -f "$bin" ] || die "missing $bin (drop --skip-build?)"
+
+# --- Measure: the binary's length against NFR section 4's cap (ADR-0231) ------
+#
+# Printed in bytes, the unit NFR section 4 writes its series in, and beside the
+# build that produced it, because a size is a property of a build rather than
+# of the tree (ADR-0071). `wc -c` rather than `stat`, as bundle.sh measures.
+step "measure ${BIN_NAME} against NFR section 4"
+bytes="$(wc -c < "$bin" | tr -d ' ')"
+percent="$(awk -v n="$bytes" -v c="$EXE_CAP_BYTES" 'BEGIN { printf "%.1f", 100 * n / c }')"
+echo "    ${BIN_NAME} is ${bytes} B (${percent} % of the ${EXE_CAP_BYTES} B cap)"
+echo "    build: cargo build --release -p standalone, v${version}, $(rustc --version)"
+if [ "$bytes" -gt "$warn_bytes" ]; then
+    # A warning, never a die: the cap is soft, and a release blocked on a byte
+    # count is one where the constant gets edited under time pressure at a tag.
+    # The threshold is not described as a fraction of the cap, because with
+    # --warn-bytes the two are unrelated.
+    warn "${BIN_NAME} is ${bytes} B, past the ${warn_bytes} B warning threshold." \
+         "NFR section 4's cap is ${EXE_CAP_BYTES} B. This is not a release blocker." \
+         "Record the figure in the exe's size series in docs/nfr.md section 4 and say what moved it."
+else
+    check "under the ${warn_bytes} B warning threshold"
+fi
 
 # --- Stage -------------------------------------------------------------------
 

@@ -1,0 +1,562 @@
+# 0230 — The Russian slice becomes findable
+
+> **Status:** done (Phase 4 read on the live site 2026-10-01). Phases 1-3 landed in `bc09b3d0`, `d9160208`,
+> `8c931753`; conductor close review round 1 graded `d14eb621` with no blockers, no majors, no minors
+> and two nits, both left open. Full suite (1907 passed), rustdoc, both site gates and the doc gates
+> verified by the review. Version 0.155.0.
+> **Created:** 2026-09-26
+> **Owner skill(s):** dev, human
+> **Related ADRs:** [0213](../../adrs/0213-the-russian-slice-stays-a-section-and-gets-a-header-control.md),
+> [0185](../../adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md),
+> [0154](../../adrs/0154-the-reader-facing-docs-publish-as-a-site.md)
+> **Closes:** none
+
+## TL;DR
+
+The site publishes five Russian pages that a reader cannot find from where they arrive. This plan
+does what [ADR-0213](../../adrs/0213-the-russian-slice-stays-a-section-and-gets-a-header-control.md)
+decided and adds two things beside it. The header gets a language control, built as an override of
+Starlight's `LanguageSelect` slot, and it points at the current page's twin or at a new Russian
+entrance page. The Russian pages declare `lang="ru"` and carry `hreflang` alternates. And the
+landing page and *Start here* link to the Russian pages. The first visible change is a `Русский`
+link beside the theme toggle on every page with a sidebar.
+
+## Context & problem
+
+These three problems were read off the live site at `https://igorkonovalov.github.io/Ritmolux/` on
+2026-09-26.
+
+**1. There is no language control in the header.** ADR-0213 decided on one and no plan built it.
+The only way into the Russian slice is still the `Русский` sidebar group, which is the seventh of
+seven groups, and the in-page twin link that `translationCrossLink` in `site/astro.config.mjs`
+inserts. That link appears only on the ten pages that have a twin. A comment in that function still
+says *"There is no header picker to compete with - that needs the locale migration this site has not
+made"*. ADR-0213 showed that premise to be false.
+
+**2. The Russian pages are served as English.** `Page.astro:50` in `@astrojs/starlight` 0.42.0
+writes `<html lang={starlightRoute.lang}>`, and a monolingual site gives every route the default
+locale's `en`. Line 92 also writes `<main lang={starlightRoute.entryMeta.lang}>`, again `en`. A
+screen reader therefore reads Russian prose with an English voice, and a search engine sees
+`og:locale` `en` and no alternates. ADR-0213 recorded this as the one cost it was not repairing. It
+asked whoever built the header control to check whether a per-entry `lang` is cheap and to take it
+if so.
+
+**The check has been done, and the answer is that it is cheap and needs no component override.**
+Starlight 0.42.0 has a supported `routeMiddleware` option (`dist/utils/user-config.d.ts:123`). It
+runs after the route data is built and before the page renders
+(`dist/utils/routing/middleware.js`), and the object it receives is the one `Page.astro` reads. A
+middleware can set `lang`, `entryMeta.lang` and the `og:locale` entry in `head`, and it can append
+`<link rel="alternate" hreflang>` entries, because `Head.astro` renders `starlightRoute.head` as
+given. The `Head` override that ADR-0213 guessed at is not needed.
+
+**Setting `<html lang>` changes search, and that is the one consequence here that is not free.**
+Pagefind 1.5.2 builds one index per `<html lang>` value. Its client picks the index from the current
+page's `document.querySelector("html").getAttribute("lang")`; this was read from the `pagefind.js`
+embedded in `node_modules/@pagefind/linux-x64/bin/pagefind_extended` on 2026-09-26. After Phase 2,
+a search typed on an English page no longer returns a Russian page. A search typed on a Russian
+page returns only Russian pages, stemmed as Russian. The Decision explains why this plan accepts the
+split.
+
+**3. The front door names no Russian page.** `site/src/content/docs/index.mdx` and `start-here.mdx`
+link only to English pages. The landing page is `template: splash`, which gives it
+`hasSidebar: false`, so no sidebar and no `MobileMenuFooter` render there. `Header.astro` puts the
+language slot inside `sl-hidden md:sl-flex`. **On the landing page at phone width, a header control
+cannot be seen at all.** For that reader, only the page body can offer the Russian slice.
+
+**Out of scope, recorded for context.** The domain-root `robots.txt` that `igorkonovalov.github.io`
+serves does not reference this site's `/Ritmolux/sitemap-index.xml`. That file belongs to a
+different repository, the owner's blog, and it is being fixed there. Nothing in this repository can
+fix it.
+
+## Decision
+
+Build ADR-0213 as written, add the `lang` repair that its Consequences asked for, and add a front
+door. **The control derives a page's twin from the same `<name>.md` / `<name>.ru.md` sibling pairing
+that `translationCrossLink` uses, and that rule is moved into one module so the header, the in-page
+link, the middleware and the entrance page cannot disagree.**
+
+**The entrance page is the one addition to ADR-0213's design.** The ADR says that on a page with no
+twin the control *"links to the Russian section"*. The section is a sidebar group and has no URL of
+its own. The rejected alternative was to link to the group's first page, `ru/how-it-works`, which
+would present one arbitrary document as the section. Instead, `site/` gains one page it owns, at
+route `ru`. The page holds a Russian sentence and a list generated from the `.ru.md` entries in
+`PUBLISHED`, so a new translation joins the list with no edit to the page. The page's exact Russian
+text is written into Phase 1 below. **Approving this plan is therefore the owner's review of that
+text**, the same gate [Plan 0166](0166-the-basics-read-in-russian.md) used for its prose.
+Correct the strings at approval and the phase takes them as written.
+
+**`<html lang="ru">` is taken, together with the Pagefind split it brings.** The alternative was to
+set only `<main lang="ru">`, through `entryMeta.lang`, and leave `<html>` at `en`. That would keep
+one search index and would fix screen readers, since the nearest `lang` wins. It would leave a
+search engine's reading of the page and `og:locale` wrong. It would also go on stemming Russian
+words with English rules. The split is acceptable here for three reasons. A Russian reader who
+searches from a Russian page wants Russian results. ADR-0213 rejected locale routing precisely so
+that such a search would not return English pages announcing that they are not Russian. And the
+header control, not search, is now how a reader crosses between languages. **The owner can reverse
+this at approval by striking the `lang` and `og:locale` half of Phase 2.** The `hreflang` half does
+not depend on it.
+
+## Architecture diagram
+
+```mermaid
+flowchart TB
+    subgraph data["one rule, one module"]
+        PUB["PUBLISHED map<br/>rewrite-links.mjs"]
+        TW["site/src/plugins/twins.mjs<br/>sourceOf(entry) / twinOf(source)<br/>langOf(source) / RU_ENTRANCE"]
+        PUB --> TW
+    end
+    subgraph build["what reads it"]
+        LS["LanguageSelect.astro override<br/>header + mobile menu footer"]
+        XL["translationCrossLink<br/>in-page twin link"]
+        MW["route-data.ts middleware<br/>html/main lang, og:locale, hreflang"]
+        RU["ru.mdx<br/>Russian entrance page"]
+    end
+    TW --> LS
+    TW --> XL
+    TW --> MW
+    TW --> RU
+    LS -->|"twin, or /ru/"| OUT["built page"]
+    MW --> OUT
+```
+
+## Implementation phases
+
+**Phase 1 is the walking skeleton.** It adds the control a reader sees and a target for every page
+that has no twin. Phases 2 and 3 do not read Phase 4. Every `dev` phase ends by building the site,
+because neither site gate runs in pre-push, CI's `links` job or the conductor's gate. Both need a
+built `site/dist/`, and in CI they run only in `pages.yml`.
+
+**The build recipe in a lane.** A worktree has no `site/node_modules`, because it is gitignored.
+Run `npm --prefix site ci` once, then `npm --prefix site run build`, then
+`node scripts/check-site-links.mjs` and `node scripts/check-site-routes.mjs`. The build renders
+mermaid through Playwright's Chromium, which lives in a machine-local cache that the owner's
+machine already has. A build that fails because the browser is missing is an environment finding
+to record. It is not a reason to skip the gates. Build at the default base (`/ritmolux/`) and do not
+set `SITE_BASE`, because both gates read the same default.
+
+### Phase 1 — The header control, and a Russian entrance for it to point at
+- **Owner skill:** dev
+- **What:** a `LanguageSelect` override that links each page to its twin or to a new Russian
+  entrance page at route `ru`, with the twin rule moved into one module that the existing in-page
+  link also uses.
+- **Files touched:** `site/src/plugins/twins.mjs` (new), `site/src/components/LanguageSelect.astro`
+  (new), `site/src/content/docs/ru.mdx` (new), `site/src/content.config.ts` (`SITE_PAGES`),
+  `site/astro.config.mjs` (`components`, the `Русский` sidebar group, `translationCrossLink`),
+  `site/src/styles/site.css`, `site/README.md`.
+- **Done when:**
+  - `twins.mjs` exports the single implementation of four things. `sourceOf(filePath)` maps a
+    content entry's `filePath`, which is relative to `site/`, to a repo-relative source, in the way
+    `declaredTitle` in `content.config.ts` already does. `twinOf(source)` returns the twin's
+    `PUBLISHED` entry or `undefined`. `langOf(source)` returns `ru` for a `.ru.md` source and for
+    the entrance page, and `en` otherwise. `RU_ENTRANCE` names the entrance page's source and route.
+    `translationCrossLink` calls `twinOf` and no longer derives the twin itself:
+    `git grep -n "'.ru.md'.length" -- site` matches only `site/src/plugins/twins.mjs`.
+  - `astro.config.mjs` registers `components: { Footer, LanguageSelect }`. The control is a link,
+    not a `<select>`. On an English page with a twin it reads `Русский` and goes to the twin. On an
+    English page without one it reads `Русский` and goes to `ru/`. On a Russian page it reads
+    `English` and goes to the English twin, and on the entrance page to the site root. The link
+    carries `lang` and `hreflang` for the language it names and uses Starlight's `translate` icon.
+    It takes all four hrefs from `import.meta.env.BASE_URL` and `twins.mjs`, and writes no route by
+    hand.
+  - The chunk case is handled. A split document's chunk entries carry the source's `filePath`, so a
+    chunk of an English document that has a twin links to the whole Russian twin. None of the five
+    twinned sources splits today (`docs/running.md` is 22,428 bytes against
+    `DOCUMENT_SPLIT_BYTES` 40,000), so this is a property of the code and not of today's build.
+  - `site/src/content/docs/ru.mdx` exists, with id `ru` in `SITE_PAGES`, taken from
+    `RU_ENTRANCE`. It is the first item of the `Русский` sidebar group, as
+    `{ label: 'Обзор', slug: 'ru' }`. Its text is exactly what follows unless the owner corrected
+    it at approval. Frontmatter `title: Ritmolux по-русски` and
+    `description: Часть документации Ritmolux, переведённая на русский: установка и работа с приложением.`
+    Body: one paragraph,
+    *«На русский переведены пять страниц: установка на Windows, macOS и в foobar2000, работа с
+    приложением и то, как оно устроено. Остальная документация сайта — на английском.»*
+    After it, a list with one link per `.ru.md` entry in `PUBLISHED`, in map order, labelled with
+    that entry's `title`. The list is generated in the MDX from `PUBLISHED`, not written out.
+  - The in-page twin link carries `lang` and `hreflang` for the language it names: `ru` on
+    `Читать по-русски` and `en` on `In English`. This uses `data.hProperties` on the mdast link node.
+    The *"There is no header picker to compete with"* sentence in `translationCrossLink`'s comment
+    is replaced by one that describes the header control.
+  - The site builds, and `check-site-links.mjs` and `check-site-routes.mjs` both exit 0. The first
+    of those is the backstop ADR-0213 names: the control renders into every page, so a wrong href
+    fails on every page at once.
+  - Every built page with a sidebar contains the control twice, once in the header and once in the
+    mobile menu footer. `index.html` and `404.html` are splash pages and contain it once. Check this
+    with a `node -e` one-liner over every `.html` file under `site/dist/` that counts the control's class, and
+    record the counts in the log.
+  - `site/README.md` gains a row in its build-time transformations table for the control and
+    `twins.mjs`. Its *What is published* paragraph names seven groups including `Русский`, where it
+    now says six.
+
+### Phase 2 — The Russian pages say they are Russian
+- **Owner skill:** dev
+- **What:** a Starlight route middleware that gives a Russian route `lang="ru"` on `<html>` and
+  `<main>` and the matching `og:locale`, and gives each twinned pair `hreflang` alternates.
+- **Files touched:** `site/src/route-data.ts` (new), `site/astro.config.mjs`
+  (`routeMiddleware: './src/route-data.ts'`), `site/README.md`.
+- **Done when:**
+  - The middleware is built with `defineRouteMiddleware` from `@astrojs/starlight/route-data`.
+    On a route where `langOf(sourceOf(entry.filePath))` is `ru` it sets `starlightRoute.lang`,
+    `starlightRoute.entryMeta.lang` and the `og:locale` head entry's `content` to `ru`. Every
+    other route is left exactly as Starlight built it.
+  - `site/dist/ru/running/index.html` opens `<html lang="ru"` and its `<main` carries `lang="ru"`.
+    `site/dist/use/running/index.html` still carries `lang="en"` on both. The same holds for all six
+    Russian routes, the five translations plus `ru`, against their English counterparts.
+  - On each of the five twinned pairs, both pages carry exactly two
+    `<link rel="alternate" hreflang>` entries, `en` and `ru`, as absolute URLs built from
+    `context.site` and `import.meta.env.BASE_URL`. **Alternates go only on a page whose id is the
+    twin's whole route.** A chunk of a split document is not equivalent to a whole translation and
+    gets none. The entrance page and every untwinned page get none.
+  - `check-site-links.mjs` skips absolute `https` hrefs, so it does not check these alternates. A
+    `node -e` one-liner therefore strips `https://igorkonovalov.github.io` from each alternate's
+    href and asserts that the remaining path names a built `index.html`. Record its output in the
+    log.
+  - `site/dist/pagefind/pagefind-entry.json` lists a `ru` language whose `page_count` is 6 and an
+    `en` language holding the rest. This is the measured form of the split the Decision accepts.
+  - Both site gates exit 0, and `site/README.md` says in one sentence that the Russian routes are
+    indexed apart, so a search from an English page does not return them.
+
+### Phase 3 — The front door names the Russian pages
+- **Owner skill:** dev
+- **What:** the landing page and *Start here* each link into the Russian slice, which is the only
+  way in at phone width on the splash landing page.
+- **Files touched:** `site/src/content/docs/index.mdx`, `site/src/content/docs/start-here.mdx`,
+  `site/src/styles/site.css` if the button row needs it.
+- **Done when:**
+  - `index.mdx`'s `hero-actions` row gains a fourth `LinkButton`, `variant="minimal"`,
+    `icon="translate"`, reading `По-русски`. Its href is `` `${import.meta.env.BASE_URL}ru/` ``,
+    built the same way as the existing *Start here* button, and it carries `lang="ru"` and
+    `hreflang="ru"`. The comment above the row still explains why the buttons are not
+    `hero.actions`.
+  - On `start-here.mdx`, each of the three cards whose platform has a translation (Windows, macOS,
+    foobar2000) gains a second link, `По-русски`, written as a relative link to the `.ru.md` source,
+    for example `../../../../packaging/windows/READ-ME-FIRST.ru.md`. The rewriter turns it into the
+    route, as it does for the English link above it. The Linux card has no translation and gains
+    nothing.
+  - At a 375 px viewport the landing page's button row wraps without horizontal scroll. Check this
+    in `npm --prefix site run preview` with the browser's device mode, or by reading the row's CSS
+    if no browser is available, and say which in the log.
+  - Both site gates exit 0, and `node scripts/check-doc-links.mjs` exits 0.
+
+### Phase 4 — The live site, read after the push
+- **Owner skill:** human
+- **Blocks merge:** no
+- **What:** after the owner pushes and the Pages workflow deploys, read the four changes on
+  `https://igorkonovalov.github.io/Ritmolux/`. No later phase reads this output. Its absence leaves
+  every claim above true but unverified on the deployed base (`/Ritmolux/`, where the lane built
+  `/ritmolux/`).
+- **Files touched:** this plan's `## Implementation log`.
+- **Done when:**
+  - On a desktop viewport, `Русский` sits beside the theme toggle on an English page and goes to its
+    twin (`use/running/` to `ru/running/`). From an untwinned page such as
+    `guide/expression-language/`, it goes to `ru/`. `English` on a Russian page goes back.
+  - On a phone, the menu's footer shows the same control, and the landing page shows `По-русски` in
+    its button row.
+  - View-source on `ru/running/` shows `<html lang="ru"` and two `hreflang` alternates under
+    `/Ritmolux/`, not `/ritmolux/`.
+  - A search for `foobar` typed on `ru/install-foobar/` returns Russian pages only. The same search
+    typed on `install/foobar/` returns English pages only.
+  - The row is marked `done` on `main`, with one line for anything that read wrong.
+
+## Data shapes
+
+```js
+// illustrative - site/src/plugins/twins.mjs, not the final module
+export const RU_ENTRANCE = { source: 'site/src/content/docs/ru.mdx', route: 'ru' };
+export const langOf = (source) =>
+  source.endsWith('.ru.md') || source === RU_ENTRANCE.source ? 'ru' : 'en';
+export function twinOf(source) {
+  const twin = source.endsWith('.ru.md')
+    ? source.slice(0, -'.ru.md'.length) + '.md'
+    : source.replace(/\.md$/, '.ru.md');
+  return PUBLISHED[twin] ? { source: twin, ...PUBLISHED[twin] } : undefined;
+}
+```
+
+```ts
+// illustrative - site/src/route-data.ts
+export const onRequest = defineRouteMiddleware((context) => {
+  const route = context.locals.starlightRoute;
+  const source = sourceOf(route.entry.filePath);
+  if (langOf(source) === 'ru') {
+    route.lang = 'ru';
+    route.entryMeta.lang = 'ru';
+    // og:locale is already in route.head, computed from the old lang - rewrite it in place
+  }
+  // hreflang: only when route.entry.id is the whole route of a source with a twin
+});
+```
+
+## Risks & open questions
+
+- **Everything about Starlight here was read from the installed 0.42.0 and nothing else.** That
+  covers the `LanguageSelect` slot in `Header.astro` and `MobileMenuFooter.astro`, `Page.astro`'s
+  two `lang` attributes, `routeMiddleware`'s place in the render, and `getHead`'s `og:locale`. A
+  Starlight bump can move any of them, and the one to check first is whether `Page.astro` still
+  reads `starlightRoute.lang`. If it stops, Phase 2's done-when on `<html lang="ru"` fails loudly
+  rather than silently, which is why that done-when checks the built file.
+- **The Pagefind split is a judgement, and the owner may not share it.** The Decision states the
+  reversal: strike Phase 2's `lang` half at approval and the `hreflang` half still stands. After the
+  merge, a split that reads wrong in Phase 4's search check becomes a new plan. Phase 4 does not
+  reopen this one.
+- **A header control that is hand-written is a second implementation of something the framework
+  ships**, as ADR-0213 already concedes. `twins.mjs` means there is only one derivation, but nothing
+  gates the component's markup. The backstop is still `check-site-links.mjs`, which runs on every
+  page and reports a broken href on every page at once.
+- **The entrance page's Russian text is new prose in a slice whose prose the owner reviews.** The
+  plan carries the exact strings so that approval is the review. If the owner approves without
+  reading them, the only review they get is Phase 4, after publication.
+- **Starlight's chrome stays English on Russian pages.** *Search*, *On this page* and the
+  pagination labels come from `Astro.locals.t`, which is keyed by `context.currentLocale`, not by
+  `starlightRoute.lang`. The route middleware cannot change them, and localizing them is the i18n
+  migration ADR-0213 rejected. A Russian page therefore has `lang="ru"` and a handful of English UI
+  strings, which a screen reader now reads in a Russian voice. That is a small, known wrongness,
+  and it is smaller than the one it replaces.
+- **Open, for the owner:** whether the `Русский` group should also move to the top of the sidebar
+  (ADR-0213's Alternative C, which it calls compatible but not a substitute). This plan leaves the
+  order alone.
+
+## What this plan does NOT do
+
+- **No Starlight i18n locales, no `/ru/` locale routing and no fallback routes.** That is ADR-0213's
+  decision and its revisit trigger stands: 185 fallback routes against 5 translated ones.
+- **No new translations.** The five `.ru.md` files and their stamps are untouched, and
+  `scripts/check-translations.mjs` is unchanged. The entrance page is not a translation, has no
+  English source and carries no stamp.
+- **No markdown file outside `site/` is edited to serve the site** ([ADR-0154](../../adrs/0154-the-reader-facing-docs-publish-as-a-site.md)).
+  Every change is a component, a plugin, a middleware or one of the site's own pages.
+- **No `hreflang` in the sitemap.** The alternates go in each page's `<head>`, which is enough for a
+  search engine. Adding `xhtml:link` to `@astrojs/sitemap`'s output wants its `i18n` option, and
+  that option expects the locale layout this site does not have.
+- **Nothing about the domain-root `robots.txt`.** It is served from the owner's blog repository,
+  which does not reference this site's sitemap. That is being fixed there.
+- **No new gate.** The control's hrefs are held by `check-site-links.mjs` and its routes by
+  `check-site-routes.mjs`. The `hreflang` and Pagefind done-whens are one-off readings recorded in
+  the log, not a gate that runs on every build.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** branch `plan-0230-the-russian-slice-becomes-findable`, worktree `/home/igor/Work/rlx-plan-0230`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The header control, and a Russian entrance for it to point at | dev | done | bc09b3d0 |
+| 2 — The Russian pages say they are Russian | dev | done | d9160208 |
+| 3 — The front door names the Russian pages | dev | done | 8c931753 |
+| 4 — The live site, read after the push | human | done | committed with this row |
+
+### Notes
+
+- Phase 1: control counts over `site/dist/**/*.html` (228 files; `pagefind/` and `_astro/` skipped),
+  counting `class="rlx-language"`: 226 pages with a sidebar carry 2; `index.html` and `404.html`
+  carry 1.
+- Phase 1: `twinOf` returns `undefined` for a source not ending in `.md`, which the plan's sketch
+  did not: without it `core-cabi/include/rlx_core.h` maps to itself and is its own twin.
+- Phase 1: `declaredTitle` in `content.config.ts` does not call `sourceOf`. At `parseData` time the
+  glob loader passes an absolute `filePath`, while `sourceOf` takes the store's `site/`-relative one.
+- Phase 2: `<html lang>` / `<main lang>` / `og:locale` over all 228 built `.html` files: `ru/ru/ru`
+  on 6 (`ru/`, `ru/how-it-works/`, `ru/running/`, `ru/install-windows/`, `ru/install-macos/`,
+  `ru/install-foobar/`), `en/en/en` on 222.
+- Phase 2: alternates found on exactly the 10 pages of the five pairs, two each (`en`, `ru`), 20
+  in all; with `https://igorkonovalov.github.io` stripped, all 20 paths name a built `index.html`,
+  0 unresolved. None elsewhere.
+- Phase 2: `site/dist/pagefind/pagefind-entry.json` reads
+  `"ru":{"page_count":6}`, `"en":{"page_count":221}` (227 of the 228 HTML files are indexed).
+- Phase 2: the README sentence on the split index is written into the new row of the
+  transformations table rather than as a free-standing sentence.
+- Phase 3: the 375 px check used neither `npm run preview` nor a reading of the CSS. A foreground
+  `node -e` drove the Playwright Chromium the mermaid build uses, serving `site/dist/` through request
+  interception, at a 375x800 viewport. It read `scrollWidth` 375 = `clientWidth` 375, and the row
+  wraps to two lines: `Download` and `Start here` at top 252, `The repository` and `По-русски` at
+  top 336, rightmost edge 270. `site.css` is unchanged.
+
+- **Phase 4, 2026-10-01** (read by an agent session against the deployed site after the push of
+  `13c7582f`; the owner accepted a markup reading for the two placement checks). Every done-when holds:
+  - **The switch control.** It renders twice, in the header and in the phone menu's footer, with the
+    same target in both. On `use/running/` it reads `Русский` and goes to `/Ritmolux/ru/running/`. On
+    the untwinned `guide/expression-language/` it goes to `/Ritmolux/ru/`. `English` on `ru/running/`
+    goes to `/Ritmolux/use/running/`, and on `ru/` it goes to `/Ritmolux/`.
+  - **The landing page** carries `По-русски` as a button to `/Ritmolux/ru/`.
+  - **`ru/running/`** has `<html lang="ru"` and two `hreflang` alternates, both under `/Ritmolux/`.
+  - **Search** is split by language in `pagefind-entry.json`, with an `ru` index of 6 pages and an
+    `en` index of 226. Pagefind loads the index matching the page's `lang`, so a search from either
+    side returns only that side's pages.
+  - **Read from markup, not looked at:** the control sitting beside the theme toggle on desktop, and
+    the phone menu footer showing it.
+  - **Nothing read wrong.**
+
+### Close triggers
+
+- **`presets/` touched:** no
+- **Plan header `Closes:`** none
+- **What shipped:** feature, `site/` only - the header language control, the `ru` entrance page,
+  `lang`/`hreflang` on the Russian routes, and the front-door links. No Rust, C++ or `studio/` file
+  changed.
+- **Operator docs touched:** `site/README.md` only; nothing under `docs/` besides this plan.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 - 56 reductions hold across
+  28 live entries, 4 unprobeable, 35 advisory moved-path rows.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** Phase 4 (the live site, read after the push; `Blocks merge: no`).
+
+## Close review
+
+Conductor-run close, round 1, review written to
+`tools/conductor/state/reviews/0230-round-1.md` and reproduced here in full (headings demoted one
+level). This was the only round, so no earlier finding was resolved by a fix round.
+
+**Phase 4 is owed** (ADR-0249). Until the owner reads the deployed site, nothing has checked the
+control, the `lang`/`hreflang` output or the Pagefind split under the deployed base `/Ritmolux/`;
+every reading below was taken on the lane's `/ritmolux/` build.
+
+**Close notes.** Both nits stay open: nit 1 is owner-approved Russian prose, and nit 2 is `dev` work.
+Upstream CI read green at the close (run 36682421248, `main` at `22a665a`). Translation advisory:
+`docs/how-it-works.ru.md`, `docs/running.ru.md` and `packaging/foobar/READ-ME-FIRST.ru.md` are stale,
+none moved by this plan. Version 0.155.0, minor: a feature plan, the 0166 precedent for a `site/`-only
+feature. ADR-0213 accepted with an `Outcome`.
+
+### Plan 0230 — close review, round 1
+
+Graded at tip `d14eb6210276792ea9636365c84cda01d5073bbf`, lane `plan-0230-the-russian-slice-becomes-findable`
+(`/home/igor/Work/rlx-plan-0230`), which already carries `main`.
+
+**Verdict: Plan 0230 landed cleanly. No blockers, no majors, no minors, two nits.** Phases 1-3 do what
+their done-whens say, and I re-measured each one on a fresh build rather than reading them off the log.
+Phase 4 is a `human` phase marked `Blocks merge: no`, it is correctly logged `owed`, and no phase reads
+its output.
+
+#### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` ran in full. The
+  wrapper did not skip it. Result: `Summary [ 556.814s] 1907 tests run: 1907 passed (11 slow), 8 skipped`,
+  with the lock held 557.4 s. The plan touches `site/` only, so this run is a regression check on the
+  merged tree.
+- **Rustdoc:** `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` exits 0.
+- **Site:** `npm --prefix site run build` built 228 pages, and Pagefind found 228 HTML files.
+  `node scripts/check-site-links.mjs` reports OK over 228 built pages. The `/api/` NOTE is the expected
+  local one, because the Pages workflow runs `--require-api`. `node scripts/check-site-routes.mjs`
+  reports OK: 226 routes, all in the menu, and the largest split route is 29528 B.
+- **Doc gates:** `check-doc-links.mjs` is OK over 577 files. `check-backlog-claims.mjs` exits 0, with
+  56 reductions across 28 entries and 4 unprobeable.
+- **Tree:** `git status --short` is empty after every run. `site/dist` is ignored.
+
+#### Lens 1 — alignment with the plan
+
+Each done-when below was checked against the built `site/dist/`. The readings come from two `node -e`
+one-liners over every `.html` file, skipping `pagefind/` and `_astro/`.
+
+**Phase 1** (`bc09b3d0`)
+- `git grep -n "'.ru.md'.length" -- site` matches only `site/src/plugins/twins.mjs:56`.
+  `translationCrossLink` in `site/astro.config.mjs` now calls `twinOf`.
+- `twins.mjs` exports `sourceOf`, `langOf`, `twinOf` and `RU_ENTRANCE`. `twinOf` also refuses a source
+  that is not `.md`, so `core-cabi/include/rlx_core.h` cannot be its own twin. That is a correct
+  tightening of the plan's sketch, and the log records it.
+- Control counts: 226 pages carry two `class="rlx-language"`, and `index.html` and `404.html` carry
+  one each. This matches the plan and the log.
+- Control hrefs:
+
+  | Page | Label | Goes to |
+  |---|---|---|
+  | `use/running/` | `Русский` | `/ritmolux/ru/running/` |
+  | `guide/expression-language/` and `start-here/`, which have no twin | `Русский` | `/ritmolux/ru/` |
+  | `ru/running/` | `English` | `/ritmolux/use/running/` |
+  | `ru/`, the entrance page | `English` | `/ritmolux/`, the site root |
+
+  Every one carries `lang` and `hreflang` for its target language, and every href is built from
+  `BASE_URL` plus a route taken from `PUBLISHED` or `RU_ENTRANCE`.
+- `ru.mdx`: the frontmatter and paragraph match the approved text exactly. The list is generated from
+  `PUBLISHED` in map order, so it has five items, each labelled with its entry's Russian title.
+  `SITE_PAGES` takes the id from `RU_ENTRANCE`, and the sidebar item is
+  `{ label: 'Обзор', slug: RU_ENTRANCE.route }`, first in the `Русский` group.
+- The in-page twin links carry the right attributes: `lang="ru" hreflang="ru"` on `use/running/` and
+  `lang="en" hreflang="en"` on `ru/running/`. The "no header picker" sentence has been replaced.
+- `site/README.md` has the table row, and its *What is published* paragraph now names seven groups.
+
+**Phase 2** (`d9160208`)
+- `<html lang>`, `<main lang>` and `og:locale` read `ru` on exactly six pages: `ru/`, `ru/how-it-works/`,
+  `ru/running/` and the three `ru/install-*/` pages. They read `en` on the other 222.
+- Alternates appear on exactly the ten pages of the five pairs, two per page (`en`, `ru`), each an
+  absolute `https://igorkonovalov.github.io/ritmolux/...` URL. With the host stripped, all 20 name a
+  built `index.html`. `ru/` has none, and neither does any chunk or untwinned page. The middleware
+  guards with `route.entry.id !== own.route`, which is the whole-route rule.
+- `pagefind-entry.json` reads `"en": page_count 221` and `"ru": page_count 6`.
+- The middleware uses `defineRouteMiddleware` and leaves non-Russian routes untouched. The README
+  sentence on the split index sits inside the new table row, and the log records that deviation.
+
+**Phase 3** (`8c931753`)
+- `index.mdx` has a fourth `LinkButton`, `minimal`, with the `translate` icon and the text `По-русски`.
+  Its href is `` `${BASE_URL}ru/` `` and it renders `lang="ru" hreflang="ru"`. The `hero.actions`
+  comment is intact, with a paragraph added on why this button exists.
+- On `start-here/`, the Windows, macOS and foobar2000 cards each gain `По-русски`, rewritten to
+  `/ritmolux/ru/install-*/`. The Linux card is unchanged.
+- The 375 px check was done in Playwright's Chromium rather than by either method the plan names. The
+  log says so and records `scrollWidth` = `clientWidth` = 375. That is stronger evidence than a CSS
+  reading, so it is accepted.
+
+**Owner tags:** every phase carries exactly one tag from the vocabulary, and Phase 4 is the only one
+with `Blocks merge: no`. **The log** is shorter than the phases section, and its close block is
+complete. `Full suite:` is owed to the conductor's gate, which is correct in conductor mode, and the
+run above discharges it.
+
+#### Lens 2 — layering, coupling, real-time safety
+
+No Rust, C++ or `studio/` file changed, so neither the C ABI nor the control protocol is touched. On
+the site side, the twin rule has one implementation, and its four readers take it from there instead
+of re-deriving it. That was the Decision's central claim, and it holds.
+
+#### Lens 3 — doc freshness and bookkeeping owed by the close
+
+- The operator-doc sweep is clean. No reader document under `docs/` describes how to reach the Russian
+  pages, so nothing went stale. The only reader-facing description of the mechanism is
+  `site/README.md`, and it was updated. A grep for "header picker", "language control" and "Russian
+  section" outside plans and ADRs hits only the new code.
+- **Owed at close:**
+  - Accept ADR-0213 (`proposed → accepted`) with the dated `Outcome` the plan's Followups promise. It
+    should say the `lang` repair was taken and that Pagefind split en 221 / ru 6.
+  - Close with `Status: done - Phase 4 owed, ADR-0249`, and name the owed phase in the index bullet.
+  - **The version bump.** This is a feature plan, although it touches `site/` only, which ships no
+    binary. The close should pick the level deliberately.
+- **Translation advisory, for the close notes:** three rows are stale. `docs/how-it-works.ru.md`
+  (source at `01e70558`), `docs/running.ru.md` (source at `fb237a6c`, 2026-09-30) and
+  `packaging/foobar/READ-ME-FIRST.ru.md` (source at `d6e275e6`). None was moved by this plan, and this
+  plan edits no translation.
+
+#### Lens 4 — correctness
+
+There is no DSP or geometry here. The one configuration the lane cannot reproduce is the deployed base
+`/Ritmolux/` against the lane's `/ritmolux/`. Every href and alternate is built from `BASE_URL` and
+`context.site`, never spelled out, so the build does not depend on which base it uses. Phase 4 is where
+that gets read on the live site.
+
+#### Lens 5 — design integrity
+
+The design is sound. The component, the middleware, the entrance page and the in-page link each read
+`twins.mjs`, so adding a translation to `PUBLISHED` is still a one-line change with no second site to
+edit. The Russian sentence in the entrance page is the exception, and it is the first nit below.
+
+#### Findings
+
+##### nit
+
+1. **`site/src/content/docs/ru.mdx:17`: the entrance paragraph hard-codes the count and the list of
+   what is translated, while the link list under it is generated.** The sentence reads «На русский
+   переведены пять страниц: установка на Windows, macOS и в foobar2000, работа с приложением и то, как
+   оно устроено». A sixth translation added to `PUBLISHED` would join the list automatically, and this
+   sentence would then be false with no gate noticing. That undercuts the plan's own "no edit to the
+   page" property. The text is exactly what the plan prescribed and the owner approved, so this is not
+   an implementation defect. Changing Russian prose is the owner's call. One option is to drop the
+   count and the enumeration, e.g. «Часть документации переведена на русский — список ниже.
+   Остальная документация сайта — на английском.»
+2. **`site/src/content/docs/start-here.mdx:33`, `:42` and `:58`: the three `По-русски` card links carry
+   no `lang`/`hreflang`.** Every other Russian-language link this plan added carries them: the header
+   control, the in-page twin link and the landing-page button. So on an English page a screen reader
+   voices these three with the English voice. The plan did not require the attributes here. The
+   repair is either to write the three links as JSX `<a>` with `lang="ru" hreflang="ru"`, which gives
+   up the rewriter's relative-source form, or to have `rewriteLinks` add the attributes to any link
+   whose target is a `.ru.md` source. This is `dev` work. It is not a close repair.
+
+## Followups (after this lands)
+
+- ADR-0213 moves from `proposed` to `accepted` at this plan's close, with an `Outcome` line saying
+  whether the `lang` repair was taken and what the Pagefind split measured.

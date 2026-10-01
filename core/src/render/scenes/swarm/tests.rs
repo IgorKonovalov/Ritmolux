@@ -73,14 +73,14 @@ fn the_wrap_seam_projects_outside_the_visible_frame() {
     // The family's working range (Plan 0043 Phase 1).
     const ZOOMS: [f32; 4] = [1.0, 1.1, 1.2, 1.3];
     /// The range the **shipped** presets actually reach, which starts *below* 1:
-    /// `swarm_drift.toml` binds `zoom = "1.04 + sin(...) * 0.05 + ..."`, so it
-    /// bottoms out just under 1 and a guard starting at 1.0 leaves the shipped
+    /// a since-retired swarm bound `zoom = "1.04 + sin(...) * 0.05 + ..."`, so it
+    /// bottomed out just under 1 and a guard starting at 1.0 leaves the shipped
     /// minimum unmeasured (Plan 0043 close review). Used for the concrete block
     /// below, not the general one — "clears by at least `headroom`" is a
     /// `zoom >= 1` property by construction, while "clears at all" is the claim
     /// that has to hold everywhere the family goes.
     const SHIPPED_ZOOMS: [f32; 5] = [0.99, 1.0, 1.1, 1.2, 1.3];
-    /// The largest `pan_*` amplitude any surviving preset binds (Drift's `pan_x`).
+    /// The largest `pan_*` amplitude any surviving preset binds (a since-retired swarm's `pan_x`).
     /// A future preset that pans further or zooms lower has to widen these two —
     /// which is why they say where they come from.
     const PAN: f32 = 0.16;
@@ -1460,9 +1460,8 @@ fn a_constant_spin_integrates_to_the_multiply_it_replaced() {
 }
 
 /// ...and the property the multiply failed, which on this scene is the whole
-/// point of the correction: `swarm_shatter` binds `spin` to `mid` through a
-/// `tau = 0.3` one-pole, so the rate moves ~0.04 in a frame across its 0.75
-/// swing. Integrated, the field clock advances one frame's worth whatever the
+/// point of the correction: a world binding `spin` to `mid` through a
+/// `tau = 0.3` one-pole moves the rate ~0.04 in a frame across a 0.75 swing. Integrated, the field clock advances one frame's worth whatever the
 /// elapsed time; multiplied, it advanced ~4 s at t = 100 s against a nominal
 /// 0.019 s and the flow re-rolled on every loud passage.
 #[test]

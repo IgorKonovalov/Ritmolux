@@ -349,6 +349,9 @@ pub struct RenderRequest {
     /// `--ffmpeg`: spawn this encoder and wire the pipe, instead of writing the
     /// stream to stdout. `None` is the raw-stream case.
     pub encoder: Option<EncoderRequest>,
+    /// `--bar-grid`: write the render's [`BarGrid`] to this file before the
+    /// first frame. The frame stream is the same bytes either way.
+    pub bar_grid: Option<std::path::PathBuf>,
 }
 
 /// The encoder half of a render: which `ffmpeg` to run, which clip to mux, and
@@ -394,34 +397,138 @@ pub fn render_frames(
     sink: &mut dyn FnMut(u32, &CaptureImage) -> Result<(), String>,
 ) -> Result<u32, String> {
     let frames = frame_count(pcm.len(), format, fps)?;
-    let mut analyzer = Analyzer::new(format).map_err(|e| format!("--render: {e}"))?;
-    let hop_samples = hop_samples(format);
-    let hops = total_hops(pcm.len(), format);
-
-    let mut pushed = 0usize;
-    // Silence until the first hop lands — the same state the analyzer itself is
-    // in before its window has anything in it.
-    let mut current = AnalysisFrame::default();
-
+    let mut clock = FrameClock::new(pcm, format, fps)?;
     r.capture_stream(
         name,
         frames,
         fps.dt(),
-        &mut |index| {
-            let due = hops_through(index, fps, format).min(hops);
-            while pushed < due {
-                let start = pushed * hop_samples;
-                let hop = pcm.get(start..start + hop_samples).unwrap_or(&[]);
-                analyzer.push_interleaved(hop);
-                current = analyzer.take_frame();
-                pushed += 1;
-            }
-            current
-        },
+        &mut |index| clock.frame(index),
         sink,
     )
     .map_err(|e| format!("render `{name}`: {e}"))?;
     Ok(frames)
+}
+
+/// The analyzer driven on the frame clock: [`Self::frame`] returns the
+/// [`AnalysisFrame`] output frame `index` is drawn from.
+///
+/// The one walk both [`render_frames`] and [`bar_grid`] take, so the bar grid a
+/// render writes is the bar grid its frames were drawn with. Indices must be
+/// asked for in increasing order — the analyzer is a stream and cannot rewind.
+struct FrameClock<'a> {
+    analyzer: Analyzer,
+    pcm: &'a [f32],
+    format: AudioFormat,
+    fps: Fps,
+    hop_samples: usize,
+    hops: usize,
+    pushed: usize,
+    current: AnalysisFrame,
+}
+
+impl<'a> FrameClock<'a> {
+    fn new(pcm: &'a [f32], format: AudioFormat, fps: Fps) -> Result<Self, String> {
+        Ok(Self {
+            analyzer: Analyzer::new(format).map_err(|e| format!("--render: {e}"))?,
+            pcm,
+            format,
+            fps,
+            hop_samples: hop_samples(format),
+            hops: total_hops(pcm.len(), format),
+            pushed: 0,
+            // Silence until the first hop lands — the same state the analyzer
+            // itself is in before its window has anything in it.
+            current: AnalysisFrame::default(),
+        })
+    }
+
+    fn frame(&mut self, index: u32) -> AnalysisFrame {
+        let due = hops_through(index, self.fps, self.format).min(self.hops);
+        while self.pushed < due {
+            let start = self.pushed * self.hop_samples;
+            let hop = self.pcm.get(start..start + self.hop_samples).unwrap_or(&[]);
+            self.analyzer.push_interleaved(hop);
+            self.current = self.analyzer.take_frame();
+            self.pushed += 1;
+        }
+        self.current
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The bar grid
+// ---------------------------------------------------------------------------
+
+/// Where each bar of a render starts, in output frames — what `--bar-grid`
+/// writes for a consumer downstream of the frame stream (the diffusion filter's
+/// prompt timeline, ADR-0236).
+///
+/// **Bar 1 starts at frame 0**, whatever the analyzer says there. Every later
+/// bar starts at a frame whose [`AnalysisFrame::bar_index`] differs from the
+/// frame before it. That field is the analyzer's own bar counter — estimated
+/// while the downbeat tracker is locked and a counter fallback otherwise — and it
+/// may repeat or skip a bar across an alignment change; each change is one
+/// boundary here either way, so bar numbers in this grid only ever increase.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BarGrid {
+    pub fps: Fps,
+    /// Frames the render writes; the last bar runs to here.
+    pub frames: u32,
+    /// The first frame of each bar, strictly increasing, `starts[0] == 0`.
+    pub starts: Vec<u32>,
+    /// Per bar: whether the downbeat estimator was locked on the bar's first
+    /// frame, i.e. whether that boundary is estimated rather than fallback.
+    pub locked: Vec<bool>,
+}
+
+impl BarGrid {
+    /// The file `--bar-grid` writes: one JSON object, keys in a fixed order.
+    pub fn to_json(&self) -> String {
+        let join = |v: Vec<String>| v.join(",");
+        format!(
+            "{{\"fps\":\"{}\",\"frames\":{},\"bar_starts\":[{}],\"bar_locked\":[{}]}}\n",
+            self.fps.as_header_field(),
+            self.frames,
+            join(self.starts.iter().map(u32::to_string).collect()),
+            join(self.locked.iter().map(bool::to_string).collect()),
+        )
+    }
+
+    /// The stderr line a render prints about its grid: how many bars, and how
+    /// many of their boundaries the estimator placed rather than the fallback.
+    pub fn summary(&self) -> String {
+        let estimated = self.locked.iter().filter(|l| **l).count();
+        format!(
+            "render: bar grid of {} bars over {} frames, {estimated} of them started \
+             on an estimated downbeat and {} on the fallback counter",
+            self.starts.len(),
+            self.frames,
+            self.starts.len() - estimated,
+        )
+    }
+}
+
+/// The bar grid of a render of `pcm` at `fps`: the same analyzer walk
+/// [`render_frames`] draws its frames from, without drawing them.
+pub fn bar_grid(pcm: &[f32], format: AudioFormat, fps: Fps) -> Result<BarGrid, String> {
+    let frames = frame_count(pcm.len(), format, fps)?;
+    let mut clock = FrameClock::new(pcm, format, fps)?;
+    let mut grid = BarGrid {
+        fps,
+        frames,
+        starts: Vec::new(),
+        locked: Vec::new(),
+    };
+    let mut previous = None;
+    for index in 0..frames {
+        let f = clock.frame(index);
+        if previous != Some(f.bar_index) {
+            grid.starts.push(index);
+            grid.locked.push(f.downbeat_locked);
+            previous = Some(f.bar_index);
+        }
+    }
+    Ok(grid)
 }
 
 // ---------------------------------------------------------------------------
@@ -778,6 +885,15 @@ pub fn run(
         req.tier.as_str(),
         attractor_note(&presets, &name, req),
     );
+
+    // Before the encoder and the device, like the preset check: a grid that
+    // cannot be written is found before the render is paid for, not after.
+    if let Some(path) = &req.bar_grid {
+        let grid = bar_grid(pcm, format, req.fps)?;
+        std::fs::write(path, grid.to_json())
+            .map_err(|e| format!("--bar-grid {}: {e}", path.display()))?;
+        eprintln!("{} [{}]", grid.summary(), path.display());
+    }
 
     let mut encoder = req.encoder.as_ref().map(Encoder::spawn).transpose()?;
     // The **offline** ceiling (ADR-0140): no present deadline here, so the bound

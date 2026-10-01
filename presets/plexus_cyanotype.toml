@@ -1,0 +1,61 @@
+# Cyanotype - a rippling mesh drafted as a blueprint: pale lines on
+# prussian-blue paper, seen from close above like a plan view of a terrain
+# survey. The look is the ink stage, not a palette - `ink_amount = 1` remaps
+# the finished frame so unlit pixels become the blue paper and lit ones the
+# chalk-white line, which is the only way to get a lit-paper ground under an
+# additive scene.
+#
+# The field is ENDLESS by framing, not by geometry: the sheet is a finite
+# square, and the camera sits close and nearly straight down so every corner
+# of the frame lands inside it. The bearing is fixed - the camera never turns -
+# and the tilt and distance only breathe inside a range checked for that: at
+# its farthest and loudest the frame still shows no edge. Widen `pitch`,
+# `distance` or `fov` and the sheet's border walks into view.
+#
+# The terrain is what moves. BASS lifts the swell into ridges and knits the
+# mesh denser, MID speeds the current, and the swell's breadth wanders, so the
+# survey re-draws itself under a still camera.
+#
+# Saturation is 0 and `bg_*` is left out deliberately: the remap keys on
+# luminance, so colour buys nothing and a lit backdrop would grey the paper.
+system = "plexus"
+name = "Cyanotype"
+
+[plexus]
+layout = "sheet"
+points = 600
+seed   = 17
+
+[palette]
+name = "mono"
+
+[params]
+link_distance = "0.22 + clamp(bass * 0.12, 0, 0.1)"
+link_alpha    = "0.9"
+line_width    = "2.4"
+node_size     = "1.8"
+node_glow     = "1.3"
+drift         = "0.28 + clamp(mid * 0.2, 0, 0.17)"
+wave          = "0.2 + clamp(bass * 0.3, 0, 0.25)"
+wave_scale    = "0.6 + noise(time * 0.07 + 30) * 0.5"
+yaw           = "0.4"
+pitch         = "1.4 + noise(time * 0.09 + 10) * 0.12"
+distance      = "1.5 + noise(time * 0.11 + 70) * 0.15"
+fov           = "0.8"
+aperture      = "4"
+focus         = "0.5"
+saturation    = "0"
+brightness    = "1.4"
+ink_amount    = "1"
+paper_hue     = "0.6"
+paper_sat     = "0.85"
+paper_bright  = "0.24"
+ink_hue       = "0.55"
+ink_sat       = "0.06"
+ink_bright    = "0.97"
+ink_gamma     = "0.6"
+
+[smoothing]
+link_distance = 0.15
+wave          = 0.25
+drift         = 0.4

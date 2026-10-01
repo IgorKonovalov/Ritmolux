@@ -1,11 +1,12 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-  background: var(--panel);
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--scanlines), var(--panel);
   border: 1px solid var(--panel-edge);
-  border-radius: 4px;
+  border-radius: var(--radius);
+  animation: rlx-enter var(--motion-long) var(--ease);
 }
 
 .bar {
@@ -22,12 +23,17 @@
 
 .close {
   background: none;
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   color: var(--text-dim);
   font-size: 11px;
-  padding: 2px 8px;
+  padding: 2px var(--space-1);
   cursor: pointer;
+}
+
+.close:hover {
+  color: var(--text);
+  border-color: var(--accent);
 }
 
 .group {
@@ -36,8 +42,8 @@
   gap: 10px;
   margin: 0;
   padding: 12px;
-  border: 1px solid var(--panel-edge);
-  border-radius: 4px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
 }
 
 .legend {
@@ -52,7 +58,7 @@
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-areas: 'radio name' 'radio doc';
-  gap: 2px 8px;
+  gap: 2px var(--space-1);
   align-items: baseline;
   cursor: pointer;
 }
@@ -61,6 +67,7 @@
   grid-area: radio;
   align-self: start;
   margin-top: 3px;
+  accent-color: var(--accent);
 }
 
 .choiceName {
@@ -91,7 +98,7 @@
 .facts {
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: 4px 12px;
+  gap: var(--space-0) 12px;
   margin: 0;
   font-size: 11px;
 }

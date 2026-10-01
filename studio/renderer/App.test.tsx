@@ -18,20 +18,34 @@ import { App } from './App'
 /** The event listener the application registered, so a test can push events. */
 let push: (event: PlayerEvent) => void
 
+const SETTINGS_FILE = '/home/tester/.config/ritmolux-studio/settings.json'
+
+/** What main reports; a test that needs no player clears `playerPath`. */
+let info: {
+  studioVersion: string
+  playerPath: string | undefined
+  playerSource: string | undefined
+  settingsFile: string
+  playerMode: string
+  reducedMotion: boolean
+}
+
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     putImageData: () => undefined,
   } as unknown as CanvasRenderingContext2D)
 
+  info = {
+    studioVersion: '0.115.0',
+    playerPath: '/bin/ritmolux',
+    playerSource: 'PATH',
+    settingsFile: SETTINGS_FILE,
+    playerMode: 'windowed',
+    reducedMotion: false,
+  }
   const api = {
     app: {
-      getInfo: () =>
-        Promise.resolve({
-          studioVersion: '0.115.0',
-          playerPath: '/bin/ritmolux',
-          playerSource: 'PATH',
-          playerMode: 'windowed',
-        }),
+      getInfo: () => Promise.resolve(info),
       // Refused on purpose: the panel is not what is under test, and without a
       // schema it renders one line instead of every row the engine declares.
       getSchema: () => Promise.resolve({ ok: false as const, reason: 'no player in this test' }),
@@ -111,6 +125,22 @@ describe('the banner', () => {
     expect(items[0].textContent).toContain('/presets/c.toml')
     expect(items[1].textContent).toContain('/presets/b.toml')
     expect(items[2].textContent).toContain('/presets/a.toml')
+  })
+})
+
+describe('the missing-player banner', () => {
+  it('names the settings file main reported, and the key to set in it', async () => {
+    info.playerPath = undefined
+    info.playerSource = undefined
+    await open()
+    const detail = screen.getByText(/playerPath/)
+    expect(detail.textContent).toContain(SETTINGS_FILE)
+    expect(detail.textContent).toContain('"playerPath"')
+  })
+
+  it('is absent when a player resolved', async () => {
+    await open()
+    expect(screen.queryByText('No player found')).toBeNull()
   })
 })
 

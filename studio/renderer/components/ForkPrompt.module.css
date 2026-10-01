@@ -3,12 +3,13 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--panel-edge);
+  padding: var(--space-1) 0.75rem;
+  border-bottom: 1px solid var(--control-edge);
   /* Marked as the one thing waiting for an answer: the strip it replaces is
      ordinarily a quiet line of path text. */
-  border-left: 2px solid var(--accent);
-  background: var(--panel);
+  border-left: var(--space-0) solid var(--accent);
+  background: var(--highlight);
+  animation: rlx-enter var(--motion-long) var(--ease);
 }
 
 .field {
@@ -31,24 +32,29 @@
   flex: 1;
   min-width: 6rem;
   background: var(--bg);
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   color: var(--text);
   font-family: var(--mono);
   font-size: 0.72rem;
-  padding: 0.25rem 0.4rem;
+  padding: var(--space-0) 0.4rem;
 }
 
 .save,
 .cancel {
   background: none;
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   color: var(--text-dim);
   cursor: pointer;
   font-family: inherit;
   font-size: 0.7rem;
-  padding: 0.25rem 0.7rem;
+  padding: var(--space-0) 0.7rem;
+}
+
+.cancel:hover {
+  color: var(--text);
+  border-color: var(--accent);
 }
 
 .save {
@@ -56,8 +62,12 @@
   color: var(--text);
 }
 
+.save:hover:enabled {
+  background: var(--highlight);
+}
+
 .save:disabled {
-  border-color: var(--panel-edge);
+  border-color: var(--control-edge);
   color: var(--text-dim);
   cursor: default;
 }

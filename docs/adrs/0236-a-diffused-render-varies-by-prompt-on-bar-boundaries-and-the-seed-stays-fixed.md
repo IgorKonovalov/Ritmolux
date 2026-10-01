@@ -1,8 +1,8 @@
 # ADR-0236 — A diffused render varies by prompt on bar boundaries, and the seed stays fixed
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-28 (Plan 0212)
 > **Date:** 2026-09-19
-> **Related plan(s):** [0212](../plans/0212-the-diffused-render-gains-a-timeline.md)
+> **Related plan(s):** [0212](../plans/done/0212-the-diffused-render-gains-a-timeline.md)
 
 ## Context
 
@@ -103,6 +103,6 @@ pipeline does not have."*
 ## Notes
 
 Both asks came from one sitting at Plan 0106's Phase 6 gate. The resolution half is
-[Plan 0211](../plans/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md), which
+[Plan 0211](../plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md), which
 measures before it designs; this half needs no measurement first because the mechanism is absent rather
 than mis-sized.

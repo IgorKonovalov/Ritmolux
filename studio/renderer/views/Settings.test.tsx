@@ -14,23 +14,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Settings } from './Settings'
 
 const setPlayerMode = vi.fn(() => Promise.resolve({ ok: true as const }))
+const setReducedMotion = vi.fn(() => Promise.resolve({ ok: true as const }))
+const onReducedMotion = vi.fn()
 
 beforeEach(() => {
   setPlayerMode.mockClear()
+  setReducedMotion.mockClear()
+  onReducedMotion.mockClear()
   // The one bridge, stood in: the panel reaches main through `window.api` and
   // through nothing else, which is what makes a stub this small enough.
-  Object.assign(window, { api: { app: { setPlayerMode } } })
+  Object.assign(window, { api: { app: { setPlayerMode, setReducedMotion } } })
 })
 
 afterEach(cleanup)
 
-function panel(running: 'windowed' | 'windowless' = 'windowed') {
+function panel(running: 'windowed' | 'windowless' = 'windowed', reducedMotion = false) {
   return render(
     <Settings
       running={running}
       playerPath="/opt/ritmolux"
       playerSource="bundled"
       studioVersion="0.113.0"
+      reducedMotion={reducedMotion}
+      onReducedMotion={onReducedMotion}
       onClose={vi.fn()}
     />,
   )
@@ -44,6 +50,8 @@ function again(view: ReturnType<typeof panel>, running: 'windowed' | 'windowless
       playerPath="/opt/ritmolux"
       playerSource="bundled"
       studioVersion="0.113.0"
+      reducedMotion={false}
+      onReducedMotion={onReducedMotion}
       onClose={vi.fn()}
     />,
   )
@@ -110,6 +118,32 @@ describe('the player mode', () => {
     expect(screen.getByLabelText(/^windowed/).closest('label')?.textContent).toMatch(
       /copy of what that window draws/,
     )
+  })
+})
+
+describe('reduced motion', () => {
+  it('shows the value the file holds', () => {
+    panel('windowed', true)
+    expect((screen.getByLabelText(/reduce motion/) as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('writes the choice and applies it once the file took it', async () => {
+    panel('windowed', false)
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText(/reduce motion/))
+    })
+    expect(setReducedMotion).toHaveBeenCalledWith(true)
+    expect(onReducedMotion).toHaveBeenCalledWith(true)
+  })
+
+  it('applies nothing when the file refused it, and says so', async () => {
+    setReducedMotion.mockResolvedValueOnce({ ok: false, reason: 'read-only' } as never)
+    panel('windowed', false)
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText(/reduce motion/))
+    })
+    expect(onReducedMotion).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert').textContent).toContain('read-only')
   })
 })
 

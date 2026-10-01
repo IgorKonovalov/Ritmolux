@@ -3,6 +3,10 @@
 > **Maintained by:** `architect`. **Read by:** `preset-author`.
 > **Last consolidated:** 2026-08-13, from five `human` phases spread across five closed plans.
 
+**Taken by [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md) (approved 2026-09-27):**
+items 1 to 6 were answered in its walk (Phase 2) or its retunes (Phase 4), and sit under `Done`. Its
+Phase 7 verdict added item 7, the monthly walk, which stays open by design.
+
 This is the **one** copy. [`docs/plans/README.md`](plans/README.md)'s `Standing` section points here
 rather than restating, because a duty recorded in two places drifts in one of them — which is the
 failure this file exists to stop.
@@ -19,292 +23,50 @@ row moves to `Done` at the bottom with a date.
 
 ---
 
-## 1. The sky family — three items, one sitting
+## 7. The library walk, once a month
 
-**This is three standing phases on one family of looks, and walking the family once is the point.**
-The engine side is finished and will not move underneath the work: ground
-([Plan 0080](plans/done/0080-the-sky-gets-a-horizon.md)), dither
-([Plan 0082](plans/done/0082-the-gradient-stops-banding.md)) and band
-([Plan 0081](plans/done/0081-the-sky-gets-a-galaxy.md)) all shipped inside two days.
+**Standing, from [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md) Phase 7
+(the owner's verdict, 2026-10-01).** Shipping less but better needs no mechanism. It needs the owner's
+walk, repeated, because that plan's walk convicted 28 of its 35 cuts with no machine flag behind them.
 
-### 1a. Perseids' quiet sky — [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 5
-
-Author the quiet twinkling starfield that Plan 0075 cohort 4 **routed out rather than shipped**:
-sparse marks, low coverage, slow shimmer on swarm `twinkle`. Both walls it hit are now down — the
-animation gate scores `metrics::footprint_diff` over the figure's own footprint (ADR-0091), and the
-swarm individuates (`twinkle` / `size_spread` off the particle index).
-
-Two riders from the plan:
-
-- **The sanity floor is read, not fought.** If it prices the sky out, re-derive it by the floor's own
-  recorded rule — the [backlog 0072](design-backlog.md) precedent — and never lower it to fit.
-- **If the world binds `reseed` or any sustained force it owes one minutes-horizon soak
-  observation**, verdict in the world's header. That is [backlog 0086](design-backlog.md)'s bounded
-  check. **The instrument for it is [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md)
-  Phase 1** — if that plan has landed, use it; if not, the bounded observation stands as written.
-
-### 1b. The dusk ground — [Plan 0080](plans/done/0080-the-sky-gets-a-horizon.md) Phase 7, content half
-
-The judgement half is **answered and discharged** — the ramp reads as light, the horizon sits where
-the `[palette]` stops put it, and the banding it exposed became Plan 0082. What remains is authoring
-the dusk world onto the shipped ramp (`bg_angle`, `bg_hue_span`, `bg_shade`/`bg_shade_end`,
-`bg_ramp_gamma`).
-
-### 1c. The galaxy, judged against the reference — [Plan 0081](plans/done/0081-the-sky-gets-a-galaxy.md) Phase 6
-
-Three questions no instrument in this repo can answer, and the first carries the decision:
-
-- **Does it read as a galaxy, or as a smudge?** ADR-0095 rejected fbm mottling on the bet that the
-  scattered starfield drawn *in front* supplies the texture the smooth band lacks. **If it reads as an
-  airbrushed streak that is a result, not a failure** — the answer is Alternative A (fbm), with this
-  observation as its evidence, and it gets its own ADR and plan rather than a patch. Nothing forecloses
-  it: the envelope is a single multiply, so noise multiplies in later.
-- **Does the arc's curvature read at a normal field of view**, or must `bg_band_curve` be pushed until
-  the ends leave the frame?
-- **Does it band under two overlapping gradients?** Run this on the kept banding reference frame,
-  `core/tests/fixtures/scratch-0082/dusk_ground_banding.toml`, at **1920x1080** — plateau width is in
-  pixels, so the resolution is part of the measurement. Add `bg_band_amount` to the frame. The first
-  of that frame's two owed checks is discharged (58 px → 20 px, 7.5 → 2.1 px/level); **this is the
-  second, and it is due rather than pending.**
-
-### What to start from, across all three
-
-- The backdrop earns a preset **nothing** at `sanity` or `animation` — both are blind to `bg_*` by
-  design (ADR-0067, ADR-0091's Outcome) — so however much of the frame the sky fills, **the figure
-  carries both floors**.
-- The look wants `bg_bright = 0` with the band alone, which the widened build condition now supports
-  and no earlier configuration could reach.
-- Two stale headers belong to this sitting: `fragment_vitrail.toml` still explains its onset-`flash`
-  binding by *"the report is bloom-blind"* (fixed by Plan 0077 Phase 4 — the binding may stay for its
-  look, but the reason is gone), and `emitter_perseids.toml`'s header records the routed-out quiet sky
-  1a exists to ship.
-
----
-
-## 2. The ink worlds re-judge on `ink_gamma` — [Plan 0078](plans/done/0078-the-ink-learns-to-bite.md) Phase 3
-
-Small: two headers, both **predicted at Plan 0075's close as workarounds that would go stale the
-moment this lever landed.** It has landed — `presets/README.md`'s ink section carries the three-lever
-note (`ink_gamma` × `ink_amount` × `exposure`) and the measured mean-byte ladder.
-
-- **`reaction_etching.toml`** — its duotone is painted into `[palette]` because *"the ink remap gives
-  a mid-contrast field no contrast lever of its own."* Note the world has since been **inverted to
-  scratchboard** (bright line work on black), so whether the palette version still earns its place is
-  a live judgement, **not a foregone retune**.
-- **`swarm_shatter.toml`** — its light-ground twin was routed out with *"when ink grows a contrast
-  control, the light-ground twin becomes authorable."* That condition is met.
-
-**Output per world:** a verdict in its header, judged in motion — retune onto `ink_gamma`, or a
-recorded *"the palette version stays on its looks."*
-
-**One rider from the close:** `dev`'s eyeball on `attractor_ink` found that **which way to take the
-exponent depends on how dense the drawing already is** — a sparse figure's bite likely lives *below*
-1, not above. If a world needs a toe **and** a shoulder, that is
-[ADR-0092](adrs/0092-the-ink-remap-gains-a-contrast-exponent.md)'s named negative: file it **with the
-measurement** as a new backlog entry rather than reopening 0084.
-
----
-
-## 3. The attractor binds `tuple` — [Plan 0079](plans/done/0079-the-attractor-learns-new-figures.md)'s Followup
-
-A different family and a different sitting from §1 — do not bundle it. Eleven presets landed *with*
-the capability: four `attractor_*gallery` demonstrations, the pinned `attractor_torusknot`,
-`attractor_valentine`, and four walk worlds.
-
-**The question this pass should answer first is a curation question, not a tuning one.** The attractor
-family is now **17 of 37 presets — 46 % of the library on one system**, the sharpest single-family
-convergence the set has seen. Three things measured at the close rather than guessed:
-
-- `attractor_dejonggallery` and `attractor_cliffordgallery` are **near-twins by construction** —
-  identical `tuple` / `brightness` / `fade` / `reseed`, differing only in family and palette.
-- All four galleries step on a **wall clock** (`mod(floor(time * 0.33), N)`) with audio only on
-  secondary levers, which makes them demonstrations of the roster rather than worlds.
-- So: **do the galleries earn standing places, or were they scaffolding for a `human` gate?** That is
-  the lane's call, and it is the first thing to decide because it changes how much new attractor
-  content the set can absorb.
-
-**An entry's index is a preset-visible name** — the galleries step them, `attractor_torusknot` pins
-Lorenz entry 1 — so the roster table is append-only in practice. Two roster facts a still cannot show,
-both already in `presets/README.md`: the Lorenz torus knot **blooms slowly on a `reseed`** (a wide
-excursion to ~2.2x its own extent, seconds to fall back, where the canonical butterfly absorbs the
-same kick in a handful of frames), and Thomas past `a ≈ 0.208` closes into periodic orbits that have a
-perfectly good bounding box and draw as a few dots.
-
-**Twelve morph filmstrips are rendered but unjudged** and are recorded as such. They cost a viewing
-rather than a re-render only while `target/tuple-paths/` survives; `node scripts/tuple-paths.mjs`
-regenerates them.
-
----
-
-## 4. The `occlude` retune, with [backlog 0038](design-backlog.md) — [Plan 0071](plans/done/0071-light-that-adds-without-covering.md) Phase 5
-
-Library-wide, so it goes **last**: it is a walk over the whole shipped set, and doing it before §1–§3
-means walking the worlds they touch twice.
-
-Two retunes of the same shipped set against a composite that moved underneath it, judged in motion
-over a lit backdrop — **one pass, not two.**
-
-- **`occlude`** — raise the floors that were floored for the black rim, now that the ceiling above
-  them is adjustable. Two things the close measured to start from: **no shipped preset binds
-  `occlude` today**, and at shipped brightnesses the default's effect is almost negligible — the
-  ceiling binds where the figure is **dim**, so the worlds worth walking first are the ones with a
-  dimming depth cue (`swarm_storm`'s `depth_fade`, `lsystem_fern`'s `glow`-dimmed outer stems; that
-  file's header says so in place).
-- **[backlog 0038](design-backlog.md)** — mid-tone-dominated presets pay the tonemap knee. Measured:
-  `attractor_clifford` mean luma 82.54 → 75.91, **−8.0 %**, while `attractor_leviathan` gained 5.8 %
-  because it has genuinely over-range cores. The lever is one line: `exposure` (default 1.0) is a
-  linear multiplier ahead of the tonemap, added for exactly this. The population to check is presets
-  with **no over-range peak** — the attractor family, the softer `fragment_*`, `swarm_drift`.
-
-**Two record corrections that matter to whoever runs this:**
-
-- The plan's own text says to run this "with 0038 and 0058". **0058 closed by content on 2026-08-04**
-  (`ca43dff`, all thirteen fold-binding presets now name a `kaleido_edge`), five days before Plan 0071
-  reached Phase 5. The three-way pass is a two-way pass.
-- `docs/plans/README.md` states that "the *tonemap-knee* half of that pairing is now measured away" by
-  Plan 0080 Phase 7. **It is not.** What that phase retired is a different suspicion — that
-  `bg_bright = 0.85` was reaching the tonemap's shoulder on the *backdrop ramp* (0 % of the column
-  rail-pinned on any channel). Backlog 0038's finding is about **mid-tone figure luminance on
-  attractor presets**, which no backdrop measurement speaks to. **0038 is live.** ~~Only one shipped preset binds
-  `exposure` today (`lsystem_vellum.toml:60`).~~ **Corrected 2026-08-29 at the Plan 0104 close:
-  sixteen do, fifteen of them authored by that plan's cohorts, which reached for `exposure` as the
-  whole-frame level stage. None is in this item's population (the attractor family, the softer
-  `fragment_*`, `swarm_drift`), so the retune below is owed exactly as written — what is gone is the
-  premise that the lever is exotic.
-
----
-
-## 5. Two families photograph badly, and only content can fix it — [Plan 0088](plans/done/0088-the-docs-get-pictures.md) Phase 7
-
-**This item is a framing brief, not a look brief.** Plan 0088 committed one gallery image per
-built-in system, and the Phase 7 look call at its close accepted two of them as *adequate rather
-than good*. Both families ship **exactly one preset**, so there is nothing to swap to — and the
-close established, by shooting alternatives, that the capture hop is not the lever either.
-
-- **`emitter_perseids`** — the meteor fan bunches into the right half of the frame and leaves the
-  left third empty navy. Shot at hops 250, 300 and 340: the same imbalance at all three, so this is
-  the preset's spawn geometry and not a moment in the clip. The gallery image is
-  `docs/images/gallery/emitter.png`.
-- **`star_rosewindow`** — the outermost ring of the rosette runs off all four edges, so the image
-  reads as a crop rather than as a rose window. Shot at 230 and 300: identical framing, different
-  palette phase. The gallery image is `docs/images/gallery/star_pattern.png`.
-
-Three riders:
-
-- **Judge it in the window, not only in a still.** Both may well be right in motion — a fan that
-  sweeps and a rosette that breathes past the frame edge are legitimate looks. The complaint is
-  specifically that the *single committed frame* misrepresents the family to a first-time reader.
-  If the motion is right and the still is not, say so and close this with that verdict; adding a
-  second preset to the family is then the better answer than retuning the one that exists.
-- **A swap is one manifest line.** If the sitting produces a second `emitter` or `star_pattern`
-  preset, point `scripts/docs-shots.mjs` at it and re-run the script — argument-free, no other
-  image moves (verified at the close: re-running changed only the two entries that were edited).
-- **Re-run the script whatever the outcome**, since a retune of either preset silently invalidates
-  its committed picture and [ADR-0100](adrs/0100-documentation-images-are-committed-headless-renders.md)
-  deliberately has no gate that would notice.
-
-**Record the verdict here**, then move the row to `Done` below.
-
----
-
-## 6. The figure at frame scale — [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) Phase 6
-
-> **PARTLY RUN, 2026-08-16.** Three of the sitting's questions are answered and one world shipped;
-> the item stays open on the two that are not. What is settled, so nobody re-litigates it:
->
-> - **The contour construction reads.** `presets/shape_pulse.toml` ships from it — the first
->   `shape_field` world. Judged in the running app across four rounds of user notes, and the
->   parameters that survived are recorded in its header with the arithmetic behind them.
-> - **`gamma`'s useful range is bounded by a measured wall, not by its clamp.** Past roughly `1.5`
->   on a wrapping palette and `3` on a single sweep, the exterior compresses past the pixel grid and
->   the corners break into moire. The `0.05..20` clamp is far outside anything usable.
-> - **The star silhouettes PASS — verdict 2026-08-16, on the second re-judge.** *"It looks
->   objectively good, and I can say yes to all, except maybe drawn by hand, but it's fine also."*
->   All three Phase 5 params reach their reference shapes: `star_valley` on the sharp seven-pointer,
->   `star_jitter` on the irregular bang, `star_curve` on both concave sparkles, and all three
->   together on the six-pointer. **The one soft edge is filed as
->   [backlog 0100](design-backlog.md)** — "hand-drawn" is *edge wobble*, displacement along the line
->   between tip and valley, and the arm only varies each spike's tip *radius*. Different quantity,
->   no lever for it, and the user passed it anyway.
->
->   **Getting to that verdict took two corrected probes, and both corrections were mine.** The first
->   rejection (*"dirty and upscaled"*) was the probe drawing its figure through **8-32 of the
->   palette's 256 LUT texels** with a **1.31-texel** edge ([backlog 0099](design-backlog-archive.md)). The
->   second attempt came back with **blunt tips** because the band boundary sat at 1.35x the outline,
->   so it drew a *dilated* silhouette — and an outward offset rounds convex corners, the same
->   mechanism as the heart's notch running the other way. Only with the boundary exactly on `d = 1`
->   was the shape itself visible. **Twice a probe artifact impersonated a shape defect**, which is
->   why the user's precise wording was worth more than the rejection.
-> - **Two engine gaps came out of it** and are filed:
->   [backlog 0096](design-backlog.md) (the scene draws offset contours where the reference wants
->   scaled copies — the reason a nested figure's inner notch rounds off) and
->   [backlog 0097](design-backlog.md) (a curved or jittered star returns a negative distance at its
->   own centre, which punches a hole through the figure on this scene).
->
-> **Still open, and both need the user rather than the lane:** whether a beat-latched
-> `palette_steps` reads as a response or a strobe — the probe set for it was built and never run —
-> and which of the three star params is mis-shaped.
->
-> **The star question is closed** (see above), and it settles
-> [backlog 0092](design-backlog.md)'s trigger **negatively and now conclusively**: the silhouettes
-> were judged good on a fair probe, so nothing in this gate says the flat sparkle was the
-> disappointing one. **Lighting must not be planned off this trigger.**
->
-> **Only one question is still open on this item: does a beat-latched `palette_steps` read as a
-> response or as a strobe.** The probe set for it was built (`p2a`-`p2e`) and has never been run.
-> `p2a` against `p2b` on one track is the whole test — same mechanism, half the rate — and it
-> decides whether a beat-driven band count is available to every future `shape_field` world or
-> whether the fallback (`scale`, `gamma`, or `color_span`) is the permanent answer.
->
-> **There is also now a content opportunity rather than a question.** The five star silhouettes are
-> judged good and **no star world ships**. Authoring one is ordinary lane work against a surface
-> that has been verified rather than assumed — and it would pay off `docs/preset-guide.md`'s missing
-> tenth gallery entry at the same time, which is still owed.
-
-**This is the first sitting on a system that ships with no content at all.** Plan 0091 landed the
-`shape_field` scene, the `star` arm's three shape params, and the two-tone `multiply` route, and it
-deliberately shipped **zero presets** (ADR-0081 puts worlds in this lane). So this item is both the
-look gate the plan owed *and* the authoring job that would discharge it — judge the figures by
-authoring them, in the running app, against both reference batches.
-
-The plan's three questions, none of which an instrument in this repo can answer:
-
-- **Do the contours read as the reference does?** The construction is proved — a band of the palette
-  coordinate is a band of constant distance, measured against the heart's own numerically sampled
-  outline. Whether ~20 nested offsets of a heart *look* like the poster is a different question.
-- **Does the ring count on the beat read as a response, or as a strobe?** This is the one the plan
-  flagged hardest. A band count is a global change to every pixel at once, "which is exactly the
-  shape a strobe has", and `fragment_mandala`'s own header raises the same worry and never settled
-  it. **The recorded fallback if it strobes:** move the beat term onto `scale` or `gamma` and let
-  the count sit still.
-- **Does the `star` batch reach its five reference silhouettes** with `star_valley`, `star_curve`
-  and `star_jitter`? **A named miss is the useful outcome here** — it says which of the three is
-  mis-shaped, or that a silhouette needs something none of them expresses. The cartoon star's
-  *eyes* are known to be out of reach and are not a miss.
-
-Four riders, all from the close:
-
-- **`gamma` runs the opposite way to `ink_gamma`, and nothing warns.** Because a band boundary sits
-  at `(k/n)^(1/gamma)`, it is `gamma` **below** 1 that tightens the rings toward the centre — the
-  reference's direction. `presets/README.md` carries the table. The plan also owes a verdict on the
-  param's *useful range*, taken from rendered comparisons rather than from its `0.05..20` clamp.
-- **The rings travel on `color_center`, and the palette must be cyclic.** The coordinate wraps at 1,
-  so unless the gradient's last stop is its first colour again, the wrap is a visible edge crossing
-  the figure once per cycle. Measured seamless on a cyclic gradient across a full 12-step walk.
-- **A heavily jittered `star` is approximate at frame scale** — up to 0.54 out on its *outer* rings
-  at seven points, because the angular fold measures against a point's own spike. `star_curve` costs
-  0.0032 and is invisible. A many-pointed star's *inner* rings are approximate for a different
-  reason (0.248 at 12 points). Both are recorded in `presets/README.md` beside the params.
-- **`docs/preset-guide.md`'s section 2 owes a tenth entry, and only a shipped preset can pay it.**
-  Every entry there is a real shipped preset with a committed render, so the guide currently
-  lags the roster by one system. When a `shape_field` world lands, add the section
-  and re-run `node scripts/docs-shots.mjs` — argument-free, and nothing else moves.
-
-**Record the verdict here**, then move the row to `Done` below.
+- **Cadence:** once a month, and before a plan that adds a cohort decides how large it can be.
+- **What it is:** the walk that Plan 0232 Phase 2 ran. One family per sitting in the running app,
+  each preset fullscreen, F1 to keep and F2 to cut, then a ledger of the marks with a reason per cut.
+  Run `shot --report` and `distinctness` first as the candidate sheet. They point at suspects and
+  convict nothing.
+- **What it may land:** cuts go through the curation route, keeping each family at its two-preset
+  floor (ADR-0253). Retunes are content-lane work. A gap the walk exposes is a brief for the next
+  cohort, as Plan 0232's `## Gaps` was.
+- **Where the verdict goes:** a dated ledger, in a short plan or a section of the plan that runs the
+  sitting. Each sitting adds a dated line under `Done`, and this item stays open.
+- **The scripts:** the hotkey walk and the retune loop are still scratch files under `target/`
+  (backlog 0277). A `cargo clean` deletes them.
 
 ---
 
 ## Done
 
-*(Nothing yet — this file was consolidated 2026-08-13. Move a row here with its date and a
-one-line verdict when its sitting is finished.)*
+- **2026-09-30 — 1. The sky family** ([Plan 0077](plans/done/0077-the-quiet-sky.md),
+  [Plan 0080](plans/done/0080-the-sky-gets-a-horizon.md), [Plan 0081](plans/done/0081-the-sky-gets-a-galaxy.md)).
+  Retired by the [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md) walk:
+  Perseids, the sky it named, was cut, and no sky world is owed. Vitrail's stale "the report is
+  bloom-blind" reason for its onset flash is replaced; the flash stays for its look.
+- **2026-09-30 — 2. The ink worlds re-judge on `ink_gamma`** ([Plan 0078](plans/done/0078-the-ink-learns-to-bite.md)).
+  Etching and Shatter were cut in Plan 0232 Phase 3. Ink on Paper was re-judged in motion and
+  retuned: it bites harder (`ink_gamma` 0.6, below 1, as the rider predicted for a sparse figure)
+  and now walks the Thomas roster in 3D, with the music driving only its turn and depth.
+- **2026-09-30 — 3. The attractor binds `tuple`** ([Plan 0079](plans/done/0079-the-attractor-learns-new-figures.md)).
+  The curation question is answered: Thomas Gallery earns a place as a world, and the Clifford
+  gallery is cut, leaving Thomas Gallery and the De Jong and Thomas walks as the `tuple` worlds.
+- **2026-09-30 — 5. Two families photograph badly** ([Plan 0088](plans/done/0088-the-docs-get-pictures.md)).
+  Perseids was cut. Rose Window was judged in motion: it still crops at every edge, a reframe
+  was tried, and the owner kept it as it is, so the committed frame stands.
+- **2026-09-30 — 6. The figure at frame scale** ([Plan 0091](plans/done/0091-the-figure-fills-the-frame.md)).
+  The last open question is answered on rebuilt probes (Strata Heart with the band count latched
+  to the beat): a `palette_steps` stepping every second beat reads as a response, and every beat
+  strobes. A beat-driven band count is available to `shape_field` worlds at half the beat rate.
+  Strata Heart is the shipped `shape_field` world and guide card.
+- **2026-09-30 — 4. The `occlude` retune, with [backlog 0038](design-backlog-archive.md)** ([Plan 0071](plans/done/0071-light-that-adds-without-covering.md)).
+  Closed by the owner as answered by the Plan 0232 walk: every preset in its population was judged
+  in motion, with "too dim" a verdict in use, and the dim ones were brightened at the retune. An
+  `occlude` binding stays open authoring for any world that wants one, not an owed pass.

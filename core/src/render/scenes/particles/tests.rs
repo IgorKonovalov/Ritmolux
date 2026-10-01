@@ -1292,6 +1292,7 @@ impl Harness {
             // ceiling equal to it keeps the allocation exactly TEST_PARTICLES.
             TEST_PARTICLES,
             TierConfig::FLOOR.attractor_trail_cap,
+            TierConfig::FLOOR.max_coc_px as f32,
         );
         scene.configure(&crate::render::scenes::lines::GeneratorConfig::Particles {
             family,
@@ -2334,7 +2335,7 @@ fn the_hue_route_moves_hue_and_leaves_the_palette_coordinate_alone() {
 /// to the LUT, and the hue route leaves that coordinate untouched and rotates
 /// the colour that came back. That separation is what makes `root_hue` the
 /// escape when the palette coordinate is already fully spent — which Plan
-/// 0074's Phase 2 gate measured it to be on `attractor_fern`.
+/// 0074's Phase 2 gate measured it to be on the Barnsley fern preset.
 #[test]
 fn the_root_hue_route_rotates_without_touching_the_palette_coordinate() {
     use projection_mirror as m;
@@ -3912,6 +3913,7 @@ fn law_scene(trail_cap: (u32, u32)) -> Option<(RenderContext, AttractorScene, wg
         LAW_ANCHOR,
         LAW_CEILING,
         trail_cap,
+        TierConfig::FLOOR.max_coc_px as f32,
     );
     scene.configure(&crate::render::scenes::lines::GeneratorConfig::Particles {
         family: AttractorFamily::DeJong,
@@ -4147,4 +4149,222 @@ fn field_light(ctx: &RenderContext, scene: &AttractorScene) -> f64 {
         .flat_map(|rgba| rgba.iter().take(3))
         .map(|c| f64::from(*c))
         .sum()
+}
+
+/// **A 3D figure's sprites blur with their distance from the focal depth** —
+/// wider and dimmer away from it, untouched on it (ADR-0257), read off the CPU
+/// transcription of the draw shader's depth-of-field terms.
+#[test]
+fn a_sprite_away_from_the_focal_depth_grows_and_dims() {
+    use projection_mirror as m;
+
+    for family in [AttractorFamily::Thomas, AttractorFamily::Lorenz] {
+        let inv = family.canonical_framing().inv_depth_extent(family);
+        assert!(inv > 0.0, "{family:?} has depth");
+        let r_px = 2.0;
+        // Focus at mid depth, `dn = 0`.
+        let at_focus = m::blur_growth(r_px, m::figure_coc(0.0, 20.0, 0.5, 40.0, inv));
+        assert_eq!(at_focus, 1.0, "in focus, a sprite keeps its size");
+        let mut prev = at_focus;
+        for dn in [-0.25, -0.5, -0.75, -1.0] {
+            let grow = m::blur_growth(r_px, m::figure_coc(dn, 20.0, 0.5, 40.0, inv));
+            let keep = 1.0 / (grow * grow);
+            assert!(grow > prev, "{family:?} at dn {dn}: no wider than {prev}");
+            assert!(keep < 1.0, "and dimmer");
+            prev = grow;
+        }
+        // Nearer than the focus blurs too.
+        assert!(m::figure_coc(0.8, 20.0, 0.5, 40.0, inv) > 0.0);
+        // A pinhole blurs nothing anywhere.
+        for dn in [-1.0, 0.0, 1.0] {
+            assert_eq!(m::figure_coc(dn, 0.0, 0.2, 40.0, inv), 0.0);
+        }
+    }
+    // The flat maps have no depth, so no aperture blurs them.
+    for family in [AttractorFamily::DeJong, AttractorFamily::Clifford] {
+        let inv = family.canonical_framing().inv_depth_extent(family);
+        assert_eq!(inv, 0.0);
+        for focus in [0.0, 0.3, 1.0] {
+            assert_eq!(m::figure_coc(0.0, 30.0, focus, 40.0, inv), 0.0);
+        }
+    }
+}
+
+/// **An aperture past the tier's cap is announced** (ADR-0007, ADR-0257): the
+/// aperture, the far side's blur, is checked against `max_coc_px` every frame;
+/// the near side's blur, which grows past it and saturates at the cap, is not
+/// judged. A flat map, which no aperture blurs, never reports one.
+#[test]
+fn a_blur_past_the_tier_cap_is_announced() {
+    use crate::render::scenes::OverflowContext;
+
+    let cap = TierConfig::FLOOR.max_coc_px as f32;
+    assert_eq!(super::asked_blur(40.0, true), 40.0);
+    assert_eq!(super::asked_blur(0.0, true), 0.0, "a pinhole asks nothing");
+    assert_eq!(
+        super::asked_blur(f32::NAN, true),
+        0.0,
+        "a non-finite aperture is sanitized as the uniform packing does"
+    );
+    assert_eq!(
+        super::asked_blur(40.0, false),
+        0.0,
+        "a flat map asks nothing"
+    );
+    assert!(
+        super::blur_overflow(cap, cap).is_none(),
+        "at the cap is not past it"
+    );
+    let over = super::blur_overflow(40.0, cap).expect("40 px is past the Floor cap");
+    assert_eq!(over.context, OverflowContext::Blur(40));
+    assert_eq!(over.cap, cap as usize);
+    // Focus moves the near side's blur and never the notice: an aperture under
+    // the cap stays quiet at whichever depth is sharp.
+    assert!(super::blur_overflow(super::asked_blur(cap - 1.0, true), cap).is_none());
+    // The scene's lens is the shader's: the CPU copy of the virtual lens names
+    // the constants the draw shader declares.
+    for (name, value) in [
+        ("FIGURE_DISTANCE", super::FIGURE_DISTANCE),
+        ("FIGURE_RADIUS", super::FIGURE_RADIUS),
+    ] {
+        assert!(
+            super::DRAW_SHADER.contains(&format!("const {name}: f32 = {value:?};")),
+            "the draw shader's {name} is not {value:?}"
+        );
+    }
+
+    // Through the scene: a 3D figure reports it per frame, a flat map never.
+    let Some(mut h) = Harness::new(AttractorFamily::Thomas) else {
+        return;
+    };
+    h.scene.set_param("aperture", 40.0);
+    h.run(1);
+    let reported = h
+        .scene
+        .mirror_overflow()
+        .expect("thomas announces the clamp");
+    assert_eq!(reported.context, OverflowContext::Blur(40));
+    h.scene.set_param("aperture", 0.0);
+    h.run(1);
+    assert!(
+        h.scene.mirror_overflow().is_none(),
+        "the clamp lifts with the aperture"
+    );
+
+    let Some(mut flat) = Harness::new(AttractorFamily::DeJong) else {
+        return;
+    };
+    flat.scene.set_param("aperture", 40.0);
+    flat.run(1);
+    assert!(
+        flat.scene.mirror_overflow().is_none(),
+        "de_jong has no depth to blur"
+    );
+}
+
+/// **The blur is a width on screen, whatever size the trail field is drawn
+/// at** (ADR-0257, ADR-0037): the draw shader turns a circle of confusion in
+/// pixels into world units through the height it is handed, and that height is
+/// the render target's. At a grid scale of `0.5` the trail field is half the
+/// target, so a blur measured in its pixels would come out twice as wide on
+/// screen; here the same figure, lens and target give the same on-screen
+/// sprite at both scales.
+#[test]
+fn the_blur_is_in_target_pixels_whatever_the_grid_scale() {
+    use crate::render::tier::GridScale;
+    use projection_mirror as m;
+
+    let Some(mut h) = Harness::new(AttractorFamily::Thomas) else {
+        return;
+    };
+    let inv = AttractorFamily::Thomas
+        .canonical_framing()
+        .inv_depth_extent(AttractorFamily::Thomas);
+    let (zoom, sprite_world, (w, ht)) = (1.0f32, 0.004f32, (1920u32, 1080u32));
+    // The on-screen radius, in target pixels, of a sprite at the figure's far
+    // extent through a lens focused at its near one: the shader's
+    // `sprite * grow`, carried to pixels by the same height it is handed.
+    let mut reading = |scale: f32| {
+        h.scene
+            .set_grid_scale(GridScale::new(scale).expect("a valid grid scale"));
+        h.scene.set_target_size(w, ht);
+        let px_per_world = zoom * h.scene.target_h as f32 * 0.5;
+        let r_px = sprite_world * px_per_world;
+        let grow = m::blur_growth(r_px, m::figure_coc(-1.0, 12.0, 0.0, 40.0, inv));
+        ((h.scene.trail_w, h.scene.trail_h), r_px * grow)
+    };
+    let (full_grid, full) = reading(1.0);
+    let (half_grid, half) = reading(0.5);
+    assert_ne!(
+        full_grid, half_grid,
+        "the grid has to shrink with the scale, or this compares nothing"
+    );
+    assert!(full > 1.0, "the far sprite is blurred: {full} px");
+    assert_eq!(
+        full, half,
+        "the on-screen blur moved with the grid: {full} px at 1.0, {half} px at 0.5"
+    );
+    assert_eq!(h.scene.target_h, ht, "the lens reads the target's height");
+}
+
+/// **Through the whole engine**: an aperture changes a 3D figure's frame and
+/// spreads its light, and leaves a flat map's frame byte-identical, since a
+/// flat map has no depth to be out of focus at.
+#[test]
+fn an_aperture_blurs_a_3d_figure_and_leaves_a_flat_map_alone() {
+    use crate::preset::Preset;
+    use crate::render::metrics::{coverage, frame_diff};
+    use crate::render::{HeadlessOptions, RenderError, Renderer};
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: 160,
+        height: 100,
+        prefer_software: true,
+    }) {
+        Ok(r) => r,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    let capture = |renderer: &mut Renderer, family: &str, aperture: f32| {
+        let preset = Preset::from_toml_str(&format!(
+            "system = \"attractor\"\nname = \"dof_probe\"\n[particles]\nfamily = \"{family}\"\n\
+             [params]\nperspective = \"0.5\"\nfocus = \"0.0\"\naperture = \"{aperture}\"\n"
+        ))
+        .expect("the probe loads");
+        renderer.set_presets(vec![preset]);
+        renderer
+            .capture_preset("dof_probe", &AnalysisFrame::default(), 60)
+            .expect("capture the probe")
+    };
+    for family in ["thomas", "lorenz"] {
+        let sharp = capture(&mut renderer, family, 0.0);
+        let blurred = capture(&mut renderer, family, 30.0);
+        let (a, b) = (
+            coverage(&sharp, [0, 0, 0, 255], 4),
+            coverage(&blurred, [0, 0, 0, 255], 4),
+        );
+        println!(
+            "{family}: lit {a:.4} -> {b:.4}, diff {:.4}",
+            frame_diff(&sharp, &blurred)
+        );
+        assert!(
+            frame_diff(&sharp, &blurred) > 0.0,
+            "{family}: the aperture changed nothing"
+        );
+        assert!(
+            b > a,
+            "{family}: blurred sprites spread over more of the frame"
+        );
+    }
+    for family in ["de_jong", "clifford"] {
+        let sharp = capture(&mut renderer, family, 0.0);
+        let blurred = capture(&mut renderer, family, 30.0);
+        assert_eq!(
+            sharp.rgba, blurred.rgba,
+            "{family} is flat and must not blur"
+        );
+    }
 }

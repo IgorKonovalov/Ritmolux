@@ -63,7 +63,7 @@
 )]
 
 use crate::render::gpu;
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// `ink_amount` default — 0 = off (passthrough), so an unbound preset is
 /// unaffected and the stage is never built.
@@ -395,6 +395,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How far the frame is remapped onto the paper-and-ink pair; 0 leaves it untouched.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: true,
     },
     ParamSpec {
         name: "paper_hue",
@@ -402,6 +404,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Hue of the colour an unlit pixel becomes, as a position around the wheel.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "paper_sat",
@@ -409,6 +413,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Saturation of the paper colour; 0 is neutral.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "paper_bright",
@@ -416,6 +422,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Brightness of the paper colour, which sets how light the empty ground reads.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "ink_hue",
@@ -423,6 +431,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Hue of the colour a fully lit pixel becomes.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "ink_sat",
@@ -430,6 +440,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Saturation of the ink colour; 0 is neutral.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "ink_bright",
@@ -437,6 +449,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Brightness of the ink colour, which sets how dark the drawn marks read.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "ink_gamma",
@@ -444,6 +458,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.25, 4.0]),
         doc: "Shapes the paper-to-ink ramp: below 1 the mid tones bite earlier, above 1 they hold back.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
 ];
 

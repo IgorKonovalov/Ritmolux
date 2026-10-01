@@ -57,10 +57,15 @@ export const GATES = [
   { script: "check-release-tag.mjs", args: [], carriers: ["hook", "conductor"] },
   { script: "check-release-tag.mjs", args: ["--self-test"], carriers: CHECKOUT },
   { script: "check-release-tag.mjs", args: ["--remote"], carriers: ["ci"] },
+  // The release count needs a release's assets, which only a release run has, so the roster runs
+  // its self-test: the refusal half no release run can show (ADR-0254).
+  { script: "check-release-assets.mjs", args: ["--self-test"], carriers: CHECKOUT },
   { script: "check-translations.mjs", args: [], carriers: CHECKOUT },
   { script: "check-translations.mjs", args: ["--self-test"], carriers: CHECKOUT },
   { script: "check-system-counts.mjs", args: [], carriers: CHECKOUT },
   { script: "check-settings-have-files.mjs", args: [], carriers: CHECKOUT },
+  { script: "check-claude-declarations.mjs", args: [], carriers: CHECKOUT },
+  { script: "check-claude-declarations.mjs", args: ["--self-test"], carriers: CHECKOUT },
   // The roster's own gate, carried by all three: a carrier that stopped running it would stop
   // noticing everything else that left.
   { script: "check-gate-carriers.mjs", args: [], carriers: CHECKOUT },

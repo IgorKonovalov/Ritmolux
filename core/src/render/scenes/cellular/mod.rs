@@ -86,7 +86,7 @@ use crate::dsp::AnalysisFrame;
 use crate::render::feedback::PingPongField;
 use crate::render::gpu;
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// Which rule space the automaton runs (ADR-0180 rule 1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -499,6 +499,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Which live-neighbour counts bring a dead cell to life, as a bitmask over the \
               counts 0-8: bit k set means k neighbours give birth. 8 (bit 3) is Conway's.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "survive",
@@ -507,6 +509,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Which live-neighbour counts keep a live cell alive, as a bitmask over the counts \
               0-8. 12 (bits 2 and 3) is Conway's.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "radius",
@@ -515,6 +519,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How far the neighbourhood reaches, in cells: a square of side 2 x radius + 1 \
               about each cell. Capped by the quality tier.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "birth_lo",
@@ -522,6 +528,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "The least filled fraction of its neighbourhood at which a dead cell is born.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "birth_hi",
@@ -529,6 +537,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "The most filled fraction of its neighbourhood at which a dead cell is born.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "survive_lo",
@@ -536,6 +546,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "The least filled fraction of its neighbourhood at which a live cell survives.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "survive_hi",
@@ -543,6 +555,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "The most filled fraction of its neighbourhood at which a live cell survives.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "states",
@@ -550,6 +564,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([2.0, MAX_STATES]),
         doc: "How many colours the cycle holds; each cell advances to the next one round it.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "threshold",
@@ -558,6 +574,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How many of its eight neighbours must already hold the next colour before a cell \
               advances to it.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "step_rate",
@@ -566,6 +584,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How many generations the automaton runs per second, whatever the frame rate; 0 \
               freezes it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "reseed",
@@ -574,6 +594,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "A rise past 0.5 refills one disc of the grid with fresh seeded cells, once per \
               rise; bind a beat or a latch to it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "trail",
@@ -582,6 +604,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How many generations a dead cell keeps glowing, fading as it goes; 0 draws only \
               the live cells.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "age_tint",
@@ -590,6 +614,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How far along the palette a dead cell's glow travels as it fades; 0 keeps the \
               wake the live cells' colour.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     common::brightness(common::DEFAULT_BRIGHTNESS),
     common::hue(DEFAULT_HUE),

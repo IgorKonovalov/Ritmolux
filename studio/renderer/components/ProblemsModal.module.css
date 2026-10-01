@@ -5,20 +5,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1rem;
+  padding: var(--space-4) var(--space-2);
   background: rgb(0 0 0 / 55%);
+  animation: rlx-fade var(--motion-short) var(--ease);
 }
 
 .sheet {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-1);
   width: min(48rem, 100%);
   max-height: 100%;
   padding: 0.75rem;
   border: 1px solid var(--panel-edge);
-  border-radius: 4px;
-  background: var(--panel);
+  border-radius: var(--radius);
+  background: var(--scanlines), var(--panel);
+  animation: rlx-enter var(--motion-long) var(--ease);
 }
 
 .head {
@@ -36,8 +38,8 @@
 .close {
   margin-left: auto;
   background: none;
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   color: var(--text-dim);
   cursor: pointer;
   font-family: inherit;
@@ -62,7 +64,7 @@
   grid-template-columns: 4.5rem minmax(0, 1fr);
   gap: 0.15rem 0.6rem;
   padding: 0.4rem 0;
-  border-top: 1px solid var(--panel-edge);
+  border-top: 1px solid var(--control-edge);
   font-size: 11px;
 }
 

@@ -182,6 +182,141 @@ fn the_hop_schedule_never_runs_ahead_of_the_clip() {
 }
 
 // ---------------------------------------------------------------------------
+// The bar grid
+// ---------------------------------------------------------------------------
+
+/// `seconds` of a 120 BPM click train, the fourth click of each bar louder, as
+/// interleaved stereo at `format`.
+fn click_train(seconds: f32, format: AudioFormat) -> Vec<f32> {
+    let rate = format.sample_rate as usize;
+    let beat = rate / 2;
+    let click = rate / 200;
+    let frames = (seconds * rate as f32) as usize;
+    let mut pcm = Vec::with_capacity(frames * 2);
+    for i in 0..frames {
+        let (n, within) = (i / beat, i % beat);
+        let level = if within < click {
+            let gain = if n % 4 == 0 { 0.9 } else { 0.5 };
+            gain * (1.0 - within as f32 / click as f32)
+        } else {
+            0.0
+        };
+        pcm.extend([level, level]);
+    }
+    pcm
+}
+
+/// The bar starts `--bar-grid` writes are the analyzer's own bar grid for the
+/// frames the render draws.
+///
+/// The expectation is derived a second way on purpose: hop by hop through a
+/// fresh [`Analyzer`], recording the bar counter after each hop, and then asking
+/// which hop each frame is drawn from through [`hops_through`] — no frame clock
+/// shared with the code under test.
+#[test]
+fn the_bar_grid_is_the_analyzers_bar_counter_on_the_frames_it_renders() {
+    for (rate, fps) in [
+        (48_000, DEFAULT_FPS),
+        (44_100, Fps { num: 24, den: 1 }),
+        (
+            48_000,
+            Fps {
+                num: 30_000,
+                den: 1_001,
+            },
+        ),
+    ] {
+        let format = stereo(rate);
+        let pcm = click_train(8.0, format);
+        let grid = bar_grid(&pcm, format, fps).expect("an eight-second clip has a grid");
+
+        let mut analyzer = Analyzer::new(format).expect("a stereo format is valid");
+        let per_hop: Vec<(u32, bool)> = pcm
+            .chunks_exact(HOP_SIZE * 2)
+            .map(|hop| {
+                analyzer.push_interleaved(hop);
+                let f = analyzer.take_frame();
+                (f.bar_index, f.downbeat_locked)
+            })
+            .collect();
+        let silence = (
+            AnalysisFrame::default().bar_index,
+            AnalysisFrame::default().downbeat_locked,
+        );
+        let frames = frame_count(pcm.len(), format, fps).expect("frames");
+        let mut starts = Vec::new();
+        let mut locked = Vec::new();
+        for index in 0..frames {
+            let due = hops_through(index, fps, format).min(per_hop.len());
+            let (bar, lock) = if due == 0 { silence } else { per_hop[due - 1] };
+            let begins = match index {
+                0 => true,
+                _ => {
+                    let prev = hops_through(index - 1, fps, format).min(per_hop.len());
+                    let before = if prev == 0 {
+                        silence.0
+                    } else {
+                        per_hop[prev - 1].0
+                    };
+                    before != bar
+                }
+            };
+            if begins {
+                starts.push(index);
+                locked.push(lock);
+            }
+        }
+
+        let label = format!("{rate} Hz at {} fps", fps.as_header_field());
+        assert_eq!(grid.frames, frames, "{label}: the grid spans the render");
+        assert_eq!(grid.starts, starts, "{label}: bar starts");
+        assert_eq!(
+            grid.locked, locked,
+            "{label}: estimated-or-fallback per bar"
+        );
+        assert_eq!(grid.starts.first(), Some(&0), "{label}: bar 1 is frame 0");
+        assert!(
+            grid.starts.windows(2).all(|w| w[0] < w[1]),
+            "{label}: strictly increasing"
+        );
+        // Eight seconds at 120 BPM is four bars of music; a grid of one bar
+        // would pass every comparison above and say nothing.
+        assert!(
+            grid.starts.len() >= 3,
+            "{label}: the counter advanced, got {:?}",
+            grid.starts
+        );
+    }
+}
+
+/// The file is a wire format read by another language, so it is asserted
+/// verbatim.
+#[test]
+fn the_bar_grid_file_is_one_json_object_in_a_fixed_order() {
+    let grid = BarGrid {
+        fps: Fps {
+            num: 30_000,
+            den: 1_001,
+        },
+        frames: 300,
+        starts: vec![0, 96, 192],
+        locked: vec![false, true, true],
+    };
+    assert_eq!(
+        grid.to_json(),
+        "{\"fps\":\"30000:1001\",\"frames\":300,\"bar_starts\":[0,96,192],\
+         \"bar_locked\":[false,true,true]}\n"
+    );
+    let line = grid.summary();
+    assert!(line.contains("3 bars over 300 frames"), "{line}");
+    assert!(
+        line.contains("2 of them started on an estimated downbeat"),
+        "{line}"
+    );
+    assert!(line.contains("1 on the fallback counter"), "{line}");
+}
+
+// ---------------------------------------------------------------------------
 // The wire format
 // ---------------------------------------------------------------------------
 
@@ -677,6 +812,7 @@ fn the_header_names_the_offline_sample_budget() {
             height,
             tier,
             encoder: None,
+            bar_grid: None,
         }
     }
 

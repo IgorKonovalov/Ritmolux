@@ -382,7 +382,12 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // large drop and it costs nothing the shells do not already catch: a
         // broken field scores near zero at zero shells and is convicted, while
         // `Tiled Rosette` was already riding the structural rescue at 9/10.
-        SystemKind::FragmentField => 0.08,
+        //
+        // Re-derived 2026-09-30 (Plan 0232 Phase 3) from 0.08. `Tiled Rosette`
+        // was retired, and the family minimum moved to `Drift Mono` at 0.4274,
+        // which left the old floor 5.34x below it — over this file's 2.2x
+        // slack. Half of that minimum.
+        SystemKind::FragmentField => 0.21,
         // A dense point cloud that fills the frame far more than "sparse points"
         // suggested — the old 0.01 was 84x below the thinnest of the three.
         // Re-derived 2026-08-27 (Plan 0122 Phase 5) from 0.28, which the slack
@@ -394,7 +399,12 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // cloud. Half the new minimum, as every floor here is. The family is two
         // presets and both bind `spin`, so there is no unaffected member to hold
         // this number still: expect to re-derive it whenever either is retuned.
-        SystemKind::Swarm => 0.33,
+        //
+        // Re-derived 2026-09-30 (Plan 0232 Phase 3) from 0.33. `Shatter` was
+        // retired, and the family minimum moved to `Braid` at 0.7403, which left
+        // the old floor 2.24x below it — over this file's 2.2x slack. Half of
+        // that minimum.
+        SystemKind::Swarm => 0.37,
         // Line art. The trails-heavy looks score lowest because a faint tail is
         // still lit; Rose Trails at 0.6722 sets this one.
         SystemKind::ParametricCurve => 0.33,
@@ -488,7 +498,14 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // floor above. The areal question is now the one that convicts an
         // emptied canvas, at the quiet excitation where emptying happens —
         // [`a_canvas_the_music_empties_is_convicted_and_black_calls_it_full`].
-        SystemKind::ShapeCollage => 0.13,
+        //
+        // Re-derived 2026-09-30 (Plan 0232 Phase 4) from 0.13. `On White` was
+        // cut from forty elements to five-to-seven at the owner's direction, a
+        // sparse canvas by design, and reads 0.0556 against its paper — 2.3x
+        // under the old floor, over this file's 2.2x slack. Half of that
+        // minimum. The emptied-canvas conviction is untouched: it rests on
+        // `MODERATE_MIN_COVERAGE`, not on this floor.
+        SystemKind::ShapeCollage => 0.027,
         // **Derived from the distribution on 2026-09-11**, when the family's
         // first twelve worlds shipped, from a `0.08` borrowed off
         // `FragmentField`. The lowest shipped member is `Echo Plate` at 0.3253 —
@@ -504,6 +521,13 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // it, past the 2.2x slack this file allows. Half that minimum, like
         // every floor above.
         SystemKind::Cellular => 0.30,
+        // **Derived from the distribution on 2026-10-01**, when the system's
+        // first five presets shipped, from a `0.02` guess set while it shipped
+        // none. The lowest shipped member is `Storm Sea` at 0.4391 — a sheet
+        // seen from the waterline leaves the sky above the swell dark — and the
+        // guess sat 21.96x under it, past the 2.2x slack this file allows. Half
+        // that minimum, like every floor above.
+        SystemKind::Plexus => 0.22,
     }
 }
 
@@ -638,6 +662,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::ShapeCollage => "shape_collage",
         SystemKind::AnalyticField => "analytic_field",
         SystemKind::Cellular => "cellular",
+        SystemKind::Plexus => "plexus",
     }
 }
 
@@ -1392,8 +1417,9 @@ fn each_term_of_the_flatness_conjunction_is_load_bearing() {
     }
 }
 
-/// **`spectrum_ridge` exactly as it shipped broken**, recovered from
-/// `git show 81190ac^:presets/spectrum_ridge.toml` — every table and every
+/// **Spectrum Ridge exactly as it shipped broken**, recovered from its preset
+/// file under `presets/` at `81190ac^` (the preset has since been retired) —
+/// every table and every
 /// binding byte-for-byte, comments stripped and the `name` suffixed so the
 /// output reads clearly. Nothing here is tunable: this is the defect, frozen.
 ///
@@ -1964,7 +1990,7 @@ fn the_honest_mandala_tunings_pass_the_structural_measure() {
 /// [`MAX_FLOOR_SLACK`]'s ceremony.
 ///
 /// **Non-vacuous, and by the case that motivated the gate**: the
-/// pre-repair `spectrum_ridge` scores `0.0000` here as well as at `LOUD`,
+/// pre-repair Spectrum Ridge scores `0.0000` here as well as at `LOUD`,
 /// asserted in
 /// [`the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one`].
 ///

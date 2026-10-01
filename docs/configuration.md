@@ -534,6 +534,19 @@ Turn it off on a machine running on battery or under security software that obje
 menu's **Thumbnails** row writes this key, and turning it off also stops a pass that is running.
 Pictures already in the cache still show either way.
 
+### `[ui]`
+
+How the interface drawn over the show behaves, where `[hud]` is *what* it draws.
+
+| Key | Default | What it means |
+|---|---|---|
+| `motion` | `"full"` | `"full"`: the browser and the settings menu fade and slide as they open and close, the selection glides between rows, the corner name crossfades when the preset changes, and the now-playing banner eases in and out. `"reduced"`: every one of those is a step, so things appear and vanish in one frame |
+
+| `hints` | `true` | Show the key hint — `?  help     Tab  browse     S  settings` — in the lower-right corner for a few seconds at launch, and again whenever the pointer moves over the window. It is never drawn while a menu is open |
+
+The animation is only ever a view: a key pressed while a menu is still opening acts on that frame,
+under either value. The settings menu's **Motion** and **Key hints** rows write these two keys.
+
 ### A complete file
 
 Every key at its default. `display_name` in `[output]` and `[console]`, and `gpu` in `[output]`,
@@ -588,6 +601,10 @@ present_every_n = 1
 
 [thumbnails]
 enabled = true
+
+[ui]
+motion = "full"
+hints = true
 ```
 
 ## Precedence
@@ -625,6 +642,15 @@ menu or a panel is an editor of that file.
 `sessionStorage` and `indexedDB` all keep a choice where no file can be edited and no other process
 can read it, and `scripts/check-settings-have-files.mjs` is what holds that to being a property
 rather than a habit.
+
+| Key | Values | Default | What it does |
+|---|---|---|---|
+| `playerPath` | a path | none | An explicit player binary, tried after the bundled one and before `PATH` |
+| `playerMode` | `windowed`, `windowless` | `windowed` | Which sink the player is spawned with; read at spawn |
+| `ui.reducedMotion` | `true`, `false` | `false` | Stops the studio's transitions: panels, tabs and dialogs appear at once. Applied the moment the Settings view writes it. The system's own reduced-motion preference does the same whatever this says |
+
+The studio's Settings view edits the last two and shows the first; a `settings.json` written by hand
+before the first launch is read the same way.
 
 **The foobar2000 component has no settings and no file**, and the one thing it stores host-side is
 not one. `g_cfg_preset` is a `cfg_string` holding the **name** of the preset that was last on

@@ -425,6 +425,36 @@ test("a live run's Now names each lane's plan, step and spend so far", () => {
   assert.match(text, /^- run started 2026-09-15 08:30, 1 h 10 min ago\.$/m);
 });
 
+// ADR-0261: a finding whose repair claim git contradicted is open, whatever its severity, and says why.
+test("a reopened finding is listed under Needs you with the reason it was reopened", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = pilotState(repo, head, stateDir);
+  const reason = "fixed_in abc1234 does not change a.rs";
+  state.plans["0185"].verdicts.at(-1).findings.push({ severity: "major", file: "c.rs", line: 9, what: "a race", reopened: { fixed_in: "abc1234", reason } });
+  state.plans["0185"].reopened = [{ finding: 2, fixed_in: "abc1234", reason }];
+  const text = renderDigest(state, { repo, stateDir, now: NOW });
+  assert.match(text, /^- \*\*0185 merged with 3 open findings\*\*:\n {2}- minor `a\.rs:3` stale comment\n {2}- nit `b\.md` typo\n {2}- major `c\.rs:9` a race - reopened: fixed_in abc1234 does not change a\.rs$/m);
+  // Disposing of it takes it off the page like any other open finding.
+  state.plans["0185"].verdicts.at(-1).findings[2].disposition = { verb: "done", reason: "repaired in 0186", at: "2026-09-16T00:00:00.000Z" };
+  assert.match(renderDigest(state, { repo, stateDir, now: NOW }), /^- \*\*0185 merged with 2 open findings\*\*:/m);
+});
+
+// ADR-0261: a pass on retry stays visible, next to the plan's own entry in the history.
+test("the history names a plan's flaky tests from the suite ledger, and a hand run's under no plan", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = pilotState(repo, head, stateDir);
+  const at = state.plans["0185"].merge.at;
+  const line = (by, extra = {}) => JSON.stringify({ tree: "a".repeat(40), cmd: "cargo nextest run --workspace", exit: 0, summary: "2 tests run", flaky: ["rlx-standalone::control_loopback a_preset_datagram_selects_by_name"], by, at, ms: 1, ...extra });
+  writeFileSync(join(stateDir, "suite-ledger.jsonl"), [line("gate 0185-pre-review"), line("0185-close", { served: true, cmd: "cargo nextest run --workspace -P fast" }), line("hand")].join("\n") + "\n");
+  const text = renderHistory(state, { repo, stateDir });
+  const closed = text.slice(text.indexOf("### Closed"), text.indexOf("### Failed and parked"));
+  assert.ok(closed.includes("  - flaky, passed on retry in `gate 0185-pre-review`: `rlx-standalone::control_loopback a_preset_datagram_selects_by_name`"), closed);
+  assert.ok(closed.includes("  - flaky, passed on retry in `0185-close` (served -P fast): `rlx-standalone::control_loopback a_preset_datagram_selects_by_name`"), closed);
+  assert.equal((text.match(/flaky, passed on retry/g) ?? []).length, 2, "the hand run belongs to no plan");
+});
+
 test("an empty worklist is one line, and says what it found nothing of", () => {
   const state = {
     version: 1,
@@ -488,6 +518,23 @@ test("a human_phase park whose phase is marked Blocks merge: no and whose row re
     assert.equal(settledPark(state.plans["0301"], blocking), null, `Blocks merge: ${blocksMerge ?? "(unmarked)"}`);
     assert.match(renderDigest(state, { repo: blocking, stateDir: tmp(), now: NOW }), /^1 park\.$/m);
   }
+});
+
+// ADR-0261: a park over a run of human phases is settled only when every phase in it is.
+test("a human_phase park over a run of phases is settled only when every one of them reads done", () => {
+  const plan = (rows) => {
+    const repo = tmp("rlx-stale-run-");
+    writePlan(repo, { number: "0301", title: "A park to judge", phases: [{ id: "1", owner: "dev" }, { id: "2", owner: "human" }, { id: "3", owner: "human" }], rows });
+    return repo;
+  };
+  const state = parkedState("human_phase");
+  Object.assign(state.plans["0301"].park, { phases: ["2", "3"], detail: "Phases 2-3 are owned by human" });
+  const partly = plan({ 1: { state: "done" }, 2: { state: "done" }, 3: { state: "not started" } });
+  assert.equal(settledPark(state.plans["0301"], partly), null);
+  assert.match(renderDigest(state, { repo: partly, stateDir: tmp(), now: NOW }), /^1 park\.$/m);
+  const all = plan({ 1: { state: "done" }, 2: { state: "done" }, 3: { state: "done" } });
+  assert.equal(settledPark(state.plans["0301"], all), "Phases 2 `done`, 3 `done` in the plan's `## Implementation log`");
+  assert.match(renderDigest(state, { repo: all, stateDir: tmp(), now: NOW }), /^1 already settled\.$/m);
 });
 
 test("a gate_red park whose plan is under done/ is a record to clear", () => {

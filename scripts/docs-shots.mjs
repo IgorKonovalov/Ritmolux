@@ -69,8 +69,8 @@
 // So hop 340 is not the peak of the build — it is 34 hops INTO the quiet bar,
 // and every reactive family photographs there at its resting state. Measured on
 // the shipped library: spectrum_halo's readout is collapsed to a stub at 340 and
-// fully extended at 300; fragment_supernova's `kaleido_order` select drops to its
-// lowest arm and the frame flattens to a near-uniform wash.
+// fully extended at 300; fragment_supernova's `kaleido_order` select, since fixed at 8
+// (Plan 0232), dropped to its lowest arm and the frame flattened to a near-uniform wash.
 //
 // Hop 300 is the last hop of beat 5: maximum energy, and the most scene time any
 // accumulating family can have before the rest. attractor_leviathan — the
@@ -140,11 +140,10 @@ import { basename, relative, resolve, sep } from "node:path";
 /// judged and kept at Plan 0136 Phase 10, and the other two were seen at that
 /// same look and left standing. A swap is one line here plus a re-run.
 ///
-/// Two slots came out of the Plan 0088 pass with a picture that is accepted
+/// One slot came out of the Plan 0088 pass with a picture that is accepted
 /// rather than good, and the fix is content work rather than a hop:
-/// `emitter_perseids` bunches its fan into the right half at every hop tried,
-/// and `star_rosewindow`'s outermost ring runs off all four edges. Both are
-/// recorded as content-lane notes at that close, not as manifest bugs.
+/// `star_rosewindow`'s outermost ring runs off all four edges. It is recorded
+/// as a content-lane note at that close, not as a manifest bug.
 // --- the per-preset gallery cards ---------------------------------------
 //
 // One card per SHIPPED preset, filed under docs/images/gallery/presets/. This
@@ -172,7 +171,7 @@ import { basename, relative, resolve, sep } from "node:path";
 // third of a page column, and over a hundred of them at full size would put tens of
 // megabytes of derived PNG into the repository for detail no reader can see.
 const CARD_SIZE = "640x360";
-const CARD_HOP_OVERRIDES = { swarm_braid: 374, swarm_drift: 374, swarm_shatter: 374, swarm_stipple: 374 };
+const CARD_HOP_OVERRIDES = { swarm_braid: 374 };
 
 /// The clip `shot` synthesizes when `--signal-secs` is absent — `SIGNAL_SECS` in
 /// standalone/src/shot/args.rs — and the analysis-hop arithmetic every `hop`
@@ -228,7 +227,7 @@ const cardHop = (preset) =>
 /// each group is a count, so a family that gains a preset and not a card is
 /// visible here as well as in the test.
 const CARDS = [
-  // analytic_field (12)
+  // analytic_field (11)
   "analytic_echoplate",
   "analytic_juliacircuit",
   "analytic_lacegrid",
@@ -237,30 +236,19 @@ const CARDS = [
   "analytic_pearlstring",
   "analytic_ringorbit",
   "analytic_seahorse",
-  "analytic_searchlight",
   "analytic_stainedglass",
   "analytic_standingwave",
   "analytic_twobandjulia",
-  // attractor (20)
+  // attractor (10)
   "attractor_clifford",
-  "attractor_cliffordgallery",
-  "attractor_dejonggallery",
   "attractor_dragon",
-  "attractor_fern",
   "attractor_fernmono",
   "attractor_ink",
   "attractor_leviathan",
-  "attractor_lorenzgallery",
   "attractor_lorenzknot",
-  "attractor_thomas",
   "attractor_thomasgallery",
   "attractor_thomasred",
-  "attractor_torusknot",
-  "attractor_valentine",
-  "attractor_volute",
   "attractor_walkdejong",
-  "attractor_walkknot",
-  "attractor_walkrho",
   "attractor_walkthomas",
   // cellular (5)
   "cellular_ember_life",
@@ -268,13 +256,10 @@ const CARDS = [
   "cellular_spiral_bloom",
   "cellular_tide_bugs",
   "cellular_wavefront",
-  // emitter (5)
+  // emitter (2)
   "emitter_driftfield",
-  "emitter_emberjet",
   "emitter_heartfall",
-  "emitter_perseids",
-  "emitter_petalfall",
-  // fragment_field (14)
+  // fragment_field (13)
   "fragment_driftmono",
   "fragment_drostemono",
   "fragment_etchingplate",
@@ -284,19 +269,16 @@ const CARDS = [
   "fragment_strata",
   "fragment_sumi",
   "fragment_supernova",
-  "fragment_tiled",
   "fragment_tiledmono",
   "fragment_tunnel",
   "fragment_vitrail",
   "fragment_whorl",
-  // lsystem (6)
-  "lsystem_bower",
-  "lsystem_coral",
+  // lsystem (4)
   "lsystem_icecrystal",
   "lsystem_rime",
   "lsystem_sumimono",
-  "lsystem_vellum",
-  // parametric_curve (13)
+  "lsystem_thicket",
+  // parametric_curve (12)
   "curve_blueprint",
   "curve_broadside",
   "curve_cogwheel",
@@ -304,66 +286,59 @@ const CARDS = [
   "curve_inkpendulum",
   "curve_ionwake",
   "curve_lacework",
-  "curve_loom",
-  "curve_nightbloom",
   "curve_phosphor",
   "curve_prismscope",
   "curve_rosemono",
   "curve_turnabout",
-  // reaction_diffusion (7)
-  "reaction_etching",
+  // plexus (5)
+  "plexus_crystal",
+  "plexus_cyanotype",
+  "plexus_stormsea",
+  "plexus_synapse",
+  "plexus_wormhole",
+  // reaction_diffusion (6)
   "reaction_fluxmono",
   "reaction_glaciermono",
   "reaction_lichen",
   "reaction_mitosis",
   "reaction_spotmono",
   "reaction_verdigris",
-  // shape_collage (4)
+  // shape_collage (3)
   "collage_mono",
-  "collage_nocturne",
   "collage_onwhite",
   "collage_suprematist",
-  // shape_field (9)
+  // shape_field (6)
   "shape_aperture",
   "shape_contourmono",
-  "shape_facet",
-  "shape_heartmono",
-  "shape_lion",
   "shape_maple",
-  "shape_pulse",
   "shape_ringmono",
   "shape_strataheart",
-  // spectrum (5)
+  "shape_target",
+  // spectrum (4)
   "spectrum_anemone",
   "spectrum_metermono",
   "spectrum_radialbloom",
-  "spectrum_ridge",
   "spectrum_skyline",
   // star_pattern (4)
   "star_corona",
-  "star_mandala_bordered",
+  "star_interlace",
+  "star_redpaper",
   "star_rosewindow",
-  "star_zellij",
-  // swarm (5)
+  // swarm (3)
   "swarm_braid",
-  "swarm_drift",
+  "swarm_maelstrom",
   "swarm_murmuration",
-  "swarm_shatter",
-  "swarm_stipple",
-  // warp_mesh (7)
-  "warp_cauldron",
+  // warp_mesh (4)
   "warp_ladder",
-  "warp_millrace",
   "warp_sirocco",
   "warp_smoke",
   "warp_tracery",
-  "warp_wellhead",
 ];
 
 const IMAGES = [
   {
     // Judged at the Plan 0088 close (Phase 7) against fragment_supernova,
-    // fragment_vitrail, fragment_mandala and attractor_volute. Supernova held
+    // fragment_vitrail, fragment_mandala and a since-retired attractor. Supernova held
     // this slot through Phases 2-6 and lost it on the front page's terms rather
     // than on its own: a flat salmon field over most of the frame reads as
     // wallpaper at the top of a README. Tunnel has real blacks, so it carries
@@ -464,6 +439,20 @@ const IMAGES = [
     tier: "rich",
   },
 
+  // --- the plexus system's layouts beyond cloud ---------------------------
+  //
+  // UNJUDGED: the system ships no preset yet, so the sheet is drawn from the
+  // teaching preset the guide prints for it. Filed outside the gallery for the
+  // curves' reason.
+  {
+    out: "docs/images/plexus/sheet.png",
+    presetFile: "docs/examples/plexus/sheet.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+
   // --- the gallery: one per SystemKind ------------------------------------
 
   {
@@ -476,44 +465,45 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // swarm — judged at the Plan 0088 close (Phase 7). swarm_drift held this
-    // slot through Phase 3 and `dev` flagged it as the weakest picture in the
-    // set; the close agreed, for a reason no column measures: drift is charcoal
-    // on black and collapses to a dark rectangle at README column width. Both
-    // swarm presets were shot at 300 and 374 and shatter won at both.
+    // swarm — UNJUDGED. The world judged into this slot at the Plan 0088 close
+    // was retired at the Plan 0232 walk; `swarm_braid` is the survivor that walk
+    // named for its references. A since-retired charcoal-on-black swarm held the
+    // slot before and lost it because it collapsed to a dark rectangle at
+    // README column width.
     //
     // The hop is still NOT 300, and for drift's original reason: a swarm is a
     // MOTION, and at full energy it photographs as uniform noise. 374 is inside
     // the phrase's quiet bar, where the flock settles onto the flow field and
     // the wave crest driving it becomes legible.
     out: "docs/images/gallery/swarm.png",
-    presetFile: "presets/swarm_shatter.toml",
+    presetFile: "presets/swarm_braid.toml",
     hop: 374,
     signal: "dynamic:110",
     size: "1280x720",
     tier: "rich",
   },
   {
-    // parametric_curve — provisional, from 2 candidates.
+    // parametric_curve — the owner chose Broadside at the Plan 0232 retune, when
+    // Loom, which had held the slot since the walk, was retired. A crisp-lined
+    // Maurer rose, the same family of figure.
     out: "docs/images/gallery/parametric_curve.png",
-    presetFile: "presets/curve_nightbloom.toml",
+    presetFile: "presets/curve_broadside.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
     tier: "rich",
   },
   {
-    // lsystem — UNJUDGED. Chosen when this family shipped one preset; 5 ship
-    // now and none has been compared against vellum.
+    // lsystem — the family's representative.
     out: "docs/images/gallery/lsystem.png",
-    presetFile: "presets/lsystem_vellum.toml",
+    presetFile: "presets/lsystem_rime.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
     tier: "rich",
   },
   {
-    // star_pattern — UNJUDGED. Chosen when this family shipped one preset; 4
+    // star_pattern — UNJUDGED. Chosen when this family shipped one preset; 2
     // ship now. The Plan 0088 close notes this picture's outermost ring runs off
     // all four edges, and called that content work rather than a hop.
     out: "docs/images/gallery/star_pattern.png",
@@ -544,7 +534,7 @@ const IMAGES = [
   {
     // spectrum — UNJUDGED. `spectrum_radialbloom` took this slot when the owner
     // retired `spectrum_halo` in its favour, so it inherits the slot rather than
-    // winning it; the other four spectrum worlds have not been compared at it.
+    // winning it; the other three spectrum worlds have not been compared at it.
     out: "docs/images/gallery/spectrum.png",
     presetFile: "presets/spectrum_radialbloom.toml",
     signal: "dynamic:110",
@@ -553,40 +543,34 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // shape_field — the first shipped world on the system (ADR-0105), and the
+    // shape_field — a heart drawn as nested scaled copies of itself, and the
     // one that shows what the family is FOR: the scene hands the palette a
     // FIGURE COORDINATE rather than a level, so `palette_steps` turns it into
     // flat graphic bands and `palette_contour` draws the hairline between them.
-    // Chosen over shape_aperture and shape_facet on that ground; the three mono
-    // worlds are deliberate two-ink prints and read as a different family at
-    // gallery size.
+    // Chosen over shape_aperture and a since-retired star world on that ground;
+    // the mono worlds are deliberate two-ink prints and read as a different
+    // family at gallery size.
     out: "docs/images/gallery/shape_field.png",
-    presetFile: "presets/shape_pulse.toml",
+    presetFile: "presets/shape_strataheart.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
     tier: "rich",
   },
   {
-    // warp_mesh — JUDGED at Plan 0136 Phase 10 and kept. Backlog 0133 and that
-    // plan both record that this family ships no preset, which had stopped being
-    // true: four warp worlds ship, and all four were shot at this hop and
-    // compared. A fifth, `warp_smoke`, was authored during that same phase and
-    // was NOT taken for this slot - the plume is a stronger picture of smoke than
-    // wellhead is of the family.
+    // warp_mesh — UNJUDGED. The world judged into this slot at Plan 0136 Phase
+    // 10 was retired at the Plan 0232 walk, with the two it was compared against
+    // there; `warp_tracery` is one of the two representatives that walk named.
     //
     // The whole family is SOFT — a warp field has no edges of its own, it only
     // moves what is already there — so the question is which world still has a
-    // readable subject at gallery size. Wellhead does: a dark star-shaped
-    // aperture against teal, with the ring feeding it legible as depth. Cauldron
-    // held this slot first and lost it on that ground, being a symmetric bloom
-    // with no hard edge anywhere in it; millrace is one crescent on black, and
-    // sirocco is a horizontal drape that reads as an abstract gradient.
+    // readable subject at gallery size. `warp_smoke` was not taken at that
+    // phase because the plume is a picture of smoke rather than of the family,
+    // and sirocco is a horizontal drape that reads as an abstract gradient.
     //
-    // Confirmed at that phase's own look. A later swap is one line here plus a
-    // re-run.
+    // A later swap is one line here plus a re-run.
     out: "docs/images/gallery/warp_mesh.png",
-    presetFile: "presets/warp_wellhead.toml",
+    presetFile: "presets/warp_tracery.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
@@ -596,8 +580,8 @@ const IMAGES = [
     // shape_collage — the first shipped world on the system (ADR-0123), and the
     // only family here that draws a GRAPHIC rather than light: a pixel starts at
     // the paper colour and composites each element with `over`, so the array
-    // index is the depth. Chosen over the three others for the same reason
-    // shape_pulse was — collage_mono and collage_onwhite are two-ink by intent.
+    // index is the depth. Chosen over the other two for the same reason
+    // shape_strataheart is — collage_mono and collage_onwhite are two-ink by intent.
     out: "docs/images/gallery/shape_collage.png",
     presetFile: "presets/collage_suprematist.toml",
     signal: "dynamic:110",
@@ -606,11 +590,11 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // emitter — UNJUDGED. Chosen when this family shipped one preset; 5 ship
-    // now. The Plan 0088 close notes this picture bunches its fan into the right
-    // half at every hop tried, and called that content work rather than a hop.
+    // emitter — UNJUDGED. The meteor shower that held this slot was retired at
+    // the Plan 0232 walk; `emitter_heartfall` is the family's longer-standing
+    // representative of the two that ship.
     out: "docs/images/gallery/emitter.png",
-    presetFile: "presets/emitter_perseids.toml",
+    presetFile: "presets/emitter_heartfall.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
@@ -634,6 +618,17 @@ const IMAGES = [
     // before it through a teaching preset.
     out: "docs/images/gallery/cellular.png",
     presetFile: "presets/cellular_ember_life.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // plexus — Synapse, the cloud layout's declared representative and the
+    // look the owner signed off as drawn: the camera inside the network, focus
+    // racking through it.
+    out: "docs/images/gallery/plexus.png",
+    presetFile: "presets/plexus_synapse.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
@@ -731,10 +726,10 @@ const aliases = (entry) =>
     a.replaceAll("\\", "/"),
   );
 
-/// Matching is EXACT against those spellings rather than a substring test.
-/// `attractor_clifford` and `attractor_cliffordgallery` are both shipped presets,
-/// so a substring match would re-render a card nobody asked for and put its
-/// driver drift in the same commit as the intended one.
+/// Matching is EXACT against those spellings rather than a substring test. When
+/// one shipped stem is a prefix of another, as `attractor_clifford` was of a
+/// since-retired gallery, a substring match would re-render a card nobody asked
+/// for and put its driver drift in the same commit as the intended one.
 const requested = process.argv.slice(2).map((name) => name.replaceAll("\\", "/"));
 const unmatched = requested.filter(
   (name) => !IMAGES.some((entry) => aliases(entry).includes(name)),

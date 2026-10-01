@@ -45,6 +45,7 @@
 # music goes into the level and the coordinate - into where the tracery is.
 system = "warp_mesh"
 name = "Tracery"
+representative = true
 
 [palette]
 # NINE RUNS, THREE INKS, three cycles of black -> paper -> vermilion. The order

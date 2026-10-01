@@ -300,6 +300,19 @@ accepted cost" are different documents and only one of them is honest.
 - [0254 — every gallery card is captured at hop 300, which is before an accumulating world exists](#0254--every-gallery-card-is-captured-at-hop-300-which-is-before-an-accumulating-world-exists)
 - [0255 — `docs-shots.mjs` renders all or nothing, so adding one card is done by hand-copying its manifest entry](#0255--docs-shotsmjs-renders-all-or-nothing-so-adding-one-card-is-done-by-hand-copying-its-manifest-entry)
 - [0258 — the content lane's scene catalogue covers ten of fourteen systems, and nothing makes it notice the four it skipped](#0258--the-content-lanes-scene-catalogue-covers-ten-of-fourteen-systems-and-nothing-makes-it-notice-the-four-it-skipped)
+- [0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution](#0125--every-diffused-frame-is-an-upscale-both-profiles-diffuse-well-below-the-streams-own-resolution)
+- [0263 — the conductor reads a `not run` log row as unfinished, so a phase whose done-when was not to run parks its plan as a disagreement](#0263--the-conductor-reads-a-not-run-log-row-as-unfinished-so-a-phase-whose-done-when-was-not-to-run-parks-its-plan-as-a-disagreement)
+- [0264 — two players at once run two thumbnail passes into one cache, and their temp files collide](#0264--two-players-at-once-run-two-thumbnail-passes-into-one-cache-and-their-temp-files-collide)
+- [0265 — the pane-clearance test pins the library at 114 presets while more ship](#0265--the-pane-clearance-test-pins-the-library-at-114-presets-while-more-ship)
+- [0266 — the exe's size cap is written in three places that nothing holds equal, and the Linux recipe measures nothing](#0266--the-exes-size-cap-is-written-in-three-places-that-nothing-holds-equal-and-the-linux-recipe-measures-nothing)
+- [0268 — under `order = "sequential"`, Space after a browser pick does not continue from what is on screen](#0268--under-order--sequential-space-after-a-browser-pick-does-not-continue-from-what-is-on-screen)
+- [0269 — two unreachable divergences Plan 0215's review left: a capture loop's `lost`, and `Observed<T>`'s feedback](#0269--two-unreachable-divergences-plan-0215s-review-left-a-capture-loops-lost-and-observedts-feedback)
+- [0270 — an npm advisory with no GHSA url could only be cleared by a bump](#0270--an-npm-advisory-with-no-ghsa-url-could-only-be-cleared-by-a-bump)
+- [0271 — the studio's missing-player banner says to edit a settings file without saying where it is](#0271--the-studios-missing-player-banner-says-to-edit-a-settings-file-without-saying-where-it-is)
+- [0272 — `npm run dev` leaves Vite and the esbuild watchers running after the studio window closes](#0272--npm-run-dev-leaves-vite-and-the-esbuild-watchers-running-after-the-studio-window-closes)
+- [0273 — a headless session's `Write` can create a file outside its lane, and nothing bounds it](#0273--a-headless-sessions-write-can-create-a-file-outside-its-lane-and-nothing-bounds-it)
+- [0038 — mid-tone-dominated presets lost ~8 % luminance to the tonemap knee, and the library has not been retuned](#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned)
+- [0256 — the only report that asks whether two presets look alike covers nine of fourteen families, and both places naming the absent ones are stale](#0256--the-only-report-that-asks-whether-two-presets-look-alike-covers-nine-of-fourteen-families-and-both-places-naming-the-absent-ones-are-stale)
 <!-- toc:end -->
 
 ## The ledger
@@ -328,11 +341,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0126 | A render is one prompt, one seed and one preset from first frame to last | [Plan 0212](plans/0212-the-diffused-render-gains-a-timeline.md). **Promoted** |
-| 0236 | The `.claude/` park reads a phase's declared `Files touched`, and prose escapes it | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
-| 0237 | The allowlist bounds a deletion by literal path shapes, so an expansion escapes the lane | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
-| 0241 | The allowlist is asserted against a model of the CLI's matcher, which one run falsified | [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md). **Promoted** |
-| 0258 | The content lane's scene catalogue covers ten of fourteen systems | [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -376,6 +384,7 @@ live entry citing this one.
 | 0035 | `presets/README.md` listed 10 expression variables; the code had 19 | Fixed at [Plan 0048](plans/done/0048-analysis-v2-and-the-retune.md)'s close |
 | 0036 | Does the fold stop folding the backdrop, and does that lose a look? | [ADR-0055](adrs/0055-backdrop-leaves-the-post-chain.md) |
 | 0037 | The fold covers a disc, and on a field scene that reads worse | [ADR-0061](adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md) + [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md) |
+| 0038 | Mid-tone presets lost ~8 % luminance to the tonemap knee, and the library was not retuned | [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md) Phase 4 (content-brief §4, answered by the walk). **Closed 2026-10-01** |
 | 0039 | Four bind-group layouts are shared by pipelines live in one frame | [ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md) + [Plan 0053](plans/done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) |
 | 0040 | Additive light occludes by geometry, so a dim figure over a lit backdrop reads as dark speckle | [ADR-0085](adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) + [Plan 0071](plans/done/0071-light-that-adds-without-covering.md). **Closed 2026-08-09**; see 0038 |
 | 0041 | The line seam's lit-backdrop guard discriminates on ~5 pixels | [Plan 0053](plans/done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) |
@@ -632,6 +641,23 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0255 | `docs-shots.mjs` renders all or nothing, so adding one card is done by hand | [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phase 1. A name filter, exact match, unknown name exits 1. **Closed 2026-09-22** |
 | 0254 | Every gallery card is captured at hop 300, before an accumulating world exists | [Plan 0210](plans/done/0210-the-gallery-card-shows-the-world-it-names.md) Phases 2-4 + ADR-0235. Six families at hop 2754/2828 over a 30 s clip. **Closed 2026-09-22** |
 | 0257 | The standalone exe is 9.7 % over NFR §4's cap, and only the component would have noticed | [Plan 0207](plans/done/0207-the-commitments-get-their-instruments.md) Phase 1 + ADR-0231. Re-derived to 16,777,216 B; both recipes measure and warn. **Closed 2026-09-23** |
+| 0258 | The content lane's scene catalogue covers ten of fourteen systems | [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md) Phases 4-5 + ADR-0234. The sweep row is the owner's. **Closed 2026-09-26** |
+| 0236 | The `.claude/` park reads a phase's declared `Files touched`, and prose escapes it | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 5. A drafting gate; closed plans are an advisory. **Closed 2026-09-27** |
+| 0237 | The allowlist bounds a deletion by literal path shapes, so an expansion escapes the lane | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 3 + ADR-0233. `$` and backtick probed; `Remove-Item` modelled. **Closed 2026-09-27** |
+| 0241 | The allowlist is asserted against a model of the CLI's matcher, which one run falsified | [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phases 1-2 + ADR-0233. Deny cases rest on a transcript. **Closed 2026-09-27** |
+| 0125 | Every diffused frame is an upscale: both profiles diffuse well below the stream's resolution | [Plan 0211](plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) Phases 1-2. `quality` answers it; the residue is 0262. **Closed 2026-09-27** |
+| 0126 | A render is one prompt, one seed and one preset from first frame to last | [Plan 0212](plans/done/0212-the-diffused-render-gains-a-timeline.md) + ADR-0236. A prompt timeline in bars; the owner judged it reads. **Closed 2026-09-28** |
+| 0273 | A headless session's `Write` can create a file outside its lane | [Plan 0234](plans/done/0234-a-conductor-session-writes-only-where-it-works.md) + ADR-0255. Lane, `/tmp` and reviews; Linux only. **Closed 2026-09-29** |
+| 0263 | The conductor reads a `not run` log row as unfinished | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 1. `rowIsDone` accepts `not run`. **Closed 2026-09-29** |
+| 0264 | Two players' thumbnail passes collide in one cache | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 4. The temp name carries the pid; a pass removes only its own. **Closed 2026-09-29** |
+| 0265 | The pane-clearance test pins the library at 114 presets | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 3. The count is `default_presets().len()`. **Closed 2026-09-29** |
+| 0266 | The exe size cap has three unheld copies; the Linux recipe measures nothing | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 5. A hygiene guard holds four copies; Linux measures. **Closed 2026-09-29** |
+| 0268 | Space after a browser pick does not continue from it under sequential order | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 2. Every explicit selection re-anchors; `--stream`'s empty-trail Prev does not. **Closed 2026-09-29** |
+| 0269 | Two unreachable divergences from Plan 0215's review | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 6. One `lost` exit; `Observed` forwards the sink. **Closed 2026-09-29** |
+| 0270 | An npm advisory with no GHSA id can only be cleared by a bump | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 7. The allow reader accepts `npm-<digits>`. **Closed 2026-09-29** |
+| 0271 | The missing-player banner does not say where the settings file is | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 8. The banner names the path. **Closed 2026-09-29** |
+| 0272 | `npm run dev` leaves Vite and the watchers running | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 9. `--kill-others`. **Closed 2026-09-29** |
+| 0256 | Nothing asks whether a preset is any good, only whether two look alike | [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md) Phase 7. A monthly owner walk; no mechanism. **Closed 2026-10-01** |
 <!-- roster:end -->
 
 ---
@@ -15822,9 +15848,15 @@ in increasing order of what they disturb:
 **Do not fold this into a resolution plan.** It shares a verdict with backlog 0125 and nothing else:
 one is a pixel budget against a VRAM wall, the other is a timeline the pipeline does not have.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0212](plans/0212-the-diffused-render-gains-a-timeline.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0212](plans/done/0212-the-diffused-render-gains-a-timeline.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+- **CLOSED 2026-09-28** by [Plan 0212](plans/done/0212-the-diffused-render-gains-a-timeline.md) and
+  [ADR-0236](adrs/0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md).
+  The sidecar takes a `--timeline` of `{at_bar, prompt}` entries and interpolates the conditioning
+  between neighbours, the seed fixed; `shot --render --bar-grid` supplies the bars. The owner judged
+  the full-track render on 2026-09-28: *"it looks great, amazing really"*. The bar grid has the right
+  length but not reliably the music's bar 1 — that residue is backlog 0042's, not this entry's.
 
 ---
 
@@ -15877,9 +15909,18 @@ Shapes, none decided:
 one — and the conductor is stood down. It matters the first time a conductor-run plan touches a skill
 file without naming it, which is a normal thing for a plan to do.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-27 by [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 5 — the first shape, a gate at drafting time
+
+**CLOSED.** `scripts/check-claude-declarations.mjs` refuses an active plan phase that names a skill, a
+hook, `settings.json` or a conductor-mode section without a `.claude/` path in `Files touched`. It
+fails on a fixture in Plan 0190 Phase 9's shape and passes once the paths are declared. Closed plans
+are read as an advisory only: 14 phases across 11 of them, Plan 0190 Phase 9 among them, and none was
+edited. The declaration pattern is a subset of `claudePaths()`'s, so a phase the gate calls declared is
+one the conductor parks in front of.
 
 ---
 
@@ -15927,9 +15968,18 @@ Shapes, none decided:
 in that file whose stated bound — *"a path that leaves the lane is refused, whatever it is for"* — is
 not the bound the rules actually enforce, and the README repeats the claim.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-27 by [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phase 3 — the first shape, widened by what the probe showed
+
+**CLOSED.** The expansion syntax is denied: `Bash(rm *$*)` and `` Bash(rm *`*) ``, the second because
+the probe showed a backtick substitution was needed. The rules also deny a leading `/` in any argument
+position and a quoted absolute path. `rm *%*` was left out, because neither shell tool expands
+`%VAR%`. `rm -rf $HOME/.cargo` reads DENIED under the real CLI, and `rm -rf target/debug` still runs.
+**The `Remove-Item` half is modelled, not observed.** The PowerShell tool exists only on Windows and
+the probe ran on Linux, so it is owed to a Windows probe run (ADR-0233's `Outcome`).
 
 ---
 
@@ -16009,9 +16059,18 @@ cost turns, the sessions recovered, all three phases of 0191 committed. It is fi
 negative cases are the ones worth being right about, and the run just demonstrated that the thing
 asserting them can be wrong about a case it states outright.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/0208-the-conductors-safety-claims-get-their-evidence.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-27 by [Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md) Phases 1-2 and 4 — probed, and the prompt rule kept with its reason
+
+**CLOSED.** `tools/conductor/spike/` probes the matcher and records a RAN/DENIED table beside the CLI
+version. On 2.1.282 a `cd` to the session's own lane never reached the matcher, and every other `cd`
+was refused. `settings.test.mjs` asserts every probed deny case against the recorded outcome, and also
+asserts `decide()` refuses it, so a deleted deny rule goes red. The allow cases stay a model. The
+prompt's `No cd` stays, with the reason: a refused `cd` costs a turn. Nothing yet re-runs the probe
+when the CLI version moves.
 
 ---
 
@@ -16211,6 +16270,473 @@ see a quarter of the surface it composes over, which reads as "these systems hav
 writing" rather than as a missing page. It rises with every system landed, and the four sections are
 an evening's work for someone who has the app open.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+**CLOSED 2026-09-26** — [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md)
+Phases 4 and 5 + [ADR-0234](adrs/0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md).
+`systems.md` has a `## ` section for every `SystemKind`, and the four this entry named carry guidance
+distilled from the shipped presets. The architect sweep row asked for above is **not** added: the
+close cannot edit `.claude/`, so it is the owner's (Plan 0209's close review, minor 2), and until it
+lands the mechanism this entry named is still missing.
+
+---
+
+## 0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution
+
+**Raised by:** the user, at Plan 0106's Phase 6 human gate (2026-08-25), on a full-track render of
+`star_rosewindow` — *"it would obviously be great if resolution would be higher"*. **Owner if
+taken:** `architect` — it reopens a clause ADR-0121 recorded as deliberately rejected, so it is an
+ADR question before it is a code one.
+
+- **Verified 2026-08-25** — the shipping `quality` profile diffuses at a 589,824 px budget, which is
+  28 % of a 1920x1080 frame, so every output pixel is resampled up:
+  `present: "size": "589824" in: tools/sd-filter/sd_filter.py`
+
+### The finding
+
+The clip that drew the verdict was rendered at **`fast`** — a 262,144 px budget, **680x384** at
+16:9 — and resampled to 1920x1080. `quality` is 1024x576, **2.25x the pixels**, and *has never been
+rendered on a real track*. So an unknown and possibly large share of this complaint is a profile
+choice rather than a wall, and **the cheap first move is a side-by-side still at both budgets**, not
+a design.
+
+What is genuinely walled, and why this is not simply "raise the budget":
+
+- **SD1.5 duplicates or mirrors content above roughly 768²** — its native-resolution artifact, named
+  in Plan 0106 Phase 1's traps. Raising the budget does not scale smoothly into it.
+- **SDXL plus ControlNet is ~7.5 GB against an 8 GB card**, and the spike already peaks at 5.68 GB
+  with two ControlNets loaded. Offloading fixes the memory and ruins the throughput over thousands
+  of frames, which Phase 1 also measured.
+- **Cost scales with pixels.** Phase 2b measured 2.721 s/frame at 589,824 px against roughly a third
+  of that at 262,144. A 4-minute track at `quality` already measures ~5.9 h *before* the 1.406x
+  scope correction Plan 0106 Phase 7d applies to that figure.
+
+**The tension worth surfacing before anyone designs.**
+[ADR-0121](adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)'s
+Alternative C is *diffuse at a smaller budget and upscale*, measured as the cheaper route and
+**rejected by this same user in the design interview**, on the ground that generated detail is worth
+its price against inferred detail. This verdict does not obviously overturn that — the ask is for
+*more* detail, and an upscaler infers rather than generates — but it does mean the rejection was
+made before anyone had watched five minutes of output. A tiled or multi-pass approach that
+*generates* at higher resolution is the option neither the ADR nor the plan has costed.
+- **PARTLY TAKEN 2026-09-19 -> [Plan 0211](plans/done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)**,
+  which takes the *measurement* this entry asks for before any design: a matched pair of the same clip
+  at both budgets, then the owner's verdict. **This entry stays live because the verdict is what
+  decides whether anything is owed** — if `quality` answers the ask, what was filed as a wall was a
+  profile default and the residue is a documentation change; if it does not, the tiled route nobody has
+  costed is Phase 3 and an ADR reopening ADR-0121's Alternative C follows the plan rather than
+  preceding it.
+- **Moved to the archive 2026-09-27 at Plan 0211's close.** The entry was taken but never promoted,
+  so it left the live file when the plan closed rather than when it was approved.
+
+**CLOSED 2026-09-27 by Plan 0211's Phase 2 verdict.** The matched pair at both budgets was rendered on
+one machine. The owner's verdict was *"quality are fine"*: `quality` answers the ask, so what was
+filed as a wall was a profile default. Phase 3's tiled route was not run, and ADR-0121's Alternative
+C was not reopened. The residue is documentation: which profile `docs/diffusion-filter.md` leads
+with, and a cost table measured on another OS with another preset. It is live as backlog 0262.
+
+## 0263 — the conductor reads a `not run` log row as unfinished, so a phase whose done-when was not to run parks its plan as a disagreement
+
+In [Plan 0226](plans/done/0226-the-conductor-stops-waiting-for-the-owner.md)'s pilot run (started
+2026-09-26 16:50 UTC), 0202 parked `disagreement` after its amended Phase 3 landed:
+*"implement 2-3: the log does not mark Phase 2 done; log row for Phase 2 names 09be6b65, not a commit
+this step made"*. Phase 2's done-when said the phase does not run if Phase 1 falsified its candidate.
+Phase 1 had falsified it, and the log row honestly read `not run: Phase 1 falsified the candidate`.
+`rowIsDone` in `tools/conductor/lib/plan.mjs` accepts only a state beginning `done`, or
+`committed with this row`. So on resume the conductor handed the session "2-3", re-verified Phase 2
+against that step's commits, and parked. The owner reworded the row to `done - not run: ...`
+(`941941be`) and resumed.
+
+That is the only park of the pilot's ten that the pipeline should have absorbed. The other nine were
+judgements it could not make (two `plan_wrong`, a `stop_condition`, three `human_phase`), an edit
+under `.claude/` (`claude_dir`), a dirty main (`main_dirty`), and a red close gate (`check_red`) that
+the gate refuses to retry by design, the flake itself being backlog 0219. The shape recurs: closed
+plans already carry `not run` rows written by hand. So the next plan with a conditional phase parks
+the same way unless its implementer happens to spell the row `done - ...`.
+
+- **Raised:** 2026-09-27 by `architect`, recording Plan 0226 Phase 7's pilot readings. **Owner if
+  taken:** `dev` for `rowIsDone`, or `architect` if the answer is instead a rule that a skipped phase
+  writes `done - not run`.
+- **Verified 2026-09-27** — `rowIsDone` has no case for a skipped phase:
+  `absent: not run in: tools/conductor/lib/plan.mjs`
+- **Verified 2026-09-27** — the predicate is where the entry says:
+  `present: export function rowIsDone in: tools/conductor/lib/plan.mjs`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
+
+## 0264 — two players at once run two thumbnail passes into one cache, and their temp files collide
+
+The studio's windowed player and the standalone app each start the thumbnail pass
+([Plan 0206](plans/done/0206-the-browser-shows-the-look.md)). Both write into the one per-user
+cache, and both name an in-flight entry `<entry>.rlxthumb-part`. So two children rendering the same
+preset collide. The loser logs the collision as a failure, which counts toward the pass giving up on
+that preset, and `discard_partials` in either process deletes the other's in-flight file. Nothing in
+the docs says the studio's player runs the pass at all.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0206's close review finding 1 (minor). **Owner
+  if taken:** `dev` (a per-process temp name or a lock file), plus a docs line in `docs/running.md`.
+- **Verified 2026-09-27** — the temp name carries no process identity:
+  `present: with_extension\("rlxthumb-part"\) in: standalone/src/thumbs.rs`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
+
+## 0265 — the pane-clearance test pins the library at 114 presets while more ship
+
+`standalone/src/overlay/tests.rs` asserts that the browser's last column clears the pane with
+`LIBRARY = 114`. More presets than that ship now. At about 122 the last column reaches the pane, and
+the test would still pass, because it measures a library that no longer exists. The count should come
+from `rlx_core::preset::default_presets().len()`.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0206's close review finding 6 (nit). **Owner if
+  taken:** `dev` (test logic).
+- **Verified 2026-09-27** — the count is a literal:
+  `present: const LIBRARY: usize = 114; in: standalone/src/overlay/tests.rs`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
+
+## 0266 — the exe's size cap is written in three places that nothing holds equal, and the Linux recipe measures nothing
+
+[Plan 0207](plans/done/0207-the-commitments-get-their-instruments.md) gave the exe a cap and a 90 %
+warning threshold. The pair is written in `packaging/windows/stage.ps1`, in
+`packaging/macos/bundle.sh`, and in NFR section 4. Guard (e) in `core/tests/suite/hygiene.rs` holds
+the *component's* pair to the NFR and re-derives the 90 %, but it reads neither exe recipe. That
+leaves ADR-0159's own stated negative, a number in two scripts drifting from its source, reproduced
+and untested. Separately, `packaging/linux/stage.sh` is the one standalone recipe with no measurement
+block, although two of NFR section 4's three size-series rows are Linux readings taken by hand.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0207's close review findings 3 (minor) and 7
+  (nit). **Owner if taken:** `dev` (a guard beside (e), and the Linux measurement block).
+- **Verified 2026-09-27** — the guard reads neither exe recipe:
+  `absent: stage\.ps1|bundle\.sh in: core/tests/suite/hygiene.rs`
+- **Verified 2026-09-27** — the Windows recipe carries its own copy of the pair:
+  `present: \$ExeCapBytes = 16777216 in: packaging/windows/stage.ps1`
+- **Verified 2026-09-27** — the Linux recipe has no size warning:
+  `absent: WarnBytes|warn-bytes|WARN_BYTES in: packaging/linux/stage.sh`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
+
+## 0268 — under `order = "sequential"`, Space after a browser pick does not continue from what is on screen
+
+With presets alpha to echo in sequential order: Space gives alpha, Space gives bravo, pick `echo` in
+the browser, Space gives `charlie` and not `alpha`. A browser pick never enters the traversal, which
+is inherited from [Plan 0205](plans/done/0205-the-library-becomes-navigable.md) (it never enters the
+shuffle's `seen` either), but only sequential order makes it visible. It leaves ADR-0239's "Space
+means the next preset again" partly undelivered, since the rule before 0205 took the successor of the
+active index. Whether a manual selection should re-anchor the traversal is a design call.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0216's close review finding 1 (minor). **Owner
+  if taken:** `architect` (the re-anchor rule), then `dev`.
+- **Verified 2026-09-27** — the sequential arm is where the entry says:
+  `present: Order::Sequential => in: standalone/src/director.rs`
+- **Verified 2026-09-27** — the defect itself is a runtime order:
+  `unprobeable: the successor after a browser pick is decided at runtime, and no text line shows it`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
+
+## 0269 — two unreachable divergences Plan 0215's review left: a capture loop's `lost`, and `Observed<T>`'s feedback
+
+Both are unreachable today and both would bite silently if that changed.
+
+- `standalone/src/capture_linux/rt.rs`: the `let Some(window) = bytes.get_mut(carry..filled) else {
+  return; }` exit leaves `lost` unset, while the `stream.read` error path three lines below stores
+  it. The two ways the loop ends report differently. The bound is unreachable at the sizes the caller
+  establishes.
+- `core/src/render/tests.rs`: `Observed<T>` no longer forwards `set_feedback`, so it inherits
+  `Scene`'s `None` for `as_feedback_sink`, and `hand_over_active_preset` would drop an observed
+  attractor's `[feedback]` table. No scene observed today has that capability.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0215's close review findings 3 and 4 (nits).
+  **Owner if taken:** `dev`.
+- **Verified 2026-09-27** — `present: let Some\(window\) = bytes\.get_mut\(carry\.\.filled\) else in: standalone/src/capture_linux/rt.rs`
+- **Verified 2026-09-27** — `present: struct Observed<T> in: core/src/render/tests.rs`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
+
+## 0270 — an npm advisory with no GHSA url could only be cleared by a bump
+
+`scripts/check-npm-audit.mjs` gives an advisory without a GHSA url the id `npm-<source>`, and the
+allow file's reader accepts only GHSA ids. Such an advisory could never be excepted with a reason,
+which ADR-0244 says every exception carries. It is theoretical while npm keys every advisory by GHSA.
+
+- **Raised:** 2026-09-27 by `architect`, filing Plan 0220's close review finding 3 (nit). **Owner if
+  taken:** `dev`.
+- **Verified 2026-09-27** — `present: npm-\$\{via\.source\} in: scripts/check-npm-audit.mjs`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
+
+## 0271 — the studio's missing-player banner says to edit a settings file without saying where it is
+
+When no player resolves, the banner reads *"Set "playerPath" in the studio settings file to a
+ritmolux build."* The file is `settings.json` under a per-OS directory (`%APPDATA%/ritmolux-studio`,
+`~/Library/Application Support/ritmolux-studio`, `~/.config/ritmolux-studio`), which
+`studio/README.md` names and the banner does not. The person who sees the banner is the one who has
+not read the README.
+
+- **Raised:** 2026-09-27 by `architect`, filing the unrouted followup from
+  [Plan 0219](plans/done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s Phase 4 notes.
+  **Owner if taken:** `studio-builder`.
+- **Verified 2026-09-27** — `present: Set "playerPath" in the studio settings file in: studio/renderer/App.tsx`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
+
+## 0272 — `npm run dev` leaves Vite and the esbuild watchers running after the studio window closes
+
+The studio's `dev` script starts four processes under `concurrently` without `--kill-others`, so
+closing the Electron window ends the player and Electron but leaves Vite and both esbuild watchers
+running. The next `npm run dev` then finds port 5273 taken.
+
+- **Raised:** 2026-09-27 by `architect`, filing the unrouted followup from
+  [Plan 0219](plans/done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)'s Phase 4 notes.
+  **Owner if taken:** `studio-builder`.
+- **Verified 2026-09-27** — `absent: kill-others in: studio/package.json`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md)
+landed the repair, one phase per entry; the `### Closed` ledger row names the phase.
+
+## 0273 — a headless session's `Write` can create a file outside its lane, and nothing bounds it
+
+Re-verifying the conductor's CLI on 2.1.283 (2026-09-29) found `~/Work/rlx-probe-0187\probe-control.txt`,
+a file in the directory **above** a probe worktree, holding `delta`. The 2.1.282 probe run of
+2026-09-26 wrote it. Its session C runs under `tools/conductor/settings.conductor.json` exactly as a
+conductor session does, and its prompt carried a Windows backslash, so the path the model wrote named
+a file beside the worktree rather than in it. The `Write` succeeded. The settings allow the bare
+`Write` and `Edit` tools, and
+[Plan 0208](plans/done/0208-the-conductors-safety-claims-get-their-evidence.md)'s lane bound covers
+deletions only (`rm`, `Remove-Item`). So a session can create or overwrite any file its user can,
+anywhere on the machine, and the README's claim that the lane is the bound holds for deletion and not
+for writing. The probe's prompt is fixed; the gap it exposed is not. Path-scoped `Write(<lane>/**)`
+rules are the obvious shape, and 2.1.273 showed the matcher ignores some path-scoped spellings for
+`.claude/`, so a probe row has to decide it, the way ADR-0233 decided the deletion bound.
+
+- **Raised:** 2026-09-29 by `architect`, from the 2.1.283 re-verification in
+  `tools/conductor/spike/README.md`. **Owner if taken:** `architect` (the bound and its probe),
+  then `dev`.
+- **Verified 2026-09-29** — the settings allow the bare tools, with no path scope:
+  `present: "Write", in: tools/conductor/settings.conductor.json`
+- **Verified 2026-09-29** — no path-scoped write rule exists:
+  `absent: Write\( in: tools/conductor/settings.conductor.json`
+- **Moved to the archive 2026-09-29 on promotion**, when [Plan 0234](plans/done/0234-a-conductor-session-writes-only-where-it-works.md) was approved.
+
+**CLOSED 2026-09-29** — [Plan 0234](plans/done/0234-a-conductor-session-writes-only-where-it-works.md)
+and [ADR-0255](adrs/0255-a-conductor-session-writes-inside-its-lane-and-the-os-temp-directory.md).
+`settings.conductor.json` grants `Write` and `Edit` on `./**`, `//tmp/**` and `/state/reviews/**` and
+nothing bare; the `--writes` probe recorded the lane's parent and `$HOME` DENIED on 2.1.283, and
+`settings.test.mjs` reads those refusals from the table. The macOS and Windows temp-directory rows are
+owed beside 0267.
+
+## 0038 — mid-tone-dominated presets lost ~8 % luminance to the tonemap knee, and the library has not been retuned
+
+- **STILL OPEN 2026-08-13, and a document that says otherwise is wrong.**
+  [`docs/plans/README.md`](plans/README.md)'s Plan 0080 Phase 7 write-up states that *"the
+  **tonemap-knee** half of that pairing is now measured away."* **It is not.** What Plan 0080 Phase 7
+  retired is a *different* suspicion raised at its own close — that `bg_bright = 0.85` was reaching
+  the tonemap's shoulder on the **backdrop ramp** — settled by finding 0 % of the scanned column
+  rail-pinned on any channel in any of the three probes. That measurement is about a backdrop
+  gradient. **This entry is about mid-tone figure luminance on attractor presets**, measured as
+  `attractor_clifford` 82.54 → 75.91 mean luma, and no backdrop measurement speaks to it. The two
+  were conflated because both mention the tonemap.
+- **Verified 2026-08-29** at the Plan 0104 close — **the "lever is unused" half of this entry is
+  falsified, and the retune it asks for is not.** The reduction that now stands for this entry is
+  that its own measured subject is still untouched:
+  `absent: ^exposure in: presets/attractor_clifford.toml` — red the day someone retunes the
+  preset whose −8.0 % opened this entry, which is exactly when it should be re-read. This entry said twice (2026-08-13, 2026-08-15)
+  that exactly **one** shipped preset binds `exposure` (`lsystem_vellum.toml:60`). **Sixteen do**,
+  and fifteen of them landed in [Plan 0104](plans/done/0104-the-library-stops-being-lopsided.md):
+  its Phase 2 found that a branching or line figure has too little area for a level term to
+  register on the stroke, and moved the level response to a whole-frame stage — `exposure` or
+  `bg_bright` — on cohort after cohort. So `exposure` is now a routine authoring lever rather
+  than an unused one, and any argument here resting on its rarity is void.
+- **What survives that correction is the whole of the ask.** None of the fifteen new binders is in
+  the population this entry names — *the attractor family, the softer `fragment_*`, `swarm_drift`*
+  — which is the set of presets with no over-range peak, and not one of them was touched by
+  Plan 0104. The measured −8.0 % on `attractor_clifford` is unaddressed. **The entry stays live.**
+- **Why no gate caught this, which is the reusable part.** The claim is carried as
+  `unprobeable: ... the grammar deliberately has no count verb (ADR-0108, Notes)`, so
+  `scripts/check-backlog-claims.mjs` reported green across every run of the plan that falsified it.
+  This is the case the close ceremony prints the `unprobeable:` roster for: the roster is the set of
+  claims nothing checks, and a claim in it decays silently until a human reads it against the tree.
+- **ROUTED, and now scheduled:** it is §4 of [`content-brief.md`](content-brief.md), paired with Plan
+  0071's standing `occlude` retune as one pass over the shipped set. That brief also records the
+  other correction this entry's routing carries — the plan text says to run it "with 0038 and 0058",
+  but **0058 closed by content on 2026-08-04**, five days before Plan 0071 reached Phase 5, so the
+  three-way pass is a two-way pass.
+- **Raised:** 2026-07-31, from `architect`, at Plan 0045's Mode 4 review.
+- **Verified against code:** yes — measured, not inferred (numbers below).
+- **Verified 2026-08-15, and its headline claim is superseded above — sixteen presets bind
+  `exposure`, not one.** What that dated check still establishes stands: the original binding is
+  present — `present: ^exposure in: presets/lsystem_vellum.toml`. The count around it never
+  reduced, and that is why the falsification went unseen for a whole plan:
+  `unprobeable: exactly one shipped preset binds exposure is a claim about how many files match,
+  and the grammar deliberately has no count verb (ADR-0108, Notes)`. The document this
+  entry corrects still carries the sentence it corrects: `present: tonemap-knee in: docs/plans/README.md`
+  — which goes red when that paragraph is next rewritten, and that is the moment to re-read whether
+  the correction is still owed.
+- **For:** `preset-author`. This is genuinely content-lane work; the engine behaved as designed.
+- **ROUTED 2026-08-01 → `preset-author`, as a content pass rather than a plan.** The user's
+  call at the Plan 0051 close: this needs no engine change and no ADR, so it goes to the lane
+  directly. It pairs naturally with [0040](design-backlog-archive.md) (**closed 2026-08-09**; its retune half is Plan 0071 Phase 5, which this should run with) — both are retunes of the same shipped set
+  against a composite whose behaviour has changed under them.
+
+The user's report was "clifford is really dim". Rendering `attractor_clifford` at an identical
+stimulus on `main` and on the Plan 0045 branch (640x360, 90 frames, hardware adapter):
+
+| preset | main | branch | |
+|---|---|---|---|
+| `attractor_clifford` | mean luma 82.54 | 75.91 | **-8.0 %** |
+| `attractor_leviathan` | mean luma 63.98 | 67.70 | **+5.8 %** |
+
+That is not drift. It is the tonemap knee's documented price, to the decimal: `tonemap.rs`'s
+`KNEE` docstring says a linear 0.8 mid-tone now presents at 0.733, which is -8.4 %. **The split is
+the whole story.** Clifford is a diffuse particle cloud living almost entirely in the mid range, so
+it pays the knee and collects none of the headroom above 1.0. Leviathan has genuinely over-range
+cores, so it gains. Plan 0045 chose to pay this on mid-tones rather than on highlights, deliberately
+and in writing — the consequence is simply that every preset shaped like Clifford now reads dimmer.
+
+**The lever already exists and is one line:** `exposure` (default 1.0) is a linear multiplier ahead
+of the tonemap, added by this same plan for exactly this. `exposure = "1.1"` restores Clifford's
+level without re-balancing a single element against its own background, which is what raising
+per-element `brightness` would force. The population to check is presets with no over-range peak —
+the attractor family, the softer `fragment_*`, `swarm_drift`.
+
+**A related record correction, since this is the entry about the luminance model.** This file's own
+`0034` section (the "why it works, mechanically" passage under the Supernova table, around line
+1561) still says "the frame clips per channel" in the present tense, and reasons from it. That
+premise retired with Plan 0045. The *conclusion* stands and is if anything stronger — geometry
+still has somewhere to go when luminance does not — but the mechanism is now a roll-off, not a
+clip. Per this file's append-only rule the passage is left standing; this paragraph is the
+correction.
+
+- **Moved to the archive 2026-10-01 on close**, by [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md)'s close.
+
+**CLOSED 2026-10-01** — [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md)
+Phase 4, as content-brief §4. The owner closed the sitting as answered by the walk: every preset in
+this entry's population was judged in motion with "too dim" a verdict in use, and the dim ones were
+brightened at the retune. Of the population named above, `swarm_drift` was retired and
+`attractor_clifford` was kept as it stands. An `occlude` binding stays open authoring for any world
+that wants one, not an owed pass.
+
+## 0256 — the only report that asks whether two presets look alike covers nine of fourteen families, and both places naming the absent ones are stale
+
+The `distinctness` report is the one instrument in this repository that asks whether two shipped
+presets have converged. It reads its roster from a hand-written array — `const FAMILIES:
+[(SystemKind, &str); 9]` in `core/tests/distinctness.rs` — and
+[`docs/testing.md`](testing.md) states the consequence plainly: *"a new `SystemKind` does not
+appear in it on its own and nothing fails when one is missing."*
+
+**Five shipped families are missing, not three.** By filename family over `presets/*.toml`:
+
+| family | shipped | in the array |
+|---|---|---|
+| `analytic_field` | 12 | **no** |
+| `shape_field` | 9 | **no** |
+| `warp_mesh` | 7 | **no** |
+| `shape_collage` | 4 | **no** |
+| `cellular` | 3 | **no** |
+
+That is **35 of 114 presets — most of a third of the library — with no similarity check of any
+kind**, and `analytic_field` is the third-largest family in the set.
+
+**Both carriers that name the absent families name three of the five.** `docs/testing.md` says
+*"nine of the twelve"* and lists `shape_field`, `warp_mesh` and `shape_collage`; the doc comment
+above the array at `core/tests/distinctness.rs:62` lists the same three. `analytic_field` and
+`cellular` shipped afterwards and neither carrier noticed, because nothing makes them.
+
+**The comment predicted this exact failure and then suffered it.** Its closing line, about the
+count that had previously gone stale: *"A count is a fine reason to leave a family out and a
+terrible one to leave written down, because it stops being true silently."* The sentence is
+correct, it is four lines below a written-down list, and that list is now wrong in the same way.
+
+**The other half has no instrument at all, and that is the more important half.** `distinctness`
+measures *similarity* — whether two presets look alike. Nothing in this repository asks whether one
+is any *good*. Backlog 0248 above is a narrow slice of that question (four
+`fragment_field` presets, composition or fill) and records the same absence in its own words:
+*"no statistic in this repository decides between the two readings."*
+
+### Why it matters now, and what the owner's aim is
+
+The stated goal is **to ship less but better** — which is
+[ADR-0089](adrs/0089-the-library-renews-by-replacement-cohorts.md)'s replacement-cohort mechanism
+used as designed, rather than the pure addition the set has grown by since. ADR-0089's own Context
+already recorded the symptom at 41 presets: *"~55 % of the library is one template per family with
+different numbers."* The library is now 114 and nobody has re-read that figure.
+
+[Plan 0204](plans/done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) makes it live. It
+adds a cohort and its Phase 4 asks whether to add fifteen more, and the system those picks most
+plausibly route to — `warp_mesh` — is one of the five nothing checks.
+
+### The route, and its order is the point
+
+**The owner set this sequence deliberately, and it is not the obvious one:**
+
+1. **This entry** — record the gap. Done.
+2. **A human smoke sitting.** The owner walks the shipped library in the running app and marks, by
+   eye, what reads as *lame* and what reads as a *duplicate*. That produces evidence.
+3. **Then design the mechanism on that evidence** — an ADR and a plan, argued from what a person
+   actually convicted rather than from what is easy to compute.
+
+**Building the mechanism before step 2 is the thing to not do.** Similarity is measurable and
+quality is not, so a mechanism designed first would measure similarity, call it curation, and
+retire the wrong presets with a number behind it. The evidence has to come first precisely because
+the interesting half of the question has no statistic.
+
+- **Raised:** 2026-09-19 by `architect`, asked by the owner (*"do we have a plan to cut curated
+  presets that are too similar to each other or lame?"*). **Owner if taken:** `human` for step 2,
+  then `architect` for the ADR and plan.
+- **PARTLY PROMOTED 2026-09-27 -> [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md)**,
+  which takes **step 2** (the owner's walk, and the cull it convicts under ADR-0253). Step 3, whether a
+  mechanism is owed, stays here until that plan's Phase 7 verdict answers it.
+- **Verified 2026-09-26** — the instrument half is discharged by
+  [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md) (closed 2026-09-26): the
+  similarity roster is every `SystemKind`, held to the enum by `family_tests!`'s exhaustive match, and
+  `docs/testing.md` names no count. The heading's "nine of fourteen" describes the state this entry was
+  raised against, not the tree. The four 2026-09-19 probes that recorded the gap went red on delivery
+  and are replaced by these:
+  `present: family_tests! in: core/tests/distinctness.rs`
+  `absent: nine of the twelve in: docs/testing.md`
+- **Verified 2026-09-19** — the quality half has no instrument, which is an absence no probe can
+  assert:
+  `unprobeable: whether a shipped preset is worth shipping is a look judgement; this repository has
+  no statistic for it, which is the finding rather than a gap in the probe`
+- **PARTLY PROMOTED 2026-09-19 -> [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md)**,
+  which takes the **instrument half** only: the roster derives from `SystemKind` so all fourteen
+  families are reported and a new variant fails the build, and the two stale prose carriers stop naming
+  a list ([ADR-0234](adrs/0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md)).
+  **This entry stays live for the half that matters more** — whether the library should ship less and
+  better — which needs a person, an evening and the app, and whose evidence is the favourite/hidden
+  marks [Plan 0205](plans/done/0205-the-library-becomes-navigable.md) builds. Plan 0209 Phase 2 reads the
+  widened report and is forbidden from tuning a threshold to quiet it, so its output is input here.
+
+### Priority
+
+**Medium, and it rises with every preset landed.** Nothing is broken and no gate is red — the cost
+is that the set grows in the dark on a third of its families, and that the one decision the owner
+wants to make (ship less, better) has no evidence under it. Step 2 is cheap: it needs a person, an
+evening and the app, and it is the only step that cannot be skipped or automated.
+
+- **Moved to the archive 2026-10-01 on close**, by [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md)'s Phase 7 verdict.
+
+**CLOSED 2026-10-01** — [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md)
+Phase 7. Step 3 is answered: no mechanism is owed. Of the walk's 35 cuts, 28 carried no machine flag,
+so a mechanism designed on what is computable would have convicted one cut in five. Shipping less but
+better is a monthly owner walk instead, a standing sitting in `docs/content-brief.md` §7. The
+instrument half was already discharged by Plan 0209, and step 2 by Plan 0232's walk.
+

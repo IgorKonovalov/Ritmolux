@@ -18,6 +18,7 @@
 
 system = "swarm"
 name = "Murmuration"
+representative = true
 
 [palette]
 stops = [

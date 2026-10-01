@@ -10,7 +10,7 @@
   gap: 12px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--panel-edge);
-  background: var(--panel);
+  background: var(--scanlines), var(--panel);
 }
 
 .title {
@@ -30,8 +30,8 @@
   /* Pushed to the far end, so the preset name stays beside the title. */
   margin-left: auto;
   background: none;
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   color: var(--text-dim);
   font-size: 11px;
   padding: 3px 10px;
@@ -79,13 +79,13 @@
 /* The way into the whole list, sitting on the banner that shows its head. */
 .problems {
   background: none;
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   color: var(--text-dim);
   cursor: pointer;
   font-family: inherit;
   font-size: 11px;
-  padding: 2px 8px;
+  padding: 2px var(--space-1);
 }
 
 .problems:hover {

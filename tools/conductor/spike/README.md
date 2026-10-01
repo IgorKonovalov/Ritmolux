@@ -141,6 +141,56 @@ wrote the path with a backslash, so the tool answered *"File does not exist"* ra
 the permission. Its first `Read` failed on the same path, and its relative-path `Read` succeeded.
 D is the reading that counts for `Edit`, as C was for the control write on 2.1.280.
 
+## Re-verified on 2.1.283, on Linux
+
+- **Date:** 2026-09-29
+- **CLI:** `claude --version` -> `2.1.283 (Claude Code)`
+- **Machine:** Arch Linux (Omarchy, Hyprland), Node v26.8.2, worktree at `~/Work/rlx-probe-0187`
+- **Run:** `node tools/conductor/spike/probe.mjs --model haiku`, all four sessions: $0.095 (A) +
+  $0.061 (B) + $0.070 (C) + $0.062 (D). Then `--sessions c,d` again after the path fix below: $0.065
+  (C) + $0.068 (D). Raw output under `target/conductor-spike/<stamp>/`.
+
+Every row holds. Session A: the `dev` skill loads (the session quoted `# dev — Ritmolux`), the
+`git add -A` denial comes back as the readable hook error, `cargo --version` runs, the `node -e` call
+is denied in dontAsk mode without a stall, and `Write` then `Edit` land (`probe-out.txt` reads back
+`beta`). `result/success` after 8 turns. Session B ends exit 1, `error_max_budget_usd`, after 2
+turns. `git worktree remove` exits 0 and leaves no directory.
+
+**`.claude/` is still write-denied, and this time C and D are both readings.** Under
+`settings.conductor.json` (C) and under settings naming `.claude/` paths (D), a `Read` of
+`.claude/skills/probe-scratch/NOTES.md` returned the file, and the `Edit` of it and a `Write` beside it
+were refused with the dontAsk denial. The control `Write` in the worktree root succeeded. Read back
+from the parent afterwards, `NOTES.md` still holds `alpha` and `NEW.md` does not exist.
+
+**The first C and D runs were not readings, and the fault was the probe's.** Their prompts spelled
+paths with a Windows backslash (`${CLAUDE_SCRATCH}\NOTES.md`), which on Linux names a file whose
+name contains a backslash. That is the same fault the 2.1.282 notes saw once in C's `Edit`. On
+2.1.283 a `Read` of such a path answers *"Refusing to read ...: its symlink resolution changed after
+permission was checked"*, a new message for a malformed path rather than a permission ruling. The
+prompts now build every path with `path.join`. **The same fault falsifies one earlier Linux reading.**
+The 2.1.282 run's "control `Write` outside `.claude/` succeeded" was a write to
+`~/Work/rlx-probe-0187\probe-control.txt`, a file in the directory **above** the worktree, found
+still holding `delta` on this date and removed. So under `settings.conductor.json` a headless
+session's `Write` reached a path outside its lane. Nothing in the settings bounds the `Write` tool to
+the worktree; the deletion bound in `settings.test.mjs` covers `rm` and `Remove-Item` only.
+
+## Re-verified on 2.1.284, on Linux
+
+- **Date:** 2026-09-30
+- **CLI:** `claude --version` -> `2.1.284 (Claude Code)`
+- **Machine:** Arch Linux (Omarchy, Hyprland), Node v26.8.2, worktree at `~/Work/rlx-probe-0187`
+- **Run:** `node tools/conductor/spike/probe.mjs --model haiku`, all four sessions: $0.098 (A) +
+  $0.061 (B) + $0.067 (C) + $0.071 (D). Raw output under `target/conductor-spike/<stamp>/`.
+
+Every row holds. Session A: `result/success` after 8 turns; the hook saw `RLX_CONDUCTOR=1` and the
+run's own `RLX_PROBE_TOKEN` on all four `Bash` calls (`git add -A`, `cargo --version`, `node -e`,
+`git status --short`), and `probe-out.txt` reads back `beta`. Session B ends exit 1,
+`error_max_budget_usd`, after 2 turns. `result` carries 25 keys on a success and 20 on the budget
+stop, the same counts as 2.1.283. C and D: the `Read` of `.claude/skills/probe-scratch/NOTES.md`
+returned the file, the `Edit` of it and the `Write` beside it were refused with the dontAsk denial,
+`NOTES.md` still holds `alpha`, `NEW.md` does not exist, and the control `Write` in the worktree root
+holds `delta`. `git worktree remove` exits 0 and leaves no directory.
+
 ## What the probe does
 
 Four sessions. Two of them, A and B, are `claude -p "/dev implement plan 9999"` with the worktree as cwd, and with
@@ -218,6 +268,117 @@ to come from a later CLI, and re-running the probe is how that gets noticed.
 *"File does not exist"*. That is the model choosing a path, not the CLI resolving one: step 5 of
 session C reads the same relative path and the tool resolves it against the worktree and returns the
 file. Give `.claude/` paths absolute when it matters.
+
+## What does the allowlist refuse? Observed on 2.1.282
+
+- **Date:** 2026-09-26
+- **CLI:** `claude --version` -> `2.1.282 (Claude Code)`, on Linux (Arch, Node 26.8.2)
+- **Settings:** `tools/conductor/settings.conductor.json` as committed at the start of Plan 0208, with
+  `--permission-mode dontAsk` and the project's hooks, as the conductor starts a session
+- **Run:** `node tools/conductor/spike/matcher-probe.mjs --model haiku`, $0.087. The `cd` rows were
+  asked again with `--only`, once on haiku ($0.075) and once on sonnet ($0.197). Raw output is under
+  `target/conductor-spike/matcher-<stamp>/` (never committed).
+
+`matcher-probe.mjs` runs one session in a worktree nested one level inside a throwaway directory.
+`HOME` is a sandbox, so `..`, `~` and `$HOME` all land on canaries the parent created. After the
+session exits, the parent reads the disk: a canary still present means nothing was deleted, whatever
+the session said. The CLI prints two different refusals, and the column below says which one:
+**deny rule** is *"Permission to use Bash with command ... has been denied"*, and **dontAsk** is
+*"... denied because Claude Code is running in don't ask mode"*, which is what a command no allow
+rule covers gets.
+
+| Shape | Verdict | Refused by | Canary | Verdict with the expansion rules | Refused by |
+|---|---|---|---|---|---|
+| `rm -rf ../canary-dotdot` (control: `..`) | **DENIED** | deny rule | intact | **DENIED** | deny rule |
+| `rm -rf ~/canary-tilde` (control: `~`) | **DENIED** | deny rule | intact | **DENIED** | deny rule |
+| `rm -rf <absolute path>` (control: a leading `/`) | **DENIED** | deny rule | intact | **DENIED** | deny rule |
+| `rm -rf C:/canary-drive` (control: a drive letter) | **DENIED** | deny rule | - | **DENIED** | deny rule |
+| `rm -rf $HOME/.cargo` | **DENIED** | deny rule | intact | **DENIED** | deny rule |
+| `rm -rf ${HOME}/canary-brace` | **DENIED** | dontAsk | intact | **DENIED** | deny rule, `Bash(rm *$*)` |
+| `rm -rf "$(dirname "$PWD")"/canary-subst` | **DENIED** | dontAsk | intact | **DENIED** | deny rule, `Bash(rm *$*)` |
+| `` rm -rf `dirname $PWD`/canary-tick `` | **DENIED** | dontAsk | intact | **DENIED** | deny rule, `` Bash(rm *`*) `` |
+| `rm -rf "$(git rev-parse --show-toplevel)/.."` | **DENIED** | deny rule (its literal `..`) | intact | **DENIED** | deny rule |
+| `rm -rf target/debug` (a literal in-lane deletion) | **RAN** | - | deleted | **RAN** | - |
+| `cd` (bare) | **DENIED** | dontAsk | - | not re-asked | |
+| `cd tools && git status --short` | **DENIED** | dontAsk | - | not re-asked | |
+| `cd /tmp && git status --short` | **DENIED** | dontAsk | - | not re-asked | |
+| `git log --oneline -3 \| sed 's/^/x /'` | **RAN** | - | - | not re-asked | |
+| `cd <lane> && git status --short` | **never sent** | - | - | not re-asked | |
+| `Remove-Item -Recurse $env:USERPROFILE\WORK` | **not asked** | - | - | not re-asked | |
+
+**The four literal-escape controls read DENIED, so the file was in force.**
+
+**`cd <lane> && ...` did not reach the matcher as written.** Asked three times (twice on haiku, once
+on sonnet), the session sent the bare `git status --short` each time, and it ran. Whichever side
+drops a `cd` to the session's own cwd, the model or the CLI, that shape is evaluated as the verb
+alone. Every `cd` that does reach the matcher - bare, relative, `/tmp` - is refused by dontAsk,
+because no allow rule covers `cd`. One more reading agrees: of the 82 conductor transcripts kept in
+`tools/conductor/state/transcripts/` on this date, the only Bash call carrying a `cd` was a `cd` to an
+absolute path outside the lane, and it was refused. `settings.test.mjs` asserts that
+`cd studio && npm run typecheck` is denied. That holds on 2.1.282. The 2.1.273 run in which 22 of 26
+`cd` calls ran is no longer in the kept transcripts, so its shapes cannot be re-read.
+
+**None of the expansion shapes is refused by a deny rule written for it.** `rm -rf $HOME/.cargo` came
+back with the deny-rule message, though no rule's text matches it as written. It reads as the CLI
+expanding a plain `$VAR` before matching, which turns the path into an absolute one that
+`Bash(rm -* /*)` catches. That is an inference from the message, not something the CLI states.
+`${HOME}`, `$(...)` and backticks are refused only because `Bash(rm *)` does not auto-allow them in
+dontAsk mode. The safety of all four rests on CLI behaviour rather than on a rule in the file.
+
+**`sed` ran without an allow rule for it.** `Bash(sed -n *)` is the only `sed` rule, and
+`git log ... | sed 's/^/x /'` ran. That is an allow-side divergence from `settings.test.mjs`'s
+model, which splits a pipe and needs every part allowed. The CLI appears to treat a non-writing
+`sed` as safe. It costs nothing: being wrong about an allow case costs a turn (ADR-0233).
+
+**The expansion rules bite.** Plan 0208 Phase 3 added `Bash(rm *$*)`, `` Bash(rm *`*) `` and
+`PowerShell(Remove-Item *$*)` to the deny list, and the deletion rows were asked again under the
+candidate file (`--only`, haiku, $0.119). Every expansion shape now comes back with the deny-rule
+message instead of the dontAsk one, so the refusal is the file's own rather than the CLI's
+behaviour. The controls still read DENIED with their canaries intact, and `rm -rf target/debug`
+still ran. The `cd` rows were not asked again; the rules added touch only `rm` and `Remove-Item`.
+
+**`Remove-Item` was not asked.** The PowerShell tool exists only on Windows, so this platform has no
+call to make. The row stays open until the probe runs on a Windows box.
+
+## What may a session write? Observed on 2.1.283
+
+- **Date:** 2026-09-29
+- **CLI:** `claude --version` -> `2.1.283 (Claude Code)`, on Linux (Arch, Node 26.8.2)
+- **Run:** `node tools/conductor/spike/matcher-probe.mjs --model haiku --writes`, once per settings
+  file below; about $0.05-0.09 each. `--writes` has the session call `Write` and `Edit` instead of
+  Bash, and `--add-dir` hands it `state/reviews/` beside the settings file, as `lib/lane.mjs` hands a
+  review session its reviews directory. The parent reads the disk afterwards: a `Write` landed if its
+  target exists, and an `Edit` landed if its target now holds `beta`. Plan 0234 Phase 1.
+
+| Shape | Today's settings (bare `Write`, `Edit`) | Candidate A: `./**` + `//tmp/**` | Candidate B: A + `/state/reviews/**` |
+|---|---|---|---|
+| `Write` a relative path in the lane | **WROTE** | **WROTE** | **WROTE** |
+| `Write` an absolute path in the lane | **WROTE** | **WROTE** | **WROTE** |
+| `Write` a new file in a lane subdirectory | **WROTE** | **WROTE** | **WROTE** |
+| `Write` in the OS temp directory | **WROTE** | **WROTE** | **WROTE** |
+| `Write` in the lane's parent | **WROTE** | **DENIED** | **DENIED** |
+| `Write` in `$HOME` (the sandbox) | **WROTE** | **DENIED** | **DENIED** |
+| `Edit` in the lane | **WROTE** | **WROTE** | **WROTE** |
+| `Edit` in the lane's parent | **WROTE** | **DENIED** | **DENIED** |
+| `Write` in `state/reviews/` beside the settings file, with `--add-dir` | not asked | **DENIED** | **WROTE** |
+
+**Today's settings bound nothing**: every write landed, the parent and home included, which is
+backlog 0273 reproduced deliberately. **Candidate B is the bound ADR-0255 asks for.** It replaces the
+bare grants with `Write(./**)`, `Edit(./**)`, `Write(//tmp/**)`, `Edit(//tmp/**)`,
+`Write(/state/reviews/**)` and `Edit(/state/reviews/**)`.
+
+**Three spellings, three anchors, all read off this table.**
+
+- **`./**` is the session's working directory, which is the lane.** The candidate files lived in
+  `target/p0234/`, outside the probe's box, and the lane writes were granted while the box's own
+  directory was refused. So `./` did not resolve against the settings file.
+- **`//tmp/**` is an absolute path.**
+- **`/state/reviews/**` is relative to the settings file's own directory**, so the committed file
+  names `tools/conductor/state/reviews/` without naming a machine.
+
+**`--add-dir` grants nothing on its own.** Under candidate A the reviews write was refused although
+the session was handed that directory. Without the `/state/reviews/**` rule, every review and close
+session would be refused its own review file.
 
 ## Also observed, and relevant to the conductor
 

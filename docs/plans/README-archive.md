@@ -18,6 +18,18 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0204 - The library learns from the corpus it will not ship](#0204---the-library-learns-from-the-corpus-it-will-not-ship)
+  - [0232 - The library is walked, cut and refilled](#0232---the-library-is-walked-cut-and-refilled)
+  - [0241 - The conductor parks only on what the owner must settle](#0241---the-conductor-parks-only-on-what-the-owner-must-settle)
+  - [0235 - The plexus system, and a shared camera with depth of field](#0235---the-plexus-system-and-a-shared-camera-with-depth-of-field)
+  - [0230 - The Russian slice becomes findable](#0230---the-russian-slice-becomes-findable)
+  - [0231 - The interface is audited, then learns one look](#0231---the-interface-is-audited-then-learns-one-look)
+  - [0233 - The close reviews' small findings are repaired](#0233---the-close-reviews-small-findings-are-repaired)
+  - [0234 - A conductor session writes only where it works](#0234---a-conductor-session-writes-only-where-it-works)
+  - [0212 - The diffused render gains a timeline](#0212---the-diffused-render-gains-a-timeline)
+  - [0211 - The diffused frame's resolution is measured before it is designed](#0211---the-diffused-frames-resolution-is-measured-before-it-is-designed)
+  - [0208 - The conductor's safety claims get their evidence](#0208---the-conductors-safety-claims-get-their-evidence)
+  - [0209 - A system joins the instruments by existing](#0209---a-system-joins-the-instruments-by-existing)
   - [0223 - The heavy presets fit the integrated GPU](#0223---the-heavy-presets-fit-the-integrated-gpu)
   - [0206 - The browser shows the look](#0206---the-browser-shows-the-look)
   - [0229 - The conductor reports itself honestly](#0229---the-conductor-reports-itself-honestly)
@@ -231,6 +243,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-10-01 from `README.md` — the 0204-behind-0201 note, spent](#moved-2026-10-01-from-readmemd--the-0204-behind-0201-note-spent)
   - [Moved 2026-09-26 from `README.md` — the 0223-after-0214 note, spent](#moved-2026-09-26-from-readmemd--the-0223-after-0214-note-spent)
   - [Moved 2026-09-23 from `README.md` — the 0215-runs-last note, spent](#moved-2026-09-23-from-readmemd--the-0215-runs-last-note-spent)
   - [Moved 2026-09-23 from `README.md` — the 0224-before-0223 note, spent](#moved-2026-09-23-from-readmemd--the-0224-before-0223-note-spent)
@@ -264,6 +277,230 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0204 - The library learns from the corpus it will not ship](done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md)
+
+- closed 2026-10-01 by an architect review in a fresh session on `main`. All four phases are `human`
+(content-lane sittings, outside the conductor); commits `66ce9350`, `b97ca31b`, `c235225a`,
+`dd1ed3ac`. Review: **no blockers, no majors, one minor, one nit.** The minor (the plan's
+`## Followups` still read as open after Phase 4 settled both) was repaired at the close; the nit
+(a misaligned `bg_vignette` in `swarm_maelstrom.toml`) is left to the content lane. Full
+`nextest --workspace` 1934 passed, 8 skipped; `cargo doc -D warnings` clean. Version: **0.159.0**
+(minor: one preset added). ADR-0227 accepted with an Outcome. Upstream CI read green.
+- **What landed.** A 21-pick reference sheet outside the repository; a routing table across
+the picks; a cohort of four drafted on four systems; one keep, Maelstrom (`swarm`).
+- **The verdict.** Not worth it, swarm excepted: a borrowed look made of motion survives a
+native reading, and one made of the source engine's texture does not. Picks 7-21 are abandoned.
+Phase 3 shipped one preset on one system against a done-when of four to six across three - the
+owner's recorded call, accepted at the review because the routing claim was tested by the drafts.
+- **Open.** Backlog 0278 (pick 12's sphere) stays live and low priority.
+
+### [0232 - The library is walked, cut and refilled](done/0232-the-library-is-walked-cut-and-refilled.md)
+
+- closed 2026-10-01 by a conductor close on the lane `plan-0232-the-library-is-walked-cut-and-refilled`.
+Phases 1-6 landed (the plan's log maps each to its commits); **Phase 7, the owner's verdict on
+backlog 0256 step 3, is owed** (`Blocks merge: no`, ADR-0249). Round 1 review: **no blockers, no
+majors, three minors, two nits.** M1, N1 and N2 were repaired at the close in `0cde6dbe`. M2 (a
+frozen corpus-walk floor in `preset_check.rs`) stays open for `dev`, and M3 (two preset-author
+skill lines made false by `star_redpaper`) stays open for the owner, with replacement text. Version:
+**0.158.0** (minor: four presets added, 35 retired). ADR-0253 accepted. Backlog 0038 closed to the
+archive. Upstream CI read green at the close. The full review is the plan's own `## Close review`.
+- **What landed.** A 116-row ledger with a verdict on every row; 35 retirements (30 at the cull, 5
+  at the retunes) with no family below two presets and two representatives; retunes across every
+  family; the six content-brief sittings moved to `Done`; a seven-row gap table that hands Plan 0204
+  rows 1-4; and a refill cohort of four (Interlace, Red Paper, Target, Thicket) on three systems.
+- **Open.** Phase 7. Backlog 0256 and 0248 stay live; 0248 should take the four `fill` readings.
+  The release notes for 0.158.0 should list the 35 retired presets, which the plan's `## Close
+  review` names.
+
+### [0241 - The conductor parks only on what the owner must settle](done/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md)
+
+- closed 2026-10-01, run by hand on `main` (no lane). Phases 1-4 landed: `c1a17bf7`, `7991c87e`,
+`3171cf30`, `a5a52e4a`. Mode 4 review: **no blockers, no majors, three minors (two repaired at the
+close in `2378cad8`, one accepted as recorded), one nit (repaired).** Version: **0.157.0** (minor: the
+conductor's and the pre-push hook's behaviour change). ADR-0261 accepted. Closes no backlog entry.
+Upstream CI read green at the close. The full review is the plan's own `## Close review` section.
+- **What landed.** A session's wrapped full suite is served `-P fast` the way the gate is, and a green
+  served line skips its own tree only; a run of human phases parks once and settles when every phase
+  does; a false `fixed_in` reopens its finding into the digest's Needs you instead of parking; one
+  diagnosed flake (backlog 0219's `a_preset_datagram_selects_by_name`) retries by exact name, and the
+  ledger and history digest name the flaky pass.
+- **Open.** The flaky names print on the history page only, not the current-state page. Backlog 0219
+  stays live and does not yet record the retry; when it closes, its test leaves `.config/nextest.toml`.
+
+### [0235 - The plexus system, and a shared camera with depth of field](done/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md)
+
+- closed 2026-10-01, run by hand on `main` (no lane). Phases 1-7 and 9 landed: `8b3a6d41`,
+`6a52a633`, `f7e09ec4`, `de309bfc`, `f43f1dd7`, `0c23e166`, `2ad353bc`, `695b41cb`. Phase 8, the
+owner's look judgement, recorded as a **keep** at the close. Three review rounds: round 1 two majors
+(fixed `25c9519e`, `7cdf291e`), round 2 one major and one minor (fixed `75c80fee`, `1222b4b6`), round
+3 after Phase 9 **no blockers, no majors, two minors (repaired at the close), two nits** (one open by
+design). Version: **0.156.0** (minor: a feature plan). ADR-0257 accepted, carrying its 2026-10-01
+amendment. Closes no backlog entry. Upstream CI read green at the close. The full round-3 review is the
+plan's own `## Close review` section.
+- **What landed.** `SystemKind::Plexus` with `cloud` and `sheet` layouts; the shared `Camera3d` and
+  `camera.wgsl`; the `seg3d` and `quad3d` pipelines with a per-endpoint circle of confusion; `focus`
+  and `aperture` on the attractor's 3D families; tier caps `plexus_points`, `plexus_edges`,
+  `max_coc_px` that announce. Phase 9 made the cap the lens's ceiling: only an `aperture` past it is
+  announced, and `pin --tier rich` is offered only below Rich.
+- **Curation.** The first five plexus presets (2ea44e40, content lane) all kept; Synapse and Storm
+  Sea are the representatives. No near-duplicate; none binds treble.
+- **Open.** The plexus goldens were blessed on llvmpipe, so Windows CI's golden job is their first
+  WARP reading. Nit 2: the Blur notice's far-field wording is asymptotic. Translation advisory at the
+  close: `how-it-works.ru.md` (moved by this plan's Phase 7), `running.ru.md` and the foobar
+  `READ-ME-FIRST.ru.md`.
+
+### [0230 - The Russian slice becomes findable](done/0230-the-russian-slice-becomes-findable.md)
+
+- closed 2026-09-30, conductor-run close of lane `plan-0230-the-russian-slice-becomes-findable`.
+Phases 1-3 landed: `bc09b3d0`, `d9160208`, `8c931753`. **Phase 4 is owed** (ADR-0249): the reading of
+the deployed site under `/Ritmolux/`. Round 1 review: **no blockers, no majors, no minors, two nits**,
+both left open. Version: **0.155.0** (minor: a feature plan, `site/` only). ADR-0213 accepted with an
+`Outcome` (the `lang` repair was taken; Pagefind splits en 221 / ru 6). Closes no backlog entry.
+Upstream CI read green at the close. The full review is the plan's own `## Close review` section.
+- **What landed.** A header `LanguageSelect` override linking every page to its twin or to a new `ru`
+  entrance page; the twin rule in one module, `site/src/plugins/twins.mjs`; a route middleware giving
+  the Russian routes `lang="ru"`, `og:locale` and `hreflang` alternates; a `По-русски` button on the
+  landing page and links on three *Start here* cards.
+- **Open.** Nit 1: `ru.mdx`'s paragraph hard-codes the count of translations (owner-approved Russian
+  prose). Nit 2: the *Start here* `По-русски` links carry no `lang`/`hreflang`, `dev` work. Translation
+  advisory at the close: `how-it-works.ru.md`, `running.ru.md` and the foobar `READ-ME-FIRST.ru.md`,
+  none moved by this plan.
+
+### [0231 - The interface is audited, then learns one look](done/0231-the-interface-is-audited-then-learns-one-look.md)
+
+- closed 2026-09-30, conductor-run close of lane `plan-0231-the-interface-is-audited-then-learns-one-look`.
+Phases 1-11 landed: `21f261cb`, `98e4d4e7`, `9907f1b5` (the owner's audit, look A), `6202a083`,
+`4d82db06`, `697fafc4`, `fb237a6c`, `d9ddfe12`, `b548dedc`, `7a4996aa`, `cfc7ed95`. **Phase 12 is
+owed** (ADR-0249): the before-and-after judgement on devices, including the foobar panel on Windows.
+Round 1 review: **no blockers, no majors, two minors, two nits**. Both minors and N2 were repaired at
+the close in `dad17147` (comment text only). Version: **0.154.0** (minor: a feature plan).
+ADR-0252 accepted with an `Outcome` (the type scale is declared but no engine surface reads it yet);
+ADR-0256 accepted. Closes no backlog entry. Upstream CI read green at the close. The full review is the
+plan's own `## Close review` section.
+- **What landed.** One `THEME` table in the core, with the studio's `tokens.css` generated from it and
+  gated; panels with the amber edge and width-measured text; overlay motion with a reduced-motion key;
+  one binding table read by dispatch and by the `?` help sheet; parameter `group` and `main` in the
+  schema export, and a studio parameter panel that lists bound rows first and groups the rest.
+- **Open.** N1: the help sheet's mid-group column break drops the group heading
+  (`standalone/src/overlay.rs`), code the close cannot repair. Phase 9's plugin build is owed to CI's
+  `foobar` job after the push. Translation advisory at the close: `running.ru.md` (moved by this
+  plan), `how-it-works.ru.md` and the foobar `READ-ME-FIRST.ru.md`.
+
+### [0233 - The close reviews' small findings are repaired](done/0233-the-close-reviews-small-findings-are-repaired.md)
+
+- closed 2026-09-29, conductor-run close of lane `plan-0233-the-close-reviews-small-findings-are-repaired`.
+Nine phases, no human phase: `4e2085d5`, `0c3db3c5`, `959b4f85`, `96b39b12`, `6b9c6a45`, `cae0ca7b`,
+`eb1b4274`, `1dff2c94`, `6ccaa3c1`. Round 1 review: **no blockers, no majors, two minors, one nit**.
+Minor 1 (`docs/nfr.md` section 4 naming two measuring recipes) was repaired at the close in
+`d664dbc6`. Version: **0.153.0** (minor: Phase 2 changes what Space does after a pick). Closes
+backlog 0263, 0264, 0265, 0266, 0268, 0269, 0270, 0271, 0272. Upstream CI read green at the close.
+The full review is the plan's own `## Close review` section.
+- **What landed.** Under sequential order every explicit selection re-anchors the walk; the
+  thumbnail temp name carries the pid; a hygiene guard holds the exe's size pair equal across NFR
+  section 4 and the three recipes, and the Linux recipe measures; the conductor settles a `not run`
+  row; an `npm-<digits>` advisory can be excepted; the studio's banner names its settings file and
+  `npm run dev` ends every process.
+- **Open.** Minor 2: `--stream`'s empty-trail Prev selects without re-anchoring
+  (`standalone/src/stream.rs`), code the close cannot repair. Nit 3: Phase 5's `bash -n` done-when
+  is not runnable under the conductor's allowlist. Translation advisory at the close:
+  `how-it-works.ru.md`, `running.ru.md` (moved by this plan) and the foobar `READ-ME-FIRST.ru.md`.
+
+### [0234 - A conductor session writes only where it works](done/0234-a-conductor-session-writes-only-where-it-works.md)
+
+- closed 2026-09-29, conductor-run close of lane `plan-0234-a-conductor-session-writes-only-where-it-works`.
+Phases 1-3 ran interactively on `main`, because they edit the settings every conductor session runs
+under: Phase 1 `edfb02a1`, Phase 2 `62bf76c6`, Phase 3 `af200b33` + `cf0502e6`. Round 1 review: **no
+blockers, no majors, two minors, two nits**. Both minors were repaired at the close in `79bca2cd`;
+the nits (a test comment and a settings rule) stay open. Version: **none** (repository tooling: the
+conductor's settings, its probe and tests; no shipped artifact changes). ADR-0255 accepted with an
+`Outcome`. Closes backlog 0273. Upstream CI read green at the close. The full review is the plan's own
+`## Close review` section.
+- **What landed.** `Write` and `Edit` are granted on `./**` (the lane), `//tmp/**` and
+  `/state/reviews/**` (relative to the settings file), and nothing bare. `matcher-probe.mjs --writes`
+  recorded the lane's parent and `$HOME` DENIED on 2.1.283, and that `--add-dir` alone grants nothing;
+  `settings.test.mjs` reads the refusals from that table.
+- **Open.** The macOS and Windows temp-directory rows are unprobed, beside backlog 0267. Every session
+  kind, not only a review, may write `state/reviews/` (review nit 4). Translation advisory at the
+  close: `how-it-works.ru.md`, `running.ru.md` and the foobar `READ-ME-FIRST.ru.md` have moved
+  sources; this plan moved none of them.
+
+### [0212 - The diffused render gains a timeline](done/0212-the-diffused-render-gains-a-timeline.md)
+
+- closed 2026-09-28, conductor-run close of lane `plan-0212-the-diffused-render-gains-a-timeline`.
+Phase 1 `e245ef72` (the sidecar's `--timeline`), Phase 2 `87242235` (`shot --render --bar-grid` and
+the sidecar's reader), Phase 3 (human) recorded in the log. Two review rounds: round 1 one major and
+four minors, the major and three minors fixed in `68070a57`, `a56d7b21`, `6cb70cc7` and `b56153ec`;
+round 2 **no blockers, no majors, one minor**, repaired at the close in `a2f31c32`. Version:
+**0.152.0** (minor: a feature, in dev tooling only). ADR-0236 accepted, no `Outcome` - the verdict
+was the passing one. Closes backlog 0126. Upstream CI read green at the close. The full review is the
+plan's own `## Close review` section.
+- **What landed.** A prompt timeline of `{at_bar, prompt}` entries whose conditioning interpolates
+  between neighbours, the seed fixed; a bar grid `shot` writes from the analyzer's own walk over the
+  frames it renders, read by the sidecar once the Y4M header arrives and held to the stream's rate.
+  The owner judged the full-track render: *"it looks great, amazing really"*.
+- **Open.** The grid's bars are the right length and not reliably on the music's bar 1 - evidence
+  for backlog 0042, not against ADR-0236. Authoring a timeline has no tooling. Translation advisory
+  at the close: `how-it-works.ru.md`, `running.ru.md` and the foobar `READ-ME-FIRST.ru.md` have moved
+  sources; this plan moved none of them.
+
+### [0211 - The diffused frame's resolution is measured before it is designed](done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)
+
+- closed 2026-09-27, conductor-run close of lane `plan-0211-the-diffused-frames-resolution-is-measured-before-it-is-designed`.
+Phase 1 `2be319f4` (the readings) and Phase 2 `06e20dec` (the owner's verdict) ran interactively on
+`main`, because the sidecar needs the CUDA `.venv`. Phase 3 did not run, by the plan's own terms.
+Round 1 review: **no blockers, no majors, three minors**. Minors 1 and 2 were repaired at the close in
+`7af1efc5`, and minor 3 (the log outweighs the phases) needs no repair. Version: **none**
+(docs/chore-only: a measurement and a verdict, no code). No ADR was written or owed, and ADR-0121
+stands unreopened. Closes backlog 0125 and files its residue as backlog 0262. Upstream CI read green
+at the close. The full review is the plan's own `## Close review` section.
+- **What landed.** A matched pair of the same 24 s clip of `star_rosewindow`, rendered at both
+  profiles on one build and one machine: `fast` at 0.554 s and `quality` at 3.065 s per emitted frame,
+  about 5.5x. The owner's verdict was *"quality are fine"*, so the resolution ask was a profile
+  default and not a wall.
+- **Open.** Backlog 0262 covers two things. The first is which profile `docs/diffusion-filter.md`
+  leads with. The second is that the page's cost table was measured on Windows with another preset
+  and reads about 2.5x this box's `quality` figure. Translation advisory: see the close's
+  `check-translations.mjs` run; this plan moved no English source.
+
+### [0208 - The conductor's safety claims get their evidence](done/0208-the-conductors-safety-claims-get-their-evidence.md)
+
+- closed 2026-09-27, conductor-run close of lane `plan-0208-the-conductors-safety-claims-get-their-evidence`.
+Phase 1 `0075c675`, Phase 2 `95d86c89`, Phase 3 `3afa3de4`, Phase 4 `25eea723`, Phase 5 `2d9af125`.
+Three review rounds: round 1 two majors and five minors, round 2 one major and three minors, both
+rounds' majors fixed; round 3 **no blockers, no majors, one minor, one nit**, the nit repaired at the
+close in `2d3df840`. Version: **none** (repository tooling: the conductor's settings, its tests and a
+new Node gate; no shipped artifact changes). ADR-0233 accepted with an `Outcome`. Closes backlog 0236,
+0237 and 0241. Upstream CI read green at the close. The full review is the plan's own `## Close review`
+section.
+- **What landed.** A matcher probe under `tools/conductor/spike/` and its RAN/DENIED table on a named
+  CLI version; `settings.test.mjs` asserts every probed deny case against that table; deny rules for a
+  shell expansion (`$`, backtick), a leading `/` in any argument and a quoted absolute path;
+  `scripts/check-claude-declarations.mjs` on the gate roster.
+- **Open.** The `Remove-Item` half of the bound is modelled, not observed, and is owed to a Windows
+  probe run (review minor 1). Nothing re-runs the probe when the CLI version moves. Translation
+  advisory at the close: `how-it-works.ru.md`, `running.ru.md` and the foobar `READ-ME-FIRST.ru.md`
+  have moved sources; this plan moved none of them.
+
+### [0209 - A system joins the instruments by existing](done/0209-a-system-joins-the-instruments-by-existing.md)
+
+- closed 2026-09-26, conductor-run close of lane `plan-0209-a-system-joins-the-instruments-by-existing`.
+Phase 1 `17961a15`, Phase 2 `52c66c06` (a recorded reading), Phase 3 `ba62c093`, Phase 4 `8bf91ce1`
+and Phase 5 `c46abfa2` (both owner-started sessions, since each edits `.claude/`). Round 1 review:
+**no blockers, no majors, three minors, one nit**; minors 1 and 3 and the nit were repaired at the
+close in `166909f9`, minor 2 (the architect sweep row for `systems.md`) is under `.claude/` and is
+the owner's. Version: **none** (docs/chore-only: an integration test and docs/skill material, no
+shipped artifact changes). ADR-0234 accepted. Closes backlog 0258; takes backlog 0256's instrument
+half, and 0256 stays live for the curation half. The full review is the plan's own `## Close review`
+section.
+- **What landed.** `core/tests/distinctness.rs` declares one test per family through `family_tests!`,
+  which also emits an exhaustive `match` over `SystemKind`, so the report covers all fourteen families
+  and a new variant with no test is a compile error. `docs/testing.md` names no count. The content
+  lane's `systems.md` has a section for every system, the four new ones distilled from the shipped
+  presets.
+- **Open.** The close-ceremony sweep row that would keep `systems.md` current (review minor 2, owner).
+  None of the five arriving families raised a near-duplicate flag; six `attractor` pairs flag and stay
+  unlabelled, input to backlog 0256.
 
 ### [0223 - The heavy presets fit the integrated GPU](done/0223-the-heavy-presets-fit-the-integrated-gpu.md)
 
@@ -10322,6 +10559,25 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-10-01 from `README.md` — the 0204-behind-0201 note, spent
+
+Spent when [Plan 0204](done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) closed on 2026-10-01.
+
+**Added 2026-09-19 - [0204] is approved, it sits behind [0201], and it is not a conductor plan.**
+Every one of its phases is `human` - content-lane sittings the owner starts - so a conductor run
+would park at Phase 1 and stay there, and it is deliberately not in `queue.json`. Only its Phase 3
+waits on [0201]: the reference sheet and the routing table need nothing, and `warp_mesh` is the one
+system whose parameter reference is false today. It also jumps no queue - the six standing sittings
+in [`content-brief.md`](../content-brief.md) are unaffected, and whether the remaining picks join
+them is [0204]'s own Phase 4 verdict.
+**The [0201] half is spent 2026-09-20**, when that plan closed: the `zoom` direction is corrected in
+both declarations and the parameter reference is regenerated from them, so [0204] Phase 3 no longer
+waits on anything and `warp_mesh`'s reference is no longer the false one. The rest of this note
+stands - every phase is still `human` and it is still deliberately out of `queue.json`.
+
+[0204]: done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md
+[0201]: done/0201-the-warp-surface-stops-lying.md
+
 ### Moved 2026-09-26 from `README.md` — the 0223-after-0214 note, spent
 
 Spent when [Plan 0223](done/0223-the-heavy-presets-fit-the-integrated-gpu.md) closed on 2026-09-26.
@@ -10352,7 +10608,7 @@ plans' links are written for this file's depth:
 **Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster above.**
 It carries the three structural findings of that day's architecture sweep, and its position is
 deliberate rather than incidental: [0206](done/0206-the-browser-shows-the-look.md) adds a consumer to the
-preview surface its Phase 5 extracts, [0209](0209-a-system-joins-the-instruments-by-existing.md)
+preview surface its Phase 5 extracts, [0209](done/0209-a-system-joins-the-instruments-by-existing.md)
 derives a roster from the `SystemKind` its Phase 4 gates, and [0203] touches scene params. Run
 earlier it would refactor code three approved plans are about to rewrite. **The [0203] third of that
 is spent 2026-09-20**, when it closed having added six scene params and changed a seventh's meaning;

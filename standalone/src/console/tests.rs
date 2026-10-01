@@ -315,10 +315,10 @@ fn view() -> crate::settings::SettingsView {
         tier: rlx_core::render::Tier::Rich,
         tier_state: crate::settings::TierState::Pinned,
         grid_scale: rlx_core::render::GridScale::FULL,
-        grid_scale_choice: standalone::config::GridScaleChoice::Auto,
+        grid_scale_choice: crate::config::GridScaleChoice::Auto,
         auto_rotate: true,
-        rotate_order: standalone::config::RotateOrder::Shuffled,
-        rotate_source: standalone::config::RotateSource::All,
+        rotate_order: crate::config::RotateOrder::Shuffled,
+        rotate_source: crate::config::RotateSource::All,
         favourites_marked: false,
         min_dwell_secs: 20,
         max_dwell_secs: 90,
@@ -327,7 +327,7 @@ fn view() -> crate::settings::SettingsView {
         display_count: 1,
         display_name: "display".to_owned(),
         diagnostics: false,
-        input_mode: standalone::config::InputMode::Loopback,
+        input_mode: crate::config::InputMode::Loopback,
         input_device_index: 0,
         input_device_count: 0,
         input_device_name: String::new(),
@@ -337,6 +337,8 @@ fn view() -> crate::settings::SettingsView {
         next_rotation: true,
         console: false,
         thumbnails: true,
+        motion: crate::config::Motion::Full,
+        hints: true,
         adapter_index: 0,
         adapter_count: 1,
         adapter_name: "adapter".to_owned(),
@@ -428,84 +430,6 @@ fn the_staging_line_names_the_successor_and_the_rotation_state() {
 
     let off = staging_line(Some(next), false, DWELL);
     assert!(off.text.contains("auto off"), "{}", off.text);
-}
-
-/// **The announced name is the one the rotation then takes**, against the
-/// shipped roster rather than a hand-written one.
-///
-/// The staging line is fed by the traversal's own peek, so this drives a real
-/// [`Director`](crate::director::Director) to a real rotation and compares what
-/// the console would have announced *beforehand* with the name the draw returns
-/// *afterwards*. The rule itself is asserted next door in `director/tests.rs`;
-/// what this adds is the shipped library and the director firing.
-///
-/// Needs a GPU device for the roster, so it takes ADR-0016's skip shape.
-#[test]
-fn the_staged_name_is_the_one_the_rotation_then_takes() {
-    use crate::director::{Traversal, eligible_names};
-    use rlx_core::dsp::AnalysisFrame;
-    use rlx_core::render::{HeadlessOptions, RenderError, Renderer};
-    use standalone::config::RotateSource;
-    use standalone::marks::Marks;
-
-    let renderer = match Renderer::new_headless(HeadlessOptions {
-        width: 64,
-        height: 64,
-        prefer_software: true,
-    }) {
-        Ok(r) => r,
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            return;
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    };
-
-    // Zero dwell bounds so the timer fires on the first advance: this test is
-    // about *which* preset a rotation takes, and the *when* has its own tests
-    // next door in `director/tests.rs`.
-    let mut director = crate::director::Director::from_config(&standalone::config::Rotate {
-        auto: true,
-        min_dwell_secs: 0,
-        max_dwell_secs: 0,
-        track_change: false,
-        ..standalone::config::Rotate::default()
-    });
-
-    let marks = Marks::default();
-    let eligible = eligible_names(renderer.preset_names(), &marks, RotateSource::All);
-    assert!(
-        eligible.len() > 1,
-        "the embedded roster needs more than one eligible preset for this to \
-         say anything"
-    );
-
-    let mut traversal = Traversal::new(renderer.preset_names().count() as u32);
-    let announced = traversal
-        .peek(&eligible)
-        .map(str::to_owned)
-        .expect("a multi-preset roster stages a next");
-    let staged = staging_line(Some(&announced), true, DWELL);
-    assert!(
-        staged.text.contains(&announced),
-        "the staging line did not carry the announced name: {}",
-        staged.text
-    );
-
-    let fired = director.advance(1.0 / 60.0, &AnalysisFrame::default());
-    assert!(
-        fired.is_some(),
-        "a director at zero dwell must rotate on its first advance, or this \
-         test is comparing against a rotation that never happened"
-    );
-
-    let taken = traversal.draw(&eligible).expect("a non-empty eligible set");
-    assert_eq!(
-        taken, announced,
-        "the console announced a different preset than the rotation took — the \
-         staging line is computed from something other than the traversal the \
-         rotation draws from"
-    );
 }
 
 /// The predecessor the `prev` control selects is the one `select_preset` lands
@@ -646,7 +570,7 @@ fn the_random_control_is_a_cut_and_not_a_settings_row() {
 /// mapping and would keep passing after the strip's changed.
 #[test]
 fn a_transport_verb_resolves_the_strips_own_action() {
-    use standalone::osc::decode::Transport;
+    use crate::osc::decode::Transport;
     let view = view();
     assert_eq!(
         action_for_transport(Transport::Next, view.auto_rotate, &view),
@@ -666,7 +590,7 @@ fn a_transport_verb_resolves_the_strips_own_action() {
 /// messages from a control surface that repeats its state would leave rotation off.
 #[test]
 fn auto_and_hold_are_positions_rather_than_presses() {
-    use standalone::osc::decode::Transport;
+    use crate::osc::decode::Transport;
     let view = view();
     for (verb, already) in [(Transport::Auto, true), (Transport::Hold, false)] {
         assert_eq!(

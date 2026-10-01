@@ -126,7 +126,7 @@
 
 use super::gpu;
 use super::post::{Fold, PostGrid, PostStage};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// `bloom_amount` default — **off**, so an unbound preset never builds the stage.
 const DEFAULT_AMOUNT: f32 = default_of(PARAMS, "bloom_amount");
@@ -886,6 +886,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much of the blurred bright pass is added back; 0 turns the stage off entirely.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: true,
     },
     ParamSpec {
         name: "bloom_threshold",
@@ -893,6 +895,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "The linear level a pixel must exceed before it glows at all; raise it to bloom only highlights.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "bloom_radius",
@@ -900,6 +904,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.25, 4.0]),
         doc: "Scales how far the glow spreads from the pixel that produced it.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
 ];
 

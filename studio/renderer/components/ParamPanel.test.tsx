@@ -26,13 +26,31 @@ const ROSTERS: ParamRoster[] = [
   {
     name: 'fragment_field',
     params: [
-      { name: 'warp', default: 0.4, range: [0, 1.5], doc: 'Amplitude of the fold.', kind: 'modal' },
-      { name: 'drift', default: 1, range: [0, 4], doc: 'How fast it turns.', kind: 'modal' },
+      {
+        name: 'warp',
+        default: 0.4,
+        range: [0, 1.5],
+        doc: 'Amplitude of the fold.',
+        group: 'shape',
+        main: true,
+        kind: 'modal',
+      },
+      {
+        name: 'drift',
+        default: 1,
+        range: [0, 4],
+        doc: 'How fast it turns.',
+        group: 'motion',
+        main: true,
+        kind: 'modal',
+      },
       {
         name: 'mirror_order',
         default: 6,
         range: [0, 12],
         doc: 'How many mirrors.',
+        group: 'shape',
+        main: false,
         kind: 'structural',
       },
     ],
@@ -144,13 +162,161 @@ describe('what each binding renders as', () => {
       rosters: [
         {
           name: 'invented',
-          params: [{ name: 'x', default: 0, range: [0, 1], doc: '', kind: 'modal' }],
+          params: [
+            {
+              name: 'x',
+              default: 0,
+              range: [0, 1],
+              doc: '',
+              group: 'light',
+              main: false,
+              kind: 'modal',
+            },
+          ],
         },
       ],
       bindings: [],
     })
     expect(screen.getByLabelText('x')).toBeDefined()
     expect(screen.queryByLabelText('warp')).toBeNull()
+  })
+})
+
+/**
+ * What the preset binds is on top, and the rest is filed by the engine's own
+ * groups, closed (ADR-0256).
+ *
+ * Against the engine's committed document, so the groups asserted are the ones
+ * the declarations make rather than a fixture's.
+ */
+describe('bound first, the rest grouped', () => {
+  const DOCUMENT = schemaDocumentSchema.parse(PLAYER_SCHEMA)
+  const ROSTERS = rostersFor(DOCUMENT, 'parametric_curve')
+  const SPECS = ROSTERS.flatMap((roster) => roster.params)
+  // One of each binding shape, and one from an engine stage rather than the
+  // system, so the bound list is shown to cross rosters.
+  const THREE: Binding[] = [
+    { kind: 'expr', name: 'n', text: 'bass * 4', line: 5 },
+    { kind: 'const', name: 'd', value: 3, line: 6, quote: '"' },
+    { kind: 'const', name: 'bloom_amount', value: 0.4, line: 7, quote: '"' },
+  ]
+
+  /** The `data-param` names inside `container`, in document order. */
+  function names(container: Element): string[] {
+    return [...container.querySelectorAll('[data-param]')].map(
+      (row) => row.getAttribute('data-param') ?? '',
+    )
+  }
+
+  it('lists exactly the three bound parameters above every group', () => {
+    for (const binding of THREE) expect(SPECS.map((spec) => spec.name)).toContain(binding.name)
+    const { container } = render(
+      <ParamPanel
+        rosters={ROSTERS}
+        family={null}
+        bindings={THREE}
+        writable
+        hasDocument
+        onDrag={vi.fn()}
+        onCommit={vi.fn()}
+      />,
+    )
+    const boundList = container.querySelector('[data-bound]')
+    if (boundList === null) throw new Error('no bound list')
+    expect(names(boundList).sort()).toEqual(['bloom_amount', 'd', 'n'])
+
+    const folds = [...container.querySelectorAll('details')]
+    expect(folds.length).toBeGreaterThan(0)
+    for (const fold of folds) {
+      // Above: the bound list precedes every group in the document.
+      expect(boundList.compareDocumentPosition(fold) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(fold.open).toBe(false)
+    }
+
+    // Every other parameter is in exactly one group, and it is its own group.
+    const filed = new Map<string, string>()
+    for (const fold of folds) {
+      for (const name of names(fold)) filed.set(name, fold.getAttribute('data-group') ?? '')
+    }
+    const unbound = SPECS.filter((spec) => !THREE.some((binding) => binding.name === spec.name))
+    expect([...filed.keys()].sort()).toEqual(unbound.map((spec) => spec.name).sort())
+    for (const spec of unbound) expect([spec.name, filed.get(spec.name)]).toEqual([spec.name, spec.group])
+  })
+
+  it('orders the groups shape, motion, colour, light, post, each headed with its count', () => {
+    const { container } = render(
+      <ParamPanel
+        rosters={ROSTERS}
+        family={null}
+        bindings={[]}
+        writable
+        hasDocument
+        onDrag={vi.fn()}
+        onCommit={vi.fn()}
+      />,
+    )
+    const folds = [...container.querySelectorAll('details')]
+    const order = folds.map((fold) => fold.getAttribute('data-group'))
+    const expected = ['shape', 'motion', 'colour', 'light', 'post'].filter((group) =>
+      SPECS.some((spec) => spec.group === group),
+    )
+    expect(order).toEqual(expected)
+    for (const fold of folds) {
+      const count = SPECS.filter((spec) => spec.group === fold.getAttribute('data-group')).length
+      expect(fold.querySelector('summary')?.textContent).toContain(String(count))
+    }
+  })
+
+  it('lists a group’s main rows first when it is expanded', () => {
+    const { container } = render(
+      <ParamPanel
+        rosters={ROSTERS}
+        family={null}
+        bindings={[]}
+        writable
+        hasDocument
+        onDrag={vi.fn()}
+        onCommit={vi.fn()}
+      />,
+    )
+    const byName = new Map(SPECS.map((spec) => [spec.name, spec]))
+    let checked = 0
+    for (const fold of container.querySelectorAll('details')) {
+      const summary = fold.querySelector('summary')
+      if (summary === null) throw new Error('a group with no summary')
+      fireEvent.click(summary)
+      expect(fold.open).toBe(true)
+      const mains = names(fold).map((name) => byName.get(name)?.main === true)
+      // Once a secondary row appears, no main row follows it.
+      const firstSecondary = mains.indexOf(false)
+      if (firstSecondary !== -1) expect(mains.slice(firstSecondary)).not.toContain(true)
+      if (mains.includes(true) && mains.includes(false)) checked += 1
+    }
+    // At least one group mixes the two, or the ordering was never exercised.
+    expect(checked).toBeGreaterThan(0)
+  })
+
+  it('moves a row up into the bound list once the preset binds it', () => {
+    const props = {
+      rosters: ROSTERS,
+      family: null,
+      writable: true,
+      hasDocument: true,
+      onDrag: vi.fn(),
+      onCommit: vi.fn(),
+    }
+    const view = render(<ParamPanel {...props} bindings={[]} />)
+    expect(view.container.querySelector('[data-bound]')).toBeNull()
+    view.rerender(
+      <ParamPanel
+        {...props}
+        bindings={[{ kind: 'const', name: 'd', value: 3, line: 6, quote: '"' }]}
+      />,
+    )
+    const boundList = view.container.querySelector('[data-bound]')
+    if (boundList === null) throw new Error('no bound list after binding')
+    expect(names(boundList)).toEqual(['d'])
+    for (const fold of view.container.querySelectorAll('details')) expect(names(fold)).not.toContain('d')
   })
 })
 

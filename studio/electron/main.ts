@@ -24,7 +24,14 @@ import { playerArgs, PlayerSupervisor } from './player/supervisor'
 import { resolvePlayer, type ResolvedPlayer } from './player/resolve'
 import type { PlayerMode } from '@shared/player-mode'
 
-import { playerModeOf, readSettings, settingsFile, writeSettings } from './settings'
+import {
+  playerModeOf,
+  readSettings,
+  reducedMotionOf,
+  settingsFile,
+  writeSettings,
+  type StudioSettings,
+} from './settings'
 import { createWindow, DEV_SERVER_ORIGIN, getRendererPaths, installCsp } from './window'
 import { captureRequest, runCapture } from './capture'
 
@@ -65,7 +72,9 @@ function send(window: BrowserWindow, event: PlayerEvent): void {
 
 function start(): void {
   const file = settingsFile(app.getPath('userData'))
-  const settings = readSettings(file)
+  // The file as this session last wrote it: every setter merges onto this and
+  // then replaces it, so a second write in one session keeps the first.
+  let settings = readSettings(file)
   // Read once, at spawn. A mode changed later is written to the file and picked
   // up by the next launch: switching live would mean tearing down the player,
   // the control socket and the frame port under whatever is unsaved (ADR-0186
@@ -82,14 +91,23 @@ function start(): void {
     studioVersion: app.getVersion(),
     playerPath: resolved?.path,
     playerSource: resolved?.source,
+    settingsFile: file,
     playerMode: mode,
+    reducedMotion: reducedMotionOf(settings),
   })
   const schema = new SchemaCache(resolved?.path)
   // Merged onto what was read, because `writeSettings` writes what it is handed
   // and `playerPath` is the key nobody would notice losing until a relaunch.
-  const setPlayerMode = (next: PlayerMode): void =>
-    writeSettings(file, { ...settings, playerMode: next })
-  registerAppHandlers(info, () => schema.get(), setPlayerMode)
+  // `settings` is replaced only after the write succeeded, so a refused write
+  // leaves the session agreeing with the file.
+  const update = (next: StudioSettings): void => {
+    writeSettings(file, next)
+    settings = next
+  }
+  const setPlayerMode = (next: PlayerMode): void => update({ ...settings, playerMode: next })
+  const setReducedMotion = (next: boolean): void =>
+    update({ ...settings, ui: { ...settings.ui, reducedMotion: next } })
+  registerAppHandlers(info, () => schema.get(), setPlayerMode, setReducedMotion)
   registerPresetHandlers(() => scope)
   registerPlayerHandlers(
     () => control,

@@ -63,8 +63,24 @@ const SCHEMA: SchemaDocument = {
     {
       name: 'attractor',
       params: [
-        { name: 'warp', default: 0.4, range: [0, 1.5], doc: 'Amplitude.', kind: 'modal' },
-        { name: 'drift', default: 1, range: [0, 4], doc: 'How fast.', kind: 'modal' },
+        {
+          name: 'warp',
+          default: 0.4,
+          range: [0, 1.5],
+          doc: 'Amplitude.',
+          group: 'shape',
+          main: true,
+          kind: 'modal',
+        },
+        {
+          name: 'drift',
+          default: 1,
+          range: [0, 4],
+          doc: 'How fast.',
+          group: 'motion',
+          main: false,
+          kind: 'modal',
+        },
       ],
     },
     { name: 'swarm', params: [] },

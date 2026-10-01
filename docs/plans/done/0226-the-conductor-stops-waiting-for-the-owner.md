@@ -1,6 +1,6 @@
 # 0226 — The conductor stops waiting for the owner
 
-> **Status:** done - Phase 7 owed, ADR-0249. Closed 2026-09-24 (human-started lane). Phases 1-6 `affd4859`, `6e0b3d2c`, `56061b8b`, `8f363852`, `362d0f02`, `0bec06ee`. Mode 4: one major (the implementer skills' conductor mode did not admit `repair`), fixed at the close in `ee17e357`; three minors open. Full workspace suite (1805 passed, 7 skipped), `cargo doc -D warnings` and the conductor tests (423 pass) verified green at the close. Version: none (conductor tooling, nothing a release ships).
+> **Status:** done (Phase 7 read 2026-09-27). Closed 2026-09-24 (human-started lane). Phases 1-6 `affd4859`, `6e0b3d2c`, `56061b8b`, `8f363852`, `362d0f02`, `0bec06ee`. Mode 4: one major (the implementer skills' conductor mode did not admit `repair`), fixed at the close in `ee17e357`; three minors open. Full workspace suite (1805 passed, 7 skipped), `cargo doc -D warnings` and the conductor tests (423 pass) verified green at the close. Version: none (conductor tooling, nothing a release ships).
 > **Created:** 2026-09-24
 > **Approved:** 2026-09-24 (user). Human-started, not queued; settle 0217 before starting.
 > **Owner skill(s):** dev, human
@@ -342,7 +342,7 @@ behaviour, never at the end.
 | 4 — A red gate gets one repair session | dev | done | `8f363852` |
 | 5 — The close is its own session, holds the lock alone, and keeps a clean verdict | dev | done | `362d0f02` |
 | 6 — A readiness check reads the plan before any spend | dev | done | `0bec06ee` |
-| 7 — The pilot: one resident run over the real queue | human | owed | |
+| 7 — The pilot: one resident run over the real queue | human | done | committed with this row |
 
 ### Notes
 
@@ -396,6 +396,31 @@ behaviour, never at the end.
 - Close (architect, 2026-09-24): Phase 7 is the pilot of the merged conductor and cannot run before the
   merge, so the close gave it `Blocks merge: no` and left its row `owed` (ADR-0249). The review's one
   major, a repair session its own skill would not admit, is fixed in `ee17e357`.
+
+- **Phase 7, the pilot readings** (recorded 2026-09-27 from `digest --history` and
+  `state/live.log`, by an architect session at the owner's request).
+  - **Runs started: one.** The pilot run started 2026-09-26 16:50 UTC and stayed up about 24.5 h,
+    through the night. It ended when the editor holding its shell was closed by accident at 17:18 UTC
+    the next day, not by anything the conductor did. A plain `run` restarted at 17:19 and took the
+    plan it had been in (0211) from its remerge. The same day had three earlier runs (13:32, 13:49,
+    15:01), all restarted by hand, which are why this run and not those is the pilot.
+  - **Parks by reason: ten.** `plan_wrong` 2 (0212, readiness and implement), `human_phase` 3 (0202
+    Phase 4, 0209 Phase 5, 0212 Phase 3), `stop_condition` 1 (0202 Phase 3), `disagreement` 1
+    (0202), `claude_dir` 1 (0209 Phase 4), `main_dirty` 1 (0209), `check_red` 1 (0211, the
+    loopback flake on a docs-only close).
+  - **Self-resumes: none.** All eight resumes were the owner's. The one park with a self-resume
+    path, 0209's `main_dirty`, was resumed by hand within the minute the main checkout was committed.
+  - **Merge and repair sessions:** one merge session, `0211 merge-03`, which merged. There were no
+    repair sessions. 0209 also re-merged once through the conductor's own remerge, with no session.
+  - **Readiness verdicts: seven.** Six `ready` (0202 twice, 0209, 0212 twice, 0208) and one
+    `parked plan_wrong` (0212's first). Each cost $0.64-0.72.
+  - **Spend: $37.32 for two merges** (0208 $11.59, 0209 $6.30 in this run), against the previous
+    window's $274 for six. That is about $18.7 per merge against about $45.7. The remainder went to
+    the parked plans (0202, 0212) and to 0211's close. Usage moved from 7d 0.44 to 0.51 over the run.
+  - **The park the pipeline should have absorbed** is 0202's `disagreement`: a `not run` log row read
+    as unfinished. It is backlog 0263. The other nine were judgements or rules working as designed.
+    0211's `check_red` in particular is the gate declining to retry a flake (ADR-0193), and the flake
+    is backlog 0219.
 
 ### Close triggers
 

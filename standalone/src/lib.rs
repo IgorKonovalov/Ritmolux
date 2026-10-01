@@ -36,20 +36,33 @@ use std::path::{Path, PathBuf};
 // `standalone/tests/` can round-trip the documented `config.toml` through the
 // very type the app deserializes - the same reason `osc` and `shot` are here.
 pub mod config;
+// The operator console's routing, the preset browser and the settings menu: the
+// binary's alone, but pure functions of state that also compose the headless
+// `shot --ui` captures, so the audit's pictures and the app's frames are built
+// by one set of functions.
+pub mod console;
 pub mod control;
 pub mod events;
 pub mod gpu;
+// Every key binding, read by the binary's dispatch and by the help sheet the
+// headless capture draws, so both come from one table.
+pub mod keymap;
 // The per-user preset marks (ADR-0228). A library module for the reason
 // `config` is: it is the binary's alone, but it round-trips through a file, and
 // a library module is where that test runs.
 pub mod marks;
+// How the overlays move. Beside `console` and `overlay` for their reason: pure,
+// and exercised against their state machines without a window.
+pub mod motion;
 pub mod osc;
+pub mod overlay;
 // The `--check` preset checker (ADR-0190). A library module rather than a binary
 // one for the reason `config` is: `standalone/tests/` runs it over the whole
 // preset corpus as the gate, which needs the checker callable without spawning
 // a process per file.
 pub mod preset_check;
 pub mod rss;
+pub mod settings;
 pub mod shot;
 // The Spout video-out (ADR-0125). Behind a default-off feature AND a Windows
 // cfg, so nothing about a normal build reaches it: the C++ shim it binds is

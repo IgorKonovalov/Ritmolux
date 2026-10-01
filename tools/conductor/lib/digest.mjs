@@ -24,7 +24,7 @@ import { join, relative } from "node:path";
 
 import { isAncestor, resolveCommit, tagObjectType } from "./git.mjs";
 import { dirtyText, resumeCommand } from "./inbox.mjs";
-import { laneOpen } from "./lane.mjs";
+import { laneOpen, openParkPhases, parkPhases } from "./lane.mjs";
 import { readLedger } from "./ledger.mjs";
 import { usageReading } from "./live.mjs";
 import { CLAUDE_DIR } from "./outcome.mjs";
@@ -111,20 +111,24 @@ function planTitle(repo, plan) {
   return { title: readPlanFile(found.path).title ?? `Plan ${plan}`, rel: relative(repo, found.path).replace(/\\/g, "/") };
 }
 
+/** Why a finding the close claimed to repair is open after all (ADR-0261), or nothing. */
+const reopenedText = (f) => (f.reopened ? ` - reopened: ${f.reopened.reason}` : "");
+
 function findingLine(f, resolvedIn) {
   const fixed = resolvedIn ? ` - resolved in \`${short(resolvedIn)}\`` : f.fixed_in ? ` - repaired by the close in \`${short(f.fixed_in)}\`` : "";
   const d = f.disposition;
   const closed = d ? ` - closed ${d.at.slice(0, 10)} (${d.verb}): ${d.reason}` : "";
-  return `  - ${f.severity} \`${findingWhere(f)}\` ${f.what}${fixed}${closed}`;
+  return `  - ${f.severity} \`${findingWhere(f)}\` ${f.what}${fixed}${reopenedText(f)}${closed}`;
 }
 
 /**
- * The minors and nits the closing verdict merged with that its close did not repair (ADR-0209) and
- * the owner has not disposed of (ADR-0216). `fixed_in` is evidence checked against the branch; a
- * disposition is a judgement checked against nothing, and both take a finding off the worklist.
+ * The minors and nits the closing verdict merged with that its close did not repair (ADR-0209), and
+ * every finding whose repair claim `git` contradicted (ADR-0261), that the owner has not disposed of
+ * (ADR-0216). `fixed_in` is evidence checked against the branch; a disposition is a judgement checked
+ * against nothing, and both take a finding off the worklist.
  */
 function openFindings(rec) {
-  return (rec.verdicts.at(-1)?.findings ?? []).filter((f) => (f.severity === "minor" || f.severity === "nit") && !f.fixed_in && !f.disposition);
+  return (rec.verdicts.at(-1)?.findings ?? []).filter((f) => (f.severity === "minor" || f.severity === "nit" || f.reopened) && !f.fixed_in && !f.disposition);
 }
 
 /** How many of a plan's closing findings the owner has closed with a verb and a reason. */
@@ -161,6 +165,22 @@ function timeInRun(rec, run, inRun) {
   return { active, wall: end - start };
 }
 
+/**
+ * One line per suite run of `plan` in the run that passed a test only on its retry (ADR-0261), read
+ * off the ledger's `flaky` key. A ledger line belongs to a plan by its `by`: `gate NNNN-<stage>` for
+ * the conductor's gate and `NNNN-<step>` for a session's wrapped suite. A hand run names no plan.
+ */
+function flakyLines(ledger, plan, inRun, indent) {
+  const out = [];
+  for (const e of ledger) {
+    if (!e.flaky?.length || !inRun(e.at)) continue;
+    if (/^(?:gate )?(\d{4})-/.exec(e.by ?? "")?.[1] !== plan) continue;
+    const names = e.flaky.map((n) => `\`${n}\``).join(", ");
+    out.push(`${indent}flaky, passed on retry in \`${e.by}\`${e.served ? " (served -P fast)" : ""}: ${names}`);
+  }
+  return out;
+}
+
 function closedFindings(rec) {
   const lines = [];
   for (const v of rec.verdicts) {
@@ -178,9 +198,9 @@ function closedFindings(rec) {
  *
  * - the plan is under `docs/plans/done/` **in the main checkout** with `Status: done` — a close that
  *   landed outside the conductor, which never touches state/conductor.json;
- * - a park on a phase only the owner can do (`human_phase`, `claude_dir`) sits on a phase the plan's
- *   own `## Implementation log` now marks done, or owed on a phase marked `Blocks merge: no`
- *   (`settledPhase`, the same reader `parkStillTrue` asks). That row is read in the lane when the
+ * - a park on phases only the owner can do (`human_phase`, `claude_dir`) sits on phases the plan's
+ *   own `## Implementation log` now marks done, or owed on a phase marked `Blocks merge: no` —
+ *   every phase of the run it recorded (`openParkPhases`, the same reader `parkStillTrue` asks). That row is read in the lane when the
  *   worktree is still there and in the main checkout otherwise, so a lane removed by hand is not a
  *   missing plan.
  *
@@ -198,9 +218,13 @@ export function settledPark(rec, repo) {
   if ((reason !== "human_phase" && reason !== CLAUDE_DIR) || !phase) return null;
   const where = rec.worktree && existsSync(rec.worktree) ? rec.worktree : repo;
   const found = findPlan(where, rec.plan);
-  const how = found ? settledPhase(readPlanFile(found.path), phase) : null;
-  if (!how) return null;
-  return `Phase ${phase} now reads \`${how}\` in the plan's \`## Implementation log\``;
+  if (!found) return null;
+  const plan = readPlanFile(found.path);
+  // A run of phases settles only when every one of them has (openParkPhases, shared with resume).
+  if (openParkPhases(plan, rec.park).length) return null;
+  const ids = parkPhases(rec.park);
+  if (ids.length === 1) return `Phase ${phase} now reads \`${settledPhase(plan, phase)}\` in the plan's \`## Implementation log\``;
+  return `Phases ${ids.map((id) => `${id} \`${settledPhase(plan, id)}\``).join(", ")} in the plan's \`## Implementation log\``;
 }
 
 /**
@@ -367,7 +391,7 @@ function needsYou(view) {
     if (open.length === 0) continue;
     counts.findings += 1;
     lines.push(`- **${rec.plan} merged with ${plural(open.length, "open finding")}**:`);
-    for (const f of open) lines.push(`  - ${f.severity} \`${findingWhere(f)}\` ${f.what}`);
+    for (const f of open) lines.push(`  - ${f.severity} \`${findingWhere(f)}\` ${f.what}${reopenedText(f)}`);
   }
   // One line for every finding the owner has closed, never a per-plan breakdown: that is the
   // accumulation this page was rid of, one indent further in (ADR-0216). It is left out entirely at
@@ -494,7 +518,7 @@ export function renderHistory(state, opts) {
         const open = openFindings(rec);
         if (open.length > 0) {
           minorsMerged.push(`- **${rec.plan} merged with ${plural(open.length, "open finding")}**:`);
-          for (const f of open) minorsMerged.push(`  - ${f.severity} \`${findingWhere(f)}\` ${f.what}`);
+          for (const f of open) minorsMerged.push(`  - ${f.severity} \`${findingWhere(f)}\` ${f.what}${reopenedText(f)}`);
         }
       }
     }
@@ -544,6 +568,7 @@ export function renderHistory(state, opts) {
           `${usd(spendInRun(rec, inRun))} this run, ${usd(totalSpend(rec))} total. Review: \`${rel ?? rec.plan}\` \`## Close review\`.`,
       );
       out.push(...closedFindings(rec));
+      out.push(...flakyLines(ledger, rec.plan, inRun, "  - "));
     }
     out.push("");
 
@@ -551,6 +576,8 @@ export function renderHistory(state, opts) {
     out.push("### Failed and parked", "");
     const failed = [];
     for (const rec of plans) {
+      // A merged plan's flaky passes sit under its Closed bullet; any other plan's sit here.
+      if (!closed.includes(rec)) failed.push(...flakyLines(ledger, rec.plan, inRun, `- **${rec.plan}** `));
       for (const g of (rec.gates ?? []).filter((x) => !x.ok && inRun(x.at))) {
         const tests = g.failed.tests?.length ? ` - failing: ${g.failed.tests.join(", ")}` : "";
         failed.push(`- **${rec.plan}** gate red at \`${g.label}\`: ${g.failed.name} exited ${g.failed.code}${tests}. Log: \`${g.failed.log}\``);

@@ -26,7 +26,7 @@
 
 use rlx_core::render::{GridScale, Tier};
 
-use standalone::config::{GridScaleChoice, InputMode, RotateOrder, RotateSource};
+use crate::config::{GridScaleChoice, InputMode, Motion, RotateOrder, RotateSource};
 
 /// The fixed values the Grid scale row steps through, smallest first; `auto`
 /// sits past the top. Quarters, because a finer step is not a difference an
@@ -126,6 +126,10 @@ pub struct SettingsView {
     /// Whether the background pass renders the browser's pictures
     /// (`[thumbnails] enabled`).
     pub thumbnails: bool,
+    /// Whether the overlays move (`[ui] motion`).
+    pub motion: Motion,
+    /// Whether the launch hint shows (`[ui] hints`).
+    pub hints: bool,
     /// Position of the running graphics adapter in the shell's cached roster,
     /// and how big that roster is (ADR-0246). A count under two means there is
     /// nowhere to move to — one adapter, or an enumeration that failed — and
@@ -227,6 +231,11 @@ pub enum SettingsAction {
     ToggleConsole,
     /// Start or stop the background thumbnail pass, persisted (ADR-0230).
     ToggleThumbnails,
+    /// Switch how the overlays move, persisted as `[ui] motion`. A switch
+    /// rather than a toggle, for the reason the order row is one.
+    SetMotion(Motion),
+    /// Show the launch hint or not, persisted as `[ui] hints`.
+    ToggleHints,
     /// Move the running show onto the adapter at this position in the shell's
     /// cached roster, and persist it (ADR-0246). The position is already
     /// stepped and wrapped here, so the shell switches without re-deciding
@@ -256,13 +265,15 @@ pub enum SettingsRow {
     NowPlaying,
     NextRotation,
     Console,
+    Motion,
+    Hints,
     Thumbnails,
     Presets,
 }
 
 impl SettingsRow {
     /// Every row, in display order. The one read-only row stays last.
-    pub const ALL: [SettingsRow; 19] = [
+    pub const ALL: [SettingsRow; 21] = [
         SettingsRow::Quality,
         // Directly under the tier, because it is resolved from the tier and
         // qualifies it: `RICH` at 0.50 is a different picture from `RICH` at
@@ -299,6 +310,11 @@ impl SettingsRow {
         // console is also about what the operator sees rather than about the
         // show, but it opens a window rather than changing the canvas.
         SettingsRow::Console,
+        // After the console, with the other rows about how the interface
+        // behaves rather than about the show.
+        SettingsRow::Motion,
+        // The other `[ui]` key, beside its sibling.
+        SettingsRow::Hints,
         // Beside the read-only library row: both are about the library rather
         // than the show, and this one decides whether its pictures are made.
         SettingsRow::Thumbnails,
@@ -340,6 +356,8 @@ impl SettingsRow {
             SettingsRow::NowPlaying => Some("hud.now_playing"),
             SettingsRow::NextRotation => Some("hud.next_rotation"),
             SettingsRow::Console => Some("console.enabled"),
+            SettingsRow::Motion => Some("ui.motion"),
+            SettingsRow::Hints => Some("ui.hints"),
             SettingsRow::Thumbnails => Some("thumbnails.enabled"),
             // The path display: it names where presets are loaded from, which
             // is a launch-time resolution (`RLX_PRESET_DIR`, then the per-user
@@ -367,6 +385,8 @@ impl SettingsRow {
             SettingsRow::NowPlaying => "Now playing",
             SettingsRow::NextRotation => "Next in",
             SettingsRow::Console => "Console",
+            SettingsRow::Motion => "Motion",
+            SettingsRow::Hints => "Key hints",
             SettingsRow::Thumbnails => "Thumbnails",
             SettingsRow::Presets => "Presets",
         }
@@ -459,6 +479,9 @@ impl SettingsRow {
             SettingsRow::NowPlaying => on_off(view.now_playing).to_owned(),
             SettingsRow::NextRotation => on_off(view.next_rotation).to_owned(),
             SettingsRow::Console => on_off(view.console).to_owned(),
+            // The word `config.toml` holds, like the order row.
+            SettingsRow::Motion => view.motion.as_str().to_owned(),
+            SettingsRow::Hints => on_off(view.hints).to_owned(),
             SettingsRow::Thumbnails => on_off(view.thumbnails).to_owned(),
             SettingsRow::Presets => view.preset_dir.clone(),
         }
@@ -549,6 +572,11 @@ impl SettingsRow {
             SettingsRow::NowPlaying => SettingsAction::ToggleNowPlaying,
             SettingsRow::NextRotation => SettingsAction::ToggleNextRotation,
             SettingsRow::Console => SettingsAction::ToggleConsole,
+            // `full` on the left because it is the default.
+            SettingsRow::Motion => {
+                SettingsAction::SetMotion(if right { Motion::Reduced } else { Motion::Full })
+            }
+            SettingsRow::Hints => SettingsAction::ToggleHints,
             SettingsRow::Thumbnails => SettingsAction::ToggleThumbnails,
             // Read-only, and already returned above on the strength of its
             // empty `config_path`. The arm stays because the match is

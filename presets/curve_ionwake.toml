@@ -102,7 +102,7 @@ softness   = "0"
 # What the trim buys back is the header's dark water between echoes, which the
 # untrimmed solid deposit had begun to fill in.
 glow       = "0.95"
-brightness = "0.32 + (noise(time * 0.6) - 0.5) * 0.14 + beat * 0.85"
+brightness = "0.60 + (noise(time * 0.6) - 0.5) * 0.14 + beat * 0.85"
 
 # A two-tone band riding a cyan-to-magenta ramp - wider than the first draft
 # but still a BAND, not the whole wheel (the add-blend wash trade): the braid
@@ -110,7 +110,9 @@ brightness = "0.32 + (noise(time * 0.6) - 0.5) * 0.14 + beat * 0.85"
 # A new colour every beat, riding the full electric ramp - with a slow drift
 # under it so the idle spiral's colour is never frozen between beats.
 hue        = "hash(beat_index) * 0.85 + time * 0.02"
-hue_spread = "0.25 + clamp(treb * 0.33, 0, 0.2)"
+hue_spread = "0.35 + clamp(treb * 0.5, 0, 0.3)"
+bloom_amount    = "0.35"
+bloom_threshold = "0.8"
 saturation = "1.0"
 
 [smoothing]

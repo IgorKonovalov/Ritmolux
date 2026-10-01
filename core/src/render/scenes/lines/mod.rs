@@ -21,7 +21,7 @@
     clippy::unreachable
 )]
 
-use crate::render::scenes::{ParamKind, ParamSpec};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec};
 
 pub mod biarc;
 pub mod curves;
@@ -37,7 +37,8 @@ pub mod turtle;
 pub use lsystem::LSystemScene;
 pub use parametric::ParametricCurveScene;
 pub use renderer::{
-    ArcInstance, LineRenderer, MITER_LIMIT, SegmentInstance, StrokeMetric, miter_extension,
+    ArcInstance, LineRenderer, MITER_LIMIT, Segment3dInstance, SegmentInstance, StrokeMetric,
+    miter_extension,
 };
 pub use spectrum::{SpectrumLayout, SpectrumScene};
 pub use star::StarPatternScene;
@@ -91,7 +92,7 @@ pub fn half_width(thickness: f32) -> f32 {
 ///
 /// **`1.0` remains reachable and is not dead surface.** The same gate returned
 /// `1.0` for the Maurer roses, `0` for `curve_ionwake` and `0.25` for
-/// `lsystem_vellum` — which is why this is an authorable parameter with a
+/// a since-retired ink-on-paper lsystem — which is why this is an authorable parameter with a
 /// default rather than a constant. A preset that wants the luminous smear
 /// binds one number and gets the pre-Plan-0114 fragment back, term for term.
 ///
@@ -125,6 +126,8 @@ pub const SOFTNESS: ParamSpec = ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Light,
+    main: false,
 };
 
 /// `stroke_blend`, shared: additive light at 0, opaque paint at 1.
@@ -134,6 +137,8 @@ pub const STROKE_BLEND: ParamSpec = ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Light,
+    main: false,
 };
 
 /// `mirror_order`, shared: how many copies of the geometry ring the centre.
@@ -143,6 +148,8 @@ pub const MIRROR_ORDER: ParamSpec = ParamSpec {
     range: Some([1.0, 12.0]),
     doc: "Repeats the geometry this many times around the centre; 1 draws it once.",
     kind: ParamKind::Structural,
+    group: ParamGroup::Shape,
+    main: false,
 };
 
 /// `mirror_reflect`, shared: whether those copies alternate as mirror images.
@@ -152,6 +159,8 @@ pub const MIRROR_REFLECT: ParamSpec = ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "Alternates the repeats into mirror images rather than plain rotations.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Shape,
+    main: false,
 };
 
 /// `draw_progress`, shared: how much of the figure has been drawn.
@@ -161,6 +170,8 @@ pub const DRAW_PROGRESS: ParamSpec = ParamSpec {
     range: Some([0.0, 1.0]),
     doc: "How much of the figure is drawn, from its start; below 1 the line is still arriving.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Motion,
+    main: false,
 };
 
 /// `glow`, shared: the halo around a stroke, on top of the stroke itself.
@@ -170,6 +181,8 @@ pub const GLOW: ParamSpec = ParamSpec {
     range: Some([0.0, 4.0]),
     doc: "Brightness of the halo around each stroke, on top of the stroke itself.",
     kind: ParamKind::Modal,
+    group: ParamGroup::Light,
+    main: true,
 };
 
 /// `thickness` at the scene's own resting width, in pixels at the render target.
@@ -180,6 +193,8 @@ pub const fn thickness(default: f32) -> ParamSpec {
         range: Some([0.5, 12.0]),
         doc: "Stroke width in pixels at the render target, before softness widens the falloff.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     }
 }
 
@@ -191,6 +206,8 @@ pub const fn scale(default: f32) -> ParamSpec {
         range: Some([0.1, 2.0]),
         doc: "Size of the figure within the frame, before the shared zoom is applied.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     }
 }
 
@@ -202,6 +219,8 @@ pub const fn hue_spread(default: f32) -> ParamSpec {
         range: Some([0.0, 1.0]),
         doc: "How far along the palette the colour travels from one end of the figure to the other.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     }
 }
 

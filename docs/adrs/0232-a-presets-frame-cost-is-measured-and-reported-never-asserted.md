@@ -22,7 +22,7 @@ line, so the commitment is not in question.
 `animation`, `beat`, `distinctness`, `golden`, `composite`, `bloom`, `geometry_extent` and the
 per-system ones — and **not one of them measures time**. Every gate asks what a frame looks like.
 Nothing asks what it cost. So the Floor commitment is asserted in a document and checked by
-nothing, which is the same shape as [backlog 0256](../design-backlog.md)'s quality gap one level
+nothing, which is the same shape as [backlog 0256](../design-backlog-archive.md)'s quality gap one level
 over.
 
 **There is direct evidence the commitment can be missed.** While browsing the converted MilkDrop

@@ -135,6 +135,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::ShapeCollage => "shape_collage",
         SystemKind::AnalyticField => "analytic_field",
         SystemKind::Cellular => "cellular",
+        SystemKind::Plexus => "plexus",
     }
 }
 

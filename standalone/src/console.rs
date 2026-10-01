@@ -16,7 +16,9 @@
 //! The console owns no state of its own yet — it is a second destination, not a
 //! second model.
 
-use rlx_core::render::TextRun;
+use rlx_core::render::text::LINE_HEIGHT_RATIO;
+use rlx_core::render::theme::THEME;
+use rlx_core::render::{Panel, PanelKind, TextRun};
 
 /// One positioned line of text, owned so the routing can move it between
 /// destinations without borrowing the roster it was built from.
@@ -24,6 +26,11 @@ use rlx_core::render::TextRun;
 /// The shape mirrors [`TextRun`] one field at a time; it exists because a
 /// `TextRun` borrows its `&str`, and routing decides a line's destination after
 /// the strings that back it are built.
+///
+/// **A line may instead be a backdrop** — the panel a block of text sits on —
+/// built by [`Line::backdrop`]. It travels with the text it backs: the routing,
+/// the console's scaling and every envelope treat it as one more line, so a
+/// panel can never land on one surface while its text lands on the other.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Line {
     pub text: String,
@@ -31,6 +38,19 @@ pub struct Line {
     pub y: f32,
     pub size: f32,
     pub color: [f32; 4],
+    /// `Some` when this line is a panel rather than text. Its opacity is
+    /// `color`'s alpha, so an envelope that fades the text fades the panel
+    /// under it by the same step.
+    pub backdrop: Option<Backdrop>,
+}
+
+/// The size and kind of a line that is a panel.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Backdrop {
+    pub w: f32,
+    pub h: f32,
+    /// A block's backdrop, or the selection highlight on one of its rows.
+    pub kind: PanelKind,
 }
 
 impl Line {
@@ -42,7 +62,51 @@ impl Line {
             y,
             size,
             color,
+            backdrop: None,
         }
+    }
+
+    /// A backdrop panel at `(x, y)`, `w` x `h` device pixels, in the theme's
+    /// panel roles.
+    pub fn backdrop(x: f32, y: f32, w: f32, h: f32) -> Self {
+        Self::panel(x, y, w, h, PanelKind::Backdrop)
+    }
+
+    /// The selection highlight on a row at `(x, y)`, `w` x `h` device pixels.
+    pub fn highlight(x: f32, y: f32, w: f32, h: f32) -> Self {
+        Self::panel(x, y, w, h, PanelKind::Highlight)
+    }
+
+    fn panel(x: f32, y: f32, w: f32, h: f32, kind: PanelKind) -> Self {
+        Self {
+            text: String::new(),
+            x,
+            y,
+            size: 0.0,
+            color: [1.0; 4],
+            backdrop: Some(Backdrop { w, h, kind }),
+        }
+    }
+
+    /// The backdrop that holds the text lines of `lines` whose widths
+    /// `measure` reports, padded by the theme's small spacing step, or `None`
+    /// when there is no text among them.
+    pub fn backdrop_around(
+        lines: &[Line],
+        mut measure: impl FnMut(&str, f32) -> f32,
+    ) -> Option<Self> {
+        let mut bounds: Option<(f32, f32, f32, f32)> = None;
+        for line in lines.iter().filter(|l| l.backdrop.is_none()) {
+            let x1 = line.x + measure(&line.text, line.size);
+            let y1 = line.y + line.size * LINE_HEIGHT_RATIO;
+            bounds = Some(match bounds {
+                None => (line.x, line.y, x1, y1),
+                Some((a, b, c, d)) => (a.min(line.x), b.min(line.y), c.max(x1), d.max(y1)),
+            });
+        }
+        let (x0, y0, x1, y1) = bounds?;
+        let p = Panel::around(x0, y0, x1, y1, THEME.space[1]);
+        Some(Self::backdrop(p.x, p.y, p.w, p.h))
     }
 
     /// Borrow this line as a [`TextRun`] for the frame it is drawn in.
@@ -55,6 +119,27 @@ impl Line {
             color: self.color,
         }
     }
+
+    /// This line as a [`Panel`], when it is one.
+    pub fn as_panel(&self) -> Option<Panel> {
+        let Backdrop { w, h, kind } = self.backdrop?;
+        let panel = match kind {
+            PanelKind::Backdrop => Panel::new(self.x, self.y, w, h),
+            PanelKind::Highlight => Panel::highlight(self.x, self.y, w, h),
+        };
+        Some(Panel {
+            alpha: self.color[3],
+            ..panel
+        })
+    }
+}
+
+/// The panels among `lines`, backdrops first: one draw paints them in order,
+/// and a highlight has to land on its block's backdrop rather than under it.
+pub fn panels(lines: &[Line]) -> Vec<Panel> {
+    let mut out: Vec<Panel> = lines.iter().filter_map(Line::as_panel).collect();
+    out.sort_by_key(|p| p.kind == PanelKind::Highlight);
+    out
 }
 
 /// A frame's text, split by the surface it is destined for.
@@ -67,15 +152,34 @@ pub struct FrameText {
 }
 
 impl FrameText {
-    /// The output's lines as borrowed runs, ready for `queue_text`.
+    /// The output's text lines as borrowed runs, ready for `queue_text`.
     pub fn output_runs(&self) -> Vec<TextRun<'_>> {
-        self.output.iter().map(Line::as_run).collect()
+        runs(&self.output)
     }
 
-    /// The console's lines as borrowed runs, ready for `present_aux`.
-    pub fn console_runs(&self) -> Vec<TextRun<'_>> {
-        self.console.iter().map(Line::as_run).collect()
+    /// The output's backdrops, ready for `queue_panels`.
+    pub fn output_panels(&self) -> Vec<Panel> {
+        panels(&self.output)
     }
+
+    /// The console's text lines as borrowed runs, ready for `present_aux`.
+    pub fn console_runs(&self) -> Vec<TextRun<'_>> {
+        runs(&self.console)
+    }
+
+    /// The console's backdrops, ready for `present_aux`.
+    pub fn console_panels(&self) -> Vec<Panel> {
+        panels(&self.console)
+    }
+}
+
+/// The text lines of `lines`, skipping backdrops.
+fn runs(lines: &[Line]) -> Vec<TextRun<'_>> {
+    lines
+        .iter()
+        .filter(|l| l.backdrop.is_none())
+        .map(Line::as_run)
+        .collect()
 }
 
 /// Whether the operator console is currently open.
@@ -126,9 +230,8 @@ pub fn route_into(
 ///
 /// The same implementation the frame path runs — it delegates rather than
 /// restating the rule, so a test can never pass against a second copy of the
-/// routing that the show does not use. Test-only because the frame path wants
-/// the draining form; the logic under assertion is `route_into` either way.
-#[cfg(test)]
+/// routing that the show does not use. The frame path wants the draining form;
+/// the logic under assertion is `route_into` either way.
 pub fn route(mut chrome: Vec<Line>, mut modal: Vec<Line>, console: Console) -> FrameText {
     let mut dst = FrameText::default();
     route_into(&mut dst, &mut chrome, &mut modal, console);
@@ -185,6 +288,10 @@ pub fn scale_lines(lines: &mut [Line], s: f32) {
         line.x *= s;
         line.y *= s;
         line.size *= s;
+        if let Some(b) = line.backdrop.as_mut() {
+            b.w *= s;
+            b.h *= s;
+        }
     }
 }
 
@@ -192,20 +299,17 @@ pub fn scale_lines(lines: &mut [Line], s: f32) {
 ///
 /// Present even with no modal open, so an operator can tell a console that is
 /// alive and idle from one whose window is up but whose app has stopped
-/// presenting to it.
+/// presenting to it. In the dim text role, so it reads as a label rather than as
+/// content.
 pub fn header(preset: &str) -> Line {
     Line::new(
         format!("console  -  {preset}"),
         crate::overlay::LIST_INSET,
         crate::overlay::LIST_INSET,
         crate::overlay::ROW_SIZE,
-        HEADER_COLOR,
+        THEME.text_dim.rgba(),
     )
 }
-
-/// The console header's colour — dimmer than a modal row, so it reads as a
-/// label rather than as content.
-const HEADER_COLOR: [f32; 4] = [0.55, 0.62, 0.74, 0.9];
 
 // ---------------------------------------------------------------------------
 // The transport strip
@@ -380,11 +484,11 @@ pub fn action_for(button: Button, view: &crate::settings::SettingsView) -> Conso
 /// `auto` twice must not turn rotation off — which is what `auto_enabled` is
 /// read for, and the only asymmetry between the two sources.
 pub fn action_for_transport(
-    verb: standalone::osc::decode::Transport,
+    verb: crate::osc::decode::Transport,
     auto_enabled: bool,
     view: &crate::settings::SettingsView,
 ) -> Option<ConsoleAction> {
-    use standalone::osc::decode::Transport;
+    use crate::osc::decode::Transport;
     Some(match verb {
         Transport::Next => action_for(Button::Next, view),
         Transport::Prev => action_for(Button::Prev, view),
@@ -466,13 +570,10 @@ pub fn staging_line(next: Option<&str>, auto: bool, dwell: (u32, u32)) -> Line {
         crate::overlay::LIST_INSET,
         STRIP_TOP + BUTTON_H + crate::overlay::LIST_INSET,
         crate::overlay::ROW_SIZE,
-        STAGING_COLOR,
+        // Standing information, not the thing being driven.
+        THEME.text_dim.rgba(),
     )
 }
-
-/// The staging line's colour — brighter than the header, dimmer than a modal
-/// row: it is standing information, not the thing being driven.
-const STAGING_COLOR: [f32; 4] = [0.72, 0.78, 0.88, 0.95];
 
 /// The transport's labels as lines, at the reference geometry.
 ///
@@ -484,23 +585,44 @@ pub fn transport_lines(auto: bool) -> Vec<Line> {
         .iter()
         .enumerate()
         .map(|(i, button)| {
+            // `auto` is the one control whose label reports a state as well as
+            // offering an action: faint while hands-off rotation is off.
             let lit = !matches!(button, Button::ToggleAuto) || auto;
             Line::new(
                 button.label().to_owned(),
                 crate::overlay::LIST_INSET + i as f32 * (BUTTON_W + BUTTON_GAP) + BUTTON_GAP,
                 STRIP_TOP + BUTTON_GAP,
                 crate::overlay::ROW_SIZE,
-                if lit { BUTTON_COLOR } else { BUTTON_OFF_COLOR },
+                if lit {
+                    THEME.text.rgba()
+                } else {
+                    THEME.text_faint.rgba()
+                },
             )
         })
         .collect()
 }
 
-/// A live control's label colour.
-const BUTTON_COLOR: [f32; 4] = [0.86, 0.90, 0.96, 1.0];
-/// The `auto` label while hands-off rotation is off — the one control whose
-/// label reports a state as well as offering an action.
-const BUTTON_OFF_COLOR: [f32; 4] = [0.45, 0.48, 0.55, 1.0];
+/// The console's standing furniture at the reference geometry, in draw order:
+/// the header, the transport labels, then the staging line.
+///
+/// Drawn only while no modal is up — a browse list or a settings menu starts at
+/// the same inset, and the two overlap into an unreadable pile. Scaled onto the
+/// real window with the routed lines by one [`scale_lines`] call, so the header
+/// cannot drift off the rows. One backdrop holds the three, appended last.
+pub fn standing_lines(
+    preset: &str,
+    auto: bool,
+    next: Option<&str>,
+    dwell: (u32, u32),
+    measure: &mut crate::overlay::Measure<'_>,
+) -> Vec<Line> {
+    let mut lines = vec![header(preset)];
+    lines.extend(transport_lines(auto));
+    lines.push(staging_line(next, auto, dwell));
+    crate::overlay::push_backdrop(&mut lines, 0, measure);
+    lines
+}
 
 /// Which window an event arrived from, once the raw `WindowId` has been
 /// resolved against the two the app owns.

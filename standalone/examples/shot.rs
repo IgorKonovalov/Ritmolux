@@ -54,6 +54,13 @@
 //!   --crf <0-51>             the encoder's rate-quality setting (default 18,
 //!                            archival). Higher is smaller; +6 is about half the
 //!                            size. Needs --ffmpeg
+//!   --ui <state>,...|all     interface capture: one PNG per state, written as
+//!                            <out>/<state>.png, of that state's overlay text
+//!                            composed over the preset's frame from fixed
+//!                            fixture data. System-font text: never a golden
+//!   --bar-grid <path>        also write the render's bar starts, in frames, as
+//!                            JSON for the diffusion filter's --timeline. The
+//!                            frame stream is unchanged. Needs --render
 //!   --help, -h               print the usage text and exit 0
 //!
 //! Which preset library is used, highest precedence first: `--preset-file`,
@@ -69,7 +76,7 @@ use std::path::{Path, PathBuf};
 use rlx_core::audio::AudioFormat;
 use rlx_core::dsp::AnalysisFrame;
 use rlx_core::preset::{Preset, SystemKind, default_presets, load_dir};
-use rlx_core::render::{CaptureImage, Tier};
+use rlx_core::render::{CaptureImage, ImageRect, OverlayImage, Tier};
 use standalone::shot::args::{
     BandLevels, SIGNAL_SECS, apply_set, band_levels, parse_hops, parse_signal_secs, parse_size,
     synth_signal_secs,
@@ -80,6 +87,7 @@ use standalone::shot::horizon;
 use standalone::shot::render::{self, Fps, parse_fps};
 use standalone::shot::renderer;
 use standalone::shot::report;
+use standalone::shot::ui::{self, UiState, parse_ui};
 use standalone::shot::wav::parse_wav_16bit;
 use standalone::{PRESET_DIR_ENV, resolve_preset_dir};
 
@@ -179,6 +187,12 @@ struct Args {
     /// [`render::DEFAULT_CRF`]. An `Option` rather than an eager default so
     /// "passed without an encoder to pass it to" is an exact question.
     crf: Option<u8>,
+    /// `--ui <state>,...`: the interface states to capture, one PNG each, over
+    /// the preset's frame. `None` leaves the mode off.
+    ui: Option<Vec<UiState>>,
+    /// `--bar-grid <path>`: write the render's bar starts, in frames, to this
+    /// file — see [`render::BarGrid`].
+    bar_grid: Option<PathBuf>,
 }
 
 impl Default for Args {
@@ -211,6 +225,8 @@ impl Default for Args {
             fps: render::DEFAULT_FPS,
             ffmpeg: None,
             crf: None,
+            ui: None,
+            bar_grid: None,
         }
     }
 }
@@ -279,6 +295,9 @@ fn parse_args() -> Result<Args, String> {
             "--fps" => args.fps = parse_fps(&next_value(&mut it, "--fps")?)?,
             "--ffmpeg" => args.ffmpeg = Some(PathBuf::from(next_value(&mut it, "--ffmpeg")?)),
             "--crf" => args.crf = Some(render::parse_crf(&next_value(&mut it, "--crf")?)?),
+            "--bar-grid" => {
+                args.bar_grid = Some(PathBuf::from(next_value(&mut it, "--bar-grid")?));
+            }
             "--at" => args.at = Some(parse_hops(&next_value(&mut it, "--at")?)?),
             "--frame-at" => {
                 let value = next_value(&mut it, "--frame-at")?;
@@ -286,6 +305,7 @@ fn parse_args() -> Result<Args, String> {
                     format!("--frame-at expects a single hop index, got `{value}`")
                 })?);
             }
+            "--ui" => args.ui = Some(parse_ui(&next_value(&mut it, "--ui")?)?),
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -294,6 +314,26 @@ fn parse_args() -> Result<Args, String> {
                 args.family = Some(parse_system(other.trim_start_matches("family="))?);
             }
             other => return Err(format!("unknown argument `{other}` (try --help)")),
+        }
+    }
+    // `--ui` composes its states over one held-stimulus preset frame, the frame
+    // a single shot takes. Every other mode draws something else, so any of
+    // them beside it would mean silently ignoring one of the two requests.
+    if args.ui.is_some() {
+        for (flag, given) in [
+            ("--all", matches!(args.mode, Mode::All)),
+            ("--report", matches!(args.mode, Mode::Report)),
+            ("--horizon", args.horizon.is_some()),
+            ("--render", args.render.is_some()),
+            ("--signal", args.signal.is_some()),
+            ("--audio", args.audio.is_some()),
+        ] {
+            if given {
+                return Err(format!(
+                    "--ui captures interface states over one preset frame and cannot \
+                     also take {flag}: pass one"
+                ));
+            }
         }
     }
     if args.frame_at.is_some() {
@@ -396,6 +436,9 @@ fn parse_args() -> Result<Args, String> {
         if args.crf.is_some() {
             return Err("--crf only applies to --render <clip.wav>".to_string());
         }
+        if args.bar_grid.is_some() {
+            return Err("--bar-grid only applies to --render <clip.wav>".to_string());
+        }
     }
     Ok(args)
 }
@@ -464,6 +507,15 @@ fn print_usage() {
          --crf <0-51>               encoder rate-quality (default 18, archival).\n\
                                     Higher is smaller; +6 about halves it.\n\
                                     Needs --ffmpeg\n\
+         --ui <state>,...|all       interface capture, one <out>/<state>.png\n\
+                                    each: hud browse browse-filtered\n\
+                                    browse-thumbs settings console banner\n\
+                                    diagnostics. Fixed fixture data over the\n\
+                                    preset's frame; system-font text, so a\n\
+                                    capture and never a golden. Needs --out\n\
+         --bar-grid <path>          also write the render's bar starts, in\n\
+                                    frames, as JSON (for sd-filter --timeline).\n\
+                                    The stream is unchanged. Needs --render\n\
          --help, -h                 print this usage and exit"
     );
 }
@@ -555,6 +607,10 @@ fn run() -> Result<(), String> {
     if args.signal.is_some() || args.audio.is_some() {
         return filmstrip(args, presets, &source);
     }
+    // Rejected beside every other mode at parse time, so it is decided here.
+    if args.ui.is_some() {
+        return ui_shots(args, presets, &source);
+    }
     match args.mode {
         Mode::Shot => shot(args, presets, &source),
         Mode::All => contact_sheet(args, presets, &source),
@@ -609,6 +665,7 @@ fn offline_render(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), 
             height: args.height,
             tier: args.tier,
             encoder,
+            bar_grid: args.bar_grid.clone(),
         },
         &pcm,
         format,
@@ -637,6 +694,103 @@ fn shot(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {
         img.height,
         args.frames
     );
+    Ok(())
+}
+
+/// `--ui <state>,...`: each state's interface composed over the preset's frame,
+/// one PNG per state at `<out>/<state>.png`.
+///
+/// The composition is [`ui::compose`]'s; this owns the GPU half. Each state
+/// re-captures the preset from its reset — so every PNG shares one scene frame
+/// whatever ran before it — then queues the state's text, image and panel and
+/// draws one more frame with them on. That last frame is one clock step past
+/// the plain shot, which is why the scene under them is not byte-identical to a
+/// `--frames N` capture of the same preset.
+fn ui_shots(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {
+    let states = args.ui.clone().ok_or("--ui needs a state")?;
+    let out = args
+        .out
+        .clone()
+        .ok_or("--ui needs --out <dir> to write one PNG per state into")?;
+    // The fixture preset unless one is named, so two runs on one machine share a
+    // scene whatever order its library loads in. A library without it falls
+    // back to its first preset, and says so.
+    let name = match &args.preset {
+        Some(name) => name.clone(),
+        None if presets.iter().any(|p| p.name == ui::FIXTURE_PRESET) => {
+            ui::FIXTURE_PRESET.to_string()
+        }
+        None => {
+            let first = presets
+                .first()
+                .ok_or("no preset available to render")?
+                .name
+                .clone();
+            eprintln!(
+                "shot: --ui: `{}` is not in this library; composing over `{first}`",
+                ui::FIXTURE_PRESET
+            );
+            first
+        }
+    };
+    let mut r = renderer(args.width, args.height, presets, args.tier)?;
+    let (w, h) = (args.width as f32, args.height as f32);
+
+    for state in states {
+        let scene = r
+            .capture_preset(&name, &args.stimulus, args.frames)
+            .map_err(|e| format!("capture `{name}`: {e}"))?;
+        let frame = ui::compose(state, w, h, &name, &mut |text, size| {
+            r.measure_text(text, size)
+        });
+
+        if let Some(pane) = frame.still {
+            // The scene itself stands in for the highlighted preset's picture:
+            // shrunk to the cache's stored size and drawn back at the pane's, as
+            // the app draws a cached still.
+            let still = image::imageops::resize(
+                &to_rgba(&scene)?,
+                ui::STILL_W,
+                ui::STILL_H,
+                image::imageops::FilterType::Triangle,
+            );
+            r.set_overlay_image(Some(OverlayImage {
+                rgba: still.as_raw(),
+                width: ui::STILL_W,
+                height: ui::STILL_H,
+            }))
+            .map_err(|e| format!("--ui {}: preview still: {e:?}", state.name()))?;
+            r.queue_image(ImageRect {
+                x: pane.x,
+                y: pane.y,
+                w: pane.w,
+                h: pane.h,
+            });
+        }
+        r.set_overlay(frame.diagnostics);
+        let runs: Vec<_> = frame
+            .lines
+            .iter()
+            .filter(|line| line.backdrop.is_none())
+            .map(|line| line.as_run())
+            .collect();
+        r.queue_text(&runs);
+        r.queue_panels(&standalone::console::panels(&frame.lines));
+        let img = r
+            .capture_frame(&args.stimulus)
+            .map_err(|e| format!("--ui {}: {e}", state.name()))?;
+        r.set_overlay(false);
+
+        let path = out.join(format!("{}.png", state.name()));
+        save_png(&img, &path)?;
+        println!(
+            "wrote {} ({}x{}, ui {}, preset {name}) [{source}]",
+            path.display(),
+            img.width,
+            img.height,
+            state.name()
+        );
+    }
     Ok(())
 }
 

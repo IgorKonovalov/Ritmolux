@@ -485,6 +485,44 @@ parses and would otherwise convict its own documentation:
 0 plugin source(s)` and exits 0, which reads exactly like a clean tree — that is the one way this
 root goes vacuously green, and staging the files is what stops it.
 
+## `claude-declarations/` — for `check-claude-declarations.mjs`
+
+```
+node scripts/check-claude-declarations.mjs scripts/fixtures/claude-declarations/undeclared   # exit 1, three findings, one advisory
+node scripts/check-claude-declarations.mjs scripts/fixtures/claude-declarations/declared     # exit 0
+node scripts/check-claude-declarations.mjs --self-test                                       # expects exit 0, 12 of 12
+```
+
+**Two roots, one phase.** Each root holds a `docs/plans/` because that is the only directory the
+gate reads. `undeclared/` carries Plan 0190 Phase 9 as it was drafted, with *the three
+conductor-mode sections* and no path. `declared/` carries the same phase with the three
+`SKILL.md` paths written into `Files touched`, and nothing else changed. The done-when is the pair:
+red on the first, green on the second.
+
+| Root | Phase | Case | Expected |
+|------|------:|------|----------|
+| `undeclared/` | 9 | Plan 0190 Phase 9, the conductor-mode sections named across a line wrap | reported |
+| `undeclared/` | 3 | `<!-- claude-allow: -->`, a marker with no reason | reported in the match's place |
+| `undeclared/` | 10 | `Files touched` of a bare `` `.claude/` ``, which the conductor's `claudePaths()` reads as no path | reported |
+| `undeclared/` | done/0002 | the same shape in a plan under `done/` | an **advisory** row, and never the exit code |
+| `declared/` | 9 | the same phase with its paths declared | exit 0 |
+
+**The silences are what make it usable**, because this gate reads prose and every one of them is
+a sentence a plan writes without editing anything under `.claude/`:
+
+| Phase | Case | Expected |
+|------:|------|----------|
+| 1 | the forbidden shape inside double quotes | not reported: a quotation is a mention |
+| 2 | *a skill, a hook, a `settings.json` or a conductor-mode section* | not reported: an indefinite article describes a class. This is how Plan 0208 Phase 5 is written, and a gate that convicted the plan that built it would be red on its first run |
+| 4 | `claude-allow:` with a reason | not reported |
+| 5 | *the pre-push hook* and *the studio's `settings.json`* | not reported: `.githooks/` holds hooks too, and the studio's settings file is its own (ADR-0240) |
+| 6 | a phase whose `Files touched` carries a `.claude/` path | not reported: that is the declaration |
+| 7 | *the skill lane*, and an `Owner skill` line | not reported |
+
+**Nothing tracked in this repository reaches the reporting path**, so the plain run exits 0 and a
+detector that stopped matching would too. The self-test asserts the counts and every silence by
+phase id, and both invocations are on the roster for that reason.
+
 ## `gate-carriers/` — for `check-gate-carriers.mjs`
 
 ```

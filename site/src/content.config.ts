@@ -9,6 +9,7 @@ import { docsSchema } from '@astrojs/starlight/schema';
 // the link rewrite cannot disagree about what is published.
 import { PUBLISHED } from './plugins/rewrite-links.mjs';
 import { chunksOf, contentsList, splitDocument, splitSources } from './plugins/split-document.mjs';
+import { RU_ENTRANCE } from './plugins/twins.mjs';
 
 /**
  * Pages that belong to the site rather than to the documentation corpus.
@@ -23,6 +24,7 @@ const SITE_PAGES: Record<string, string> = {
   'site/src/content/docs/index.mdx': 'index',
   'site/src/content/docs/gallery.mdx': 'gallery',
   'site/src/content/docs/start-here.mdx': 'start-here',
+  [RU_ENTRANCE.source]: RU_ENTRANCE.route,
 };
 
 const SITE_ROOT = new URL('../', import.meta.url);

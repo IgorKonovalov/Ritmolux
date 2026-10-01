@@ -25,6 +25,7 @@ pub mod lines;
 /// (ADR-0084). Crate-internal: it is arithmetic and a roster, not a scene.
 pub(crate) mod marks;
 pub mod particles;
+pub mod plexus;
 pub mod reaction_diffusion;
 pub mod shape_collage;
 pub mod shape_field;
@@ -133,6 +134,55 @@ pub struct ParamSpec {
     /// compares this against a hand-kept roster — a field nothing checks is a
     /// field that drifts.
     pub kind: ParamKind,
+    /// Which of the five groups an editor files the parameter under (ADR-0256).
+    pub group: ParamGroup,
+    /// Whether the parameter is one of the few that most decide its system's
+    /// look — listed first when its group is opened. One flag per declaration,
+    /// not per preset: a parameter central to one preset is shown by the
+    /// preset binding it.
+    pub main: bool,
+}
+
+/// The group a parameter is filed under in an editor (ADR-0256), in the order
+/// an editor lists them.
+///
+/// The engine-wide stages declare [`Post`](Self::Post), except the overall
+/// exposure and the backdrop's brightness, which are [`Light`](Self::Light).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParamGroup {
+    /// What is drawn: form, count, mode, extent, framing.
+    Shape,
+    /// How it moves: speed, spin, drift, flow, anything over time.
+    Motion,
+    /// Hue, saturation, the palette and how the picture reads it.
+    Colour,
+    /// Brightness, glow, fade and the other amounts of light.
+    Light,
+    /// A pass over the finished frame: the backdrop, trails, mirroring,
+    /// bloom, the ink remap.
+    Post,
+}
+
+impl ParamGroup {
+    /// Every group, in listing order.
+    pub const ALL: [ParamGroup; 5] = [
+        ParamGroup::Shape,
+        ParamGroup::Motion,
+        ParamGroup::Colour,
+        ParamGroup::Light,
+        ParamGroup::Post,
+    ];
+
+    /// The name the generated reference and the exported schema print.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ParamGroup::Shape => "shape",
+            ParamGroup::Motion => "motion",
+            ParamGroup::Colour => "colour",
+            ParamGroup::Light => "light",
+            ParamGroup::Post => "post",
+        }
+    }
 }
 
 /// Byte-wise `str` equality, usable in a `const fn`.
@@ -245,6 +295,7 @@ pub fn family_params(label: &str) -> &'static [FamilyParam] {
         "parametric_curve" => lines::parametric::FAMILY_PARAMS,
         "analytic_field" => analytic_field::FAMILY_PARAMS,
         "cellular" => cellular::FAMILY_PARAMS,
+        "plexus" => plexus::FAMILY_PARAMS,
         "attractor" => particles::FAMILY_PARAMS,
         _ => &[],
     }
@@ -475,6 +526,10 @@ pub enum GeneratorConfig {
     /// Always `Some` for that system, so `configure` runs on every preset switch
     /// and the incoming preset starts from its own seed.
     Cellular(cellular::CellularConfig),
+    /// The plexus system's `[plexus]` table (ADR-0257): the layout, the point
+    /// count and the seed. Always `Some` for that system, so `configure` runs on
+    /// every preset switch and the incoming preset starts from its own points.
+    Plexus(plexus::PlexusConfig),
 }
 
 impl GeneratorConfig {
@@ -495,7 +550,8 @@ impl GeneratorConfig {
             | GeneratorConfig::WarpMesh { .. }
             | GeneratorConfig::Path { .. }
             | GeneratorConfig::Field(_)
-            | GeneratorConfig::Cellular(_) => 0,
+            | GeneratorConfig::Cellular(_)
+            | GeneratorConfig::Plexus(_) => 0,
         }
     }
 }
@@ -535,6 +591,27 @@ pub enum OverflowContext {
     /// [`cellular_radius`](crate::render::TierConfig::cellular_radius) — per
     /// frame, since the radius is bindable. Carries what was asked.
     Radius(u32),
+    /// A `[plexus] points` asked for past the tier's
+    /// [`plexus_points`](crate::render::TierConfig::plexus_points) — at preset
+    /// load, since the count is structural. Carries what was asked. A clamp of
+    /// content: fewer points is a sparser network.
+    Points(u32),
+    /// A plexus graph that linked more pairs than the tier's
+    /// [`plexus_edges`](crate::render::TierConfig::plexus_edges) — per frame,
+    /// since `link_distance` is bindable. Carries how many linked; the surplus
+    /// is dropped in index order.
+    Edges(u32),
+    /// An `aperture` asked for past the tier's
+    /// [`max_coc_px`](crate::render::TierConfig::max_coc_px) — per frame, since
+    /// `aperture` is bindable. Carries the aperture, in whole pixels: the blur
+    /// of the far field, which the drawn blur stops short of.
+    ///
+    /// **Not the widest blur the lens draws.** In front of the focal plane the
+    /// circle of confusion grows without bound as depth shrinks, so a close
+    /// camera saturates the cap on every tier with any aperture at all; that
+    /// saturation is the lens's ceiling, not an overflow, and is never
+    /// announced (ADR-0257).
+    Blur(u32),
 }
 
 impl std::fmt::Display for OverflowContext {
@@ -548,6 +625,9 @@ impl std::fmt::Display for OverflowContext {
             OverflowContext::Iterations(asked) => write!(f, "iterations {asked}"),
             OverflowContext::Grid(asked) => write!(f, "grid {asked}"),
             OverflowContext::Radius(asked) => write!(f, "radius {asked}"),
+            OverflowContext::Points(asked) => write!(f, "points {asked}"),
+            OverflowContext::Edges(linked) => write!(f, "{linked} links"),
+            OverflowContext::Blur(asked) => write!(f, "an aperture of {asked} px"),
         }
     }
 }
@@ -572,6 +652,14 @@ pub struct CapOverflow {
 
 impl std::fmt::Display for CapOverflow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Pinning the top tier is offered only where it would lift the cap: on
+        // Rich it is the cap that bit, and a remedy naming the tier the run is
+        // already on sends the operator nowhere.
+        let pin = if self.top_tier_lifts() {
+            ", or pin --tier rich"
+        } else {
+            ""
+        };
         match self.context {
             // A clamp, not a cut: nothing is dropped, the picture is drawn at
             // the cap, and the operator is told which lever gets it back.
@@ -579,21 +667,41 @@ impl std::fmt::Display for CapOverflow {
                 f,
                 "{} is past this quality tier's cap of {}; drawn at {} instead, so the \
                  set's boundary resolves less detail than the preset asked for \
-                 (ask for {} or fewer, or pin --tier rich)",
+                 (ask for {} or fewer{pin})",
                 self.context, self.cap, self.cap, self.cap
             ),
             OverflowContext::Grid(_) => write!(
                 f,
                 "{} is past this quality tier's cap of {}; the automaton runs on a {}-cell \
                  grid instead, so every pattern draws larger than the preset asked \
-                 (ask for {} or fewer, or pin --tier rich)",
+                 (ask for {} or fewer{pin})",
                 self.context, self.cap, self.cap, self.cap
             ),
             OverflowContext::Radius(_) => write!(
                 f,
                 "{} is past this quality tier's cap of {}; the neighbourhood is drawn at {} \
                  instead, which runs a different rule than the preset asked \
-                 (ask for {} or fewer, or pin --tier rich)",
+                 (ask for {} or fewer{pin})",
+                self.context, self.cap, self.cap, self.cap
+            ),
+            OverflowContext::Points(_) => write!(
+                f,
+                "{} is past this quality tier's cap of {}; the network is drawn with {} \
+                 points instead, so it is sparser than the preset asked \
+                 (ask for {} or fewer{pin})",
+                self.context, self.cap, self.cap, self.cap
+            ),
+            OverflowContext::Edges(_) => write!(
+                f,
+                "{} exceeded this quality tier's {}-link cap (dropped {}); lower \
+                 link_distance or the point count{pin}",
+                self.context, self.cap, self.dropped
+            ),
+            OverflowContext::Blur(_) => write!(
+                f,
+                "{} is past this quality tier's cap of {} px; drawn at {} px instead, so \
+                 the background is sharper than the preset asked \
+                 (ask for {} or fewer{pin})",
                 self.context, self.cap, self.cap, self.cap
             ),
             OverflowContext::Mirror(_) | OverflowContext::Depth(_) => write!(
@@ -607,6 +715,27 @@ impl std::fmt::Display for CapOverflow {
 }
 
 impl CapOverflow {
+    /// Whether the top tier's cap for this context is above the one that bit,
+    /// so that pinning it would draw more of what the preset asked.
+    ///
+    /// Read off [`TierConfig::RICH`](crate::render::TierConfig::RICH) rather
+    /// than carried, so no producer has to know which tier it runs on: a cap
+    /// below Rich's can only have come from a lower tier, and a cap equal to it
+    /// is the top tier's own.
+    pub fn top_tier_lifts(&self) -> bool {
+        let rich = crate::render::TierConfig::RICH;
+        let top = match self.context {
+            OverflowContext::Mirror(_) | OverflowContext::Depth(_) => rich.max_segments,
+            OverflowContext::Iterations(_) => rich.field_iterations as usize,
+            OverflowContext::Grid(_) => rich.cellular_grid as usize,
+            OverflowContext::Radius(_) => rich.cellular_radius as usize,
+            OverflowContext::Points(_) => rich.plexus_points as usize,
+            OverflowContext::Edges(_) => rich.plexus_edges as usize,
+            OverflowContext::Blur(_) => rich.max_coc_px as usize,
+        };
+        self.cap < top
+    }
+
     /// The clearing of this overflow, worded in the same terms its onset was.
     ///
     /// Three of the five contexts clamp a structural parameter rather than
@@ -646,6 +775,15 @@ impl std::fmt::Display for Recovered<'_> {
                     f,
                     "the neighbourhood is back within this tier's cap of {cap}"
                 )
+            }
+            OverflowContext::Points(_) => {
+                write!(f, "the point count is back within this tier's cap of {cap}")
+            }
+            OverflowContext::Edges(_) => {
+                write!(f, "the links are back within this tier's cap of {cap}")
+            }
+            OverflowContext::Blur(_) => {
+                write!(f, "the aperture is back within this tier's cap of {cap} px")
             }
         }
     }
@@ -1106,7 +1244,8 @@ pub(crate) fn kind_info(kind: SystemKind) -> SceneKindInfo {
         | SystemKind::WarpMesh
         | SystemKind::ShapeCollage
         | SystemKind::AnalyticField
-        | SystemKind::Cellular => false,
+        | SystemKind::Cellular
+        | SystemKind::Plexus => false,
     };
     SceneKindInfo {
         shares_line_renderer,
@@ -1191,6 +1330,13 @@ fn create(
             tier.cellular_radius,
             tier.cellular_grid,
         )),
+        SystemKind::Plexus => Box::new(plexus::PlexusScene::new(
+            device,
+            surface_format,
+            tier.plexus_points as usize,
+            tier.plexus_edges as usize,
+            tier.max_coc_px as f32,
+        )),
     }
 }
 
@@ -1216,6 +1362,7 @@ fn create_attractor(
             crate::render::SampleBudget::Offline => tier.attractor_particles_offline_ceiling,
         },
         tier.attractor_trail_cap,
+        tier.max_coc_px as f32,
     )
 }
 
@@ -1258,6 +1405,44 @@ mod tests {
     use crate::preset::SystemKind;
     use crate::render::context::{RenderContext, RenderError};
 
+    /// **`pin --tier rich` is offered only where Rich would lift the cap.** At
+    /// a cap below the top tier's the remedy names it; at the top tier's own
+    /// cap it does not, in every context that offers it.
+    #[test]
+    fn the_tier_remedy_is_offered_only_below_the_top_tier() {
+        let rich = crate::render::TierConfig::RICH;
+        for (context, top) in [
+            (
+                OverflowContext::Iterations(5000),
+                rich.field_iterations as usize,
+            ),
+            (OverflowContext::Grid(4096), rich.cellular_grid as usize),
+            (OverflowContext::Radius(40), rich.cellular_radius as usize),
+            (OverflowContext::Points(9000), rich.plexus_points as usize),
+            (OverflowContext::Edges(90_000), rich.plexus_edges as usize),
+            (OverflowContext::Blur(30), rich.max_coc_px as usize),
+        ] {
+            let below = CapOverflow {
+                dropped: 1,
+                context,
+                cap: top / 2,
+            };
+            assert!(
+                below.to_string().contains("pin --tier rich"),
+                "{context} under a lower tier's cap: {below}"
+            );
+            let at_top = CapOverflow {
+                dropped: 1,
+                context,
+                cap: top,
+            };
+            assert!(
+                !at_top.to_string().contains("--tier"),
+                "{context} at the top tier's cap: {at_top}"
+            );
+        }
+    }
+
     /// **Each context's recovery is worded in that context's own terms.** Three
     /// of the five clamp a structural parameter rather than cutting geometry, so
     /// a line telling an operator that "geometry is back within the segment cap"
@@ -1271,6 +1456,9 @@ mod tests {
             (OverflowContext::Iterations(600), "iteration budget"),
             (OverflowContext::Grid(512), "grid"),
             (OverflowContext::Radius(7), "neighbourhood"),
+            (OverflowContext::Points(900), "point count"),
+            (OverflowContext::Edges(30_000), "links"),
+            (OverflowContext::Blur(30), "aperture"),
         ] {
             let overflow = CapOverflow {
                 dropped: 0,
@@ -1291,6 +1479,9 @@ mod tests {
                 OverflowContext::Iterations(_)
                     | OverflowContext::Grid(_)
                     | OverflowContext::Radius(_)
+                    | OverflowContext::Points(_)
+                    | OverflowContext::Edges(_)
+                    | OverflowContext::Blur(_)
             );
             if structural {
                 assert!(
@@ -1385,6 +1576,7 @@ mod tests {
             SystemKind::ShapeCollage => "shape collage",
             SystemKind::AnalyticField => "analytic field",
             SystemKind::Cellular => "cellular",
+            SystemKind::Plexus => "plexus",
         }
     }
 
@@ -1549,8 +1741,8 @@ mod tests {
             Err(e) => panic!("headless context build failed: {e}"),
         };
 
-        // `density = 0.02` is the shipped trace value — `attractor_thomas` and
-        // `fragment_sumi`'s layer among them.
+        // `density = 0.02` is the shipped trace value — `attractor_lorenzknot`
+        // and `fragment_sumi`'s layer among them.
         const DENSITY: f32 = 0.02;
         let rich = TierConfig::RICH;
 
@@ -1678,6 +1870,7 @@ mod tests {
             SystemKind::ShapeCollage,
             SystemKind::AnalyticField,
             SystemKind::Cellular,
+            SystemKind::Plexus,
         ];
         for (i, a) in independent.iter().enumerate() {
             for b in independent.iter().skip(i + 1).chain(lines.iter()) {

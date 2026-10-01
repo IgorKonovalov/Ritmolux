@@ -325,7 +325,9 @@ impl PipelineResources {
         });
         let draw_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("attractor-draw-shader"),
-            source: wgpu::ShaderSource::Wgsl(DRAW_SHADER.into()),
+            source: wgpu::ShaderSource::Wgsl(
+                format!("{}\n{DRAW_SHADER}", crate::render::camera::CAMERA_WGSL).into(),
+            ),
         });
         // ADR-0048's transform, concatenated in: the same WGSL the engine trails
         // stage compiles, so the two accumulation sinks cannot drift apart on what

@@ -38,8 +38,8 @@
 # `--set` CANNOT DRIVE THIS PRESET. `apply_set` writes the frame scalars and
 # there is deliberately no key for the 64-band array, so every `bin()` term reads
 # ZERO in a `--set` still and every spoke renders at its `base` length.
-# That is the stimulus, not the preset - the shipped `spectrum_ridge` has the
-# same property and its header says so. VERIFY THIS FILE WITH `--signal` OR
+# That is the stimulus, not the preset - every shipped spectrum preset has the
+# same property. VERIFY THIS FILE WITH `--signal` OR
 # `--audio`. `--report` and the contact sheets are fine since `ca99cb1`; their
 # frames light the log-band slice each named band summarises.
 #

@@ -2055,6 +2055,11 @@ fn render_parameter_reference() -> String {
          the family the system draws: it reads over the range given beside each family named, \
          and does nothing at all on a family the cell calls inert.\n",
     );
+    out.push_str(
+        "\nThe **Group** cell is where the studio files the parameter — shape, motion, colour, \
+         light or post — and **main** marks the few that most decide the look, which the studio \
+         lists first when that group is opened.\n",
+    );
 
     let systems: Vec<_> = reference_rosters();
     let stage_names: Vec<&str> = engine_stage_rosters().iter().map(|(n, _)| *n).collect();
@@ -2078,8 +2083,10 @@ fn render_parameter_reference() -> String {
                 continue;
             }
             out.push_str(&format!("\n**{group}**\n\n"));
-            out.push_str("| Parameter | Default | Range | What it does |\n");
-            out.push_str("|---|---|---|---|\n");
+            // Group last, so every reader of the first four cells reads them
+            // where it always has.
+            out.push_str("| Parameter | Default | Range | What it does | Group |\n");
+            out.push_str("|---|---|---|---|---|\n");
             let families = rlx_core::render::scenes::family_params(label);
             for spec in rows {
                 let range = match (
@@ -2091,10 +2098,12 @@ fn render_parameter_reference() -> String {
                     (None, None) => String::new(),
                 };
                 out.push_str(&format!(
-                    "| `{}` | `{}` | {range} | {} |\n",
+                    "| `{}` | `{}` | {range} | {} | {}{} |\n",
                     spec.name,
                     number(spec.default),
                     spec.doc,
+                    spec.group.as_str(),
+                    if spec.main { ", main" } else { "" },
                 ));
             }
         }
@@ -2213,6 +2222,10 @@ fn declared_params_match_set_param() {
         (
             src.join("render/scenes/cellular/mod.rs"),
             SystemKind::Cellular.param_names(),
+        ),
+        (
+            src.join("render/scenes/plexus/mod.rs"),
+            SystemKind::Plexus.param_names(),
         ),
         // The global compositing stages, declared the same way.
         (
@@ -2501,6 +2514,7 @@ const STRUCTURAL: &[(&str, &str)] = &[
     // neighbours.
     ("cellular", "states"),
     ("cellular", "threshold"),
+    ("plexus", "palette_steps"),
     // `fold_order` / `fold_edge`: the kaleidoscope's two stepped params.
     ("kaleidoscope", "kaleido_order"),
     ("kaleidoscope", "kaleido_edge"),
@@ -3753,7 +3767,7 @@ color_span = "0.037"
 /// a span that animates rather than resting, and a system whose `color_span` is
 /// not a figure coordinate at all.
 ///
-/// The `palette_steps` row is the load-bearing one — `shape_facet` ships at
+/// The `palette_steps` row is the load-bearing one — a banded figure can sit at
 /// `color_span = 0.0521`, thirteen texels, and is unaffected because it bands.
 #[test]
 fn the_starved_span_warning_is_silent_where_the_trap_does_not_exist() {

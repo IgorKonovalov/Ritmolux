@@ -15,6 +15,7 @@ import {
   diffPaths,
   FAILED_CAP,
   failingTests,
+  flakyTests,
   greenRecord,
   isFullSuite,
   readLedger,
@@ -29,7 +30,7 @@ import {
   treeOf,
 } from "../lib/ledger.mjs";
 import { defaultGate } from "../lib/gate.mjs";
-import { RED_NEXTEST_OUTPUT, tmp } from "./helpers.mjs";
+import { FLAKY_NEXTEST_OUTPUT, RED_NEXTEST_OUTPUT, RETRIED_RED_NEXTEST_OUTPUT, tmp } from "./helpers.mjs";
 
 function repo() {
   const dir = tmp("rlx-ledger-repo-");
@@ -256,7 +257,7 @@ test("a green record for a tree this worktree cannot resolve is passed over, not
   assert.equal(servingRecord(file, b, dir).record.tree, a);
 });
 
-test("a served line names the tier, the tree it leaned on and the diff, and is no tree's green record", () => {
+test("a served line names the tier, the tree it leaned on and the diff, and serves no other tree", () => {
   const { dir, commit } = treeRepo();
   const a = commit({ "README.md": "r\n" }, "init");
   const b = commit({ "docs/a.md": "a\n" }, "docs: one file");
@@ -277,9 +278,41 @@ test("a served line names the tier, the tree it leaned on and the diff, and is n
   assert.notEqual(line.cmd, SUITE_COMMAND);
   assert.deepEqual(line.green, { tree: a, by: "gate 0100-post-close", at: "2026-09-16T01:00:00.000Z" }, "the record it leaned on, and no more of it");
   assert.deepEqual(line.diff, ["docs/a.md"]);
-  assert.equal(greenRecord(file, b), null, "a `-P fast` pass is no tree's green record");
+  assert.equal(greenRecord(file, b).served, true, "a green `-P fast` pass is its own tree's green record");
+  assert.equal(greenRecord(file, c), null, "and no other tree's");
   assert.equal(servingRecord(file, c, dir), null, "and it serves no later tree, so no `-P fast` chains off another");
   assert.match(servedNotice({ record: { tree: a, by: "gate 0100-post-close", at: "2026-09-16T01:00:00.000Z" }, paths: ["docs/a.md"] }), /^tree [0-9a-f]{7} green by gate 0100-post-close at 2026-09-16T01:00:00\.000Z, 1 served path$/);
+});
+
+test("a skip after serving reads the served line back for its own tree, and only while it is green", () => {
+  const { dir, commit } = treeRepo();
+  const a = commit({ "README.md": "r\n", "core/src/lib.rs": "fn a() {}\n" }, "init");
+  const b = commit({ "docs/a.md": "a\n" }, "docs: one file");
+  const file = ledgerGreenFor(a);
+  const served = (exit, by) =>
+    appendServed(file, { tree: b, exit, summary: "1200 tests run", by, ms: 10, green: { tree: a, by: "gate 0101-pre-review", at: "2026-09-16T01:00:00.000Z" }, paths: ["docs/a.md"] });
+  assert.equal(greenRecord(file, b), null, "before any served run, B has no record of its own");
+  served(100, "0101-close");
+  assert.equal(greenRecord(file, b), null, "a red served run is never skipped on");
+  served(0, "0101-close-2");
+  const rec = greenRecord(file, b);
+  assert.equal(rec.served, true);
+  assert.equal(rec.by, "0101-close-2");
+  served(100, "0101-post-close");
+  assert.equal(greenRecord(file, b), null, "the newest run on the tree decides, served or not");
+  assert.equal(servingRecord(file, b, dir).record.tree, a, "B is still served by A's full record");
+});
+
+test("a served line never chains: a tree its own diff from the served tree would serve is not served by it", () => {
+  const { dir, commit } = treeRepo();
+  const a = commit({ "README.md": "r\n", "core/src/lib.rs": "fn a() {}\n" }, "init");
+  const b = commit({ "core/src/lib.rs": "fn b() {}\n" }, "feat: code");
+  const c = commit({ "docs/a.md": "a\n" }, "docs: one file");
+  const file = ledgerGreenFor(a);
+  appendServed(file, { tree: b, exit: 0, summary: "1200 tests run", by: "0101-close", ms: 10, green: { tree: a, by: "gate 0101-pre-review", at: "2026-09-16T01:00:00.000Z" }, paths: ["docs/x.md"] });
+  assert.equal(servesDiff(diffPaths(b, c, dir), dir, b, c), true, "C's diff from B alone would be served");
+  assert.equal(servesDiff(diffPaths(a, c, dir), dir, a, c), false, "A's diff to C is not");
+  assert.equal(servingRecord(file, c, dir), null);
 });
 
 test("the summary is nextest's last Summary line", () => {
@@ -320,4 +353,29 @@ test("a record keeps the first FAILED_CAP failing names and the total past them"
   const [red] = readLedger(file);
   assert.deepEqual(red.failed, names.slice(0, FAILED_CAP));
   assert.equal(red.failed_count, FAILED_CAP + 5);
+});
+
+// ADR-0261: a test passing on its retry is named as flaky, and is never a failure.
+test("a recorded flaky pass yields exactly the one retried name, and no failing test", () => {
+  assert.deepEqual(flakyTests(FLAKY_NEXTEST_OUTPUT), ["flaky-scratch::control_loopback a_preset_datagram_selects_by_name"]);
+  assert.deepEqual(failingTests(FLAKY_NEXTEST_OUTPUT), [], "its TRY 1 FAIL is not a failure once TRY 2 passed");
+  assert.equal(summaryLine(FLAKY_NEXTEST_OUTPUT), "2 tests run: 2 passed (1 flaky), 0 skipped");
+  assert.deepEqual(flakyTests(RED_NEXTEST_OUTPUT), [], "a run with no retry names none");
+});
+
+test("a retried test that fails every try is still named failing, once", () => {
+  assert.deepEqual(failingTests(RETRIED_RED_NEXTEST_OUTPUT), ["flaky-scratch::control_loopback a_preset_datagram_selects_by_name"]);
+  assert.deepEqual(flakyTests(RETRIED_RED_NEXTEST_OUTPUT), []);
+});
+
+test("a record and a served line carry flaky only when a test passed on retry", () => {
+  const file = join(tmp("rlx-ledger-flaky-"), "suite-ledger.jsonl");
+  const names = flakyTests(FLAKY_NEXTEST_OUTPUT);
+  appendRecord(file, { tree: "a".repeat(40), exit: 0, summary: "2 tests run", flaky: names, by: "gate 0101-pre-review", ms: 1 });
+  appendRecord(file, { tree: "b".repeat(40), exit: 0, summary: "2 tests run", flaky: [], by: "gate 0101-pre-review", ms: 1 });
+  appendServed(file, { tree: "c".repeat(40), exit: 0, summary: "2 tests run", flaky: names, by: "0101-close", ms: 1, green: { tree: "a".repeat(40), by: "x", at: "y" }, paths: ["docs/a.md"] });
+  const [flaky, steady, served] = readLedger(file);
+  assert.deepEqual(flaky.flaky, names);
+  assert.equal("flaky" in steady, false);
+  assert.deepEqual(served.flaky, names);
 });

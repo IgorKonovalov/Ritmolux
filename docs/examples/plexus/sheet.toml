@@ -1,0 +1,31 @@
+# The `sheet` layout of the plexus system, for the illustrated guide's picture
+# of it. Teaching material, not a shipped preset: a jittered grid rippled by a
+# slow swell, seen across at a grazing angle through a shallow depth of field —
+# sharp in a band a little in front of the middle, soft before and behind it.
+system = "plexus"
+name = "Plexus Sheet"
+
+[plexus]
+layout = "sheet"
+points = 500
+seed   = 3
+
+[palette]
+name = "ice"
+
+[params]
+link_distance = "0.3"
+link_alpha    = "0.8"
+line_width    = "1.6"
+node_size     = "2.2"
+drift         = "0.2"
+wave          = "0.18"
+wave_scale    = "1.1"
+yaw           = "0.5 + time * 0.03"
+pitch         = "0.22"
+distance      = "3.2"
+focus         = "0.4"
+aperture      = "10"
+hue_center    = "0.6"
+hue_spread    = "0.5"
+brightness    = "1.1"

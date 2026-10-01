@@ -63,7 +63,7 @@ use super::{
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::Palette;
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 const DEFAULT_VISIBLE_DEPTH: f32 = default_of(PARAMS, "visible_depth");
 const DEFAULT_ROTATION: f32 = default_of(PARAMS, "rotation");
@@ -289,6 +289,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Which recursion generation is drawn, counted from 1 and capped at `max_depth`; a \
               fraction floors to the generation below it, and anything under 2 draws the first.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "rotation",
@@ -296,6 +298,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, std::f32::consts::TAU]),
         doc: "Turns the whole figure, in radians.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),
     crate::render::scenes::lines::hue_spread(DEFAULT_HUE_SPREAD),

@@ -30,6 +30,56 @@ pub struct Config {
     pub control: Control,
     pub console: Console,
     pub thumbnails: Thumbnails,
+    pub ui: Ui,
+}
+
+/// `[ui]` — how the interface drawn over the show behaves, as distinct from
+/// `[hud]`, which is *what* it draws.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Ui {
+    /// Whether the overlays move — the browser, settings menu and banner fade
+    /// and slide, the selection glides — or every change is a step.
+    pub motion: Motion,
+    /// Show the launch hint — the keys for help, the browser and settings —
+    /// for a few seconds at launch and whenever the pointer moves over the
+    /// window. `true` because a first launch otherwise says nothing about what
+    /// the keys are, and the hint clears itself.
+    pub hints: bool,
+}
+
+impl Default for Ui {
+    fn default() -> Self {
+        Self {
+            motion: Motion::Full,
+            hints: true,
+        }
+    }
+}
+
+/// How the interface moves. Serializes as `"full"` / `"reduced"`.
+///
+/// **Animation is only ever a view of state**: under either, a key acts on the
+/// state it names on the frame it is pressed, so `reduced` changes what the
+/// operator sees and never what the app does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Motion {
+    /// Every overlay fades, slides and glides on the theme's curve.
+    #[default]
+    Full,
+    /// Every envelope is a step: things appear and vanish in one frame.
+    Reduced,
+}
+
+impl Motion {
+    /// The kebab-case word this serializes as.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Motion::Full => "full",
+            Motion::Reduced => "reduced",
+        }
+    }
 }
 
 /// `[thumbnails]` — the background pass that renders the browser's pictures

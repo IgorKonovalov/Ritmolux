@@ -38,7 +38,21 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { git } from "./lib/git.mjs";
-import { appendRecord, appendSkip, cleanTree, failingTests, greenRecord, isFullSuite, skipNotice, summaryLine } from "./lib/ledger.mjs";
+import {
+  appendRecord,
+  appendServed,
+  appendSkip,
+  cleanTree,
+  failingTests,
+  flakyTests,
+  greenRecord,
+  isFullSuite,
+  SERVED_SUITE_ARGS,
+  servedNotice,
+  servingRecord,
+  skipNotice,
+  summaryLine,
+} from "./lib/ledger.mjs";
 
 const GUARD_STALE_MS = 10_000;
 const SELF_DIR = dirname(fileURLToPath(import.meta.url));
@@ -313,8 +327,9 @@ export function isTestListing(command, args) {
  * A run of exactly `cargo nextest run --workspace` consults the suite ledger `suiteLedger` picks
  * (ADR-0207, lib/ledger.mjs): on a clean tree the ledger records green it prints one notice naming
  * the record and exits 0 without running, and otherwise it runs, recording the run when the worktree
- * was clean at both ends. Any other argument vector, and any run with no ledger to consult, neither
- * skips nor records.
+ * was clean at both ends. When another tree's green record serves this one, the run is the suite with
+ * `SERVED_SUITE_ARGS` appended and its record is a served line, exactly as the gate does (ADR-0261).
+ * Any other argument vector, and any run with no ledger to consult, neither skips nor records.
  */
 export async function runWrapped(argv, { env = process.env, cwd = process.cwd(), run = spawnRun, selfDir = SELF_DIR } = {}) {
   const sep = argv.indexOf("--");
@@ -330,13 +345,17 @@ export async function runWrapped(argv, { env = process.env, cwd = process.cwd(),
   const ledger = suiteLedger(cwd, env, selfDir);
   const suite = Boolean(ledger) && isFullSuite(command, args);
   if (suite && ledger.notice) process.stderr.write(`with-lock: notice: ${ledger.notice}\n`);
+  let serving = null;
   if (suite) {
-    const green = greenRecord(ledger.path, cleanTree(cwd));
+    const tree = cleanTree(cwd);
+    const green = greenRecord(ledger.path, tree);
     if (green) {
       appendSkip(ledger.path, { green, by: ledger.by });
       process.stdout.write(`with-lock: ${skipNotice(green)}\n`);
       return 0;
     }
+    serving = servingRecord(ledger.path, tree, cwd);
+    if (serving) process.stderr.write(`with-lock: served, running ${SERVED_SUITE_ARGS.join(" ")}: ${servedNotice(serving)}\n`);
   }
 
   const what = [command, ...args].join(" ");
@@ -350,11 +369,13 @@ export async function runWrapped(argv, { env = process.env, cwd = process.cwd(),
       ),
   });
   const startTree = suite ? cleanTree(cwd) : null;
-  const { code, output } = await run(command, args, { capture: suite });
+  const { code, output } = await run(command, serving ? [...args, ...SERVED_SUITE_ARGS] : args, { capture: suite });
   lock.release();
   const heldMs = Date.now() - lock.acquiredAt;
   if (suite && startTree && cleanTree(cwd) === startTree) {
-    appendRecord(ledger.path, { tree: startTree, exit: code, summary: summaryLine(output), failed: failingTests(output), by: ledger.by, ms: heldMs });
+    const record = { tree: startTree, exit: code, summary: summaryLine(output), failed: failingTests(output), flaky: flakyTests(output), by: ledger.by, ms: heldMs };
+    if (serving) appendServed(ledger.path, { ...record, green: serving.record, paths: serving.paths });
+    else appendRecord(ledger.path, record);
   }
   // Read back by the run terminal's stream reader (lib/live.mjs lockTimes); keep the shape.
   process.stderr.write(`with-lock: "${name}" waited ${(lock.waitedMs / 1000).toFixed(1)}s, held ${(heldMs / 1000).toFixed(1)}s\n`);

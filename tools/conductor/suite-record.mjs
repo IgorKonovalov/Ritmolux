@@ -11,8 +11,10 @@
 // One reader, one answer: the ledger's location is `suiteLedger` in `with-lock.mjs` and the lookup is
 // `greenRecord` in `lib/ledger.mjs`, the same pair the wrapper consults before it skips a full suite,
 // so the hook cannot disagree with the conductor about which trees are proved. `greenRecord` reads
-// only exact `cargo nextest run --workspace` runs: a `-P fast` line — run by hand, or served under
-// ADR-0211 — never answers yes here. Nothing is written; the hook is a reader of the ledger only.
+// exact `cargo nextest run --workspace` runs, and a green served line on its own exact tree
+// (ADR-0261): that line is a `-P fast` pass on this tree, the very run the hook would make. A `-P fast`
+// run by hand is neither and never answers yes here. Nothing is written; the hook is a reader of the
+// ledger only.
 
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";

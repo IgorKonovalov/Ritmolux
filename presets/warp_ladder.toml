@@ -88,6 +88,7 @@
 # minute than the one that has been up for five.
 system = "warp_mesh"
 name = "Ladder"
+representative = true
 
 [palette]
 # SIX RUNS, TWO INKS. Paper white and a warm black, alternating three times

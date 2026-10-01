@@ -41,8 +41,8 @@
 # wide - and of the five IFS figures only the fern is (0.49 against a bound of
 # 0.54; `spiral` overruns by 79 %). It is pinned anyway, because a turning plant
 # reads as a turntable and because this library has just been reminded on a wall
-# that a figure with an obvious upright axis must keep it (see
-# `shape_heartmono.toml`, which lost a 1.6-degree wander for the same reason).
+# that a figure with an obvious upright axis must keep it (the shape_field heart
+# Heart Mono, since retired, lost a 1.6-degree wander for the same reason).
 #
 # `zoom` IS A FRAMING VALUE, NOT A LOOK. The fit's guarantee is "inside
 # the frame at neutral levers and zero rotation" and it deliberately does NOT

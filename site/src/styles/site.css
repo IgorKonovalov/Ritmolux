@@ -223,6 +223,28 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * The language control (ADR-0213), in the header and the mobile menu footer.
+ *
+ * Styled like the social icon beside it - accent colour, white on hover - with
+ * its label written out, because a globe alone does not say which language it
+ * leads to. `white-space: nowrap` keeps the icon and the word on one line in the
+ * header's tight right-hand group.
+ * ------------------------------------------------------------------------- */
+.rlx-language {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--sl-color-text-accent);
+  font-size: var(--sl-text-sm);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.rlx-language:hover {
+  color: var(--sl-color-white);
+}
+
+/* ---------------------------------------------------------------------------
  * The build stamp, on every page (ADR-0154: this site tracks `main`).
  *
  * Deliberately quiet - it is provenance, not content, and a reader who is not

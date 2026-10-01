@@ -7,7 +7,7 @@
   "properties": {
     "system": {
       "type": "string",
-      "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular"],
+      "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus"],
       "description": "Which built-in scene this preset drives. Required."
     },
     "name": {
@@ -91,6 +91,10 @@
     "cellular": {
       "$ref": "#/definitions/cellular",
       "description": "Which automaton the cellular system runs, and on how large a grid."
+    },
+    "plexus": {
+      "$ref": "#/definitions/plexus",
+      "description": "The arrangement, count and seed of the plexus system's points."
     },
     "milk": {
       "$ref": "#/definitions/milk",
@@ -621,6 +625,8 @@
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
             "reseed": { "$ref": "#/definitions/param.reseed.attractor" },
             "perspective": { "$ref": "#/definitions/param.perspective" },
+            "focus": { "$ref": "#/definitions/param.focus.attractor" },
+            "aperture": { "$ref": "#/definitions/param.aperture.attractor" },
             "depth_fade": { "$ref": "#/definitions/param.depth_fade" },
             "depth_hue": { "$ref": "#/definitions/param.depth_hue" },
             "spin": { "$ref": "#/definitions/param.spin.attractor" },
@@ -1049,7 +1055,7 @@
             "angle_bias": { "$ref": "#/definitions/param.angle_bias" },
             "roster": { "$ref": "#/definitions/param.roster" },
             "density": { "$ref": "#/definitions/param.density" },
-            "drift": { "$ref": "#/definitions/param.drift" },
+            "drift": { "$ref": "#/definitions/param.drift.shape_collage" },
             "spin": { "$ref": "#/definitions/param.spin.shape_collage" },
             "recompose": { "$ref": "#/definitions/param.recompose" },
             "recompose_blend": { "$ref": "#/definitions/param.recompose_blend" },
@@ -1124,7 +1130,7 @@
           "properties": {
             "mode_n": { "$ref": "#/definitions/param.mode_n" },
             "mode_m": { "$ref": "#/definitions/param.mode_m" },
-            "line_width": { "$ref": "#/definitions/param.line_width" },
+            "line_width": { "$ref": "#/definitions/param.line_width.analytic_field" },
             "plate_mix": { "$ref": "#/definitions/param.plate_mix" },
             "iterations": { "$ref": "#/definitions/param.iterations" },
             "c_re": { "$ref": "#/definitions/param.c_re" },
@@ -1228,6 +1234,86 @@
             "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
             "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
             "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" },
+            "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
+            "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
+            "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
+            "bg_angle": { "$ref": "#/definitions/param.bg_angle" },
+            "bg_hue_span": { "$ref": "#/definitions/param.bg_hue_span" },
+            "bg_coord_mode": { "$ref": "#/definitions/param.bg_coord_mode" },
+            "bg_center_x": { "$ref": "#/definitions/param.bg_center_x" },
+            "bg_center_y": { "$ref": "#/definitions/param.bg_center_y" },
+            "bg_shade": { "$ref": "#/definitions/param.bg_shade" },
+            "bg_shade_end": { "$ref": "#/definitions/param.bg_shade_end" },
+            "bg_ramp_gamma": { "$ref": "#/definitions/param.bg_ramp_gamma" },
+            "bg_band_amount": { "$ref": "#/definitions/param.bg_band_amount" },
+            "bg_band_angle": { "$ref": "#/definitions/param.bg_band_angle" },
+            "bg_band_pos": { "$ref": "#/definitions/param.bg_band_pos" },
+            "bg_band_width": { "$ref": "#/definitions/param.bg_band_width" },
+            "bg_band_curve": { "$ref": "#/definitions/param.bg_band_curve" },
+            "bg_band_hue": { "$ref": "#/definitions/param.bg_band_hue" },
+            "bg_band_hue_span": { "$ref": "#/definitions/param.bg_band_hue_span" },
+            "trails": { "$ref": "#/definitions/param.trails" },
+            "fb_zoom": { "$ref": "#/definitions/param.fb_zoom.trails" },
+            "fb_rotate": { "$ref": "#/definitions/param.fb_rotate.trails" },
+            "fb_dx": { "$ref": "#/definitions/param.fb_dx.trails" },
+            "fb_dy": { "$ref": "#/definitions/param.fb_dy.trails" },
+            "fb_center_x": { "$ref": "#/definitions/param.fb_center_x.trails" },
+            "fb_center_y": { "$ref": "#/definitions/param.fb_center_y.trails" },
+            "fb_warp": { "$ref": "#/definitions/param.fb_warp.trails" },
+            "kaleido_order": { "$ref": "#/definitions/param.kaleido_order" },
+            "kaleido_angle": { "$ref": "#/definitions/param.kaleido_angle" },
+            "kaleido_center_x": { "$ref": "#/definitions/param.kaleido_center_x" },
+            "kaleido_center_y": { "$ref": "#/definitions/param.kaleido_center_y" },
+            "kaleido_edge": { "$ref": "#/definitions/param.kaleido_edge" },
+            "kaleido_tile": { "$ref": "#/definitions/param.kaleido_tile" },
+            "kaleido_radial": { "$ref": "#/definitions/param.kaleido_radial" },
+            "kaleido_spiral": { "$ref": "#/definitions/param.kaleido_spiral" },
+            "kaleido_zoom": { "$ref": "#/definitions/param.kaleido_zoom" },
+            "kaleido_inner": { "$ref": "#/definitions/param.kaleido_inner" },
+            "bloom_amount": { "$ref": "#/definitions/param.bloom_amount" },
+            "bloom_threshold": { "$ref": "#/definitions/param.bloom_threshold" },
+            "bloom_radius": { "$ref": "#/definitions/param.bloom_radius" },
+            "occlude": { "$ref": "#/definitions/param.occlude" },
+            "exposure": { "$ref": "#/definitions/param.exposure" },
+            "ink_amount": { "$ref": "#/definitions/param.ink_amount" },
+            "paper_hue": { "$ref": "#/definitions/param.paper_hue" },
+            "paper_sat": { "$ref": "#/definitions/param.paper_sat" },
+            "paper_bright": { "$ref": "#/definitions/param.paper_bright" },
+            "ink_hue": { "$ref": "#/definitions/param.ink_hue" },
+            "ink_sat": { "$ref": "#/definitions/param.ink_sat" },
+            "ink_bright": { "$ref": "#/definitions/param.ink_bright" },
+            "ink_gamma": { "$ref": "#/definitions/param.ink_gamma" }
+          } } } }
+    },
+    {
+      "if": { "required": ["system"], "properties": { "system": { "const": "plexus" } } },
+      "then": { "properties": { "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "link_distance": { "$ref": "#/definitions/param.link_distance" },
+            "link_alpha": { "$ref": "#/definitions/param.link_alpha" },
+            "line_width": { "$ref": "#/definitions/param.line_width.plexus" },
+            "node_size": { "$ref": "#/definitions/param.node_size" },
+            "node_glow": { "$ref": "#/definitions/param.node_glow" },
+            "drift": { "$ref": "#/definitions/param.drift.plexus" },
+            "wave": { "$ref": "#/definitions/param.wave" },
+            "wave_scale": { "$ref": "#/definitions/param.wave_scale" },
+            "yaw": { "$ref": "#/definitions/param.yaw" },
+            "pitch": { "$ref": "#/definitions/param.pitch" },
+            "distance": { "$ref": "#/definitions/param.distance" },
+            "fov": { "$ref": "#/definitions/param.fov" },
+            "focus": { "$ref": "#/definitions/param.focus.plexus" },
+            "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+            "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
+            "hue_center": { "$ref": "#/definitions/param.hue_center.plexus" },
+            "hue_spread": { "$ref": "#/definitions/param.hue_spread.plexus" },
+            "saturation": { "$ref": "#/definitions/param.saturation" },
+            "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
+            "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
+            "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
+            "pan_x": { "$ref": "#/definitions/param.pan_x" },
+            "pan_y": { "$ref": "#/definitions/param.pan_y" },
             "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
             "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
             "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
@@ -1488,6 +1574,8 @@
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
             "reseed": { "$ref": "#/definitions/param.reseed.attractor" },
             "perspective": { "$ref": "#/definitions/param.perspective" },
+            "focus": { "$ref": "#/definitions/param.focus.attractor" },
+            "aperture": { "$ref": "#/definitions/param.aperture.attractor" },
             "depth_fade": { "$ref": "#/definitions/param.depth_fade" },
             "depth_hue": { "$ref": "#/definitions/param.depth_hue" },
             "spin": { "$ref": "#/definitions/param.spin.attractor" },
@@ -1678,7 +1766,7 @@
             "angle_bias": { "$ref": "#/definitions/param.angle_bias" },
             "roster": { "$ref": "#/definitions/param.roster" },
             "density": { "$ref": "#/definitions/param.density" },
-            "drift": { "$ref": "#/definitions/param.drift" },
+            "drift": { "$ref": "#/definitions/param.drift.shape_collage" },
             "spin": { "$ref": "#/definitions/param.spin.shape_collage" },
             "recompose": { "$ref": "#/definitions/param.recompose" },
             "recompose_blend": { "$ref": "#/definitions/param.recompose_blend" },
@@ -1704,7 +1792,7 @@
           "properties": {
             "mode_n": { "$ref": "#/definitions/param.mode_n" },
             "mode_m": { "$ref": "#/definitions/param.mode_m" },
-            "line_width": { "$ref": "#/definitions/param.line_width" },
+            "line_width": { "$ref": "#/definitions/param.line_width.analytic_field" },
             "plate_mix": { "$ref": "#/definitions/param.plate_mix" },
             "iterations": { "$ref": "#/definitions/param.iterations" },
             "c_re": { "$ref": "#/definitions/param.c_re" },
@@ -1760,6 +1848,37 @@
             "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
             "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" }
           } } } } } }
+    },
+    {
+      "if": { "required": ["layer"], "properties": { "layer": { "required": ["system"], "properties": { "system": { "const": "plexus" } } } } },
+      "then": { "properties": { "layer": { "properties": { "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "link_distance": { "$ref": "#/definitions/param.link_distance" },
+            "link_alpha": { "$ref": "#/definitions/param.link_alpha" },
+            "line_width": { "$ref": "#/definitions/param.line_width.plexus" },
+            "node_size": { "$ref": "#/definitions/param.node_size" },
+            "node_glow": { "$ref": "#/definitions/param.node_glow" },
+            "drift": { "$ref": "#/definitions/param.drift.plexus" },
+            "wave": { "$ref": "#/definitions/param.wave" },
+            "wave_scale": { "$ref": "#/definitions/param.wave_scale" },
+            "yaw": { "$ref": "#/definitions/param.yaw" },
+            "pitch": { "$ref": "#/definitions/param.pitch" },
+            "distance": { "$ref": "#/definitions/param.distance" },
+            "fov": { "$ref": "#/definitions/param.fov" },
+            "focus": { "$ref": "#/definitions/param.focus.plexus" },
+            "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+            "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
+            "hue_center": { "$ref": "#/definitions/param.hue_center.plexus" },
+            "hue_spread": { "$ref": "#/definitions/param.hue_spread.plexus" },
+            "saturation": { "$ref": "#/definitions/param.saturation" },
+            "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
+            "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
+            "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
+            "pan_x": { "$ref": "#/definitions/param.pan_x" },
+            "pan_y": { "$ref": "#/definitions/param.pan_y" }
+          } } } } } }
     }
   ],
   "definitions": {
@@ -1770,7 +1889,7 @@
       "properties": {
         "system": {
           "type": "string",
-          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular"],
+          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus"],
           "description": "Which built-in scene the layer draws. Required."
         },
         "join": {
@@ -1854,6 +1973,10 @@
         "cellular": {
           "$ref": "#/definitions/cellular",
           "description": "The layer's automaton family and grid."
+        },
+        "plexus": {
+          "$ref": "#/definitions/plexus",
+          "description": "The layer's plexus arrangement, point count and seed."
         }
       }
     },
@@ -2110,6 +2233,28 @@
           "type": "boolean",
           "description": "Whether the grid is a torus; false makes every cell past the border dead.",
           "markdownDescription": "Whether the grid is a torus; false makes every cell past the border dead.\n\nDefault `true`."
+        }
+      }
+    },
+    "plexus": {
+      "description": "Which arrangement the plexus system's points take, how many there are, and what they are seeded from.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "type": "string",
+          "enum": ["cloud", "sheet"],
+          "description": "The arrangement of the points.",
+          "markdownDescription": "The arrangement of the points.\n\nDefault `cloud`."
+        },
+        "points": {
+          "type": "integer",
+          "description": "How many points; the quality tier may draw fewer, and says so.",
+          "markdownDescription": "How many points; the quality tier may draw fewer, and says so.\n\nDefault `300`."
+        },
+        "seed": {
+          "type": "integer",
+          "description": "What the points and their drift are drawn from; absent, the preset's own seed."
         }
       }
     },
@@ -2723,6 +2868,16 @@
       "description": "How strongly depth shrinks a particle, turning a flat figure into a solid one.",
       "markdownDescription": "How strongly depth shrinks a particle, turning a flat figure into a solid one.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
+    "param.focus.attractor": {
+      "type": "string",
+      "description": "Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest.",
+      "markdownDescription": "Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.aperture.attractor": {
+      "type": "string",
+      "description": "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.",
+      "markdownDescription": "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
     "param.depth_fade": {
       "type": "string",
       "description": "How much depth dims a particle, which is what reads as air between the layers.",
@@ -3188,7 +3343,7 @@
       "description": "How much of the frame the arrangement fills.",
       "markdownDescription": "How much of the frame the arrangement fills.\n\n- default `1.0`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.drift": {
+    "param.drift.shape_collage": {
       "type": "string",
       "description": "How far the elements wander from their placed positions.",
       "markdownDescription": "How far the elements wander from their placed positions.\n\n- default `0.0`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
@@ -3258,7 +3413,7 @@
       "description": "The plate's second mode number: how many nodal lines cross the other axis.",
       "markdownDescription": "The plate's second mode number: how many nodal lines cross the other axis.\n\n- default `5.0`\n- typical range depends on the family: `chladni` `1.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `escape_time` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
-    "param.line_width": {
+    "param.line_width.analytic_field": {
       "type": "string",
       "description": "How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line.",
       "markdownDescription": "How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line.\n\n- default `0.04`\n- typical range depends on the family: `chladni` `0.0` to `0.3` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `escape_time` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
@@ -3382,6 +3537,86 @@
       "type": "string",
       "description": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.",
       "markdownDescription": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.\n\n- default `0.35`\n- typical range depends on the family: `life_like` `0.0` to `1.0`, `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.link_distance": {
+      "type": "string",
+      "description": "How close two points must be to be joined, in the layout's own units; the cube is 2 across.",
+      "markdownDescription": "How close two points must be to be joined, in the layout's own units; the cube is 2 across.\n\n- default `0.35`\n- typical range `0.05` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.link_alpha": {
+      "type": "string",
+      "description": "How strongly a link at its closest is drawn; a link always fades to nothing at link_distance.",
+      "markdownDescription": "How strongly a link at its closest is drawn; a link always fades to nothing at link_distance.\n\n- default `0.7`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.line_width.plexus": {
+      "type": "string",
+      "description": "Line width in pixels at the focal plane; nearer lines are wider and farther ones thinner.",
+      "markdownDescription": "Line width in pixels at the focal plane; nearer lines are wider and farther ones thinner.\n\n- default `1.5`\n- typical range `0.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.node_size": {
+      "type": "string",
+      "description": "Radius of the dot at every point, in pixels at the focal plane; 0 draws no dots.",
+      "markdownDescription": "Radius of the dot at every point, in pixels at the focal plane; 0 draws no dots.\n\n- default `2.5`\n- typical range `0.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.node_glow": {
+      "type": "string",
+      "description": "Brightness of the dots relative to the lines.",
+      "markdownDescription": "Brightness of the dots relative to the lines.\n\n- default `1.0`\n- typical range `0.0` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.drift.plexus": {
+      "type": "string",
+      "description": "How fast the points drift on their flow; 0 holds the network still.",
+      "markdownDescription": "How fast the points drift on their flow; 0 holds the network still.\n\n- default `0.15`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.wave": {
+      "type": "string",
+      "description": "How far a sheet ripples above and below its plane, in the layout's own units; 0 lies flat.",
+      "markdownDescription": "How far a sheet ripples above and below its plane, in the layout's own units; 0 lies flat.\n\n- default `0.15`\n- typical range depends on the family: `sheet` `0.0` to `0.6` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cloud` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.wave_scale": {
+      "type": "string",
+      "description": "How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop.",
+      "markdownDescription": "How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop.\n\n- default `1.0`\n- typical range depends on the family: `sheet` `0.3` to `3.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cloud` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.yaw": {
+      "type": "string",
+      "description": "Turns the camera around the network, in radians; bind it to a slow clock to orbit.",
+      "markdownDescription": "Turns the camera around the network, in radians; bind it to a slow clock to orbit.\n\n- default `0.0`\n- typical range `-3.1415927` to `3.1415927` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.pitch": {
+      "type": "string",
+      "description": "Raises the camera above the network, in radians; negative looks up from below.",
+      "markdownDescription": "Raises the camera above the network, in radians; negative looks up from below.\n\n- default `0.25`\n- typical range `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.distance": {
+      "type": "string",
+      "description": "How far the camera sits from the network's centre; nearer exaggerates the perspective.",
+      "markdownDescription": "How far the camera sits from the network's centre; nearer exaggerates the perspective.\n\n- default `3.5`\n- typical range `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.fov": {
+      "type": "string",
+      "description": "The camera's vertical field of view in radians; zoom divides it.",
+      "markdownDescription": "The camera's vertical field of view in radians; zoom divides it.\n\n- default `0.8`\n- typical range `0.2` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.focus.plexus": {
+      "type": "string",
+      "description": "Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest.",
+      "markdownDescription": "Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.aperture.plexus": {
+      "type": "string",
+      "description": "The blur of the far background, in pixels; lines nearer than the focal plane blur more, up to the tier's cap. 0 keeps every line sharp, and wider costs fill.",
+      "markdownDescription": "The blur of the far background, in pixels; lines nearer than the focal plane blur more, up to the tier's cap. 0 keeps every line sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.hue_center.plexus": {
+      "type": "string",
+      "description": "Where along the palette the middle of the volume's depth is coloured.",
+      "markdownDescription": "Where along the palette the middle of the volume's depth is coloured.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.hue_spread.plexus": {
+      "type": "string",
+      "description": "How far along the palette the colour travels from the nearest part of the volume to the farthest.",
+      "markdownDescription": "How far along the palette the colour travels from the nearest part of the volume to the farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.bg_hue": {
       "type": "string",

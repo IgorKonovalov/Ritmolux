@@ -323,8 +323,9 @@ fn a_chord_web_declines_the_fit_and_a_rose_takes_it() {
         (fitted, pieces)
     };
 
-    // The shipped webs: `curve_nightbloom` binds 29 / 37 / 43, the golden
-    // fixture and `parametric_curve`'s own default bind 71.
+    // Chord webs: 29 / 37 / 43 are the roster a since-retired shipped web
+    // stepped through at `n = 7`; the golden fixture and `parametric_curve`'s
+    // own default bind 71.
     for d in [29.0, 37.0, 43.0, 71.0] {
         let (fitted, pieces) = walk(7.0, d, 240);
         assert!(!fitted, "d = {d} is a chord web and must decline the fit");

@@ -40,7 +40,7 @@ use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::PingPongField;
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// Fixed internal simulation grid (square). 256² resolves the Gray-Scott
 /// patterns well while staying cheap enough that the headless capture tests run
@@ -851,6 +851,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.01, 0.09]),
         doc: "Feed rate of the reaction - with `kill`, it is what decides whether you get spots, stripes or mitosis.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "kill",
@@ -858,6 +860,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.03, 0.07]),
         doc: "Kill rate of the reaction; small moves here change the pattern's whole character.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "flow",
@@ -865,6 +869,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "How fast the simulation advances per second.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "inject",
@@ -872,6 +878,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Drops fresh reagent into the field, which is how a beat seeds new growth.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),
     ParamSpec {
@@ -881,6 +889,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How many bands the concentration is drawn as, as a real density: a fraction \
                slides the whole set of iso-lines. 0 is a smooth gradient.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "hatch",
@@ -888,6 +898,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 24.0]),
         doc: "Density of the hatching drawn along the concentration gradient.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "glow",
@@ -895,6 +907,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 2.0]),
         doc: "Overall light the field emits.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "color_span",
@@ -902,6 +916,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much of the palette the concentration range covers.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "color_center",
@@ -909,6 +925,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Shifts which concentration lands in the middle of the palette.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,

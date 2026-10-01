@@ -224,9 +224,27 @@ jobs:
           path: target/dist/*.zip
           if-no-files-found: error
 
-  # Publish. Gated on ALL SIX builds by `needs:`, so a failure on any platform
-  # leaves no Release at all rather than a half-published one - the release job
-  # is skipped, not merely red.
+  # Count what the six builds produced, on EVERY run - a tag push and a dispatch
+  # dry run alike - so a rehearsal checks everything a release checks except
+  # the publish (ADR-0254). No `if:` on the event, deliberately: this is the job
+  # a dispatch exists to exercise. The count itself is a script so that its
+  # refusal can be proven by a seeded self-test on every push; a release run can
+  # only ever show it passing.
+  verify:
+    needs: [macos, windows, linux, foobar, studio-macos, studio-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Count the release assets
+        run: node scripts/check-release-assets.mjs assets
+
+  # Publish. Gated on ALL SIX builds and on `verify` by `needs:`, so a failure on
+  # any platform, or a short set of assets, leaves no Release at all rather than
+  # a half-published one - the release job is skipped, not merely red.
   #
   # Gated on the EVENT and the ref, not the ref alone. A tag push publishes; a
   # workflow_dispatch never does, whatever ref it names, so the dry-run path
@@ -237,7 +255,7 @@ jobs:
   # on every runner image, so no pinned third-party release action is needed
   # (NFR section 4 - every dependency is a cost to justify).
   release:
-    needs: [macos, windows, linux, foobar, studio-macos, studio-windows]
+    needs: [macos, windows, linux, foobar, studio-macos, studio-windows, verify]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -255,23 +273,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Five zips - the Windows and macOS standalone, the foobar2000
-          # component, and the two studio zips - and one tarball, the Linux
-          # standalone. The recipe either produces all six or the tag is
-          # incomplete (ADR-0115, Negative), and an exact count PER KIND is what
-          # makes a silently-skipped job fail here rather than ship a short
-          # release: counting zips alone passes a release that carries nothing
-          # for Linux. `nullglob` so a missing kind counts as 0 rather than as
-          # its own unexpanded pattern.
+          # The per-kind count ran in `verify`, which this job needs, on the
+          # same downloaded artifacts (ADR-0254). `nullglob` so the upload
+          # below names only what is there.
           shopt -s nullglob
           zips=(assets/*.zip)
           tarballs=(assets/*.tar.gz)
-          if [ "${#zips[@]}" -ne 5 ] || [ "${#tarballs[@]}" -ne 1 ]; then
-              echo "expected exactly 5 zips and 1 tarball, found ${#zips[@]} and ${#tarballs[@]}:" >&2
-              ls -1 assets/ >&2
-              exit 1
-          fi
-          ls -1 "${zips[@]}" "${tarballs[@]}"
 
           notes="Builds of the ${TAG} tag: the standalone app for macOS,
           Windows and Linux, the foobar2000 component, and the studio for macOS

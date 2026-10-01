@@ -5,13 +5,19 @@
 // move the lane's branch, `git stash`, whose stack every worktree shares, or a deletion whose path
 // leaves the worktree.
 //
-// `decide` below models the CLI's documented rule matching, so a case here says what a session may
-// actually run rather than what a rule looks like: a rule's text is matched against the whole
-// command with `*` standing for any run of characters, spaces included; a rule whose only wildcard
-// is a trailing ` *` also matches the bare command; a compound command is split at `&&`, `||`, `;`,
-// `|`, `&` and newlines and every part must be allowed on its own; and deny is consulted before
-// allow, so a deny match wins however specific the allow beside it. It is a model of the CLI, not
-// the CLI: it pins what this file means, and a CLI that changed its matcher would not turn it red.
+// THE TWO HALVES REST ON DIFFERENT THINGS (ADR-0233). A case that says a command is REFUSED and
+// names a `recorded` shape is asserted against what the real CLI did with that shape, read out of the
+// table in `tools/conductor/spike/README.md` that `spike/matcher-probe.mjs` produced; being wrong
+// about a refusal costs a directory, so it is not left to a model. It also goes through `decide`, so a
+// deny rule deleted after the probe turns it red. Every other case — every allowed
+// one, and a refusal the probe has not asked — goes through `decide` below, which models the CLI's
+// documented rule matching: a rule's text is matched against the whole command with `*` standing for
+// any run of characters, spaces included; a rule whose only wildcard is a trailing ` *` also matches
+// the bare command; a compound command is split at `&&`, `||`, `;`, `|`, `&` and newlines and every
+// part must be allowed on its own; and deny is consulted before allow. That half is a model of the
+// CLI, not the CLI: the probe has already caught it wrong — it refuses a `| sed` the CLI runs, and
+// before the `$` and backtick rules it allowed the shell expansions the CLI refuses — and a CLI that
+// changed its matcher would not turn it red. Being wrong about an allowed case costs a session one turn.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -25,6 +31,37 @@ const settings = JSON.parse(readFileSync(join(TOOL_DIR, "settings.conductor.json
 // The rustdoc form the review prompt prints, read out of the prompt, so a prompt and an allowlist that
 // drift apart turn a case below red rather than send a session into a denial.
 const promptedRustdoc = readFileSync(join(TOOL_DIR, "prompts", "review.md"), "utf8").match(/`(RUSTDOCFLAGS=[^`]+)`/)?.[1];
+// The recorded half: the probe's verdict table, keyed by the shape exactly as the table spells it.
+// A re-run adds a `Verdict ...` column beside the earlier ones rather than overwriting them, so each
+// row's verdict is the rightmost one it carries, and `refusedBy` is the column beside that verdict.
+const recorded = readRecorded(readFileSync(join(TOOL_DIR, "spike", "README.md"), "utf8"));
+
+/** { cli, verdicts: Map<shape, verdict>, refusedBy: Map<shape, text> } from spike/README.md. */
+function readRecorded(md) {
+  const heading = md.match(/^## What does the allowlist refuse\? Observed on (\S+)$/m);
+  assert.ok(heading, "spike/README.md carries no allowlist verdict table");
+  const section = md.slice(heading.index).split(/\n## /)[0];
+  const lines = section.split("\n").filter((l) => l.startsWith("|"));
+  const cells = (l) => l.slice(1, -1).split(/(?<!\\)\|/).map((c) => c.trim());
+  const verdictCols = cells(lines[0]).flatMap((h, i) => (h.startsWith("Verdict") ? [i] : []));
+  assert.ok(verdictCols.length, "the verdict table has no Verdict column");
+  const verdicts = new Map();
+  const refusedBy = new Map();
+  for (const l of lines.slice(2)) {
+    const row = cells(l);
+    const shape = row[0].match(/^(`+)\s?(.*?)\s?\1/)?.[2]?.replace(/\\\|/g, "|");
+    for (const col of [...verdictCols].reverse()) {
+      const verdict = row[col]?.match(/\*\*(.+?)\*\*/)?.[1];
+      if (shape && verdict) {
+        verdicts.set(shape, verdict);
+        refusedBy.set(shape, row[col + 1] ?? "");
+        break;
+      }
+    }
+  }
+  return { cli: heading[1], verdicts, refusedBy };
+}
+
 const allow = settings.permissions.allow;
 const deny = settings.permissions.deny;
 
@@ -95,8 +132,21 @@ const CASES = [
   { tool: "Read", command: "", allowed: true },
   { tool: "Glob", command: "", allowed: true },
   { tool: "Grep", command: "", allowed: true },
-  { tool: "Edit", command: "", allowed: true },
-  { tool: "Write", command: "", allowed: true },
+  // Write and Edit are path-scoped (ADR-0255): the lane (`./`, the session's cwd), the OS temp
+  // directory, and state/reviews/ beside this settings file. The model reads the path as the command;
+  // the refusals below are also asserted against the recorded write table.
+  // These allowed cases are written in the rules' own spellings, so the model never sees the absolute
+  // lane path a session most often writes. That shape's evidence is the write table's row "`Write` an
+  // absolute path in the lane" in spike/README.md, observed WROTE under the shipped rules.
+  { tool: "Write", command: "./core/src/lib.rs", allowed: true },
+  { tool: "Edit", command: "./core/src/lib.rs", allowed: true },
+  { tool: "Write", command: "//tmp/rlx-scratch.txt", allowed: true },
+  { tool: "Edit", command: "//tmp/rlx-scratch.txt", allowed: true },
+  { tool: "Write", command: "/state/reviews/0233-round-1.md", allowed: true, why: "a review session's own output" },
+  { tool: "Edit", command: "/state/reviews/0233-round-1.md", allowed: true },
+  { tool: "Write", command: "../rlx-plan-0180/x.txt", allowed: false, why: "the lane's parent" },
+  { tool: "Edit", command: "../rlx-plan-0180/x.txt", allowed: false },
+  { tool: "Write", command: "~/.bashrc", allowed: false, why: "outside the lane and the temp directory" },
   { tool: "Skill", command: "", allowed: true },
   { tool: "Monitor", command: "", allowed: false, why: "nothing re-invokes a headless session" },
   { tool: "WebFetch", command: "", allowed: false },
@@ -189,7 +239,7 @@ const CASES = [
   // Then the ones refused for their shape rather than their verb. The prompts' shape rules are what
   // avoids these; widening for them would mean allowing `cd` and a bare assignment.
   { tool: "PowerShell", command: "cd studio; npm run typecheck", allowed: false, why: "`cd` is not a command a session may run" },
-  { tool: "Bash", command: "cd studio && npm run typecheck", allowed: false, why: "same, in the other shell" },
+  { tool: "Bash", command: "cd studio && npm run typecheck", allowed: false, why: "same, in the other shell", recorded: "cd tools && git status --short" },
   { tool: "PowerShell", command: "$env:ELECTRON_SKIP_BINARY_DOWNLOAD = '1'; npm --prefix studio ci", allowed: false, why: "an assignment is its own command" },
   { tool: "PowerShell", command: "$env:CARGO_TARGET_DIR = 'target/p9'; cargo nextest run", allowed: false, why: "same" },
 
@@ -220,17 +270,34 @@ const CASES = [
   { tool: "Bash", command: "git grep -n -e settledPark -e parkStillTrue -- tools/conductor", allowed: true, why: "the same search, spelled without a `|`" },
 
   // The lane is the bound. A deletion whose path leaves it is refused however it is spelled.
-  { tool: "Bash", command: "rm -rf ../rlx-plan-0175", allowed: false, why: "escapes the worktree" },
-  { tool: "Bash", command: "rm ../../secrets.txt", allowed: false },
-  { tool: "Bash", command: "rm -rf ~/.cargo", allowed: false },
-  { tool: "Bash", command: "rm -rf /etc/hosts", allowed: false },
-  { tool: "Bash", command: "rm /tmp/x", allowed: false },
-  { tool: "Bash", command: "rm -rf C:/Users/Someone/WORK", allowed: false },
+  { tool: "Bash", command: "rm -rf ../rlx-plan-0175", allowed: false, why: "escapes the worktree", recorded: "rm -rf ../canary-dotdot" },
+  { tool: "Bash", command: "rm ../../secrets.txt", allowed: false, recorded: "rm -rf ../canary-dotdot" },
+  { tool: "Bash", command: "rm -rf ~/.cargo", allowed: false, recorded: "rm -rf ~/canary-tilde" },
+  { tool: "Bash", command: "rm -rf /etc/hosts", allowed: false, recorded: "rm -rf <absolute path>" },
+  { tool: "Bash", command: "rm /tmp/x", allowed: false, recorded: "rm -rf <absolute path>" },
+  { tool: "Bash", command: "rm -rf C:/Users/Someone/WORK", allowed: false, recorded: "rm -rf C:/canary-drive" },
+  { tool: "Bash", command: "rm target/x /home/someone/.ssh", allowed: false, why: "an absolute path after the first argument; not probed" },
+  { tool: "Bash", command: "rm -rf target/x /etc", allowed: false },
+  { tool: "Bash", command: 'rm -rf "/etc"', allowed: false, why: "a quoted absolute path; not probed" },
+  { tool: "Bash", command: "rm -rf '/home/someone/.ssh'", allowed: false, why: "a quoted absolute path; not probed" },
+  { tool: "Bash", command: 'rm -rf "target/debug"', allowed: true, why: "a quoted relative path still runs" },
+  // Paths the shell produces rather than a session writes. `decide` refuses every one of these
+  // through the `$` and backtick rules, and the transcript is what shows the CLI agrees.
+  { tool: "Bash", command: "rm -rf $HOME/.cargo", allowed: false, recorded: "rm -rf $HOME/.cargo" },
+  { tool: "Bash", command: "rm -rf ${HOME}/.cargo", allowed: false, recorded: "rm -rf ${HOME}/canary-brace" },
+  { tool: "Bash", command: 'rm -rf "$(git rev-parse --show-toplevel)/../rlx-plan-0180"', allowed: false, recorded: 'rm -rf "$(git rev-parse --show-toplevel)/.."' },
+  { tool: "Bash", command: 'rm -rf "$(dirname "$PWD")"/rlx-plan-0180', allowed: false, recorded: 'rm -rf "$(dirname "$PWD")"/canary-subst' },
+  { tool: "Bash", command: "rm -rf `dirname $PWD`/rlx-plan-0180", allowed: false, recorded: "rm -rf `dirname $PWD`/canary-tick" },
+  { tool: "Bash", command: 'rm -rf "$SCRATCH"', allowed: false, why: "the bound's price: any expansion in a deletion is refused, a legitimate one too" },
+  { tool: "PowerShell", command: "Remove-Item -Recurse $env:USERPROFILE\\WORK", allowed: false, why: "not probed: the PowerShell tool exists only on Windows" },
   { tool: "Bash", command: "rm -rf C:\\Users\\Someone\\WORK", allowed: false },
   { tool: "PowerShell", command: "Remove-Item -Recurse ../rlx-plan-0175", allowed: false },
   { tool: "PowerShell", command: "Remove-Item ~/.cargo/config.toml", allowed: false },
   { tool: "PowerShell", command: "Remove-Item /etc/hosts", allowed: false },
   { tool: "PowerShell", command: "Remove-Item -Recurse /var/log", allowed: false },
+  { tool: "PowerShell", command: "Remove-Item target/x /home/someone/.ssh", allowed: false, why: "an absolute path after the first argument" },
+  { tool: "PowerShell", command: 'Remove-Item "/etc"', allowed: false, why: "a quoted absolute path; not probed" },
+  { tool: "PowerShell", command: "Remove-Item -Recurse '/var/log'", allowed: false, why: "a quoted absolute path; not probed" },
   { tool: "PowerShell", command: "Remove-Item C:/Users/Someone/WORK", allowed: false },
   { tool: "PowerShell", command: "Remove-Item -Recurse C:\\Users\\Someone\\WORK", allowed: false },
 
@@ -258,10 +325,85 @@ const CASES = [
 
 for (const c of CASES) {
   const label = c.command ? `${c.tool}: ${c.command}` : c.tool;
-  test(`${c.allowed ? "allowed" : "refused"} - ${label}${c.why ? ` (${c.why})` : ""}`, () => {
-    assert.equal(decide(c.tool, c.command).allowed, c.allowed);
+  const basis = c.recorded ? ` [recorded on ${recorded.cli}]` : "";
+  test(`${c.allowed ? "allowed" : "refused"} - ${label}${c.why ? ` (${c.why})` : ""}${basis}`, () => {
+    if (c.recorded) {
+      // A refusal the probe asked is what the CLI did, not what the model says: a shape the table
+      // records as RAN turns this red however the rules read.
+      assert.equal(c.allowed, false, "a recorded shape backs a refusal only");
+      const verdict = recorded.verdicts.get(c.recorded);
+      assert.ok(verdict, `spike/README.md records no verdict for \`${c.recorded}\``);
+      assert.equal(verdict, "DENIED", `the CLI ${verdict} \`${c.recorded}\` on ${recorded.cli}`);
+      // The table is frozen at probe time, so it cannot see a rule deleted since. The model reads the
+      // file as it is now: the transcript says the CLI refused the shape, and this says the file still
+      // carries a rule that refuses it.
+      assert.equal(decide(c.tool, c.command).allowed, false, "settings.conductor.json no longer refuses a shape the CLI was recorded refusing");
+    } else {
+      assert.equal(decide(c.tool, c.command).allowed, c.allowed);
+    }
   });
 }
+
+test("a deletion through a shell expansion is refused by the file, not only by the CLI", () => {
+  // Without a rule of its own, `${HOME}`, `$(...)` and backticks were refused only because dontAsk
+  // does not auto-allow them - behaviour of one CLI version, not a claim this file makes.
+  for (const shape of ["rm -rf $HOME/.cargo", "rm -rf ${HOME}/canary-brace", 'rm -rf "$(dirname "$PWD")"/canary-subst', "rm -rf `dirname $PWD`/canary-tick"]) {
+    assert.equal(recorded.verdicts.get(shape), "DENIED", shape);
+    assert.match(recorded.refusedBy.get(shape), /deny rule/, `${shape} is refused by ${recorded.refusedBy.get(shape)}`);
+  }
+});
+
+test("a literal in-lane deletion still runs, so the bound did not buy safety by refusing work", () => {
+  assert.equal(recorded.verdicts.get("rm -rf target/debug"), "RAN");
+});
+
+// The recorded write table (Plan 0234): its shipped column, and the spellings it says ship.
+const writeTable = readWriteTable(readFileSync(join(TOOL_DIR, "spike", "README.md"), "utf8"));
+
+/** { cli, rows: [{ shape, verdict }], spellings } from the write section of spike/README.md. */
+function readWriteTable(md) {
+  const heading = md.match(/^## What may a session write\? Observed on (\S+)$/m);
+  assert.ok(heading, "spike/README.md carries no write verdict table");
+  const section = md.slice(heading.index).split(/\n## /)[0];
+  const lines = section.split("\n").filter((l) => l.startsWith("|"));
+  const cells = (l) => l.slice(1, -1).split(/(?<!\\)\|/).map((c) => c.trim());
+  const header = cells(lines[0]);
+  const col = header.length - 1;
+  assert.match(header[col], /^Candidate B/, "the shipped column is the table's last, Candidate B");
+  const rows = lines.slice(2).map((l) => {
+    const row = cells(l);
+    return { shape: row[0], verdict: row[col].match(/\*\*(.+?)\*\*/)?.[1] ?? row[col] };
+  });
+  // The paragraph naming the shipped grants; it wraps, and its spellings carry dots of their own.
+  const shipped = section.match(/It replaces the\s+bare grants with ([\s\S]*?)\n\n/)?.[1] ?? "";
+  const spellings = [...shipped.matchAll(/`((?:Write|Edit)\([^`]+\))`/g)].map((m) => m[1]);
+  return { cli: heading[1], rows, spellings };
+}
+
+test("the Write and Edit grants are exactly the spellings the write probe recorded", () => {
+  // A grant edited without re-running the probe is a bound nobody measured.
+  const granted = allow.filter((r) => /^(Write|Edit)(\(|$)/.test(r)).sort();
+  assert.deepEqual(granted, [...writeTable.spellings].sort(), `recorded on ${writeTable.cli}`);
+  assert.ok(!allow.includes("Write") && !allow.includes("Edit"), "a bare Write or Edit grant reaches every path");
+});
+
+test("the recorded write table refuses the parent, home and a parent Edit, and allows the rest", () => {
+  const verdict = (prefix) => writeTable.rows.find((r) => r.shape.startsWith(prefix))?.verdict;
+  for (const shape of ["`Write` in the lane's parent", "`Write` in `$HOME`", "`Edit` in the lane's parent"]) {
+    assert.equal(verdict(shape), "DENIED", shape);
+  }
+  for (const shape of ["`Write` a relative path in the lane", "`Write` an absolute path in the lane", "`Write` in the OS temp directory", "`Edit` in the lane", "`Write` in `state/reviews/`"]) {
+    assert.equal(verdict(shape), "WROTE", shape);
+  }
+});
+
+test("the verdict table's literal-escape controls are refused, or the run proved nothing", () => {
+  // The four shapes the deny rules were written for. If any of them ran, the settings file was not
+  // in force during the probe and no other verdict in the table means anything.
+  for (const shape of ["rm -rf ../canary-dotdot", "rm -rf ~/canary-tilde", "rm -rf <absolute path>", "rm -rf C:/canary-drive"]) {
+    assert.equal(recorded.verdicts.get(shape), "DENIED", shape);
+  }
+});
 
 test("every rule in settings.conductor.json is exercised by a case above", () => {
   const exercised = new Set();

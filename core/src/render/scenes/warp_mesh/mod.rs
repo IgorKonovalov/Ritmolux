@@ -85,7 +85,7 @@ mod shaders;
 // keep their old path rather than gaining a `mesh::` segment.
 pub use mesh::{DEFAULT_MESH, MAX_MESH, MIN_MESH, clamp_grid, vertex_count, vertex_position};
 
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 use mesh::*;
 use resources::*;
 use shaders::*;
@@ -115,6 +115,8 @@ pub const PER_VERTEX_PARAMS: &[ParamSpec] = &[
         range: Some([0.5, 2.0]),
         doc: "Scale the previous frame is resampled at, per vertex; above 1 the past is magnified and the image travels outward.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "rot",
@@ -122,6 +124,8 @@ pub const PER_VERTEX_PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Turns per second the resample is rotated by, per vertex.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "cx",
@@ -129,6 +133,8 @@ pub const PER_VERTEX_PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Horizontal point the per-vertex zoom and rotation pivot about, in uv.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "cy",
@@ -136,6 +142,8 @@ pub const PER_VERTEX_PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Vertical point the per-vertex zoom and rotation pivot about, in uv.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "dx",
@@ -143,6 +151,8 @@ pub const PER_VERTEX_PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Sideways offset of the resample, in frame widths.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "dy",
@@ -150,6 +160,8 @@ pub const PER_VERTEX_PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Vertical offset of the resample, in frame heights.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "sx",
@@ -157,6 +169,8 @@ pub const PER_VERTEX_PARAMS: &[ParamSpec] = &[
         range: Some([0.5, 2.0]),
         doc: "Horizontal stretch of the resample, independently of `zoom`.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "sy",
@@ -164,6 +178,8 @@ pub const PER_VERTEX_PARAMS: &[ParamSpec] = &[
         range: Some([0.5, 2.0]),
         doc: "Vertical stretch of the resample, independently of `zoom`.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "warp",
@@ -171,6 +187,8 @@ pub const PER_VERTEX_PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 2.0]),
         doc: "Amplitude of the travelling ripple added to the resample.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
 ];
 
@@ -273,6 +291,8 @@ pub const COMPOSITE_PARAMS: &[ParamSpec] = &[
         range: Some([0.25, 4.0]),
         doc: "Shapes the field's tone curve on its way out; below 1 lifts the mid tones.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "wrap",
@@ -280,6 +300,8 @@ pub const COMPOSITE_PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Wraps a sample that leaves the frame back in at the opposite edge, instead of clamping.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "darken_center",
@@ -287,6 +309,8 @@ pub const COMPOSITE_PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Pulls brightness down toward the middle of the frame.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "brighten",
@@ -294,6 +318,8 @@ pub const COMPOSITE_PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Lifts the field's bright end, MilkDrop's own brighten switch.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "darken",
@@ -301,6 +327,8 @@ pub const COMPOSITE_PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Pushes the field's dark end down, MilkDrop's own darken switch.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "solarize",
@@ -308,6 +336,8 @@ pub const COMPOSITE_PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Inverts the field above its midpoint, so highlights fold back into shadow.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "invert",
@@ -315,6 +345,8 @@ pub const COMPOSITE_PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Inverts the whole field.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "echo_alpha",
@@ -322,6 +354,8 @@ pub const COMPOSITE_PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How strongly a second, scaled copy of the field is blended over the first.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "echo_zoom",
@@ -329,6 +363,8 @@ pub const COMPOSITE_PARAMS: &[ParamSpec] = &[
         range: Some([0.25, 4.0]),
         doc: "How much larger or smaller that echoed copy is.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "echo_orient",
@@ -336,6 +372,8 @@ pub const COMPOSITE_PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 3.0]),
         doc: "Which way the echoed copy is flipped before it is blended.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Post,
+        main: false,
     },
 ];
 
@@ -406,6 +444,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.5, 2.0]),
         doc: "Scale the previous frame is resampled at, per vertex; above 1 the past is magnified and the image travels outward.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "rot",
@@ -413,6 +453,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Turns per second the resample is rotated by, per vertex.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: true,
     },
     ParamSpec {
         name: "cx",
@@ -420,6 +462,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Horizontal point the per-vertex zoom and rotation pivot about, in uv.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "cy",
@@ -427,6 +471,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Vertical point the per-vertex zoom and rotation pivot about, in uv.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "dx",
@@ -434,6 +480,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Sideways offset of the resample, in frame widths.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "dy",
@@ -441,6 +489,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Vertical offset of the resample, in frame heights.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "sx",
@@ -448,6 +498,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.5, 2.0]),
         doc: "Horizontal stretch of the resample, independently of `zoom`.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "sy",
@@ -455,6 +507,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.5, 2.0]),
         doc: "Vertical stretch of the resample, independently of `zoom`.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "warp",
@@ -462,6 +516,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 2.0]),
         doc: "Amplitude of the travelling ripple added to the resample.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "warp_scale",
@@ -469,6 +525,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.1, 4.0]),
         doc: "Spatial frequency of the ripple; higher makes it finer.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "warp_speed",
@@ -476,6 +534,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 4.0]),
         doc: "How fast the ripple travels, as a multiple of its base rate.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "decay",
@@ -483,6 +543,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much of the field survives each second, which is what sets the trail's length.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: true,
     },
     ParamSpec {
         name: "deposit",
@@ -490,6 +552,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 8.0]),
         doc: "How much light the source figure adds into the field each frame.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
     },
     ParamSpec {
         name: "deposit_x",
@@ -497,6 +561,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Horizontal position of the deposited figure, in uv.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "deposit_y",
@@ -504,6 +570,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Vertical position of the deposited figure, in uv.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "deposit_radius",
@@ -511,6 +579,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Radius of the deposited ring.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "deposit_width",
@@ -518,6 +588,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 0.5]),
         doc: "How thick that ring is; narrow reads as a wire, wide as a disc.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "deposit_arms",
@@ -526,6 +598,8 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "How many arms the ring is broken into, as a whole number of arms; 0 leaves it \
                whole.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "deposit_twist",
@@ -533,6 +607,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-2.0, 2.0]),
         doc: "Sweeps the arms into a spiral rather than leaving them radial.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "deposit_spin",
@@ -540,6 +616,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-2.0, 2.0]),
         doc: "Turns per second the deposited figure rotates by.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
     },
     ParamSpec {
         name: "gamma",
@@ -547,6 +625,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.25, 4.0]),
         doc: "Shapes the field's tone curve on its way out; below 1 lifts the mid tones.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "wrap",
@@ -554,6 +634,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Wraps a sample that leaves the frame back in at the opposite edge, instead of clamping.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
     },
     ParamSpec {
         name: "darken_center",
@@ -561,6 +643,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Pulls brightness down toward the middle of the frame.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "brighten",
@@ -568,6 +652,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Lifts the field's bright end, MilkDrop's own brighten switch.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "darken",
@@ -575,6 +661,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Pushes the field's dark end down, MilkDrop's own darken switch.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "solarize",
@@ -582,6 +670,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Inverts the field above its midpoint, so highlights fold back into shadow.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "invert",
@@ -589,6 +679,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Inverts the whole field.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "echo_alpha",
@@ -596,6 +688,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How strongly a second, scaled copy of the field is blended over the first.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "echo_zoom",
@@ -603,6 +697,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.25, 4.0]),
         doc: "How much larger or smaller that echoed copy is.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Post,
+        main: false,
     },
     ParamSpec {
         name: "echo_orient",
@@ -610,6 +706,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 3.0]),
         doc: "Which way the echoed copy is flipped before it is blended.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Post,
+        main: false,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),
     ParamSpec {
@@ -618,6 +716,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "How much of the palette the field's range covers.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "color_center",
@@ -625,6 +725,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([-1.0, 1.0]),
         doc: "Shifts which part of that range lands in the middle of the palette.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "color_source",
@@ -632,6 +734,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Where the field takes its colour: 0 the deposit's own angle, 1 the light it has built up.",
         kind: ParamKind::Structural,
+        group: ParamGroup::Colour,
+        main: false,
     },
     ParamSpec {
         name: "coverage_threshold",
@@ -639,6 +743,8 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "In level mode, the coverage a pixel needs to hold the ink: at or above it the palette's colour, below it the backdrop. 0 is off.",
         kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,

@@ -1,8 +1,17 @@
 use super::{
-    CAPTURE_TOP, COL_GUTTER, COL_W, LIST_INSET, ListLayout, NAME_CHARS, OverlayAction, OverlayKey,
-    OverlayState, PANE_IMAGE_H, PANE_IMAGE_W, PANE_PLACEHOLDER, PANE_TEXT_SIZE, PaneSlot, ROW_H,
-    ROWS_TOP, Row, capture_line, fit, header_text, layout, mark_glyph, pane, row_text,
+    CAPTURE_TOP, COL_GUTTER, COL_W, FAMILY_W, FAMILY_X, LIST_INSET, ListLayout, NAME_W, NAME_X,
+    OverlayAction, OverlayKey, OverlayState, PANE_IMAGE_H, PANE_IMAGE_W, PANE_PLACEHOLDER,
+    PANE_TEXT_SIZE, PaneSlot, ROW_H, ROW_SIZE, ROWS_TOP, Row, capture_line, fit, header_text,
+    layout, mark_glyph, pane, row_lines,
 };
+use crate::console::Line;
+
+/// A monospaced stand-in for the renderer's measurement: `0.55` em per
+/// character, a little wider than a sans-serif's average. The properties below
+/// hold for any measurement; this one makes the numbers in them readable.
+fn mono(text: &str, size: f32) -> f32 {
+    text.chars().count() as f32 * size * 0.55
+}
 
 const NAMES: [&str; 4] = ["alpha", "bravo", "charlie", "delta"];
 
@@ -241,23 +250,35 @@ fn a_degenerate_window_still_lays_out_one_row_in_one_column() {
     }
 }
 
-/// Truncation is cosmetic and only fires past the budget, which every shipped
-/// name is inside but `Star Mandala Bordered`.
+/// **Truncation is measured.** A name that fits its slot is untouched, however
+/// many characters it has — `Iris Bloom Kaleidoscope` included, which a
+/// per-character guess cuts with room to spare — and one that does not is cut
+/// to the widest prefix that fits, ellipsis and all.
 #[test]
-fn a_name_is_only_shortened_past_the_column_budget() {
-    assert_eq!(fit("Spectrum Corona"), "Spectrum Corona");
-    let exact: String = "a".repeat(NAME_CHARS);
-    assert_eq!(fit(&exact), exact, "a name that exactly fits is untouched");
+fn a_name_is_only_shortened_when_it_measures_past_its_slot() {
+    let mut m = mono;
+    for name in [
+        "Spectrum Corona",
+        "Iris Bloom Kaleidoscope",
+        "Star Mandala Bordered",
+    ] {
+        assert!(mono(name, ROW_SIZE) <= NAME_W, "{name} is meant to fit");
+        assert_eq!(fit(name, NAME_W, &mut m), name);
+    }
 
-    let long: String = "a".repeat(NAME_CHARS + 10);
-    let cut = fit(&long);
-    assert_eq!(cut.chars().count(), NAME_CHARS);
+    let long: String = "a".repeat(60);
+    let cut = fit(&long, NAME_W, &mut m);
     assert!(cut.ends_with("..."));
+    assert!(mono(&cut, ROW_SIZE) <= NAME_W);
+    assert!(
+        mono(&format!("a{cut}"), ROW_SIZE) > NAME_W,
+        "one more character would not have fit, so none was cut early"
+    );
 
-    // Multi-byte: counted in characters, so this must not panic or split a
+    // Multi-byte: cut on characters, so this must not panic or split a
     // code point.
-    let wide: String = "é".repeat(NAME_CHARS + 5);
-    assert_eq!(fit(&wide).chars().count(), NAME_CHARS);
+    let wide: String = "é".repeat(60);
+    assert!(mono(&fit(&wide, NAME_W, &mut m), ROW_SIZE) <= NAME_W);
 }
 
 // ---------------------------------------------------------------------------
@@ -452,24 +473,37 @@ fn reopening_keeps_the_narrowings_and_the_header_names_them() {
     assert!(header_text(&s).contains("+hidden"));
 }
 
-/// **Every row names its system**, and says whether it is marked, in one line
-/// whose name column is a fixed width so the family lands in the same place on
-/// every row.
+/// The three pieces of one drawn row.
+fn drawn(row: &Row<'_>, highlighted: bool) -> Vec<Line> {
+    let mut out = Vec::new();
+    row_lines(
+        row,
+        highlighted,
+        (LIST_INSET, ROWS_TOP),
+        &mut mono,
+        &mut out,
+    );
+    out
+}
+
+/// **Every row names its system**, and says whether it is marked, with the name
+/// and the family each at a fixed offset so they line up on every row.
 #[test]
 fn a_row_carries_its_family_and_its_mark() {
     let n = library();
-    let favourite = row_text(&n[0], "> ");
-    assert!(favourite.contains("Gyre"), "{favourite}");
-    assert!(favourite.contains("curve"), "{favourite}");
-    assert!(favourite.starts_with("> *"), "{favourite}");
+    let favourite = drawn(&n[0], true);
+    assert_eq!(favourite[0].text, "> *");
+    assert!(favourite[1].text.contains("Gyre"), "{:?}", favourite[1]);
+    assert_eq!(favourite[2].text, "curve");
 
-    let plain = row_text(&n[1], "  ");
-    assert!(plain.starts_with("   "), "an unmarked row wears no glyph");
-    assert_eq!(
-        favourite.find("curve"),
-        plain.find("curve"),
-        "the family column moved between two rows, so the list is ragged"
-    );
+    let plain = drawn(&n[1], false);
+    assert_eq!(plain[0].text.trim(), "", "an unmarked row wears no glyph");
+    for piece in [1, 2] {
+        assert_eq!(
+            favourite[piece].x, plain[piece].x,
+            "piece {piece} moved between two rows, so the list is ragged"
+        );
+    }
 
     // Hidden wins over favourite: the mark that decides whether you see a
     // preset is the one worth showing.
@@ -482,25 +516,27 @@ fn a_row_carries_its_family_and_its_mark() {
     assert_eq!(mark_glyph(&n[1]), ' ');
 }
 
-/// The column budget holds the row this module actually draws — if it did not,
-/// a long name would run into the next column and nothing on screen would say
-/// why.
+/// Each piece of a drawn row ends inside its slot, so a long name never runs
+/// into its family and a row never runs into the next column — measured, for
+/// any measurement.
 #[test]
 fn a_drawn_row_fits_the_column_it_is_drawn_in() {
-    let longest = "a".repeat(NAME_CHARS + 20);
+    let longest = "W".repeat(80);
+    let long_family = "attractorattractor";
     let row = Row {
         name: &longest,
-        family: "attractor", // the longest family in the system roster
+        family: long_family,
         favourite: true,
         hidden: false,
     };
-    let text = row_text(&row, "> ");
-    assert!(
-        text.chars().count() <= super::COL_CHARS,
-        "a drawn row is {} characters and the column reserves {}: {text}",
-        text.chars().count(),
-        super::COL_CHARS
-    );
+    let pieces = drawn(&row, true);
+    let (name, family) = (&pieces[1], &pieces[2]);
+    assert_eq!(name.x, LIST_INSET + NAME_X);
+    assert!(name.x + mono(&name.text, ROW_SIZE) <= LIST_INSET + NAME_X + NAME_W);
+    assert!(name.x + mono(&name.text, ROW_SIZE) < family.x);
+    assert_eq!(family.x, LIST_INSET + FAMILY_X);
+    assert!(family.x + mono(&family.text, ROW_SIZE) <= LIST_INSET + FAMILY_X + FAMILY_W);
+    const { assert!(FAMILY_X + FAMILY_W <= COL_W - COL_GUTTER) };
 }
 
 #[test]
@@ -773,17 +809,18 @@ fn roster_change_reclamps_the_highlight_and_keeps_open() {
 // The preview pane
 // ---------------------------------------------------------------------------
 
-/// The shipped library's size when the pane was placed. Pinned as a number for
-/// the reason [`SHIPPED`] is: the claim is arithmetic over it.
-const LIBRARY: usize = 114;
-
 /// **The pane sits beside the list, clear of every row, at the sizes the app is
 /// run at.** The list is laid out exactly as it is with no pane — `layout` is not
 /// told about it — so what is asserted is that the shipped library's rows leave
 /// the corner the pane occupies empty, whichever row is highlighted, and that
 /// the pane and its caption stay on the surface.
+///
+/// The library's size is read from the embedded set rather than written here,
+/// so a library that grows into the pane fails this test instead of passing it
+/// against a count other than the one that ships.
 #[test]
 fn the_pane_is_clear_of_the_shipped_librarys_rows() {
+    let library = rlx_core::preset::default_presets().len();
     for (width, height) in [HD, QHD] {
         let pane = pane(width, height).unwrap_or_else(|| panic!("{width}x{height} has a pane"));
         assert!(pane.x + pane.w <= width, "{width}x{height}: off the right");
@@ -794,9 +831,9 @@ fn the_pane_is_clear_of_the_shipped_librarys_rows() {
         assert_eq!((pane.w, pane.h), (PANE_IMAGE_W, PANE_IMAGE_H));
 
         let pane_bottom = pane.caption_y + ROW_H;
-        for highlight in [0, LIBRARY - 1] {
-            let list = layout(LIBRARY, highlight, width, height);
-            for row in 0..LIBRARY {
+        for highlight in [0, library - 1] {
+            let list = layout(library, highlight, width, height);
+            for row in 0..library {
                 let Some((col, r)) = list.place(row) else {
                     continue;
                 };

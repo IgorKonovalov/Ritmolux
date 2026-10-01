@@ -9,7 +9,10 @@
  * The target directory is **asked of cargo**, never assumed to be `<repo>/target`:
  * `CARGO_TARGET_DIR` when it is set, else `cargo metadata`'s `target_directory`,
  * which also honours a `[build] target-dir` in any ancestor's cargo config.
- * Within it `release` is preferred to `debug`.
+ * Within it the more recently built of `release` and `debug` wins, `release` on
+ * a tie. A fixed preference would let a stale release binary answer for a
+ * source tree its `--schema` no longer describes, while the everyday loop keeps
+ * `debug` current.
  *
  * Every way of not finding a player is a reason string, not a throw, so a
  * caller skips with a notice (ADR-0016's shape) or falls back to a committed
@@ -17,7 +20,7 @@
  * once per test file.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 /** The studio's own directory; `cargo metadata` finds the workspace from here. */
@@ -71,14 +74,19 @@ function askCargo(): { dir: string } | { missing: string } {
   return { dir }
 }
 
-/** The built `ritmolux`, `release` before `debug`, in the directory cargo names. */
+/** The newest built `ritmolux` in the directory cargo names, `release` on a tie. */
 export function builtPlayer(): BuiltPlayer {
   const target = targetDirectory()
   if ('missing' in target) return { missing: target.missing }
   const name = process.platform === 'win32' ? 'ritmolux.exe' : 'ritmolux'
+  let newest: { path: string; mtimeMs: number } | undefined
   for (const profile of ['release', 'debug']) {
     const candidate = join(target.dir, profile, name)
-    if (existsSync(candidate)) return { path: candidate }
+    if (!existsSync(candidate)) continue
+    const { mtimeMs } = statSync(candidate)
+    // Strictly newer, so `release`, listed first, keeps a tie.
+    if (newest === undefined || mtimeMs > newest.mtimeMs) newest = { path: candidate, mtimeMs }
   }
+  if (newest !== undefined) return { path: newest.path }
   return { missing: `no built ritmolux in ${target.dir}` }
 }

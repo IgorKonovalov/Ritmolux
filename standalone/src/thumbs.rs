@@ -287,16 +287,32 @@ pub(crate) fn cached_still(name: &str) -> Option<Entry> {
     read_entry(&dir, name).filter(|entry| entry.width == THUMB_W && entry.height == THUMB_H)
 }
 
+/// The extension every in-flight entry carries, and the only one
+/// [`discard_partials`] removes.
+const PARTIAL_EXT: &str = "rlxthumb-part";
+
+/// Where process `pid` writes `path`'s entry before renaming it into place:
+/// `<slug>-<hash>.<pid>.rlxthumb-part`.
+///
+/// **The pid is what keeps two writers apart.** The standalone app and the
+/// studio's player each run a pass into the one per-user cache, so two children
+/// can render the same preset at once; with one shared temp name the second
+/// write truncates the first's file and one rename fails.
+fn partial_path(path: &Path, pid: u32) -> PathBuf {
+    path.with_extension(format!("{pid}.{PARTIAL_EXT}"))
+}
+
 /// Write `entry` into `dir`, **atomically**: the bytes go to a temporary file
-/// beside the destination and are renamed onto it.
+/// beside the destination, named for this process, and are renamed onto it.
 ///
 /// A rename within one directory either happens or does not, which is what
 /// stops a reader from ever seeing a half-written entry — the picture is either
-/// the old one or the new one. A run killed mid-write leaves the temporary file
-/// behind, and it is not a name [`read_entry`] ever looks for.
+/// the old one or the new one, and two processes renaming complete files onto
+/// one entry leave one complete entry. A run killed mid-write leaves its
+/// temporary file behind, and it is not a name [`read_entry`] ever looks for.
 pub(crate) fn write_entry(dir: &Path, entry: &Entry) -> Result<(), String> {
     let path = entry_path(dir, &entry.name);
-    let temp = path.with_extension("rlxthumb-part");
+    let temp = partial_path(&path, std::process::id());
     std::fs::write(&temp, entry.encode()).map_err(|err| format!("{}: {err}", temp.display()))?;
     std::fs::rename(&temp, &path).map_err(|err| {
         let _ = std::fs::remove_file(&temp);
@@ -380,7 +396,8 @@ pub(crate) enum PassEvent {
 /// [`drain`](Self::drain). **Nothing here blocks shutdown beyond one poll**:
 /// dropping the pass raises the stop flag, the worker kills a running child at
 /// its next poll, and the join waits for that. A child killed mid-write leaves
-/// a temporary file no reader looks for, and the next pass discards it.
+/// a temporary file no reader looks for, and the pass that killed it discards
+/// it.
 ///
 /// **A covered library parks the worker rather than ending it.** It sleeps in a
 /// blocking receive, with no child and no timer, until [`rescan`](Self::rescan)
@@ -404,14 +421,15 @@ impl Pass {
     }
 
     /// A pass whose walks render what `survey` returns, with `exe` standing in
-    /// for the player — the render loop without the library or the cache
-    /// behind it.
-    #[cfg(test)]
+    /// for the player and `dir` for the cache its children write into — the
+    /// render loop without the library behind it.
+    #[cfg(all(test, unix))]
     fn start_with(
         exe: PathBuf,
+        dir: PathBuf,
         survey: impl FnMut() -> (Vec<Job>, usize) + Send + 'static,
     ) -> Pass {
-        Pass::spawn(move |stop, tx, rescans| serve(&exe, stop, tx, rescans, survey))
+        Pass::spawn(move |stop, tx, rescans| serve(&exe, &dir, stop, tx, rescans, survey))
     }
 
     fn spawn(
@@ -517,7 +535,6 @@ fn walk(stop: &AtomicBool, tx: &Sender<PassEvent>, rescans: &Receiver<()>) {
         Ok(dir) => dir,
         Err(reason) => return note(unavailable_note(&reason)),
     };
-    discard_partials(&dir);
     let exe = match std::env::current_exe() {
         Ok(exe) => exe,
         Err(err) => {
@@ -526,7 +543,7 @@ fn walk(stop: &AtomicBool, tx: &Sender<PassEvent>, rescans: &Receiver<()>) {
             ));
         }
     };
-    serve(&exe, stop, tx, rescans, || {
+    serve(&exe, &dir, stop, tx, rescans, || {
         let presets = library();
         let total = presets.len();
         let library = presets.into_iter().map(|preset| {
@@ -555,6 +572,7 @@ fn stale(dir: &Path, library: impl Iterator<Item = (String, Stamp)>) -> Vec<Job>
 /// retry — but an edit that moves its stamp makes it a new job.
 fn serve(
     exe: &Path,
+    dir: &Path,
     stop: &AtomicBool,
     tx: &Sender<PassEvent>,
     rescans: &Receiver<()>,
@@ -572,7 +590,7 @@ fn serve(
                 "thumbnail pass: start, {} of {total} presets to render",
                 jobs.len()
             )));
-            if let Walk::Ended = render_all(exe, &jobs, stop, tx, &mut failed) {
+            if let Walk::Ended = render_all(exe, dir, &jobs, stop, tx, &mut failed) {
                 return;
             }
         }
@@ -589,6 +607,7 @@ fn serve(
 /// `failed`.
 fn render_all(
     exe: &Path,
+    dir: &Path,
     jobs: &[Job],
     stop: &AtomicBool,
     tx: &Sender<PassEvent>,
@@ -604,7 +623,7 @@ fn render_all(
         if stop.load(Ordering::Relaxed) {
             break;
         }
-        match render_child(exe, name, stop, &mut plain_priority, &note) {
+        match render_child(exe, dir, name, stop, &mut plain_priority, &note) {
             Render::Wrote => {
                 rendered += 1;
                 streak = 0;
@@ -645,17 +664,24 @@ fn render_all(
     Walk::Covered
 }
 
-/// Remove the temporary files a killed child left behind, so a half-written
-/// entry is discarded rather than kept. [`read_entry`] never opens one either
-/// way; this is housekeeping, not correctness.
-fn discard_partials(dir: &Path) {
+/// Remove the temporary files process `pid` — one of this pass's own children,
+/// once it has ended — left behind, so a half-written entry is discarded rather
+/// than kept. [`read_entry`] never opens one either way; this is housekeeping,
+/// not correctness.
+///
+/// **Only that child's files, never another process's.** Another player's pass
+/// may be writing into the same directory right now, and a file of its child's
+/// is in flight rather than abandoned. The cost of the rule: a partial whose
+/// child and pass both died hard stays in the directory, unread and colliding
+/// with nothing, because no later pass owns its pid.
+fn discard_partials(dir: &Path, pid: u32) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
+    let suffix = format!(".{pid}.{PARTIAL_EXT}");
     for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().is_some_and(|ext| ext == "rlxthumb-part") {
-            let _ = std::fs::remove_file(path);
+        if entry.file_name().to_string_lossy().ends_with(&suffix) {
+            let _ = std::fs::remove_file(entry.path());
         }
     }
 }
@@ -693,27 +719,52 @@ fn child_command(exe: &Path, name: &str, plain: bool) -> Command {
 }
 
 /// Render `name` in one child and wait for it, polling so the stop flag is
-/// honoured while it runs.
+/// honoured while it runs, then discard whatever temporary file that child left
+/// in `dir` — a child killed mid-write is the one case that leaves one.
 fn render_child(
     exe: &Path,
+    dir: &Path,
     name: &str,
     stop: &AtomicBool,
     plain: &mut bool,
     note: &impl Fn(String),
 ) -> Render {
-    let mut child = match child_command(exe, name, *plain).spawn() {
+    let mut child = match spawn_child(exe, name, plain, note) {
         Ok(child) => child,
+        Err(err) => return Render::Unstartable(err),
+    };
+    // `nice` execs the player, so the pid the child writes under is this one.
+    let pid = child.id();
+    let outcome = await_child(&mut child, stop);
+    discard_partials(dir, pid);
+    outcome
+}
+
+/// Start the child that renders `name`, falling back to normal priority once
+/// when `nice` is missing.
+fn spawn_child(
+    exe: &Path,
+    name: &str,
+    plain: &mut bool,
+    note: &impl Fn(String),
+) -> Result<Child, String> {
+    match child_command(exe, name, *plain).spawn() {
+        Ok(child) => Ok(child),
         // No `nice` on this system: run at normal priority, and say so once.
         Err(err) if !*plain && err.kind() == std::io::ErrorKind::NotFound => {
             *plain = true;
             note("thumbnail pass: `nice` not found, renders run at normal priority".to_owned());
-            match child_command(exe, name, true).spawn() {
-                Ok(child) => child,
-                Err(err) => return Render::Unstartable(err.to_string()),
-            }
+            child_command(exe, name, true)
+                .spawn()
+                .map_err(|err| err.to_string())
         }
-        Err(err) => return Render::Unstartable(err.to_string()),
-    };
+        Err(err) => Err(err.to_string()),
+    }
+}
+
+/// Wait for `child`, polling so the stop flag is honoured while it runs, and
+/// say how it ended.
+fn await_child(child: &mut Child, stop: &AtomicBool) -> Render {
     // Drained on its own thread so a chatty child cannot fill the pipe and
     // stall; read after it exits for the failure's reason.
     let stderr = child.stderr.take().map(|mut pipe| {
@@ -736,7 +787,7 @@ fn render_child(
 
     for _ in 0..CHILD_POLLS {
         if stop.load(Ordering::Relaxed) {
-            kill(&mut child);
+            kill(child);
             return Render::Stopped;
         }
         match child.try_wait() {
@@ -746,12 +797,12 @@ fn render_child(
             }
             Ok(None) => std::thread::sleep(CHILD_POLL),
             Err(err) => {
-                kill(&mut child);
+                kill(child);
                 return Render::Failed(err.to_string());
             }
         }
     }
-    kill(&mut child);
+    kill(child);
     Render::Failed(format!(
         "no picture after {} s",
         CHILD_POLL.as_millis() * u128::from(CHILD_POLLS) / 1000
@@ -1058,6 +1109,7 @@ mod tests {
         path
     }
 
+    #[cfg(unix)]
     fn jobs(names: &[&str]) -> Vec<Job> {
         names
             .iter()
@@ -1068,12 +1120,14 @@ mod tests {
             .collect()
     }
 
+    #[cfg(unix)]
     /// A survey that finds `names` stale on every walk.
     fn names(names: &[&str]) -> impl FnMut() -> (Vec<Job>, usize) + Send + 'static {
         let jobs = jobs(names);
         move || (jobs.clone(), jobs.len())
     }
 
+    #[cfg(unix)]
     /// Let the worker run out on its own — no stop, only the end of rescans —
     /// and take what it said.
     fn finish(mut pass: Pass) -> Vec<PassEvent> {
@@ -1086,6 +1140,7 @@ mod tests {
         events
     }
 
+    #[cfg(unix)]
     fn notes(events: &[PassEvent]) -> Vec<&str> {
         events
             .iter()
@@ -1112,7 +1167,11 @@ mod tests {
                 lock = lock.display()
             ),
         );
-        let events = finish(Pass::start_with(exe, names(&["A", "B", "C", "D"])));
+        let events = finish(Pass::start_with(
+            exe,
+            dir.clone(),
+            names(&["A", "B", "C", "D"]),
+        ));
 
         let landed: Vec<&str> = events
             .iter()
@@ -1138,7 +1197,11 @@ mod tests {
     fn failing_children_are_named_once_and_the_pass_gives_up() {
         let dir = scratch("give-up");
         let exe = stub(&dir, "echo \"no adapter for $2\" >&2\nexit 3");
-        let events = finish(Pass::start_with(exe, names(&["A", "B", "C", "D", "E"])));
+        let events = finish(Pass::start_with(
+            exe,
+            dir.clone(),
+            names(&["A", "B", "C", "D", "E"]),
+        ));
         let notes = notes(&events);
 
         for name in ["A", "B", "C"] {
@@ -1181,7 +1244,7 @@ mod tests {
             &dir,
             &format!("echo $$ > '{}'\nexec sleep 60", pid.display()),
         );
-        let mut pass = Pass::start_with(exe, names(&["A", "B"]));
+        let mut pass = Pass::start_with(exe, dir.clone(), names(&["A", "B"]));
         // Wait for the child to be running, by its own pid file.
         for _ in 0..200 {
             if std::fs::read_to_string(&pid).is_ok_and(|text| !text.trim().is_empty()) {
@@ -1216,6 +1279,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    #[cfg(unix)]
     /// Drain `pass` into `events` until `walks` closing `done` lines have
     /// arrived in all.
     fn until_done(pass: &mut Pass, events: &mut Vec<PassEvent>, walks: usize) {
@@ -1264,7 +1328,7 @@ mod tests {
             // A was edited.
             vec![at("A", 2)],
         ]);
-        let mut pass = Pass::start_with(exe, move || {
+        let mut pass = Pass::start_with(exe, dir.clone(), move || {
             let jobs = walks.pop_front().unwrap_or_default();
             let total = jobs.len();
             (jobs, total)
@@ -1383,22 +1447,120 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// **A half-written entry is discarded**: the temporary file a killed child
-    /// leaves is removed by the next pass, and an entry beside it is kept.
+    /// **A half-written entry is discarded, and only the ended child's**: the
+    /// temporary file a killed child leaves is removed by the pass that ran it,
+    /// while another process's in-flight file and a whole entry are kept.
     #[test]
     fn the_pass_discards_what_a_killed_child_left() {
         let dir = scratch("partials");
         let entry = sample("Gyre", Stamp::EMBEDDED);
         write_entry(&dir, &entry).expect("write the entry");
-        let partial = entry_path(&dir, "Lace Grid").with_extension("rlxthumb-part");
-        std::fs::write(&partial, b"RLXT half").expect("write a partial");
+        let ours = partial_path(&entry_path(&dir, "Lace Grid"), 4242);
+        let theirs = partial_path(&entry_path(&dir, "Lace Grid"), 4343);
+        std::fs::write(&ours, b"RLXT half").expect("write a partial");
+        std::fs::write(&theirs, b"RLXT half").expect("write another's partial");
 
-        discard_partials(&dir);
-        assert!(!partial.exists(), "the half-written file survived");
+        discard_partials(&dir, 4242);
+        assert!(!ours.exists(), "the half-written file survived");
+        assert!(
+            theirs.exists(),
+            "another process's in-flight file was removed under it"
+        );
         assert_eq!(
             read_entry(&dir, "Gyre"),
             Some(entry),
             "a whole entry went with it"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The variables that make [`thumb_child_writes_its_entry`] act: the cache
+    /// directory to write into, and the preset. Unset, it does nothing.
+    #[cfg(unix)]
+    const CHILD_DIR_ENV: &str = "RLX_THUMB_TEST_CHILD_DIR";
+    #[cfg(unix)]
+    const CHILD_NAME_ENV: &str = "RLX_THUMB_TEST_CHILD_NAME";
+
+    /// A full-size entry of `name`, as the `--thumb` child writes one.
+    #[cfg(unix)]
+    fn full(name: &str) -> Entry {
+        Entry {
+            name: name.to_owned(),
+            stamp: Stamp::EMBEDDED,
+            width: THUMB_W,
+            height: THUMB_H,
+            rgba: vec![9; (THUMB_W * THUMB_H * 4) as usize],
+        }
+    }
+
+    /// Not a test of its own: the child a pass spawns in
+    /// [`two_passes_rendering_one_preset_do_not_collide`], run as this test
+    /// binary filtered to this one ignored case. It writes its entry through
+    /// the shipped [`write_entry`] many times over, so two of it running at once
+    /// overlap, and fails the way a `--thumb` child fails if any write does.
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "a pass's child, spawned by two_passes_rendering_one_preset_do_not_collide"]
+    fn thumb_child_writes_its_entry() {
+        let (Some(dir), Ok(name)) = (
+            std::env::var_os(CHILD_DIR_ENV),
+            std::env::var(CHILD_NAME_ENV),
+        ) else {
+            return;
+        };
+        let entry = full(&name);
+        for _ in 0..200 {
+            write_entry(Path::new(&dir), &entry).expect("a write collided");
+        }
+    }
+
+    /// **Two players' passes rendering the same preset into one cache do not
+    /// collide.** The standalone app and the studio's player each run a pass;
+    /// both children write the one entry at once, and both finish without a
+    /// failure note, leaving one complete entry and no temporary file.
+    #[cfg(unix)]
+    #[test]
+    fn two_passes_rendering_one_preset_do_not_collide() {
+        let dir = scratch("two-passes");
+        let cache = dir.join("cache");
+        std::fs::create_dir_all(&cache).expect("create the cache");
+        let test_binary = std::env::current_exe().expect("this test binary");
+        let exe = stub(
+            &dir,
+            &format!(
+                "export {CHILD_DIR_ENV}='{cache}' {CHILD_NAME_ENV}=\"$2\"\n\
+                 exec '{bin}' --exact thumbs::tests::thumb_child_writes_its_entry \
+                 --ignored --test-threads=1",
+                cache = cache.display(),
+                bin = test_binary.display()
+            ),
+        );
+        let first = Pass::start_with(exe.clone(), cache.clone(), names(&["Gyre"]));
+        let second = Pass::start_with(exe, cache.clone(), names(&["Gyre"]));
+        let (first, second) = (finish(first), finish(second));
+
+        for events in [&first, &second] {
+            assert_eq!(
+                notes(events).last().copied(),
+                Some("thumbnail pass: done, 1 rendered, 0 failed"),
+                "a pass reported a failure: {:?}",
+                notes(events)
+            );
+        }
+        assert_eq!(
+            read_entry(&cache, "Gyre"),
+            Some(full("Gyre")),
+            "the cache does not hold one complete entry"
+        );
+        let files: Vec<String> = std::fs::read_dir(&cache)
+            .expect("read the cache")
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(
+            files,
+            [entry_file_name("Gyre")],
+            "the cache holds something besides the one entry"
         );
         let _ = std::fs::remove_dir_all(&dir);
     }

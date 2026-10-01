@@ -8,7 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { readLedger } from "../lib/ledger.mjs";
+import { appendRecord, readLedger } from "../lib/ledger.mjs";
 import { acquire, holder, isTestListing, pidAlive, runWrapped, suiteLedger } from "../with-lock.mjs";
 import { RED_NEXTEST_OUTPUT, tmp } from "./helpers.mjs";
 
@@ -185,6 +185,57 @@ test("a wrapped full suite that fails records both failing tests' names from nex
   assert.equal(rec.exit, 100);
   assert.equal(rec.summary, "6 tests run: 4 passed, 2 failed, 0 skipped");
   assert.deepEqual(rec.failed, ["red-scratch::golden golden_rose_star", "red-scratch::shot_cli the_count_column"]);
+});
+
+/**
+ * A clean repository at tree B whose green full record is for tree A, the reviewed tree. B's diff from
+ * A is a `docs/` file and the root `Cargo.toml` `[workspace.package]` version line, plus `extra`.
+ */
+function servedScratch(extra = {}) {
+  const s = wrapperScratch();
+  const sh = (...a) => assert.equal(spawnSync("git", a, { cwd: s.repo, encoding: "utf8" }).status, 0, a.join(" "));
+  const commit = (files) => {
+    for (const [p, body] of Object.entries(files)) {
+      mkdirSync(dirname(join(s.repo, p)), { recursive: true });
+      writeFileSync(join(s.repo, p), body);
+      sh("add", p);
+    }
+    sh("commit", "-q", "-m", "c");
+    return spawnSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: s.repo, encoding: "utf8" }).stdout.trim();
+  };
+  const toml = (v) => `[workspace.package]\nversion = "${v}"\n\n[workspace.dependencies]\nwgpu = "=0.20.0"\n`;
+  const a = commit({ "Cargo.toml": toml("0.1.0"), "core/src/lib.rs": "fn a() {}\n" });
+  appendRecord(s.ledger, { tree: a, exit: 0, summary: "1940 tests run: 1940 passed", by: "gate 0101-pre-review", ms: 10 });
+  const b = commit({ "Cargo.toml": toml("0.2.0"), "docs/plans/done/0101-a.md": "closed\n", ...extra });
+  return { ...s, a, b };
+}
+
+test("a wrapped full suite on a tree a green record serves runs -P fast and writes one served line", async () => {
+  const s = servedScratch();
+  const r = await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: s.repo, run: s.run }));
+  assert.equal(r.value, 0);
+  assert.deepEqual(s.calls, [{ argv: ["cargo", "nextest", "run", "--workspace", "-P", "fast"], capture: true }]);
+  assert.match(r.out, /with-lock: served, running -P fast: tree [0-9a-f]{7} green by gate 0101-pre-review/);
+  const served = readLedger(s.ledger).filter((e) => e.tree === s.b);
+  assert.equal(served.length, 1);
+  assert.equal(served[0].served, true);
+  assert.equal(served[0].cmd, "cargo nextest run --workspace -P fast");
+  assert.equal(served[0].green.tree, s.a);
+  assert.deepEqual(served[0].diff, ["Cargo.toml", "docs/plans/done/0101-a.md"]);
+
+  // The post-close gate's lookup on the same tree now skips on that line.
+  const again = await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: s.repo, run: s.run }));
+  assert.equal(again.value, 0);
+  assert.equal(s.calls.length, 1, "the second run on B skipped");
+});
+
+test("a wrapped full suite whose diff from the green tree touches code runs the full command unchanged", async () => {
+  const s = servedScratch({ "core/src/lib.rs": "fn b() {}\n" });
+  await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: s.repo, run: s.run }));
+  assert.deepEqual(s.calls, [{ argv: ["cargo", "nextest", "run", "--workspace"], capture: true }]);
+  const [line] = readLedger(s.ledger).filter((e) => e.tree === s.b);
+  assert.equal(line.cmd, "cargo nextest run --workspace");
+  assert.equal(line.served, undefined);
 });
 
 test("any other argument vector neither skips nor records", async () => {

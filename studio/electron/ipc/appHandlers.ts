@@ -15,8 +15,12 @@ export interface AppInfo {
   /** The binary that was resolved, and which root it came from. */
   playerPath: string | undefined
   playerSource: string | undefined
+  /** The full path of this machine's `settings.json`, where `playerPath` is set. */
+  settingsFile: string
   /** The mode the running player was spawned in (ADR-0186). */
   playerMode: PlayerMode
+  /** `ui.reducedMotion` as the settings file holds it now. */
+  reducedMotion: boolean
 }
 
 /** What the renderer gets back when the schema could not be read. */
@@ -29,6 +33,7 @@ export function registerAppHandlers(
   info: () => AppInfo,
   schema: () => Promise<SchemaDocument>,
   setPlayerMode: (mode: PlayerMode) => void,
+  setReducedMotion: (on: boolean) => void,
 ): void {
   ipcMain.handle(IPC_CHANNELS.APP_GET_INFO, () => info())
   ipcMain.handle(IPC_CHANNELS.APP_GET_SCHEMA, async (): Promise<SchemaResult> => {
@@ -48,6 +53,15 @@ export function registerAppHandlers(
       return { ok: false, reason: `\`${String(mode)}\` is not a player mode` }
     try {
       setPlayerMode(mode)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, reason: (error as Error).message }
+    }
+  })
+  ipcMain.handle(IPC_CHANNELS.APP_SET_REDUCED_MOTION, (_event, on: unknown): SettingsResult => {
+    if (typeof on !== 'boolean') return { ok: false, reason: '`reducedMotion` takes true or false' }
+    try {
+      setReducedMotion(on)
       return { ok: true }
     } catch (error) {
       return { ok: false, reason: (error as Error).message }

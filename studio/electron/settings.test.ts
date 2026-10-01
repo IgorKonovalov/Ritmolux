@@ -11,7 +11,13 @@ import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_PLAYER_MODE } from '@shared/player-mode'
 
-import { playerModeOf, readSettings, settingsFile, writeSettings } from './settings'
+import {
+  playerModeOf,
+  readSettings,
+  reducedMotionOf,
+  settingsFile,
+  writeSettings,
+} from './settings'
 
 function withContent(content: string): string {
   const file = join(mkdtempSync(join(tmpdir(), 'rlx-studio-')), 'settings.json')
@@ -52,6 +58,16 @@ describe('readSettings', () => {
     expect(
       readSettings(withContent('{"playerPath":"/opt/ritmolux","playerMode":"windowles"}')),
     ).toEqual({ playerPath: '/opt/ritmolux' })
+  })
+
+  it('reads ui.reducedMotion, and drops it when it is not a boolean', () => {
+    expect(readSettings(withContent('{"ui":{"reducedMotion":true}}'))).toEqual({
+      ui: { reducedMotion: true },
+    })
+    expect(readSettings(withContent('{"playerMode":"windowless","ui":{"reducedMotion":"yes"}}'))).toEqual({
+      playerMode: 'windowless',
+    })
+    expect(readSettings(withContent('{"ui":[true]}'))).toEqual({})
   })
 
   it('puts the file in the per-user directory it was given', () => {
@@ -96,5 +112,23 @@ describe('the mode the studio spawns with', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'rlx-studio-')), 'nested', 'settings.json')
     writeSettings(file, { playerMode: 'windowless' })
     expect(playerModeOf(readSettings(file))).toBe('windowless')
+  })
+})
+
+describe('whether the studio reduces its motion', () => {
+  it('does not when nothing was ever chosen', () => {
+    expect(reducedMotionOf({})).toBe(false)
+    expect(reducedMotionOf(readSettings(withContent('{"ui":{}}')))).toBe(false)
+  })
+
+  it('survives a restart beside the other keys', () => {
+    const file = withContent('{"playerPath":"/opt/ritmolux","playerMode":"windowless"}')
+    const before = readSettings(file)
+    writeSettings(file, { ...before, ui: { ...before.ui, reducedMotion: true } })
+
+    const after = readSettings(file)
+    expect(reducedMotionOf(after)).toBe(true)
+    expect(after.playerPath).toBe('/opt/ritmolux')
+    expect(playerModeOf(after)).toBe('windowless')
   })
 })

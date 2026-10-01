@@ -1,8 +1,8 @@
 # ADR-0227 — A borrowed look is authored natively, and the reference never enters the repository
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-01 (Plan 0204 closed; see Outcome)
 > **Date:** 2026-09-19
-> **Related plan(s):** [0204](../plans/0204-the-library-learns-from-the-corpus-it-will-not-ship.md)
+> **Related plan(s):** [0204](../plans/done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md)
 > **Relates to:** [ADR-0113](0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
 > (which deliberately left provenance undecided),
 > [ADR-0081](0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) (the landing
@@ -141,3 +141,23 @@ Render each pick once, commit the stills, and let the plan point at them. **Reje
 render of a preset is derived from that preset**, so this puts third-party-derived content in the
 tree under a different file extension. It would also be the first thing anyone cites as precedent
 the next time the question comes up, which makes a convenience into a policy without an argument.
+
+## Outcome (2026-10-01, Plan 0204 close)
+
+**The three constraints held, and the route they define was judged mostly not worth running.**
+The reference sheet stayed under `WORK/milk-browse/refs/`; the one commit that shipped content
+(`dd1ed3ac`) adds a native preset, its own gallery render and a `CARDS` entry, and nothing derived
+from the corpus. The shipped header states its mechanism and names no third-party work, and the
+picks are recorded only in the plan's routing table.
+
+What the ADR could not know is how much of a borrowed look survives the native reading. Four picks
+were authored across four systems and judged by the owner in the running app. One, a swarm, was
+kept. Three were binned, each because its look lived in the source engine's own texture or draw
+layer: the fine streaks a resampling feedback mesh blurs away, a radial burst `emitter` can only
+fan as a wedge, a bundle of smoky filaments that became one clean ribbon. The owner's verdict
+abandons the remaining seventeen picks. So the Positive bullet *"the content lane gets a real
+target"* held, and the target was mostly unreachable. A look made of motion survived the
+translation, and a look made of texture did not.
+
+The Decision stands unchanged for any future borrowed look. The lesson for one is to route it by
+whether its interest is motion or surface before authoring anything.

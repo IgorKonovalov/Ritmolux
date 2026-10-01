@@ -385,7 +385,7 @@ still establishing. Length itself is no longer a bound: since Plan 0099 every wo
 requested horizon, and a run that ends short — floored to a whole interval, or dead — **says so
 where the table is read** rather than printing rows that look complete.
 
-On its first outing it cleared the named suspect (`swarm_shatter`: no trend across ten minutes) and
+On its first outing it cleared the named suspect (Shatter, since retired: no trend across ten minutes) and
 convicted one nobody suspected — `attractor_ink` goes coverage **0.199 → 0.002** with the silhouette
 intact and the density gone. That asymmetry is the argument for running it.
 
@@ -464,7 +464,7 @@ could not express (`references/api-feedback.md`).
 - **A bare still is silent.** Always `--set` a loud frame or use `--signal`.
 - **`--set` cannot drive the spectrum — only `--signal` / `--audio` can.** `apply_set` writes the
   frame *scalars* and there is deliberately no key for the 64-band array, so **every `bin()` term
-  reads `0`** in a `--set` still and a `spectrum` preset renders flat there (`spectrum_ridge` comes
+  reads `0`** in a `--set` still and a `spectrum` preset renders flat there (a polyline spectrum comes
   out as two straight lines — that is the stimulus, not the preset). `--report` and the contact
   sheets are **fine** since `ff2c4d9`: their frames now light the log-band slice each named band
   summarises, mirroring `reactivity.rs`. **Verify anything spectral with `--signal`.**

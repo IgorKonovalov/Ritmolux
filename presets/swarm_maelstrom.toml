@@ -1,0 +1,24 @@
+# Maelstrom - a dense, fast swarm curled into vortices, flaring on the beat.
+# A high spin bias curls the flow field into tight eddies, and long trails
+# draw every particle as a dotted orbit, so the frame reads as a field of
+# whirlpools rather than a drift. Force rides the bass, so a loud passage
+# whips the eddies tighter, and every beat kicks the swarm outward from the
+# centre. A narrow hue band keeps the cloud one colour family, magenta and
+# rose with violet and orange strays, and a vignette darkens the edges so the
+# frame reads as one storm.
+system = "swarm"
+name = "Maelstrom"
+
+[params]
+force      = "3 + clamp(bass * 4.7, 0, 4)"
+spin       = "1.6 + clamp(mid * 0.7, 0, 0.6)"
+burst      = "beat * 9"
+size       = "1.1"
+brightness = "1.1"
+hue_center = "0.06"
+hue_spread = "0.18"
+trails     = "0.82"
+bg_vignette   = "0.8"
+
+[smoothing]
+force = { attack = 0.04, release = 0.35 }

@@ -43,6 +43,8 @@ never will:
 | `src/plugins/rewrite-links.mjs` | renames a link whose whole text is the target's path to the target's declared title, when the target is published (ADR-0169) |
 | `rehype-mermaid`, configured in `astro.config.mjs` | renders each mermaid fence to a `<picture>` with a light and a dark SVG, at build time, with no script on the page (ADR-0171) |
 | `src/content.config.ts` | fences a `wrap`ped, non-markdown source into a page — the C ABI header is published as the bytes it compiles from |
+| `src/route-data.ts` | a Starlight route middleware: gives a Russian route `lang="ru"` on `<html>` and `<main>` and `og:locale` `ru`, and gives each whole page of a twinned pair `hreflang` alternates to both halves. Pagefind indexes per `<html lang>`, so the Russian routes are indexed apart and a search from an English page does not return them (ADR-0213) |
+| `src/components/LanguageSelect.astro`, `src/plugins/twins.mjs` | puts a language link in the header and the mobile menu footer: a page's `.md` / `.ru.md` twin, or the Russian entrance page `ru`, or the site root. `twins.mjs` holds the one twin rule, which the in-page cross link in `astro.config.mjs` also reads (ADR-0213) |
 
 ## Working on it
 
@@ -94,9 +96,10 @@ node scripts/check-site-links.mjs --require-api
 
 ## What is published
 
-Six groups, each named for what a reader is doing rather than for where the file came from
+Seven groups, six named for what a reader is doing rather than for where the file came from
 (ADR-0169) - **Get it**, **Use it**, **Author presets**, **Embed it**, **How it works**,
-**Contribute** - listed in full in `PUBLISHED` (`src/plugins/rewrite-links.mjs`) and ordered in the
+**Contribute** - and **Русский**, the translated slice behind its entrance page `ru` (ADR-0185,
+ADR-0213) - listed in full in `PUBLISHED` (`src/plugins/rewrite-links.mjs`) and ordered in the
 sidebar (`astro.config.mjs`). The install pages
 ARE the three `packaging/*/READ-ME-FIRST.md` a tester finds inside the release zip, published as
 they ship rather than rewritten, so a drift between the two is unrepresentable (ADR-0167). The

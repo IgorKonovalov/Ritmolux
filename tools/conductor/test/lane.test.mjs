@@ -10,9 +10,9 @@ import { test } from "node:test";
 
 import { writeDigest, writeHistory } from "../lib/digest.mjs";
 import { git, resolveCommit, tagObjectType } from "../lib/git.mjs";
-import { gateDetail, runLanes } from "../lib/lane.mjs";
+import { gateDetail, parkStillTrue, runLanes } from "../lib/lane.mjs";
 import { readLedger } from "../lib/ledger.mjs";
-import { findPlan, readPlanFile } from "../lib/plan.mjs";
+import { findPlan, nextStep, readPlanFile } from "../lib/plan.mjs";
 import { validateQueue } from "../lib/queue.mjs";
 import { askResume, loadState, planRecord, statePaths } from "../lib/state.mjs";
 import { FAKE, REPO, TEST_DIR, TOOL_DIR, tmp, writePlan } from "./helpers.mjs";
@@ -783,24 +783,32 @@ test("a close that repairs one minor and leaves one open shows exactly the open 
   assert.ok(history("### Closed").includes(`  - minor \`phase-0101-1.txt:1\` a comment the plan made false - repaired by the close in \`${repaired.fixed_in.slice(0, 7)}\``));
 });
 
-test("a fixed_in commit that does not change the finding's file parks as a disagreement", async () => {
-  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "wrongFile" } } });
+// ADR-0261: a false `fixed_in` reopens its finding and the close proceeds; it is never recorded repaired.
+test("a fixed_in commit that does not change the finding's file reopens the finding, and the plan merges", async () => {
+  const { ctx, repo, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "wrongFile" } } });
   const mainBefore = resolveCommit("main", repo);
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
-  assert.equal(rec.status, "parked");
-  assert.equal(rec.park.reason, "disagreement");
-  assert.match(rec.park.detail, /finding 0 is fixed_in [0-9a-f]{7}, which does not change phase-0101-1\.txt/);
-  assert.equal(resolveCommit("main", repo), mainBefore);
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.notEqual(resolveCommit("main", repo), mainBefore);
+  assert.equal(rec.reopened.length, 1);
+  assert.equal(rec.reopened[0].finding, 0);
+  assert.match(rec.reopened[0].reason, /^fixed_in [0-9a-f]{7} does not change phase-0101-1\.txt$/);
+  const f = rec.verdicts.at(-1).findings[0];
+  assert.equal("fixed_in" in f, false, "the claim git contradicts is never recorded");
+  assert.equal(f.reopened.reason, rec.reopened[0].reason);
+  assert.ok(
+    digest("## Needs you").includes(`  - minor \`phase-0101-1.txt:1\` a comment the plan made false - reopened: ${rec.reopened[0].reason}`),
+    digest("## Needs you"),
+  );
 });
 
-test("a fixed_in commit that is not on the branch parks as a disagreement", async () => {
+test("a fixed_in commit that is not on the branch reopens the finding, and the plan merges", async () => {
   const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "offBranch" } } });
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
-  assert.equal(rec.status, "parked");
-  assert.equal(rec.park.reason, "disagreement");
-  assert.match(rec.park.detail, /finding 0 is fixed_in [0-9a-f]{40}, which is not on the branch/);
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.match(rec.reopened[0].reason, /^fixed_in [0-9a-f]{40} is not on the branch$/);
 });
 
 test("with no fix round and an unmoved main, a plan executes the full suite twice and skips it twice", async () => {
@@ -1051,6 +1059,23 @@ test("once the owner has done the `.claude/` phase and marked its row, the plan 
   assert.equal(readFileSync(join(repo, "phase-0101-1.txt"), "utf8"), "done by the owner\n");
 });
 
+test("a `.claude/` park settles when the plan is amended so the phase no longer declares that path", async () => {
+  const { parkStillTrue } = await import("../lib/lane.mjs");
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [claudePhase("1"), dev("2")] }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  const parked = ctx.state.plans["0101"];
+  assert.equal(parked.park.reason, "claude_dir");
+  assert.match(parkStillTrue(parked, repo) ?? "", /Phase 1 is still not marked done/, "unamended, the park holds");
+
+  // The architect moves the skill edit out of Phase 1; the row stays not started.
+  const planPath = join(parked.worktree, "docs", "plans", "0101-fixture.md");
+  writeFileSync(planPath, readFileSync(planPath, "utf8").replace("`.claude/skills/dev/SKILL.md`", "`core/src/lib.rs`"));
+  sh(["add", "docs/plans/0101-fixture.md"], parked.worktree);
+  sh(["commit", "-q", "-m", "docs(plans): phase 1 no longer edits the skill"], parked.worktree);
+
+  assert.equal(parkStillTrue(parked, repo), null, "the reason it could not run is gone");
+});
+
 // ADR-0218: a lane makes its plan's preconditions true. `studio/node_modules` is gitignored and
 // `git worktree add` never creates one, so without an install the gate's three studio checks skip.
 
@@ -1274,6 +1299,56 @@ test("a resident run resumes a human_phase park the lane's log settles while it 
   const entries = selfResumeEntries(ctx);
   assert.equal(entries.length, 1, entries.join("\n"));
   assert.match(readFileSync(statePaths(ctx.stateDir).inbox, "utf8"), /^- \*\*Settled:\*\* Phase 2 reads done in the plan's ## Implementation log$/m);
+});
+
+// ADR-0261: a run of consecutive human phases parks once, and settles only when every phase in it does.
+test("a run of three human phases parks once, holds while any is open, and resumes into the next implementer run", async () => {
+  const { ctx, repo } = scratch({
+    plans: [{ number: "0101", phases: [dev("1"), dev("2"), dev("3"), human("4"), human("5"), human("6"), dev("7")] }],
+    lanes: { a: ["0101"] },
+  });
+  const seen = [];
+  const r = resident(ctx, {
+    done: () => ctx.state.plans["0101"]?.status === "merged",
+    onLook: () => {
+      const rec = ctx.state.plans["0101"];
+      if (rec?.status !== "parked" || seen.length >= 2) return;
+      if (seen.length === 0) {
+        assert.equal(rec.park.reason, "human_phase");
+        assert.equal(rec.park.phase, "4");
+        assert.deepEqual(rec.park.phases, ["4", "5", "6"]);
+        assert.equal(rec.park.detail, "Phases 4-6 are owned by human");
+        markDone(rec.worktree, "0101", "4");
+        seen.push(parkStillTrue(rec, repo));
+        return;
+      }
+      markDone(rec.worktree, "0101", "5");
+      markDone(rec.worktree, "0101", "6");
+      seen.push(parkStillTrue(rec, repo));
+      assert.deepEqual(nextStep(readPlanFile(findPlan(rec.worktree, "0101").path)), { kind: "implement", owner: "dev", phases: ["7"], lastRun: true });
+    },
+  });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+
+  assert.match(seen[0], /^Phases 5, 6 are still not marked done .*; commit the rows there first$/, "partly settled names the phases still open");
+  assert.equal(seen[1], null, "all three marked settles it");
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.ok(r.looks() < 200);
+  assert.deepEqual(rec.parks.map((p) => p.reason), ["human_phase"], "one park for the whole run");
+  assert.deepEqual(kinds(rec), ["readiness:architect", "implement:dev", "implement:dev", "review:architect", "close:architect"]);
+  assert.match(readFileSync(statePaths(ctx.stateDir).inbox, "utf8"), /^- \*\*Settled:\*\* Phases 4 done, 5 done, 6 done in the plan's ## Implementation log$/m);
+});
+
+test("a human_phase park recorded with no phases list holds and settles on its one phase, as before", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1"), human("2"), human("3"), dev("4")] }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.deepEqual(rec.park.phases, ["2", "3"]);
+  delete rec.park.phases;
+  assert.match(parkStillTrue(rec, repo), /^Phase 2 is still not marked done .*; commit the row there first$/);
+  markDone(rec.worktree, "0101", "2");
+  assert.equal(parkStillTrue(rec, repo), null, "an old record waits on its one phase only");
 });
 
 test("a resident run leaves a settled human_phase park alone while its worktree is dirty", async () => {

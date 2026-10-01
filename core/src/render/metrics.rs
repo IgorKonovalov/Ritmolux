@@ -587,8 +587,8 @@ pub const RADIAL_SHELLS: usize = 10;
 /// real stroke. Measured at this threshold: the three honest ring-mandala
 /// tunings (backlog 0072's evidence — `glow = 1.0`, no `trails`) read
 /// **10 / 10 / 9** occupied shells, every shipped preset reads ≥ 3, and the
-/// frozen renders-nothing defect (the pre-repair `spectrum_ridge`, its contour
-/// off frame) reads exactly **0** — the threshold separates honest-thin from
+/// frozen renders-nothing defect (the pre-repair Spectrum Ridge fixture in the
+/// sanity suite, its contour off frame) reads exactly **0** — the threshold separates honest-thin from
 /// absent by the measure's whole range.
 pub const MIN_SHELL_LIT: f32 = 0.02;
 

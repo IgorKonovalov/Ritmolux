@@ -1,6 +1,6 @@
 # Heartfall - black hearts thrown up a white page, arcing over and falling out of
-# shot. The cohort's second heart and its opposite: `shape_heartmono.toml` is ONE
-# heart the whole frame is made of, this is MANY the frame merely contains.
+# shot. The opposite of a frame-scale heart such as `shape_strataheart.toml`, which is
+# ONE heart the whole frame is made of: this is MANY the frame merely contains.
 #
 # -- IT IS A DUOTONE, AND THAT IS A CEILING RATHER THAN A CHOICE ------------------
 #
@@ -38,7 +38,7 @@
 #
 # `shape = "4"` IS THE HEART, from the closed five-name roster shared by `swarm`,
 # `emitter` and `shape_field` (ADR-0084/0105). It is the same selector
-# `shape_heartmono.toml` uses at frame scale.
+# `shape_strataheart.toml` uses at frame scale.
 #
 # -- THE THROW --------------------------------------------------------------------
 #
@@ -121,9 +121,9 @@ size_spread = "0.30"
 # it. `spread` does the fanning; this stays at 0.
 #
 # TWO MORE NUMBERS THAT WERE WRONG BY THE SAME ORDER. `size` is in the same units
-# the shipped emitters use - `emitter_perseids` runs 1.7 - and the first draft
-# had 0.085, which is a mark a fraction of a pixel across. `spawn_rate` was 9
-# against that file's 200. Both are now in the shipped range, with the rate held
+# the shipped emitters used - the meteor shower it was measured against ran 1.7 -
+# and the first draft had 0.085, which is a mark a fraction of a pixel across.
+# `spawn_rate` was 9 against that file's 200. Both are now in the shipped range, with the rate held
 # well under a spark emitter's because a heart is a far larger mark and this page
 # floods where that one twinkles.
 source_y     = "-1.15"
@@ -140,7 +140,7 @@ lifetime_spread = "0.40"
 # baseline is not zero - an empty page in a quiet passage reads as a broken
 # preset rather than a restrained one.
 #
-# THE RATE IS AN ORDER UNDER A SPARK EMITTER'S ON PURPOSE. `emitter_perseids`
+# THE RATE IS AN ORDER UNDER A SPARK EMITTER'S ON PURPOSE. A meteor shower
 # runs 200 and up; these marks are forty times its area and print as solid ink,
 # so the same rate is a black page rather than a fuller one.
 spawn_rate = "18 + clamp(onset * 21.7, 0, 13)"

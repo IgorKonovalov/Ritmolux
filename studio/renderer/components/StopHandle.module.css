@@ -2,18 +2,22 @@
   display: grid;
   grid-template-columns: 1.6rem 1fr auto;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-1);
   padding: 0.1rem 0;
 }
 
 .swatch {
   background: none;
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
   height: 1.3rem;
   padding: 0;
   width: 100%;
   cursor: pointer;
+}
+
+.swatch:hover {
+  border-color: var(--accent);
 }
 
 .position {

@@ -1,6 +1,7 @@
 // Checking a session's claim against the repository. Each verifier returns a list of problems; an
 // empty list is the only thing that lets the lane move on, and any problem parks the plan as a
-// disagreement with the problems as its detail. The session's word is never the evidence.
+// disagreement with the problems as its detail. The session's word is never the evidence. The one
+// claim that does not park is a close's false `fixed_in`: `verifyClose` reopens that finding instead.
 
 import { commitsBetween, git, head, isAncestor, isClean, resolveCommit, tagObjectType } from "./git.mjs";
 import { donePhases, findPlan, nonBlocking, readPlanFile, rowIsOwed } from "./plan.mjs";
@@ -182,28 +183,49 @@ function earlierPaths(file, sha, cwd, plan) {
 }
 
 /**
- * Each finding a close marked repaired (ADR-0209): its `fixed_in` commit must exist, be on the
- * branch, and change that finding's file - under the path the finding names, or under a path the
+ * Each finding a close marked repaired (ADR-0209) whose claim `git` contradicts, as
+ * `{ finding, fixed_in, reason }`. A claim holds when its `fixed_in` commit exists, is on the
+ * branch, and changes that finding's file - under the path the finding names, or under a path the
  * file had at that commit, since a close moves the plan file after repairing it.
+ *
+ * A false claim is not a problem: the finding is reopened rather than the close parked (ADR-0261).
+ * It is never recorded as repaired either way.
  */
-function repairProblems(outcome, cwd, plan) {
-  const problems = [];
+function falseRepairs(outcome, cwd, plan) {
+  const reopened = [];
   for (const [i, f] of (outcome.verdict?.findings ?? []).entries()) {
     if (!f.fixed_in) continue;
+    const reopen = (reason) => reopened.push({ finding: i, fixed_in: f.fixed_in, reason });
     const full = resolveCommit(f.fixed_in, cwd);
-    if (!full) problems.push(`finding ${i} is fixed_in ${f.fixed_in}, which does not exist`);
-    else if (!isAncestor(full, "HEAD", cwd)) problems.push(`finding ${i} is fixed_in ${f.fixed_in}, which is not on the branch`);
+    if (!full) reopen(`fixed_in ${f.fixed_in} does not exist`);
+    else if (!isAncestor(full, "HEAD", cwd)) reopen(`fixed_in ${f.fixed_in} is not on the branch`);
     else {
       const file = f.file.replace(/\\/g, "/");
       const changed = changedPaths(full, cwd);
       const earlier = earlierPaths(file, full, cwd, plan);
       if (![file, ...earlier].some((p) => changed.includes(p))) {
         const also = earlier.length ? ` (nor ${earlier.join(", ")}, its path at ${f.fixed_in})` : "";
-        problems.push(`finding ${i} is fixed_in ${f.fixed_in}, which does not change ${f.file}${also}`);
+        reopen(`fixed_in ${f.fixed_in} does not change ${f.file}${also}`);
       }
     }
   }
-  return problems;
+  return reopened;
+}
+
+/**
+ * The closing verdict as it is recorded: `verdict` with each reopened finding's `fixed_in` claim
+ * dropped and the reason it was reopened kept on the finding as `reopened`. The input is not mutated.
+ */
+export function withReopened(verdict, reopened) {
+  if (!reopened.length) return verdict;
+  const findings = (verdict.findings ?? []).map((f) => ({ ...f }));
+  for (const r of reopened) {
+    const f = findings[r.finding];
+    if (!f) continue;
+    delete f.fixed_in;
+    f.reopened = { fixed_in: r.fixed_in, reason: r.reason };
+  }
+  return { ...verdict, findings };
 }
 
 /**
@@ -219,12 +241,13 @@ function owedProblems(doc, plan) {
 
 /**
  * A close: the plan moved to done/ with Status done and a ## Close review section, no row owed that
- * may not be, a clean tree, every repaired finding's commit on the branch and
- * touching its file, and — when a version moved — an annotated tag on the branch tip.
+ * may not be, a clean tree, and — when a version moved — an annotated tag on the branch tip. Returns
+ * `{ problems, reopened }`: any problem parks the plan, while a repaired finding whose claim `git`
+ * contradicts is only reopened (`falseRepairs`).
  */
 export function verifyClose({ cwd, plan, outcome }) {
   const problems = [];
-  if (outcome.kind !== "closed") return [`expected a closed outcome, got ${outcome.kind}`];
+  if (outcome.kind !== "closed") return { problems: [`expected a closed outcome, got ${outcome.kind}`], reopened: [] };
   const found = findPlan(cwd, plan);
   if (!found || !found.done) problems.push(`plan ${plan} is not under docs/plans/done/`);
   else {
@@ -234,12 +257,11 @@ export function verifyClose({ cwd, plan, outcome }) {
     problems.push(...owedProblems(doc, plan));
   }
   if (!isClean(cwd)) problems.push("the worktree is not clean");
-  problems.push(...repairProblems(outcome, cwd, plan));
   if (outcome.tag) {
     const type = tagObjectType(outcome.tag, cwd);
     if (!type) problems.push(`tag ${outcome.tag} does not exist`);
     else if (type !== "tag") problems.push(`tag ${outcome.tag} is lightweight, not annotated`);
     else if (resolveCommit(outcome.tag, cwd) !== head(cwd)) problems.push(`tag ${outcome.tag} is not on the branch tip`);
   }
-  return problems;
+  return { problems, reopened: falseRepairs(outcome, cwd, plan) };
 }

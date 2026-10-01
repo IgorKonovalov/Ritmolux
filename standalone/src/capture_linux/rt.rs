@@ -49,11 +49,12 @@ pub(super) fn read_loop(
         // `filled` is always inside the buffer sized above. Asked rather than
         // indexed because this module denies slicing outright, and a loop that
         // ends is a better failure here than one that unwinds through the
-        // PulseAudio stream it owns.
-        let Some(window) = bytes.get_mut(carry..filled) else {
-            return;
-        };
-        if stream.read(window).is_err() {
+        // PulseAudio stream it owns. Either way the loop ends, a window out of
+        // bounds or a failed read, it reports `lost` through the one exit below.
+        let read = bytes
+            .get_mut(carry..filled)
+            .map(|window| stream.read(window));
+        if !matches!(read, Some(Ok(()))) {
             lost.store(true, Ordering::Relaxed);
             return;
         }

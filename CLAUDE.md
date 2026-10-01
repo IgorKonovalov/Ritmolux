@@ -77,6 +77,9 @@ presets/             # The curated preset library (*.toml) — build.rs globs an
     ├── pending/     #   Authored, approved, NOT shipped — held back by a known engine or harness
     │                #   gap, not by the look. build.rs's read_dir is non-recursive (ADR-0022), so
     │                #   a subdirectory is skipped by construction. See its own README.
+    ├── proposed/    #   Authored, NOT judged — drafts awaiting the owner's keep / tune / bin, with
+    │                #   ROSTER.md as the record. The opposite of pending/: that waits on the
+    │                #   engine, this waits on the owner. Skipped by build.rs the same way.
     └── schema/      #   GENERATED editor JSON Schemas, one per system, beside the generic
                      #   preset.schema.json; the root .taplo.toml (also generated) picks one by
                      #   filename family (ADR-0190). Never hand-edited: core/tests/suite/preset_schema.rs
@@ -214,7 +217,10 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   ANNOTATED `v` tag - offline at pre-push (exists, annotated, on HEAD's
                      #   history), `--remote` in CI on a push to main (origin advertises it), and
                      #   at the close after the tag is written, with `--stranded` listing any older
-                     #   tag origin lacks (ADR-0203); check-translations.mjs reads every `.ru.md`
+                     #   tag origin lacks (ADR-0203); check-release-assets.mjs --self-test proves
+                     #   the release's per-kind count (5 zips, 1 tarball) refuses a short set,
+                     #   since release.yml's `verify` job can only ever see it pass (ADR-0254);
+                     #   check-translations.mjs reads every `.ru.md`
                      #   translation's `translated-from: <sha>` stamp - a MISSING or malformed one
                      #   is an exit code, a source that has MOVED past its stamp is an advisory row
                      #   and never one, because no machine here can read the prose either way
@@ -227,6 +233,11 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   cannot see to ADR-0240 - no browser storage under studio/, and every
                      #   plugin-foobar/ `cfg_*` declaration named in docs/configuration.md, with
                      #   `settings-allow: <why>` on the line as the escape;
+                     #   check-claude-declarations.mjs refuses an active plan phase that names a
+                     #   `.claude/` artefact - a skill, a hook, settings.json - without writing its
+                     #   path into `Files touched`, the one place the conductor reads to park in
+                     #   front of an edit a headless session cannot make (ADR-0210), with
+                     #   `claude-allow: <why>` as the escape and a closed plan an advisory only;
                      #   check-gate-carriers.mjs asserts that .githooks/pre-push and the CI `links`
                      #   job each run the ordered roster held in scripts/gates.manifest.mjs, in that
                      #   order - the manifest being DATA rather than a gate, and the one the

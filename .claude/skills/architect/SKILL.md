@@ -339,6 +339,7 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   | **`docs/presets.md`** | **the expression grammar — a variable, constant, function, operator, or the error surface** |
   | **`docs/preset-palettes.md`** | **palette names, custom-stop rules, per-scene colour params, A/B crossfade** |
   | **`docs/preset-guide.md`** | **a system added or retired, or a system's look changed enough that its picture lies** |
+  | **`.claude/skills/preset-author/references/systems.md`** | **a `SystemKind` added or retired, or a scene's params or shipped presets changed enough that a section's working ranges lie** — one `## ` section per system, declared even when it only says no guidance is written yet (ADR-0234); a system with no section is the drift backlog 0258 recorded |
   | `docs/preset-tuning-walkthrough.md` | a param or `--report` column the walkthrough's steps use |
   | `docs/capturing.md` | `shot` CLI flags, `--render`, the live video-out |
   | `docs/testing.md` | the `core/tests/` visual-QA harness, what a gate can and cannot see |

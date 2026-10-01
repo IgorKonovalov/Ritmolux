@@ -35,11 +35,13 @@ name = "Vitrail"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#26164d" },
-  { at = 0.30, color = "#5d47a5" },
-  { at = 0.55, color = "#8c6cdd" },
-  { at = 0.80, color = "#e684d4" },
-  { at = 1.00, color = "#ffeef8" },
+  { at = 0.00, color = "#1b1034" },
+  { at = 0.18, color = "#8e1b2e" },  # ruby
+  { at = 0.36, color = "#1d3f9a" },  # cobalt
+  { at = 0.54, color = "#157a55" },  # emerald
+  { at = 0.72, color = "#d9a23a" },  # gold
+  { at = 0.88, color = "#b3306a" },  # rose
+  { at = 1.00, color = "#fbe9c8" },
 ]
 
 [params]
@@ -59,8 +61,8 @@ zoom         = "1.35"
 # uniform lavender and the darkness that makes the window read was gone. The
 # vault's light lives in its bands and the fold, not in an ambient lift.
 glow         = "0.15 + clamp(bass * 0.176, 0, 0.15)"
-# Onset gets a structural flash, not bloom (the report is bloom-blind - house
-# note from cohort 4).
+# Onset gets a structural flash rather than bloom: it lights the panes
+# themselves instead of a halo around the leading, which is the look.
 flash        = "clamp(onset * 0.42, 0, 0.30)"
 color_span   = "0.85"
 # Treble slides the vault's light through the panes - the first report pass
@@ -110,14 +112,14 @@ family = "maurer_rose"
 n             = "6"
 d             = "29 + floor(hash(floor(beat_index * 0.25)) * 5) * 6"
 phase         = "time * 0.010"
-samples       = "500"
+samples       = "240"
 # THIS WAS THE WHOLE BUG, FIXED 2026-08-16 ON A USER LOOK CALL: the rose was
 # rendering as STIPPLE - scattered dots rather than a line figure - and it read
 # as gauze over the vault instead of as a window.
 #
 # It was `0.016`, about a HUNDREDTH of what this param takes. Every other line
-# preset in the library sits at 1.5-3.2 (`curve_nightbloom` 1.5, `curve_ionwake`
-# 2.6, `lsystem_vellum` 2.0, `star_rosewindow` 3.2). At 0.016 the stroke is
+# preset in the library sits at 1.5-3.2 (`curve_broadside` 2.1, `curve_ionwake`
+# 2.6, `star_rosewindow` 3.2). At 0.016 the stroke is
 # sub-pixel, so nothing survives rasterization except where a sample happens to
 # land - which is exactly the dotted figure that was on screen, and it is why
 # the value looked like a plausible small number rather than like a defect.
@@ -135,11 +137,11 @@ samples       = "500"
 # straight back to dots, so there is no continuous dial down to the old look.
 # 1.0 is the thinnest CONTINUOUS line available, and it reads as lace that sits
 # back into the vault rather than as leading laid over it.
-thickness     = "1.0 + clamp(treb * 0.55, 0, 0.35)"
+thickness     = "2.1 + clamp(treb * 0.55, 0, 0.35)"
 # THE WINDOW KEEPS THE OLD PROFILE, DELIBERATELY - do not "fix" it to the 0.25
 # default. Plan 0114's look gate named 1.0 for the Maurer roses and this layer
-# is one, for the same reason `curve_nightbloom` is: crossing chords read as
-# lace only while each thread is a bright centre in a dim skirt.
+# is one, for the reason that gate gave: crossing chords read as lace only
+# while each thread is a bright centre in a dim skirt.
 #
 # It carries an extra reason the solo rose does not. This figure hangs OVER a
 # processed vault, and the whole join depends on it sitting BACK into that
@@ -153,7 +155,8 @@ thickness     = "1.0 + clamp(treb * 0.55, 0, 0.35)"
 # is all edge floor, and Phase 3 measured this file drawing 0.00 and 0.25
 # byte-identically at BOTH sizes. Buying range means thickness, and the comment
 # above is why thickness is not available.
-softness      = "1.0"
+softness      = "0"
+stroke_blend  = "1"
 brightness    = "1.15 + clamp(treb * 0.41, 0, 0.35)"
 glow          = "0.25"
 scale         = "0.80"

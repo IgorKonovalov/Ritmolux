@@ -667,6 +667,46 @@ pub struct TierConfig {
     /// **When the floor tier is next exercised on real target hardware this is
     /// a constant to measure**, with `cellular_radius`, on one frame.
     pub cellular_grid: u32,
+
+    /// The most points a `plexus` preset draws (ADR-0257), holding its
+    /// `[plexus] points` at load.
+    ///
+    /// **A cap on content, clamped and announced at load**
+    /// ([`OverflowContext::Points`](super::scenes::OverflowContext::Points)):
+    /// fewer points is a sparser network, not the same one cheaper.
+    ///
+    /// The graph is built by testing every pair, so the per-frame cost is
+    /// quadratic in this: `N (N - 1) / 2` distance checks. `Floor`'s 600 is
+    /// 180 thousand checks a frame and `Rich`'s 1500 is 1.1 million.
+    ///
+    /// # Where the numbers come from
+    ///
+    /// `Floor`'s three plexus caps were **measured together** (Plan 0235 Phase
+    /// 6): a preset at 600 points with links saturating the edge cap, nodes on
+    /// and an aperture past the blur cap costs under 4 ms a frame at 1080p on an
+    /// integrated GPU, which leaves the frame budget its composite. `Rich`'s are
+    /// the same proportions scaled, not measured.
+    pub plexus_points: u32,
+
+    /// The most edges a `plexus` frame draws (ADR-0257): the size of its
+    /// instance buffer, and so the fill the graph can cost.
+    ///
+    /// A frame whose graph links more pairs than this draws the first this many
+    /// in index order and announces the rest
+    /// ([`OverflowContext::Edges`](super::scenes::OverflowContext::Edges)).
+    /// Measured with [`plexus_points`](Self::plexus_points).
+    pub plexus_edges: u32,
+
+    /// The largest circle of confusion a 3D primitive is blurred by, as a
+    /// radius in pixels (ADR-0257).
+    ///
+    /// A blurred stroke costs fill in proportion to how far it is widened, so
+    /// this is the lever that keeps a wide-open aperture inside the frame
+    /// budget: past it a line stops spreading, and an operator on a lower tier
+    /// sees a shallower blur rather than a slower frame — and is told so
+    /// ([`OverflowContext::Blur`](super::scenes::OverflowContext::Blur)).
+    /// Measured with [`plexus_points`](Self::plexus_points).
+    pub max_coc_px: u32,
 }
 
 impl TierConfig {
@@ -688,6 +728,9 @@ impl TierConfig {
         field_iterations: 64,
         cellular_radius: 6,
         cellular_grid: 512,
+        plexus_points: 600,
+        plexus_edges: 6_000,
+        max_coc_px: 12,
     };
 
     /// The midrange-discrete tier.
@@ -715,6 +758,9 @@ impl TierConfig {
         field_iterations: 512,
         cellular_radius: 10,
         cellular_grid: 1024,
+        plexus_points: 1_500,
+        plexus_edges: 20_000,
+        max_coc_px: 24,
     };
 
     /// The config for `tier`.

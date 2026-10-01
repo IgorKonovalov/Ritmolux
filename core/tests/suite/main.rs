@@ -63,5 +63,6 @@ mod spectrum;
 mod tempo_probe;
 mod tier_switch;
 mod transition;
+mod ui_tokens;
 mod warp_mesh;
 mod warp_mesh_wide;

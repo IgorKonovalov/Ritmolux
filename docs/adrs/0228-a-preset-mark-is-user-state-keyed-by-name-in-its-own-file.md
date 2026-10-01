@@ -52,7 +52,7 @@ auto-rotate and from the browser's default view. It is **not** deleted, not move
 does not make on anyone's behalf.
 
 **The accumulated `hidden` set is evidence, and that is a stated purpose rather than a side
-effect.** [Backlog 0256](../design-backlog.md) records that nothing in this repository asks whether
+effect.** [Backlog 0256](../design-backlog-archive.md) records that nothing in this repository asks whether
 a shipped preset is any good, and that the route to a curation mechanism runs through a human
 verdict first. A mark made in passing, during ordinary use, is that verdict recorded at the moment
 it forms — which is a better instrument than an evening set aside to produce one.
