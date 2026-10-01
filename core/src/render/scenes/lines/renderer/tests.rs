@@ -2396,9 +2396,12 @@ mod seg3d {
     }
 
     /// **A blurred line dims as it spreads and keeps its light.** Across a
-    /// sweep of the aperture, the far end's peak falls monotonically while its
-    /// summed cross-section shows no monotone trend (a property, per ADR-0071,
-    /// rather than a tolerance).
+    /// sweep of the aperture, the far end's peak falls monotonically, and its
+    /// summed cross-section moves by under a tenth of the peak's relative fall
+    /// over the same sweep. A ratio of two readings off one render, so the
+    /// property holds on any adapter (ADR-0071): energy leaking with the blur
+    /// would move the sum in step with the peak, and pixel sampling moves it by
+    /// a fraction of a percent.
     ///
     /// The sum is judged over the blurred readings. The pinhole reading is a
     /// sharp stroke, which keeps the corner-interpolated across-the-stroke
@@ -2427,16 +2430,29 @@ mod seg3d {
                 "the peak must fall: {readings:?}"
             );
         }
-        let blurred: Vec<f32> = readings
+        let blurred: Vec<(f32, f32)> = readings
             .iter()
             .filter(|(aperture, _)| *aperture > 0.0)
-            .map(|(_, (_, sum, _))| *sum)
+            .map(|(_, (peak, sum, _))| (*peak, *sum))
             .collect();
-        let rising = blurred.windows(2).all(|p| p[1] >= p[0]);
-        let falling = blurred.windows(2).all(|p| p[1] <= p[0]);
+        let (Some(&(first_peak, _)), Some(&(last_peak, _))) = (blurred.first(), blurred.last())
+        else {
+            panic!("the sweep has blurred readings");
+        };
+        let peak_fall = (first_peak - last_peak) / first_peak;
+        let sums = blurred.iter().map(|(_, sum)| *sum);
+        let (lo, hi) = sums
+            .clone()
+            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), s| {
+                (lo.min(s), hi.max(s))
+            });
+        let mean = sums.sum::<f32>() / blurred.len() as f32;
+        let spread = (hi - lo) / mean;
+        println!("peak fall {peak_fall:.4}, summed-light spread {spread:.4}");
         assert!(
-            !rising && !falling,
-            "the summed light trends with the aperture, so the energy is not kept: {blurred:?}"
+            spread < 0.1 * peak_fall,
+            "the summed light moves by {spread:.4} while the peak falls {peak_fall:.4}, \
+             so the energy is not kept: {blurred:?}"
         );
     }
 }

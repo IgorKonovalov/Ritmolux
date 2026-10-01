@@ -361,7 +361,11 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
   `OverflowContext::Blur` through `mirror_overflow` per frame, from the lens's widest circle of
   confusion over the figure, and never on a family without depth. `FIGURE_DISTANCE` /
   `FIGURE_RADIUS` move from `projection_mirror.rs` into `particles/mod.rs`, which both read; a test
-  holds them to the draw shader's text. Commit: the `fix(core)` commit carrying this line.
+  holds them to the draw shader's text. Commit 25c9519e.
+- Close-review fix, major 2 (the energy test passed on a two-reading dip): the summed light is now
+  held to a ratio, a relative spread under a tenth of the peak's relative fall over the blurred
+  sweep. Reads 0.0070 against 0.6013 on llvmpipe. Commit: the `test(core)` commit carrying this
+  line.
 
 ### Close triggers
 
