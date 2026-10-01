@@ -86,15 +86,47 @@ flowchart LR
 
 ### Phase 3 — Caps, cost and the goldens
 - **Owner skill:** dev
-- **What:** measure the frame cost of `Floor`'s 10,000 sprites at the worst-case `aperture` and
-  `max_coc_px`, extend `mark_cost` to the blurred case, and record the measurement against NFR section 1
-  in the log. If it does not fit, lower the swarm's own CoC ceiling rather than the population, and say
-  so. Re-bless `swarm` and `swarm_shaped`, and re-run the backdrop fixtures' tests.
-- **Files touched:** `core/src/render/tier.rs`, `core/tests/mark_cost.rs`, `core/tests/golden/`,
-  `core/src/render/post/tests.rs`, `core/tests/`.
-- **Done when:** both goldens hold on the software adapter. The `mark_cost` blurred case runs, and the
-  measured cost is in the log. The backdrop tests pass, or each one that changed is named in the log
-  with the reason.
+- **What:** blur grows a sprite's **area**, so a 3 px sprite at a 12 px CoC fills 25 times its sharp
+  pixels. At 10,000 sprites that is the one cost in Plans 0236 to 0240 that may not fit `Floor`.
+  Plexus's blur added 45 to 65 percent (Plan 0235 Phase 6), but on 600 nodes. This phase measures
+  the cost against a stated budget and walks a fixed fallback ladder until the budget holds.
+  - **The probe.** A worst-case fixture: `Floor`'s 10,000 sprites, `aperture` past the cap, `focus`
+    at the near slab bound so most of the population is defocused, the `trails` post stage on as
+    every shipped preset has it, 1920x1080, release profile. It runs at `aperture = 0` and at the
+    worst case, in the same run on the same adapter. Extend `mark_cost` with that pair, in the
+    measurement shape `mark_cost` already uses (ADR-0071: it names its machine and skips elsewhere).
+  - **The budget.** The blurred frame costs at most **twice** the sharp one, and the blurred frame
+    sits inside NFR section 1's 16.67 ms with the headroom NFR section 1 already records for the
+    shipped set. The two terms of the ratio are the same quantity, from one fixture, one run and one
+    adapter (ADR-0074).
+  - **The fallback ladder**, in this order, stopping at the first rung that meets the budget, with
+    each rung's measurement in the log:
+    1. A swarm-only CoC ceiling, `swarm_max_coc_px` in `TierConfig`, below `max_coc_px`. Start
+       `Floor` at 6 px. The clamp is announced through `OverflowContext::Blur`, as the shared cap is.
+    2. A cheap fragment path for heavily blurred sprites. Past a CoC of about twice the sprite's
+       radius, a polygon or star silhouette is visually a disc. The fragment then evaluates an
+       analytic radial falloff instead of the SDF. The two paths are cross-faded over a band of
+       `coc / r`, so no sprite pops as it crosses the threshold, and a test sweeps `coc` through the
+       band and finds no step in a sprite's summed light.
+    3. Lower `swarm_particles` on `Floor`, announced. This rung changes the look, so taking it is
+       written in the log for Phase 6's judgement, never taken silently.
+  - **`Rich`.** Measure `Rich`'s 30,000 sprites the same way on the reference machine's discrete GPU
+    (Plan 0218 Phase 2), and give `Rich` its own `swarm_max_coc_px`. If no discrete GPU is reachable
+    from the session, the log says `Rich` is unmeasured, as Plan 0235's did, rather than inventing a
+    value.
+  - Then re-bless `swarm` and `swarm_shaped` on whatever the ladder settled, and re-run the backdrop
+    fixtures' tests.
+- **Files touched:** `core/src/render/tier.rs`, `core/src/render/scenes/swarm.rs`,
+  `core/src/render/scenes/swarm/tests.rs`, `core/tests/mark_cost.rs`, `core/tests/golden/`,
+  `core/tests/fixtures/`, `core/src/render/post/tests.rs`, `core/tests/`.
+- **Done when:**
+  - The log carries the probe's sharp and blurred frame times on `Floor`, the rung the ladder stopped
+    at, and the ratio. The ratio is at most 2, and the blurred time is inside NFR section 1.
+  - `Rich` carries a measured value, or the log says it is unmeasured.
+  - The CoC never exceeds `swarm_max_coc_px` at any `aperture`.
+  - If rung 2 was built, its cross-fade test shows no step.
+  - Both goldens hold on the software adapter. The backdrop tests pass, or each one that changed is
+    named in the log with the reason.
 
 ### Phase 4 — The shipped presets keep rendering
 - **Owner skill:** dev
@@ -150,8 +182,20 @@ struct Particle {
 - **The look changes, and the five presets were judged in motion.** Phase 6 is blocking for that
   reason. A preset the owner marks cut, under Plan 0232's two-per-family floor, may leave the swarm
   short. Then the refill is `preset-author`'s, and the merge waits.
-- **Fill cost.** 10,000 blurred sprites is the largest blurred population in the engine. Phase 3 may
-  need a swarm-specific CoC ceiling below `max_coc_px`. That is a content limit, announced (ADR-0045).
+- **Fill cost, the plan's main hazard.** 10,000 blurred sprites is the largest blurred population in
+  the engine, and blur grows each one by area, not by width. A rough estimate, not a measurement:
+  - `mark_cost` reads about 0.88 ms for 10,000 sharp discs.
+  - With a third of the population fully defocused at 25 times the area, fill lands around 5 to
+    10 ms, before the `trails` stage.
+
+  Phase 3's ladder is the answer, and its order is deliberate. Shallower blur first, because that is a
+  content limit (ADR-0045). The cheap path second, because it changes pixels only where the eye cannot
+  tell a polygon from a disc. Fewer particles last, because that changes what the swarm is.
+- **The CPU loop gets heavier too.** Per particle, the flow gains a third axis, and the position is
+  converted to and from world space by the frustum half-extent. That is arithmetic per particle, not
+  per pixel, at 10,000 to 30,000 particles, single-threaded. Phase 1 times `update` before and after
+  and puts both numbers in the log. If it grows past about 1 ms on `Floor`, the conversion can be
+  cached per depth band, since `half_extent(z)` is linear in `z`.
 - **The sway bound** is derived from the margin. With a larger `fov`, the frustum is wider and the same
   angle shows less of the margin. The bound should be computed from both, not fixed. Phase 1 decides
   and the test covers both target sizes.

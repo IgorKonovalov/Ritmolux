@@ -101,11 +101,38 @@ flowchart LR
   and find out which branch the system passes on. A system that is still under constant input is the
   case `spectrum` is already in, so the waterfall follows `spectrum`'s precedent rather than inventing
   autonomous motion.
+  - **The cost probe.** The waterfall's segments are not the short segments `seg3d_segments` was
+    measured on (Plan 0236 Phase 4), and two shapes of its frame are its own:
+    - **long near rows:** at a low `pitch` the nearest rows span the whole frame width, so one blurred
+      row fills a band across the screen;
+    - **horizon pile-up:** at `pitch` near 0, the far rows converge into a few pixels above the
+      horizon, and additive overdraw stacks there.
+
+    Two fixtures pin those shapes, each at `Floor`'s cap (`rows` at the clamp, `elements = 64`),
+    `aperture` past the cap, and 1920x1080 in the release profile:
+    - `pitch = 0.15` with `focus` at the far edge, so the near rows are the blurred ones;
+    - `pitch = 0.02` with `focus` at the near edge, so the pile-up is blurred.
+
+    Each runs at `aperture = 0` and at the worst case in the same run, on the same adapter (ADR-0074).
+    The budget is the one Plan 0239 holds the swarm to: the blurred frame at most twice the sharp one,
+    and inside NFR section 1.
+  - **The fallback ladder,** stopping at the first rung that meets the budget, with each rung's
+    measurement in the log:
+    1. Skip a row whose `fade` has brought its light below one 8-bit step. A dark additive row still
+       costs fill, so it is culled before upload rather than drawn at zero.
+    2. A waterfall-only ceiling on `rows`, `waterfall_rows` in `TierConfig`, below what
+       `seg3d_segments` allows. This keeps the waterfall's cost from lowering the shared cap that the
+       curve and turtle systems size from.
+    3. Lower `seg3d_segments` itself, announced, and say in the log which other systems that affects.
 - **Files touched:** `core/src/render/scenes/lines/waterfall.rs`, `core/src/render/tier.rs`,
   `core/tests/golden.rs`, `core/tests/golden/`, `core/tests/fixtures/`, `core/tests/`.
-- **Done when:** the golden holds on the software adapter. An over-cap `rows` is clamped with a notice.
-  The same seed and analysis frames give the same ring after 600 frames. The `animation`, `reactivity`,
-  `sanity` and `distinctness` suites pass with the system in their rosters.
+- **Done when:**
+  - The golden holds on the software adapter. An over-cap `rows` is clamped with a notice.
+  - The same seed and analysis frames give the same ring after 600 frames.
+  - The `animation`, `reactivity`, `sanity` and `distinctness` suites pass with the system in their
+    rosters.
+  - The log carries both probes' sharp and blurred frame times on `Floor`, the rung the ladder
+    stopped at, and the ratio. Each ratio is at most 2, and each blurred time is inside NFR section 1.
 
 ### Phase 3 — Documentation and the references
 - **Owner skill:** dev
@@ -156,9 +183,11 @@ struct Ring {
 - **A long `row_period` reads as a stutter.** The continuous offset hides the push. If the eased level
   of the newest row jumps at a push, the near edge pops. The newest row could draw the live eased level
   rather than the pushed one. Phase 1 decides on sight and says which in a comment.
-- **Fill cost.** A near row at a low pitch is long on screen, and a blurred far field is wide. The
-  shared cap was measured on curves (Plan 0236), whose segments are short. If this system's cost per
-  segment is much higher, it lowers `seg3d_segments` for every system, and the log says so.
+- **Fill cost.** A near row at a low pitch is long on screen, a blurred far field is wide, and the far
+  rows pile up above the horizon. The shared cap was measured on curves (Plan 0236), whose segments are
+  short. Phase 2 probes both shapes. Its ladder culls dark rows and caps `waterfall_rows` before it
+  touches `seg3d_segments`, so the waterfall's cost lands on the waterfall and not on the curve and
+  turtle systems.
 - **The animation gate.** Constant input fills the ring with identical rows, and the scroll then moves
   nothing visible. Phase 2 checks how `spectrum` passes that gate today and follows it.
 
