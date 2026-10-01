@@ -1051,7 +1051,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
-- [0232 - The library is walked, cut and refilled](done/0232-the-library-is-walked-cut-and-refilled.md) - closed 2026-10-01, **Phase 7 owed**. Review: **no blockers, no majors, three minors (one fixed), two nits (fixed).** Version: **0.158.0**. ADR-0253 accepted. Closed 0038. [Write-up](README-archive.md).
+- [0232 - The library is walked, cut and refilled](done/0232-the-library-is-walked-cut-and-refilled.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (one fixed), two nits (fixed).** Version: **0.158.0**. ADR-0253 accepted. Closed 0038. [Write-up](README-archive.md).
 - [0241 - The conductor parks only on what the owner must settle](done/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (two fixed), one nit (fixed).** Version: **0.157.0**. ADR-0261 accepted. [Write-up](README-archive.md).
 - [0235 - The plexus system, and a shared camera with depth of field](done/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md) - closed 2026-10-01. Review: **three rounds; 3 majors, 3 minors (all fixed), two nits.** Version: **0.156.0**. ADR-0257 accepted. [Write-up](README-archive.md).
 - [0230 - The Russian slice becomes findable](done/0230-the-russian-slice-becomes-findable.md) - closed 2026-09-30, Phase 4 read 2026-10-01. Review: **no blockers, no majors, no minors, two nits.** Version: **0.155.0**. ADR-0213 accepted, Outcome. [Write-up](README-archive.md).

@@ -1,6 +1,6 @@
 # 0232 — The library is walked, cut and refilled
 
-> **Status:** done - Phase 7 owed, ADR-0249. Closed 2026-10-01 by a conductor close (round 1:
+> **Status:** done (Phase 7 verdict 2026-10-01: a monthly walk). Closed 2026-10-01 by a conductor close (round 1:
 > no blockers, no majors, three minors, two nits). Phases 1-6 landed (see the log); 35 presets
 > retired, four added; ADR-0253 accepted; backlog 0038 archived. Version 0.158.0.
 > **Created:** 2026-09-27
@@ -264,6 +264,23 @@ working surface, and nowhere else fits it better.
 ## The ledger
 
 _(Filled by Phase 1; verdicts by Phase 2; commits by Phases 3-4. Columns: preset, family, machine
+
+**Phase 7, the verdict (owner, 2026-10-01): a periodic walk is enough, once a month. No mechanism
+is owed.** It answers backlog 0256 step 3. The evidence is this ledger:
+
+- **The walk convicted what the instruments could not.** Of 116 presets it cut 35 and retuned 25. Of
+  the 35 cuts, 28 carried no machine flag at all. The reasons were look judgements: redundant with a
+  stronger keep (12), does not follow the music (4), broken or ugly in the running app (3), and
+  near-twins of a named keep. `--report` and `distinctness` raised flags on 7 of the 35. A mechanism
+  built on what is computable would have found one cut in five, which is the outcome backlog 0256's
+  route was written to avoid.
+- **The walk was cheap enough to repeat.** One family per sitting, each preset held fullscreen with
+  F1 to keep and F2 to cut, and the ledger then folds in the marks. The owner called the hotkey walk
+  a large speed-up. The cadence is monthly, and it is now a standing sitting in
+  [`docs/content-brief.md`](../../content-brief.md).
+- **What it does not settle:** the walk's scripts are still scratch files under `target/`, which is
+  backlog 0277. A monthly sitting is the second reason that entry may be worth taking.
+
 flags, verdict, reason, survivor/representative, commit.)_
 
 **Decided before the walk (owner, 2026-09-27):** `attractor_leviathan` and `fragment_tiledmono`
@@ -513,7 +530,7 @@ None. No types, parameters or engine surface. A look that needs one is a backlog
 | 4 — The retunes and the sittings | human | done | many, one per family: see Notes |
 | 5 — The gap brief | human | done | 2619581b |
 | 6 — The first refill cohort | human | done | committed with this row |
-| 7 — The verdict | human | owed | |
+| 7 — The verdict | human | done | committed with this row |
 
 ### Notes
 

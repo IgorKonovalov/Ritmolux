@@ -87,7 +87,7 @@ ADR-0177's lane boundary names this shape specifically.
 
 Let each surface mark independently. **Rejected because two answers to "is this a favourite" is
 not a feature.** The marks would diverge on the first use, and the `hidden` set — which
-[backlog 0256](../design-backlog.md) intends to read as evidence — would be split across two files
+[backlog 0256](../design-backlog-archive.md) intends to read as evidence — would be split across two files
 with no rule for combining them.
 
 ### Alternative C — the studio asks the player to open a mark editor

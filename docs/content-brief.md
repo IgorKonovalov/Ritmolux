@@ -4,7 +4,8 @@
 > **Last consolidated:** 2026-08-13, from five `human` phases spread across five closed plans.
 
 **Taken by [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md) (approved 2026-09-27):**
-every item below is answered in its walk (Phase 2) or its retunes (Phase 4), and leaves for `Done` there.
+items 1 to 6 were answered in its walk (Phase 2) or its retunes (Phase 4), and sit under `Done`. Its
+Phase 7 verdict added item 7, the monthly walk, which stays open by design.
 
 This is the **one** copy. [`docs/plans/README.md`](plans/README.md)'s `Standing` section points here
 rather than restating, because a duty recorded in two places drifts in one of them — which is the
@@ -19,6 +20,27 @@ what order*.
 [Plan 0067 curation route](plans/done/0067-the-curation-route.md) (ADR-0081 — the lane commits
 presets directly, gated on the behavioral suite), records the verdict where the item says to, and the
 row moves to `Done` at the bottom with a date.
+
+---
+
+## 7. The library walk, once a month
+
+**Standing, from [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md) Phase 7
+(the owner's verdict, 2026-10-01).** Shipping less but better needs no mechanism. It needs the owner's
+walk, repeated, because that plan's walk convicted 28 of its 35 cuts with no machine flag behind them.
+
+- **Cadence:** once a month, and before a plan that adds a cohort decides how large it can be.
+- **What it is:** the walk that Plan 0232 Phase 2 ran. One family per sitting in the running app,
+  each preset fullscreen, F1 to keep and F2 to cut, then a ledger of the marks with a reason per cut.
+  Run `shot --report` and `distinctness` first as the candidate sheet. They point at suspects and
+  convict nothing.
+- **What it may land:** cuts go through the curation route, keeping each family at its two-preset
+  floor (ADR-0253). Retunes are content-lane work. A gap the walk exposes is a brief for the next
+  cohort, as Plan 0232's `## Gaps` was.
+- **Where the verdict goes:** a dated ledger, in a short plan or a section of the plan that runs the
+  sitting. Each sitting adds a dated line under `Done`, and this item stays open.
+- **The scripts:** the hotkey walk and the retune loop are still scratch files under `target/`
+  (backlog 0277). A `cargo clean` deletes them.
 
 ---
 

@@ -312,6 +312,7 @@ accepted cost" are different documents and only one of them is honest.
 - [0272 — `npm run dev` leaves Vite and the esbuild watchers running after the studio window closes](#0272--npm-run-dev-leaves-vite-and-the-esbuild-watchers-running-after-the-studio-window-closes)
 - [0273 — a headless session's `Write` can create a file outside its lane, and nothing bounds it](#0273--a-headless-sessions-write-can-create-a-file-outside-its-lane-and-nothing-bounds-it)
 - [0038 — mid-tone-dominated presets lost ~8 % luminance to the tonemap knee, and the library has not been retuned](#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned)
+- [0256 — the only report that asks whether two presets look alike covers nine of fourteen families, and both places naming the absent ones are stale](#0256--the-only-report-that-asks-whether-two-presets-look-alike-covers-nine-of-fourteen-families-and-both-places-naming-the-absent-ones-are-stale)
 <!-- toc:end -->
 
 ## The ledger
@@ -656,6 +657,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0270 | An npm advisory with no GHSA id can only be cleared by a bump | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 7. The allow reader accepts `npm-<digits>`. **Closed 2026-09-29** |
 | 0271 | The missing-player banner does not say where the settings file is | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 8. The banner names the path. **Closed 2026-09-29** |
 | 0272 | `npm run dev` leaves Vite and the watchers running | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 9. `--kill-others`. **Closed 2026-09-29** |
+| 0256 | Nothing asks whether a preset is any good, only whether two look alike | [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md) Phase 7. A monthly owner walk; no mechanism. **Closed 2026-10-01** |
 <!-- roster:end -->
 
 ---
@@ -16631,3 +16633,110 @@ this entry's population was judged in motion with "too dim" a verdict in use, an
 brightened at the retune. Of the population named above, `swarm_drift` was retired and
 `attractor_clifford` was kept as it stands. An `occlude` binding stays open authoring for any world
 that wants one, not an owed pass.
+
+## 0256 — the only report that asks whether two presets look alike covers nine of fourteen families, and both places naming the absent ones are stale
+
+The `distinctness` report is the one instrument in this repository that asks whether two shipped
+presets have converged. It reads its roster from a hand-written array — `const FAMILIES:
+[(SystemKind, &str); 9]` in `core/tests/distinctness.rs` — and
+[`docs/testing.md`](testing.md) states the consequence plainly: *"a new `SystemKind` does not
+appear in it on its own and nothing fails when one is missing."*
+
+**Five shipped families are missing, not three.** By filename family over `presets/*.toml`:
+
+| family | shipped | in the array |
+|---|---|---|
+| `analytic_field` | 12 | **no** |
+| `shape_field` | 9 | **no** |
+| `warp_mesh` | 7 | **no** |
+| `shape_collage` | 4 | **no** |
+| `cellular` | 3 | **no** |
+
+That is **35 of 114 presets — most of a third of the library — with no similarity check of any
+kind**, and `analytic_field` is the third-largest family in the set.
+
+**Both carriers that name the absent families name three of the five.** `docs/testing.md` says
+*"nine of the twelve"* and lists `shape_field`, `warp_mesh` and `shape_collage`; the doc comment
+above the array at `core/tests/distinctness.rs:62` lists the same three. `analytic_field` and
+`cellular` shipped afterwards and neither carrier noticed, because nothing makes them.
+
+**The comment predicted this exact failure and then suffered it.** Its closing line, about the
+count that had previously gone stale: *"A count is a fine reason to leave a family out and a
+terrible one to leave written down, because it stops being true silently."* The sentence is
+correct, it is four lines below a written-down list, and that list is now wrong in the same way.
+
+**The other half has no instrument at all, and that is the more important half.** `distinctness`
+measures *similarity* — whether two presets look alike. Nothing in this repository asks whether one
+is any *good*. Backlog 0248 above is a narrow slice of that question (four
+`fragment_field` presets, composition or fill) and records the same absence in its own words:
+*"no statistic in this repository decides between the two readings."*
+
+### Why it matters now, and what the owner's aim is
+
+The stated goal is **to ship less but better** — which is
+[ADR-0089](adrs/0089-the-library-renews-by-replacement-cohorts.md)'s replacement-cohort mechanism
+used as designed, rather than the pure addition the set has grown by since. ADR-0089's own Context
+already recorded the symptom at 41 presets: *"~55 % of the library is one template per family with
+different numbers."* The library is now 114 and nobody has re-read that figure.
+
+[Plan 0204](plans/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) makes it live. It
+adds a cohort and its Phase 4 asks whether to add fifteen more, and the system those picks most
+plausibly route to — `warp_mesh` — is one of the five nothing checks.
+
+### The route, and its order is the point
+
+**The owner set this sequence deliberately, and it is not the obvious one:**
+
+1. **This entry** — record the gap. Done.
+2. **A human smoke sitting.** The owner walks the shipped library in the running app and marks, by
+   eye, what reads as *lame* and what reads as a *duplicate*. That produces evidence.
+3. **Then design the mechanism on that evidence** — an ADR and a plan, argued from what a person
+   actually convicted rather than from what is easy to compute.
+
+**Building the mechanism before step 2 is the thing to not do.** Similarity is measurable and
+quality is not, so a mechanism designed first would measure similarity, call it curation, and
+retire the wrong presets with a number behind it. The evidence has to come first precisely because
+the interesting half of the question has no statistic.
+
+- **Raised:** 2026-09-19 by `architect`, asked by the owner (*"do we have a plan to cut curated
+  presets that are too similar to each other or lame?"*). **Owner if taken:** `human` for step 2,
+  then `architect` for the ADR and plan.
+- **PARTLY PROMOTED 2026-09-27 -> [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md)**,
+  which takes **step 2** (the owner's walk, and the cull it convicts under ADR-0253). Step 3, whether a
+  mechanism is owed, stays here until that plan's Phase 7 verdict answers it.
+- **Verified 2026-09-26** — the instrument half is discharged by
+  [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md) (closed 2026-09-26): the
+  similarity roster is every `SystemKind`, held to the enum by `family_tests!`'s exhaustive match, and
+  `docs/testing.md` names no count. The heading's "nine of fourteen" describes the state this entry was
+  raised against, not the tree. The four 2026-09-19 probes that recorded the gap went red on delivery
+  and are replaced by these:
+  `present: family_tests! in: core/tests/distinctness.rs`
+  `absent: nine of the twelve in: docs/testing.md`
+- **Verified 2026-09-19** — the quality half has no instrument, which is an absence no probe can
+  assert:
+  `unprobeable: whether a shipped preset is worth shipping is a look judgement; this repository has
+  no statistic for it, which is the finding rather than a gap in the probe`
+- **PARTLY PROMOTED 2026-09-19 -> [Plan 0209](plans/done/0209-a-system-joins-the-instruments-by-existing.md)**,
+  which takes the **instrument half** only: the roster derives from `SystemKind` so all fourteen
+  families are reported and a new variant fails the build, and the two stale prose carriers stop naming
+  a list ([ADR-0234](adrs/0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md)).
+  **This entry stays live for the half that matters more** — whether the library should ship less and
+  better — which needs a person, an evening and the app, and whose evidence is the favourite/hidden
+  marks [Plan 0205](plans/done/0205-the-library-becomes-navigable.md) builds. Plan 0209 Phase 2 reads the
+  widened report and is forbidden from tuning a threshold to quiet it, so its output is input here.
+
+### Priority
+
+**Medium, and it rises with every preset landed.** Nothing is broken and no gate is red — the cost
+is that the set grows in the dark on a third of its families, and that the one decision the owner
+wants to make (ship less, better) has no evidence under it. Step 2 is cheap: it needs a person, an
+evening and the app, and it is the only step that cannot be skipped or automated.
+
+- **Moved to the archive 2026-10-01 on close**, by [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md)'s Phase 7 verdict.
+
+**CLOSED 2026-10-01** — [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md)
+Phase 7. Step 3 is answered: no mechanism is owed. Of the walk's 35 cuts, 28 carried no machine flag,
+so a mechanism designed on what is computable would have convicted one cut in five. Shipping less but
+better is a monthly owner walk instead, a standing sitting in `docs/content-brief.md` §7. The
+instrument half was already discharged by Plan 0209, and step 2 by Plan 0232's walk.
+
