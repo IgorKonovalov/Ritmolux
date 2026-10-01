@@ -1,6 +1,6 @@
 # 0231 — The interface is audited, then learns one look
 
-> **Status:** done - Phase 12 owed, ADR-0249. Closed 2026-09-30 by a conductor-run close: Phases 1-11 landed (`21f261cb` to `cfc7ed95`), round 1 review no blockers, no majors, two minors (fixed), two nits (one fixed) in `dad17147`; ADR-0252 (with an Outcome) and ADR-0256 accepted; version 0.154.0
+> **Status:** done (Phase 12 judged 2026-10-01 on the Linux walk; Windows, macOS and foobar not walked). Closed 2026-09-30 by a conductor-run close: Phases 1-11 landed (`21f261cb` to `cfc7ed95`), round 1 review no blockers, no majors, two minors (fixed), two nits (one fixed) in `dad17147`; ADR-0252 (with an Outcome) and ADR-0256 accepted; version 0.154.0
 > **Approved:** 2026-09-27 (user). Queued in `tools/conductor/queue.json` 2026-09-28 at the owner's request, for Phases 1-2; the run parks at Phase 3, the `human` audit that re-scopes Phases 8, 9 and 11
 > **Created:** 2026-09-27
 > **Owner skill(s):** dev, studio-builder, human
@@ -448,7 +448,7 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
 | 9 — foobar component takes the look | dev | done | b548dedc |
 | 10 — Studio tokens and motion | studio-builder | done | 7a4996aa |
 | 11 — Bound first, the rest grouped (F2, studio) | studio-builder | done | cfc7ed95 |
-| 12 — Before and after on devices | human | owed | |
+| 12 — Before and after on devices | human | done, Linux walk only | committed with this row |
 
 ### Notes
 
@@ -596,6 +596,24 @@ pub const KEYMAP: &[Binding] = &[ /* ... */ ];
   `fields`/`grammar`/`templates.test.ts` that way; it was rebuilt (`cargo build --release -p
   standalone --bin ritmolux`) and the suite passed. Files outside the list:
   `studio/electron/player/schema.test.ts`, `studio/renderer/views/Editor.test.tsx` (fixtures).
+
+- **Phase 12, 2026-10-01** (judged by the owner on the Arch box, the machine the Phase 3 audit walked).
+  After-captures were taken at v0.158.0: `shot --ui all` at 1920x1080 and 1280x800 into
+  `target/ui-audit/after-*/`, and `npm run ui-shots` into `studio/target/ui-audit/`. The Phase 1-2
+  before-captures no longer exist, because they lived in a removed lane's `target/`. The comparison is
+  therefore against the audit's written findings. The owner agreed this reading of each:
+  - **F1 resolved.** The browser and settings now sit on a near-opaque dark panel with an amber edge,
+    and every row stays legible over a bright figure.
+  - **F2 resolved.** The studio's Parameters tab opens on "Bound by this preset", and the rest of the
+    parameters sit in collapsed groups.
+  - **F3 resolved.** Names are measured rather than estimated: `Iris Bloom Kaleidoscope` and
+    `Star Mandala Bordered` show in full.
+  - **F4 partly resolved.** A `?` help sheet lists every key, including `Tab`, `S` and `C`, and
+    settings carries a "Key hints" row. The HUD capture shows only the name plate, so a first-launch
+    hint was not seen.
+  - **Not walked:** Windows, macOS and the foobar2000 panel. Foobar's half of the task script was
+    deferred to Windows at Phase 3 and has still never been walked. No regression was found, so no
+    backlog entry was filed.
 
 ### Close triggers
 
