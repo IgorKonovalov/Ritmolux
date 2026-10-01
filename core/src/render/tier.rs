@@ -667,6 +667,22 @@ pub struct TierConfig {
     /// **When the floor tier is next exercised on real target hardware this is
     /// a constant to measure**, with `cellular_radius`, on one frame.
     pub cellular_grid: u32,
+
+    /// The most points a `plexus` preset draws (ADR-0257), holding its
+    /// `[plexus] points` at load.
+    ///
+    /// The graph is built by testing every pair, so the per-frame cost is
+    /// quadratic in this: `N (N - 1) / 2` distance checks. `Floor`'s 600 is
+    /// 180 thousand checks a frame and `Rich`'s 1500 is 1.1 million, both
+    /// arithmetic on one CPU core before the drawing is paid for.
+    pub plexus_points: u32,
+
+    /// The most edges a `plexus` frame draws (ADR-0257): the size of its
+    /// instance buffer, and so the fill the graph can cost.
+    ///
+    /// A preset whose link distance reaches past this has its graph truncated
+    /// in index order.
+    pub plexus_edges: u32,
 }
 
 impl TierConfig {
@@ -688,6 +704,8 @@ impl TierConfig {
         field_iterations: 64,
         cellular_radius: 6,
         cellular_grid: 512,
+        plexus_points: 600,
+        plexus_edges: 6_000,
     };
 
     /// The midrange-discrete tier.
@@ -715,6 +733,8 @@ impl TierConfig {
         field_iterations: 512,
         cellular_radius: 10,
         cellular_grid: 1024,
+        plexus_points: 1_500,
+        plexus_edges: 20_000,
     };
 
     /// The config for `tier`.

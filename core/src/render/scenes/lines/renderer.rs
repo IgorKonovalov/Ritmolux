@@ -237,6 +237,35 @@ pub struct ArcInstance {
     pub width: f32,
 }
 
+/// One segment in **3D**, drawn through the shared camera (ADR-0257): two world
+/// endpoints, an RGB colour, a width in pixels at the camera's reference depth
+/// and an alpha.
+///
+/// Drawn by the `seg3d` pipeline, which [`LineRenderer::new_3d`] builds and
+/// [`LineRenderer::draw_3d`] selects — a separate pipeline and instance buffer
+/// rather than a branch in the 2D one, so every 2D line scene keeps its bytes.
+///
+/// **Field order is shader-location order**, for the reason
+/// [`SegmentInstance::alpha`] records: a field inserted anywhere but the end
+/// re-points every attribute after it.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct Segment3dInstance {
+    /// First endpoint, world space, in front of the near plane.
+    pub a: [f32; 3],
+    /// Second endpoint, world space, in front of the near plane.
+    pub b: [f32; 3],
+    /// RGB light (pre-glow; additive blend sums overlaps).
+    pub color: [f32; 3],
+    /// Full stroke width in **pixels of the render target** at the camera's
+    /// reference depth; each end is scaled by perspective from there.
+    pub width: f32,
+    /// How much of the stroke is present: its light and its coverage are both
+    /// multiplied by this, so a fading edge fades out of the frame rather than
+    /// into a dark line.
+    pub alpha: f32,
+}
+
 /// **Which space the stroke is measured in** (ADR-0160) — the half-width, the
 /// join extensions and the direction all three are taken along.
 ///
@@ -658,6 +687,257 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 "#;
 
+/// The `seg3d` pipeline's full WGSL: [`PROFILE_WGSL`], the shared camera and
+/// [`SEG3D_SHADER`], in that order.
+///
+/// The profile is prepended here for the reason [`arc_shader_source`] gives: a
+/// 3D stroke and a 2D one fall off across their width by one definition.
+///
+/// Runs once per [`LineRenderer::new_3d`] (pipeline build, not the hot path).
+fn seg3d_shader_source() -> String {
+    format!(
+        "{PROFILE_WGSL}
+{}
+{SEG3D_SHADER}",
+        crate::render::camera::CAMERA_WGSL
+    )
+}
+
+/// The `seg3d` pipeline's WGSL: each [`Segment3dInstance`] projected through the
+/// shared camera and expanded into a quad **in pixels of the render target**.
+///
+/// The quad is built in pixel space after the divide, where the space is
+/// isotropic, so the stroke has the same thickness on screen at every
+/// orientation; the aspect comes from the camera's viewport, which is the
+/// render target's (ADR-0037). Each end's half-width is the stroke width carried
+/// to that end's depth by perspective, and the quad is a trapezoid between the
+/// two, so a line receding from the camera thins along its length.
+///
+/// **A half-width is floored at half a pixel, and the light is scaled down by
+/// the same ratio**, so a stroke too thin to rasterize fades rather than
+/// breaking into a dotted line, and keeps the light it would have had.
+///
+/// The position leaves the vertex shader already divided (`w = 1`). The quad is
+/// a screen-space shape, and interpolating its varyings perspective-correctly
+/// against the endpoints' depths would bend the across-the-stroke coordinate.
+const SEG3D_SHADER: &str = r#"
+struct Stroke {
+    // x: glow multiplier, y: softness (ADR-0124), zw: unused
+    v: vec4<f32>,
+}
+
+@group(0) @binding(0) var<uniform> cam: Camera;
+@group(0) @binding(1) var<uniform> stroke: Stroke;
+
+struct Seg3dOut {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) side: f32,
+    @location(1) color: vec3<f32>,
+    @location(2) alpha: f32,
+}
+
+// Half a pixel: the narrowest half-width a stroke is rasterized at.
+const MIN_HALF_PX: f32 = 0.5;
+
+@vertex
+fn vs_main(
+    @builtin(vertex_index) vi: u32,
+    @location(0) a: vec3<f32>,
+    @location(1) b: vec3<f32>,
+    @location(2) color: vec3<f32>,
+    @location(3) width: f32,
+    @location(4) alpha: f32,
+) -> Seg3dOut {
+    // (along, side): along runs a->b, side spans -1..1 across the width.
+    var corners = array<vec2<f32>, 6>(
+        vec2<f32>(0.0, -1.0), vec2<f32>(1.0, -1.0), vec2<f32>(0.0, 1.0),
+        vec2<f32>(0.0, 1.0), vec2<f32>(1.0, -1.0), vec2<f32>(1.0, 1.0),
+    );
+    let c = corners[vi];
+
+    let ca = project(cam, a);
+    let cb = project(cam, b);
+    let sa = clip_to_px(cam, ca);
+    let sb = clip_to_px(cam, cb);
+
+    let hw_a = at_depth(cam, 0.5 * width, ca.w);
+    let hw_b = at_depth(cam, 0.5 * width, cb.w);
+    let hw_true = mix(hw_a, hw_b, c.x);
+    let hw = max(hw_true, MIN_HALF_PX);
+
+    var dir = sb - sa;
+    let len = length(dir);
+    if (len > 1e-6) {
+        dir = dir / len;
+    } else {
+        dir = vec2<f32>(1.0, 0.0);
+    }
+    let nrm = vec2<f32>(-dir.y, dir.x);
+    let p = mix(sa, sb, c.x) + nrm * c.y * hw;
+
+    var out: Seg3dOut;
+    out.pos = vec4<f32>(px_to_ndc(cam, p), 0.0, 1.0);
+    out.side = c.y;
+    out.color = color * (hw_true / hw);
+    out.alpha = alpha;
+    return out;
+}
+
+@fragment
+fn fs_main(in: Seg3dOut) -> @location(0) vec4<f32> {
+    // The shared profile, read off `side` rather than `|side|` for the reason
+    // the 2D fragment gives.
+    let inward = max(0.0, 1.0 - abs(in.side));
+    let g = stroke_coverage(inward, fwidth(in.side), stroke.v.y) * in.alpha;
+    // Premultiplied (ADR-0056): the glow scales the light, not the coverage.
+    return vec4<f32>(in.color * g * stroke.v.x, g);
+}
+"#;
+
+/// The `seg3d` stroke uniform: `[glow, softness, unused, unused]`.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct Stroke3dUniform {
+    v: [f32; 4],
+}
+
+/// The `seg3d` pipeline and everything it binds — built only by
+/// [`LineRenderer::new_3d`].
+struct Seg3d {
+    pipeline: wgpu::RenderPipeline,
+    instances: wgpu::Buffer,
+    camera: wgpu::Buffer,
+    stroke: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
+    capacity: usize,
+}
+
+impl Seg3d {
+    fn new(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        capacity: usize,
+        label: &str,
+    ) -> Self {
+        use crate::render::camera::CameraUniform;
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(&format!("{label}-seg3d-shader")),
+            source: wgpu::ShaderSource::Wgsl(seg3d_shader_source().into()),
+        });
+        let instances = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(&format!("{label}-seg3d-instances")),
+            size: (capacity * std::mem::size_of::<Segment3dInstance>()) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let camera = gpu::uniform_buffer(
+            device,
+            &format!("{label}-seg3d-camera"),
+            std::mem::size_of::<CameraUniform>(),
+        );
+        let stroke = gpu::uniform_buffer(
+            device,
+            &format!("{label}-seg3d-stroke"),
+            std::mem::size_of::<Stroke3dUniform>(),
+        );
+        // A shape of its own — two uniforms, split by stage, each with a size
+        // — so no other live layout matches it (ADR-0058).
+        let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some(&format!("{label}-seg3d-bind-layout")),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(
+                            std::mem::size_of::<CameraUniform>() as u64,
+                        ),
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(
+                            std::mem::size_of::<Stroke3dUniform>() as u64,
+                        ),
+                    },
+                    count: None,
+                },
+            ],
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(&format!("{label}-seg3d-bind-group")),
+            layout: &bind_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: stroke.as_entire_binding(),
+                },
+            ],
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some(&format!("{label}-seg3d-pipeline-layout")),
+            bind_group_layouts: &[Some(&bind_layout)],
+            immediate_size: 0,
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some(&format!("{label}-seg3d-pipeline")),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[Some(wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Segment3dInstance>() as u64,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &wgpu::vertex_attr_array![
+                        0 => Float32x3,
+                        1 => Float32x3,
+                        2 => Float32x3,
+                        3 => Float32,
+                        4 => Float32,
+                    ],
+                })],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: surface_format,
+                    // The seam every additive line draws through (ADR-0056).
+                    blend: Some(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+        Self {
+            pipeline,
+            instances,
+            camera,
+            stroke,
+            bind_group,
+            capacity,
+        }
+    }
+}
+
 /// The share of the segment `a -> b` lying inside `[-aspect, aspect] x [-1, 1]`,
 /// as a fraction of its own length: Liang-Barsky against the four edges.
 ///
@@ -853,6 +1133,12 @@ pub struct LineRenderer {
     capacity: usize,
     /// Maximum arcs the arc buffer holds; `0` when there is no arc pipeline.
     arc_capacity: usize,
+    /// The 3D segment pipeline (ADR-0257), **`None` unless the scene asked for
+    /// it** ([`LineRenderer::new_3d`]) — for the reason
+    /// [`over_pipeline`](Self::over_pipeline) records: a pipeline nobody binds
+    /// still allocates on the device, and on WARP a changed allocation order
+    /// changes what a later pass resolves to.
+    seg3d: Option<Seg3d>,
 }
 
 impl LineRenderer {
@@ -919,6 +1205,23 @@ impl LineRenderer {
         label: &str,
     ) -> Self {
         Self::build(device, surface_format, capacity, label, false, arc_capacity)
+    }
+
+    /// A renderer for **3D segments only** (ADR-0257): the `seg3d` pipeline and
+    /// a `capacity`-instance buffer for it, drawn with [`draw_3d`](Self::draw_3d).
+    ///
+    /// Its 2D half is built empty — no segment capacity, no arcs, no OVER
+    /// pipelines — so a 3D scene owns its renderer outright and the roster's
+    /// shared 2D renderer creates exactly the resources it did before 3D existed.
+    pub fn new_3d(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        capacity: usize,
+        label: &str,
+    ) -> Self {
+        let mut renderer = Self::build(device, surface_format, 0, label, false, 0);
+        renderer.seg3d = Some(Seg3d::new(device, surface_format, capacity, label));
+        renderer
     }
 
     fn build(
@@ -1111,6 +1414,7 @@ impl LineRenderer {
             bind_group,
             capacity,
             arc_capacity,
+            seg3d: None,
         }
     }
 
@@ -1305,6 +1609,59 @@ impl LineRenderer {
         self.draw_all(
             queue, encoder, view, aspect, glow, softness, metric, xform, segments, 0, arcs, true,
         );
+    }
+
+    /// 3D segments the `seg3d` buffer can hold — `0` when this renderer was not
+    /// built with [`new_3d`](Self::new_3d).
+    pub fn capacity_3d(&self) -> usize {
+        self.seg3d.as_ref().map_or(0, |seg3d| seg3d.capacity)
+    }
+
+    /// Draw `segments` through the shared camera (ADR-0257), **loading** over
+    /// the backdrop, in one additive pass of their own. Segments beyond
+    /// [`capacity_3d`](Self::capacity_3d) are dropped defensively; a renderer
+    /// without the pipeline draws none.
+    ///
+    /// Every endpoint must already be in front of the near plane: the scene
+    /// clips on the CPU against the same view the uniform carries
+    /// ([`CameraView::clip_near`](crate::render::camera::CameraView::clip_near)).
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "distinct GPU handles plus the per-frame camera and stroke values; bundling \
+                  them would only shuffle the same values behind a one-use struct"
+    )]
+    pub fn draw_3d(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        camera: &crate::render::camera::CameraUniform,
+        glow: f32,
+        softness: f32,
+        segments: &[Segment3dInstance],
+    ) {
+        let mut pass = gpu::color_pass(encoder, "seg3d-pass", view, wgpu::LoadOp::Load);
+        let Some(seg3d) = self.seg3d.as_ref() else {
+            return;
+        };
+        let count = segments.len().min(seg3d.capacity);
+        let drawn = segments.get(..count).unwrap_or(&[]);
+        if drawn.is_empty() {
+            return; // nothing to stroke; the backdrop shows through
+        }
+        queue.write_buffer(&seg3d.instances, 0, bytemuck::cast_slice(drawn));
+        queue.write_buffer(&seg3d.camera, 0, bytemuck::bytes_of(camera));
+        queue.write_buffer(
+            &seg3d.stroke,
+            0,
+            bytemuck::bytes_of(&Stroke3dUniform {
+                v: [glow, softness, 0.0, 0.0],
+            }),
+        );
+        pass.set_pipeline(&seg3d.pipeline);
+        pass.set_bind_group(0, &seg3d.bind_group, &[]);
+        pass.set_vertex_buffer(0, seg3d.instances.slice(..));
+        pass.draw(0..6, 0..count as u32);
     }
 
     /// The one body behind [`draw`](Self::draw),

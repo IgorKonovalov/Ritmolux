@@ -66,6 +66,7 @@ impl Preset {
             raw.mesh,
             raw.field,
             raw.cellular,
+            raw.plexus,
             raw.milk,
             pinned_salt,
         )?;
@@ -647,6 +648,7 @@ pub(super) fn build_layer(
         raw.mesh,
         raw.field,
         raw.cellular,
+        raw.plexus,
         // A `[layer]` carries no `[milk]` table: a converted preset is a whole
         // preset, and layering one under another is a composition nothing in the
         // corpus asks for. A layer warp mesh drives its mesh from `[layer.params]`
@@ -704,6 +706,7 @@ pub(super) fn build_config(
     mesh: Option<RawMesh>,
     field: Option<RawField>,
     cellular: Option<RawCellular>,
+    plexus: Option<RawPlexus>,
     milk: Option<RawMilk>,
     salt: u32,
 ) -> Result<Option<GeneratorConfig>, PresetError> {
@@ -799,6 +802,15 @@ pub(super) fn build_config(
         // function of the preset in the live app as well as in a capture.
         SystemKind::Cellular => Ok(Some(GeneratorConfig::Cellular(
             cellular.unwrap_or_default().into_config(salt)?,
+        ))),
+        // The layout, point count and seed are structural: the count sizes the
+        // point set and the seed places it, and an eased value would re-seed it
+        // mid-frame. Config is always `Some` so `configure` runs on every preset
+        // switch and re-seeds the points — never stale. An absent `[plexus]
+        // seed` takes the pinned salt, so a network is a pure function of the
+        // preset in the live app as well as in a capture.
+        SystemKind::Plexus => Ok(Some(GeneratorConfig::Plexus(
+            plexus.unwrap_or_default().into_config(salt)?,
         ))),
         // Reaction-diffusion drives its regime through named params (feed/kill/
         // flow), not a declarative structural table. `shape_collage`'s structure

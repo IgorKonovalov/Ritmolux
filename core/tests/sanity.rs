@@ -504,6 +504,12 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // it, past the 2.2x slack this file allows. Half that minimum, like
         // every floor above.
         SystemKind::Cellular => 0.30,
+        // **Not derived from a distribution**: the system ships no preset
+        // content. Set low because a network of fine lines over a dark ground
+        // lights little of the frame — a guess, not a measurement.
+        // **Re-derive it from this test's printed distribution when the first
+        // preset ships**, at half the family minimum like every floor above.
+        SystemKind::Plexus => 0.02,
     }
 }
 
@@ -638,6 +644,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::ShapeCollage => "shape_collage",
         SystemKind::AnalyticField => "analytic_field",
         SystemKind::Cellular => "cellular",
+        SystemKind::Plexus => "plexus",
     }
 }
 

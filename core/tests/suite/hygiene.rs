@@ -304,6 +304,15 @@ fn hot_path_modules_carry_the_panic_pragma() {
         collect_rs_files(target, &mut files);
     }
     assert!(!files.is_empty(), "found no hot-path source files to check");
+    // A scene directory joins the set by being under `render/`, which is
+    // scanned recursively; this names the newest one so a change to that walk
+    // that stopped reaching nested scene directories fails here.
+    assert!(
+        files
+            .iter()
+            .any(|f| f.ends_with(Path::new("scenes").join("plexus").join("mod.rs"))),
+        "the scan no longer reaches `render/scenes/plexus/`"
+    );
 
     for file in &files {
         let text = std::fs::read_to_string(file)

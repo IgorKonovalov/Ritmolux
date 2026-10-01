@@ -33,6 +33,7 @@
 pub mod aux_target;
 pub(crate) mod background;
 pub(crate) mod bloom;
+pub mod camera;
 pub mod capture;
 // The `capture_*` entry points themselves — a continuation of `impl Renderer`
 // (Plan 0061 Phase 3). Private, because it adds no path of its own: every method
@@ -1455,6 +1456,7 @@ impl Renderer {
             GeneratorConfig::Particles { family, .. } => Some(family.as_str()),
             GeneratorConfig::Field(config) => Some(config.family.as_str()),
             GeneratorConfig::Cellular(config) => Some(config.family.as_str()),
+            GeneratorConfig::Plexus(config) => Some(config.layout.as_str()),
             // Exhaustive rather than a wildcard, so a system that grows a family
             // has to answer here as well as in `family_params`.
             GeneratorConfig::LSystem { .. }

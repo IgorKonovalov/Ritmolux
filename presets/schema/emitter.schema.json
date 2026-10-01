@@ -175,6 +175,10 @@
       "$ref": "#/definitions/cellular",
       "description": "Which automaton the cellular system runs, and on how large a grid."
     },
+    "plexus": {
+      "$ref": "#/definitions/plexus",
+      "description": "The arrangement, count and seed of the plexus system's points."
+    },
     "milk": {
       "$ref": "#/definitions/milk",
       "description": "A converted MilkDrop preset's compiled programs and shaders."
@@ -208,7 +212,7 @@
       "properties": {
         "system": {
           "type": "string",
-          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular"],
+          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus"],
           "description": "Which built-in scene the layer draws. Required."
         },
         "join": {
@@ -292,6 +296,10 @@
         "cellular": {
           "$ref": "#/definitions/cellular",
           "description": "The layer's automaton family and grid."
+        },
+        "plexus": {
+          "$ref": "#/definitions/plexus",
+          "description": "The layer's plexus arrangement, point count and seed."
         }
       }
     },
@@ -548,6 +556,28 @@
           "type": "boolean",
           "description": "Whether the grid is a torus; false makes every cell past the border dead.",
           "markdownDescription": "Whether the grid is a torus; false makes every cell past the border dead.\n\nDefault `true`."
+        }
+      }
+    },
+    "plexus": {
+      "description": "Which arrangement the plexus system's points take, how many there are, and what they are seeded from.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "type": "string",
+          "enum": ["cloud"],
+          "description": "The arrangement of the points.",
+          "markdownDescription": "The arrangement of the points.\n\nDefault `cloud`."
+        },
+        "points": {
+          "type": "integer",
+          "description": "How many points; the quality tier may draw fewer, and says so.",
+          "markdownDescription": "How many points; the quality tier may draw fewer, and says so.\n\nDefault `300`."
+        },
+        "seed": {
+          "type": "integer",
+          "description": "What the points and their drift are drawn from; absent, the preset's own seed."
         }
       }
     },

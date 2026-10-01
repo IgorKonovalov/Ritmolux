@@ -173,6 +173,15 @@ include = [
 schema.path = "presets/schema/cellular.schema.json"
 
 [[rule]]
+name = "ritmolux-plexus"
+include = [
+  "/**/presets/plexus_*.toml",
+  "/**/presets/proposed/plexus_*.toml",
+  "/**/presets/pending/plexus_*.toml",
+]
+schema.path = "presets/schema/plexus.schema.json"
+
+[[rule]]
 name = "ritmolux-preset"
 include = [
   "/**/presets/*.toml",
@@ -223,5 +232,8 @@ exclude = [
   "/**/presets/cellular_*.toml",
   "/**/presets/proposed/cellular_*.toml",
   "/**/presets/pending/cellular_*.toml",
+  "/**/presets/plexus_*.toml",
+  "/**/presets/proposed/plexus_*.toml",
+  "/**/presets/pending/plexus_*.toml",
 ]
 schema.path = "presets/preset.schema.json"

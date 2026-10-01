@@ -25,6 +25,7 @@ pub mod lines;
 /// (ADR-0084). Crate-internal: it is arithmetic and a roster, not a scene.
 pub(crate) mod marks;
 pub mod particles;
+pub mod plexus;
 pub mod reaction_diffusion;
 pub mod shape_collage;
 pub mod shape_field;
@@ -524,6 +525,10 @@ pub enum GeneratorConfig {
     /// Always `Some` for that system, so `configure` runs on every preset switch
     /// and the incoming preset starts from its own seed.
     Cellular(cellular::CellularConfig),
+    /// The plexus system's `[plexus]` table (ADR-0257): the layout, the point
+    /// count and the seed. Always `Some` for that system, so `configure` runs on
+    /// every preset switch and the incoming preset starts from its own points.
+    Plexus(plexus::PlexusConfig),
 }
 
 impl GeneratorConfig {
@@ -544,7 +549,8 @@ impl GeneratorConfig {
             | GeneratorConfig::WarpMesh { .. }
             | GeneratorConfig::Path { .. }
             | GeneratorConfig::Field(_)
-            | GeneratorConfig::Cellular(_) => 0,
+            | GeneratorConfig::Cellular(_)
+            | GeneratorConfig::Plexus(_) => 0,
         }
     }
 }
@@ -1155,7 +1161,8 @@ pub(crate) fn kind_info(kind: SystemKind) -> SceneKindInfo {
         | SystemKind::WarpMesh
         | SystemKind::ShapeCollage
         | SystemKind::AnalyticField
-        | SystemKind::Cellular => false,
+        | SystemKind::Cellular
+        | SystemKind::Plexus => false,
     };
     SceneKindInfo {
         shares_line_renderer,
@@ -1239,6 +1246,12 @@ fn create(
             surface_format,
             tier.cellular_radius,
             tier.cellular_grid,
+        )),
+        SystemKind::Plexus => Box::new(plexus::PlexusScene::new(
+            device,
+            surface_format,
+            tier.plexus_points as usize,
+            tier.plexus_edges as usize,
         )),
     }
 }
@@ -1434,6 +1447,7 @@ mod tests {
             SystemKind::ShapeCollage => "shape collage",
             SystemKind::AnalyticField => "analytic field",
             SystemKind::Cellular => "cellular",
+            SystemKind::Plexus => "plexus",
         }
     }
 
@@ -1727,6 +1741,7 @@ mod tests {
             SystemKind::ShapeCollage,
             SystemKind::AnalyticField,
             SystemKind::Cellular,
+            SystemKind::Plexus,
         ];
         for (i, a) in independent.iter().enumerate() {
             for b in independent.iter().skip(i + 1).chain(lines.iter()) {

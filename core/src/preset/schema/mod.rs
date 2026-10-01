@@ -25,6 +25,7 @@ use crate::render::scenes::lines::{
 };
 use crate::render::scenes::particles::AttractorFamily;
 use crate::render::scenes::particles::ifs::IfsFigure;
+use crate::render::scenes::plexus::{PlexusConfig, PlexusLayout};
 
 // The six concerns this file holds apart. `system` is the roster of built-in
 // systems, `easing` the attack/release pair, `hold` the musical edge a binding

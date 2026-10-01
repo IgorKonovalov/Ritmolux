@@ -72,6 +72,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
             include_str!("fixtures/analytic_field.toml"),
         ),
         SystemKind::Cellular => ("cellular", include_str!("fixtures/cellular.toml")),
+        SystemKind::Plexus => ("plexus", include_str!("fixtures/plexus.toml")),
     }
 }
 

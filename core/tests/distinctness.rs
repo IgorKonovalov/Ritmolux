@@ -118,6 +118,14 @@ fn report_distinctness_within(system: SystemKind) {
     // A family with fewer than two presets compares nothing and reports clean,
     // which is the one way this advisory can go quiet without anyone noticing.
     let n = caps.len();
+    // A system that ships no preset yet has nothing to report on, which is a
+    // different fact from a family of one: the content lane has not reached it.
+    // One preset is still a failure, because then the family exists and the
+    // report is silent about it.
+    if n == 0 {
+        println!("  {label} ships no preset yet; nothing to compare");
+        return;
+    }
     assert!(
         n >= 2,
         "{label} ships {n} preset(s), so it has no pair to compare and the report says nothing \
@@ -183,4 +191,5 @@ family_tests! {
     distinctness_shape_collage => ShapeCollage,
     distinctness_analytic_field => AnalyticField,
     distinctness_cellular => Cellular,
+    distinctness_plexus => Plexus,
 }

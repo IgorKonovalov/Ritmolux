@@ -25,7 +25,7 @@
       "properties": {
         "mode_n": { "$ref": "#/definitions/param.mode_n" },
         "mode_m": { "$ref": "#/definitions/param.mode_m" },
-        "line_width": { "$ref": "#/definitions/param.line_width" },
+        "line_width": { "$ref": "#/definitions/param.line_width.analytic_field" },
         "plate_mix": { "$ref": "#/definitions/param.plate_mix" },
         "iterations": { "$ref": "#/definitions/param.iterations" },
         "c_re": { "$ref": "#/definitions/param.c_re" },
@@ -166,6 +166,10 @@
       "$ref": "#/definitions/cellular",
       "description": "Which automaton the cellular system runs, and on how large a grid."
     },
+    "plexus": {
+      "$ref": "#/definitions/plexus",
+      "description": "The arrangement, count and seed of the plexus system's points."
+    },
     "milk": {
       "$ref": "#/definitions/milk",
       "description": "A converted MilkDrop preset's compiled programs and shaders."
@@ -199,7 +203,7 @@
       "properties": {
         "system": {
           "type": "string",
-          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular"],
+          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus"],
           "description": "Which built-in scene the layer draws. Required."
         },
         "join": {
@@ -283,6 +287,10 @@
         "cellular": {
           "$ref": "#/definitions/cellular",
           "description": "The layer's automaton family and grid."
+        },
+        "plexus": {
+          "$ref": "#/definitions/plexus",
+          "description": "The layer's plexus arrangement, point count and seed."
         }
       }
     },
@@ -542,6 +550,28 @@
         }
       }
     },
+    "plexus": {
+      "description": "Which arrangement the plexus system's points take, how many there are, and what they are seeded from.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "type": "string",
+          "enum": ["cloud"],
+          "description": "The arrangement of the points.",
+          "markdownDescription": "The arrangement of the points.\n\nDefault `cloud`."
+        },
+        "points": {
+          "type": "integer",
+          "description": "How many points; the quality tier may draw fewer, and says so.",
+          "markdownDescription": "How many points; the quality tier may draw fewer, and says so.\n\nDefault `300`."
+        },
+        "seed": {
+          "type": "integer",
+          "description": "What the points and their drift are drawn from; absent, the preset's own seed."
+        }
+      }
+    },
     "milk": {
       "description": "A converted MilkDrop preset's compiled programs, its two shaders, and the frame-level choices that ride with them. Produced by the converter, not hand-authored.",
       "type": "object",
@@ -772,7 +802,7 @@
       "description": "The plate's second mode number: how many nodal lines cross the other axis.",
       "markdownDescription": "The plate's second mode number: how many nodal lines cross the other axis.\n\n- default `5.0`\n- typical range depends on the family: `chladni` `1.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `escape_time` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
-    "param.line_width": {
+    "param.line_width.analytic_field": {
       "type": "string",
       "description": "How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line.",
       "markdownDescription": "How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line.\n\n- default `0.04`\n- typical range depends on the family: `chladni` `0.0` to `0.3` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `escape_time` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."

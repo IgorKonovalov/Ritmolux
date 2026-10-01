@@ -1,6 +1,6 @@
 # 0235 — The plexus system, and a shared camera with depth of field
 
-> **Status:** approved (2026-09-30; run by hand in ordinary sessions, not queued for the conductor)
+> **Status:** in-progress (2026-09-30; run by hand in ordinary sessions, not queued for the conductor)
 > **Created:** 2026-09-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md) (proposed), [ADR-0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0256](../adrs/0256-a-parameter-declares-its-group-and-whether-it-is-main.md)
@@ -281,11 +281,11 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 
 ## Implementation log
 
-**Lane:**
+**Lane:** `main`, directly
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton | dev | not started | |
+| 1 — Walking skeleton | dev | done | committed with this row |
 | 2 — Depth of field on segments | dev | not started | |
 | 3 — Nodes: the 3D quad pipeline | dev | not started | |
 | 4 — The sheet layout | dev | not started | |
@@ -295,6 +295,24 @@ onset; a calm one binds `focus` to a slow `sin(time)`. Both are content, not eng
 | 8 — The look, judged | human | not started | |
 
 ### Notes
+
+- Phase 1, scope (owner-approved before starting): files outside the phase list were touched
+  because adding a `SystemKind` fails the schema, param-reference and gallery guards otherwise:
+  `core/src/preset/schema/{export,mod,tests}.rs`, `raw/preset.rs`, `render/mod.rs`
+  (`active_family_key`), `scripts/docs-shots.mjs`, `docs/images/gallery/plexus.png`,
+  `docs/examples/plexus/cloud.toml`, the regenerated `presets/README.md`, `presets/schema/`,
+  `presets/preset.schema.json`, `.taplo.toml` and `docs/specs/player-schema.json`.
+- Phase 1, `core/tests/golden/plexus.png` was blessed on llvmpipe, not WARP, through an
+  uncommitted local bypass of the WARP-only guard, at the owner's instruction. Windows CI is
+  the first WARP reading of it. Existing baselines were not re-blessed; their llvmpipe readings
+  were identical before and after the phase.
+- Phase 1, `core/tests/distinctness.rs`: a system that ships zero presets now prints and returns
+  instead of failing `n >= 2`; a family of one still fails. Plexus ships none by design.
+- Phase 1, `[plexus] seed` absent takes the preset's pinned salt.
+- Phase 1, palette coordinate on edges is already normalized view depth (the plan places it in
+  Phase 3); points carry a face fade so a wrap at the cube's faces never pops an edge.
+- Phase 1, the `plexus_points` / `plexus_edges` tier values are provisional arithmetic; Phase 6
+  measures them. The tier clamp is silent until Phase 6 announces it.
 
 ### Close triggers
 
