@@ -1,8 +1,8 @@
 # ADR-0262 — The studio renders a clip by piping three children, and transcodes what the player cannot read
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-02 (Plan 0247)
 > **Date:** 2026-10-01
-> **Related plan(s):** [0247](../plans/0247-the-studio-renders-a-neural-clip.md); amends
+> **Related plan(s):** [0247](../plans/done/0247-the-studio-renders-a-neural-clip.md); amends
 > [ADR-0175](0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md)'s *"spawned with
 > progress read from its events"*
 

@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0247 - The studio renders a neural clip](#0247---the-studio-renders-a-neural-clip)
   - [0236 - Space curves, and the camera becomes a shared block](#0236---space-curves-and-the-camera-becomes-a-shared-block)
   - [0244 - Sessions start lighter](#0244---sessions-start-lighter)
   - [0202 - The three mechanisms get their gate](#0202---the-three-mechanisms-get-their-gate)
@@ -284,6 +285,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0211 - The diffused frame's resolution is measured before it is designed](done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) - closed 2026-09-27. Review: **no blockers, no majors, three minors (two fixed).** Version: none. Closes 0125; filed 0262. [Write-up](README-archive.md).
 - [0208 - The conductor's safety claims get their evidence](done/0208-the-conductors-safety-claims-get-their-evidence.md) - closed 2026-09-27. Review: **three rounds; 3 majors (fixed), one minor, one nit (fixed).** Version: none. ADR-0233 accepted, Outcome. Closed 0236, 0237, 0241. [Write-up](README-archive.md).
 - [0209 - A system joins the instruments by existing](done/0209-a-system-joins-the-instruments-by-existing.md) - closed 2026-09-26. Review: **no blockers, no majors, three minors (two fixed), one nit (fixed).** Version: none. ADR-0234 accepted. Closes 0258. [Write-up](README-archive.md).
 - [0223 - The heavy presets fit the integrated GPU](done/0223-the-heavy-presets-fit-the-integrated-gpu.md) - closed 2026-09-26. Review: **no blockers, no majors, three minors (two fixed).** Version: **0.151.0**. ADR-0245 accepted, Outcome. [Write-up](README-archive.md).
@@ -486,6 +488,29 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0247 - The studio renders a neural clip](done/0247-the-studio-renders-a-neural-clip.md)
+
+- closed 2026-10-02 by a conductor close on the lane `plan-0247-the-studio-renders-a-neural-clip`.
+The phases landed in `30083e5a` (Phase 1), `8d8f2547` (2), `8fcef278` (3), `30ef08ec` (4) and
+`e7e7394e` (5). **Phase 6, a real MP3 and FLAC rendered and judged from a packaged studio on the
+CUDA machine, is owed** (`Blocks merge: no`, ADR-0249). The round 1 review found **no blockers, no
+majors, two minors and one nit**. The Risks bullet that said CI proves the three-stage pipe was
+repaired at the close in `4fc5a4f6`. The quit-while-preparing gap and the stray `.bars.json` are code
+and stay open. Version: **0.162.0** (minor: a feature). ADR-0262 accepted. The close closes no
+backlog entry. Upstream CI read red (Windows `check`) at the close. The full review is the plan's
+own `## Close review`.
+- **What landed.** The player gains `--render` (Y4M on stdout, byte-identical to `shot`'s) and
+  `--bars` / `--out` (the bar-grid JSON, with no GPU type on its path). The studio gains a Render
+  view: an ffmpeg transcode cache, a waveform-and-bar strip carrying prompts, a neural switch behind
+  a readiness probe, child-to-child piping of player, `sd_filter.py` and ffmpeg, and a
+  `<output>.render.json` job file that reopens the render. Four `render.*` keys live in
+  `settings.json`.
+- **Open.** `abandon()` reaches no child while a job is still transcoding or running `--bars`, so a
+  quit confirmed in that window leaves the transcode's ffmpeg running. A neural Start refused by the
+  counted-grid check leaves `<output>.bars.json` behind. The three-stage integration test skips on
+  CI's studio job, which builds no player, so Phase 6 and a developer run are its only end-to-end
+  readings.
 
 ### [0236 - Space curves, and the camera becomes a shared block](done/0236-space-curves-and-the-camera-becomes-a-shared-block.md)
 

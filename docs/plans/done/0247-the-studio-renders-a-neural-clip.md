@@ -1,12 +1,15 @@
 # 0247 — The studio renders a neural clip
 
-> **Status:** in-progress (2026-10-02)
+> **Status:** done - Phase 6 owed, ADR-0249 (2026-10-02). Phases 1-5 in `30083e5a`, `8d8f2547`,
+> `8fcef278`, `30ef08ec`, `e7e7394e`. Conductor close review round 1: no blockers, no majors, two
+> minors (one fixed in `4fc5a4f6`), one nit. Version 0.162.0. Phase 6, the owner's packaged-studio
+> render of an MP3 and a FLAC on the CUDA machine, has not been done.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, studio-builder, human
-> **Related ADRs:** [0262](../adrs/0262-the-studio-renders-a-clip-by-piping-three-children-and-transcodes-what-the-player-cannot-read.md)
-> (proposed; this plan's decision), [0175](../adrs/0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md)
-> (the `render` subcommand it promised), [0236](../adrs/0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md)
-> (the prompt timeline it drives), [0240](../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md)
+> **Related ADRs:** [0262](../../adrs/0262-the-studio-renders-a-clip-by-piping-three-children-and-transcodes-what-the-player-cannot-read.md)
+> (accepted; this plan's decision), [0175](../../adrs/0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md)
+> (the `render` subcommand it promised), [0236](../../adrs/0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md)
+> (the prompt timeline it drives), [0240](../../adrs/0240-a-setting-lives-in-a-file-and-the-menu-edits-that-file.md)
 > (every new choice has a `settings.json` key)
 
 ## TL;DR
@@ -341,6 +344,200 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
   `check-doc-links`, `check-reader-prose`, `check-settings-have-files` and
   `check-comment-hygiene`.
 - `human` phases remaining: Phase 6 (`Blocks merge: no`).
+
+## Close review
+
+Closed 2026-10-02 by a conductor close at round 1. The review is reproduced in full below, as
+written to `tools/conductor/state/reviews/0247-round-1.md`. The close repaired the first minor in
+`4fc5a4f6`. The second minor and the nit are code changes, so they stay open. **Phase 6 is owed**
+(`Blocks merge: no`, ADR-0249). That leaves three things unchecked. Nobody has judged a real neural
+clip from a packaged studio. Nobody has measured a plain clip's duration against its source with
+`ffprobe`. And nobody has seen the quit prompt during a render. Upstream CI on `main` read red
+(Windows `check`) at the close.
+
+### Plan 0247 — close review, round 1
+
+Graded at tip `abdb59dafe2dd6226328abd08f03cee38eca7f95` (tree `76ac22c5`), lane
+`/home/igor/Work/rlx-plan-0247` on `plan-0247-the-studio-renders-a-neural-clip`.
+
+**Verdict: Plan 0247 landed cleanly. No blockers, no majors, two minors and one nit.** Phases 1-5
+are built as written, with every deviation recorded in the log. Phase 6 (`human`,
+`Blocks merge: no`) is correctly `owed`.
+
+#### Evidence
+
+- **Full suite (lens 1):** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 76ac22c is green in the suite ledger, run by
+  gate 0247-pre-review at 2026-10-02T09:07:36.655Z: 1951 tests run: 1951 passed (14 slow), 8 skipped`.
+  `git rev-parse HEAD^{tree}` is `76ac22c5097696ba497f0aa7869c0f976be4e220`, so that ledger record
+  covers this tip's tree. It is the full-suite evidence (ADR-0207).
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: exit 0.
+- Studio: `npm --prefix studio run typecheck`, `run lint` and `run test` all exit 0, with 44 files and
+  396 tests. No `skipped:` notice was printed, so the three-stage integration test appears to have run
+  on this machine rather than skipped.
+- `check-settings-have-files`, `check-filter-figures`, `check-doc-links`, `check-reader-prose` and
+  `check-comment-hygiene` each exit 0.
+- `git status --porcelain` is empty before and after every run.
+
+#### Lens 1 — alignment with the plan
+
+Every phase has a single, in-vocabulary `**Owner skill:**`. Phase 6 carries `**Blocks merge:** no`,
+no later phase reads it, and its log row reads `owed`.
+
+**Phase 1 (dev).** `standalone/src/render_mode.rs` is dispatched from `main` after `--thumb` and
+before `run::run()`. It calls `shot::render::run` and `render::bar_grid` instead of copying them, and
+resolves presets through `thumbs::library()` (made `pub(crate)`, noted in the log). I read each
+done-when's test body:
+- `the_players_render_is_byte_identical_to_shots` renders the same preset, clip, fps 30, 48x32 and
+  tier `rich` (off both defaults) through both binaries. It asserts the header, the exact length for
+  30 frames, and `ours.stdout == theirs.stdout`. Where there is no adapter it skips in ADR-0016's
+  shape, keyed on the adapter error.
+- `the_players_bars_match_shots_bar_grid` asserts string equality of the two JSON files, plus a
+  six-second/30-fps prefix so that two empty grids cannot pass.
+- `an_unknown_preset_exits_2_and_a_non_pcm_wav_exits_1` asserts exit codes 2 and 1, one stderr line
+  each, and an empty stdout. It also checks that a refused `--bars` writes no file.
+- The structural `--bars` check is a source-reading unit test with a control arm, as the log
+  describes.
+- Binary size: 12,854,504 B before and 12,928,352 B after, which is 77.1 % of NFR §4's cap.
+- `docs/configuration.md` lists `--render`, `--bars` and `--out`. `docs/capturing.md` has the twin
+  paragraph and no flag table.
+
+The `FlagSpec::requires` widening to "any one of" keeps `every_requires_names_a_real_flag` and the
+help-text test true. Two older tests were moved from `--fps` to `--sender` so that they still probe a
+single-companion flag. The change is sound.
+
+**Phase 2 (studio-builder).**
+- `progress.test.ts` parses a recorded transcript in five chunk sizes. It asserts a strictly
+  increasing count, rejects any truncated-number reading, and accepts done only on `progress=end`.
+- `pipeline.test.ts` covers the spec in four ways:
+  - It asserts the encoder's stdio is `[children[0].stdout, 'ignore', 'pipe', 'pipe']`, not `'pipe'`,
+    and that the parent destroyed its own copy.
+  - Cancel kills every child and removes the output.
+  - Each stage's failure names that stage.
+  - It covers the two ordering edge cases the log describes.
+- The settings test and the Settings view test read and write both keys, and the settings gate
+  exits 0.
+- The default fps, size and tier are 30 / 1920x1080 / `rich`, as specified.
+- The transcode keeps the sample rate (no `-ar`). The cache key covers path, size and mtime. The
+  cache is emptied at start and at quit.
+- The window's `close` prompt and `powerSaveBlocker` are in `main.ts` and `ipc/renderHandlers.ts`.
+
+**Phase 3.**
+- `peaks.test.ts` builds the specified synthetic WAV (with an ffmpeg-style `LIST` chunk) and asserts
+  [0,0] then [-1,1], with a tolerance of one column.
+- `timeline.test.ts` is table-driven over each refusal `parse_timeline` and `check_timeline_fits`
+  make. I compared the TypeScript validator with `sd_filter.py:148-201` and they match.
+- `BarStrip.test.tsx` covers four things:
+  - a drag that lands on a bar start and keeps its prompt;
+  - locked and fallback bars drawn with different classes;
+  - the summary line;
+  - adding and removing a prompt.
+
+**Phase 4.**
+- The probe's outcomes are distinct in `probe.test.ts`. The switch's disabled and enabled states,
+  each with its own line, are in `Render.test.tsx`.
+- `service.test.ts` holds three refusals:
+  - a neural job with no prompt is refused before anything is transcoded or spawned;
+  - a job is refused while the probe says no;
+  - a prompt past the counted grid is refused.
+- The integration test runs player → `sd_filter.py --passthrough` → ffmpeg. It asserts the MP4's
+  decoded frame count equals `--bars`' `frames`, and skips in ADR-0016's shape.
+- The done-when's "the passthrough run proves the loader parses `--timeline`" was false as written,
+  because `--passthrough` never calls `load_timeline`. The log says so, and the test runs
+  `load_timeline` and `load_bar_grid` directly. That is a faithful repair, not a drift.
+- The sidecar's `sd-filter: N frames` line exists at `sd_filter.py:495`, once every ten frames.
+
+**Phase 5.** `job.test.ts` round-trips a plain job and a neural job. It refuses `version: 2` with a
+message naming both versions, and refuses a document with no version. The three doc gates exit 0.
+`studio/README.md` has `## Rendering a clip`. `docs/configuration.md` carries the four `render.*`
+keys. `docs/diffusion-filter.md`'s *From the studio* carries no figure. `docs/capturing.md` has the
+pointer.
+
+The log is shorter than `## Implementation phases`, and its close-trigger bullets are present and
+accurate.
+
+#### Lens 2 — layering, real-time safety, contracts
+
+- Nothing under `core/` changes. No audio callback is touched.
+- The C ABI is unchanged.
+- No OSC address or event is added. The studio reaches the new modes through the player's CLI and
+  its standard streams, which ADR-0262 records. Spec 0003 owes nothing.
+- On the studio side, Electron is confined to `ipc/renderHandlers.ts` and `main.ts`, so
+  `render/service.ts` runs under plain tests.
+- Paths from the renderer are accepted only when main produced them.
+
+#### Lens 3 — docs and bookkeeping
+
+- The operator docs this plan moved are swept: configuration, capturing, diffusion-filter and the
+  studio README.
+- Owed at the close:
+  - ADR-0262 is `proposed` and needs flipping to `accepted`.
+  - The plan moves to `done/` with `Status: done - Phase 6 owed, ADR-0249`.
+  - Both plan indexes need refreshing.
+  - **A minor version bump.** The plan is a feature: new player flags and a new studio view. The two
+    studio version copies follow the bump.
+- `presets/` is not touched, and the plan header has no `Closes:`.
+
+#### Lens 4 — correctness
+
+- `--render` defaults to tier `floor` unpinned, so a render does not depend on the machine.
+- The new tests carry no frozen numeric thresholds. Their frame counts are exact, derived from
+  `ceil(secs x fps)`, and the binary-size figures are recorded as measurements on Linux.
+- Nothing here depends on the render target's aspect.
+
+#### Lens 5 — design integrity
+
+- Dependency direction is preserved: `standalone` calls its own `shot` lib, and the studio spawns
+  binaries.
+- The `RenderJob` / `RenderService` / handler split is clean.
+- No seam is widened without an ADR.
+
+#### Findings
+
+##### minor — the plan says CI proves the three-stage pipe; CI's studio job never can
+
+`docs/plans/0247-the-studio-renders-a-neural-clip.md:247-249`. The Risks bullet says
+*"Phase 4's integration test proves it end to end on CI's Linux runner."* The `studio` job in
+`.github/workflows/ci.yml:459-474` runs `npm ci` / typecheck / lint / `npm test` and builds no
+player. `builtPlayer()` therefore finds none, and the test always takes its `skipped:` branch there.
+The runner has no GPU adapter either. The child-to-child stdio wiring is proved end to end only on a
+developer machine with a built player: this lane's run, and Phase 6.
+
+**Fix:** a close repair in Markdown. Reword the bullet to: *"Phase 2's stub test pins the wiring.
+Phase 4's integration test proves it end to end on a machine with a built player, ffmpeg and a GPU
+adapter. It skips on CI's studio job, which builds no player."* State the same in the `## Close
+review`.
+
+##### minor — a quit confirmed while a job is still starting stops nothing
+
+`studio/electron/render/service.ts:219-221`, called from `studio/electron/main.ts`'s `will-quit`.
+`busy` is true while `starting`, which covers the transcode and `--bars` before `launch`, so the close
+prompt correctly asks. But `abandon()` reaches only `this.job`, which is still `undefined` then.
+Quitting at that moment leaves the transcode's `ffmpeg` child running as an orphan into a cache
+directory that `cache.clear()` just removed.
+
+The cost is small: the transcode is bounded and nothing is spawned after exit. Still, the prompt's
+text, *"Quitting stops it"*, is not true in that window.
+
+**Fix:** record in-flight `execFile` children in `TranscodeCache` / `readBars` and kill them in
+`abandon()`. Alternatively, let the prompt say a job is still preparing. This is code, so it stays
+open for a fix round or a followup.
+
+##### nit — a neural Start refused after `--bars` leaves `<output>.bars.json` behind
+
+`studio/electron/render/service.ts:160-163`. In a neural Start, the grid is written beside the output
+before the counted-grid timeline check. When that check refuses, `<output>.bars.json` stays on disk
+next to an MP4 that never existed. It is harmless, and the next Start overwrites it.
+
+**Fix:** remove the file on that refusal.
+
+#### Prior rounds
+
+None. This is round 1.
+
+### Findings from earlier rounds
+
+None: round 1 was the only round.
 
 ## Followups (after this lands)
 
