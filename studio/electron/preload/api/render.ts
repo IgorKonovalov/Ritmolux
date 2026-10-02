@@ -9,14 +9,15 @@ import { ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import type {
   PreparedTrack,
+  ProbeResult,
   RenderEvent,
   RenderRequest,
   RenderResult,
-  RenderSettings,
+  RenderSettingKey,
 } from '@shared/render'
 
 /** A `render` settings write: a value sets its key, `null` or `''` clears it. */
-export type RenderSettingsPatch = { [K in keyof RenderSettings]?: string | null }
+export type RenderSettingsPatch = Partial<Record<RenderSettingKey, string | null>>
 
 export const renderApi = {
   /** The track dialog; `null` when it was dismissed. */
@@ -51,6 +52,10 @@ export const renderApi = {
       ipcRenderer.off(IPC_CHANNELS.RENDER_EVENT, handler)
     }
   },
+
+  /** Whether the neural switch can be offered; `recheck` asks again. */
+  probe: (recheck: boolean): Promise<ProbeResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RENDER_PROBE, recheck) as Promise<ProbeResult>,
 
   /** Write the `render` key of `settings.json`. */
   setSettings: (patch: RenderSettingsPatch): Promise<RenderResult<null>> =>

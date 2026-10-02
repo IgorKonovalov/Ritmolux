@@ -3,7 +3,7 @@
  * Phase 2).
  */
 import { EventEmitter } from 'node:events'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { RenderEvent } from '@shared/render'
 
-import { RenderService, suggestedName } from './service'
+import { RenderService, SidecarMeter, suggestedName } from './service'
 import { TranscodeCache, type RunTool } from './transcode'
 
 const GRID = '{"fps":"30","frames":90,"bar_starts":[0,40],"bar_locked":[false,true]}\n'
@@ -40,7 +40,11 @@ function harness() {
   const dir = mkdtempSync(join(tmpdir(), 'rlx-service-'))
   const source = join(dir, 'track.flac')
   writeFileSync(source, 'flac')
+  const script = join(dir, 'sd_filter.py')
+  writeFileSync(script, '# the sidecar')
+  let cuda = 'True'
   const run: RunTool = vi.fn((_command: string, args: string[]) => {
+    if (args[0] === '-c') return Promise.resolve(`${cuda}\n`)
     // ffmpeg's transcode writes its last argument; --bars writes after --out.
     const out = args.includes('--out') ? args[args.indexOf('--out') + 1] : (args.at(-1) as string)
     writeFileSync(out, args.includes('--bars') ? GRID : silentWav())
@@ -62,6 +66,7 @@ function harness() {
   const service = new RenderService({
     player: () => '/bin/ritmolux',
     ffmpeg: () => '/bin/ffmpeg',
+    diffusion: () => ({ python: '/venv/bin/python', script }),
     outputDir: () => join(dir, 'Videos'),
     cache: new TranscodeCache(join(dir, 'cache'), () => '/bin/ffmpeg', run),
     emit: (event) => events.push(event),
@@ -69,7 +74,7 @@ function harness() {
     run,
     spawn,
   })
-  return { service, source, spawned, events, release }
+  return { service, source, spawned, events, release, script, noCuda: () => (cuda = 'False') }
 }
 
 describe('the suggested name', () => {
@@ -94,6 +99,7 @@ describe('the render service', () => {
       size: '1920x1080',
       tier: 'rich',
       output: '/etc/passwd',
+      neural: null,
     }
     expect(await service.start(request)).toEqual({
       ok: false,
@@ -116,7 +122,7 @@ describe('the render service', () => {
     const output = service.suggestOutput(source, 'Gyre')
     expect(output.ok).toBe(true)
     if (!output.ok) return
-    const request = { source, preset: 'Gyre', fps: '30', size: '1920x1080', tier: 'rich', output: output.value }
+    const request = { source, preset: 'Gyre', fps: '30', size: '1920x1080', tier: 'rich', output: output.value, neural: null }
     expect(await service.start(request)).toEqual({ ok: true, value: null })
     expect(spawned.map((s) => s.command)).toEqual(['/bin/ritmolux', '/bin/ffmpeg'])
     expect(spawned[0].args.slice(0, 1)).toEqual(['--render'])
@@ -124,5 +130,97 @@ describe('the render service', () => {
     expect(events[0]).toEqual({ kind: 'started', output: output.value, frames: 90 })
     expect(service.busy).toBe(true)
     expect(await service.start(request)).toEqual({ ok: false, reason: 'a render is already running' })
+  })
+})
+
+describe('a neural job', () => {
+  function neuralRequest(source: string, output: string, timeline: { at_bar: number; prompt: string }[]) {
+    return {
+      source,
+      preset: 'Gyre',
+      fps: '30',
+      size: '1920x1080',
+      tier: 'rich',
+      output,
+      neural: { profile: 'fast', negative: 'blurry', seed: 7, timeline },
+    }
+  }
+
+  it('is refused with no prompt before anything is spawned or transcoded', async () => {
+    const { service, source, spawned } = harness()
+    service.grant(source)
+    const output = service.suggestOutput(source, 'Gyre')
+    if (!output.ok) throw new Error(output.reason)
+    for (const timeline of [[], [{ at_bar: 1, prompt: '  ' }]]) {
+      const result = await service.start(neuralRequest(source, output.value, timeline))
+      expect(result).toMatchObject({ ok: false, reason: expect.stringContaining('cannot start') })
+    }
+    expect(spawned).toEqual([])
+    expect(existsSync(`${output.value}.timeline.json`)).toBe(false)
+  })
+
+  it('is refused while the probe says no, with its reason', async () => {
+    const { service, source, spawned, noCuda } = harness()
+    noCuda()
+    service.grant(source)
+    const output = service.suggestOutput(source, 'Gyre')
+    if (!output.ok) throw new Error(output.reason)
+    const result = await service.start(neuralRequest(source, output.value, [{ at_bar: 1, prompt: 'a canyon' }]))
+    expect(result).toMatchObject({ ok: false, reason: expect.stringContaining('torch reports no CUDA') })
+    expect(spawned).toEqual([])
+  })
+
+  it('writes the grid and the timeline beside the output and splices the sidecar in', async () => {
+    const { service, source, spawned, script } = harness()
+    service.grant(source)
+    const output = service.suggestOutput(source, 'Gyre')
+    if (!output.ok) throw new Error(output.reason)
+    const timeline = [
+      { at_bar: 1, prompt: 'a vast canyon' },
+      { at_bar: 2, prompt: 'a rose window' },
+    ]
+    expect(await service.start(neuralRequest(source, output.value, timeline))).toEqual({ ok: true, value: null })
+
+    expect(JSON.parse(readFileSync(`${output.value}.timeline.json`, 'utf8'))).toEqual(timeline)
+    expect(readFileSync(`${output.value}.bars.json`, 'utf8')).toBe(GRID)
+    expect(spawned.map((s) => s.command)).toEqual(['/bin/ritmolux', '/venv/bin/python', '/bin/ffmpeg'])
+    expect(spawned[1].args).toEqual([
+      script,
+      '--profile',
+      'fast',
+      '--timeline',
+      `${output.value}.timeline.json`,
+      '--bar-grid',
+      `${output.value}.bars.json`,
+      '--negative',
+      'blurry',
+      '--seed',
+      '7',
+    ])
+  })
+
+  it('refuses a prompt past the grid the player counted', async () => {
+    const { service, source, spawned } = harness()
+    service.grant(source)
+    const output = service.suggestOutput(source, 'Gyre')
+    if (!output.ok) throw new Error(output.reason)
+    const result = await service.start(neuralRequest(source, output.value, [{ at_bar: 3, prompt: 'late' }]))
+    expect(result).toMatchObject({ ok: false, reason: expect.stringContaining('past the track') })
+    expect(spawned).toEqual([])
+  })
+})
+
+describe('the sidecar meter', () => {
+  it('counts from its lines and paces from the first one', () => {
+    let now = 0
+    const meter = new SidecarMeter(() => now)
+    expect(meter.read('sd-filter: stream 1920x1080 C444, 6220800 bytes/frame')).toBe(false)
+    expect(meter.reading()).toEqual({ frames: 0, secondsPerFrame: undefined })
+    now = 60_000
+    expect(meter.read('sd-filter: 10 frames')).toBe(true)
+    expect(meter.reading()).toEqual({ frames: 10, secondsPerFrame: undefined })
+    now = 100_000
+    meter.read('sd-filter: 20 frames')
+    expect(meter.reading()).toEqual({ frames: 20, secondsPerFrame: 4 })
   })
 })

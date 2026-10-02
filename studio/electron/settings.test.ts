@@ -158,6 +158,44 @@ describe('the render keys', () => {
   })
 })
 
+describe('the diffusion keys', () => {
+  it('are absent by default, and read key by key', () => {
+    expect(readSettings(withContent('{}')).render).toBeUndefined()
+    expect(
+      readSettings(
+        withContent('{"render":{"diffusion":{"python":"/venv/bin/python","script":7}}}'),
+      ).render,
+    ).toEqual({ diffusion: { python: '/venv/bin/python' } })
+    expect(readSettings(withContent('{"render":{"diffusion":"yes"}}')).render).toBeUndefined()
+  })
+
+  it('round-trip beside the other render keys, and clear one at a time', () => {
+    const file = withContent('{"render":{"ffmpegPath":"/opt/ffmpeg"}}')
+    writeSettings(
+      file,
+      withRender(readSettings(file), {
+        'diffusion.python': '/src/tools/sd-filter/.venv/bin/python',
+        'diffusion.script': '/src/tools/sd-filter/sd_filter.py',
+      }),
+    )
+    expect(readSettings(file).render).toEqual({
+      ffmpegPath: '/opt/ffmpeg',
+      diffusion: {
+        python: '/src/tools/sd-filter/.venv/bin/python',
+        script: '/src/tools/sd-filter/sd_filter.py',
+      },
+    })
+
+    writeSettings(file, withRender(readSettings(file), { 'diffusion.python': null }))
+    expect(readSettings(file).render).toEqual({
+      ffmpegPath: '/opt/ffmpeg',
+      diffusion: { script: '/src/tools/sd-filter/sd_filter.py' },
+    })
+    writeSettings(file, withRender(readSettings(file), { 'diffusion.script': '' }))
+    expect(readSettings(file).render).toEqual({ ffmpegPath: '/opt/ffmpeg' })
+  })
+})
+
 describe('whether the studio reduces its motion', () => {
   it('does not when nothing was ever chosen', () => {
     expect(reducedMotionOf({})).toBe(false)

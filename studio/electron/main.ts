@@ -132,6 +132,7 @@ function start(): void {
   const service = new RenderService({
     player: () => resolved?.path,
     ffmpeg: () => ffmpegOf(settings),
+    diffusion: () => settings.render?.diffusion,
     outputDir: () => outputDirOf(settings, app.getPath('videos')),
     cache,
     emit: renderEmitter(() => shown),

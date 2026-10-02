@@ -4,9 +4,10 @@
  * Built here and nowhere else, so the pipeline, the render log and the tests
  * read the same argument lists.
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 
-import { parseBarGrid, type BarGrid, type RenderRequest } from '@shared/render'
+import { parseBarGrid, type BarGrid, type NeuralRequest, type RenderRequest } from '@shared/render'
+import type { TimelineEntry } from '@shared/timeline'
 
 import type { RunTool } from './transcode'
 
@@ -80,6 +81,41 @@ export function playerRenderArgs(wav: string, request: RenderRequest): string[] 
     request.size,
     '--tier',
     request.tier,
+  ]
+}
+
+/**
+ * The two files a neural job writes beside its output before anything is
+ * spawned: the grid `--bars` counted, and the timeline verbatim.
+ */
+export function neuralFiles(output: string): { bars: string; timeline: string } {
+  return { bars: `${output}.bars.json`, timeline: `${output}.timeline.json` }
+}
+
+/** The timeline document `sd_filter.py --timeline` reads. */
+export function writeTimeline(path: string, timeline: TimelineEntry[]): void {
+  writeFileSync(path, `${JSON.stringify(timeline, null, 2)}\n`, 'utf8')
+}
+
+/**
+ * The sidecar: `<script> --profile <p> --timeline <t> --bar-grid <b>
+ * [--negative <n>] [--seed <s>]`, run by the configured interpreter.
+ */
+export function sidecarArgs(
+  script: string,
+  neural: NeuralRequest,
+  files: { bars: string; timeline: string },
+): string[] {
+  return [
+    script,
+    '--profile',
+    neural.profile,
+    '--timeline',
+    files.timeline,
+    '--bar-grid',
+    files.bars,
+    ...(neural.negative === null ? [] : ['--negative', neural.negative]),
+    ...(neural.seed === null ? [] : ['--seed', String(neural.seed)]),
   ]
 }
 

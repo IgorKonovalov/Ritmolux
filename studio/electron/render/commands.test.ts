@@ -9,7 +9,14 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { encoderArgs, ENCODER_CRF, playerRenderArgs, readBars } from './commands'
+import {
+  encoderArgs,
+  ENCODER_CRF,
+  neuralFiles,
+  playerRenderArgs,
+  readBars,
+  sidecarArgs,
+} from './commands'
 
 const RENDER_RS = join(__dirname, '..', '..', '..', 'standalone', 'src', 'shot', 'render.rs')
 
@@ -57,6 +64,7 @@ describe('the encode', () => {
         size: '1920x1080',
         tier: 'rich',
         output: '/v/c.mp4',
+        neural: null,
       }),
     ).toEqual([
       '--render',
@@ -70,6 +78,26 @@ describe('the encode', () => {
       '--tier',
       'rich',
     ])
+  })
+})
+
+describe('the sidecar', () => {
+  it('reads the two files beside the output, and passes negative and seed only when set', () => {
+    const files = neuralFiles('/v/c.mp4')
+    expect(files).toEqual({ bars: '/v/c.mp4.bars.json', timeline: '/v/c.mp4.timeline.json' })
+    const timeline = [{ at_bar: 1, prompt: 'a canyon' }]
+    expect(sidecarArgs('/src/sd_filter.py', { profile: 'quality', negative: null, seed: null, timeline }, files)).toEqual([
+      '/src/sd_filter.py',
+      '--profile',
+      'quality',
+      '--timeline',
+      '/v/c.mp4.timeline.json',
+      '--bar-grid',
+      '/v/c.mp4.bars.json',
+    ])
+    expect(
+      sidecarArgs('/s.py', { profile: 'fast', negative: 'blurry', seed: 0, timeline }, files).slice(-4),
+    ).toEqual(['--negative', 'blurry', '--seed', '0'])
   })
 })
 

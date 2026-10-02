@@ -17,7 +17,12 @@ import {
 } from 'electron'
 
 import { IPC_CHANNELS } from '@shared/ipc-channels'
-import type { RenderEvent, RenderResult } from '@shared/render'
+import {
+  RENDER_SETTING_KEYS,
+  type RenderEvent,
+  type RenderResult,
+  type RenderSettingKey,
+} from '@shared/render'
 
 import type { RenderService } from '../render/service'
 
@@ -45,8 +50,12 @@ export function stayAwake(): () => void {
 export function registerRenderHandlers(
   service: RenderService,
   window: () => BrowserWindow | undefined,
-  setRenderSettings: (next: Record<string, string | null>) => void,
+  setRenderSettings: (next: Partial<Record<RenderSettingKey, string | null>>) => void,
 ): void {
+  ipcMain.handle(IPC_CHANNELS.RENDER_PROBE, (_event, recheck: unknown) =>
+    service.probe(recheck === true),
+  )
+
   ipcMain.handle(IPC_CHANNELS.RENDER_PICK_AUDIO, async (): Promise<string | null> => {
     const parent = window()
     const options: OpenDialogOptions = {
@@ -102,17 +111,19 @@ export function registerRenderHandlers(
       if (typeof next !== 'object' || next === null || Array.isArray(next)) {
         return { ok: false, reason: 'the render settings are an object' }
       }
-      const known = ['ffmpegPath', 'outputDir']
-      const values: Record<string, string | null> = {}
+      const values: Partial<Record<RenderSettingKey, string | null>> = {}
       for (const [key, value] of Object.entries(next as Record<string, unknown>)) {
-        if (!known.includes(key)) return { ok: false, reason: `\`render.${key}\` is not a setting` }
+        const known = RENDER_SETTING_KEYS.find((name) => name === key)
+        if (known === undefined) return { ok: false, reason: `\`render.${key}\` is not a setting` }
         if (value !== null && typeof value !== 'string') {
           return { ok: false, reason: `\`render.${key}\` is a path` }
         }
-        values[key] = value
+        values[known] = value
       }
       try {
         setRenderSettings(values)
+        // A diffusion path that moved makes the last probe's answer stale.
+        if (Object.keys(values).some((key) => key.startsWith('diffusion.'))) service.forgetProbe()
         return { ok: true, value: null }
       } catch (error) {
         return { ok: false, reason: (error as Error).message }

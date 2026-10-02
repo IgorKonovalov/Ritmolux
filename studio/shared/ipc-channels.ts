@@ -92,6 +92,11 @@ export const IPC_CHANNELS = {
   RENDER_EVENT: 'render:event',
   /** Write the `render` key of the studio's settings file (ADR-0240). */
   RENDER_SET_SETTINGS: 'render:set-settings',
+  /**
+   * Whether the diffusion sidecar can run here: its script exists and its
+   * interpreter's torch sees CUDA. Cached for the session unless asked again.
+   */
+  RENDER_PROBE: 'render:probe',
 
   /** `shell.openExternal`, the only way a link leaves the window. */
   SHELL_OPEN_EXTERNAL: 'shell:open-external',

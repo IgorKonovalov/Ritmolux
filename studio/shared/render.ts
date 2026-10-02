@@ -24,7 +24,35 @@ export const DEFAULT_RENDER_TIER: RenderTier = 'rich'
 export interface RenderSettings {
   ffmpegPath?: string
   outputDir?: string
+  diffusion?: DiffusionSettings
 }
+
+/**
+ * The diffusion sidecar's two paths, both absent by default: it never ships,
+ * so the studio runs one only when it has been pointed at a checkout.
+ */
+export interface DiffusionSettings {
+  /** An interpreter whose environment has torch, such as a venv's `python`. */
+  python?: string
+  /** `tools/sd-filter/sd_filter.py` in a checkout. */
+  script?: string
+}
+
+/** The `render` keys a settings write may name, `diffusion.*` spelled dotted. */
+export const RENDER_SETTING_KEYS = [
+  'ffmpegPath',
+  'outputDir',
+  'diffusion.python',
+  'diffusion.script',
+] as const
+export type RenderSettingKey = (typeof RENDER_SETTING_KEYS)[number]
+
+/** The sidecar's two named profiles (`sd_filter.py --profile`). */
+export const DIFFUSION_PROFILES = ['fast', 'quality'] as const
+export type DiffusionProfile = (typeof DIFFUSION_PROFILES)[number]
+
+/** Whether the sidecar can run here, from the probe main runs. */
+export type ProbeResult = { ready: true } | { ready: false; reason: string }
 
 /**
  * A rate as the player's `--fps` reads it: a whole number, or an exact
@@ -37,6 +65,18 @@ export const fpsSchema = z
 /** A frame size as `--size` reads it. */
 export const sizeSchema = z.string().regex(/^[1-9]\d*x[1-9]\d*$/, 'a size is WxH, such as 1920x1080')
 
+/**
+ * The neural half of a job: the sidecar's profile, its optional negative prompt
+ * and seed (`null` is the sidecar's own default), and the prompt timeline.
+ */
+export const neuralSchema = z.object({
+  profile: z.enum(DIFFUSION_PROFILES),
+  negative: z.string().nullable(),
+  seed: z.number().int().nonnegative().nullable(),
+  timeline: z.array(z.object({ at_bar: z.number().int(), prompt: z.string() }).strict()),
+})
+export type NeuralRequest = z.infer<typeof neuralSchema>
+
 /** What Start sends: one clip, fully described. Validated in main. */
 export const renderRequestSchema = z.object({
   source: z.string().min(1),
@@ -45,6 +85,8 @@ export const renderRequestSchema = z.object({
   size: sizeSchema,
   tier: z.enum(RENDER_TIERS),
   output: z.string().min(1),
+  /** `null` when the neural switch is off. */
+  neural: neuralSchema.nullable(),
 })
 export type RenderRequest = z.infer<typeof renderRequestSchema>
 
@@ -113,10 +155,23 @@ export type RenderStage = 'player' | 'sidecar' | 'encoder'
 /** What main pushes while a job runs, and once when it ends. */
 export type RenderEvent =
   | { kind: 'started'; output: string; frames: number }
-  | { kind: 'progress'; frame: number; frames: number; elapsedMs: number }
+  | {
+      kind: 'progress'
+      frame: number
+      frames: number
+      elapsedMs: number
+      /** The sidecar's own count and pace, from its stderr, when it is in the chain. */
+      sidecar?: SidecarPace
+    }
   | { kind: 'done'; output: string }
   | { kind: 'cancelled' }
   | { kind: 'failed'; stage: RenderStage; reason: string; log: string | undefined; tail: string[] }
+
+/** Frames the sidecar has emitted, and the seconds each took since its first report. */
+export interface SidecarPace {
+  frames: number
+  secondsPerFrame: number | undefined
+}
 
 /** The answer every render call resolves to: never a rejection. */
 export type RenderResult<T> = { ok: true; value: T } | { ok: false; reason: string }

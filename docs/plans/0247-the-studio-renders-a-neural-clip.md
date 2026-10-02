@@ -266,8 +266,8 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 |---|---|---|---|
 | 1 — The player renders and reports bars | dev | done | committed with this row |
 | 2 — A plain clip from the studio | studio-builder | done | `8d8f2547` |
-| 3 — The strip and the prompts | studio-builder | done | committed with this row |
-| 4 — The neural toggle | studio-builder | not started | |
+| 3 — The strip and the prompts | studio-builder | done | `8fcef278` |
+| 4 — The neural toggle | studio-builder | done | committed with this row |
 | 5 — The job is a file, and the docs say so | studio-builder | not started | |
 | 6 — A real neural clip, judged | human | not started | |
 
@@ -322,6 +322,26 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 - Phase 3, a marker dropped on a bar that already holds a prompt stays where it was, because two
   prompts on one bar is a timeline the sidecar refuses. A prompt the grid ends before after a new
   rate is drawn dotted at the end of the strip, and the validator line under it names the bar.
+- Phase 4, outside the file list: `studio/shared/render.ts` (the neural request, the probe result,
+  the sidecar pace), `studio/shared/ipc-channels.ts` (a ninth OS channel, `render:probe`),
+  `studio/electron/ipc/renderHandlers.ts` and `preload/api/render.ts`, `render/commands.ts`,
+  `studio/electron/main.ts`, `Render.module.css`, `studio/README.md` (the `render` row gains
+  `diffusion`), and the tests beside them, `Render.test.tsx` among them.
+- Phase 4, the plan's claim that the passthrough run proves the loaders is wrong in detail:
+  `sd_filter.py --passthrough` skips `resolve()` and never calls `load_timeline`, so it accepts
+  `--timeline` without reading it. `pipeline.integration.test.ts` therefore also runs the
+  sidecar's own `load_timeline` and `load_bar_grid` over the two files before the pipeline does.
+- Phase 4, the integration test ran here and did not skip: the debug player, `python3` and
+  `ffmpeg` on this machine, 60 frames at 30 fps and 160x90. `--bars` counted 60, and an `ffmpeg`
+  decode of the MP4 counted 60.
+- Phase 4, the probe checks in this order: the script key, the script file, the interpreter
+  key, then `<python> -c "import torch; print(torch.cuda.is_available())"`. Its answer is cached
+  for the session, asked again by the view's re-check, and dropped when a `diffusion.*` key is
+  written. The two files beside the output are written for a neural job only. A plain job keeps
+  its grid in the session cache, because it has no reader for one.
+- Phase 4, the sidecar's figure is its `sd-filter: N frames` line, printed every ten frames. The
+  view shows that count and the seconds per frame since the first such line, so the model load
+  is not averaged in.
 
 ### Close triggers
 

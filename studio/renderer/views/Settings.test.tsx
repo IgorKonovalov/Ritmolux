@@ -182,6 +182,15 @@ describe('the render paths', () => {
     })
     expect(setSettings).toHaveBeenLastCalledWith({ ffmpegPath: null })
     expect(ffmpeg.value).toBe('')
+
+    // The diffusion paths are the nested keys, written by their dotted names.
+    const python = screen.getByLabelText('diffusion python') as HTMLInputElement
+    expect(python.placeholder).toMatch(/no neural renders/)
+    fireEvent.change(python, { target: { value: '/venv/bin/python' } })
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: 'save' })[2])
+    })
+    expect(setSettings).toHaveBeenLastCalledWith({ 'diffusion.python': '/venv/bin/python' })
   })
 })
 

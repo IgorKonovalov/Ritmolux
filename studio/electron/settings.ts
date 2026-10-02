@@ -12,7 +12,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 import { DEFAULT_PLAYER_MODE, isPlayerMode, type PlayerMode } from '@shared/player-mode'
-import type { RenderSettings } from '@shared/render'
+import type { DiffusionSettings, RenderSettingKey, RenderSettings } from '@shared/render'
 
 export interface StudioSettings {
   /** An explicit player binary, second in ADR-0178's resolution order. */
@@ -61,7 +61,21 @@ function readRender(value: unknown): RenderSettings | undefined {
   if (ffmpegPath !== undefined) render.ffmpegPath = ffmpegPath
   const outputDir = pathValue(record.outputDir)
   if (outputDir !== undefined) render.outputDir = outputDir
+  const diffusion = readDiffusion(record.diffusion)
+  if (diffusion !== undefined) render.diffusion = diffusion
   return Object.keys(render).length === 0 ? undefined : render
+}
+
+/** `render.diffusion`, kept key by key the same way. */
+function readDiffusion(value: unknown): DiffusionSettings | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  const diffusion: DiffusionSettings = {}
+  const python = pathValue(record.python)
+  if (python !== undefined) diffusion.python = python
+  const script = pathValue(record.script)
+  if (script !== undefined) diffusion.script = script
+  return Object.keys(diffusion).length === 0 ? undefined : diffusion
 }
 
 /** The `ffmpeg` a render runs — the one place its default is applied. */
@@ -77,16 +91,22 @@ export function outputDirOf(settings: StudioSettings, videos: string): string {
 /**
  * `next` merged onto the `render` key of `settings`, with an empty or `null`
  * value removing its key: clearing a field in the panel means "the default".
+ * A `diffusion.*` key names the nested object's field.
  */
 export function withRender(
   settings: StudioSettings,
-  next: Record<string, string | null>,
+  next: Partial<Record<RenderSettingKey, string | null>>,
 ): StudioSettings {
   const merged: Record<string, unknown> = { ...settings.render }
+  const diffusion: Record<string, unknown> = { ...settings.render?.diffusion }
   for (const [key, value] of Object.entries(next)) {
-    if (value === null || value.trim() === '') delete merged[key]
-    else merged[key] = value
+    const [target, field] = key.startsWith('diffusion.')
+      ? [diffusion, key.slice('diffusion.'.length)]
+      : [merged, key]
+    if (value === null || value === undefined || value.trim() === '') delete target[field]
+    else target[field] = value
   }
+  merged.diffusion = diffusion
   const render = readRender(merged)
   const rest: StudioSettings = { ...settings }
   delete rest.render

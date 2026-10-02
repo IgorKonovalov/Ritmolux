@@ -14,7 +14,7 @@
 import { useState } from 'react'
 
 import { PLAYER_MODES, type PlayerMode } from '@shared/player-mode'
-import type { RenderSettings } from '@shared/render'
+import type { RenderSettingKey, RenderSettings } from '@shared/render'
 
 import styles from './Settings.module.css'
 
@@ -34,10 +34,26 @@ export interface SettingsProps {
 }
 
 /** The `render` keys the panel edits, each a path, and what absent means. */
-const RENDER_FIELDS: { key: keyof RenderSettings; label: string; absent: string }[] = [
+const RENDER_FIELDS: { key: RenderSettingKey; label: string; absent: string }[] = [
   { key: 'ffmpegPath', label: 'ffmpeg', absent: 'ffmpeg on PATH' },
   { key: 'outputDir', label: 'output folder', absent: 'your Videos folder' },
+  { key: 'diffusion.python', label: 'diffusion python', absent: 'not set: no neural renders' },
+  { key: 'diffusion.script', label: 'diffusion script', absent: 'not set: no neural renders' },
 ]
+
+/** One key's value as the settings file holds it, `diffusion.*` read nested. */
+function fileValue(render: RenderSettings, key: RenderSettingKey): string | undefined {
+  switch (key) {
+    case 'ffmpegPath':
+      return render.ffmpegPath
+    case 'outputDir':
+      return render.outputDir
+    case 'diffusion.python':
+      return render.diffusion?.python
+    case 'diffusion.script':
+      return render.diffusion?.script
+  }
+}
 
 const WHAT_IT_DOES: Record<PlayerMode, string> = {
   windowed:
@@ -169,14 +185,15 @@ export function Settings({
  */
 function RenderGroup({ render }: { render: RenderSettings }): JSX.Element {
   /** What each field holds now, starting from the file; `undefined` while untouched. */
-  const [drafts, setDrafts] = useState<Partial<Record<keyof RenderSettings, string>>>({})
-  const [saved, setSaved] = useState<Partial<RenderSettings>>({})
+  const [drafts, setDrafts] = useState<Partial<Record<RenderSettingKey, string>>>({})
+  /** What the file took this session; an `undefined` value is a cleared key. */
+  const [saved, setSaved] = useState<Partial<Record<RenderSettingKey, string | undefined>>>({})
   const [problem, setProblem] = useState<string>()
 
-  const value = (key: keyof RenderSettings): string =>
-    drafts[key] ?? (key in saved ? (saved[key] ?? '') : (render[key] ?? ''))
+  const value = (key: RenderSettingKey): string =>
+    drafts[key] ?? (key in saved ? (saved[key] ?? '') : (fileValue(render, key) ?? ''))
 
-  const save = (key: keyof RenderSettings): void => {
+  const save = (key: RenderSettingKey): void => {
     const next = value(key).trim()
     void window.api.render.setSettings({ [key]: next === '' ? null : next }).then((result) => {
       setProblem(result.ok ? undefined : result.reason)
@@ -206,8 +223,10 @@ function RenderGroup({ render }: { render: RenderSettings }): JSX.Element {
         </div>
       ))}
       <p className={styles.note}>
-        Saved as <code>render.ffmpegPath</code> and <code>render.outputDir</code>, and used by the
-        next render. Empty means the placeholder.
+        Saved under <code>render</code> in the settings file and used by the next render. Empty
+        means the placeholder. The two diffusion paths point at a checkout&apos;s{' '}
+        <code>tools/sd-filter/sd_filter.py</code> and a venv with torch; the neural switch stays off
+        until both are set and torch sees a CUDA device.
       </p>
       {problem !== undefined && (
         <p className={styles.problem} role="alert">

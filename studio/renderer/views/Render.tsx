@@ -16,14 +16,18 @@ import {
   DEFAULT_RENDER_FPS,
   DEFAULT_RENDER_SIZE,
   DEFAULT_RENDER_TIER,
+  DIFFUSION_PROFILES,
   etaSeconds,
   formatDuration,
   fpsSchema,
   RENDER_TIERS,
   sizeSchema,
+  type DiffusionProfile,
   type PreparedTrack,
+  type ProbeResult,
   type RenderEvent,
   type RenderTier,
+  type SidecarPace,
 } from '@shared/render'
 import { timelineProblem, type TimelineEntry } from '@shared/timeline'
 
@@ -47,7 +51,14 @@ export interface RenderProps {
 type JobState =
   | { kind: 'idle' }
   | { kind: 'starting' }
-  | { kind: 'running'; output: string; frame: number; frames: number; elapsedMs: number }
+  | {
+      kind: 'running'
+      output: string
+      frame: number
+      frames: number
+      elapsedMs: number
+      sidecar?: SidecarPace
+    }
   | { kind: 'done'; output: string }
   | { kind: 'cancelled' }
   | Extract<RenderEvent, { kind: 'failed' }>
@@ -73,8 +84,16 @@ export function Render({ roster, active, hidden, onClose }: RenderProps): JSX.El
    * numbers; a prompt the new grid ends before is flagged, not moved.
    */
   const [timeline, setTimeline] = useState<TimelineEntry[]>(FIRST_PROMPT)
+  /** The sidecar probe's answer, asked once the view is first opened. */
+  const [probe, setProbe] = useState<ProbeResult>()
+  const [neural, setNeural] = useState(false)
+  const [profile, setProfile] = useState<DiffusionProfile>('fast')
+  const [negative, setNegative] = useState('')
+  const [seed, setSeed] = useState('')
 
   const preset = picked ?? active ?? roster[0]
+  const neuralOn = neural && probe?.ready === true
+  const seedValid = seed.trim() === '' || /^\d+$/.test(seed.trim())
   const output = chosenOutput ?? suggested
   const fpsValid = fpsSchema.safeParse(fps).success
   const sizeValid = sizeSchema.safeParse(size).success
@@ -90,7 +109,13 @@ export function Render({ roster, active, hidden, onClose }: RenderProps): JSX.El
           case 'progress':
             setJob((previous) =>
               previous.kind === 'running'
-                ? { ...previous, frame: event.frame, frames: event.frames, elapsedMs: event.elapsedMs }
+                ? {
+                    ...previous,
+                    frame: event.frame,
+                    frames: event.frames,
+                    elapsedMs: event.elapsedMs,
+                    sidecar: event.sidecar,
+                  }
                 : previous,
             )
             break
@@ -100,6 +125,14 @@ export function Render({ roster, active, hidden, onClose }: RenderProps): JSX.El
       }),
     [],
   )
+
+  // Asked when the view first opens, not at launch: the probe starts an
+  // interpreter that imports torch, which costs seconds nobody rendering pays.
+  const probed = probe !== undefined
+  useEffect(() => {
+    if (hidden || probed) return
+    void window.api.render.probe(false).then(setProbe)
+  }, [hidden, probed])
 
   // The grid is counted at a rate, so a new rate is a new `--bars`.
   useEffect(() => {
@@ -153,17 +186,40 @@ export function Render({ roster, active, hidden, onClose }: RenderProps): JSX.El
     if (source === undefined || preset === undefined || output === undefined) return
     setProblem(undefined)
     setJob({ kind: 'starting' })
-    void window.api.render.start({ source, preset, fps, size, tier, output }).then((result) => {
+    const request = {
+      source,
+      preset,
+      fps,
+      size,
+      tier,
+      output,
+      neural: neuralOn
+        ? {
+            profile,
+            negative: negative.trim() === '' ? null : negative.trim(),
+            seed: seed.trim() === '' ? null : Number(seed.trim()),
+            timeline,
+          }
+        : null,
+    }
+    void window.api.render.start(request).then((result) => {
       if (result.ok) return
       setJob({ kind: 'idle' })
       setProblem(result.reason)
     })
   }
 
-  const ready =
-    track !== undefined && preset !== undefined && output !== undefined && fpsValid && sizeValid
   const timelineIssue =
     track === undefined ? undefined : timelineProblem(timeline, track.grid.bar_starts.length)
+  // A neural job with no usable prompt is refused here, and again in main
+  // before anything is spawned.
+  const ready =
+    track !== undefined &&
+    preset !== undefined &&
+    output !== undefined &&
+    fpsValid &&
+    sizeValid &&
+    (!neuralOn || (timelineIssue === undefined && seedValid))
 
   return (
     <section className={styles.panel} aria-label="Render a clip" hidden={hidden}>
@@ -243,6 +299,77 @@ export function Render({ roster, active, hidden, onClose }: RenderProps): JSX.El
         </label>
       </div>
 
+      <fieldset className={styles.neural}>
+        <legend className={styles.legend}>
+          <label className={styles.switch}>
+            <input
+              type="checkbox"
+              checked={neuralOn}
+              disabled={running || probe?.ready !== true}
+              onChange={(event) => setNeural(event.target.checked)}
+            />
+            neural
+          </label>
+        </legend>
+        <div className={styles.row}>
+          <span className={probe?.ready === false ? styles.problem : styles.note}>
+            {probe === undefined
+              ? 'Checking whether the diffusion sidecar can run…'
+              : probe.ready
+                ? 'The diffusion sidecar is ready: torch sees a CUDA device.'
+                : probe.reason}
+          </span>
+          <button
+            type="button"
+            className={styles.quiet}
+            disabled={running}
+            onClick={() => {
+              setProbe(undefined)
+              void window.api.render.probe(true).then(setProbe)
+            }}
+          >
+            re-check
+          </button>
+        </div>
+        {neuralOn && (
+          <div className={styles.fields}>
+            <label className={styles.field}>
+              <span>profile</span>
+              <select
+                value={profile}
+                onChange={(event) => setProfile(event.target.value as DiffusionProfile)}
+                disabled={running}
+              >
+                {DIFFUSION_PROFILES.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.field}>
+              <span>negative prompt</span>
+              <input
+                value={negative}
+                placeholder="the sidecar's default"
+                onChange={(event) => setNegative(event.target.value)}
+                disabled={running}
+              />
+            </label>
+            <label className={styles.field}>
+              <span>seed</span>
+              <input
+                value={seed}
+                placeholder="the sidecar's default"
+                aria-invalid={!seedValid}
+                onChange={(event) => setSeed(event.target.value)}
+                disabled={running}
+              />
+            </label>
+          </div>
+        )}
+      </fieldset>
+
       <div className={styles.row}>
         <button
           type="button"
@@ -294,9 +421,17 @@ function JobLine({ job }: { job: JobState }): JSX.Element | null {
         <div className={styles.progress}>
           <progress value={job.frame} max={job.frames} aria-label="render progress" />
           <span className={styles.note}>
-            {job.frame} / {job.frames} frames
+            {job.frame} / {job.frames} frames encoded
             {eta === undefined ? '' : ` · ${formatDuration(eta)} left`} · {fileName(job.output)}
           </span>
+          {job.sidecar !== undefined && (
+            <span className={styles.note}>
+              sidecar: {job.sidecar.frames} frames
+              {job.sidecar.secondsPerFrame === undefined
+                ? ''
+                : ` · ${job.sidecar.secondsPerFrame.toFixed(2)} s per frame`}
+            </span>
+          )}
         </div>
       )
     }
