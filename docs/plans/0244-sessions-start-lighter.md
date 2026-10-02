@@ -1,6 +1,6 @@
 # 0244 — Sessions start lighter: standing context moves to where it is read on demand
 
-> **Status:** approved (2026-10-01). Runs after Plan 0242 closes (both edit the architect skill).
+> **Status:** in-progress (approved 2026-10-01). Runs after Plan 0242 closes (both edit the architect skill).
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md), [ADR-0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
@@ -178,14 +178,30 @@ flowchart LR
 
 ## Implementation log
 
-**Lane:**
+**Lane:** `plan-0244-sessions-start-lighter`, worktree `/home/igor/Work/rlx-plan-0244`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `CLAUDE.md` becomes an orientation map | dev | not started | |
+| 1 — `CLAUDE.md` becomes an orientation map | dev | parked: size done-when red, CLAUDE.md 26606 bytes against 25000 (Notes) | |
 | 2 — The plans index keeps only the recent closes | dev | not started | |
 | 3 — The architect skill loads its review and close on demand | human | not started | |
 
 ### Notes
+
+- **Phase 1, size done-when red.** All four moves are made and every other Phase 1 done-when exits
+  0 (`check-doc-links`, `toc --check`, `check-system-counts`, `check-reader-prose`; `check-gate-carriers`
+  is in `scripts/README.md`, `rust-lld` in `docs/developing.md`). `CLAUDE.md` measures 26606 bytes.
+  Per section after the moves: "Where things live" 10.5 KB of which the `docs/` map is about 0.8 KB
+  and the `scripts/` pointer about 0.3 KB; "How we work" 5.9 KB; non-negotiables 4.3 KB; the rest
+  under 2 KB each. Removing the `docs/` map and the setup pointer entirely would still leave about
+  25.4 KB, so 25000 is reachable only by trimming entries or sections the four moves do not name
+  (the `site/`, `packaging/`, `studio/`, `tools/conductor/`, `.claude/hooks/` entries, or "How we
+  work"), which is a choice of what the always-loaded file keeps.
+- **`docs/README.md` does not exist.** The "Repository layout" the plan names is in the root
+  `README.md`, which is what the `CLAUDE.md` `docs/` entry already pointed at; the layout row for
+  `scripts/README.md` went there.
+- **The moved Linux paragraph.** `docs/developing.md` already had *No linker override on Linux*
+  with its own `mold` figures, so the moved "Windows-only" paragraph keeps its first sentence and
+  refers to that one rather than restating the measurement.
 
 ### Close triggers

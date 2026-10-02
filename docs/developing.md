@@ -99,6 +99,70 @@ named after the `"name"` in `studio/package.json`, so it is lowercase, unlike th
 binary in about 200 ms. `mold` 2.42 saves about 15 ms of that, and makes no measurable difference to
 a cold rebuild of `rlx-core`'s tests, so no machine-local config file is suggested.
 
+### Machine setup: the linker override (opt-in, and inert if skipped)
+
+**Every worktree compiles into its own `target/`.** The one machine-local override is the MSVC
+linker, and it lives in a file one directory *above* the worktrees — `WORK/.cargo/config.toml`,
+beside `ritmolux/` rather than inside it — so cargo's ancestor walk finds it from
+whichever lane is building and a new lane needs no setup of its own:
+
+```toml
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"
+```
+
+That is the whole file. `rust-lld.exe` is not on `PATH` and still resolves — rustc finds it in its
+own sysroot, so no explicit path and no linker-flavor flag are needed. It took the cold path to
+every test binary from 171 s to 145 s while moving no golden (ADR-0141's `Outcome`, which stands).
+
+**The override is Windows-only.** A Linux checkout has no `WORK/.cargo/config.toml` and currently
+needs none: since Rust 1.90, `x86_64-unknown-linux-gnu` already links with the bundled `rust-lld`
+by default, and the paragraph above, *No linker override on Linux*, has what `mold` was measured
+against it.
+
+**It is never committed, and it cannot be.** The macOS arm has a different linker story, and
+reaching `rust-lld` any other way means naming a sysroot path specific to one machine. Like
+`git config core.hooksPath .githooks`
+([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)), this is
+**opt-in per machine and inert when skipped** — a machine without the file builds correctly, just
+with the default linker.
+
+**There is no shared artifact store, and a `[build] target-dir` redirect must not go back in this
+file.** [ADR-0141](adrs/0141-one-artifact-store-serves-every-lane.md) pointed every worktree at
+one store; [ADR-0147](adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
+revoked that half, because **the worktree path is not in cargo's fingerprint** — two lanes with the
+same layout and dependency graph are indistinguishable, so one lane is served the other's compiled
+`rlx-core` as fresh. Plan 0115's lane hit `no method named open_tap found for struct Renderer`
+against committed source that defines it. The failure is silent, it is not a cache miss, and no gate
+catches it. The linker half above is not implicated and stays.
+
+The cost that comes back with the revocation is disk, and it is not gated:
+
+- **[ADR-0053](adrs/0053-plan-lanes-run-in-git-worktrees.md)'s *"disk cost is severe and
+  recurring"* is live again.** One lane held ~8 GB in `target/debug/incremental` and filled the
+  disk mid-session. **Remove a finished lane's worktree** — on Windows `git worktree remove` fails
+  with `Permission denied` while any shell still has its working directory inside it. The
+  [Disk](#disk) section below is what to do short of removing one.
+
+### Dependencies compile with no debug info (committed, unlike the override above)
+
+`[profile.dev.package."*"]` in the root `Cargo.toml` carries `debug = 0`, so **every dependency —
+wgpu, naga, winit, windows-rs — compiles with no debug info at all**, while every workspace crate
+keeps `profile.dev`'s `line-tables-only`. Unlike the linker override this is **committed and applies
+to every clone**: it names nothing machine-specific, and a build profile that silently differs
+between two checkouts is the hazard ADR-0147 exists to end.
+
+**What it costs you: a backtrace frame inside one of those crates carries no line number.** A wgpu
+validation failure is normally diagnosed from its message rather than from a backtrace line, which
+is what makes that affordable — and on the day it is not, **delete the `debug = 0` line and
+rebuild**. That buys the line numbers back at the price of a full rebuild of the dependency graph at
+`opt-level = 2` — 87 s on the reference machine, and the same again when the line goes back. Do not
+commit the deletion.
+
+Why the line is there: MSVC emits a separate `.pdb` per linked target and packs no split debuginfo,
+so the dependency graph's line tables are duplicated into every one of the workspace's test
+binaries — 25.5 MB per binary, measured, which the setting stops emitting. ADR-0165.
+
 ## Editing presets in VS Code
 
 Install **Even Better TOML** (`tamasfe.even-better-toml`). That is the whole setup: a committed
