@@ -210,81 +210,42 @@ struct Ring {
 
 ### Notes
 
-- Phase 1: `downsample` and `curve_level` were already `pub(crate)`. The new shared step is
-  `shape_and_ease` in `spectrum.rs`, which `spectrum`'s `update` now calls; `CURVE_MIN` and
-  `CURVE_MAX` became `pub(crate)` so the waterfall's `curve` spec shares their range.
-- Phase 1 adds surface the plan's param list does not name: `curve` (so the shared `curve_level`
-  step has a lever), `zoom`, `pan_x` and `pan_y` (the camera block's frame takes them, as on the
-  plexus), and a `smoothing` key in `[waterfall]` (so the shared easing step has a constant). The
-  palette set is `saturation`, `palette_mix` and `palette_steps`, as on the plexus.
-- Phase 1, the risk on a long `row_period`: the front row is the live eased level, drawn every
-  frame at depth 0; a pushed row is born on it and fades in over its first period (`alpha = frac`),
-  and the oldest row of a full ring fades out over its last. So `rows` counts the live row, and the
-  ring holds `rows - 1`. Decided from `shot` renders of the fixture, not live.
-- Phase 1: "cleared on `configure` and `resize`" is read as the scene's own buffer-sizing step, as
-  `spectrum`'s `resize` is. A render-target resize does not clear the ring.
-- Phase 1: the 60/144 Hz test runs at `row_period = 5/12` s, a whole number of frames at both
-  rates, with the band array held over 1/12 s windows. A period that is not a whole number of
-  frames at both rates pushes at different instants on the two rates and samples different levels;
-  that is the push cadence's nature, not a tolerance. Two seconds is 4.8 periods, so the compared
-  offset is 0.8 of a row, not zero.
-- Phase 1: `rows` past `seg3d_segments / (elements - 1)` is clamped silently here; Phase 2
-  announces it.
-- Phase 1 touched files outside its list, because the build or a gate needs them:
-  `core/src/preset/schema/raw/preset.rs` (the `[waterfall]` field and key in the root and
-  `[layer]`), `core/src/preset/schema/export.rs` (`TABLES`), `core/src/preset/schema/tests.rs`
-  (descriptor pairs), `core/src/render/mod.rs` (`active_family_key`). It regenerates
-  `presets/README.md`, `presets/schema/`, `presets/preset.schema.json`, `.taplo.toml` and
-  `docs/specs/player-schema.json`, because the generated-file tests fail otherwise. And
-  `hygiene::every_system_has_a_gallery_image` needs a gallery picture, so it adds the teaching
-  preset `docs/examples/waterfall/landscape.toml`, its `scripts/docs-shots.mjs` entry, and
-  `docs/images/gallery/waterfall.png`, rendered on RADV with that entry's exact `shot` command.
-- Phase 1's `shot` check: `shot --preset-file core/tests/fixtures/waterfall.toml --signal
-  dynamic:110 --size 640x360` drew the landscape changing across the filmstrip.
-- Phase 1's spectrum check: `core/tests/golden/spectrum*.png` and the spectrum fixtures are not
-  touched. The `spectrum` golden reads mean 0.0000, outlier 1 on llvmpipe; WARP was not run.
-- Phase 1 adds the rostered golden fixture `core/tests/fixtures/waterfall.toml` but no baseline;
-  `golden` fails on the missing `waterfall.png` until Phase 2 writes it.
-- Phase 2's cost probe: `shot --report family=waterfall --tier floor --presets <dir> --size
-  1920x1080`, release profile, on AMD Radeon Graphics (RADV RENOIR) iGPU, Mesa 26.2.2, all four in
-  one run. Scratch presets under `target/waterfall-cost/`: `elements 64`, `rows 126` (Floor's
-  clamp), `line_width 8`, `fade 0`, `aperture 0` against `aperture 40` (past the 12 px cap).
-  Long near rows (`pitch 0.15`, `distance 1.5`, `focus 1`): 0.690 ms sharp, 0.821 ms blurred, ratio
-  1.19. Horizon pile-up (`pitch 0.02`, `focus 0`): 0.911 ms sharp, 1.407 ms blurred, ratio 1.54.
-  NFR section 1's budget is 16.67 ms. The ladder stopped before its first rung; nothing was culled
-  and no cap moved. 960x540 renders of the two blurred probes show the near rows filling the frame
-  edge to edge and the far rows piled into a band above the horizon.
-- Phase 2 announces the row clamp through a new `OverflowContext::Rows(asked, segments per row)`,
-  with its onset and recovery sentences and Rich's `seg3d_segments` in `top_tier_lifts`. That is an
-  edit to `core/src/render/scenes/mod.rs`, outside the phase list; no existing context words a row
-  count. The `CapOverflow`'s `cap` stays in segments so the Rich remedy compares like with like;
-  the sentences derive the rows kept from it.
+- **Files outside the phase lists**, each needed by the build or a gate: Phase 1 touched
+  `core/src/preset/schema/raw/preset.rs`, `schema/export.rs`, `schema/tests.rs` and
+  `core/src/render/mod.rs`, regenerated `presets/README.md`, `presets/schema/`,
+  `presets/preset.schema.json`, `.taplo.toml` and `docs/specs/player-schema.json`, and added the
+  teaching preset `docs/examples/waterfall/landscape.toml`, its `scripts/docs-shots.mjs` entry and
+  `docs/images/gallery/waterfall.png` (RADV) for `hygiene::every_system_has_a_gallery_image`.
+  Phase 2 added `OverflowContext::Rows` in `core/src/render/scenes/mod.rs`.
+- Phase 1: the shared step is `shape_and_ease` in `spectrum.rs`; `downsample` and `curve_level`
+  were already `pub(crate)`, and `CURVE_MIN`/`CURVE_MAX` became so. Unlisted surface: `curve`,
+  `zoom`, `pan_x`, `pan_y` and a `[waterfall] smoothing` key, which the shared helpers and the
+  camera block's frame take; the palette set is the plexus's.
+- Phase 1, the long-`row_period` risk: the front row is the live eased level at depth 0; a pushed
+  row fades in over its first period (`alpha = frac`) and the oldest fades out over its last, so the
+  ring holds `rows - 1`. Decided from `shot` renders, not live. A render-target resize does not
+  clear the ring; "cleared on `resize`" is read as the scene's buffer-sizing step.
+- Phase 1's 60/144 Hz test runs at `row_period = 5/12` s, a whole number of frames at both rates,
+  with input held over 1/12 s windows; any other period samples different instants. The compared
+  offset is 0.8 of a row. `shot --signal dynamic:110` drew the landscape changing; the `spectrum`
+  golden and fixtures are untouched (llvmpipe mean 0.0000).
+- Phase 2's cost probe: `shot --report family=waterfall --tier floor --size 1920x1080`, release,
+  RADV RENOIR iGPU (Mesa 26.2.2), one run, `rows 126`, `elements 64`, `aperture 0` against `40`.
+  Long near rows (`pitch 0.15`): 0.690 ms sharp, 0.821 ms blurred, ratio 1.19. Horizon pile-up
+  (`pitch 0.02`): 0.911 ms, 1.407 ms, ratio 1.54. Inside NFR section 1's 16.67 ms; the ladder
+  stopped before rung 1.
 - Phase 2's branch finding: a full ring under constant input reads silent 0.0000, driven 0.3883,
-  so it passes on the driven branch, `spectrum`'s case. The golden fixture itself passes on the
-  silent branch (silent 0.1092, driven 0.4235), because its 23-row ring is still filling between
-  frames 24 and 48 and the flat rows it adds read as motion. A shipped preset with a ring that
-  fills slower than 0.4 s would pass the same way. `the_waterfall_passes_on_the_driven_branch_once_its_ring_is_full`
-  pins both readings. Reactivity on the fixture: bass 0.0236, mid 0.0154, treb 0.0081, onset 0.0254.
-- Phase 2's goldens, `waterfall.png` (the roster's, under the one constant frame) and
-  `waterfall_ramp.png` (its own test, `fixed_frame_spectrum()` scaled by a 0.2-to-1 per-frame ramp
-  through `capture_stream`), were written on llvmpipe, not WARP, through an uncommitted local change
-  to `golden.rs` that wrote only a missing baseline, as Plans 0235 and 0236 did. It was reverted
-  before the commit; no existing baseline was rewritten. Both read mean 0.0000, outlier 0 on
-  llvmpipe afterwards. Windows CI's golden job is their first WARP reading, and the first WARP
-  reading of the roster captures after `waterfall`, which now builds a `seg3d` renderer.
-- Phase 2: `animation`, `reactivity`, `sanity` and `distinctness` were run on the waterfall's
-  entries and on every non-batch test of the last two, not on the shipped-library batch sweeps;
-  the system ships no preset, so the sweeps hold none of it. The full sweeps are the pre-review
-  gate's.
-
-- Phase 3 was done by an interactive session at the owner's request, after the conductor parked the
-  plan `claude_dir` on `.claude/skills/preset-author/references/systems.md`. Its regeneration step
-  changed nothing in the params block or `presets/schema/`, which Phases 1 and 2 had kept current;
-  `node scripts/toc.mjs` did add the missing `waterfall` row to `presets/README.md`'s contents block.
-- Phase 3's guide picture is the gallery image Phase 1 already rendered,
-  `docs/images/gallery/waterfall.png`, so `docs/images/` is not touched.
-- Phase 3's `systems.md` ranges come from the teaching preset, the golden fixture and Phase 2's cost
-  probes, because no waterfall preset ships yet. The section says so.
+  `spectrum`'s case; the golden fixture's still-filling 23-row ring passes on the silent branch
+  (0.1092). `the_waterfall_passes_on_the_driven_branch_once_its_ring_is_full` pins both. Reactivity
+  on the fixture: bass 0.0236, mid 0.0154, treb 0.0081, onset 0.0254.
+- Phase 2's goldens `waterfall.png` and `waterfall_ramp.png` were written on llvmpipe through a
+  reverted local missing-baseline-only change, as Plans 0235 and 0236 did; Windows CI's golden job
+  is their first WARP reading. The four gates ran on the waterfall's entries; the shipped-library
+  sweeps hold no waterfall preset and were the pre-review gate's.
+- Phase 3 ran in an interactive session after the conductor parked the plan `claude_dir` on
+  `systems.md`. Regeneration changed nothing; `toc.mjs` added `presets/README.md`'s `waterfall`
+  row. The guide picture is the Phase 1 gallery image. `systems.md`'s ranges come from the teaching
+  preset, the fixture and the cost probes, and the section says so.
 
 ### Close triggers
 
