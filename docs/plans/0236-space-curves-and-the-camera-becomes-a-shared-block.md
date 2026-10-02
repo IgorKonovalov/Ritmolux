@@ -186,8 +186,8 @@ pub(crate) struct FamilyArm3d {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The camera becomes a shared block | dev | done | 5ad3413c |
-| 2 — Walking skeleton: a torus knot in perspective | dev | done | committed with this row |
-| 3 — `lissajous_3d`, and the family table | dev | not started | |
+| 2 — Walking skeleton: a torus knot in perspective | dev | done | 389984de |
+| 3 — `lissajous_3d`, and the family table | dev | done | committed with this row |
 | 4 — The `seg3d_segments` cap, measured, and the goldens | dev | not started | |
 | 5 — Documentation and the references | dev | not started | |
 | 6 — The look, judged | human | not started | |
@@ -219,6 +219,10 @@ pub(crate) struct FamilyArm3d {
   2 px near and 1 px far through a pinhole, and 7 px near and 20 px far at an aperture of 12, on
   llvmpipe. The golden readings, `parametric_curve` included, were identical to Phase 1's on
   llvmpipe.
+- Phase 3: before it, the unknown-family error did not list the roster, so "as it does now" did
+  not hold. The list was added in `core/src/preset/schema/raw/generator.rs`, where the error is
+  raised, not in `load.rs`. Phase 3 also rewords the `n`, `d` and `phase` doc lines to name the
+  space families, and regenerates the same generated files as Phase 2.
 
 ### Close triggers
 

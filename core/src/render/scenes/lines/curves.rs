@@ -114,6 +114,10 @@ pub struct Levers {
     pub decay: f32,
     /// Torus knot: the tube's radius, as a fraction of the core circle's.
     pub tube: f32,
+    /// 3D Lissajous: the depth axis's frequency.
+    pub m: f32,
+    /// 3D Lissajous: the depth axis's phase, a fraction of a turn.
+    pub phase_z: f32,
 }
 
 impl Default for Levers {
@@ -128,6 +132,8 @@ impl Default for Levers {
             lobe: default_of(PARAMS, "lobe"),
             decay: default_of(PARAMS, "decay"),
             tube: default_of(PARAMS, "tube"),
+            m: default_of(PARAMS, "m"),
+            phase_z: default_of(PARAMS, "phase_z"),
         }
     }
 }
@@ -348,8 +354,8 @@ pub(crate) fn arm(family: CurveFamily) -> FamilyArm {
         },
         // A space family has no flat walk: the scene draws it through
         // [`arm3d`] and never reaches here. The empty walk is what a stray call
-        // gets, so it draws nothing rather than a flattened knot.
-        CurveFamily::TorusKnot => FamilyArm {
+        // gets, so it draws nothing rather than a flattened figure.
+        CurveFamily::TorusKnot | CurveFamily::Lissajous3d => FamilyArm {
             sample: |_, points| {
                 points.clear();
                 false
@@ -386,6 +392,19 @@ pub(crate) fn arm3d(family: CurveFamily) -> Option<FamilyArm3d> {
                 periodic_walk_3d(p, std::f32::consts::TAU, |t| knot.point(t), points)
             },
             extent: |p| (1.0 + Knot::of(p).tube) * finite_or_zero(p.scale).abs(),
+        }),
+        CurveFamily::Lissajous3d => Some(FamilyArm3d {
+            sample: |p, points| {
+                periodic_walk_3d(
+                    p,
+                    std::f32::consts::TAU,
+                    |t| lissajous_3d_point(p, t),
+                    points,
+                )
+            },
+            // The unit cube's corner: each axis is a sine, so no point lies
+            // farther from the centre than this, whatever the frequencies.
+            extent: |p| 3.0f32.sqrt() * finite_or_zero(p.scale).abs(),
         }),
         CurveFamily::MaurerRose
         | CurveFamily::Lissajous
@@ -630,6 +649,16 @@ fn lissajous_point(p: &CurveParams, t: f32) -> [f32; 2] {
         (finite_or_zero(p.n) * t + phase).sin(),
         (finite_or_zero(p.d) * t).sin(),
     ]
+}
+
+/// The 3D Lissajous figure in its unit cube: [`lissajous_point`] for `x` and
+/// `y`, and `z = sin(m t + phase_z)` with `phase_z` a fraction of a turn. At
+/// `m = 0` and `phase_z = 0` the figure lies flat in the `z = 0` plane; whole
+/// `n`, `d` and `m` close over one `TAU` of `t`.
+fn lissajous_3d_point(p: &CurveParams, t: f32) -> [f32; 3] {
+    let [x, y] = lissajous_point(p, t);
+    let phase_z = finite_or_zero(p.levers.phase_z) * std::f32::consts::TAU;
+    [x, y, (finite_or_zero(p.levers.m) * t + phase_z).sin()]
 }
 
 /// The rolling construction a hypotrochoid walk is drawn from, resolved once

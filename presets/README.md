@@ -518,23 +518,25 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 
 | Parameter | Default | Range | What it does | Group |
 |---|---|---|---|---|
-| `sym` | `5` | `superformula` `1` – `24`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph`, `torus_knot` | How many lobes the figure repeats around its centre, as a whole number. | shape |
+| `sym` | `5` | `superformula` `1` – `24`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph`, `torus_knot`, `lissajous_3d` | How many lobes the figure repeats around its centre, as a whole number. | shape |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. | colour |
-| `mirror_order` | `1` | `maurer_rose` `1` – `12`; `lissajous` `1` – `12`; `hypotrochoid` `1` – `12`; `superformula` `1` – `12`; `harmonograph` `1` – `12`; inert on `torus_knot` | Repeats a flat figure this many times around the centre; 1 draws it once. | shape |
+| `mirror_order` | `1` | `maurer_rose` `1` – `12`; `lissajous` `1` – `12`; `hypotrochoid` `1` – `12`; `superformula` `1` – `12`; `harmonograph` `1` – `12`; inert on `torus_knot`, `lissajous_3d` | Repeats a flat figure this many times around the centre; 1 draws it once. | shape |
 
 **Modal**
 
 | Parameter | Default | Range | What it does | Group |
 |---|---|---|---|---|
-| `n` | `6` | `maurer_rose` `1` – `24`; `lissajous` `1` – `12`; `hypotrochoid` `-8` – `8`; `harmonograph` `1` – `12`; `torus_knot` `1` – `12`; inert on `superformula` | The figure's first number, read as a real value per family: the rose's petal number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed radius ratio. | shape, main |
-| `d` | `71` | `maurer_rose` `1` – `360`; `lissajous` `1` – `12`; `hypotrochoid` `1` – `24`; `superformula` `0.25` – `4`; `harmonograph` `1` – `12`; `torus_knot` `1` – `12` | The figure's second number, per family: the rose's sampling step in degrees, the Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the superformula's lobe skew. | shape, main |
-| `phase` | `0` | `maurer_rose` `0` – `1`; `lissajous` `0` – `1`; `hypotrochoid` `0` – `1`; `harmonograph` `0` – `1`; inert on `superformula`, `torus_knot` | Offsets where the figure starts: inside the rose's sine, between the Lissajous and harmonograph axes, and at the hypotrochoid's pen. | motion |
-| `radial_offset` | `0` | `maurer_rose` `-1` – `1`; inert on `lissajous`, `hypotrochoid`, `superformula`, `harmonograph`, `torus_knot` | Pushes every point out from the centre, opening the figure into a ring. | shape |
-| `pen` | `1` | `hypotrochoid` `0` – `2`; inert on `maurer_rose`, `lissajous`, `superformula`, `harmonograph`, `torus_knot` | How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops. | shape |
-| `sharpness` | `1` | `superformula` `0.1` – `20`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph`, `torus_knot` | How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle. | shape |
-| `lobe` | `1` | `superformula` `0.1` – `10`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph`, `torus_knot` | How the lobes swell between their tips: low pinches them thin, high fills them into a polygon. | shape |
-| `decay` | `0.1` | `harmonograph` `0` – `0.5`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `torus_knot` | How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward. | light |
-| `tube` | `0.4` | `torus_knot` `0.05` – `0.9`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | How far a knot's strand winds out from the torus's core circle, as a fraction of that circle's radius. | shape |
+| `n` | `6` | `maurer_rose` `1` – `24`; `lissajous` `1` – `12`; `hypotrochoid` `-8` – `8`; `harmonograph` `1` – `12`; `torus_knot` `1` – `12`; `lissajous_3d` `1` – `12`; inert on `superformula` | The figure's first number, read as a real value per family: the rose's petal number, the two Lissajous figures' and the harmonograph's x frequency, the hypotrochoid's signed radius ratio, the knot's whole turns round its axis. | shape, main |
+| `d` | `71` | `maurer_rose` `1` – `360`; `lissajous` `1` – `12`; `hypotrochoid` `1` – `24`; `superformula` `0.25` – `4`; `harmonograph` `1` – `12`; `torus_knot` `1` – `12`; `lissajous_3d` `1` – `12` | The figure's second number, per family: the rose's sampling step in degrees, the two Lissajous figures' and the harmonograph's y frequency, the hypotrochoid's cusp count, the superformula's lobe skew, the knot's whole turns through its hole. | shape, main |
+| `phase` | `0` | `maurer_rose` `0` – `1`; `lissajous` `0` – `1`; `hypotrochoid` `0` – `1`; `harmonograph` `0` – `1`; `lissajous_3d` `0` – `1`; inert on `superformula`, `torus_knot` | Offsets where the figure starts: inside the rose's sine, between the two Lissajous figures' and the harmonograph's x and y axes, and at the hypotrochoid's pen. | motion |
+| `radial_offset` | `0` | `maurer_rose` `-1` – `1`; inert on `lissajous`, `hypotrochoid`, `superformula`, `harmonograph`, `torus_knot`, `lissajous_3d` | Pushes every point out from the centre, opening the figure into a ring. | shape |
+| `pen` | `1` | `hypotrochoid` `0` – `2`; inert on `maurer_rose`, `lissajous`, `superformula`, `harmonograph`, `torus_knot`, `lissajous_3d` | How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops. | shape |
+| `sharpness` | `1` | `superformula` `0.1` – `20`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph`, `torus_knot`, `lissajous_3d` | How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle. | shape |
+| `lobe` | `1` | `superformula` `0.1` – `10`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph`, `torus_knot`, `lissajous_3d` | How the lobes swell between their tips: low pinches them thin, high fills them into a polygon. | shape |
+| `decay` | `0.1` | `harmonograph` `0` – `0.5`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `torus_knot`, `lissajous_3d` | How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward. | light |
+| `tube` | `0.4` | `torus_knot` `0.05` – `0.9`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph`, `lissajous_3d` | How far a knot's strand winds out from the torus's core circle, as a fraction of that circle's radius. | shape |
+| `m` | `1` | `lissajous_3d` `0` – `12`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph`, `torus_knot` | The depth axis's frequency on a 3D Lissajous figure; 0 with phase_z at 0 lays it flat. | shape |
+| `phase_z` | `0.25` | `lissajous_3d` `0` – `1`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph`, `torus_knot` | Offsets the depth axis of a 3D Lissajous figure against the other two, as a fraction of a turn. | motion |
 | `samples` | `361` | `16` – `2048` | How many points the curve is drawn from; fewer reads as a polygon. Truncated, so a rise adds its next point on arrival. | shape |
 | `thickness` | `2` | `0.5` – `12` | Stroke width in pixels at the render target, before softness widens the falloff. | shape, main |
 | `hue` | `0.6` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. | colour, main |
@@ -542,23 +544,23 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. | colour |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. | colour |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. | colour |
-| `spin` | `0.1` | `maurer_rose` `-2` – `2`; `lissajous` `-2` – `2`; `hypotrochoid` `-2` – `2`; `superformula` `-2` – `2`; `harmonograph` `-2` – `2`; inert on `torus_knot` | Turns per second the whole figure rotates by. | motion, main |
+| `spin` | `0.1` | `maurer_rose` `-2` – `2`; `lissajous` `-2` – `2`; `hypotrochoid` `-2` – `2`; `superformula` `-2` – `2`; `harmonograph` `-2` – `2`; inert on `torus_knot`, `lissajous_3d` | Turns per second the whole figure rotates by. | motion, main |
 | `scale` | `0.9` | `0.1` – `2` | Size of the figure within the frame, before the shared zoom is applied. | shape |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
 | `glow` | `1` | `0` – `4` | Brightness of the halo around each stroke, on top of the stroke itself. | light, main |
 | `softness` | `0.25` | `0` – `1` | How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core. | light |
-| `stroke_blend` | `0` | `maurer_rose` `0` – `1`; `lissajous` `0` – `1`; `hypotrochoid` `0` – `1`; `superformula` `0` – `1`; `harmonograph` `0` – `1`; inert on `torus_knot` | Moves a flat figure's stroke from additive light toward opaque paint, so crossings stop brightening. | light |
+| `stroke_blend` | `0` | `maurer_rose` `0` – `1`; `lissajous` `0` – `1`; `hypotrochoid` `0` – `1`; `superformula` `0` – `1`; `harmonograph` `0` – `1`; inert on `torus_knot`, `lissajous_3d` | Moves a flat figure's stroke from additive light toward opaque paint, so crossings stop brightening. | light |
 | `draw_progress` | `1` | `0` – `1` | How much of the figure is drawn, from its start; below 1 the line is still arriving. | motion |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. | shape |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
-| `mirror_reflect` | `0` | `maurer_rose` `0` – `1`; `lissajous` `0` – `1`; `hypotrochoid` `0` – `1`; `superformula` `0` – `1`; `harmonograph` `0` – `1`; inert on `torus_knot` | Alternates a flat figure's repeats into mirror images rather than plain rotations. | shape |
-| `yaw` | `0` | `torus_knot` `-3.1415927` – `3.1415927`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | Turns the camera around a space curve, in radians; bind it to a slow clock to orbit. | motion |
-| `pitch` | `0.25` | `torus_knot` `-1.55` – `1.55`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | Raises the camera above a space curve, in radians; negative looks up from below. | motion |
-| `distance` | `3.5` | `torus_knot` `1.5` – `8`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | How far the camera sits from a space curve's centre; nearer exaggerates the perspective. | motion |
-| `fov` | `0.8` | `torus_knot` `0.2` – `2`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | The camera's vertical field of view onto a space curve, in radians; zoom divides it. | motion |
-| `focus` | `0.5` | `torus_knot` `0` – `1`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | Where the focal plane sits in a space curve's depth: 0 at its nearest point, 1 at its farthest. | light, main |
-| `aperture` | `0` | `torus_knot` `0` – `24`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | The blur of a space curve's far side, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill. | light, main |
+| `mirror_reflect` | `0` | `maurer_rose` `0` – `1`; `lissajous` `0` – `1`; `hypotrochoid` `0` – `1`; `superformula` `0` – `1`; `harmonograph` `0` – `1`; inert on `torus_knot`, `lissajous_3d` | Alternates a flat figure's repeats into mirror images rather than plain rotations. | shape |
+| `yaw` | `0` | `torus_knot` `-3.1415927` – `3.1415927`; `lissajous_3d` `-3.1415927` – `3.1415927`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | Turns the camera around a space curve, in radians; bind it to a slow clock to orbit. | motion |
+| `pitch` | `0.25` | `torus_knot` `-1.55` – `1.55`; `lissajous_3d` `-1.55` – `1.55`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | Raises the camera above a space curve, in radians; negative looks up from below. | motion |
+| `distance` | `3.5` | `torus_knot` `1.5` – `8`; `lissajous_3d` `1.5` – `8`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | How far the camera sits from a space curve's centre; nearer exaggerates the perspective. | motion |
+| `fov` | `0.8` | `torus_knot` `0.2` – `2`; `lissajous_3d` `0.2` – `2`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | The camera's vertical field of view onto a space curve, in radians; zoom divides it. | motion |
+| `focus` | `0.5` | `torus_knot` `0` – `1`; `lissajous_3d` `0` – `1`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | Where the focal plane sits in a space curve's depth: 0 at its nearest point, 1 at its farthest. | light, main |
+| `aperture` | `0` | `torus_knot` `0` – `24`; `lissajous_3d` `0` – `24`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | The blur of a space curve's far side, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill. | light, main |
 
 ### System: `lsystem`
 

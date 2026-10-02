@@ -297,18 +297,22 @@ pub enum CurveFamily {
     /// round the torus's axis and `q` times through its hole, on a tube of
     /// radius `tube`. Drawn through the shared camera, not the 2D stroke.
     TorusKnot,
+    /// A **space curve**: the Lissajous figure given a third axis,
+    /// `x = sin(n t + phase)`, `y = sin(d t)`, `z = sin(m t + phase_z)`.
+    Lissajous3d,
 }
 
 impl CurveFamily {
     /// Every family, in roster order — the closed set, and the list the schema
     /// export renders rather than restating.
-    pub const ALL: [CurveFamily; 6] = [
+    pub const ALL: [CurveFamily; 7] = [
         CurveFamily::MaurerRose,
         CurveFamily::Lissajous,
         CurveFamily::Hypotrochoid,
         CurveFamily::Superformula,
         CurveFamily::Harmonograph,
         CurveFamily::TorusKnot,
+        CurveFamily::Lissajous3d,
     ];
 
     /// Whether this family is a **space curve**, sampled in 3D and drawn
@@ -316,7 +320,7 @@ impl CurveFamily {
     /// (ADR-0258). On one, the biarc fit, the mirror, `stroke_blend` and the
     /// in-plane rotation are unavailable.
     pub fn is_space(self) -> bool {
-        matches!(self, CurveFamily::TorusKnot)
+        matches!(self, CurveFamily::TorusKnot | CurveFamily::Lissajous3d)
     }
 
     /// Parse a `[curve] family` name, or `None` if unknown.
@@ -328,6 +332,7 @@ impl CurveFamily {
             "superformula" => CurveFamily::Superformula,
             "harmonograph" => CurveFamily::Harmonograph,
             "torus_knot" => CurveFamily::TorusKnot,
+            "lissajous_3d" => CurveFamily::Lissajous3d,
             _ => return None,
         })
     }
@@ -342,6 +347,7 @@ impl CurveFamily {
             CurveFamily::Superformula => "superformula",
             CurveFamily::Harmonograph => "harmonograph",
             CurveFamily::TorusKnot => "torus_knot",
+            CurveFamily::Lissajous3d => "lissajous_3d",
         }
     }
 }

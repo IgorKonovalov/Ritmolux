@@ -545,11 +545,25 @@ fn every_family_loads_by_name_and_an_unknown_one_is_rejected() {
             preset.config
         );
     }
-    for unknown in ["lissajou", "Lissajous", "spirograph", ""] {
-        assert!(
-            load(unknown).is_err(),
-            "the unknown family `{unknown}` must be rejected, not defaulted"
-        );
+    for unknown in [
+        "lissajou",
+        "Lissajous",
+        "spirograph",
+        "",
+        "lissajous3d",
+        "torus",
+    ] {
+        let Err(error) = load(unknown) else {
+            panic!("the unknown family `{unknown}` must be rejected, not defaulted");
+        };
+        let message = error.to_string();
+        for family in CurveFamily::ALL {
+            assert!(
+                message.contains(family.as_str()),
+                "rejecting `{unknown}` must name `{}` among the families: {message}",
+                family.as_str()
+            );
+        }
     }
 }
 
@@ -1317,6 +1331,72 @@ fn a_knot_rounds_its_windings_scales_and_reveals_a_prefix() {
     assert_eq!(prefix.len(), 201, "half of 400 chords, plus the start");
     assert_eq!(prefix[..], whole[..201]);
     assert_eq!((arm.extent)(&half), (arm.extent)(&knot(2.0, 3.0, 0.3)));
+}
+
+/// A 3D Lissajous at `n = 3`, `d = 2`, with the depth axis at `m` and
+/// `phase_z`, unscaled.
+fn lissajous_3d(m: f32, phase_z: f32) -> CurveParams {
+    CurveParams {
+        n: 3.0,
+        d: 2.0,
+        samples: 360,
+        scale: 1.0,
+        levers: Levers {
+            m,
+            phase_z,
+            ..Levers::default()
+        },
+        ..rose()
+    }
+}
+
+/// Plan 0236 Phase 3's done-when: at `m = 0` and `phase_z = 0` every point of
+/// a 3D Lissajous sits at `z = 0` — and its `x` and `y` are the flat 3:2
+/// figure's, point for point.
+#[test]
+fn a_flat_depth_axis_lays_the_3d_lissajous_on_the_flat_one() {
+    let (closed, points) = walk3d(CurveFamily::Lissajous3d, lissajous_3d(0.0, 0.0));
+    assert!(closed, "whole frequencies close over one turn");
+    let (_, flat, _) = walk_of(
+        CurveFamily::Lissajous,
+        CurveParams {
+            scale: 1.0,
+            ..lissajous()
+        },
+    );
+    assert_eq!(points.len(), flat.len());
+    for (k, (&[x, y, z], &[fx, fy])) in points.iter().zip(&flat).enumerate() {
+        assert_eq!(z, 0.0, "sample {k} left the z = 0 plane");
+        assert_eq!([x, y], [fx, fy], "sample {k} is off the flat figure");
+    }
+}
+
+/// The depth axis is `sin(m t + phase_z)`, with `phase_z` a fraction of a
+/// turn, and it fills the unit cube the extent names.
+#[test]
+fn the_3d_lissajous_depth_axis_follows_m_and_phase_z() {
+    let p = lissajous_3d(5.0, 0.25);
+    let (closed, points) = walk3d(CurveFamily::Lissajous3d, p);
+    assert!(closed, "whole n, d and m close over one turn");
+    let step = std::f32::consts::TAU / p.samples as f32;
+    let mut deepest = 0.0f32;
+    for (k, point) in points.iter().enumerate() {
+        let t = step * k as f32;
+        let want = (5.0 * t + 0.25 * std::f32::consts::TAU).sin();
+        assert!(
+            (point[2] - want).abs() < 1e-5,
+            "sample {k} has z {} against {want}",
+            point[2]
+        );
+        deepest = deepest.max(dist3([0.0; 3], *point));
+    }
+    let extent = (arm3d(CurveFamily::Lissajous3d).expect("space arm").extent)(&p);
+    assert!(
+        deepest <= extent,
+        "a sample {deepest} from the centre lies outside the extent {extent}"
+    );
+    let (open, _) = walk3d(CurveFamily::Lissajous3d, lissajous_3d(2.5, 0.0));
+    assert!(!open, "a fractional depth frequency does not close");
 }
 
 /// Every flat family has no 3D arm and every space family has one, so the

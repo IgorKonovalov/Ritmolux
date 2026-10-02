@@ -18,7 +18,15 @@ impl RawCurve {
     /// panicking) on an unknown family.
     pub(in crate::preset::schema) fn into_config(self) -> Result<GeneratorConfig, PresetError> {
         let family = CurveFamily::from_name(&self.family).ok_or_else(|| {
-            PresetError::Config(format!("unknown curve family '{}'", self.family))
+            PresetError::Config(format!(
+                "unknown curve family '{}' (expected one of: {})",
+                self.family,
+                CurveFamily::ALL
+                    .iter()
+                    .map(|f| f.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))
         })?;
         Ok(GeneratorConfig::Curve { family })
     }

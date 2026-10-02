@@ -67,6 +67,8 @@ const DEFAULT_SHARPNESS: f32 = default_of(PARAMS, "sharpness");
 const DEFAULT_LOBE: f32 = default_of(PARAMS, "lobe");
 const DEFAULT_DECAY: f32 = default_of(PARAMS, "decay");
 const DEFAULT_TUBE: f32 = default_of(PARAMS, "tube");
+const DEFAULT_M: f32 = default_of(PARAMS, "m");
+const DEFAULT_PHASE_Z: f32 = default_of(PARAMS, "phase_z");
 const DEFAULT_SAMPLES: f32 = default_of(PARAMS, "samples");
 const DEFAULT_THICKNESS: f32 = 2.0;
 const DEFAULT_HUE: f32 = 0.6;
@@ -174,6 +176,8 @@ pub struct ParametricCurveScene {
     mirror_order: f32,
     mirror_reflect: f32,
     tube: f32,
+    m: f32,
+    phase_z: f32,
 
     /// The space families' own renderer (ADR-0258): the `seg3d` pipeline and
     /// an instance buffer of the tier's
@@ -229,6 +233,8 @@ impl ParametricCurveScene {
             samples3d: 0,
             instances3d: Vec::with_capacity(seg3d_cap),
             tube: DEFAULT_TUBE,
+            m: DEFAULT_M,
+            phase_z: DEFAULT_PHASE_Z,
             renderer,
             segments: Vec::with_capacity(max_segments),
             single_buf: Vec::with_capacity(max_segments),
@@ -428,6 +434,8 @@ impl ParametricCurveScene {
                 lobe: self.lobe,
                 decay: self.decay,
                 tube: self.tube,
+                m: self.m,
+                phase_z: self.phase_z,
             },
         }
     }
@@ -549,8 +557,8 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 6.0,
         range: Some([1.0, 24.0]),
         doc: "The figure's first number, read as a real value per family: the rose's petal \
-               number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed \
-               radius ratio.",
+               number, the two Lissajous figures' and the harmonograph's x frequency, the \
+               hypotrochoid's signed radius ratio, the knot's whole turns round its axis.",
         kind: ParamKind::Modal,
         group: ParamGroup::Shape,
         main: true,
@@ -560,8 +568,8 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 71.0,
         range: Some([1.0, 360.0]),
         doc: "The figure's second number, per family: the rose's sampling step in degrees, the \
-               Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the \
-               superformula's lobe skew.",
+               two Lissajous figures' and the harmonograph's y frequency, the hypotrochoid's \
+               cusp count, the superformula's lobe skew, the knot's whole turns through its hole.",
         kind: ParamKind::Modal,
         group: ParamGroup::Shape,
         main: true,
@@ -570,8 +578,8 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "phase",
         default: 0.0,
         range: Some([0.0, 1.0]),
-        doc: "Offsets where the figure starts: inside the rose's sine, between the Lissajous and \
-               harmonograph axes, and at the hypotrochoid's pen.",
+        doc: "Offsets where the figure starts: inside the rose's sine, between the two Lissajous \
+               figures' and the harmonograph's x and y axes, and at the hypotrochoid's pen.",
         kind: ParamKind::Modal,
         group: ParamGroup::Motion,
         main: false,
@@ -642,6 +650,26 @@ pub const PARAMS: &[ParamSpec] = &[
                that circle's radius.",
         kind: ParamKind::Modal,
         group: ParamGroup::Shape,
+        main: false,
+    },
+    ParamSpec {
+        name: "m",
+        default: 1.0,
+        range: Some([0.0, 12.0]),
+        doc: "The depth axis's frequency on a 3D Lissajous figure; 0 with phase_z at 0 lays it \
+               flat.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
+    },
+    ParamSpec {
+        name: "phase_z",
+        default: 0.25,
+        range: Some([0.0, 1.0]),
+        doc: "Offsets the depth axis of a 3D Lissajous figure against the other two, as a \
+               fraction of a turn.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
         main: false,
     },
     ParamSpec {
@@ -737,10 +765,10 @@ const APERTURE: ParamSpec = ParamSpec {
 
 /// One row of [`FAMILY_PARAMS`], its ranges in [`CurveFamily::ALL`]'s order:
 /// the rose, the Lissajous, the hypotrochoid, the superformula, the
-/// harmonograph, the torus knot. `None` is a family that does not read the
-/// parameter.
+/// harmonograph, the torus knot, the 3D Lissajous. `None` is a family that
+/// does not read the parameter.
 macro_rules! per_family {
-    ($name:expr; $rose:expr, $lissajous:expr, $hypotrochoid:expr, $superformula:expr, $harmonograph:expr, $torus_knot:expr $(,)?) => {
+    ($name:expr; $rose:expr, $lissajous:expr, $hypotrochoid:expr, $superformula:expr, $harmonograph:expr, $torus_knot:expr, $lissajous_3d:expr $(,)?) => {
         FamilyParam {
             name: $name,
             ranges: &[
@@ -768,6 +796,10 @@ macro_rules! per_family {
                     family: "torus_knot",
                     range: $torus_knot,
                 },
+                FamilyRange {
+                    family: "lissajous_3d",
+                    range: $lissajous_3d,
+                },
             ],
         }
     };
@@ -777,7 +809,7 @@ macro_rules! per_family {
 /// on every flat family.
 macro_rules! space_only {
     ($spec:expr) => {
-        per_family!($spec.name; None, None, None, None, None, $spec.range)
+        per_family!($spec.name; None, None, None, None, None, $spec.range, $spec.range)
     };
 }
 
@@ -787,7 +819,7 @@ macro_rules! space_only {
 /// ones.
 macro_rules! flat_only {
     ($spec:expr) => {
-        per_family!($spec.name; $spec.range, $spec.range, $spec.range, $spec.range, $spec.range, None)
+        per_family!($spec.name; $spec.range, $spec.range, $spec.range, $spec.range, $spec.range, None, None)
     };
 }
 
@@ -802,22 +834,25 @@ macro_rules! flat_only {
 pub const FAMILY_PARAMS: &[FamilyParam] = &[
     per_family!("n";
         Some([1.0, 24.0]), Some([1.0, 12.0]), Some([-8.0, 8.0]), None, Some([1.0, 12.0]),
-        Some([1.0, 12.0])),
+        Some([1.0, 12.0]), Some([1.0, 12.0])),
     per_family!("d";
         Some([1.0, 360.0]), Some([1.0, 12.0]), Some([1.0, 24.0]), Some([0.25, 4.0]), Some([1.0, 12.0]),
-        Some([1.0, 12.0])),
+        Some([1.0, 12.0]), Some([1.0, 12.0])),
     per_family!("phase";
-        Some([0.0, 1.0]), Some([0.0, 1.0]), Some([0.0, 1.0]), None, Some([0.0, 1.0]), None),
-    per_family!("radial_offset"; Some([-1.0, 1.0]), None, None, None, None, None),
-    per_family!("pen"; None, None, Some([0.0, 2.0]), None, None, None),
-    per_family!("sym"; None, None, None, Some([1.0, 24.0]), None, None),
-    per_family!("sharpness"; None, None, None, Some([0.1, 20.0]), None, None),
-    per_family!("lobe"; None, None, None, Some([0.1, 10.0]), None, None),
-    per_family!("decay"; None, None, None, None, Some([0.0, 0.5]), None),
-    per_family!("tube"; None, None, None, None, None, Some([0.05, 0.9])),
+        Some([0.0, 1.0]), Some([0.0, 1.0]), Some([0.0, 1.0]), None, Some([0.0, 1.0]), None,
+        Some([0.0, 1.0])),
+    per_family!("radial_offset"; Some([-1.0, 1.0]), None, None, None, None, None, None),
+    per_family!("pen"; None, None, Some([0.0, 2.0]), None, None, None, None),
+    per_family!("sym"; None, None, None, Some([1.0, 24.0]), None, None, None),
+    per_family!("sharpness"; None, None, None, Some([0.1, 20.0]), None, None, None),
+    per_family!("lobe"; None, None, None, Some([0.1, 10.0]), None, None, None),
+    per_family!("decay"; None, None, None, None, Some([0.0, 0.5]), None, None),
+    per_family!("tube"; None, None, None, None, None, Some([0.05, 0.9]), None),
+    per_family!("m"; None, None, None, None, None, None, Some([0.0, 12.0])),
+    per_family!("phase_z"; None, None, None, None, None, None, Some([0.0, 1.0])),
     per_family!("spin";
         Some([-2.0, 2.0]), Some([-2.0, 2.0]), Some([-2.0, 2.0]), Some([-2.0, 2.0]),
-        Some([-2.0, 2.0]), None),
+        Some([-2.0, 2.0]), None, None),
     flat_only!(STROKE_BLEND),
     flat_only!(MIRROR_ORDER),
     flat_only!(MIRROR_REFLECT),
@@ -865,6 +900,8 @@ impl Scene for ParametricCurveScene {
         self.mirror_order = DEFAULT_MIRROR_ORDER;
         self.mirror_reflect = DEFAULT_MIRROR_REFLECT;
         self.tube = DEFAULT_TUBE;
+        self.m = DEFAULT_M;
+        self.phase_z = DEFAULT_PHASE_Z;
         self.camera.reset();
     }
 
@@ -890,6 +927,8 @@ impl Scene for ParametricCurveScene {
             "lobe" => self.lobe = value,
             "decay" => self.decay = value,
             "tube" => self.tube = value,
+            "m" => self.m = value,
+            "phase_z" => self.phase_z = value,
             "samples" => self.samples = value,
             "thickness" => self.thickness = value,
             "hue_spread" => self.hue_spread = value,
@@ -1258,12 +1297,26 @@ mod tests {
     /// schema keeps is a range some family genuinely reads.
     ///
     /// And each lever that only one family reads is inert everywhere else,
-    /// which is what the rows for `pen`, `sym`, `sharpness`, `lobe` and `decay`
-    /// claim: asserted on the sampler, by moving the lever on every family that
-    /// the table calls inert and finding the walk unmoved.
+    /// which is what the rows for `pen`, `sym`, `sharpness`, `lobe`, `decay`,
+    /// `tube`, `m` and `phase_z` claim: asserted on the sampler, by moving the
+    /// lever on every family that the table calls inert and finding the walk
+    /// unmoved.
     #[test]
     fn the_family_table_is_the_roster_and_its_inert_cells_are_inert() {
         let families: Vec<&str> = CurveFamily::ALL.iter().map(|f| f.as_str()).collect();
+        assert_eq!(
+            families,
+            [
+                "maurer_rose",
+                "lissajous",
+                "hypotrochoid",
+                "superformula",
+                "harmonograph",
+                "torus_knot",
+                "lissajous_3d"
+            ],
+            "the roster the macro's seven columns are written against"
+        );
         let mut seen = Vec::new();
         for row in FAMILY_PARAMS {
             assert!(!seen.contains(&row.name), "`{}` has two rows", row.name);
@@ -1292,6 +1345,8 @@ mod tests {
                 "lobe" => l.lobe = 4.0,
                 "decay" => l.decay = 0.3,
                 "tube" => l.tube = 0.7,
+                "m" => l.m = 3.0,
+                "phase_z" => l.phase_z = 0.6,
                 other => panic!("no lever called `{other}`"),
             }
             l
@@ -1321,7 +1376,17 @@ mod tests {
             points.iter().map(|&[x, y]| [x, y, 0.0]).collect()
         };
         let mut inert_checked = 0;
-        for name in ["pen", "sym", "sharpness", "lobe", "decay", "tube"] {
+        const LEVERS: [&str; 8] = [
+            "pen",
+            "sym",
+            "sharpness",
+            "lobe",
+            "decay",
+            "tube",
+            "m",
+            "phase_z",
+        ];
+        for name in LEVERS {
             let row = FAMILY_PARAMS
                 .iter()
                 .find(|row| row.name == name)
@@ -1346,7 +1411,7 @@ mod tests {
         }
         assert_eq!(
             inert_checked,
-            6 * (CurveFamily::ALL.len() - 1),
+            LEVERS.len() * (CurveFamily::ALL.len() - 1),
             "each lever is inert on every family but its own"
         );
     }
