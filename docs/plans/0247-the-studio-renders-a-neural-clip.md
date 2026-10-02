@@ -245,8 +245,9 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 - **Is the CUDA machine the Arch box or the Windows laptop?** The sidecar was measured on Windows.
   Phase 6 runs wherever CUDA is. The Linux venv recipe is already in `tools/sd-filter/README.md`.
 - **Electron child stdio across platforms.** Passing one child's `stdout` stream as another's `stdin` is
-  supported by Node on all three platforms, but has not been exercised in this repo. Phase 2's test
-  pins the wiring, and Phase 4's integration test proves it end to end on CI's Linux runner.
+  supported by Node on all three platforms, but has not been exercised in this repo. Phase 2's stub
+  test pins the wiring. Phase 4's integration test proves it end to end on a machine with a built
+  player, ffmpeg and a GPU adapter. It skips on CI's studio job, which builds no player.
 
 ## What this plan does NOT do
 
