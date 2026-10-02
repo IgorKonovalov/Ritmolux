@@ -47,7 +47,7 @@
 
 use super::renderer::{LineRenderer, Segment3dInstance};
 use super::spectrum::{CURVE_MAX, CURVE_MIN, downsample, shape_and_ease};
-use super::{CapOverflow, ColorRamp, GeneratorConfig};
+use super::{CapOverflow, ColorRamp, GeneratorConfig, OverflowContext};
 use crate::dsp::AnalysisFrame;
 use crate::preset::Easing;
 use crate::render::camera::{self, CameraParams};
@@ -411,16 +411,20 @@ impl WaterfallScene {
             camera: CameraParams::default(),
         };
         scene.camera.pitch = DEFAULT_PITCH;
-        scene.resize(&WaterfallConfig::default());
+        // The default table fits every tier's buffer, so there is no clamp to
+        // report before a preset is configured.
+        let _ = scene.resize(&WaterfallConfig::default());
         scene
     }
 
     /// Size and empty the ring for `config`, with the rows held to what the
-    /// `seg3d` buffer can draw. Off the hot path: preset load only.
-    fn resize(&mut self, config: &WaterfallConfig) {
-        let rows = rows_clamp(config.rows, config.elements, self.seg3d_cap);
+    /// `seg3d` buffer can draw, and return that clamp when it bit. Off the hot
+    /// path: preset load only.
+    fn resize(&mut self, config: &WaterfallConfig) -> Option<CapOverflow> {
+        let (rows, overflow) = rows_clamp(config.rows, config.elements, self.seg3d_cap);
         self.landscape
             .resize(config.elements, rows, config.row_period, config.easing);
+        overflow
     }
 
     /// The colour ramp this frame's palette knobs describe.
@@ -437,10 +441,23 @@ impl WaterfallScene {
 }
 
 /// `rows` held to the most whole rows of `elements` bands a buffer of `cap`
-/// segments draws: a row is `elements - 1` segments.
-pub(crate) fn rows_clamp(rows: u32, elements: usize, cap: usize) -> usize {
+/// segments draws — a row is `elements - 1` segments — and the overflow to
+/// announce when the cap bit (ADR-0045), its `dropped` counted in segments.
+pub(crate) fn rows_clamp(rows: u32, elements: usize, cap: usize) -> (usize, Option<CapOverflow>) {
     let per_row = elements.saturating_sub(1).max(1);
-    (rows as usize).min(cap / per_row)
+    let fits = cap / per_row;
+    let asked = rows as usize;
+    if asked <= fits {
+        return (asked, None);
+    }
+    (
+        fits,
+        Some(CapOverflow {
+            dropped: (asked - fits) * per_row,
+            context: OverflowContext::Rows(rows, u32::try_from(per_row).unwrap_or(u32::MAX)),
+            cap,
+        }),
+    )
 }
 
 impl Scene for WaterfallScene {
@@ -464,10 +481,13 @@ impl Scene for WaterfallScene {
         let GeneratorConfig::Waterfall(config) = cfg else {
             return None;
         };
-        // A switch starts the incoming preset from an empty ring.
-        self.resize(config);
+        // A switch starts the incoming preset from an empty ring, with its rows
+        // held to the tier and the clamp returned for the renderer to announce
+        // with the preset.
+        let overflow = self.resize(config);
+        // The outgoing preset's per-frame clamp is not this one's to report.
         self.clamp = None;
-        None
+        overflow
     }
 
     fn mirror_overflow(&self) -> Option<&CapOverflow> {
@@ -777,14 +797,54 @@ mod tests {
         assert!(landscape.frac() < 1.0);
     }
 
-    /// Rows past what the buffer draws are held to it.
+    /// Rows past what the buffer draws are held to it, and the clamp is
+    /// announced with what was asked, in the buffer's own unit.
     #[test]
     fn rows_are_held_to_whole_rows_of_the_buffer() {
-        assert_eq!(rows_clamp(100, 64, 8000), 100);
-        assert_eq!(
-            rows_clamp(200, 64, 8000),
-            126,
-            "8000 segments hold 126 rows of 63"
+        assert_eq!(rows_clamp(126, 64, 8000), (126, None), "exactly at the cap");
+        let (rows, overflow) = rows_clamp(200, 64, 8000);
+        assert_eq!(rows, 126, "8000 segments hold 126 rows of 63");
+        let overflow = overflow.unwrap_or_else(|| panic!("a clamp that bit is announced"));
+        assert_eq!(overflow.context, OverflowContext::Rows(200, 63));
+        assert_eq!(overflow.cap, 8000);
+        assert_eq!(overflow.dropped, 74 * 63);
+        let text = overflow.to_string();
+        assert!(
+            text.contains("rows 200") && text.contains("keeps 126 rows"),
+            "{text}"
+        );
+    }
+
+    /// **The same seed and analysis frames give the same ring after 600
+    /// frames**: two landscapes stepped through one varying sequence hold
+    /// bit-identical rows and offsets.
+    #[test]
+    fn the_same_frames_give_the_same_ring_after_600_frames() {
+        let run = || {
+            let mut landscape = Landscape::default();
+            landscape.resize(32, 40, 0.04, Easing::symmetric(0.08));
+            for n in 0..600u64 {
+                landscape.step(&spectrum_at(n), 0.8, 1.0 / 60.0);
+            }
+            landscape
+        };
+        let (a, b) = (run(), run());
+        assert_eq!(a.len(), 39, "600 frames at 0.04 s a row fill a 39-row ring");
+        assert_eq!(a.frac().to_bits(), b.frac().to_bits());
+        for k in 0..a.len() {
+            let (ra, rb) = (a.row(k).unwrap_or(&[]), b.row(k).unwrap_or(&[]));
+            assert!(!ra.is_empty());
+            assert!(
+                ra.iter().zip(rb).all(|(x, y)| x.to_bits() == y.to_bits()),
+                "row {k} differs between two runs of the same frames"
+            );
+        }
+        assert!(
+            a.live()
+                .iter()
+                .zip(b.live())
+                .all(|(x, y)| x.to_bits() == y.to_bits()),
+            "the live row differs"
         );
     }
 

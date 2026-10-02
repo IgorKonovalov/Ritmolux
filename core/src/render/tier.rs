@@ -724,7 +724,10 @@ pub struct TierConfig {
     /// [`max_coc_px`](Self::max_coc_px), filling up to 70 % of the frame, costs
     /// about 1.1 ms a frame at 1080p on an integrated GPU — far inside the frame
     /// budget, which leaves the systems that share this cap their own headroom.
-    /// `Rich`'s 20 000 is not measured.
+    /// The `waterfall`'s two fill shapes at this cap — near rows spanning the
+    /// frame, and far rows piled above the horizon, both blurred past the cap —
+    /// were measured the same way (Plan 0238 Phase 2) and stay under twice their
+    /// sharp cost. `Rich`'s 20 000 is not measured.
     pub seg3d_segments: u32,
 }
 

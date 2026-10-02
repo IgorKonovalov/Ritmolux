@@ -73,7 +73,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
         ),
         SystemKind::Cellular => ("cellular", include_str!("fixtures/cellular.toml")),
         SystemKind::Plexus => ("plexus", include_str!("fixtures/plexus.toml")),
-        SystemKind::Waterfall => ("waterfall", include_str!("fixtures/waterfall.toml")),
+        SystemKind::Waterfall => ("waterfall", FIXTURES_WATERFALL),
     }
 }
 
@@ -203,6 +203,10 @@ const EXTRA_FIXTURES: [(&str, &str); 17] = [
     ),
 ];
 
+/// The waterfall fixture, which both the roster above and
+/// [`the_waterfall_holds_a_ramped_ring`] render.
+const FIXTURES_WATERFALL: &str = include_str!("fixtures/waterfall.toml");
+
 /// The stroke fixture's text, named once so the roster entry above and the guard
 /// below cannot come to mean different files.
 const FIXTURES_WARP_MESH_STROKE: &str = include_str!("fixtures/warp_mesh_stroke.toml");
@@ -284,6 +288,81 @@ fn scenes_match_golden_baselines() {
     assert!(
         failures.is_empty(),
         "golden drift beyond tolerance (bless with RLX_BLESS=1 if intended): {failures:#?}"
+    );
+}
+
+/// **The waterfall's ring, filled with rows that differ** (Plan 0238 Phase 2).
+///
+/// The roster's `waterfall` baseline is captured under one constant frame, so
+/// every pushed row holds the same levels and the picture would not move if the
+/// ring pushed the wrong row, or none. This one drives the same fixture with
+/// [`common::fixed_frame_spectrum`] scaled by a ramp that rises frame by frame,
+/// so each pushed row stands taller than the one behind it: a ring that dropped,
+/// repeated or reordered rows draws a different landscape. Through the fixture's
+/// fixed camera with an open aperture, so the far rows are the blurred ones.
+///
+/// Its own test and renderer rather than an entry in [`EXTRA_FIXTURES`], because
+/// those are captured under the one constant frame.
+#[test]
+fn the_waterfall_holds_a_ramped_ring() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let bless = common::bless_requested(&renderer);
+    let home = common::baseline_adapter(&renderer);
+    let preset = Preset::from_toml_str(FIXTURES_WATERFALL).expect("waterfall.toml is valid");
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+
+    let base = common::fixed_frame_spectrum();
+    let last_index = FRAMES - 1;
+    let mut analysis = |i: u32| {
+        let mut frame = base;
+        let ramp = 0.2 + 0.8 * i as f32 / last_index as f32;
+        for band in frame.spectrum.iter_mut() {
+            *band *= ramp;
+        }
+        frame
+    };
+    let mut last = None;
+    renderer
+        .capture_stream(&name, FRAMES, 1.0 / 60.0, &mut analysis, &mut |i, img| {
+            if i == last_index {
+                last = Some(img.clone());
+            }
+            Ok(())
+        })
+        .expect("capture the ramped waterfall");
+    let fresh = last.expect("the stream reached its last frame");
+
+    let path = common::golden_dir().join("waterfall_ramp.png");
+    if bless {
+        common::encode(&fresh, &path);
+        println!("blessed {}", path.display());
+        return;
+    }
+    assert!(
+        path.exists(),
+        "missing baseline {} — run `RLX_BLESS=1 cargo test -p rlx-core --test golden`",
+        path.display()
+    );
+    let baseline = common::decode(&path);
+    let mean = frame_diff(&baseline, &fresh);
+    let outlier = max_channel_outlier(&baseline, &fresh);
+    println!(
+        "waterfall_ramp     mean {mean:.4} (tol {MEAN_TOL}) max_outlier {outlier} (tol {MAX_OUTLIER})"
+    );
+    let drifted: Vec<String> = (mean > MEAN_TOL || outlier > MAX_OUTLIER)
+        .then(|| format!("waterfall_ramp: mean {mean:.4} / outlier {outlier} exceeds tolerance"))
+        .into_iter()
+        .collect();
+    if let Err(adapter) = home {
+        common::skip_off_baseline(&adapter, &drifted);
+        return;
+    }
+    assert!(
+        drifted.is_empty(),
+        "golden drift beyond tolerance (bless with RLX_BLESS=1 if intended): {drifted:#?}"
     );
 }
 

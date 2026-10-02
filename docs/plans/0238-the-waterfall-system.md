@@ -203,8 +203,8 @@ struct Ring {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: a scrolling landscape | dev | done | committed with this row |
-| 2 — Caps, the golden and determinism | dev | not started | |
+| 1 — Walking skeleton: a scrolling landscape | dev | done | 76976a1e |
+| 2 — Caps, the golden and determinism | dev | done | committed with this row |
 | 3 — Documentation and the references | dev | not started | |
 | 4 — The look, judged | human | not started | |
 
@@ -245,6 +245,37 @@ struct Ring {
   touched. The `spectrum` golden reads mean 0.0000, outlier 1 on llvmpipe; WARP was not run.
 - Phase 1 adds the rostered golden fixture `core/tests/fixtures/waterfall.toml` but no baseline;
   `golden` fails on the missing `waterfall.png` until Phase 2 writes it.
+- Phase 2's cost probe: `shot --report family=waterfall --tier floor --presets <dir> --size
+  1920x1080`, release profile, on AMD Radeon Graphics (RADV RENOIR) iGPU, Mesa 26.2.2, all four in
+  one run. Scratch presets under `target/waterfall-cost/`: `elements 64`, `rows 126` (Floor's
+  clamp), `line_width 8`, `fade 0`, `aperture 0` against `aperture 40` (past the 12 px cap).
+  Long near rows (`pitch 0.15`, `distance 1.5`, `focus 1`): 0.690 ms sharp, 0.821 ms blurred, ratio
+  1.19. Horizon pile-up (`pitch 0.02`, `focus 0`): 0.911 ms sharp, 1.407 ms blurred, ratio 1.54.
+  NFR section 1's budget is 16.67 ms. The ladder stopped before its first rung; nothing was culled
+  and no cap moved. 960x540 renders of the two blurred probes show the near rows filling the frame
+  edge to edge and the far rows piled into a band above the horizon.
+- Phase 2 announces the row clamp through a new `OverflowContext::Rows(asked, segments per row)`,
+  with its onset and recovery sentences and Rich's `seg3d_segments` in `top_tier_lifts`. That is an
+  edit to `core/src/render/scenes/mod.rs`, outside the phase list; no existing context words a row
+  count. The `CapOverflow`'s `cap` stays in segments so the Rich remedy compares like with like;
+  the sentences derive the rows kept from it.
+- Phase 2's branch finding: a full ring under constant input reads silent 0.0000, driven 0.3883,
+  so it passes on the driven branch, `spectrum`'s case. The golden fixture itself passes on the
+  silent branch (silent 0.1092, driven 0.4235), because its 23-row ring is still filling between
+  frames 24 and 48 and the flat rows it adds read as motion. A shipped preset with a ring that
+  fills slower than 0.4 s would pass the same way. `the_waterfall_passes_on_the_driven_branch_once_its_ring_is_full`
+  pins both readings. Reactivity on the fixture: bass 0.0236, mid 0.0154, treb 0.0081, onset 0.0254.
+- Phase 2's goldens, `waterfall.png` (the roster's, under the one constant frame) and
+  `waterfall_ramp.png` (its own test, `fixed_frame_spectrum()` scaled by a 0.2-to-1 per-frame ramp
+  through `capture_stream`), were written on llvmpipe, not WARP, through an uncommitted local change
+  to `golden.rs` that wrote only a missing baseline, as Plans 0235 and 0236 did. It was reverted
+  before the commit; no existing baseline was rewritten. Both read mean 0.0000, outlier 0 on
+  llvmpipe afterwards. Windows CI's golden job is their first WARP reading, and the first WARP
+  reading of the roster captures after `waterfall`, which now builds a `seg3d` renderer.
+- Phase 2: `animation`, `reactivity`, `sanity` and `distinctness` were run on the waterfall's
+  entries and on every non-batch test of the last two, not on the shipped-library batch sweeps;
+  the system ships no preset, so the sweeps hold none of it. The full sweeps are the pre-review
+  gate's.
 
 ### Close triggers
 

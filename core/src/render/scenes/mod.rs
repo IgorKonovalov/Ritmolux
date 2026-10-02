@@ -623,6 +623,13 @@ pub enum OverflowContext {
     /// frame, since `samples` is bindable. Carries what was asked. A clamp of
     /// content: the curve is walked from fewer points, so it is coarser.
     Samples(u32),
+    /// A `[waterfall] rows` asked for past what the tier's
+    /// [`seg3d_segments`](crate::render::TierConfig::seg3d_segments) draws at the
+    /// preset's band count — at preset load, since the count is structural.
+    /// Carries the rows asked and the segments one row costs (`elements - 1`);
+    /// the [`CapOverflow`] carries the segment cap. A clamp of content: the
+    /// landscape keeps less of the music.
+    Rows(u32, u32),
 }
 
 impl std::fmt::Display for OverflowContext {
@@ -640,6 +647,7 @@ impl std::fmt::Display for OverflowContext {
             OverflowContext::Edges(linked) => write!(f, "{linked} links"),
             OverflowContext::Blur(asked) => write!(f, "an aperture of {asked} px"),
             OverflowContext::Samples(asked) => write!(f, "samples {asked}"),
+            OverflowContext::Rows(asked, _) => write!(f, "rows {asked}"),
         }
     }
 }
@@ -723,6 +731,17 @@ impl std::fmt::Display for CapOverflow {
                  (ask for {} or fewer{pin})",
                 self.context, self.cap, self.cap, self.cap
             ),
+            // `cap` is in segments; the rows kept are the whole rows it holds.
+            OverflowContext::Rows(_, per_row) => {
+                let kept = self.cap / per_row.max(1) as usize;
+                write!(
+                    f,
+                    "{} is past this quality tier's {}-segment cap at this band count; the \
+                     landscape keeps {kept} rows instead, so it shows less of the music than \
+                     the preset asked (ask for {kept} or fewer, or fewer elements{pin})",
+                    self.context, self.cap
+                )
+            }
             OverflowContext::Mirror(_) | OverflowContext::Depth(_) => write!(
                 f,
                 "geometry exceeded the {}-segment cap at {} (dropped {} segment(s)); \
@@ -751,7 +770,7 @@ impl CapOverflow {
             OverflowContext::Points(_) => rich.plexus_points as usize,
             OverflowContext::Edges(_) => rich.plexus_edges as usize,
             OverflowContext::Blur(_) => rich.max_coc_px as usize,
-            OverflowContext::Samples(_) => rich.seg3d_segments as usize,
+            OverflowContext::Samples(_) | OverflowContext::Rows(..) => rich.seg3d_segments as usize,
         };
         self.cap < top
     }
@@ -809,6 +828,13 @@ impl std::fmt::Display for Recovered<'_> {
                 write!(
                     f,
                     "the sample count is back within this tier's cap of {cap}"
+                )
+            }
+            OverflowContext::Rows(_, per_row) => {
+                let kept = cap / per_row.max(1) as usize;
+                write!(
+                    f,
+                    "the row count is back within this tier's cap of {kept} rows"
                 )
             }
         }
@@ -1464,6 +1490,7 @@ mod tests {
                 OverflowContext::Samples(90_000),
                 rich.seg3d_segments as usize,
             ),
+            (OverflowContext::Rows(900, 63), rich.seg3d_segments as usize),
         ] {
             let below = CapOverflow {
                 dropped: 1,
@@ -1503,6 +1530,8 @@ mod tests {
             (OverflowContext::Edges(30_000), "links"),
             (OverflowContext::Blur(30), "aperture"),
             (OverflowContext::Samples(30_000), "sample count"),
+            // One segment a row, so the rows kept are the 20000 asserted below.
+            (OverflowContext::Rows(30_000, 1), "row count"),
         ] {
             let overflow = CapOverflow {
                 dropped: 0,
@@ -1527,6 +1556,7 @@ mod tests {
                     | OverflowContext::Edges(_)
                     | OverflowContext::Blur(_)
                     | OverflowContext::Samples(_)
+                    | OverflowContext::Rows(..)
             );
             if structural {
                 assert!(

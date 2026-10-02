@@ -546,6 +546,75 @@ fn the_driven_branch_carries_the_world_that_is_still_by_design() {
     );
 }
 
+/// **Which branch the waterfall passes on** (Plan 0238 Phase 2).
+///
+/// A **full** ring under constant input is the `spectrum` readout's case: every
+/// pushed row is the same row, frames [`FRAME_A`] and [`FRAME_B`] are a whole
+/// number of `row_period`s apart, so the scroll lands every row where the last
+/// one was, and the landscape is still in silence. The music is what raises
+/// it, so it passes on the driven branch. Measured on the fixture with `rows`
+/// cut to 6, whose five pushed rows fill in 0.2 s, before [`FRAME_A`].
+///
+/// The golden fixture itself passes on the **silent** branch, and not because
+/// it moves on its own: its ring of 23 rows takes 0.92 s to fill, so between
+/// the two frames it grows from 10 rows to 20, and at silence those are flat
+/// lines on the ground that the gate counts as motion. Both readings are pinned,
+/// so a change that made the full ring move in silence fails here.
+#[test]
+fn the_waterfall_passes_on_the_driven_branch_once_its_ring_is_full() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let fixture = include_str!("fixtures/waterfall.toml");
+    let full = fixture
+        .replace("rows       = 24", "rows       = 6")
+        .replace(
+            "name   = \"fixture_waterfall\"",
+            "name   = \"probe_waterfall_full\"",
+        );
+    assert_ne!(full, fixture, "the fixture's `rows` line was not found");
+    let parse = |src: &str| {
+        without_backdrop(
+            Preset::from_toml_str(src)
+                .unwrap_or_else(|e| panic!("the waterfall probe parses: {e}")),
+        )
+    };
+    renderer.set_presets(vec![parse(fixture), parse(&full)]);
+
+    let mut read = |name: &str| {
+        let m = motions(&mut renderer, name);
+        println!(
+            "{name:<24} silent {:.4}  driven {:.4}  -> {:<6} (whole-frame {:.4})",
+            m.silent,
+            m.driven,
+            m.branch().unwrap_or("FROZEN"),
+            m.whole,
+        );
+        m
+    };
+    let filling = read("fixture_waterfall");
+    let full = read("probe_waterfall_full");
+
+    assert!(
+        full.silent < ANIM_FLOOR,
+        "a full waterfall ring under constant input clears the silent floor \
+         ({:.4} >= {ANIM_FLOOR}): it moves without the music",
+        full.silent,
+    );
+    assert!(
+        full.driven >= DRIVEN_FLOOR,
+        "a full waterfall ring fails the driven floor ({:.4} < {DRIVEN_FLOOR}): it is \
+         frozen on both readings",
+        full.driven,
+    );
+    assert_eq!(
+        filling.branch(),
+        Some("silent"),
+        "the golden fixture's ring is still filling between the two frames, which \
+         the silent branch reads as motion"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // The resolution ladder (Plan 0067 Phase 1d) — a measurement, not a gate
 // ---------------------------------------------------------------------------
