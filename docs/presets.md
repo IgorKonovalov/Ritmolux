@@ -214,6 +214,7 @@ that table is maintained alongside the presets and is the authoritative list.
 | `analytic_field` | A fullscreen closed-form function of position from one of two families — the Chladni plate's nodal lines, or an escape-time Julia or Mandelbrot set with optional orbit traps ([below](#the-field-table)). |
 | `cellular` | A discrete cellular automaton on a grid of cells, from one of three families — Conway's Life and every birth/survival rule, Larger than Life's wide neighbourhoods, or the cyclic automaton's spirals — painted with the history of each cell ([below](#the-cellular-table)). |
 | `plexus` | A few hundred points in 3D, joined by a line wherever two come close, seen through a perspective camera with a real focal plane: lines and dots blur with their distance from focus. The points drift through a cube or ripple on a sheet ([below](#the-plexus-table)). |
+| `waterfall` | The spectrum's recent past as a landscape in 3D: each row is the band array at one moment, the newest at the front and older rows receding behind it, seen through the same perspective camera as `plexus` ([below](#the-waterfall-table)). |
 
 **There is deliberately no per-system preset count here.** A count re-drifts every time
 a preset is added and nothing fails when it does. `presets/` is the list; `ls presets/*.toml`
@@ -680,6 +681,49 @@ parameters (`radius` on the ring; `span` and `baseline` on `bars`/`polyline`), a
 the `curve`↔`scale` retune a level curve costs — a **5.8x** amplitude change at
 `curve = 0.5` against measured typical band levels, which is the reason the
 default is exactly linear.
+
+### The `[waterfall]` table
+
+The `waterfall` system draws the same band array `spectrum` does, but keeps its history: every
+`row_period` seconds the current levels become a new row at the front of a landscape, and the older
+rows step back from the camera until the oldest leaves. The table chooses how much history there is
+and how finely it is cut:
+
+```toml
+system = "waterfall"
+
+[waterfall]
+elements   = 48      # bands across a row, 2..=64, default 48
+rows       = 64      # rows drawn, the live front row included, 2..=1024, default 64
+row_period = 0.04    # seconds between two rows, 0.01..=2, default 0.04
+smoothing  = 0.05    # per-band easing, as on [spectrum]; default: instant
+```
+
+| Key | Values | Notes |
+|-----|--------|-------|
+| `elements` | integer `2..=64` | Bands across one row, from the bottom of the spectrum on the left to the top on the right. Default 48. |
+| `rows` | integer `2..=1024` | How many rows the landscape draws, the live front row included. Default 64. |
+| `row_period` | seconds `0.01..=2` | How often a row is pushed. With `rows` it sets how much time the landscape shows: the defaults hold about 2.5 seconds. |
+| `smoothing` | seconds, or `{ attack, release }` | Per-band easing, in the same vocabulary as `[smoothing]`. |
+
+Every key is optional and so is the table: `system = "waterfall"` alone draws the default landscape.
+An out-of-range value is a **surfaced load error** naming what it expected.
+
+Three things are worth knowing before you tune one:
+
+- **The front row is live and the rest are history.** The newest row is the current eased level,
+  redrawn every frame; a pushed row fades in over its first period and the oldest fades out over its
+  last, so the landscape scrolls without popping.
+- **Depth is `row_spacing` times `rows`.** `row_spacing` in `[params]` is the world distance between
+  two rows, so a long history at a wide spacing reaches far behind the camera's focus. `fade` dims
+  the far rows against the front edge, and `line_width` narrows with distance.
+- **The tier caps the rows.** A landscape is drawn from the same per-tier segment budget as the other
+  3D line systems, `elements - 1` segments per row, so a `rows` past what the tier allows is clamped
+  and the app says so. A wide, deep landscape at a large `aperture` is the expensive case.
+
+The camera is the shared one: `yaw`, `pitch`, `distance`, `fov`, `focus` and `aperture` behave as on
+`plexus`. The full parameter list is the `waterfall` table of
+[`presets/README.md`](../presets/README.md).
 
 ### The `[feedback]` table
 

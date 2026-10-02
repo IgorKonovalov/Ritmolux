@@ -603,6 +603,29 @@ cube two units across — or `sheet` — a rippled jittered grid), `points` and 
 The same `focus` / `aperture` pair blurs the attractor's 3D families (`thomas`, `lorenz`), on the
 same 0-nearest scale, and does nothing on the flat maps.
 
+## `waterfall` — the spectrum's recent past as a landscape through a camera
+*Terrain, scrolling history, Joy Division ridges, a sonogram in 3D.* Family `waterfall`
+(`waterfall_*.toml`). The band array `spectrum` draws, kept as history: every `row_period` seconds
+the current levels become a new row at the front, and older rows recede until the oldest leaves.
+Seen through the shared camera (ADR-0257), so `yaw`, `pitch`, `distance`, `fov`, `focus` and
+`aperture` behave as on `plexus`. **No preset ships yet**: the ranges come from
+`docs/examples/waterfall/landscape.toml`, the golden fixture and the plan's cost probes, so treat
+them as a starting point and sweep. The `[waterfall]` table (`elements`, `rows`, `row_period`,
+`smoothing`) is in `docs/presets.md`.
+
+| Param | Typical | Controls / natural driver |
+|-------|---------|---------------------------|
+| `row_period` (`[waterfall]`) | `0.03 – 0.08` s | How often a row is pushed. Short reads as smooth flowing terrain; past about `0.2` each row is a distinct step. With `rows` it sets how many seconds the landscape shows. |
+| `rows` (`[waterfall]`) | `24 – 96` | How deep the history is. The tier clamps it to `seg3d_segments / (elements - 1)` and says so, so a high `elements` buys fewer rows. |
+| `elements` (`[waterfall]`) | `32 – 48` | Bands across a row. Fewer reads as broad ridges, more as fine detail. |
+| `height` | `0.6 – 0.9` | How tall a full band stands; a row is 2 across. The main lever for drama. |
+| `row_spacing` | `0.05 – 0.12` | Depth between rows. Times `rows`, it is how far the landscape reaches behind the front. |
+| `fade` | `0.7 – 0.85` | How dark the farthest row is against the front edge. It is the landscape's distance cue, so keep it above about `0.5`. |
+| `pitch` / `distance` | `0.35 – 0.5` / `3 – 3.5` | Looking down the rows from a little above. A `pitch` near `0` piles the far rows into a band above the horizon, which is the costly shape. |
+| `aperture` | `0 – 12` px | **The blur away from the focal plane, and it costs fill.** Wide near rows span the frame, so a blurred front row is a band across the whole screen. At `12` or under it draws as written on every tier. |
+| `focus` | `0.1 – 0.3` | On the front rows, so history blurs away behind the present. |
+| `line_width` | `1.5 – 2.5` px | At the focal plane; nearer rows are wider, farther ones thinner. |
+
 ---
 
 ## Engine-wide stages (any system)

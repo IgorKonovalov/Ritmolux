@@ -436,6 +436,26 @@ music should move the camera, the focus or how much of it is connected. Wide blu
 so the quality tier caps it. The layouts and every structural key are in the
 [`[plexus]` table](presets.md#the-plexus-table).
 
+### `waterfall`
+
+![A landscape of thin coloured lines seen from a little above: row after row of the music's spectrum
+laid out front to back, low frequencies in green on the left rising into tall yellow and orange
+peaks in the middle and settling into low magenta ridges on the right, the rows receding toward a
+horizon on black](images/gallery/waterfall.png)
+
+*The teaching preset [`docs/examples/waterfall/landscape.toml`](examples/waterfall/landscape.toml);
+the system ships no preset yet*
+
+The **spectrum's recent past as terrain**. Every fraction of a second the current band levels become
+a new row at the front, and the rows before it step back into the distance, so a sustained note
+leaves a ridge running away from you and a drum hit leaves a single crest that recedes. It is the
+`spectrum` system's data with a memory, seen through the same camera as `plexus`: orbit it, look
+along it from low down, or put the focal plane on the front row and let the past blur away.
+
+**Reach for this when** the look is the music's shape over the last few seconds rather than this
+instant. `rows` and `row_period` set how much history there is, in the
+[`[waterfall]` table](presets.md#the-waterfall-table).
+
 ---
 
 ## 3. The three surfaces

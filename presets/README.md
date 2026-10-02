@@ -91,6 +91,7 @@ such flag and always draws at the full scale).
   - [System: `analytic_field`](#system-analytic_field)
   - [System: `cellular`](#system-cellular)
   - [System: `plexus`](#system-plexus)
+  - [System: `waterfall`](#system-waterfall)
   - [Engine stage: `background`](#engine-stage-background)
   - [Engine stage: `trails`](#engine-stage-trails)
   - [Engine stage: `kaleidoscope`](#engine-stage-kaleidoscope)

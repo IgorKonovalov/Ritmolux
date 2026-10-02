@@ -204,8 +204,8 @@ struct Ring {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Walking skeleton: a scrolling landscape | dev | done | 76976a1e |
-| 2 — Caps, the golden and determinism | dev | done | committed with this row |
-| 3 — Documentation and the references | dev | not started | |
+| 2 — Caps, the golden and determinism | dev | done | 89aa720d |
+| 3 — Documentation and the references | dev | done | committed with this row |
 | 4 — The look, judged | human | not started | |
 
 ### Notes
@@ -277,15 +277,27 @@ struct Ring {
   the system ships no preset, so the sweeps hold none of it. The full sweeps are the pre-review
   gate's.
 
+- Phase 3 was done by an interactive session at the owner's request, after the conductor parked the
+  plan `claude_dir` on `.claude/skills/preset-author/references/systems.md`. Its regeneration step
+  changed nothing in the params block or `presets/schema/`, which Phases 1 and 2 had kept current;
+  `node scripts/toc.mjs` did add the missing `waterfall` row to `presets/README.md`'s contents block.
+- Phase 3's guide picture is the gallery image Phase 1 already rendered,
+  `docs/images/gallery/waterfall.png`, so `docs/images/` is not touched.
+- Phase 3's `systems.md` ranges come from the teaching preset, the golden fixture and Phase 2's cost
+  probes, because no waterfall preset ships yet. The section says so.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** generated files only: `presets/README.md`, `presets/schema/`,
+  `presets/preset.schema.json` and `.taplo.toml`. No preset added or removed.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature: the `waterfall` system.
+- **Operator docs touched:** `docs/presets.md`, `docs/preset-guide.md`, `docs/on-device-validation.md`,
+  `presets/README.md` (generated), `.claude/skills/preset-author/references/systems.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 55 reductions across 27 live
+  entries (3 unprobeable), on the lane before it merges `main`.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** Phase 4, the look judged.
 
 ## Followups (after this lands)
 

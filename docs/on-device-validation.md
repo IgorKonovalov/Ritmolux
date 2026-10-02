@@ -271,6 +271,20 @@ footprint so the vendor spread is on record.
       ≥ 60 @ 1080p, **(b)** the p99, and **(c)** what the standalone prints about the clamps. **If
       it misses, the lever is the `seg3d_segments` cap**, which Plans 0237 and 0238 also size from,
       so it routes to `architect` with the numbers.
+- [ ] **The waterfall system at the Floor cap, on the low-end box, 1080p.** Plan 0238 added
+      `waterfall`, a landscape of spectrum rows drawn through the shared camera from the same
+      `seg3d_segments` budget, `elements - 1` segments a row. Its two worst shapes were measured on
+      the development box's integrated GPU (headless, release build, Floor): long blurred near rows
+      at a low `pitch`, 0.69 ms sharp and 0.82 ms blurred, and far rows piled above the horizon at
+      `pitch` near 0, 0.91 ms sharp and 1.41 ms blurred. Load
+      `docs/examples/waterfall/landscape.toml` with `elements = 64`, `rows = 1024` (clamped to the
+      cap), `line_width = "8"`, `fade = "0"` and `aperture = "24"`, once at `pitch = "0.15"` and once
+      at `pitch = "0.02"`. Overlay on (`F3`), report **(a)** whether fps holds ≥ 60 @ 1080p,
+      **(b)** the p99, and **(c)** what the standalone prints about the row clamp.
+- [ ] **The waterfall system's look, any box, with music.** Load
+      `docs/examples/waterfall/landscape.toml` and say whether a sustained note reads as a ridge
+      running away from the camera and a hit as a crest that recedes, whether rows arrive and leave
+      without popping, and whether the landscape reads as depth or as flat stacked lines.
 ### Displays, inputs and outputs
 
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
