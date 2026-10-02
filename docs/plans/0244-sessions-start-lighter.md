@@ -189,7 +189,7 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `CLAUDE.md` becomes an orientation map | dev | done | c9205236 (moves 1-4), 79c7035a (move 5) |
-| 2 — The plans index keeps only the recent closes | dev | done | committed with this row |
+| 2 — The plans index keeps only the recent closes | dev | done | a5d2dd2a |
 | 3 — The architect skill loads its review and close on demand | human | not started | |
 
 ### Notes
@@ -213,3 +213,14 @@ flowchart LR
   refers to that one rather than restating the measurement.
 
 ### Close triggers
+
+- **`presets/` touched:** no
+- **Plan header `Closes:`** none (the header has no `Closes:` line)
+- **What shipped:** docs-chore-only (`CLAUDE.md`, `README.md`, `docs/developing.md`,
+  `docs/releasing.md`, `scripts/README.md` new, `site/README.md`, the plans index and its archive)
+- **Operator docs touched:** `docs/developing.md` (machine setup and debug info, under "Building"),
+  `docs/releasing.md` (one sentence on the install pages), `scripts/README.md` (new: the gate roster)
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 55 reductions hold across
+  27 live entries, 3 unprobeable; no entry named as failing
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** Phase 3, which is marked `Blocks merge: no`
