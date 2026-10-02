@@ -1,6 +1,6 @@
 # 0236 — Space curves, and the camera becomes a shared block
 
-> **Status:** approved (2026-10-01). Runs after Plan 0235 closes.
+> **Status:** in-progress (2026-10-02). Runs after Plan 0235 closes.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed), [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md), [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md)
@@ -181,11 +181,11 @@ pub(crate) struct FamilyArm3d {
 
 ## Implementation log
 
-**Lane:**
+**Lane:** `plan-0236-space-curves-and-the-camera-becomes-a-shared-block`, worktree `/home/igor/Work/rlx-plan-0236`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The camera becomes a shared block | dev | not started | |
+| 1 — The camera becomes a shared block | dev | done | committed with this row |
 | 2 — Walking skeleton: a torus knot in perspective | dev | not started | |
 | 3 — `lissajous_3d`, and the family table | dev | not started | |
 | 4 — The `seg3d_segments` cap, measured, and the goldens | dev | not started | |
@@ -193,6 +193,13 @@ pub(crate) struct FamilyArm3d {
 | 6 — The look, judged | human | not started | |
 
 ### Notes
+
+- Phase 1 touched two files outside its list. `core/tests/suite/preset.rs`: `declared_params_match_set_param`
+  gains a `CAMERA_BLOCK` filter and delegation check, as for `PAN_BLOCK`, because plexus no longer
+  matches the six names itself. `presets/preset.schema.json` is regenerated beside `presets/schema/`
+  by the same switch, and differs in the same five doc strings.
+- Phase 1's goldens were read on llvmpipe, where the plexus baselines were blessed: `plexus` and
+  `plexus_sheet` both read mean 0.0000, outlier 0. WARP was not run.
 
 ### Close triggers
 

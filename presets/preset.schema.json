@@ -3580,18 +3580,18 @@
     },
     "param.yaw": {
       "type": "string",
-      "description": "Turns the camera around the network, in radians; bind it to a slow clock to orbit.",
-      "markdownDescription": "Turns the camera around the network, in radians; bind it to a slow clock to orbit.\n\n- default `0.0`\n- typical range `-3.1415927` to `3.1415927` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.",
+      "markdownDescription": "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.\n\n- default `0.0`\n- typical range `-3.1415927` to `3.1415927` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.pitch": {
       "type": "string",
-      "description": "Raises the camera above the network, in radians; negative looks up from below.",
-      "markdownDescription": "Raises the camera above the network, in radians; negative looks up from below.\n\n- default `0.25`\n- typical range `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Raises the camera above the scene's volume, in radians; negative looks up from below.",
+      "markdownDescription": "Raises the camera above the scene's volume, in radians; negative looks up from below.\n\n- default `0.25`\n- typical range `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.distance": {
       "type": "string",
-      "description": "How far the camera sits from the network's centre; nearer exaggerates the perspective.",
-      "markdownDescription": "How far the camera sits from the network's centre; nearer exaggerates the perspective.\n\n- default `3.5`\n- typical range `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.",
+      "markdownDescription": "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.\n\n- default `3.5`\n- typical range `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.fov": {
       "type": "string",
@@ -3600,13 +3600,13 @@
     },
     "param.focus.plexus": {
       "type": "string",
-      "description": "Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest.",
-      "markdownDescription": "Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.",
+      "markdownDescription": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.aperture.plexus": {
       "type": "string",
-      "description": "The blur of the far background, in pixels; lines nearer than the focal plane blur more, up to the tier's cap. 0 keeps every line sharp, and wider costs fill.",
-      "markdownDescription": "The blur of the far background, in pixels; lines nearer than the focal plane blur more, up to the tier's cap. 0 keeps every line sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
+      "markdownDescription": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.hue_center.plexus": {
       "type": "string",

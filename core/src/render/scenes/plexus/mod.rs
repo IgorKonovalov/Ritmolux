@@ -40,7 +40,7 @@
 pub(crate) mod sim;
 
 use crate::dsp::AnalysisFrame;
-use crate::render::camera::{Camera3d, CameraUniform, Lens};
+use crate::render::camera::{self, CameraParams};
 use crate::render::palette::{self, Palette};
 use crate::render::scenes::common::{PaletteParams, PanParams};
 use crate::render::scenes::lines::{GeneratorConfig, LineRenderer, Segment3dInstance};
@@ -118,25 +118,14 @@ impl Default for PlexusConfig {
 /// since the look this system is for is a fine luminous line.
 const SOFTNESS: f32 = 0.5;
 
-/// How far past the frame an edge may lie before it is culled, in normalized
-/// device units — room for the stroke's own width, so a line whose centre has
-/// left the frame does not take its visible edge with it.
-const CULL_MARGIN: f32 = 0.05;
-
 const DEFAULT_LINK_DISTANCE: f32 = default_of(PARAMS, "link_distance");
 const DEFAULT_LINK_ALPHA: f32 = default_of(PARAMS, "link_alpha");
 const DEFAULT_LINE_WIDTH: f32 = default_of(PARAMS, "line_width");
 const DEFAULT_DRIFT: f32 = default_of(PARAMS, "drift");
 const DEFAULT_WAVE: f32 = default_of(PARAMS, "wave");
 const DEFAULT_WAVE_SCALE: f32 = default_of(PARAMS, "wave_scale");
-const DEFAULT_YAW: f32 = default_of(PARAMS, "yaw");
-const DEFAULT_PITCH: f32 = default_of(PARAMS, "pitch");
-const DEFAULT_DISTANCE: f32 = default_of(PARAMS, "distance");
-const DEFAULT_FOV: f32 = default_of(PARAMS, "fov");
 const DEFAULT_NODE_SIZE: f32 = default_of(PARAMS, "node_size");
 const DEFAULT_NODE_GLOW: f32 = default_of(PARAMS, "node_glow");
-const DEFAULT_FOCUS: f32 = default_of(PARAMS, "focus");
-const DEFAULT_APERTURE: f32 = default_of(PARAMS, "aperture");
 const DEFAULT_BRIGHTNESS: f32 = default_of(PARAMS, "brightness");
 const DEFAULT_HUE_CENTER: f32 = default_of(PARAMS, "hue_center");
 const DEFAULT_HUE_SPREAD: f32 = default_of(PARAMS, "hue_spread");
@@ -217,60 +206,12 @@ pub const PARAMS: &[ParamSpec] = &[
         group: ParamGroup::Shape,
         main: false,
     },
-    ParamSpec {
-        name: "yaw",
-        default: 0.0,
-        range: Some([-std::f32::consts::PI, std::f32::consts::PI]),
-        doc: "Turns the camera around the network, in radians; bind it to a slow clock to orbit.",
-        kind: ParamKind::Modal,
-        group: ParamGroup::Motion,
-        main: false,
-    },
-    ParamSpec {
-        name: "pitch",
-        default: 0.25,
-        range: Some([-1.55, 1.55]),
-        doc: "Raises the camera above the network, in radians; negative looks up from below.",
-        kind: ParamKind::Modal,
-        group: ParamGroup::Motion,
-        main: false,
-    },
-    ParamSpec {
-        name: "distance",
-        default: 3.5,
-        range: Some([1.5, 8.0]),
-        doc: "How far the camera sits from the network's centre; nearer exaggerates the perspective.",
-        kind: ParamKind::Modal,
-        group: ParamGroup::Motion,
-        main: false,
-    },
-    ParamSpec {
-        name: "fov",
-        default: 0.8,
-        range: Some([0.2, 2.0]),
-        doc: "The camera's vertical field of view in radians; zoom divides it.",
-        kind: ParamKind::Modal,
-        group: ParamGroup::Motion,
-        main: false,
-    },
-    ParamSpec {
-        name: "focus",
-        default: 0.5,
-        range: Some([0.0, 1.0]),
-        doc: "Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest.",
-        kind: ParamKind::Modal,
-        group: ParamGroup::Light,
-        main: true,
-    },
-    ParamSpec {
-        name: "aperture",
-        default: 0.0,
-        range: Some([0.0, crate::render::TierConfig::RICH.max_coc_px as f32]),
-        doc: "The blur of the far background, in pixels; lines nearer than the focal plane blur more, up to the tier's cap. 0 keeps every line sharp, and wider costs fill.",
-        kind: ParamKind::Modal,
-        group: ParamGroup::Light,
-        main: true,
-    },
+    camera::YAW,
+    camera::PITCH,
+    camera::DISTANCE,
+    camera::FOV,
+    camera::FOCUS,
+    camera::APERTURE,
     crate::render::scenes::common::brightness(1.0),
     ParamSpec {
         name: "hue_center",
@@ -360,17 +301,12 @@ pub struct PlexusScene {
     drift: f32,
     wave: f32,
     wave_scale: f32,
-    yaw: f32,
-    pitch: f32,
-    distance: f32,
-    fov: f32,
-    focus: f32,
-    aperture: f32,
     hue_center: f32,
     hue_spread: f32,
     zoom: f32,
     colour: PaletteParams,
     pan: PanParams,
+    camera: CameraParams,
 }
 
 impl PlexusScene {
@@ -407,29 +343,12 @@ impl PlexusScene {
             drift: DEFAULT_DRIFT,
             wave: DEFAULT_WAVE,
             wave_scale: DEFAULT_WAVE_SCALE,
-            yaw: DEFAULT_YAW,
-            pitch: DEFAULT_PITCH,
-            distance: DEFAULT_DISTANCE,
-            fov: DEFAULT_FOV,
-            focus: DEFAULT_FOCUS,
-            aperture: DEFAULT_APERTURE,
             hue_center: DEFAULT_HUE_CENTER,
             hue_spread: DEFAULT_HUE_SPREAD,
             zoom: DEFAULT_ZOOM,
             colour: PaletteParams::new(0.0, DEFAULT_BRIGHTNESS),
             pan: PanParams::default(),
-        }
-    }
-
-    /// The camera this frame's parameters describe.
-    fn camera(&self) -> Camera3d {
-        Camera3d {
-            yaw: self.yaw,
-            pitch: self.pitch,
-            distance: self.distance,
-            fov: self.fov,
-            focus: self.focus,
-            aperture: self.aperture,
+            camera: CameraParams::default(),
         }
     }
 
@@ -492,23 +411,19 @@ impl Scene for PlexusScene {
         self.drift = DEFAULT_DRIFT;
         self.wave = DEFAULT_WAVE;
         self.wave_scale = DEFAULT_WAVE_SCALE;
-        self.yaw = DEFAULT_YAW;
-        self.pitch = DEFAULT_PITCH;
-        self.distance = DEFAULT_DISTANCE;
-        self.fov = DEFAULT_FOV;
-        self.focus = DEFAULT_FOCUS;
-        self.aperture = DEFAULT_APERTURE;
         self.hue_center = DEFAULT_HUE_CENTER;
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.zoom = DEFAULT_ZOOM;
         self.colour.reset();
         self.pan.reset();
+        self.camera.reset();
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
         // The shared param blocks first, this scene's own names after
-        // (`scenes::common`).
-        if self.colour.set(name, value) || self.pan.set(name, value) {
+        // (`scenes::common`, `render::camera`).
+        if self.colour.set(name, value) || self.pan.set(name, value) || self.camera.set(name, value)
+        {
             return;
         }
         match name {
@@ -520,12 +435,6 @@ impl Scene for PlexusScene {
             "drift" => self.drift = value,
             "wave" => self.wave = value,
             "wave_scale" => self.wave_scale = value,
-            "yaw" => self.yaw = value,
-            "pitch" => self.pitch = value,
-            "distance" => self.distance = value,
-            "fov" => self.fov = value,
-            "focus" => self.focus = value,
-            "aperture" => self.aperture = value,
             "hue_center" => self.hue_center = value,
             "hue_spread" => self.hue_spread = value,
             "zoom" => self.zoom = value,
@@ -558,36 +467,20 @@ impl Scene for PlexusScene {
         aspect: f32,
     ) {
         // The aspect is the render target's, handed in here (ADR-0037).
-        let camera = self.camera();
-        let cam = camera.view(aspect, self.zoom, [self.pan.x, self.pan.y]);
-        let radius = self.points.bounding_radius();
-        let near_extent = cam.distance - radius;
-        let far_extent = cam.distance + radius;
-        let span = far_extent - near_extent;
-        let lens = Lens::new(
-            camera.aperture,
-            cam.focal_depth(camera.focus, radius),
+        let frame = self.camera.frame(
+            aspect,
+            self.zoom,
+            [self.pan.x, self.pan.y],
+            self.target,
+            self.points.bounding_radius(),
             self.max_coc,
         );
-        // The aperture is the far field's blur, the one the lens approaches
-        // and never passes behind focus; past the cap that is what draws
-        // shallower, and it is announced unless the graph's own cap already
-        // is. The near side is unbounded and saturates at the cap by design,
-        // so it is never judged (ADR-0257).
-        if self.clamp.is_none() && lens.aperture > lens.max_coc {
-            self.clamp = Some(super::CapOverflow {
-                dropped: 0,
-                context: super::OverflowContext::Blur(lens.aperture.ceil() as u32),
-                cap: lens.max_coc as usize,
-            });
+        let (cam, margin) = (frame.view, frame.margin);
+        let (near_extent, span) = (frame.near_extent, frame.span);
+        // The blur clamp is announced unless the graph's own cap already is.
+        if self.clamp.is_none() {
+            self.clamp = frame.blur;
         }
-        // A blurred stroke reaches past its centreline by up to the cap, so
-        // the cull keeps that much more of the frame's surround.
-        let margin = if lens.aperture > 0.0 {
-            CULL_MARGIN + 2.0 * lens.max_coc / self.target.1.max(1) as f32
-        } else {
-            CULL_MARGIN
-        };
         let link_alpha = self.link_alpha.clamp(0.0, 1.0);
         let width = if self.line_width.is_finite() {
             self.line_width.max(0.0)
@@ -629,7 +522,7 @@ impl Scene for PlexusScene {
             });
         }
 
-        let uniform = CameraUniform::new(&cam, self.target.0, self.target.1, lens);
+        let uniform = frame.uniform;
         self.lines
             .draw_3d(queue, encoder, view, &uniform, 1.0, SOFTNESS, &instances);
         self.instances = instances;

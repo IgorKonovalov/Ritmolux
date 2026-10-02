@@ -2166,6 +2166,10 @@ const PALETTE_BLOCK: &[&str] = &[
     "brightness",
 ];
 const PAN_BLOCK: &[&str] = &["pan_x", "pan_y"];
+/// The six camera names a 3D system delegates to
+/// `render::camera::CameraParams` (ADR-0258); held there by that module's own
+/// roster test, and here by the delegation check below.
+const CAMERA_BLOCK: &[&str] = &["yaw", "pitch", "distance", "fov", "focus", "aperture"];
 
 /// Drift guard (ADR-0020's flagged risk): each declared `PARAMS` list must be
 /// exactly the set of names its `set_param` match handles. The two sit side by
@@ -2344,6 +2348,20 @@ fn declared_params_match_set_param() {
                 file.display(),
             );
         }
+        // A file that delegates to the camera block declares the whole block;
+        // one that does not (the attractor's own `focus`/`aperture`) matches
+        // its camera names itself and is scanned for them like any other.
+        let delegates_camera = text.contains("self.camera.set(name, value)");
+        if delegates_camera {
+            for name in CAMERA_BLOCK {
+                assert!(
+                    declared.contains(name),
+                    "{}: delegates to `self.camera.set(name, value)` but does not \
+                     declare `{name}`, so the block is answered and not bindable",
+                    file.display(),
+                );
+            }
+        }
 
         let mut declared_sorted: Vec<&str> = declared
             .iter()
@@ -2352,6 +2370,7 @@ fn declared_params_match_set_param() {
                 !name.starts_with("fb_")
                     && !PALETTE_BLOCK.contains(name)
                     && !PAN_BLOCK.contains(name)
+                    && !(delegates_camera && CAMERA_BLOCK.contains(name))
             })
             .collect();
         declared_sorted.sort_unstable();

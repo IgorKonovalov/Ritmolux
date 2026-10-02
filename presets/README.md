@@ -1004,12 +1004,12 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `drift` | `0.15` | `0` – `1` | How fast the points drift on their flow; 0 holds the network still. | motion, main |
 | `wave` | `0.15` | `sheet` `0` – `0.6`; inert on `cloud` | How far a sheet ripples above and below its plane, in the layout's own units; 0 lies flat. | shape, main |
 | `wave_scale` | `1` | `sheet` `0.3` – `3`; inert on `cloud` | How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop. | shape |
-| `yaw` | `0` | `-3.1415927` – `3.1415927` | Turns the camera around the network, in radians; bind it to a slow clock to orbit. | motion |
-| `pitch` | `0.25` | `-1.55` – `1.55` | Raises the camera above the network, in radians; negative looks up from below. | motion |
-| `distance` | `3.5` | `1.5` – `8` | How far the camera sits from the network's centre; nearer exaggerates the perspective. | motion |
+| `yaw` | `0` | `-3.1415927` – `3.1415927` | Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit. | motion |
+| `pitch` | `0.25` | `-1.55` – `1.55` | Raises the camera above the scene's volume, in radians; negative looks up from below. | motion |
+| `distance` | `3.5` | `1.5` – `8` | How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective. | motion |
 | `fov` | `0.8` | `0.2` – `2` | The camera's vertical field of view in radians; zoom divides it. | motion |
-| `focus` | `0.5` | `0` – `1` | Where the focal plane sits in the network's depth: 0 at its nearest point, 1 at its farthest. | light, main |
-| `aperture` | `0` | `0` – `24` | The blur of the far background, in pixels; lines nearer than the focal plane blur more, up to the tier's cap. 0 keeps every line sharp, and wider costs fill. | light, main |
+| `focus` | `0.5` | `0` – `1` | Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest. | light, main |
+| `aperture` | `0` | `0` – `24` | The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill. | light, main |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
 | `hue_center` | `0.5` | `0` – `1` | Where along the palette the middle of the volume's depth is coloured. | colour |
 | `hue_spread` | `0.5` | `0` – `1` | How far along the palette the colour travels from the nearest part of the volume to the farthest. | colour |

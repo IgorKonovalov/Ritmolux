@@ -2,9 +2,12 @@
 // hot-path pragma — this is not the render path.
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
-use super::{CAMERA_WGSL, Camera3d, CameraUniform, CameraView, Lens, NEAR};
+use super::{
+    CAMERA_WGSL, CULL_MARGIN, Camera3d, CameraParams, CameraUniform, CameraView, Lens, NEAR,
+};
 use crate::render::RenderError;
 use crate::render::context::RenderContext;
+use crate::render::scenes::{CapOverflow, OverflowContext};
 
 /// The camera most tests look through: level, straight down `-z`, the origin
 /// four units away.
@@ -453,4 +456,95 @@ fn a_non_finite_camera_still_projects() {
             assert!(cell.is_finite(), "{:?}", view.view_proj);
         }
     }
+}
+
+/// **The block answers exactly its six specs**, rests at their defaults, and
+/// `reset` returns there.
+#[test]
+fn the_camera_block_answers_exactly_its_specs() {
+    let mut params = CameraParams::default();
+    for spec in CameraParams::SPECS {
+        assert!(params.set(spec.name, 0.75), "`{}` is dropped", spec.name);
+    }
+    assert_eq!(
+        params,
+        CameraParams {
+            yaw: 0.75,
+            pitch: 0.75,
+            distance: 0.75,
+            fov: 0.75,
+            focus: 0.75,
+            aperture: 0.75,
+        }
+    );
+    for name in ["zoom", "pan_x", "line_width", "", "Yaw"] {
+        assert!(!params.set(name, 0.0), "`{name}` is not the camera's");
+    }
+    params.reset();
+    let rest = CameraParams::default();
+    for (spec, value) in CameraParams::SPECS.iter().zip([
+        rest.yaw,
+        rest.pitch,
+        rest.distance,
+        rest.fov,
+        rest.focus,
+        rest.aperture,
+    ]) {
+        assert_eq!(spec.default, value, "`{}` rests off its spec", spec.name);
+    }
+    assert_eq!(params, rest);
+}
+
+/// **The helper resolves the lens as each piece does on its own**: the view
+/// and uniform are `Camera3d::view` and `CameraUniform::new` through
+/// `Lens::new`, the margin widens only when the lens blurs, and the blur
+/// clamp is reported only past the cap.
+#[test]
+fn the_lens_helper_is_the_pieces_composed() {
+    let params = CameraParams {
+        yaw: 0.4,
+        pitch: 0.2,
+        distance: 3.0,
+        fov: 0.9,
+        focus: 0.3,
+        aperture: 10.0,
+    };
+    let (target, radius, max_coc) = ((1280, 800), 1.2, 16.0);
+    let frame = params.frame(1.6, 1.25, [0.1, -0.05], target, radius, max_coc);
+    let view = params.camera().view(1.6, 1.25, [0.1, -0.05]);
+    let lens = Lens::new(10.0, view.focal_depth(0.3, radius), max_coc);
+    assert_eq!(frame.view, view);
+    assert_eq!(
+        frame.uniform,
+        CameraUniform::new(&view, target.0, target.1, lens)
+    );
+    assert_eq!(frame.near_extent, view.distance - radius);
+    assert_eq!(
+        frame.span,
+        (view.distance + radius) - (view.distance - radius)
+    );
+    assert_eq!(frame.margin, CULL_MARGIN + 2.0 * max_coc / 800.0);
+    assert_eq!(frame.blur, None);
+
+    let sharp = CameraParams {
+        aperture: 0.0,
+        ..params
+    };
+    let frame = sharp.frame(1.6, 1.25, [0.1, -0.05], target, radius, max_coc);
+    assert_eq!(frame.margin, CULL_MARGIN);
+    assert_eq!(frame.blur, None);
+
+    let wide = CameraParams {
+        aperture: 40.5,
+        ..params
+    };
+    let frame = wide.frame(1.6, 1.25, [0.1, -0.05], target, radius, max_coc);
+    assert_eq!(
+        frame.blur,
+        Some(CapOverflow {
+            dropped: 0,
+            context: OverflowContext::Blur(41),
+            cap: 16,
+        })
+    );
 }

@@ -48,6 +48,10 @@
     clippy::unreachable
 )]
 
+use crate::render::scenes::{
+    CapOverflow, OverflowContext, ParamGroup, ParamKind, ParamSpec, default_of,
+};
+
 /// The WGSL half: the `Camera` uniform's shape and `project()`, prepended to
 /// each 3D pipeline's own shader. It declares no binding.
 pub(crate) const CAMERA_WGSL: &str = include_str!("camera.wgsl");
@@ -309,6 +313,219 @@ impl CameraUniform {
                 0.0,
             ],
             lens: [lens.aperture, lens.focal_depth, lens.max_coc, 0.0],
+        }
+    }
+}
+
+/// How far past the frame a primitive may lie before it is culled, in
+/// normalized device units — room for the stroke's own width, so a line whose
+/// centre has left the frame does not take its visible edge with it.
+pub(crate) const CULL_MARGIN: f32 = 0.05;
+
+/// `yaw`, shared: the orbit's turn about the volume.
+pub(crate) const YAW: ParamSpec = ParamSpec {
+    name: "yaw",
+    default: 0.0,
+    range: Some([-std::f32::consts::PI, std::f32::consts::PI]),
+    doc: "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Motion,
+    main: false,
+};
+
+/// `pitch`, shared: the orbit's elevation.
+pub(crate) const PITCH: ParamSpec = ParamSpec {
+    name: "pitch",
+    default: 0.25,
+    range: Some([-MAX_PITCH, MAX_PITCH]),
+    doc: "Raises the camera above the scene's volume, in radians; negative looks up from below.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Motion,
+    main: false,
+};
+
+/// `distance`, shared: eye to orbit target.
+pub(crate) const DISTANCE: ParamSpec = ParamSpec {
+    name: "distance",
+    default: 3.5,
+    range: Some([1.5, 8.0]),
+    doc: "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Motion,
+    main: false,
+};
+
+/// `fov`, shared: the vertical field of view.
+pub(crate) const FOV: ParamSpec = ParamSpec {
+    name: "fov",
+    default: 0.8,
+    range: Some([0.2, 2.0]),
+    doc: "The camera's vertical field of view in radians; zoom divides it.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Motion,
+    main: false,
+};
+
+/// `focus`, shared: the focal plane, normalized across the volume's depth.
+pub(crate) const FOCUS: ParamSpec = ParamSpec {
+    name: "focus",
+    default: 0.5,
+    range: Some([0.0, 1.0]),
+    doc: "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Light,
+    main: true,
+};
+
+/// `aperture`, shared: the far field's circle of confusion, in pixels. Its
+/// range tops out at the highest tier's cap; a lower tier draws at its own cap
+/// and announces it.
+pub(crate) const APERTURE: ParamSpec = ParamSpec {
+    name: "aperture",
+    default: 0.0,
+    range: Some([0.0, crate::render::TierConfig::RICH.max_coc_px as f32]),
+    doc: "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Light,
+    main: true,
+};
+
+/// The six camera params a 3D system binds, as one block (ADR-0258), in the
+/// shape of [`PanParams`](crate::render::scenes::common::PanParams): the
+/// `ParamSpec`s declared once here and spliced into each system's `PARAMS`,
+/// and a setter each scene's `set_param` delegates to.
+///
+/// **Nothing here clamps.** [`Camera3d::view`] and [`Lens::new`] make every
+/// raw bound value safe where it is read.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct CameraParams {
+    /// `yaw`, in radians.
+    pub yaw: f32,
+    /// `pitch`, in radians.
+    pub pitch: f32,
+    /// `distance`, in world units.
+    pub distance: f32,
+    /// `fov`, in radians.
+    pub fov: f32,
+    /// `focus`, `0` the volume's nearest extent and `1` its farthest.
+    pub focus: f32,
+    /// `aperture`, in pixels.
+    pub aperture: f32,
+}
+
+impl Default for CameraParams {
+    fn default() -> Self {
+        let rest = |name| default_of(&Self::SPECS, name);
+        Self {
+            yaw: rest("yaw"),
+            pitch: rest("pitch"),
+            distance: rest("distance"),
+            fov: rest("fov"),
+            focus: rest("focus"),
+            aperture: rest("aperture"),
+        }
+    }
+}
+
+/// One frame of the shared lens logic, for a scene to clip, cull and draw by.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct CameraFrame {
+    /// The projection, for clipping and culling on the CPU.
+    pub view: CameraView,
+    /// The uniform every 3D pipeline binds.
+    pub uniform: CameraUniform,
+    /// The cull margin, in normalized device units, widened by the blur cap
+    /// when the lens blurs at all.
+    pub margin: f32,
+    /// The view depth of the volume's nearest extent.
+    pub near_extent: f32,
+    /// The view depth from the volume's nearest extent to its farthest.
+    pub span: f32,
+    /// The blur clamp to announce when `aperture` is past the tier's cap.
+    pub blur: Option<CapOverflow>,
+}
+
+impl CameraParams {
+    /// The six specs, in the order a system splices them.
+    pub(crate) const SPECS: [ParamSpec; 6] = [YAW, PITCH, DISTANCE, FOV, FOCUS, APERTURE];
+
+    /// Store `value` if `name` is one of the camera's six, and say whether it
+    /// was.
+    pub(crate) fn set(&mut self, name: &str, value: f32) -> bool {
+        match name {
+            "yaw" => self.yaw = value,
+            "pitch" => self.pitch = value,
+            "distance" => self.distance = value,
+            "fov" => self.fov = value,
+            "focus" => self.focus = value,
+            "aperture" => self.aperture = value,
+            _ => return false,
+        }
+        true
+    }
+
+    /// Back to the declared defaults.
+    pub(crate) fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    /// The orbit camera these params describe.
+    pub(crate) fn camera(&self) -> Camera3d {
+        Camera3d {
+            yaw: self.yaw,
+            pitch: self.pitch,
+            distance: self.distance,
+            fov: self.fov,
+            focus: self.focus,
+            aperture: self.aperture,
+        }
+    }
+
+    /// This frame's view, lens and cull margin onto a `target` of pixels at
+    /// `aspect` (the render target's, ADR-0037), for a volume of bounding
+    /// `radius` about the orbit target, with blur held to the tier's `max_coc`.
+    ///
+    /// The aperture is the far field's blur, the one the lens approaches and
+    /// never passes behind focus; past the cap that is what draws shallower,
+    /// and [`CameraFrame::blur`] carries the clamp. The near side is unbounded
+    /// and saturates at the cap by design, so it is never judged (ADR-0257).
+    pub(crate) fn frame(
+        &self,
+        aspect: f32,
+        zoom: f32,
+        pan: [f32; 2],
+        target: (u32, u32),
+        radius: f32,
+        max_coc: f32,
+    ) -> CameraFrame {
+        let camera = self.camera();
+        let view = camera.view(aspect, zoom, pan);
+        let near_extent = view.distance - radius;
+        let far_extent = view.distance + radius;
+        let lens = Lens::new(
+            camera.aperture,
+            view.focal_depth(camera.focus, radius),
+            max_coc,
+        );
+        let blur = (lens.aperture > lens.max_coc).then(|| CapOverflow {
+            dropped: 0,
+            context: OverflowContext::Blur(lens.aperture.ceil() as u32),
+            cap: lens.max_coc as usize,
+        });
+        // A blurred stroke reaches past its centreline by up to the cap, so
+        // the cull keeps that much more of the frame's surround.
+        let margin = if lens.aperture > 0.0 {
+            CULL_MARGIN + 2.0 * lens.max_coc / target.1.max(1) as f32
+        } else {
+            CULL_MARGIN
+        };
+        CameraFrame {
+            view,
+            uniform: CameraUniform::new(&view, target.0, target.1, lens),
+            margin,
+            near_extent,
+            span: far_extent - near_extent,
+            blur,
         }
     }
 }
