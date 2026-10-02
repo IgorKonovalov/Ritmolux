@@ -124,8 +124,8 @@ flowchart LR
     `'pipe'` that JavaScript forwards.
   - The settings test reads and writes both new keys, and `node scripts/check-settings-have-files.mjs`
     exits 0.
-  - **By hand, on a built studio:** an MP3 and a FLAC each render to an MP4 whose duration `ffprobe`
-    reports within one frame of the source's. The log names the two files used.
+  - The by-hand duration check moved to Phase 6 on 2026-10-02: a headless session cannot drive a
+    built studio, and `ffprobe` is not on its allowlist.
 
 ### Phase 3 — The strip and the prompts
 - **Owner skill:** studio-builder
@@ -202,7 +202,9 @@ flowchart LR
   least three prompts each, one at `fast` and one at `quality`. Watch both.
 - **Done when:** The owner records in the log that both files play with audio in sync, that the
   prompt changes land near the bars they were placed on, or that they do not and why, and whether a
-  studio quit mid-render asked first.
+  studio quit mid-render asked first. Before the neural renders, a plain clip of each of the two files
+  (neural off) has an MP4 duration that `ffprobe` reports within one frame of the source's, and the
+  log names the two files.
 
 ## Data shapes
 

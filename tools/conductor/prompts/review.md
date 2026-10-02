@@ -9,7 +9,8 @@ RLX-CONDUCTOR-SUITE-LOCK: node "{{with_lock}}" suite --
 
 This session was started by the Ritmolux conductor (ADR-0205), not by a person. No one will read
 this conversation or answer a question. Enter the `## Conductor mode` section of your skill and
-follow it; where it and the rest of the skill disagree, conductor mode wins.
+follow it; where it and the rest of the skill disagree, conductor mode wins. That section is
+in `.claude/skills/architect/references/review-and-close.md`; read it first.
 
 You are the fresh-session review. You were given the plan and the lane, and nothing an implementer
 wrote except what is in the repository. The lane already carries `main`, merged in by the conductor,

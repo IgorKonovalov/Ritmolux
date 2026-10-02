@@ -58,8 +58,10 @@ filing it as new.
   repeated sub-expression is written out each time.
 
 **Scenes / vocabulary**
-- **Five curve families** since Plan 0162 — `maurer_rose`, `lissajous`, `hypotrochoid`,
-  `superformula`, `harmonograph` — with `pen`, `sym`, `sharpness`, `lobe` and `decay` beside them.
+- **Seven curve families**: five flat since Plan 0162 — `maurer_rose`, `lissajous`, `hypotrochoid`,
+  `superformula`, `harmonograph` — with `pen`, `sym`, `sharpness`, `lobe` and `decay` beside them,
+  and two space families since Plan 0236 — `torus_knot` (`tube`) and `lissajous_3d` (`m`,
+  `phase_z`) — drawn through the shared camera (ADR-0258).
   The epitrochoid needs no arm of its own: it is `hypotrochoid` with a negative `n`. Fractal
   flames stay catalogued (`docs/generative-techniques-catalogue.md`) and unbuilt.
 - **Four star tilings** (4/6/8/12), plus `tiling = "none"` for a rings-only figure. `variant` is a

@@ -1,0 +1,809 @@
+# Review and close — the architect's reference
+
+Read in full by a review, a close, and a conductor `review` or `close` session. It moved here from
+`SKILL.md` so a session that does neither does not load it; nothing in it is optional.
+
+## Mode 4 — Reviewing an implementation
+
+A review fires **once per plan**, after the last phase lands — in a **fresh session** (the
+`dev` close-ceremony prompt tells the user to start one). You review the whole plan's changes,
+not one phase. This is architectural integrity, not line-by-line style. Run five lenses in order:
+
+### 1. Alignment with the plan/ADR
+- **Start by reading the plan's `## Implementation log`** — the brief `dev` left, written into the
+  plan as the phases landed ([ADR-0120](../../../../docs/adrs/0120-the-close-brief-is-a-section-of-the-plan.md)).
+  It hands you the lane, the phase-to-commit mapping, `dev`'s notes and the close triggers, so none
+  of that has to be re-derived. **It is claims, not evidence.** You still open the tests, read the
+  diff and reach your own verdict — a close that grades the log instead of the tree has failed, in
+  exactly the way a green `cargo test` is not a passing test.
+- **Verify the `### Close triggers` `**Full suite:**` bullet — do not trust it.** Since
+  [ADR-0156](../../../../docs/adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
+  the nine GPU suites run **in full once per plan** rather than at every phase — the per-phase
+  `-P fast` tier carries only the declared representatives of three preset sweeps
+  ([ADR-0157](../../../../docs/adrs/0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md))
+  — so that bullet is the only record that the goldens and the full preset sweeps ever ran against
+  the finished tree. Run
+  `cargo nextest run --workspace` yourself — the full run, not `-P fast` — and compare. A green
+  full suite is precisely the claim a deferred gate makes cheapest to get wrong, and a missing or
+  vague bullet is a **blocker**, not a `minor`: it means nothing is known about the drift guards.
+  Run `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` in the same sitting. Since
+  Plan 0196 the hook runs that same `--workspace` command rather than the `-p rlx-core` subset it
+  once did, so this is a re-run and not the only run — but the hook is opt-in per clone,
+  `--no-verify` skips it, and the close is the last gate in front of a tag.
+- **Silence in it is not
+  certification:** done-when results are reported by exception, so a criterion with no note carries
+  `dev`'s *belief* that it passed and nothing more — which is precisely the claim this lens exists
+  to test.
+- **A missing or empty log is a `minor`, never a blocker** — note it and review from `git` exactly
+  as you did before the section existed. **A log longer than the plan's own
+  `## Implementation phases` section is also a `minor`**: the report is not allowed to outweigh the
+  contract, and since nothing gates that property, this check is the only thing behind it.
+- Did the implementation do the phases in the plan? Any missing or added without note?
+- Does every phase have a single, in-vocabulary `**Owner skill:**` tag (`dev` / `studio-builder` /
+  `human`)?
+  Missing/malformed tags are a **blocker**.
+- Were any ADR decisions silently reversed (e.g. ADR-0001 says wgpu, the code pulls in raw
+  OpenGL; or a WASAPI type leaked into `core/`)? If so, either the code changes or a new ADR
+  supersedes the old one.
+- **For every test the plan named, open it and read the assertion body** — don't trust "cargo
+  test was green". Look for: tautological asserts (`assert!(true)`), tests the plan promised
+  that were never written, and assertions that don't match the plan's behavioral claim
+  (e.g. plan said "sine wave → energy in exactly one FFT bin"; test only asserts the vector is
+  non-empty). Cross-check each `assert` against the plan's done-when wording.
+
+### 2. Best practices: layering, coupling, real-time safety
+- **The source-agnostic-core rule.** Any WASAPI / ScreenCaptureKit / foobar / OS type inside
+  `core/` is a layering violation — the #1 thing to catch here. Same for raw GPU calls escaping
+  the wgpu layer.
+- **The audio callback.** Any allocation, lock, `println!`/logging, or file I/O on the capture /
+  `visualisation_stream` thread is a real-time bug, not a style nit. The seam to the render side
+  must be the lock-free ring buffer.
+- **The C ABI contract.** Is the `extern "C"` surface still minimal and versioned? Did a phase
+  widen it casually? ABI shape changes are ADR-worthy. The authority on the surface is
+  [`docs/specs/0001-c-abi.md`](../../../../docs/specs/0001-c-abi.md) — compare against it, and never
+  restate its function roster in a plan, a review or this skill.
+- **The control protocol contract.** The same question for the studio↔player OSC vocabulary and
+  event roster ([ADR-0176](../../../../docs/adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md),
+  [`docs/specs/0003-studio-control-protocol.md`](../../../../docs/specs/0003-studio-control-protocol.md)):
+  widening either is ADR-worthy, and a studio-side shim that routes around a missing message is the
+  same violation seen from the other lane.
+- **God modules / tight coupling.** Files doing five jobs; scene code branching on GPU backend;
+  standalone code reaching past the core's API.
+
+### 3. Doc/diagram freshness & release bookkeeping
+- Are diagrams still accurate after new components/data flows? Update if not.
+- **Operator-doc freshness.** If the plan changed anything a user observes — controls/hotkeys,
+  a default, the preset/scene count, capture paths, CLI flags, config keys — grep the user-facing
+  docs for the thing that changed and update them in the close commit. The canonical set:
+
+  | Doc | Sweep it when the plan touched |
+  |-----|-------------------------------|
+  | `README.md` (esp. the Controls table) | hotkeys, controls, top-level behavior |
+  | **`presets/README.md`** | **the hand-written structural/palette/smoothing tables and essays.** The parameter reference between `<!-- params:begin -->` markers is **generated** from the `ParamSpec` declarations ([ADR-0170](../../../../docs/adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)) — a param added, renamed or re-defaulted means `RLX_UPDATE_PARAM_REFERENCE=1` regenerated it, never a hand edit |
+  | **`presets/schema/*.schema.json` + `.taplo.toml`** | **a `ParamSpec`, a structural table or a `SystemKind` changed** — generated editor schemas ([ADR-0190](../../../../docs/adrs/0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md)), regenerated by `RLX_UPDATE_PRESET_SCHEMA=1`; `core/tests/suite/preset_schema.rs` fails on drift, so check the regeneration was committed rather than editing |
+  | **`docs/presets.md`** | **the expression grammar — a variable, constant, function, operator, or the error surface** |
+  | **`docs/preset-palettes.md`** | **palette names, custom-stop rules, per-scene colour params, A/B crossfade** |
+  | **`docs/preset-guide.md`** | **a system added or retired, or a system's look changed enough that its picture lies** |
+  | **`.claude/skills/preset-author/references/systems.md`** | **a `SystemKind` added or retired, or a scene's params or shipped presets changed enough that a section's working ranges lie** — one `## ` section per system, declared even when it only says no guidance is written yet (ADR-0234); a system with no section is the drift backlog 0258 recorded |
+  | `docs/preset-tuning-walkthrough.md` | a param or `--report` column the walkthrough's steps use |
+  | `docs/capturing.md` | `shot` CLI flags, `--render`, the live video-out |
+  | `docs/testing.md` | the `core/tests/` visual-QA harness, what a gate can and cannot see |
+  | `docs/running.md` | a hotkey, a menu row, the operator console, the now-playing banner |
+  | `docs/configuration.md` | a flag, an environment variable, a `config.toml` key, an OSC address |
+  | `docs/how-it-works.md` | the frame's path through the engine, the frontends, either of its diagrams |
+  | `docs/embedding.md` | the C ABI lifecycle a host follows (spec 0001 is the contract; this is the walkthrough) |
+  | `docs/specs/0003-studio-control-protocol.md` | an OSC address, an event, or a stream the studio reads |
+  | `docs/milkdrop-conversion.md` | what `milkconv` emits or how its output is judged |
+  | `docs/developing.md` | a build step, a pre-push step, a generated file and its env var |
+  | `docs/releasing.md` | a release job, a zip, the version-bump procedure |
+  | `docs/on-device-validation.md` | anything the on-device checklist asserts |
+  | `docs/nfr.md` | a quantified budget moved |
+  | **the five `.ru.md` translations** | **anything their English source now says differently** — `docs/running.ru.md`, `docs/how-it-works.ru.md` and the three `packaging/*/READ-ME-FIRST.ru.md` are second copies of rows in this table, and step 1e's advisory is what says which one moved ([ADR-0185](../../../../docs/adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)). Correcting the Russian is content work; noticing it is this sweep |
+
+  **Editing a reader document carries two constraints of its own.** Whether it is published is
+  decided by the `PUBLISHED` map in `site/src/plugins/rewrite-links.mjs`
+  ([ADR-0154](../../../../docs/adrs/0154-the-reader-facing-docs-publish-as-a-site.md)) — a new doc does
+  not join the site by existing. And every document in `scripts/check-reader-prose.mjs`'s list must
+  carry each Plan/ADR citation inside a markdown link, never bare in a sentence
+  ([ADR-0168](../../../../docs/adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md));
+  that gate runs at pre-push and in CI. `check-site-links.mjs` and `check-site-routes.mjs` (the
+  per-route size cap) need a built site and run **only** in `.github/workflows/pages.yml`, so they
+  report after the push.
+
+  **The bolded rows are load-bearing for the `preset-author` lane.** That skill deliberately
+  keeps *no* catalogue of its own — it points at these docs — precisely because its private copies
+  rotted while these stayed current (rewritten 2026-07-26, commit `0e1e500`). So when a plan adds a
+  scene param or a grammar function and these don't get swept, the content lane authors against a
+  surface that doesn't exist and has no way to notice. Sweeping them *is* how that skill stays true.
+
+  Prefer count-free phrasing ("the whole embedded set") over hard numbers that re-drift. This is a
+  required sweep, not a "if you notice" — behavior docs and peripheral operator docs drift
+  independently (Plan 0026 updated the README but left `on-device-validation.md` saying "all 10"
+  and `presets.md` silent on the `A` toggle).
+- Did the plan get `Status: done` and move to `docs/plans/done/`? Is `docs/plans/README.md`
+  refreshed (roster → recently-closed, execution order, next-free-number)? Are paired ADRs
+  flipped `proposed → accepted` with `docs/adrs/README.md` matching?
+- **Version bump owed.** This plan's close ceremony owes one `cargo-release` version bump (step 4
+  of Close-ceremony bookkeeping below) unless the plan is genuinely docs/chore-only. It is the
+  most-forgotten close step — flag it here during the review so it can't slip when you do the
+  bookkeeping.
+
+### 4. Correctness & determinism (audio/DSP, and geometry that varies with the target)
+- **Boundary validation.** Sample-rate / channel-count / buffer-size checked once where audio
+  enters the core; the hot path downstream trusts them.
+- **Determinism in DSP.** FFT bins / onset envelope / beat estimate are pure functions of the
+  input window — no wall-clock reads, no unseeded randomness. Visual randomness, when wanted, is
+  explicitly seeded so a scene is reproducible.
+- **No panics in the hot path.** `unwrap()`/`expect()` on per-frame audio or render paths is a
+  latent crash; flag them. (Plan 0002 arms this as a `#![deny(clippy::unwrap_used, ...)]` pragma on
+  hot-path modules; here you verify the pragma is present on every module that *should* be hot-path,
+  since the guard test only checks the files it already knows about.)
+- **An internal grid is a resolution, not a shape.** Trail fields, post-stage offscreens and
+  simulation domains are quantized and capped, so their aspect is *not* the render target's, and
+  every present is a plain normalized stretch (ADR-0037). Anything computing screen-destined
+  geometry — a projection, a fold, a distance — takes its aspect from the **target**, so the grid's
+  own aspect cancels out of the picture. Grep the diff for `aspect`: one derived from a grid size is
+  the bug.
+- **Ask what the development configuration cannot see.** The rule above shipped twice (Plan 0029 on
+  the attractor, Plan 0033 on the composite) because 1920x1080 and the 2048x1152 display this
+  project is built on both come back from the quantizer *exactly* 16:9 — grid and target coincide
+  there, so every test written at those sizes passed a 28 % stretch without noticing. Generalize
+  the habit: whenever a value could be sourced from two places that happen to **agree** on the one
+  configuration we develop and test at — one display, one sample rate, one channel count, one GPU
+  adapter — no test at that configuration can tell you which source the code actually used. Find the
+  configuration where the two disagree and ask whether anything probes it. If nothing does, that is
+  the finding, whether or not you can also name the bug.
+- **A numeric assertion states a property, or names the machine it was measured on** (ADR-0071,
+  from Plan 0060 — five consecutive red CI pushes from two tests with this one shape). A *property*
+  holds on every configuration CI runs: dimensionless, exact, or with a tolerance derived from the
+  mechanism. A *measurement* is a frozen number that names its configuration and **does not run
+  outside it**, skipping with a printed notice in ADR-0016's shape and printing what it observed
+  instead. A frozen number asserted universally is neither. Two corollaries, both load-bearing, both
+  worth one line on any diff that adds or moves a numeric assertion:
+  - **A threshold at or below this project's own declared noise floor for the same quantity is not
+    a property.** `golden.rs` calls a `0.02` mean channel difference rasterizer drift, so an
+    assertion on that statistic below `0.02` measures the noise. (The dual-live floor was `0.01`.)
+  - **A ratio is a property only when numerator and denominator are the same kind of quantity**
+    (ADR-0074). Same run and same adapter are the *entry requirements*, not the proof — the
+    dual-live ratio was built on exactly those and still moved 7.3x between two builds of one
+    software rasterizer, because the two terms responded to the machine differently.
+  The same question applies to **prose**, and it is the one this rule keeps catching a level down:
+  a doc comment that attributes a behaviour to "the DX12 WARP rasterizer" when it was seen on one
+  build of it is the identical error, unasserted. Grep the diff for numeric literals in `assert*`
+  and for driver/adapter/platform names in comments.
+
+### 5. Design integrity — classic principles
+The rules above are mostly mechanical (Plan 0002's gates catch many). This lens is the part no
+lint enforces: whether the shape of the code still honors the architecture. Flag violations as
+`blocker` (breaks the source-agnostic/plugin split) or `major` (erodes it); most are `major`.
+
+- **Layered architecture / dependency direction.** Dependencies point inward only: shells
+  (`standalone`, `plugin-foobar`) depend on `core`; `core` depends on neither, and on no platform
+  or audio-source crate (this is lens 2's source-agnostic rule seen as a *layering* rule). A
+  `use` in `core/` that reaches a shell, a platform SDK, or a windowing type is a layer inversion.
+- **Plugin architecture / the three seams.** The project has three extension seams: the **C ABI**
+  (frontends plug into `core` across it; spec 0001 is the authority on its surface), the **`Scene`
+  trait** (scenes plug into the engine; per ADR-0002 it stays thin — the preset engine's vocabulary,
+  not a public plugin API), and the **studio control protocol** (the studio drives the player over
+  OSC and reads its event stream; ADR-0176, spec 0003). Catch any seam widening: a `Scene` gaining
+  engine-lifecycle or GPU-backend knowledge, a function added to the C ABI that spec 0001 does not
+  record, or an OSC address or event the studio relies on that spec 0003 does not carry. All three
+  are ADR-worthy, not casual edits.
+- **Law of Demeter / principle of least knowledge.** Modules talk to immediate collaborators, not
+  through them. Flag train-wreck reaches across boundaries (`core.dsp().internals().buffer()[i]`,
+  a shell poking `core`'s private state instead of its API). Each layer knows the *interface* of
+  the next, not its internals.
+- **SOLID, applied to this codebase.**
+  - *SRP* — no god modules; a file doing DSP + rendering + capture is the smell (overlaps lens 2's
+    "files doing five jobs").
+  - *OCP* — adding a scene should not require editing the engine/registry's core logic; adding a
+    capture backend should not touch the DSP. If it does, the abstraction is in the wrong place.
+  - *DIP* — `core` depends on abstractions (a render target, the wgpu seam, a PCM-frame intake),
+    never on a concrete platform capture or window type. A concrete leak here is also a lens-2 hit.
+  - *ISP / LSP* — the `Scene` trait and C ABI stay minimal (no method a scene must stub out); any
+    implementor of a trait is substitutable without special-casing.
+- **New hot-path modules join the guard.** If a phase added a hot-path directory not in Plan
+  0002's `core/tests/suite/hygiene.rs` scan set (e.g. a new `core/src/analysis/`), the guard test silently
+  passes it — require the set be extended, or the pragma is unenforced there.
+
+### Output of a review
+
+Deliver **in-conversation** (no review file). Group findings by severity (`blocker` / `major` /
+`minor` / `nit`); for each: what, where (`file:line`), why it matters, suggested fix in a
+sentence or two. Open with a one-sentence verdict ("Plan 0001 landed cleanly; no blockers, two
+minor items"), then findings, then the plan-status/ADR/diagram bookkeeping the user needs.
+
+### Close-ceremony bookkeeping (after a review that closes a plan)
+
+All architect-owned, committed to `main` by explicit path (see "Commit hygiene" below):
+
+1. **Flip the plan `Status:` to `done`** (one-line summary: the phase commits, the Mode 4
+   verdict, what was verified) and **`git mv` the file to `docs/plans/done/`**.
+1b. **Re-point every link the `git mv` just broke — both directions.** This step exists because it
+   was missed at *every* close from Plan 0050 through 0060 and left **74 broken relative links
+   across 23 files**, found only when someone asked whether anything was stale. Markdown link rot
+   degrades silently and only in a browser, so nothing surfaces it. Two directions, both mechanical:
+   - **Inbound** — anything naming the plan at its old path: ADRs' `**Related plan(s):**` headers,
+     `docs/design-backlog.md`, `docs/roadmap-visual-richness.md`, `docs/on-device-validation.md`,
+     sibling plans, and both READMEs. `../plans/NNNN-…` → `../plans/done/NNNN-…`; from inside
+     `docs/plans/`, `(NNNN-…)` → `(done/NNNN-…)`.
+   - **Outbound** — every `(../adrs/…)`, `(../design-backlog.md)`, `(../specs/…)` *inside the moved
+     plan*, which now resolves one directory too high: `../` → `../../`. Its links to
+     still-active sibling plans go the other way: `(NNNN-….md)` → `(../NNNN-….md)`.
+
+   **Verify by running the checker, not by inspection** — it is the whole point of the step, and it
+   covers `.claude/skills/**` as well as `docs/` (five broken links were hiding in the skills' own
+   references when it was first run):
+
+   ```sh
+   node scripts/check-doc-links.mjs      # exit 0 = every relative link resolves
+   ```
+
+   `.githooks/pre-push` runs it too (first step, before `fmt`), so an installed hook catches this
+   at the push rather than the close — but the hook is **opt-in per clone**, bypassable with
+   `--no-verify`, and skips when `node` is absent, so it is a safety net under this step and not a
+   replacement for it. CI's `links` job is the backstop under both: it runs the same check on
+   `ubuntu-latest`, where it cannot be skipped or bypassed — but it reports **after** the push,
+   which is why this step still runs at the close.
+
+   It prints `file:line -> target` for each break and repeats the repair rules above. Two traps it
+   cannot decide for you: a bare `NNNN-*.md` link inside `docs/adrs/` is identified by its
+   **number**, not its slug, so a wrong filename is repairable by number — *unless* the surrounding
+   prose says "Plan NNNN", in which case the number is a **plan** number and the missing piece is
+   the `../plans/` prefix rather than the filename. Guessing wrong here silently re-points a
+   citation at a different document.
+1c. **Re-run the backlog-claim probes, and read the advisory** ([ADR-0108](../../../../docs/adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)).
+
+   **The trigger is every close, without exception** — not "when the backlog changed". A close
+   lands code, and code is what falsifies an entry; the entry you break is rarely the one you
+   edited.
+
+   ```sh
+   node scripts/check-backlog-claims.mjs   # exit 0 = every stated reduction still holds
+   ```
+
+   **What it prints, and what each half means:**
+   - **Green** says *the reductions still match the tree*. It does **not** say the entries are
+     true — backlog 0081 was falsified by a verification that was dated, recent and accurate, and
+     simply covered a different claim than the one in its own title. A probe verifies the reduction
+     its author chose; reading whether that reduction covers the claim is still yours.
+   - **A break** names the entry, the probe, and the `file:line` that contradicts it. Often the
+     close that just happened is the cause — several shipped probes are written to go red **on
+     delivery** rather than on decay, which is a re-read trigger and not an accusation.
+   - **A break with no probe in it** is the other class (Plan 0094 Phase 2): a live `## NNNN`
+     heading carrying no dated verification bullet at all, reported at the heading's own line. That
+     is the *first* half of ADR-0108's Decision, and a gate whose entry roster is built out of the
+     bullets it finds cannot see it — so until 0094 the 14 live entries complied only because
+     someone did it by hand. The repair is a bullet with a probe or a reasoned `unprobeable:`.
+   - **The advisory block** (below the pass/fail line, never affecting the exit code) names entries
+     whose probed paths have moved since anyone last read them, plus the full `unprobeable:` roster.
+     That roster is the set of claims nothing checks; it is printed at every close precisely so it
+     stays small and visible rather than growing silently. **The moved half needs git history and
+     withholds itself when there is none** — on a shallow clone `git log -1` hands back the tip
+     commit for every path, so the block prints a notice instead of 25 false rows (ADR-0016's shape).
+     You run this on a full checkout, so you get the real reading; CI does not, and says so.
+
+   **Repairing a convicted entry is yours, and it is a judgement rather than an edit** — corrected
+   in place, closed to the archive, or split. `dev` is instructed to report a red probe and leave
+   the entry alone, so if a phase commit says an entry is falsified, that finding is waiting here.
+
+1d. **Re-run the index-row gate** ([ADR-0116](../../../../docs/adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)).
+
+   ```sh
+   node scripts/check-index-rows.mjs   # exit 0 = every roster row is still a pointer
+   ```
+
+   **This gate fires on you, at the close, because this ceremony is what writes the rows it
+   catches** — steps 2, 3 and 3c below each refresh a roster. It holds every row inside a
+   `<!-- roster:begin cap=320 -->` region to **320 bytes** and prints `file:line  N bytes (cap C)`
+   for each one over.
+
+   It exists because the convention alone was tried here and failed. Plan 0061 Phase 7b moved the
+   close write-ups into `README-archive.md` and wrote *"One line per plan."* into the file itself,
+   three lines above the rows; eight days later that section had regrown **7.1x** and
+   `docs/adrs/README.md` had reached **16 %** of the ADR corpus it indexes. If a row will not fit,
+   the answer is **new arithmetic in ADR-0116** — never a raised constant, and never a row nudged
+   outside the markers.
+
+1e. **Read the translation advisory** ([ADR-0185](../../../../docs/adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)).
+
+   ```sh
+   node scripts/check-translations.mjs   # exit 0 = every `.ru.md` carries a stamp
+   ```
+
+   **The trigger is every close, and the exit code is not what you came for.** A missing or
+   malformed `translated-from` stamp is the exit code, and pre-push and CI both already catch that
+   before you see it. What only this run surfaces is the **advisory block below the pass line**: the
+   translations whose English source has moved past the sha they were translated from. Nothing
+   anywhere goes red for that, by design — hard-failing would make the Russian slice a hostage of
+   every hotkey edit on a one-translator project — so **this print is the only carrier the drift
+   half has**, and the close is the right moment because a close is what moves an English source.
+
+   **A row is a reading, not a repair.** `git diff <stamped>..<current> -- <source>` says what
+   moved; whether the Russian still says it is a judgement no machine here makes. Correcting the
+   prose and moving the stamp in the same commit is content work — route it, do not do it. What you
+   owe is **one line in the close notes** naming the rows, or their absence. **The advisory is
+   withheld on a shallow clone** and says so, in ADR-0016's shape; you run on a full checkout, so
+   you get the real reading and CI does not.
+
+   **If the same translation is stale three closes running, that is the signal ADR-0185 named**:
+   retiring the page beats publishing a lie. That is an ADR-worthy call, not a close-time edit.
+
+2. **Accept any paired ADRs** (`proposed → accepted`) and refresh `docs/adrs/README.md`. An ADR is
+   append-only *once accepted* — but if the plan's implementation falsified something the ADR
+   recorded, accept it **with a dated `Outcome` section** (the ADR-0054 and ADR-0074 precedent)
+   rather than editing the body or leaving the stale claim standing.
+
+   **The row is a pointer and nothing more — link, title, status, under 320 bytes:**
+
+   ```markdown
+   | [0116](0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) | An index row is a pointer, and a gate holds it to one | accepted 2026-08-16 |
+   ```
+
+   The title is **the ADR body's `H1`**, minus its own `ADR-NNNN —` prefix; the status is the word,
+   the date, the implementing plan, and the bare word `Outcome` if the body carries one. What the
+   ADR *decided*, what it rejected and what it cost belong in the ADR — writing them here is how
+   this index reached 189 KB, and a second copy is the copy that drifts. The one thing the status
+   cell holds that lives nowhere else is the **inbound** forward-reference (`supplemented by 0020`,
+   `extended by 0006, 0008, 0013`), because an accepted ADR is append-only and nobody may reach back
+   into 0003's header to record that 0013 extended it. Never drop one.
+
+3. **Refresh `docs/plans/README.md`**: roster → recently-closed, execution order, next-free-number.
+
+   **The recently-closed bullet is one line — link, close date, review verdict, under 320 bytes:**
+
+   ```markdown
+   - [0105 — The indexes go back to being indexes](done/0105-the-indexes-go-back-to-being-indexes.md) — closed 2026-08-16. Review: **no blockers, no majors.**
+   ```
+
+   The write-up — what landed, what was falsified, what outlived the plan — goes to
+   [`docs/plans/README-archive.md`](../../../../docs/plans/README-archive.md) **first**, and the bullet
+   points at it. That is Plan 0061 Phase 7b's rule, and Plan 0105 found that 24 of the 26 fat
+   bullets it had to trim had never been archived at all: the section was emptied once and then
+   regrew entirely fresh. Moving prose between the two files strands reference-link *definitions* —
+   copy them into the archive as well, and re-run step 1b.
+3b. **Curate the preset set — trigger: the plan touched `presets/`.** Since
+   [ADR-0081](../../../../docs/adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)
+   the `preset-author` lane commits presets directly, gated on the behavioral suite; curating the
+   *set* is yours, at this cadence. **Output: a one-line verdict in the close notes** — a duty with
+   no stated trigger and no stated output is the kind this project has already proved gets skipped.
+
+   **Where the trigger is stated:** the log's `### Close triggers` bullet **`presets/` touched**
+   names the files. That is where to start looking, **not the decision** — the curation verdict is
+   yours, and `dev` states what moved and nothing about whether it earns its place.
+
+   Two sweeps, both cheap:
+   - **What landed.** Does the new content earn its place against what already ships — or did a
+     family just converge? `shot --presets presets --report` prints the near-duplicate flags and the
+     per-band reactivity in one command; `--report family=<name>` narrows it.
+   - **What the plan made stale — trigger: the plan fixed an engine defect.** A preset written to
+     work *around* that defect keeps paying for it after the fix lands, and **no instrument in this
+     repo can see it**: nothing is wrong, the workaround renders fine and passes every gate. Three
+     known instances were each found only by a human opening a comment — `attractor_leviathan`'s
+     `zoom` pinned at 0.72 to stay inside the fold's disc (lifted to 1.80 a plan *after* ADR-0061
+     made it unnecessary), `attractor_clifford`'s framing cut for the same reason with a header that
+     ended *"the general fix is a per-preset edge treatment — Plan 0055, approved, not built"* and
+     stayed cut after it was built, and `swarm_dense`'s `kaleido_order = 1` dodging a smear ADR-0047
+     had already fixed. It is **one grep**, because this project's preset headers name what they are
+     dodging:
+
+     ```sh
+     grep -rn "ADR-00NN\|Plan 00NN\|design-backlog 00NN\|backlog 00NN" presets/*.toml
+     ```
+
+     **The bare `backlog NNNN` form is in that pattern because it was missing once and cost a
+     finding.** At Plan 0090's close the grep reported clean and `emitter_perseids.toml:7` was
+     carrying a fourteen-line header declaring the quiet sky *"ROUTED, NOT SHIPPED ... on two
+     measured walls"* — both of which that very plan and Plan 0077 had taken down. It says
+     `(backlog 0068)`, not `design-backlog 0068`. **And read the whole output**: the run that missed
+     it was piped through `head`, which is the same miss wearing a different hat.
+
+     The output is a **list for the close notes, not a re-tune** — judging the look is content work
+     and stays in the `preset-author` lane.
+3c. **Archive every backlog entry this plan discharged — trigger: the plan header names a
+   `**Closes:** design-backlog NNNN`.** Since
+   [ADR-0206](../../../../docs/adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md) a promoted
+   body is **already** in [`docs/design-backlog-archive.md`](../../../../docs/design-backlog-archive.md) —
+   it moved when the plan was approved (see Mode 1 Step 3) — so the step is: append the `CLOSED`
+   marker to that archived body, and move its row from the archive's `### Promoted` table to
+   `### Closed`. An entry the plan discharged without having been promoted (a plan written before
+   ADR-0206, or an entry it discharged by the way) still takes the old path: marker, verbatim move,
+   and a `### Closed` row. **This step exists because the marker
+   half is the only half that ever gets done.** Three sweeps have now found the same accumulation —
+   2026-08-04 (26 entries), 2026-08-13 (20 more, *"recurring inside ten days"*), and a third batch
+   hours later that same day (3 entries, from two closes that ran **after** the second sweep wrote the
+   rule down). The rule lived in the backlog, the ceremony that executes it lived here, and until this
+   step existed the two never met.
+
+   **Where the trigger is stated:** the log's `### Close triggers` bullets **Plan header `Closes:`**
+   and **Backlog probes** name the entries this plan claims to discharge and the exit `dev` saw from
+   `node scripts/check-backlog-claims.mjs`. Both are starting points, **not the decision** — you
+   re-run the probes yourself (step 1c is unconditional), and whether an entry is discharged,
+   half-discharged or falsified stays a judgement. **A promoted entry's probes no longer run** — the
+   gate reads only the live file — so for those the evidence is the plan's done-whens and the
+   archived body's own probe lines, read by you against the finished tree.
+
+   Mechanically: move the body verbatim (nothing is summarized — the archive's value is the record of
+   how a diagnosis moved, and five entries had their causal claim *inverted* under verification), add
+   the ledger row, then **re-point any reference a still-live entry aimed at the moved body** to the
+   bare-number-plus-file-link form — `[backlog 0072](design-backlog-archive.md)`, or just
+   `backlog 0072` where the file is already linked in the same breath.
+   **A fragment is prohibited, not repaired** ([ADR-0149](../../../../docs/adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md)):
+   an entry's anchor is generated from the full text of its heading, so it breaks when the heading is
+   reworded and again when the body is archived, and it resolves to the top of a 4,000-line file
+   either way. `scripts/check-doc-links.mjs` rejects any `design-backlog.md#…` or
+   `design-backlog-archive.md#…` link, so this class *is* gated now — it is the one thing here you
+   do not have to catch by eye. What it still cannot see is a fragment written inside a code span
+   rather than a link, which is how this very sentence used to prescribe the retired form.
+
+   **The ledger row is a pointer too — number, one line of what it was, where it went, under 320
+   bytes:**
+
+   ```markdown
+   | 0089 | The dragon overruns the frame corner, and `FRAME_FILL = 0.88` promises it cannot | [ADR-0103](adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) + [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md). **Closed 2026-08-15** |
+   ```
+
+   The verdict, the measurements and the falsified halves are in the body you just moved — the row
+   says where, not what. A cross-reference to **another backlog entry** is a bare `see NNNN`, never
+   an anchor link: the anchor is the full text of that entry's heading and can run past eighty
+   bytes, which is what pushed six rows over the cap at Plan 0105. This applies to the **ledger
+   only** — the two tables under the archive's `## The ledger`; the entry bodies are content, sit
+   outside the marked regions, and are not measured by anything.
+
+   Two things that are not this step. An entry whose premise turns out **false** is corrected in
+   place and stays live — a wrong live entry is more dangerous than a closed one, because it sends
+   the next reader to do work that is already done. And an entry only **half** discharged (one of two
+   asks landed) stays live with a dated update naming which half; the archive is append-only and
+   closed, so a question that comes back is a *new* entry citing the archived one, never an edit to it.
+3d. **Regenerate the contents blocks — trigger: unconditional, because every close adds a
+   heading.** Run `node scripts/toc.mjs`, then stage whichever documents it rewrote. The close
+   edits headings in files that carry a block — both plans indexes (steps 3 and 3e), the backlog and
+   its archive (step 3c, and any entry step 1c's verdict corrected), and whatever the operator-doc sweep touched
+   ([ADR-0163](../../../../docs/adrs/0163-a-long-document-carries-a-generated-contents-block.md)), so a
+   close that skips this leaves a contents row pointing at a heading that is no longer there — and
+   `scripts/check-doc-links.mjs` will not say so, because it validates paths and deliberately never
+   validates fragments. `node scripts/toc.mjs --check` reports the drift and names the first row
+   that differs; the same check runs at pre-push and in the CI `links` job, so skipping it here
+   blocks the push rather than shipping quietly. **A block is never hand-edited** — if a row looks
+   wrong, the heading or the generator is what to change.
+
+3e. **Archive the sequencing prose this close supersedes — trigger: the close rewrote or
+   invalidated a note in `docs/plans/README.md`'s `## Recommended execution sequence`.** Move it
+   verbatim into [`README-archive.md`](../../../../docs/plans/README-archive.md)'s
+   `## Prior sequencing notes (superseded)`, and **rewrite whatever live sentence pointed at it** so
+   it points at the archive instead — a note that leaves usually has an index sentence above it that
+   goes stale in the same edit.
+
+   **This step exists because the section it drains had one already and nobody ever reached for
+   it.** `## Prior sequencing notes (superseded)` has existed since Plan 0061; by 2026-09-02 it held
+   three items while `README.md` carried **335 lines** of prose that declared itself spent in its
+   own text — *"Superseded 2026-08-18, kept as the record"* — 26 % of the live index. That is the
+   identical shape 3c above was written to repair one level down: a rule with no carrier.
+
+   Two things that are not this step. **Nothing is summarized on the way across** — the archive's
+   value is the words the close wrote. And **the definitions travel with the uses**: markdown scopes
+   `[label]: target` per document, so a moved paragraph's shortcut links go undefined in the
+   destination unless you copy them, which `check-doc-links.mjs` reports as
+   `[label] (no definition in this file)` — seventeen of them at the first move.
+
+4. **Bump the application version.** This is the step that chronically gets skipped (the version
+   sat at `0.2.0` across five feature plans that each forgot it), so treat it as non-optional and
+   decide it deliberately every close. Per
+   [ADR-0005](../../../../docs/adrs/0005-versioning-and-release-cadence.md) / `docs/releasing.md`, the
+   version moves **once per plan, here, by you** — never per phase, never by `dev`. Pick the level
+   from what the plan shipped: **minor** for a feature plan, **patch** for a fix-only plan, **none**
+   for a genuinely docs/chore-only plan (a deliberate call, not a miss). Then run it — it stages the
+   version edit and writes the `vX.Y.Z` tag but does **not** push (the user pushes):
+
+   ```sh
+   cargo release <patch|minor> --no-push --no-publish --no-confirm --execute
+   ```
+
+   **Where the trigger is stated:** the log's `### Close triggers` bullet **What shipped** says
+   `feature` / `fix-only` / `docs-chore-only`. That is where to start looking, **not the decision**
+   — `dev` is forbidden from proposing a level, and you pick it yourself against what the plan
+   actually landed, per ADR-0005.
+
+   The source of truth is root `Cargo.toml` `[workspace.package].version`; every workspace member
+   inherits it with `version.workspace = true`. This is a separate axis from the C ABI version
+   (`RLX_ABI_VERSION`), which moves only on an `extern "C"` shape change (ADR-0003) — never couple
+   the two.
+
+   **The studio carries two copies `cargo release` does not move, and the bump is not finished
+   until both follow.** `studio/package.json`'s `"version"` (the packaging scripts override it at
+   build time) and `EXPECTED_PLAYER_VERSION` in `studio/shared/protocol.ts` (compiled into the
+   renderer, so nothing overrides it — a stale constant ships a studio that refuses the player
+   packaged inside it). `studio/shared/version.test.ts` holds all three equal and goes red the
+   moment `Cargo.toml` moves alone. After the release commit:
+
+   ```sh
+   # set both copies to X.Y.Z, then from studio/:
+   npx vitest run shared/version.test.ts
+   git commit -m "fix(studio): the two version copies follow the workspace to X.Y.Z" -- studio/package.json studio/shared/protocol.ts
+   git tag -a -f vX.Y.Z -m "chore: Release vX.Y.Z"   # the tag moves onto the sync commit, annotated
+   node scripts/check-release-tag.mjs                # exits 0: annotated, and on HEAD's history
+   ```
+
+   The tag has to sit on the sync commit, because a studio built from the release commit alone is
+   the broken artifact the test exists to prevent. **Every tag you write is annotated (`-a`)**:
+   `git push --follow-tags` never sends a lightweight one, and a plain `git tag` writes exactly that
+   (ADR-0203). **Run `node scripts/check-release-tag.mjs` after every tag you write or move**, and
+   `node scripts/check-release-tag.mjs --stranded` once per close — it lists any older `v*` tag that
+   never reached `origin`, which the tip-only gate cannot see.
+
+   **If a parallel lane is live, `cargo release` will refuse** — it aborts on *any* dirty file
+   ("uncommitted changes detected"), and at Plan 0060's close another session's three in-progress
+   files blocked it. **Do not reach for `--allow-dirty`:** cargo-release's commit step is not
+   pathspec-scoped, so it can sweep the other lane's work into a `chore: Release` commit, and this
+   project never rewrites history. Do the bump by hand instead — `release.toml` has no hooks and no
+   custom message, so these three steps are byte-identical to what the tool produces:
+
+   ```sh
+   # edit [workspace.package].version in root Cargo.toml
+   cargo update --workspace --offline      # moves only the workspace members in Cargo.lock
+   git commit -m "chore: Release" -- Cargo.toml Cargo.lock
+   git tag -a vX.Y.Z -m "chore: Release vX.Y.Z"
+   ```
+
+   The studio sync above follows the manual path exactly as it follows the tool — the two copies
+   are never part of the `chore: Release` commit, and the tag still moves onto the sync commit.
+
+### Closing a plan that was built in a worktree
+
+Since Plan 0047 this project runs plan lanes in **git worktrees**, in either of two shapes: the
+`WORK/rlx-plan-NNNN` sibling of the main checkout on a `plan-NNNN-<slug>` branch
+([ADR-0053](../../../../docs/adrs/0053-plan-lanes-run-in-git-worktrees.md)), or the harness's
+`.claude/worktrees/<name>/` inside the repository
+([ADR-0182](../../../../docs/adrs/0182-a-plan-lane-may-live-inside-the-repository.md)). Read ADR-0053 once, then follow
+the order, because getting the merge direction backwards puts a merge commit and possibly a
+duplicate version tag on `main`. The four bookkeeping steps above are the **middle** of this
+sequence, not the whole of it:
+
+**The branch name and the worktree path come from the plan's `## Implementation log` `**Lane:**`
+line** — `dev` writes it on the first phase commit. Read them there rather than asking the user; if
+the line is absent (a plan predating [ADR-0120](../../../../docs/adrs/0120-the-close-brief-is-a-section-of-the-plan.md)),
+`git worktree list` and `git branch --show-current` recover both, and note the missing log as the
+`minor` lens 1 calls for.
+
+0. **Read `origin`'s CI before the merge** ([ADR-0251](../../../../docs/adrs/0251-a-gated-compile-path-has-a-named-job-and-the-upstream-reading-is-advisory.md)):
+
+   ```sh
+   node scripts/check-upstream-ci.mjs     # the newest CI run on origin/main
+   ```
+
+   It runs **before** step 1, because the tip it reads is the one this close is about to merge onto
+   and then tag on top of, and the conductor's own close reads it at the same point. **Red** (exit 1,
+   naming every failing job) means a job on `main` has been failing with nothing stopping the next
+   release: say so in the close notes and in the reply to the owner, then close anyway, because a
+   close never blocks on it. **Unread** (exit 0, a `skipped: not read (<case>)` line on stderr) means
+   no reading exists, whether `gh` is absent or unauthenticated or there is no network. That is not a
+   pass: record the case in one line and go on.
+1. **Merge `main` into the plan branch, from the worktree** (`git merge main`), and resolve there.
+   Never update the main checkout's working tree from a lane — another session may be live in it.
+2. **Re-run the whole gate** (`fmt` + `clippy` + `nextest`) after that merge. It is the first moment
+   the two lanes' code has met; no earlier run covers the combination.
+
+   **`nextest` here means `--workspace`, not `-p rlx-core`,** and the distinction has already cost a
+   close. Plan 0095 moved the downbeat fold from `beat_index` onto a new bar grid; `standalone/`'s
+   `--downbeat-log` writes `beat_index` beside the fold's own alignment scores, so the two columns
+   stopped being commensurable and a `standalone` test went red. **`standalone/` was not touched by
+   that plan at all** — the diff over its whole range is empty there. `dev`'s close block cited
+   `cargo nextest run -p rlx-core`, the Mode 4 review re-ran the same scope and passed it, and the
+   red was found by the `pre-push` hook — which runs `--workspace` — *after* the plan was closed,
+   merged, version-bumped and tagged. A core edit's blast radius does not stop at `core/`, and a
+   package-scoped run is structurally unable to see where it lands.
+
+   ```sh
+   cargo nextest run --workspace     # what the close owes; -p <crate> is not a substitute
+   ```
+
+   The same asymmetry is why `clippy` above is already written `--workspace --all-targets`. Note the
+   hook is **not** the backstop it looks like: it is opt-in per clone, `--no-verify` skips it, and
+   its `nextest` step is narrowed (`-P fast`) rather than complete.
+
+   **The gate also owes `cargo doc`, over the whole workspace.** Plan 0137 made two items public
+   whose doc comments linked private helpers; that is an error under `-D warnings` only once the
+   item is public, so the trigger is a visibility change rather than a doc edit, and it shipped a
+   red `main` under a release tag. Plan 0180 did it again in `milkconv`. **The hook now mirrors
+   this step** — Plan 0196 Phase 3 widened it from `-p rlx-core` to `--workspace` and closed
+   backlog 0246 — so what the close adds is a run that cannot be skipped by an uninstalled hook or
+   a `--no-verify`, on the exact tree about to be tagged. Run it before the tag, beside the
+   `nextest` above:
+
+   ```sh
+   RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
+   ```
+3. **Then steps 1–4 above** — plan status, ADRs, both READMEs, and `cargo release <level>` — all
+   **on the branch**. The version is chosen against what `main` actually reached, not against the
+   branch's base (Plan 0047 sat at `v0.23.0` while `main` had already taken `v0.24.0`), and the
+   `vX.Y.Z` tag lands on the commit that becomes `main`'s tip.
+4. **Fast-forward `main` from the main checkout** — `git -C <main checkout> merge --ff-only <branch>`.
+   By construction this is clean.
+
+   **A worktree-isolated session cannot run this.** Since Plan 0101's close the harness rejects any
+   `git -C <main checkout> …` issued from a lane — *"a worktree-isolated session's git operations must
+   target its own worktree"* — and the same guard rejects any compound command it cannot statically
+   prove stays inside the worktree. So from the lane you **finish at the tag and hand steps 4–7 to the
+   user as one block**; from a session opened in the main checkout you run them yourself.
+
+   **`main` can move during the close, not just before it.** At Plan 0099 a parallel session landed two
+   doc commits while the bookkeeping was being written and the `--ff-only` was refused twice. Recovery
+   is cheap but has one non-obvious step: after each re-`git merge main`, the `vX.Y.Z` tag is stranded
+   on a commit that is no longer the branch tip, so `git tag -a -f vX.Y.Z -m "chore: Release vX.Y.Z"` **before**
+   retrying the fast-forward.
+5. **The user pushes** — `main` and the tag. You never push.
+6. **Remove the lane's worktree — the same session the plan closes, not "later".** Each worktree carries
+   its own `target/`, and since [ADR-0147](../../../../docs/adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
+   revoked the shared artifact store that cost is per-lane again, with nothing gating it. ADR-0053
+   records ~8 GB and a build broken by a full disk mid-session; the real figure is worse — closing Plans
+   0054 and 0056 together reclaimed **32 GB** (14 + 18). Two idle lanes can plausibly fill the disk.
+
+   ```sh
+   git worktree remove <lane path>        # from the main checkout, never from inside the lane
+   git worktree prune                     # drops registrations whose directory is already gone
+   ```
+
+   `<lane path>` is the `**Lane:**` line's path — `../rlx-plan-NNNN` for a sibling lane,
+   `.claude/worktrees/<name>` for one inside the repository.
+
+   On Windows this fails with `Permission denied` while **any** process holds the directory — a shell
+   whose working directory is inside it is enough, and the session that just ran the close is usually
+   exactly that shell. Move every shell out first. A partly-failed removal can leave an empty directory
+   git has already unregistered: delete it by hand, then `git worktree prune`.
+7. **Delete the lane branch** — after step 6, because git refuses to delete a branch that is checked out
+   in a worktree.
+
+   ```sh
+   git branch -d plan-NNNN-<slug>   # -d, never -D
+   ```
+
+   **`-d` is the safety property, not a formality.** It refuses an unmerged branch, so a refusal here
+   means step 4's fast-forward did not actually land and the lane's commits are reachable from nothing
+   else. Investigate; never reach for `-D`. Only `main` and the tag are pushed, so there is normally no
+   `origin` copy of the lane branch to delete — if the user pushed one, removing it there is theirs.
+
+   A lane that is **abandoned** rather than closed takes steps 6 and 7 alone, with `-D` and a deliberate
+   note of what is being discarded — that is the one case where the branch is knowingly unmerged.
+
+One standing hazard is left, from ADR-0053's Negative section: the **stash stack is shared across every
+worktree**, so a bare `git stash` / `git stash pop` can take another lane's entry — prefer a WIP commit.
+
+### Conductor mode — a review and a close nobody is watching
+
+**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: readiness`, `review` or
+`close`.** That line is written by `tools/conductor/` (ADR-0205), which starts this
+session headless, as a separate process, in the plan's worktree, handing it the plan, the lane, a round
+number and a review path — and nothing an implementer wrote. That separation is what "fresh session"
+means for a conductor-run plan: this is not an auto-invocation of you from a lane, which stays
+forbidden. Nothing a user types enters this mode; where it and the rest of this skill disagree, it wins
+for that session only.
+
+**The review and the close are two sessions** ([ADR-0248](../../../../docs/adrs/0248-the-pipeline-repairs-before-it-parks.md)).
+A `review` session grades the plan and ends on its verdict, with no lock held, committing nothing. A
+clean verdict is recorded with the tip it graded, and the conductor takes the close lock and starts a
+`close` session, handed that review's path, which does the bookkeeping and the bump. A close that parks
+keeps the verdict: resuming starts a close again, not a review, unless the lane gained a commit nothing
+has reviewed.
+
+**`readiness`** — before the plan's first implement session, a read that spends nothing on code
+(ADR-0248). **Change nothing**: no edit, no commit, no merge. The conductor checks `HEAD` and the tree
+and parks a session that moved either. Grade **consistency, not the design** — the plan is approved,
+and whether it is a good idea is not the question. Check each phase:
+
+- its *What*, *Files touched* and *Done when* agree with each other (a done-when names no stage, file
+  or behaviour the *What* does not produce, and the *What* needs no file the list omits);
+- every path it names exists in the tree, or the plan says the phase creates it;
+- every seam it relies on (a function, module, type or config key it calls or extends) is inside some
+  phase's *Files touched*, its own or an earlier one's;
+- every done-when is runnable under `settings.conductor.json`'s allowlist, one command per call;
+- no phase reads the output of a `human` phase marked `**Blocks merge:** no`
+  ([ADR-0249](../../../../docs/adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)), which is owed
+  after the merge.
+
+End `ready`, or park `plan_wrong` naming the phase and quoting both sides of the contradiction. Park
+only on a contradiction an implementer cannot work around; a matter of taste, or a gap an implementer
+closes in a minute, is `ready`. Your verdict is the owner's to overrule: they edit the plan or resume.
+
+The same session also runs at approval, from the main checkout, under
+`conductor readiness NNNN`. There the tree may carry the owner's uncommitted changes: leave every
+one exactly as you found it, because the conductor compares `HEAD` and `git status --porcelain`
+before and after. A `ready` may carry `advisories`, one-line notes that never park, of exactly two
+kinds: a `human` phase without `**Blocks merge:** no` whose output no later phase reads, and two
+or more adjacent `human` phases. Name the phase in each.
+
+**`review`** — steps 1 to 3, then the outcome.
+
+1. **Run Mode 4** against the plan and the lane, all five lenses, exactly as a human-started close —
+   including running the full `nextest` and `cargo doc` yourself. Every `cargo nextest` runs as
+   `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo nextest ...`; a hook denies the bare form.
+   Run lens 1's suite as exactly `... suite -- cargo nextest run --workspace`, with no extra argument.
+   On a tree the conductor already saw pass, the wrapper does not re-run it: it prints one
+   `with-lock: skipped cargo nextest run --workspace: tree ... run by ... at ...: <Summary>` line naming
+   the ledger record (ADR-0207). **That printed record is lens 1's full-suite evidence**, and you cite
+   it in the review in place of a run. It is written by the process that saw the exit code, not by a
+   session. `dev`'s close block will say its `Full suite:` is owed to the conductor's `pre-review`
+   gate. In conductor mode that is correct, not a missing run.
+   The lane already carries `main`: the conductor merged it before its `pre-review` gate.
+2. **Write the review to the review path**, in the output shape Mode 4 describes. There is no
+   conversation to deliver it into. A finding under `.claude/` names its replacement text (below).
+3. **End with a `verdict` outcome, whatever it carries.** No bookkeeping, no merge, no bump, no
+   commit: the conductor checks that the tip did not move and parks a review that moved it. Blockers
+   and majors go to a fresh `dev` fix session and a fresh review after it; you will see this round's
+   review path under the next round's prior rounds. A clean verdict goes to the close.
+
+**`close`** — the prompt names the plan, the round, the clean review's path and the tip it graded.
+Read the review and the plan; do not grade the plan again. The conductor holds the close lock.
+
+4. **Close on the branch, in this order.** It differs from the human-started worktree close sequence,
+   which gates straight after the merge. Here the gate runs **last, on the tip you will tag**, because a
+   tag does not change the tree, so the conductor's `post-close` gate finds your run in the suite ledger
+   and does not repeat it (ADR-0207):
+   1. **Repair** every `minor` or `nit` finding ADR-0209 lets a close repair (below), and commit.
+   2. **`git merge main`.** Resolve a conflict **only in Markdown under `docs/`** — the plans index,
+      a README. **Any other conflicted path is code, and the architect writes no code**: run
+      `git merge --abort` and park `merge_conflict` naming the paths. The conductor runs a `dev` merge
+      session and starts a close again (ADR-0248).
+   3. **The bookkeeping, committed**: steps 1–4 of the bookkeeping including the version bump, and
+      the studio's two copies. The close commit also adds a **`## Close review`** section to the plan,
+      after `## Implementation log`: this round's review in full, then one line for every finding an
+      earlier round raised and a fix round resolved, naming the fix commit. A conductor-run close has
+      no reader in the room; that section is the evidence of what was checked, and it moves into
+      `done/` beside the log it graded. **A row reading `owed`** is a `Blocks merge: no` human phase the
+      conductor merged without (ADR-0249): leave it `owed`, never `done`. The `Status:` line reads
+      `done` and names it (`done - Phase 7 owed, ADR-0249`), the `## Close review` states what the
+      owed phase has not yet checked, and the plans index's recently-closed bullet names it too.
+   4. **The whole gate on that tip**: `fmt`, `clippy`, `nextest` as exactly
+      `... suite -- cargo nextest run --workspace` through the wrapper, and `cargo doc`, with nothing
+      left uncommitted. **A red here parks `check_red`.** Do not tag, and do not work around it.
+   5. **The annotated tag** on the branch tip.
+   6. **`node scripts/check-release-tag.mjs`**.
+
+   **What a close repairs (ADR-0209, amended by [ADR-0210](../../../../docs/adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)).**
+   A `minor` or `nit` whose repair cannot change what any program does, and nothing else. That is a
+   closed list: the text of a comment or doc comment in any source file; the message text of an
+   assertion or a panic; Markdown prose anywhere in the repository **except under `.claude/`**, and
+   except a generated region, which is repaired by regenerating it. Code, a test's logic, a constant
+   and an instruction a skill gives stay open.
+
+   **`.claude/` is excepted because the CLI refuses it, not because of who owns the file.** On 2.1.273
+   a headless session's `Edit` or `Write` under a project's `.claude/` is denied whatever the
+   allowlist says, in every spelling probed, while a read is allowed and a write elsewhere in the same
+   worktree succeeds (the table is in `tools/conductor/spike/README.md`). **Do not attempt one**: such
+   a finding stays open, carries no `fixed_in`, and reaches the owner through the digest's **Needs
+   you** like any other open finding. Because you have read the file and composed the fix, write that
+   finding so it **names the replacement text** — the owner applies a repair rather than re-deriving
+   one. A phase whose files include such a path never reaches a session at all: the conductor parks
+   the plan in front of it.
+
+   **Mark each repaired finding in the `closed` outcome with `"fixed_in": "<sha>"`,** the repairing
+   commit. The conductor checks that the commit is on the branch and changes that finding's file, and
+   parks on disagreement. **A close may correct a fact in any lane's skill material that its plan made
+   false, and never changes a rule.** A sample output, a column list, a flag spelling or a count under
+   `.claude/skills/<lane>/` is a fact and follows the tree, whichever lane owns the skill. An
+   instruction, meaning what a lane must or must not do, is that lane's contract: a close that thinks
+   one is wrong raises a backlog entry and leaves it. Either way the correction under `.claude/` is
+   reported and left for the owner, per the paragraph above; ADR-0210 changed who applies it, not who
+   is responsible for it being right. A doc-comment repair can turn `cargo doc -D
+   warnings` red; step 4 is what catches it.
+5. **Never fast-forward `main`, never remove the worktree or delete the branch, never push.** Steps 4,
+   6 and 7 of the sequence are the conductor's; step 5 is the owner's.
+6. **Park rather than improvise** when the merge conflicts in code, the gate goes red, or the plan turns
+   out wrong — a `parked` outcome with reason `merge_conflict`, `check_red` or `plan_wrong`.
+7. **Never start a command in the background, and never arm a `Monitor`.** Nothing re-invokes a
+   headless session: backgrounding the full suite and ending the turn kills it and loses its result —
+   and by then the close has already committed its repairs, its `done/` move and its version bump, so
+   the plan parks with the tag and `check-release-tag.mjs` still owed. **The suite runs in the
+   foreground and you wait for it**, bounded by the session's own timeout. A hook denies
+   `run_in_background`, `settings.conductor.json` denies `Monitor`, and a background command still
+   unfinished when the session ends parks the plan `lost_background` whatever the outcome claims.
+
+**The last thing you print is one fenced `rlx-outcome` block** holding one JSON object, in the shapes
+the prompt shows: from a readiness check, `ready` or `parked`; from a review, `verdict` (the counts, the review path, and `findings` — **every**
+finding of the round, each `{severity, file, line, what}`) or `parked`; from a close, `closed` (the
+version and tag, or `null` for a docs/chore-only close, carrying the review's verdict, with `fixed_in`
+on each finding the close repaired) or `parked`. The finding lines are what the owner reads in the morning, verbatim; write each so it
+stands on its own. The conductor verifies a `closed` against `git` — plan under `done/` with
+`Status: done`, a `## Close review` section, a clean tree, every `fixed_in` commit on the branch and
+changing its finding's file, an annotated tag on the tip — and parks on any disagreement.
+
+---
