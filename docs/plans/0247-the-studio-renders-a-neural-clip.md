@@ -268,7 +268,7 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 | 2 — A plain clip from the studio | studio-builder | done | `8d8f2547` |
 | 3 — The strip and the prompts | studio-builder | done | `8fcef278` |
 | 4 — The neural toggle | studio-builder | done | `30ef08ec` |
-| 5 — The job is a file, and the docs say so | studio-builder | done | committed with this row |
+| 5 — The job is a file, and the docs say so | studio-builder | done | `e7e7394e` |
 | 6 — A real neural clip, judged | human | not started | |
 
 ### Notes
@@ -325,6 +325,21 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 - Phase 5, opening a job grants the output and, when it still exists, the track it names.
 
 ### Close triggers
+
+- `presets/`: not touched (`git diff --name-only main...HEAD -- presets` is empty).
+- `**Closes:**`: the plan header carries none.
+- What shipped: a feature. The player gains `--render`, `--bars` and `--out` (`standalone/`), and
+  the studio gains the Render view, ten `render:` OS channels and the `render` settings key.
+- Operator docs moved: `docs/configuration.md`, `docs/capturing.md`, `docs/diffusion-filter.md`,
+  `studio/README.md`.
+- `node scripts/check-backlog-claims.mjs`: exit 0. Its advisory names three entries whose probed
+  paths this lane touched: 0260 and 0261 (`standalone/src/thumbs.rs`), and 0262
+  (`docs/diffusion-filter.md`).
+- Full suite: owed to the conductor's pre-review gate (ADR-0207). At `e7e7394e` the studio's
+  `typecheck`, `lint` and `test` (44 files, 396 tests) exit 0, as do `check-filter-figures`,
+  `check-doc-links`, `check-reader-prose`, `check-settings-have-files` and
+  `check-comment-hygiene`.
+- `human` phases remaining: Phase 6 (`Blocks merge: no`).
 
 ## Followups (after this lands)
 
