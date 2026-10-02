@@ -2314,7 +2314,7 @@ shader, so a preset that binds none of them pays nothing.
 | `invert` | past `0.5`, `1 - c` |
 | `echo_alpha` | how far the present blends toward a **second sampled copy** of the finished frame. `0` — the default — is the exact identity and costs one uniform branch; `1` is the copy *alone*, with the base frame gone |
 | `echo_zoom` | how far that copy is zoomed, about the frame centre. `1` is the same size. Default `1` |
-| `echo_orient` | how it is flipped: `0` none, `1` left-right, `2` top-bottom, `3` both. Rounded to the nearest of the four, so a smoothed or computed value never lands between them. Out of range wraps, so a preset that animates the orientation by counting gets a cycle. Default `0` |
+| `echo_orient` | how it is flipped: `0` none, `1` left-right, `2` top-bottom, `3` both. Truncated toward zero, as MilkDrop reads it, so a smoothed or computed value never lands between states and `0.99` is still `0`. Above `3` it wraps, so a preset that animates the orientation by counting upward gets a cycle; below zero `-1` and `-3` flip left-right and `-2` flips nothing. Default `0` |
 
 > **The four remaps operate on *linear light* here, where MilkDrop applied them to
 > 8-bit display-referred pixels.** They are the same gesture, not the same

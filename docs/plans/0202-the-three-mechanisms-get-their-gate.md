@@ -232,13 +232,15 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no preset file. `presets/README.md`'s hand-written echo table was corrected
+  at the close, prose only.
 - **Plan header `Closes:`** none — see `**Takes:**`; backlog 0108 and 0109 both stay live.
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** fix-only (filled at the close).
+- **Operator docs touched:** `presets/README.md`'s echo table, at the close.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** re-run at the close.
+- **Full suite:** the suite ledger record of gate `0202-pre-review` at 2026-10-02T06:00:29Z, tree
+  `41886eb`: 1934 tests run, 1934 passed, 8 skipped; re-run on the close tip.
+- **Outstanding `human` phases:** none after the split; Phases 4 and 6-7 are Plan 0246's.
 
 ## Followups (after this lands)
 
@@ -246,6 +248,11 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
   took the echo off the list. The three candidates left are the field's own: `fDecay = 1`,
   `bTexWrap = 1`, and a per-pixel `zoom` that falls below 1. Take them in a probe with a stop
   condition, the way Phase 1 took the rate candidate, if Plan 0246's look gate still reads that pair as wrong.
+- **A residual rate dependence lives in the motion path.** Phase 1 read *Fog Tunnel*'s whole-preset
+  luma at 0.270 / 0.287 / 0.247 at 30 / 60 / 165 fps, non-monotone, and it vanished with every motion
+  term zeroed, so the warp, zoom and rot advection is not rate-independent. Plan 0246's look gate
+  runs at the rig's 165 fps and should read its washed pairs knowing this; a probe with a stop
+  condition is the next step if that gate attributes anything to it.
 
 - The reach decision (backlog 0109) — an interview and an ADR, triggered by Plan 0246's look gate.
 - ADR-0199's `Outcome` for the per-mode measurement is owed at Plan 0246's close, not this one.
