@@ -188,8 +188,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `CLAUDE.md` becomes an orientation map | dev | done | c9205236 (moves 1-4), committed with this row (move 5) |
-| 2 — The plans index keeps only the recent closes | dev | not started | |
+| 1 — `CLAUDE.md` becomes an orientation map | dev | done | c9205236 (moves 1-4), 79c7035a (move 5) |
+| 2 — The plans index keeps only the recent closes | dev | done | committed with this row |
 | 3 — The architect skill loads its review and close on demand | human | not started | |
 
 ### Notes
@@ -201,6 +201,10 @@ flowchart LR
   `CLAUDE.md` keeps the live URL, which `site/README.md` does not carry. Every other sentence of the
   three entries was judged already said by its target and dropped, including the conductor entry's
   "neither a gate nor a renderer" clause.
+- **Phase 2 moved 192 bullets**, not the 185 the Risks section counts: the index gained closes
+  between drafting and this run. None used a reference-style link, so no definition moved with them.
+  The moved bullets sit outside any `roster:` marker in the archive, so `check-index-rows.mjs` no
+  longer caps them.
 - **`docs/README.md` does not exist.** The "Repository layout" the plan names is in the root
   `README.md`, which is what the `CLAUDE.md` `docs/` entry already pointed at; the layout row for
   `scripts/README.md` went there.
