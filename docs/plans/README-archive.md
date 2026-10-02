@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0202 - The three mechanisms get their gate](#0202---the-three-mechanisms-get-their-gate)
   - [0245 - A gate that runs a built binary checks it is current](#0245---a-gate-that-runs-a-built-binary-checks-it-is-current)
   - [0242 - Readiness is read when the plan is approved](#0242---readiness-is-read-when-the-plan-is-approved)
   - [0204 - The library learns from the corpus it will not ship](#0204---the-library-learns-from-the-corpus-it-will-not-ship)
@@ -279,6 +280,22 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0202 - The three mechanisms get their gate](done/0202-the-three-mechanisms-get-their-gate.md)
+
+- closed 2026-10-02 by a conductor close on the lane `plan-0202-the-three-mechanisms-get-their-gate`,
+at Phase 3; Phases 4-7 were split to Plan 0246 on 2026-10-01. Phase 1 `7027a97c`, Phase 2 `09be6b65`
+(not run). Round 1 review: **no blockers, no majors, five minors**; four repaired at the close in
+`8c11da22`, the fifth (the log outweighs the phases) asked for no change. Version: **0.160.2** (patch:
+one behaviour fix in `core`). No ADR to accept; closes no backlog entry. Upstream CI read green. The
+full review is the plan's own `## Close review`.
+- **What landed.** `echo_orientation` truncates toward zero and takes C's sign-keeping remainder, as
+  the reference's `(int)v % 4` does, so `0.99` no longer flips and `-1`, `-3` flip left-right only.
+- **Falsified.** The rate candidate for the two washed pairs: the deposit-and-decay equilibrium of
+  *Fog Tunnel* agrees across 30, 60 and 165 fps within 0.0003. And Phase 3's first premise, that the
+  reference's echo nests the previous frame: it never feeds back. Songflower's weave is unattributed.
+- **Outlived the plan.** A residual, non-monotone rate dependence in the motion path (warp, zoom and
+  rot advection), now a followup for Plan 0246's look gate to read against.
 
 ### [0245 - A gate that runs a built binary checks it is current](done/0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md)
 

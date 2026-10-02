@@ -1,16 +1,19 @@
 # 0202 — The three mechanisms get their gate
 
-> **Status:** in-progress. **Split 2026-10-01:** Phases 4-7 moved to
-> [Plan 0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md), because
+> **Status:** done - closed 2026-10-02 by a conductor close at Phase 3: Phase 1 falsified the rate
+> candidate, Phase 2 did not run, Phase 3 made the echo orientation truncate like the reference.
+> Round 1 review: no blockers, no majors, five minors (four repaired at the close). Full suite green
+> on the close tip. Version 0.160.2. **Split 2026-10-01:** Phases 4-7 moved to
+> [Plan 0246](../0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md), because
 > each needs the Windows rig or the corpus and the lane should not wait on them. This plan closes at
 > Phase 3.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
+> **Related ADRs:** [0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
 > (its third `Outcome` is this plan's brief),
-> [0199](../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)
-> (whose inference Plan 0246 Phase 2 now tests), [0019](../adrs/0019-eased-parameters.md) (the injected `dt` a
+> [0199](../../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)
+> (whose inference Plan 0246 Phase 2 now tests), [0019](../../adrs/0019-eased-parameters.md) (the injected `dt` a
 > per-second rate is converted against)
 > **Takes:** nothing since the split. Design-backlog 0108 and 0109 went to Plan 0246 with the
 > phases that serve them, and neither entry is closed by this plan.
@@ -27,7 +30,7 @@ could not settle by eye.
 
 ## Context & problem
 
-[ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
+[ADR-0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
 third `Outcome` (2026-09-18, at Plan 0142's look gate) reads: of seven pairs against
 `foo_vis_milk2` 0.2.0.0, **one better, two good, one fixed, two still washed at the ground, one
 wrong on structure**. What changed is not the verdict but its shape — after five plans the honest
@@ -237,10 +240,144 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 - **Plan header `Closes:`** none — see `**Takes:**`; backlog 0108 and 0109 both stay live.
 - **What shipped:** fix-only (filled at the close).
 - **Operator docs touched:** `presets/README.md`'s echo table, at the close.
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** re-run at the close.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** re-run at the close, exit 0 (55 reductions across 27 live entries).
 - **Full suite:** the suite ledger record of gate `0202-pre-review` at 2026-10-02T06:00:29Z, tree
   `41886eb`: 1934 tests run, 1934 passed, 8 skipped; re-run on the close tip.
 - **Outstanding `human` phases:** none after the split; Phases 4 and 6-7 are Plan 0246's.
+
+## Close review
+
+The conductor's round 1 review, graded at tip `d2b63ba9d07c63dbc1aaf9ac389bfd541e8f65f2`, in full. It
+was the only round, so no earlier finding was resolved by a fix round. Minors 1, 2, 3 and 5 were
+repaired at the close in `8c11da22`; minor 4 asked for no change and stays as recorded.
+
+### Plan 0202 — close review, round 1
+
+Graded at tip `d2b63ba9d07c63dbc1aaf9ac389bfd541e8f65f2`, lane `/home/igor/Work/rlx-plan-0202`, branch
+`plan-0202-the-three-mechanisms-get-their-gate`.
+
+**Verdict: Plan 0202 landed cleanly at its split scope (Phases 1-3). No blockers, no majors, five minors,
+all of them prose that a close can repair.**
+
+#### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 41886eb is green in the suite ledger, run by gate
+  0202-pre-review at 2026-10-02T06:00:29.799Z: 1934 tests run: 1934 passed (21 slow), 8 skipped`. That
+  ledger record is this review's full-suite evidence (ADR-0207). It covers the GPU suites the Phase 3
+  session could not run (its log says the `-P fast` run was green and the filtered golden run was stopped
+  waiting on the lock), so no golden moved under the change.
+- **rustdoc:** `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` — clean.
+- **Comment hygiene:** `node scripts/check-comment-hygiene.mjs` — OK.
+- **Diff against `main`:** `core/src/render/scenes/warp_mesh/mod.rs`, `core/src/render/scenes/warp_mesh/tests.rs`,
+  and the plan. Tree clean before and after this review.
+
+#### Lens 1 — Alignment
+
+- **Owner tags:** every phase carries one in-vocabulary `**Owner skill:**` line (Phases 1-3 `dev`). The
+  split to Plan 0246 is recorded in the header and the log rows; Phases 4-7 are not this plan's.
+- **Phase 1** (log-only). The readings table names the preset, command, machine, tree and statistic as the
+  done-when asks. The finding departs from the done-when as written and **says so**: the whole preset at
+  30 vs 165 fps differs by 0.023, just over the 0.02 floor, but the difference is non-monotone (60 fps
+  brightest, 165 darkest), vanishes when the motion terms are zeroed, and the deposit-plus-decay reading
+  agrees within 0.0003. The rate candidate is about a deposit bypassing `Exposure` raising the field by
+  `1/(1-d)`; the deposit-only isolation tests exactly that, and a 165 fps reading that is *darker* runs
+  against the wash. I accept the falsification. The residual motion-path rate dependence is not lost in
+  the Notes, but it is missing from `## Followups` (minor 5).
+- **Phase 2** correctly did not run, per its own condition.
+- **Phase 3** (amended). `echo_orientation` now computes `(v.trunc() % 4.0) as i32` and maps `1 | -1 | -3`
+  to the x flip, `2`, `3` as before, everything else to 0; non-finite still returns 0. I read the reference
+  directly (`~/Work/milkdrop2-src/vis_milk2/milkdropfs.cpp` l.4149 `(int) (*var_pf_echo_orient) % 4`,
+  l.4195-4198 `if (n % 2)` flips tu, `if (n >= 2)` flips tv): C truncates, the remainder keeps the
+  dividend's sign, `-1 % 2` and `-3 % 2` are non-zero, `-2 % 2` is zero, and no negative is `>= 2`. The
+  code and its doc comment match that exactly. Taking the `f32` remainder before the cast keeps a huge
+  value from overflowing the integer cast, which the doc comment states.
+- **The named test** is renamed to `the_echo_orientation_truncates_to_four_states` and asserts every value
+  the done-when lists: `0.99 -> 0`, `1.0 -> 1`, `1.99 -> 1`, `0.76 -> 0`, `1.24 -> 1`, plus the wrap
+  (`4 -> 0`, `5 -> 1`) and the negative cases (`-0.5 -> 0`, `-1 -> 1`, `-2 -> 0`, `-3.5 -> 1`, `-4 -> 0`,
+  `-5 -> 1`) with the `d4c843a` file and lines cited in the comment. Non-finite stays asserted. No
+  tautology.
+- **The neighbouring `colour_source` doc comment** was corrected as the phase required, and no longer
+  cites a rounding rule that `echo_orientation` gave up.
+- **Whole-number bindings cannot move:** no shipped preset binds `echo_orient` at all (`git grep`), and the
+  three fixtures carry `0.0` or `1.0` in their headers, which map identically under both rules.
+- **Implementation log:** present, with lane, phase-to-commit table and notes. Its `### Close triggers`
+  bullets are blank (minor 3) and it is longer than the phases section (minor 4).
+
+#### Lens 2 — Layering, real-time safety
+
+A pure scalar quantizer in a scene module; no new types, no allocation, no audio-source or platform
+reach, no `unwrap`. C ABI and control protocol untouched. Nothing to report.
+
+#### Lens 3 — Doc freshness and bookkeeping
+
+- Two reader-facing statements still describe the retired rounding rule (minors 1 and 2). The generated
+  parameter reference row (`presets/README.md:832`) and the schemas carry no rounding claim and need no
+  regeneration.
+- **Version bump owed: patch.** The plan shipped one behaviour fix in `core` (the echo flip now matches the
+  reference for fractional and negative orientations) and no feature.
+- No ADR to accept; ADR-0199's `Outcome` is owed at Plan 0246's close, as the plan says. `Closes:` is none,
+  so no backlog entry moves.
+
+#### Lens 4 — Correctness and determinism
+
+The quantizer is a pure function of its input; the new assertions are exact integer properties, not
+measured thresholds. No geometry, aspect or numeric-noise question arises.
+
+#### Lens 5 — Design integrity
+
+No seam widened; the change stays inside the function that owns the rule.
+
+#### Findings
+
+**Blockers.** None.
+
+**Majors.** None.
+
+**Minors.**
+
+1. **`core/tests/suite/preset.rs:2457`** — the roster comment reads
+   ``// `echo_orientation`: rounds, then wraps modulo the four flips.`` It is now false. Replace with
+   ``// `echo_orientation`: truncates toward zero as the reference's `(int)` cast does, then takes C's
+   sign-keeping remainder over the four flips.`` (Comment-only; close-repairable.) **Fixed in `8c11da22`.**
+2. **`presets/README.md:2317`** — the hand-written echo table says *"Rounded to the nearest of the four, so a
+   smoothed or computed value never lands between them. Out of range wraps, so a preset that animates the
+   orientation by counting gets a cycle."* Replace with: *"Truncated toward zero, as MilkDrop reads it, so
+   a smoothed or computed value never lands between states and `0.99` is still `0`. Above `3` it wraps, so
+   a preset that animates the orientation by counting upward gets a cycle; below zero `-1` and `-3` flip
+   left-right and `-2` flips nothing."* (Hand-written prose outside the generated region;
+   close-repairable.) **Fixed in `8c11da22`.**
+3. **`docs/plans/0202-the-three-mechanisms-get-their-gate.md:233`** — every `### Close triggers` bullet but
+   `Closes:` is empty (What shipped, `presets/` touched, operator docs, backlog probes, Full suite,
+   outstanding human phases). The full-suite evidence exists in the ledger record cited above; the close
+   should fill the bullets (fix-only; `presets/README.md` prose only; Full suite = the ledger record;
+   no outstanding human phase after the split). **Fixed in `8c11da22`.**
+4. **`docs/plans/0202-the-three-mechanisms-get-their-gate.md:149`** — the `## Implementation log` (about 93
+   lines) outweighs the `## Implementation phases` section (about 58). Most of the weight is Phase 3's
+   first-run reading of `d4c843a`, which is the evidence for the amendment and earns its place; no
+   trimming asked, recorded because nothing else gates the property.
+5. **`docs/plans/0202-the-three-mechanisms-get-their-gate.md:243`** — Phase 1's Notes call the residual
+   rate dependence in the motion path (warp, zoom and rot advection: whole-preset luma 0.270 / 0.287 /
+   0.247 at 30 / 60 / 165 fps, gone with motion zeroed) "a followup", but `## Followups` does not list it.
+   Add a bullet so Plan 0246's look gate and the next reader can find it. **Fixed in `8c11da22`.**
+
+**Nits.** None.
+
+#### Bookkeeping the close owes
+
+- Repair minors 1, 2, 3 and 5 (all comment or Markdown prose), and fill the close triggers.
+- `Status: done`, `git mv` to `docs/plans/done/`, re-point links (`node scripts/check-doc-links.mjs`),
+  backlog probes, index rows, translations advisory, `toc.mjs`.
+- `## Close review` section carrying this review.
+- **Patch** version bump plus the studio's two version copies, annotated tag, `check-release-tag.mjs`.
+
+### What the close ran
+
+- Upstream CI (`node scripts/check-upstream-ci.mjs`): green, run 36908854196 on `main` at `d32b1cc`.
+- `git merge main` was clean (the conductor queue only).
+- Doc links, index rows and backlog probes exit 0; the translation advisory names no moved source.
+- No preset file changed, so the curation sweep has nothing to judge; no ADR to accept; no backlog
+  entry moves.
 
 ## Followups (after this lands)
 
