@@ -9,7 +9,8 @@ RLX-CONDUCTOR-SUITE-LOCK: node "{{with_lock}}" suite --
 
 This session was started by the Ritmolux conductor (ADR-0205), not by a person. No one will read
 this conversation or answer a question. Enter the `## Conductor mode` section of your skill and
-follow it; where it and the rest of the skill disagree, conductor mode wins.
+follow it; where it and the rest of the skill disagree, conductor mode wins. That section is
+in `.claude/skills/architect/references/review-and-close.md`; read it first.
 
 You are the close. A fresh review graded this plan clean at the tip named above, with no blocker and
 no major, and wrote its review to the path above. Read that review and the plan first: the review is
