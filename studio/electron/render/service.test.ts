@@ -128,6 +128,9 @@ describe('the render service', () => {
     expect(spawned[0].args.slice(0, 1)).toEqual(['--render'])
     expect(spawned[1].args.at(-1)).toBe(output.value)
     expect(events[0]).toEqual({ kind: 'started', output: output.value, frames: 90 })
+    // The job file lands beside the output, and reopens to the same request.
+    const opened = await service.openJob(`${output.value}.render.json`)
+    expect(opened).toEqual({ ok: true, value: { request, sourceMissing: false } })
     expect(service.busy).toBe(true)
     expect(await service.start(request)).toEqual({ ok: false, reason: 'a render is already running' })
   })
@@ -207,6 +210,36 @@ describe('a neural job', () => {
     const result = await service.start(neuralRequest(source, output.value, [{ at_bar: 3, prompt: 'late' }]))
     expect(result).toMatchObject({ ok: false, reason: expect.stringContaining('past the track') })
     expect(spawned).toEqual([])
+  })
+})
+
+describe('opening a job', () => {
+  it('grants the paths it names, and reports a track that has moved instead of refusing', async () => {
+    const { service, source } = harness()
+    const job = join(mkdtempSync(join(tmpdir(), 'rlx-job-')), 'clip.mp4.render.json')
+    const document = {
+      version: 1,
+      audio: source,
+      preset: 'Gyre',
+      fps: '30',
+      size: '1920x1080',
+      tier: 'rich',
+      output: '/data/clips/clip.mp4',
+      neural: null,
+    }
+    writeFileSync(job, JSON.stringify(document))
+    const opened = await service.openJob(job)
+    expect(opened).toMatchObject({ ok: true, value: { sourceMissing: false } })
+    expect(service.isGranted(source)).toBe(true)
+    expect(service.isGranted('/data/clips/clip.mp4')).toBe(true)
+
+    writeFileSync(job, JSON.stringify({ ...document, audio: '/gone/track.flac' }))
+    const moved = await service.openJob(job)
+    expect(moved).toMatchObject({ ok: true, value: { sourceMissing: true } })
+    expect(service.isGranted('/gone/track.flac')).toBe(false)
+
+    writeFileSync(job, JSON.stringify({ ...document, version: 9 }))
+    expect(await service.openJob(job)).toMatchObject({ ok: false, reason: expect.stringContaining('version 9') })
   })
 })
 

@@ -136,6 +136,12 @@ export function parseBarGrid(json: unknown): BarGrid {
   return grid
 }
 
+/** A job file, read back: the request it holds, and whether its track has moved. */
+export interface OpenedJob {
+  request: RenderRequest
+  sourceMissing: boolean
+}
+
 /** A waveform's lowest and highest sample per column, each in [-1, 1]. */
 export interface Peaks {
   min: number[]

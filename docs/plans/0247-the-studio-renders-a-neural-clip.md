@@ -264,11 +264,11 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The player renders and reports bars | dev | done | committed with this row |
+| 1 — The player renders and reports bars | dev | done | `30083e5a` |
 | 2 — A plain clip from the studio | studio-builder | done | `8d8f2547` |
 | 3 — The strip and the prompts | studio-builder | done | `8fcef278` |
-| 4 — The neural toggle | studio-builder | done | committed with this row |
-| 5 — The job is a file, and the docs say so | studio-builder | not started | |
+| 4 — The neural toggle | studio-builder | done | `30ef08ec` |
+| 5 — The job is a file, and the docs say so | studio-builder | done | committed with this row |
 | 6 — A real neural clip, judged | human | not started | |
 
 ### Notes
@@ -288,60 +288,41 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 - Phase 1, binary size: `target/release/ritmolux` from `cargo build --release -p standalone --bin
   ritmolux`, Linux. 12,854,504 B at `f77a476a`, before the phase. 12,928,352 B after it, which is
   77.1 % of NFR §4's 16,777,216 B cap.
-- Phase 2, outside the file list: `studio/shared/render.ts` (the request, grid and event shapes,
-  in `shared/` because the renderer's project type-checks the preload's imports and cannot see
-  Node), `studio/electron/render/service.ts` (the rules, kept free of Electron so they test
-  plainly), `studio/electron/render/commands.ts`, `studio/electron/ipc/appHandlers.ts` and
-  `preload/api/app.ts` (`AppInfo` carries `render`), the two new and two touched CSS modules,
-  `studio/renderer/App.test.tsx` (its `window.api` stub gains `render`), and `studio/README.md`:
-  `settings.doc.test.ts` holds the settings table to `StudioSettings`, so the `render` row lands
-  with the key.
-- Phase 2, the IPC surface: eight OS channels under `render:` (pick-audio, prepare,
-  suggest-output, pick-output, start, cancel, event, set-settings). No domain channel was added.
-  A path the renderer sends back is accepted only when main produced it, a dialog's answer or the
-  output it suggested, which is the preset channels' guard applied to a second pair of paths.
-- Phase 2, the encode: `encoderArgs` is `shot::render::ffmpeg_args` at CRF 18 plus
-  `-progress pipe:3`. `commands.test.ts` reads the Rust function's string literals and holds the
-  TypeScript list to them in order.
-- Phase 2, verdicts the plan left open. The first stage to exit badly is named, and the others
-  are stopped. An upstream stage that dies after the encoder finished cleanly is not blamed,
-  because `-shortest` can close the encoder's stdin a frame early. An encoder that exits 0
-  without `progress=end` fails. A failed job removes its partial MP4 as well as writing the log,
-  because a file cut off before its index does not play. The transcode cache is emptied at
-  start as well as at quit, so a crash leaves nothing behind for a later session.
-- Phase 2, wiring checked by hand before it was written: Node's `stdio: [child.stdout, ...]`
-  with the parent's copy destroyed moved 50,000,000 bytes from `head` to `wc -c` intact. With
-  the reader exiting early, the writer saw `SIGPIPE` rather than blocking.
-- Phase 3, outside the file list: `studio/electron/render/service.ts` (prepare returns the peaks,
-  read once per transcode), `studio/shared/render.ts` (`Peaks` and `PreparedTrack.peaks`), and
-  `BarStrip.module.css`. The timeline type, its validator and the four edits live in
-  `studio/shared/timeline.ts`.
-- Phase 3, "per pixel column": the peaks are computed at a fixed 1,200 columns in main and drawn
-  as one SVG outline that scales to the strip, so a 1,200 px strip is one column per pixel. Asking
-  for the strip's measured width would cost a call per resize and changes nothing at that width.
-- Phase 3, a marker dropped on a bar that already holds a prompt stays where it was, because two
-  prompts on one bar is a timeline the sidecar refuses. A prompt the grid ends before after a new
-  rate is drawn dotted at the end of the strip, and the validator line under it names the bar.
-- Phase 4, outside the file list: `studio/shared/render.ts` (the neural request, the probe result,
-  the sidecar pace), `studio/shared/ipc-channels.ts` (a ninth OS channel, `render:probe`),
-  `studio/electron/ipc/renderHandlers.ts` and `preload/api/render.ts`, `render/commands.ts`,
-  `studio/electron/main.ts`, `Render.module.css`, `studio/README.md` (the `render` row gains
-  `diffusion`), and the tests beside them, `Render.test.tsx` among them.
-- Phase 4, the plan's claim that the passthrough run proves the loaders is wrong in detail:
-  `sd_filter.py --passthrough` skips `resolve()` and never calls `load_timeline`, so it accepts
-  `--timeline` without reading it. `pipeline.integration.test.ts` therefore also runs the
-  sidecar's own `load_timeline` and `load_bar_grid` over the two files before the pipeline does.
-- Phase 4, the integration test ran here and did not skip: the debug player, `python3` and
-  `ffmpeg` on this machine, 60 frames at 30 fps and 160x90. `--bars` counted 60, and an `ffmpeg`
-  decode of the MP4 counted 60.
-- Phase 4, the probe checks in this order: the script key, the script file, the interpreter
-  key, then `<python> -c "import torch; print(torch.cuda.is_available())"`. Its answer is cached
-  for the session, asked again by the view's re-check, and dropped when a `diffusion.*` key is
-  written. The two files beside the output are written for a neural job only. A plain job keeps
-  its grid in the session cache, because it has no reader for one.
-- Phase 4, the sidecar's figure is its `sd-filter: N frames` line, printed every ten frames. The
-  view shows that count and the seconds per frame since the first such line, so the model load
-  is not averaged in.
+- Phase 2, outside the file list: `studio/shared/render.ts` (request, grid and event shapes),
+  `studio/electron/render/service.ts` and `commands.ts`, `ipc/appHandlers.ts` and
+  `preload/api/app.ts` (`AppInfo` carries `render`), four CSS modules, `App.test.tsx` (its stub
+  gains `render`), and `studio/README.md` (the `render` row `settings.doc.test.ts` requires).
+- Phase 2, IPC: eight OS channels under `render:`; no domain channel. Main accepts a path back
+  from the renderer only when it produced it (a dialog's answer or its own suggestion).
+- Phase 2, `encoderArgs` is `shot::render::ffmpeg_args` at CRF 18 plus `-progress pipe:3`;
+  `commands.test.ts` holds it to the Rust function's string literals.
+- Phase 2, behaviour the plan left open: the first stage to exit badly is named and the rest are
+  stopped; an upstream exit after the encoder finished cleanly is not a failure; an encoder exit
+  0 without `progress=end` is one. A failed job also deletes its partial MP4. The transcode cache
+  is emptied at start as well as at quit.
+- Phase 3, outside the file list: `render/service.ts`, `shared/render.ts` (`Peaks`) and
+  `BarStrip.module.css`. The timeline type and validator are `studio/shared/timeline.ts`.
+- Phase 3, peaks are a fixed 1,200 columns drawn as one scaling SVG outline, not the strip's
+  measured pixel width.
+- Phase 3, a marker dropped on an occupied bar stays where it was. A prompt past a re-counted
+  grid is drawn dotted at the strip's end and named by the validator line.
+- Phase 4, outside the file list: `shared/render.ts`, `shared/ipc-channels.ts` (a ninth channel,
+  `render:probe`), `ipc/renderHandlers.ts`, `preload/api/render.ts`, `render/commands.ts`,
+  `main.ts`, `Render.module.css`, `studio/README.md`, and `Render.test.tsx`.
+- Phase 4, done-when not satisfiable as stated: `sd_filter.py --passthrough` never calls
+  `load_timeline`, so the passthrough run does not parse `--timeline`. The integration test runs
+  `load_timeline` and `load_bar_grid` on the two files itself.
+- Phase 4, the integration test ran here without skipping (newest built player, `python3`,
+  `ffmpeg`): `--bars` 60 frames, MP4 decoded at 60.
+- Phase 4, the probe's order is script key, script file, interpreter key, torch. Its answer is
+  dropped when a `diffusion.*` key is written. `<output>.bars.json` and `.timeline.json` are
+  written for neural jobs only.
+- Phase 4, the sidecar figure is read from its `sd-filter: N frames` line (every ten frames),
+  with seconds per frame paced from the first such line.
+- Phase 5, outside the file list: `render/service.ts` (Start writes the job; `openJob`),
+  `shared/render.ts` (`OpenedJob`), `shared/ipc-channels.ts` (a tenth channel,
+  `render:open-job`), `ipc/renderHandlers.ts`, `preload/api/render.ts`, and `service.test.ts`.
+- Phase 5, opening a job grants the output and, when it still exists, the track it names.
 
 ### Close triggers
 

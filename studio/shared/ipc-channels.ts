@@ -97,6 +97,11 @@ export const IPC_CHANNELS = {
    * interpreter's torch sees CUDA. Cached for the session unless asked again.
    */
   RENDER_PROBE: 'render:probe',
+  /**
+   * The open dialog for a `<output>.render.json`, and the render it describes.
+   * The paths the job names are granted, because the user chose the file.
+   */
+  RENDER_OPEN_JOB: 'render:open-job',
 
   /** `shell.openExternal`, the only way a link leaves the window. */
   SHELL_OPEN_EXTERNAL: 'shell:open-external',

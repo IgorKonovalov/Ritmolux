@@ -8,6 +8,7 @@ import { ipcRenderer } from 'electron'
 
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import type {
+  OpenedJob,
   PreparedTrack,
   ProbeResult,
   RenderEvent,
@@ -52,6 +53,10 @@ export const renderApi = {
       ipcRenderer.off(IPC_CHANNELS.RENDER_EVENT, handler)
     }
   },
+
+  /** The open dialog for a job file and what it describes; `null` when dismissed. */
+  openJob: (): Promise<RenderResult<OpenedJob> | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RENDER_OPEN_JOB) as Promise<RenderResult<OpenedJob> | null>,
 
   /** Whether the neural switch can be offered; `recheck` asks again. */
   probe: (recheck: boolean): Promise<ProbeResult> =>

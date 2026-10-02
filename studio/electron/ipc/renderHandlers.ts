@@ -19,6 +19,7 @@ import {
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import {
   RENDER_SETTING_KEYS,
+  type OpenedJob,
   type RenderEvent,
   type RenderResult,
   type RenderSettingKey,
@@ -70,6 +71,23 @@ export function registerRenderHandlers(
     const path = answer.filePaths[0]
     return answer.canceled || path === undefined ? null : service.grant(path)
   })
+
+  ipcMain.handle(
+    IPC_CHANNELS.RENDER_OPEN_JOB,
+    async (): Promise<RenderResult<OpenedJob> | null> => {
+      const parent = window()
+      const options: OpenDialogOptions = {
+        title: 'Open a render job',
+        properties: ['openFile'],
+        filters: [{ name: 'Render job', extensions: ['json'] }],
+      }
+      const answer = parent
+        ? await dialog.showOpenDialog(parent, options)
+        : await dialog.showOpenDialog(options)
+      const path = answer.filePaths[0]
+      return answer.canceled || path === undefined ? null : service.openJob(path)
+    },
+  )
 
   ipcMain.handle(IPC_CHANNELS.RENDER_PREPARE, (_event, source: unknown, fps: unknown) =>
     service.prepare(source, fps),

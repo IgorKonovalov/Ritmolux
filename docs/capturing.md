@@ -331,6 +331,9 @@ what the studio renders a clip through, so it needs no source checkout. It takes
 of its own: you pipe its stdout into `ffmpeg` yourself. Its flags are listed in
 [Configuration](configuration.md#the-flags).
 
+The studio's Render view composes that pipe for you, from an MP3, a FLAC or a WAV, with prompts
+placed on the track's bars: see [Rendering a clip](../studio/README.md#rendering-a-clip).
+
 **A `--preset` that names nothing costs nothing.** The name is checked against
 the roster before the encoder is spawned and before a GPU device is built, so a
 typo exits 1, lists the roster's keys, and **writes no file at all**. That check

@@ -666,9 +666,13 @@ rather than a habit.
 | `playerPath` | a path | none | An explicit player binary, tried after the bundled one and before `PATH` |
 | `playerMode` | `windowed`, `windowless` | `windowed` | Which sink the player is spawned with; read at spawn |
 | `ui.reducedMotion` | `true`, `false` | `false` | Stops the studio's transitions: panels, tabs and dialogs appear at once. Applied the moment the Settings view writes it. The system's own reduced-motion preference does the same whatever this says |
+| `render.ffmpegPath` | a path | `ffmpeg` on `PATH` | The `ffmpeg` a clip render transcodes the track with and encodes the MP4 with. Read at each render |
+| `render.outputDir` | a directory | the user's Videos directory | Where a clip render's MP4 is suggested. Read at each render |
+| `render.diffusion.python` | a path | none | The interpreter the diffusion sidecar runs under, such as a venv's `python` with torch installed. While it is absent the Render view's neural switch stays off |
+| `render.diffusion.script` | a path | none | `tools/sd-filter/sd_filter.py` in a source checkout. While it is absent the neural switch stays off |
 
-The studio's Settings view edits the last two and shows the first; a `settings.json` written by hand
-before the first launch is read the same way.
+The studio's Settings view shows `playerPath` and edits every other key. A `settings.json` written by
+hand before the first launch is read the same way.
 
 **The foobar2000 component has no settings and no file**, and the one thing it stores host-side is
 not one. `g_cfg_preset` is a `cfg_string` holding the **name** of the preset that was last on

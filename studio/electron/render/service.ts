@@ -12,12 +12,14 @@
  * answered and what this service suggested, the same rule the preset channels
  * hold with the player's own answers.
  */
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 
 import {
   renderRequestSchema,
   type DiffusionSettings,
+  type OpenedJob,
   type Peaks,
   type PreparedTrack,
   type ProbeResult,
@@ -36,6 +38,7 @@ import {
   sidecarArgs,
   writeTimeline,
 } from './commands'
+import { readJob, writeJob } from './job'
 import { peaksOfFile } from './peaks'
 import { RenderJob, type Spawner, type StageCommand } from './pipeline'
 import { probeDiffusion } from './probe'
@@ -165,12 +168,30 @@ export class RenderService {
         }
         sidecar = { stage: 'sidecar', command: python, args: sidecarArgs(script, neural, files) }
       }
+      writeJob(request)
       this.launch(player, wav, request, grid.frames, sidecar)
       return { ok: true, value: null }
     } catch (error) {
       return refuse((error as Error).message)
     } finally {
       this.starting = false
+    }
+  }
+
+  /**
+   * The render a job file describes, with its output granted, and its track
+   * granted when it is still there. A track that moved is reported rather than
+   * refused, so the view asks for it again and keeps everything else.
+   */
+  async openJob(path: string): Promise<RenderResult<OpenedJob>> {
+    try {
+      const request = readJob(await readFile(path, 'utf8'))
+      request.output = this.grant(request.output)
+      const sourceMissing = !existsSync(request.source)
+      if (!sourceMissing) request.source = this.grant(request.source)
+      return { ok: true, value: { request, sourceMissing } }
+    } catch (error) {
+      return refuse((error as Error).message)
     }
   }
 

@@ -9,6 +9,10 @@
  *
  * The prompts are held as `[{at_bar, prompt}]`, ascending and unique, which is
  * the document `sd_filter.py --timeline` reads.
+ *
+ * Start leaves `<output>.render.json` beside the MP4, and **open job** restores
+ * every field from one. A job whose track has moved restores the rest and asks
+ * for the track, and the next pick replaces only that.
  */
 import { useEffect, useState } from 'react'
 
@@ -90,6 +94,8 @@ export function Render({ roster, active, hidden, onClose }: RenderProps): JSX.El
   const [profile, setProfile] = useState<DiffusionProfile>('fast')
   const [negative, setNegative] = useState('')
   const [seed, setSeed] = useState('')
+  /** A job was opened whose track has moved; the next pick only replaces the track. */
+  const [relinking, setRelinking] = useState(false)
 
   const preset = picked ?? active ?? roster[0]
   const neuralOn = neural && probe?.ready === true
@@ -170,9 +176,51 @@ export function Render({ roster, active, hidden, onClose }: RenderProps): JSX.El
     void window.api.render.pickAudio().then((path) => {
       if (path === null) return
       setTrack(undefined)
-      setChosenOutput(undefined)
-      setTimeline(FIRST_PROMPT)
+      // A job whose track moved keeps everything but the track; any other pick
+      // is a new render and starts over.
+      if (relinking) {
+        setRelinking(false)
+        setProblem(undefined)
+      } else {
+        setChosenOutput(undefined)
+        setTimeline(FIRST_PROMPT)
+      }
       setSource(path)
+    })
+  }
+
+  /** Restore the whole view from a `<output>.render.json`. */
+  const openJob = (): void => {
+    void window.api.render.openJob().then((result) => {
+      if (result === null) return
+      if (!result.ok) {
+        setProblem(`The job was not opened: ${result.reason}`)
+        return
+      }
+      const { request, sourceMissing } = result.value
+      setPicked(request.preset)
+      setFps(request.fps)
+      setSize(request.size)
+      setTier(request.tier)
+      setChosenOutput(request.output)
+      setNeural(request.neural !== null)
+      setProfile(request.neural?.profile ?? 'fast')
+      setNegative(request.neural?.negative ?? '')
+      setSeed(request.neural?.seed === null || request.neural === null ? '' : String(request.neural.seed))
+      setTimeline(request.neural?.timeline ?? FIRST_PROMPT)
+      setTrack(undefined)
+      setJob({ kind: 'idle' })
+      if (sourceMissing) {
+        setSource(undefined)
+        setRelinking(true)
+        setProblem(
+          `The job's track is no longer at ${request.source}. Choose it again; the prompts and settings are kept.`,
+        )
+      } else {
+        setRelinking(false)
+        setProblem(undefined)
+        setSource(request.source)
+      }
     })
   }
 
@@ -225,9 +273,14 @@ export function Render({ roster, active, hidden, onClose }: RenderProps): JSX.El
     <section className={styles.panel} aria-label="Render a clip" hidden={hidden}>
       <div className={styles.bar}>
         <h2 className={styles.heading}>Render</h2>
-        <button type="button" className={styles.quiet} onClick={onClose}>
-          close
-        </button>
+        <div className={styles.row}>
+          <button type="button" className={styles.quiet} onClick={openJob} disabled={running}>
+            open job…
+          </button>
+          <button type="button" className={styles.quiet} onClick={onClose}>
+            close
+          </button>
+        </div>
       </div>
 
       <div className={styles.row}>
