@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0236 - Space curves, and the camera becomes a shared block](#0236---space-curves-and-the-camera-becomes-a-shared-block)
   - [0244 - Sessions start lighter](#0244---sessions-start-lighter)
   - [0202 - The three mechanisms get their gate](#0202---the-three-mechanisms-get-their-gate)
   - [0245 - A gate that runs a built binary checks it is current](#0245---a-gate-that-runs-a-built-binary-checks-it-is-current)
@@ -283,6 +284,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0208 - The conductor's safety claims get their evidence](done/0208-the-conductors-safety-claims-get-their-evidence.md) - closed 2026-09-27. Review: **three rounds; 3 majors (fixed), one minor, one nit (fixed).** Version: none. ADR-0233 accepted, Outcome. Closed 0236, 0237, 0241. [Write-up](README-archive.md).
 - [0209 - A system joins the instruments by existing](done/0209-a-system-joins-the-instruments-by-existing.md) - closed 2026-09-26. Review: **no blockers, no majors, three minors (two fixed), one nit (fixed).** Version: none. ADR-0234 accepted. Closes 0258. [Write-up](README-archive.md).
 - [0223 - The heavy presets fit the integrated GPU](done/0223-the-heavy-presets-fit-the-integrated-gpu.md) - closed 2026-09-26. Review: **no blockers, no majors, three minors (two fixed).** Version: **0.151.0**. ADR-0245 accepted, Outcome. [Write-up](README-archive.md).
 - [0206 - The browser shows the look](done/0206-the-browser-shows-the-look.md) - closed 2026-09-26. Review: **no blockers, no majors, six minors (four fixed), one nit.** Version: **0.150.0**. ADR-0230 accepted, Outcome. Filed 0260, 0261. [Write-up](README-archive.md).
@@ -484,6 +486,26 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0236 - Space curves, and the camera becomes a shared block](done/0236-space-curves-and-the-camera-becomes-a-shared-block.md)
+
+- closed 2026-10-02 by a conductor close on the lane
+`plan-0236-space-curves-and-the-camera-becomes-a-shared-block`. The phases landed in `5ad3413c`
+(Phase 1), `389984de` (2), `6869feed` (3), `0e43b736` (4) and `d5f48400` (5). **Phase 6, the owner
+judging the look live, is owed** (`Blocks merge: no`, ADR-0249). The round 1 review found **no
+blockers, no majors, two minors and one nit**. The on-device checklist row was repaired at the close
+in `c8dbfb40`. The `.claude/skills/preset-author/references/api-feedback.md` curve-family count is
+open for the owner, and the review gives its replacement text. Version: **0.161.0** (minor:
+a feature). ADR-0258 accepted. The close closes no backlog entry. Upstream CI read red (Windows
+`check`) at the close. The full review is the plan's own `## Close review`.
+- **What landed.** The six camera params and the lens logic moved out of `plexus` into a shared
+  `CameraParams` block in `core/src/render/camera.rs`, with byte-identical plexus goldens.
+  `parametric_curve` gained `torus_knot` and `lissajous_3d`, which are drawn through a scene-owned
+  `seg3d` renderer. The new tier cap `seg3d_segments` is Floor 8000, measured at about 1.1 ms at
+  1080p on the RADV Renoir iGPU, and Rich 20000, unmeasured.
+- **Open.** The Windows golden job after the push gives the first WARP reading of the two new
+  goldens, and of every baseline after `parametric_curve`. The low-end-box reading of the Floor cap
+  is the new on-device row.
 
 ### [0244 - Sessions start lighter](done/0244-sessions-start-lighter.md)
 

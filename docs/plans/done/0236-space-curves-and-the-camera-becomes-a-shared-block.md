@@ -1,9 +1,12 @@
 # 0236 — Space curves, and the camera becomes a shared block
 
-> **Status:** in-progress (2026-10-02). Runs after Plan 0235 closes.
+> **Status:** done - Phase 6 owed, ADR-0249 (closed 2026-10-02 by a conductor close). Phases 1-5
+> landed in `5ad3413c`, `389984de`, `6869feed`, `0e43b736` and `d5f48400`. The round 1 review found
+> no blockers, no majors and two minors; the `docs/` one was repaired at the close and the
+> `.claude/` one is the owner's. The full suite was green on the merged tree. Version 0.161.0.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed), [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md), [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md)
+> **Related ADRs:** [ADR-0258](../../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (accepted), [ADR-0257](../../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0059](../../adrs/0059-line-scenes-colour-along-their-generator-axis.md), [ADR-0045](../../adrs/0045-quality-tiers-floor-and-rich.md)
 
 ## TL;DR
 
@@ -268,6 +271,183 @@ pub(crate) struct FamilyArm3d {
   entries (3 unprobeable).
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
 - **Outstanding `human` phases:** Phase 6, the look judged.
+
+## Close review
+
+Round 1 is the only round. Its review is reproduced in full below, with its headings moved down one
+level. No earlier round raised a finding, so there is no fix-round row. At the close, minor 2 was
+repaired in `c8dbfb40`. Minor 1 is under `.claude/` and stays open for the owner, who applies the
+replacement text the review gives. The nit asked for no change.
+
+**Phase 6 is owed** (`Blocks merge: no`, ADR-0249). Until it is done, nobody has judged whether
+depth reads on a live knot and a live 3D Lissajous, whether the facets at the polyline's joints show
+at working widths, or whether the frame rate holds with `aperture` up on real hardware.
+
+**Close notes.** At the close, `node scripts/check-upstream-ci.mjs` read upstream CI **red**: run
+36971363264 on `main` at `bff63d5` failed `check (windows-latest)`. The close merged anyway, as
+ADR-0251 directs. The Windows golden job after the push gives the first WARP reading of the two new
+goldens, and of every baseline captured after `parametric_curve`. `presets/` was touched by
+generated files only, so the set has nothing to curate. ADR-0258 is accepted.
+
+### Plan 0236 — close review, round 1
+
+Graded at `8044d72db67bfa4e1fadf5aa6d470af1fefa965d` on lane
+`plan-0236-space-curves-and-the-camera-becomes-a-shared-block` (`/home/igor/Work/rlx-plan-0236`),
+`main` already merged in (`b47a5a1b`).
+
+**Verdict:** Plan 0236 landed cleanly. There are no blockers and no majors, and two minors: one
+stale fact under `.claude/` and one missing on-device checklist row. Phase 6 (`human`,
+`Blocks merge: no`) is owed after the merge, per ADR-0249.
+
+#### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 2131f3f is green in the suite ledger, run
+  by gate 0236-pre-review-after-repair-1 at 2026-10-02T07:38:09.951Z: 1944 tests run: 1944 passed
+  (5 slow), 8 skipped`. `git rev-parse HEAD^{tree}` is `2131f3ff…`, so that ledger record is for
+  the exact tree under review. That record is lens 1's full-suite evidence. The log's
+  `Full suite:` bullet defers to the conductor's pre-review gate, which is correct in conductor mode.
+- **`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`:** green.
+- **Gates run by hand:** `node scripts/toc.mjs --check`, `check-doc-links.mjs`,
+  `check-reader-prose.mjs`, `check-system-counts.mjs`, `check-comment-hygiene.mjs` all exit 0.
+  `check-backlog-claims.mjs` exits 0 (55 reductions, 27 live entries, 3 unprobeable). Its advisory
+  names 0278 (plexus layouts), whose path moved. 0278 is about point layouts, which this plan did
+  not touch, so it is not falsified.
+
+#### Lens 1 — alignment with the plan
+
+- Every phase carries one in-vocabulary owner tag. Phases 1–5 are `dev`. Phase 6 is `human` with
+  `Blocks merge: no`, and no later phase reads its output.
+- **Phase 1.** `CameraParams` (`core/src/render/camera.rs`) declares the six specs with groups
+  Motion×4 and Light×2, worded "the scene's volume". It provides `set` and `reset`, plus a
+  `frame()` helper that returns the view, the uniform, the margin, the extents and the blur clamp.
+  Plexus splices both. Its render logic is the inline code moved verbatim: the blur clamp
+  is still taken only when `self.clamp` is `None`, and the margin and lens are unchanged. `pitch`'s
+  range moved from literal `±1.55` to `±MAX_PITCH`, and `MAX_PITCH` is `1.55`. The done-when
+  `git grep -c "\"aperture\"" -- core/src/render/scenes/plexus` returns only
+  `plexus/tests.rs:2`, which are test usages. `mod.rs` has no declaration. In the Phase 1 commit
+  the generated files differ only in the five reworded doc strings (`presets/README.md` +5/−5).
+  `camera/tests.rs` asserts that the block answers exactly six names and that `frame()` equals the
+  pieces composed, margin and blur-clamp branches included.
+- **Phase 2.** `FamilyArm3d` and `arm3d()` exist, and so does `TorusKnot`, with `p` and `q`
+  rounded from `n` and `d` and `tube` clamped. The scene builds its `new_3d` renderer and its
+  `points3d` and `instances3d` buffers once, at construction, sized `seg3d_cap + 1` and
+  `seg3d_cap`. `periodic_walk_3d` pushes at most `samples + 1 ≤ cap + 1` points, so no frame
+  reallocates. Colour runs along the walk with the full walk as divisor, so the gradient draws on
+  as `draw_progress` reveals it (ADR-0059). Tests checked:
+  - `a_two_three_knot_lies_on_its_torus` asserts `|from_core − tube| < 1e-5` on every sample, the
+    ring radius inside `1 ± tube`, and a winding of 2 about the axis. That is the done-when, stated
+    more strictly.
+  - `a_torus_knot_reaches_the_frame_and_turns_with_yaw` covers the `shot`-visible knot and the yaw
+    difference. It compares two captures in the same run, so 0.002 is a "not identical" check and
+    is not measured against cross-machine drift.
+  - `an_open_aperture_strokes_the_far_side_wider_than_the_focal_side` uses a pinhole control
+    (`far ≤ near`) and asserts `far ≥ 2·near` at aperture 12. Both sides are the same kind of
+    quantity on one frame, so it is a property.
+
+  The `parametric_curve` golden is unchanged. The plan names `rotation` as inert, but the system
+  has no `rotation` param. The log notes this, and `spin`, which drives the in-plane rotation, is
+  declared inert instead. That is a correct reading of the plan.
+- **Phase 3.** `Lissajous3d` follows the plan's formula, and `m` and `phase_z` are new levers.
+  `per_family!` has seven columns, and the table test pins `CurveFamily::ALL` to seven names.
+  `a_flat_depth_axis_lays_the_3d_lissajous_on_the_flat_one` asserts `z == 0` exactly and that x
+  and y match the flat figure point for point. The plan said the unknown-family error listed the
+  roster "as it does now". It did not, and the list was added at the actual raise site
+  (`raw/generator.rs`); the test asserts that every family name appears. The generated reference
+  carries both space families with the levers they read (`presets/README.md:521–563`).
+- **Phase 4.** `seg3d_segments` is Floor 8000, measured, and Rich 20000, not measured; both are
+  recorded in the `tier.rs` doc and the log. The measurement is 1.05–1.12 ms at 1080p on RADV
+  Renoir, inside NFR §1. `OverflowContext::Samples` adds onset, recovery and `top_tier_lifts`, and
+  joins the two existing context tests. `an_over_cap_space_walk_is_clamped_with_a_notice` checks
+  the context, the cap, `dropped` and the tier remedy for both families, and checks that the cap
+  itself is silent. The two goldens are appended after the roster loop, and their fixtures bind
+  every camera param and `spin`.
+- **Phase 5.** `docs/presets.md`, `docs/preset-guide.md` (one knot picture plus its teaching
+  preset) and `systems.md` are swept, and the four named gates pass.
+- **Unlisted files.** The log notes each one (`core/tests/suite/preset.rs`,
+  `core/src/render/scenes/mod.rs`, `raw/generator.rs`, `docs/examples/curves/torus_knot.toml`,
+  `scripts/docs-shots.mjs`). Each is needed by its phase.
+
+#### Lens 2 — layering, real-time safety, contracts
+
+- No platform or audio type enters `core/`, and no raw GPU call is added.
+- The space path in `render_space` / `update_space` uses `.get()` and `let … else`, with no
+  `unwrap` and no per-frame allocation (`mem::take` and restore on `instances3d`).
+  `space_samples` maps a negative or NaN `samples` to 0. `camera.rs` carries the hot-path pragma.
+- The C ABI and the control protocol are unchanged. The `Scene` trait is not widened: the scene
+  uses the existing `set_target_size`.
+
+#### Lens 3 — docs and bookkeeping
+
+Two stale facts were found; they are minors 1 and 2 below. The generated files are committed and
+held by their tests (the suite is green). The rest is for the close:
+
+- ADR-0258 is `proposed`: accept it.
+- Version bump owed: **minor**. This is a feature plan.
+- `presets/` touched: generated files only, so the set has nothing to curate.
+- Phase 6 is owed: `Status: done - Phase 6 owed, ADR-0249`.
+- **Carry into the close notes.** The log records that both new goldens, and every baseline
+  captured after `parametric_curve`, have their first WARP reading on Windows CI.
+  `parametric_curve` now builds a `seg3d` renderer at construction, and `golden.rs` documents that
+  building GPU resources mid-run can move a later capture on WARP. This cannot be checked from
+  Linux. Read the Windows golden job after the push.
+
+#### Lens 4 — correctness and determinism
+
+- The aspect comes from the render target, which `render` is handed (ADR-0037). The pixel-scale
+  target comes from `set_target_size`, the same mechanism plexus uses.
+- `focus` is normalized across the whole figure's bounding radius, not the revealed prefix. A test
+  holds this, so a reveal does not move the focal plane.
+- There is no randomness and no clock read in the new samplers.
+- The numeric assertions are tolerances derived from the mechanism (1e-5 float geometry),
+  ratios of like quantities, or exact equalities.
+
+#### Lens 5 — design integrity
+
+The camera block follows `PanParams`' shape, and plexus and `parametric_curve` both delegate to it,
+so the open/closed property holds for Plans 0237–0240. `parametric_curve` re-declares the camera
+specs with its own doc lines through `..camera::YAW`, so default, range and kind cannot diverge.
+The log explains why, and this is sound under the family-row roster test.
+
+#### Findings
+
+##### minor
+
+1. **`.claude/skills/preset-author/references/api-feedback.md:61` still says five curve families.**
+   This plan made that fact false, and the preset-author lane reads this file as its vocabulary.
+   The CLI refuses a headless edit under `.claude/`, so the owner applies it. Replace lines 61–62:
+
+   ```
+   - **Five curve families** since Plan 0162 — `maurer_rose`, `lissajous`, `hypotrochoid`,
+     `superformula`, `harmonograph` — with `pen`, `sym`, `sharpness`, `lobe` and `decay` beside them.
+   ```
+
+   with:
+
+   ```
+   - **Seven curve families**: five flat since Plan 0162 — `maurer_rose`, `lissajous`, `hypotrochoid`,
+     `superformula`, `harmonograph` — with `pen`, `sym`, `sharpness`, `lobe` and `decay` beside them,
+     and two space families since Plan 0236 — `torus_knot` (`tube`) and `lissajous_3d` (`m`,
+     `phase_z`) — drawn through the shared camera (ADR-0258).
+   ```
+
+2. **`docs/on-device-validation.md` has no row for the new `seg3d_segments` Floor cap.** The cap
+   was measured only on the development box's iGPU, headless, and `Rich`'s 20000 is not measured
+   at all. The plexus caps in the same position have a checklist row (lines 247–258); the space
+   curves have none, so nothing asks for the low-end-box reading. The repair is Markdown prose
+   that a close may make. After the plexus look row (line 264), add:
+   `- [ ] **The space curve families at the Floor cap, on the low-end box, 1080p.** Plan 0236 added
+   torus_knot and lissajous_3d to parametric_curve, sized by seg3d_segments (Floor 8000, measured
+   at about 1.1 ms on the development box's integrated GPU, headless; Rich 20000 unmeasured). Load
+   docs/examples/curves/torus_knot.toml with samples = "8000", thickness = "12" and aperture =
+   "24"; overlay on (F3); report whether fps holds >= 60 and the p99, and what the standalone
+   prints about the clamps.` Format it with links and backticks to match its neighbours.
+
+##### nit
+
+- The implementation log (lines 182–270) is slightly longer than `## Implementation phases`
+  (lines 61–141). That is the lens 1 property, but the overrun is marginal and every note is
+  load-bearing, so the close should not trim it.
 
 ## Followups (after this lands)
 
