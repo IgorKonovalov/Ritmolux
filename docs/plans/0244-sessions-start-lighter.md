@@ -190,7 +190,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — `CLAUDE.md` becomes an orientation map | dev | done | c9205236 (moves 1-4), 79c7035a (move 5) |
 | 2 — The plans index keeps only the recent closes | dev | done | a5d2dd2a |
-| 3 — The architect skill loads its review and close on demand | human | not started | |
+| 3 — The architect skill loads its review and close on demand | human | owed | |
 
 ### Notes
 
