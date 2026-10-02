@@ -1,6 +1,6 @@
 # 0242 — Readiness is read when the plan is approved, and a judgement phase defaults to owed
 
-> **Status:** done - Phase 3 owed, ADR-0249 (closed 2026-10-01 by a conductor close). Phase 1 `7c3dbffe`, Phase 2 `47b75ecf`; Phase 3, the owner's two `.claude/` edits, is owed after the merge. Round 1 review: no blockers, no majors, one minor (open, under `.claude/`), one nit (open). Full suite green via the suite ledger. Version 0.160.0.
+> **Status:** done (closed 2026-10-01 by a conductor close; Phase 3 applied by the owner 2026-10-02). Phase 1 `7c3dbffe`, Phase 2 `47b75ecf`; Phase 3, the owner's two `.claude/` edits, landed after the merge. Round 1 review: no blockers, no majors, one minor (applied with Phase 3), one nit (open). Full suite green via the suite ledger. Version 0.160.0.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0248](../../adrs/0248-the-pipeline-repairs-before-it-parks.md), [ADR-0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md), [ADR-0210](../../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
@@ -168,7 +168,7 @@ sequenceDiagram
 |---|---|---|---|
 | 1 — `conductor readiness NNNN` runs the check at approval | dev | done | `7c3dbffe` |
 | 2 — Readiness prints advisories that never park | dev | done | `47b75ecf` |
-| 3 — The architect runs it, and the template defaults judgement phases to owed | human | owed | |
+| 3 — The architect runs it, and the template defaults judgement phases to owed | human | done | applied on main 2026-10-02, with review finding m1 |
 
 ### Notes
 
