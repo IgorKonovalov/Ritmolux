@@ -190,7 +190,7 @@ pub(crate) struct FamilyArm3d {
 | 3 — `lissajous_3d`, and the family table | dev | done | 6869feed |
 | 4 — The `seg3d_segments` cap, measured, and the goldens | dev | done | 0e43b736 |
 | 5 — Documentation and the references | dev | done | committed with this row |
-| 6 — The look, judged | human | not started | |
+| 6 — The look, judged | human | owed | |
 
 ### Notes
 
