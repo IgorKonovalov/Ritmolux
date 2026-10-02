@@ -1,9 +1,9 @@
 # 0244 — Sessions start lighter: standing context moves to where it is read on demand
 
-> **Status:** in-progress (approved 2026-10-01). Runs after Plan 0242 closes (both edit the architect skill).
+> **Status:** done - Phase 3 owed, ADR-0249 (closed 2026-10-02 by a conductor close). Phase 1 `c9205236` + `79c7035a`, Phase 2 `a5d2dd2a`; round 1 review clean, its minor and nit repaired in `23f70bbd`. Version: none (docs/chore-only).
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md), [ADR-0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
+> **Related ADRs:** [ADR-0116](../../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md), [ADR-0210](../../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
 
 ## TL;DR
 
@@ -224,3 +224,110 @@ flowchart LR
   27 live entries, 3 unprobeable; no entry named as failing
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
 - **Outstanding `human` phases:** Phase 3, which is marked `Blocks merge: no`
+
+## Close review
+
+**Phase 3 is owed (ADR-0249).** It has not yet moved Mode 4 out of
+`.claude/skills/architect/SKILL.md` into `references/review-and-close.md`, nor added the reference
+pointer to `tools/conductor/prompts/review.md` and `close.md`, so the architect skill still loads at
+its full size in every architect session, readiness included. Its three done-whens (the skill's size,
+the link check, the conductor tests) have not run.
+
+Round 1 is the only round; no earlier finding was resolved by a fix round. Both round 1 findings were
+repaired at the close in `23f70bbd`. The review follows in full, its headings demoted one level and
+its one relative link re-pointed from this file's directory.
+
+### Plan 0244 — close review, round 1
+
+Graded at tip `bb4afd42b452e644bcbd1cd5b3b60d98a1ac4515` (tree `0bbdddc`), lane
+`/home/igor/Work/rlx-plan-0244` on `plan-0244-sessions-start-lighter`, carrying `main`.
+
+**Verdict: Plan 0244 landed cleanly. No blockers, no majors, one minor and one nit, both Markdown
+prose a close can repair.** Phase 3 (`human`, `Blocks merge: no`) is owed after the merge, per
+ADR-0249.
+
+#### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 0bbdddc is green in the suite ledger, run
+  by gate 0244-pre-review at 2026-10-02T07:15:24.587Z: 1858 tests run: 1858 passed (2 slow), 84
+  skipped`. The ledger tree `0bbdddc` is this tip's tree (`git rev-parse HEAD^{tree}`), so this is
+  the lens-1 full-suite evidence.
+- **`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`:** exit 0.
+- **Phase 1 done-whens, all re-run:** `CLAUDE.md` is 24290 bytes (cap 25000);
+  `git grep -c check-gate-carriers -- scripts/README.md` = 1; `git grep -c rust-lld --
+  docs/developing.md` = 5; `check-doc-links.mjs` OK (597 files); `toc.mjs --check` OK (7 blocks);
+  `check-system-counts.mjs` OK; `check-reader-prose.mjs` OK (16 documents, 0 bare).
+- **Phase 2 done-whens, all re-run:** a `node -e` count of `- [` lines between `## Recently closed`
+  and the next `## ` prints 15; `docs/plans/README.md` is 96033 bytes (cap 100000);
+  `check-index-rows.mjs`, `check-doc-links.mjs`, `toc.mjs --check` exit 0.
+- **Verbatim move, checked by script, not by eye:** a `node -e` comparison of `main`'s
+  "Recently closed" bullets against the lane's index and archive: 207 on `main`, the lane keeps the
+  first 15 unchanged, 192 moved, and the archive's `## Closed earlier (index bullets)` holds exactly
+  those 192 byte-identical in the same order. The section sits directly before
+  `## Recently closed (full entries)` as the plan requires. Their `done/...` links resolve from the
+  archive's directory.
+- **Phase 1 moves read against `main`:** the `scripts/` prose in `scripts/README.md` is the old entry
+  re-flowed into paragraphs and bullets with its words intact; the two machine-setup sections in
+  `docs/developing.md` are verbatim except the Linux paragraph, which now refers to the page's existing
+  *No linker override on Linux* paragraph (line 98, above it) as the plan's "keeps the page's existing
+  wording" rule asks, and ADR links rebased from `docs/adrs/` to `adrs/`. The `CLAUDE.md` pointer's
+  fragment `#machine-setup-the-linker-override-opt-in-and-inert-if-skipped` matches the new heading at
+  `docs/developing.md:102` (the link checker does not validate fragments, so this was checked by hand).
+- **Move 5's drops checked against the targets:** every sentence dropped from the conductor, site and
+  packaging entries is already said by its target. `tools/conductor/README.md` carries `local.json`
+  (27, 65), the verified-CLI refusal with the patch-above warning (67-68, 579-584), `state/live.log`
+  and `digest.md` (145, 166); `site/README.md` carries the single-source rule (13-18) and the
+  `PUBLISHED` boundary (16, 24); `docs/releasing.md` carries the per-kind count (189), each staging
+  recipe (216-233) and the NFR size cap (276-278). The `docs/` lines dropped from `CLAUDE.md` all have
+  rows in the root `README.md` layout (177-189), and the translated slice its paragraph at 199.
+- **Owner tags:** every phase carries one in-vocabulary `**Owner skill:**`; only the `human` Phase 3
+  carries `Blocks merge: no`, and no later phase reads it.
+- **Implementation log:** present, shorter than the phases section, and its claims held: 192 not 185
+  bullets moved, no reference-style definitions among them, `docs/README.md` does not exist so the
+  layout row went to the root `README.md`.
+
+Lenses 2, 4 and 5 have nothing to grade: the diff touches no Rust, C++, TypeScript, C ABI, control
+protocol or hot path. Nine files change, all Markdown.
+
+#### Findings
+
+##### minor
+
+1. **`docs/releasing.md:147` — the moved READ-ME-FIRST sentence landed as a fragment.** Move 5 pasted
+   the `CLAUDE.md` clause verbatim: *"Plus the READ-ME-FIRST.md a tester finds in each archive; the site
+   publishes every one but the studio's as its install pages (ADR-0167), and a new one does not join
+   the PUBLISHED map by existing."* It begins with "Plus", has no verb of its own, and directly follows
+   a sentence saying each archive carries a `READ-ME-FIRST.txt`, so it reads as if the archives held a
+   second, `.md` file. (The staging recipes copy `packaging/*/READ-ME-FIRST.md` to `READ-ME-FIRST.txt`:
+   `packaging/linux/stage.sh:157`, `packaging/windows/stage.ps1:195`.) The citation is bare where the
+   rest of the page links its ADRs, and `PUBLISHED` is named without saying where it lives. **Fix**,
+   prose only: replace the fragment with *"That file is `packaging/*/READ-ME-FIRST.md`, renamed at
+   staging; the site publishes every one but the studio's as its install pages
+   ([ADR-0167](../../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md)),
+   and a new one joins the site only when it is added to the `PUBLISHED` map in
+   `site/src/plugins/rewrite-links.mjs`."* **Fixed in `23f70bbd`.**
+
+##### nit
+
+1. **`scripts/README.md:3-4` — the intro narrates the file's history.** *"The prose below is the
+   `scripts/` entry of the root `CLAUDE.md`, moved here so a session reads it when it edits a gate
+   rather than at every start"* describes how the page came to be, and stops being true the first time
+   the page is edited on its own. **Fix**: *"Which gate runs where, and the named exceptions to the
+   rule that every `.mjs` here is wired into pre-push or CI. The ordered gate roster itself is data..."*
+   (keeping the rest of the paragraph). **Fixed in `23f70bbd`.**
+
+#### Bookkeeping the close owes
+
+- **Version bump: none.** The plan is docs/chore-only (the log's `What shipped` agrees with the diff:
+  nine Markdown files, no code).
+- **Status:** `done - Phase 3 owed, ADR-0249`; the `## Close review` states that Phase 3 has not yet
+  moved Mode 4 out of `.claude/skills/architect/SKILL.md` or added the reference pointer to the two
+  conductor prompts, so the architect skill still loads at its full size; the plans index's
+  recently-closed bullet names the owed phase.
+- `git mv` to `docs/plans/done/` and re-point the plan's outbound `../adrs/` links to `../../adrs/`.
+- No paired ADR to accept, no `Closes:` header (step 3c does not apply), `presets/` untouched (3b does
+  not apply). Steps 1c, 1d, 1e and 3d run as at every close.
+- The new recently-closed bullet joins a list now capped at 15 by convention, so the close moves the
+  oldest bullet to the archive's `## Closed earlier (index bullets)` to keep the index's own sentence
+  true.

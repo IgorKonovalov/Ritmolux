@@ -51,7 +51,6 @@ place. The plan file carries the real link.
 | [0239](0239-the-swarm-moves-into-a-real-camera.md) | The swarm moves into a real camera | approved | dev, human | ADR-0259 (proposed) supersedes 0044's depth model. After 0236. Every swarm preset changes look; Phase 6 (owner's judgement) blocks the merge. |
 | [0240](0240-the-attractor-projects-through-the-shared-camera.md) | The attractor projects through the shared camera | approved | dev, human | ADR-0260 (proposed): `perspective` retires, presets migrate by exact mapping, re-curation owed after merge. After 0236. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
-| [0244](0244-sessions-start-lighter.md) | Sessions start lighter | approved | dev, human | Moves, deletes nothing: CLAUDE.md to <=25 KB, plans index keeps 15 closes, architect Mode 4 to a reference. |
 | [0247](0247-the-studio-renders-a-neural-clip.md) | The studio renders a neural clip | approved | dev, studio-builder, human | ADR-0262 (proposed). Player gains `--render`/`--bars`; the studio pipes player, sd_filter and ffmpeg, MP3/FLAC via transcode, prompts on a bar strip. |
 <!-- roster:end -->
 
@@ -1044,6 +1043,7 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 [Closed earlier (index bullets)](README-archive.md#closed-earlier-index-bullets).
 
 <!-- roster:begin cap=320 -->
+- [0244 - Sessions start lighter](done/0244-sessions-start-lighter.md) - closed 2026-10-02, Phase 3 owed (ADR-0249). Review: **no blockers, no majors, one minor, one nit (both fixed).** Version: none. [Write-up](README-archive.md).
 - [0202 - The three mechanisms get their gate](done/0202-the-three-mechanisms-get-their-gate.md) - closed 2026-10-02 at Phase 3. Review: **no blockers, no majors, five minors (four fixed).** Version: **0.160.2**. [Write-up](README-archive.md).
 - [0245 - A gate that runs a built binary checks it is current](done/0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) - closed 2026-10-01. Review: **two rounds; 1 major, 3 minors (all fixed).** Version: **0.160.1**. [Write-up](README-archive.md).
 - [0242 - Readiness is read when the plan is approved](done/0242-readiness-is-read-when-the-plan-is-approved.md) - closed 2026-10-01, Phase 3 done 2026-10-02. Review: **no blockers, no majors, one minor (fixed), one nit (open).** Version: **0.160.0**. [Write-up](README-archive.md).
@@ -1058,7 +1058,6 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 - [0212 - The diffused render gains a timeline](done/0212-the-diffused-render-gains-a-timeline.md) - closed 2026-09-28. Review: **two rounds; one major (fixed), five minors (four fixed).** Version: **0.152.0**. ADR-0236 accepted. Closes 0126. [Write-up](README-archive.md).
 - [0211 - The diffused frame's resolution is measured before it is designed](done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) - closed 2026-09-27. Review: **no blockers, no majors, three minors (two fixed).** Version: none. Closes 0125; filed 0262. [Write-up](README-archive.md).
 - [0208 - The conductor's safety claims get their evidence](done/0208-the-conductors-safety-claims-get-their-evidence.md) - closed 2026-09-27. Review: **three rounds; 3 majors (fixed), one minor, one nit (fixed).** Version: none. ADR-0233 accepted, Outcome. Closed 0236, 0237, 0241. [Write-up](README-archive.md).
-- [0209 - A system joins the instruments by existing](done/0209-a-system-joins-the-instruments-by-existing.md) - closed 2026-09-26. Review: **no blockers, no majors, three minors (two fixed), one nit (fixed).** Version: none. ADR-0234 accepted. Closes 0258. [Write-up](README-archive.md).
 
 <!-- roster:end -->
 

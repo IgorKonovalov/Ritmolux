@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0244 - Sessions start lighter](#0244---sessions-start-lighter)
   - [0202 - The three mechanisms get their gate](#0202---the-three-mechanisms-get-their-gate)
   - [0245 - A gate that runs a built binary checks it is current](#0245---a-gate-that-runs-a-built-binary-checks-it-is-current)
   - [0242 - Readiness is read when the plan is approved](#0242---readiness-is-read-when-the-plan-is-approved)
@@ -282,6 +283,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0209 - A system joins the instruments by existing](done/0209-a-system-joins-the-instruments-by-existing.md) - closed 2026-09-26. Review: **no blockers, no majors, three minors (two fixed), one nit (fixed).** Version: none. ADR-0234 accepted. Closes 0258. [Write-up](README-archive.md).
 - [0223 - The heavy presets fit the integrated GPU](done/0223-the-heavy-presets-fit-the-integrated-gpu.md) - closed 2026-09-26. Review: **no blockers, no majors, three minors (two fixed).** Version: **0.151.0**. ADR-0245 accepted, Outcome. [Write-up](README-archive.md).
 - [0206 - The browser shows the look](done/0206-the-browser-shows-the-look.md) - closed 2026-09-26. Review: **no blockers, no majors, six minors (four fixed), one nit.** Version: **0.150.0**. ADR-0230 accepted, Outcome. Filed 0260, 0261. [Write-up](README-archive.md).
 - [0229 - The conductor reports itself honestly](done/0229-the-conductor-reports-itself-honestly.md) - closed 2026-09-24. Review: **no blockers, no majors, no minors** (round 1's major and two minors fixed). Version: none. Closes nothing. [Write-up](README-archive.md).
@@ -482,6 +484,21 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0244 - Sessions start lighter](done/0244-sessions-start-lighter.md)
+
+- closed 2026-10-02 by a conductor close on the lane `plan-0244-sessions-start-lighter`. Phase 1
+`c9205236` (moves 1-4) and `79c7035a` (move 5), Phase 2 `a5d2dd2a`; **Phase 3, the owner's edits under
+`.claude/` and the two conductor prompts, is owed** (`Blocks merge: no`, ADR-0249). Round 1 review:
+**no blockers, no majors, one minor, one nit**, both repaired at the close in `23f70bbd`. Version: none
+(docs/chore-only: nine Markdown files). No ADR to accept; closes no backlog entry. The full review is
+the plan's own `## Close review`.
+- **What landed.** `CLAUDE.md` went from 41 KB to 24 KB: the `scripts/` prose moved to a new
+  `scripts/README.md`, machine setup and debug info to `docs/developing.md`, and the site, conductor and
+  packaging entries became pointers. The plans index keeps its 15 newest closes; 192 older bullets moved
+  verbatim to `## Closed earlier (index bullets)` above.
+- **Open.** Phase 3: until the owner moves Mode 4 to `references/review-and-close.md`, the architect
+  skill still loads at its full size in every session, readiness included.
 
 ### [0202 - The three mechanisms get their gate](done/0202-the-three-mechanisms-get-their-gate.md)
 
