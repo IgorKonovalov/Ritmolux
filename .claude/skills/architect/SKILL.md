@@ -212,6 +212,13 @@ row (status `draft`), bump next-free-number, adjust execution order if affected.
 the 1-minute entrypoint future sessions read; skipping it forces the next session to re-derive
 from `git log`.
 
+**A plan the conductor will run is read for readiness before it is approved.** Commit it,
+then run `node tools/conductor/conductor.mjs readiness NNNN` from the main checkout. A
+`plan_wrong` verdict is fixed in this session, committed, and the command re-run. Each
+advisory is answered in this session, either by changing the plan or by a one-line reason in
+the reply to the owner. The verdict is recorded against the plan's contract hash, so the lane
+does not repeat it unless the plan changes.
+
 **When the user approves a plan whose header names `**Closes:** design-backlog NNNN`, move each
 named entry out of the live backlog in the same session**
 ([ADR-0206](../../../docs/adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): the body goes
@@ -958,6 +965,13 @@ and whether it is a good idea is not the question. Check each phase:
 End `ready`, or park `plan_wrong` naming the phase and quoting both sides of the contradiction. Park
 only on a contradiction an implementer cannot work around; a matter of taste, or a gap an implementer
 closes in a minute, is `ready`. Your verdict is the owner's to overrule: they edit the plan or resume.
+
+The same session also runs at approval, from the main checkout, under
+`conductor readiness NNNN`. There the tree may carry the owner's uncommitted changes: leave every
+one exactly as you found it, because the conductor compares `HEAD` and `git status --porcelain`
+before and after. A `ready` may carry `advisories`, one-line notes that never park, of exactly two
+kinds: a `human` phase without `**Blocks merge:** no` whose output no later phase reads, and two
+or more adjacent `human` phases. Name the phase in each.
 
 **`review`** — steps 1 to 3, then the outcome.
 
