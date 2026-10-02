@@ -8,7 +8,7 @@
 //! proximity graph from it (`sim`): every pair closer than `link_distance` is
 //! an edge whose presence is `smoothstep(1 - d / link_distance)`, so a link
 //! fades in as its pair nears and out as it parts. `render` builds this frame's
-//! [`Camera3d`] view from the render target's aspect (ADR-0037), clips each edge
+//! [`Camera3d`](crate::render::camera::Camera3d) view from the render target's aspect (ADR-0037), clips each edge
 //! against the near plane, drops the ones wholly off one edge of the frame,
 //! colours each by its depth, and hands the rest to the shared line renderer's
 //! `seg3d` pipeline. A node is drawn at every point through the 3D sprite
