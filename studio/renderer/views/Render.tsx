@@ -6,6 +6,9 @@
  * what arrives here is the grid, the encoder's frame count and how the job
  * ended. Kept mounted while hidden, because a render outlives the panel being
  * open and its progress would otherwise have nowhere to land.
+ *
+ * The prompts are held as `[{at_bar, prompt}]`, ascending and unique, which is
+ * the document `sd_filter.py --timeline` reads.
  */
 import { useEffect, useState } from 'react'
 
@@ -22,8 +25,14 @@ import {
   type RenderEvent,
   type RenderTier,
 } from '@shared/render'
+import { timelineProblem, type TimelineEntry } from '@shared/timeline'
+
+import { BarStrip } from '../components/BarStrip'
 
 import styles from './Render.module.css'
+
+/** A new track starts with one prompt on bar 1, waiting for its text. */
+const FIRST_PROMPT: TimelineEntry[] = [{ at_bar: 1, prompt: '' }]
 
 export interface RenderProps {
   /** Every preset the player's library holds, in roster order. */
@@ -59,6 +68,11 @@ export function Render({ roster, active, hidden, onClose }: RenderProps): JSX.El
   const [suggested, setSuggested] = useState<string>()
   const [problem, setProblem] = useState<string>()
   const [job, setJob] = useState<JobState>({ kind: 'idle' })
+  /**
+   * The prompts, by bar number. A new rate re-counts the bars and keeps these
+   * numbers; a prompt the new grid ends before is flagged, not moved.
+   */
+  const [timeline, setTimeline] = useState<TimelineEntry[]>(FIRST_PROMPT)
 
   const preset = picked ?? active ?? roster[0]
   const output = chosenOutput ?? suggested
@@ -124,6 +138,7 @@ export function Render({ roster, active, hidden, onClose }: RenderProps): JSX.El
       if (path === null) return
       setTrack(undefined)
       setChosenOutput(undefined)
+      setTimeline(FIRST_PROMPT)
       setSource(path)
     })
   }
@@ -147,6 +162,8 @@ export function Render({ roster, active, hidden, onClose }: RenderProps): JSX.El
 
   const ready =
     track !== undefined && preset !== undefined && output !== undefined && fpsValid && sizeValid
+  const timelineIssue =
+    track === undefined ? undefined : timelineProblem(timeline, track.grid.bar_starts.length)
 
   return (
     <section className={styles.panel} aria-label="Render a clip" hidden={hidden}>
@@ -164,10 +181,17 @@ export function Render({ roster, active, hidden, onClose }: RenderProps): JSX.El
         <span className={styles.path}>{source ?? 'no track chosen'}</span>
       </div>
       {preparing && <p className={styles.note}>Reading the track and counting its bars…</p>}
-      {track !== undefined && !preparing && (
-        <p className={styles.note}>
-          {track.grid.bar_starts.length} bars over {track.grid.frames} frames at {track.grid.fps} fps
-        </p>
+      {track !== undefined && (
+        <>
+          <BarStrip
+            grid={track.grid}
+            peaks={track.peaks}
+            timeline={timeline}
+            onChange={setTimeline}
+            disabled={running || preparing}
+          />
+          {timelineIssue !== undefined && <p className={styles.note}>Prompts: {timelineIssue}</p>}
+        </>
       )}
 
       <div className={styles.fields}>

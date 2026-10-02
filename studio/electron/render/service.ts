@@ -17,6 +17,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path'
 
 import {
   renderRequestSchema,
+  type Peaks,
   type PreparedTrack,
   type RenderEvent,
   type RenderRequest,
@@ -24,6 +25,7 @@ import {
 } from '@shared/render'
 
 import { encoderArgs, playerRenderArgs, readBars } from './commands'
+import { peaksOfFile } from './peaks'
 import { RenderJob, type Spawner, type StageCommand } from './pipeline'
 import { cacheKey, runTool, type RunTool, type TranscodeCache } from './transcode'
 
@@ -55,6 +57,7 @@ export function suggestedName(source: string, preset: string): string {
 
 export class RenderService {
   private readonly granted = new Set<string>()
+  private readonly peaks = new Map<string, Promise<Peaks>>()
   private job: RenderJob | undefined
   private starting = false
 
@@ -86,7 +89,7 @@ export class RenderService {
     try {
       const wav = await this.env.cache.wavFor(source)
       const grid = await readBars(this.run, player, wav, rate.data, this.barsFile(wav, rate.data))
-      return { ok: true, value: { source, grid } }
+      return { ok: true, value: { source, grid, peaks: await this.peaksFor(wav) } }
     } catch (error) {
       return refuse((error as Error).message)
     }
@@ -162,6 +165,20 @@ export class RenderService {
       else if (outcome.kind === 'cancelled') this.env.emit({ kind: 'cancelled' })
       else this.env.emit({ ...outcome, kind: 'failed' })
     })
+  }
+
+  /**
+   * The waveform of one transcode, read once: a new rate re-counts the bars but
+   * draws the same file.
+   */
+  private peaksFor(wav: string): Promise<Peaks> {
+    let peaks = this.peaks.get(wav)
+    if (peaks === undefined) {
+      peaks = peaksOfFile(wav)
+      peaks.catch(() => this.peaks.delete(wav))
+      this.peaks.set(wav, peaks)
+    }
+    return peaks
   }
 
   /** The `--bars` answer for one transcode at one rate, kept beside it. */

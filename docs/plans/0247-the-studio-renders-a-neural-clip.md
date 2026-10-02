@@ -265,8 +265,8 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The player renders and reports bars | dev | done | committed with this row |
-| 2 — A plain clip from the studio | studio-builder | done | committed with this row |
-| 3 — The strip and the prompts | studio-builder | not started | |
+| 2 — A plain clip from the studio | studio-builder | done | `8d8f2547` |
+| 3 — The strip and the prompts | studio-builder | done | committed with this row |
 | 4 — The neural toggle | studio-builder | not started | |
 | 5 — The job is a file, and the docs say so | studio-builder | not started | |
 | 6 — A real neural clip, judged | human | not started | |
@@ -312,6 +312,16 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 - Phase 2, wiring checked by hand before it was written: Node's `stdio: [child.stdout, ...]`
   with the parent's copy destroyed moved 50,000,000 bytes from `head` to `wc -c` intact. With
   the reader exiting early, the writer saw `SIGPIPE` rather than blocking.
+- Phase 3, outside the file list: `studio/electron/render/service.ts` (prepare returns the peaks,
+  read once per transcode), `studio/shared/render.ts` (`Peaks` and `PreparedTrack.peaks`), and
+  `BarStrip.module.css`. The timeline type, its validator and the four edits live in
+  `studio/shared/timeline.ts`.
+- Phase 3, "per pixel column": the peaks are computed at a fixed 1,200 columns in main and drawn
+  as one SVG outline that scales to the strip, so a 1,200 px strip is one column per pixel. Asking
+  for the strip's measured width would cost a call per resize and changes nothing at that width.
+- Phase 3, a marker dropped on a bar that already holds a prompt stays where it was, because two
+  prompts on one bar is a timeline the sidecar refuses. A prompt the grid ends before after a new
+  rate is drawn dotted at the end of the strip, and the validator line under it names the bar.
 
 ### Close triggers
 

@@ -18,6 +18,24 @@ import { TranscodeCache, type RunTool } from './transcode'
 
 const GRID = '{"fps":"30","frames":90,"bar_starts":[0,40],"bar_locked":[false,true]}\n'
 
+/** A mono 16-bit WAV of four silent samples: what the stub transcode writes. */
+function silentWav(): Buffer {
+  const bytes = Buffer.alloc(44 + 8)
+  bytes.write('RIFF', 0)
+  bytes.writeUInt32LE(bytes.length - 8, 4)
+  bytes.write('WAVEfmt ', 8)
+  bytes.writeUInt32LE(16, 16)
+  bytes.writeUInt16LE(1, 20)
+  bytes.writeUInt16LE(1, 22)
+  bytes.writeUInt32LE(8000, 24)
+  bytes.writeUInt32LE(16000, 28)
+  bytes.writeUInt16LE(2, 32)
+  bytes.writeUInt16LE(16, 34)
+  bytes.write('data', 36)
+  bytes.writeUInt32LE(8, 40)
+  return bytes
+}
+
 function harness() {
   const dir = mkdtempSync(join(tmpdir(), 'rlx-service-'))
   const source = join(dir, 'track.flac')
@@ -25,7 +43,7 @@ function harness() {
   const run: RunTool = vi.fn((_command: string, args: string[]) => {
     // ffmpeg's transcode writes its last argument; --bars writes after --out.
     const out = args.includes('--out') ? args[args.indexOf('--out') + 1] : (args.at(-1) as string)
-    writeFileSync(out, args.includes('--bars') ? GRID : 'RIFF')
+    writeFileSync(out, args.includes('--bars') ? GRID : silentWav())
     return Promise.resolve('')
   })
   const spawned: { command: string; args: readonly string[] }[] = []
@@ -88,6 +106,7 @@ describe('the render service', () => {
     service.grant(source)
     const result = await service.prepare(source, '30')
     expect(result.ok && result.value.grid.bar_starts).toEqual([0, 40])
+    expect(result.ok && result.value.peaks.max).toEqual([0, 0, 0, 0])
     expect(await service.prepare(source, '29.97')).toMatchObject({ ok: false })
   })
 

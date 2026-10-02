@@ -94,10 +94,17 @@ export function parseBarGrid(json: unknown): BarGrid {
   return grid
 }
 
-/** A chosen track as main prepared it: transcoded, and its bars counted. */
+/** A waveform's lowest and highest sample per column, each in [-1, 1]. */
+export interface Peaks {
+  min: number[]
+  max: number[]
+}
+
+/** A chosen track as main prepared it: transcoded, its bars counted, its waveform read. */
 export interface PreparedTrack {
   source: string
   grid: BarGrid
+  peaks: Peaks
 }
 
 /** Which child of the pipeline a failure belongs to, upstream first. */
