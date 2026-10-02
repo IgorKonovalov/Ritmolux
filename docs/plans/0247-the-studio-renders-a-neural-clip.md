@@ -269,7 +269,7 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 | 3 — The strip and the prompts | studio-builder | done | `8fcef278` |
 | 4 — The neural toggle | studio-builder | done | `30ef08ec` |
 | 5 — The job is a file, and the docs say so | studio-builder | done | `e7e7394e` |
-| 6 — A real neural clip, judged | human | not started | |
+| 6 — A real neural clip, judged | human | owed | |
 
 ### Notes
 
