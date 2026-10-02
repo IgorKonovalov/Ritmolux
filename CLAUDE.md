@@ -88,77 +88,21 @@ tools/
 ├── sd-filter/       # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate,
 │                    #   not in the workspace, never shipped; its cost figures live in exactly one
 │                    #   page (docs/diffusion-filter.md) and check-filter-figures.mjs holds them there.
-└── conductor/       # The conductor (ADR-0205): zero-dependency Node that runs approved plans from
-                     #   its committed queue.json through headless `claude -p` sessions in worktree
-                     #   lanes to a fast-forwarded main, and never pushes. Neither a gate nor a
-                     #   renderer - a program that starts other programs and spends money - so it
-                     #   refuses to start without the gitignored local.json of spend caps, and
-                     #   refuses a CLI version spike/README.md did not verify - except a patch above
-                     #   a verified one, which runs with a warning (ADR-0208). Runtime record in
-                     #   state/, live.log and digest.md, all gitignored; README is the operator guide.
-site/                # The documentation front end (ADR-0154): an
-                     #   Astro Starlight site publishing the READER-FACING subset of docs/ with real
-                     #   search, live at igorkonovalov.github.io/Ritmolux/. One of the repository's
-                     #   two npm projects (studio/ is the other); never shipped, nothing shipped
-                     #   depends on it. `docs/` stays the
-                     #   SINGLE SOURCE - the content loader reads docs/, docs/specs/ and
-                     #   presets/README.md IN PLACE, there is no staged copy, and no markdown file
-                     #   outside site/ may be edited to serve it. The publish boundary is the
-                     #   PUBLISHED map in src/plugins/rewrite-links.mjs, which also rewrites every
-                     #   relative link at build time: inside the set to a site route, outside it to
-                     #   a github.com blob URL. A new doc does not join the site by existing.
-packaging/           # What a `v*` tag ships (ADR-0038) — zips, plus the Linux .tar.gz (ADR-0131);
-                     #   the release job's guard holds the exact count per kind. macos/ holds
-                     #   bundle.sh — build both Apple targets, lipo, substitute the plist version,
-                     #   ad-hoc sign, zip AND verify — so packaging runs the same on a Mac as in CI,
-                     #   not CI-only magic; linux/stage.sh does the same for the tarball. studio/
-                     #   holds the same recipe for the studio, once per platform, each carrying a
-                     #   player into resources/player/. foobar/ and spout/ stage their pinned SDKs
-                     #   before the build that needs them; windows/stage.ps1 is the exe's recipe and
-                     #   measures it against NFR section 4's cap (ADR-0231), the same way the
-                     #   component's does. Plus the READ-ME-FIRST.md a tester finds in each archive;
-                     #   the site publishes every one but the studio's as its install pages
-                     #   (ADR-0167), and a new one does not join the PUBLISHED map by existing.
-docs/                # Full one-line-per-doc map: README.md "Repository layout". Five *.ru.md carry a
-                     #   translated slice, each stamped with the commit it was made from (ADR-0185).
-                     #   The load-bearing set:
-├── nfr.md           # Quantified v1 non-functional requirements — the numbers behind every
-│                    #   "lightweight" / "real-time" / "stable frame rate" in the plans.
-├── preset-guide.md  # START HERE for presets — the illustrated entrance, one picture per system.
-├── presets.md       # Preset authoring guide: THE expression-language reference.
-├── preset-palettes.md  # The colour surface: palettes, custom stops, A/B crossfade.
-├── preset-tuning-walkthrough.md  # One preset tuned over five steps, picture + --report row each.
-├── running.md       # What the app does once open: keys, menus, console, tiers, displays.
-├── configuration.md # Every flag, env var and config.toml key, with defaults and precedence.
-├── how-it-works.md  # The explanation: two frontends, one engine, and what happens each frame.
-├── embedding.md     # Embedding the core in another host: the C ABI lifecycle, walked through.
-│                    #   Spec 0001 is the contract; this is the walkthrough over it.
-├── capturing.md     # Headless `shot` CLI + `--render` video + the live `--stream` video-out.
-├── testing.md       # The core/tests/ visual-QA harness, and what a green gate is evidence of.
-├── milkdrop-conversion.md  # Reading what `milkconv` produced, and judging it.
-├── developing.md    # Building from a checkout, and every step the pre-push gate runs.
-├── on-device-validation.md  # The manual checklist for what CI cannot run: real GPUs, live
-│                    #   loopback, installing the foobar2000 component.
-├── design-backlog.md  # The preset-author -> architect inbox: captured friction not yet an ADR or
-│                    #   a plan. Every live entry carries an executable probe (ADR-0108).
-│                    #   -archive.md holds retired entries; both are append-only records.
-├── roadmap-visual-richness.md  # The visual-capability roadmap recent plans are sequenced against.
-├── generative-techniques-catalogue.md  # The technique survey behind the scene families.
-├── content-brief.md # What the shipped preset set is FOR — the curation brief behind the library.
-├── diffusion-filter.md  # The diffusion filter's cost figures, held to one page by a gate.
-├── releasing.md     # How the version moves (one bump per plan close) + the tag push that
-│                    #   builds and publishes the two release zips.
-├── images/          # Committed documentation renders — the stills from scripts/docs-shots.mjs,
-│                    #   the demo clip and social preview from scripts/docs-clip.mjs.
-├── examples/        # Teaching presets for the guide + walkthrough. Never shipped, never seeded.
-├── specs/           # NNNN-<subsystem>.md — living behavioral contracts (C ABI, ring/DSP).
-│                    #   Deliberately minimal: the highest-value contracts only, no enforcement
-│                    #   machinery (ADR-0004). Not a gap — see its own README.
-├── adrs/            # NNNN-<slug>.md — architecture decisions + rejected alternatives. Append-only.
-│   └── README.md    #   ADR index
-└── plans/           # NNNN-<slug>.md — phased implementation plans (what's in flight)
-    ├── README.md    #   Plans index: roster + next free number. Read this first each session.
-    └── done/         #   Completed plans move here
+└── conductor/       # The conductor (ADR-0205): zero-dependency Node that runs approved plans in
+                     #   headless sessions to a fast-forwarded main, never pushes, never ships.
+                     #   Operator guide: tools/conductor/README.md.
+site/                # The documentation front end (ADR-0154), live at igorkonovalov.github.io/Ritmolux/;
+                     #   never shipped, nothing shipped depends on it. Its rules: site/README.md.
+packaging/           # What a `v*` tag ships (ADR-0038): the per-platform recipes and each archive's
+                     #   READ-ME-FIRST.md. How a release runs: docs/releasing.md.
+docs/                # Full one-line-per-doc map: README.md "Repository layout". The load-bearing set:
+├── nfr.md           # The quantified non-functional requirements behind "lightweight".
+├── presets.md       # THE expression-language reference; preset-guide.md is the entrance.
+├── configuration.md # Every flag, env var and config.toml key.
+├── developing.md    # Building, machine setup, and every step the pre-push gate runs.
+├── specs/ adrs/     # Behavioral contracts; architecture decisions (append-only, README indexes).
+└── plans/README.md  # Plans index. Read this first in a human-started session; a conductor
+                     #   session is handed its plan.
 .claude/
 ├── skills/          # architect (designs docs/) + dev (all Rust and C++) + studio-builder (studio/)
 │                    #   + preset-author (preset content)
@@ -177,156 +121,16 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
                      #   CLONE — nothing runs until `git config core.hooksPath .githooks`, and the
                      #   studio step skips itself again on a clone with no studio/node_modules.
                      #   See README + ADR-0033.
-scripts/             # Repo maintenance. The Node gates, and a count of them is deliberately not
-                     #   written here - every one below runs by pre-push and by the CI `links` job
-                     #   EXCEPT the two site gates, which need a BUILT site and so run in neither -
-                     #   they live in .github/workflows/pages.yml. check-site-links.mjs asserts that
-                     #   no site-relative href in site/dist/ ends in .md, that every one resolves to
-                     #   a built file, and that every off-site href is absolute https (ADR-0154);
-                     #   check-site-routes.mjs asserts that every route the build serves is reachable
-                     #   from the menu rather than only by search, and that no route the splitter
-                     #   produced exceeds 30,000 bytes of source (ADR-0166) - an assertion about the
-                     #   corpus, since the split already recurses at every heading level (ADR-0247),
-                     #   so a route over it wants headings in its source, never a raised constant.
-                     #   And EXCEPT check-npm-audit.mjs, CI-only like those two but for another
-                     #   reason: it asks the registry, so its answer moves without a commit, and it
-                     #   runs in ci.yml's own `npm-audit` job. It fails studio's shipped graph
-                     #   (--omit=dev) at high and every full npm graph at critical, excepting only
-                     #   what npm-audit.allow.json names by GHSA id with a reason (ADR-0244).
-                     #   Six of them also run in the close ceremony - check-doc-links.mjs,
-                     #   check-index-rows.mjs, check-backlog-claims.mjs, toc.mjs,
-                     #   check-release-tag.mjs and check-translations.mjs - the first five because a
-                     #   close is what breaks them, the last because its staleness half is an ADVISORY
-                     #   nothing else reads, and a close is where a moved English source is noticed.
-                     #   Named rather than counted off the roster above, which is ordered by cost and
-                     #   reorders without telling anyone. check-doc-links.mjs asserts
-                     #   every relative markdown link resolves (moving a plan to plans/done/ breaks
-                     #   links in both directions, and rejects a design-backlog fragment outright
-                     #   per ADR-0149); check-index-rows.mjs holds every roster row to 320 bytes AND
-                     #   to its region's form (ADR-0116); check-backlog-claims.mjs re-runs each live
-                     #   entry's probe (ADR-0108); check-filter-figures.mjs keeps the diffusion
-                     #   filter's cost figures on one page; check-comment-hygiene.mjs rejects
-                     #   relative links and plan-relative narration in .rs and .cpp/.h comments
-                     #   (ADR-0127); toc.mjs regenerates the contents block in every long document
-                     #   that carries one, from the headings under it, and --check reports drift (ADR-0163)
-                     #   — a block is generated, never hand-edited; check-reader-prose.mjs holds the
-                     #   reader documents it lists to the opposite of ADR-0127's rule — every Plan/ADR
-                     #   citation inside a markdown link, never bare in a sentence (ADR-0168), the
-                     #   two rules meeting at a filename list inside that script;
-                     #   check-release-tag.mjs asserts the version root Cargo.toml declares has an
-                     #   ANNOTATED `v` tag - offline at pre-push (exists, annotated, on HEAD's
-                     #   history), `--remote` in CI on a push to main (origin advertises it), and
-                     #   at the close after the tag is written, with `--stranded` listing any older
-                     #   tag origin lacks (ADR-0203); check-release-assets.mjs --self-test proves
-                     #   the release's per-kind count (5 zips, 1 tarball) refuses a short set,
-                     #   since release.yml's `verify` job can only ever see it pass (ADR-0254);
-                     #   check-translations.mjs reads every `.ru.md`
-                     #   translation's `translated-from: <sha>` stamp - a MISSING or malformed one
-                     #   is an exit code, a source that has MOVED past its stamp is an advisory row
-                     #   and never one, because no machine here can read the prose either way
-                     #   (ADR-0185); check-system-counts.mjs rejects a written-out count of the
-                     #   systems - a count token within two words of `system(s)` - everywhere but the
-                     #   dated records (plans, ADRs, the backlog), because a count goes stale whether
-                     #   or not it is right today, and it reads .rs WHOLE since the instance that
-                     #   survived two closes was an assertion message (ADR-0202);
-                     #   check-settings-have-files.mjs holds the two applications a Rust test
-                     #   cannot see to ADR-0240 - no browser storage under studio/, and every
-                     #   plugin-foobar/ `cfg_*` declaration named in docs/configuration.md, with
-                     #   `settings-allow: <why>` on the line as the escape;
-                     #   check-claude-declarations.mjs refuses an active plan phase that names a
-                     #   `.claude/` artefact - a skill, a hook, settings.json - without writing its
-                     #   path into `Files touched`, the one place the conductor reads to park in
-                     #   front of an edit a headless session cannot make (ADR-0210), with
-                     #   `claude-allow: <why>` as the escape and a closed plan an advisory only;
-                     #   check-gate-carriers.mjs asserts that .githooks/pre-push and the CI `links`
-                     #   job each run the ordered roster held in scripts/gates.manifest.mjs, in that
-                     #   order - the manifest being DATA rather than a gate, and the one the
-                     #   conductor's defaultGate() imports, so that third carrier cannot drift at
-                     #   all (ADR-0217).
-                     #   scripts/fixtures/ holds their seeded bite checks.
-                     #   RENDERERS, NOT GATES: docs-shots.mjs (every committed still under
-                     #   docs/images/) and its sibling docs-clip.mjs (the two artifacts that are
-                     #   not stills - the demo clip and the social preview; needs ffmpeg on PATH),
-                     #   tuple-sheets.mjs + tuple-paths.mjs (attractor roster/walk contact
-                     #   sheets) and milk-softness.mjs + softness-sheets.mjs (the stroke-profile
-                     #   judging sheets). Nothing runs these - an author does, by hand. The first
-                     #   two write committed files under docs/images/; the other four land under
-                     #   target/ uncommitted. They are here so that "every .mjs is wired into
-                     #   pre-push or CI" reads as a rule with named exceptions rather than as
-                     #   a claim that is simply false - these renderers, plus gates.manifest.mjs,
-                     #   which is wired nowhere because it is the roster the wiring is held to.
-                     #   A MAINTENANCE TOOL, the third kind: prune-target.mjs deletes what the
-                     #   everyday loop's cargo JSON no longer reports from <target>/debug/deps/
-                     #   (dry run by default, --apply, --verify-fresh). A person runs it when
-                     #   the disk fills; it judges no build (docs/developing.md "Disk").
-                     #   A HOOK HELPER, the fourth kind: push-scope.mjs answers whether a pushed
-                     #   range touches a path in push-scope.manifest.mjs - data, like the gate
-                     #   manifest - and pre-push runs its cargo steps only when it does
-                     #   (ADR-0237). The hook calls it; its --self-test runs only by hand.
+scripts/             # Repo maintenance: the Node gates, the renderers, a maintenance tool and a
+                     #   hook helper. Which gate runs where, and the named exceptions to "every
+                     #   .mjs is wired into pre-push or CI": scripts/README.md.
 ```
 
-## Machine setup: the linker override (opt-in, and inert if skipped)
+## Machine setup and debug info
 
-**Every worktree compiles into its own `target/`.** The one machine-local override is the MSVC
-linker, and it lives in a file one directory *above* the worktrees — `WORK/.cargo/config.toml`,
-beside `ritmolux/` rather than inside it — so cargo's ancestor walk finds it from
-whichever lane is building and a new lane needs no setup of its own:
-
-```toml
-[target.x86_64-pc-windows-msvc]
-linker = "rust-lld.exe"
-```
-
-That is the whole file. `rust-lld.exe` is not on `PATH` and still resolves — rustc finds it in its
-own sysroot, so no explicit path and no linker-flavor flag are needed. It took the cold path to
-every test binary from 171 s to 145 s while moving no golden (ADR-0141's `Outcome`, which stands).
-
-**The override is Windows-only.** A Linux checkout has no `WORK/.cargo/config.toml` and currently
-needs none: since Rust 1.90, `x86_64-unknown-linux-gnu` already links with the bundled `rust-lld`
-by default. `mold` was measured against it on the Arch box on 2026-09-22. It saved under 20 ms per
-warm relink of the largest test binary and nothing on a cold rebuild, so Linux has no override.
-
-**It is never committed, and it cannot be.** The macOS arm has a different linker story, and
-reaching `rust-lld` any other way means naming a sysroot path specific to one machine. Like
-`git config core.hooksPath .githooks`
-([ADR-0033](docs/adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)), this is
-**opt-in per machine and inert when skipped** — a machine without the file builds correctly, just
-with the default linker.
-
-**There is no shared artifact store, and a `[build] target-dir` redirect must not go back in this
-file.** [ADR-0141](docs/adrs/0141-one-artifact-store-serves-every-lane.md) pointed every worktree at
-one store; [ADR-0147](docs/adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
-revoked that half, because **the worktree path is not in cargo's fingerprint** — two lanes with the
-same layout and dependency graph are indistinguishable, so one lane is served the other's compiled
-`rlx-core` as fresh. Plan 0115's lane hit `no method named open_tap found for struct Renderer`
-against committed source that defines it. The failure is silent, it is not a cache miss, and no gate
-catches it. The linker half above is not implicated and stays.
-
-The cost that comes back with the revocation is disk, and it is not gated:
-
-- **[ADR-0053](docs/adrs/0053-plan-lanes-run-in-git-worktrees.md)'s *"disk cost is severe and
-  recurring"* is live again.** One lane held ~8 GB in `target/debug/incremental` and filled the
-  disk mid-session. **Remove a finished lane's worktree** — on Windows `git worktree remove` fails
-  with `Permission denied` while any shell still has its working directory inside it.
-
-## Dependencies compile with no debug info (committed, unlike the override above)
-
-`[profile.dev.package."*"]` in the root `Cargo.toml` carries `debug = 0`, so **every dependency —
-wgpu, naga, winit, windows-rs — compiles with no debug info at all**, while every workspace crate
-keeps `profile.dev`'s `line-tables-only`. Unlike the linker override this is **committed and applies
-to every clone**: it names nothing machine-specific, and a build profile that silently differs
-between two checkouts is the hazard ADR-0147 exists to end.
-
-**What it costs you: a backtrace frame inside one of those crates carries no line number.** A wgpu
-validation failure is normally diagnosed from its message rather than from a backtrace line, which
-is what makes that affordable — and on the day it is not, **delete the `debug = 0` line and
-rebuild**. That buys the line numbers back at the price of a full rebuild of the dependency graph at
-`opt-level = 2` — 87 s on the reference machine, and the same again when the line goes back. Do not
-commit the deletion.
-
-Why the line is there: MSVC emits a separate `.pdb` per linked target and packs no split debuginfo,
-so the dependency graph's line tables are duplicated into every one of the workspace's test
-binaries — 25.5 MB per binary, measured, which the setting stops emitting. ADR-0165.
+The opt-in linker override, why there is no shared artifact store, and why dependencies compile
+with no debug info live in [Developing](docs/developing.md#machine-setup-the-linker-override-opt-in-and-inert-if-skipped)
+under "Building": read it when setting up a machine or chasing a backtrace.
 
 ## How we work (canonical workflow)
 

@@ -6,6 +6,7 @@ ADR-0154.
 
 It is never shipped, and no shipped artifact depends on it - the same rule that bounds `milkconv/`
 and `tools/sd-filter/`. A broken site build is a documentation problem, never a release blocker.
+It is one of the repository's two npm projects (studio/ is the other).
 
 ## The one rule
 

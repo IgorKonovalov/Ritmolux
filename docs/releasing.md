@@ -144,7 +144,11 @@ ritmolux-studio-v<version>-windows-x64.zip       # Ritmolux Studio.exe
 ```
 
 Each carries a `READ-ME-FIRST.txt`; the standalone archives also carry a reference copy of
-`presets/*.toml`. **The two studio zips carry a player of their own**, at `resources/player/`
+`presets/*.toml`. That file is `packaging/*/READ-ME-FIRST.md`, renamed at staging; the site
+publishes every one but the studio's as its install pages
+([ADR-0167](adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md)),
+and a new one joins the site only when it is added to the `PUBLISHED` map in
+`site/src/plugins/rewrite-links.mjs`. **The two studio zips carry a player of their own**, at `resources/player/`
 inside the application, so a tester who takes the studio needs nothing else — that is the whole
 reason the studio is a release artifact rather than a checkout-only tool. If any build fails, the
 release job is **skipped** and no release exists — there is no half-published state. Re-running

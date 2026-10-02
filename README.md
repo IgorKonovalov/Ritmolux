@@ -137,7 +137,8 @@ scripts/             # Repo maintenance: the Node gates the pre-push hook and CI
                      #   check-system-counts.mjs refuses a written-out count of the systems outside
                      #   the dated records, because a count goes stale whether or not it is right
                      #   today (ADR-0202).
-                     #   And scripts/fixtures/ seeded bite checks.
+                     #   And scripts/fixtures/ seeded bite checks. scripts/README.md says which
+                     #   gate runs where, and names every .mjs that is not a gate.
 tools/               # Developer tooling. Neither half is a cargo crate, and neither ever ships.
 ├── sd-filter/       #   Python sidecar for the diffusion-filter pass (ADR-0122).
 └── conductor/       #   Zero-dependency Node that runs approved plans from a committed queue
