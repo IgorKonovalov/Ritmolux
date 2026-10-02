@@ -88,37 +88,13 @@ tools/
 ├── sd-filter/       # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate,
 │                    #   not in the workspace, never shipped; its cost figures live in exactly one
 │                    #   page (docs/diffusion-filter.md) and check-filter-figures.mjs holds them there.
-└── conductor/       # The conductor (ADR-0205): zero-dependency Node that runs approved plans from
-                     #   its committed queue.json through headless `claude -p` sessions in worktree
-                     #   lanes to a fast-forwarded main, and never pushes. Neither a gate nor a
-                     #   renderer - a program that starts other programs and spends money - so it
-                     #   refuses to start without the gitignored local.json of spend caps, and
-                     #   refuses a CLI version spike/README.md did not verify - except a patch above
-                     #   a verified one, which runs with a warning (ADR-0208). Runtime record in
-                     #   state/, live.log and digest.md, all gitignored; README is the operator guide.
-site/                # The documentation front end (ADR-0154): an
-                     #   Astro Starlight site publishing the READER-FACING subset of docs/ with real
-                     #   search, live at igorkonovalov.github.io/Ritmolux/. One of the repository's
-                     #   two npm projects (studio/ is the other); never shipped, nothing shipped
-                     #   depends on it. `docs/` stays the
-                     #   SINGLE SOURCE - the content loader reads docs/, docs/specs/ and
-                     #   presets/README.md IN PLACE, there is no staged copy, and no markdown file
-                     #   outside site/ may be edited to serve it. The publish boundary is the
-                     #   PUBLISHED map in src/plugins/rewrite-links.mjs, which also rewrites every
-                     #   relative link at build time: inside the set to a site route, outside it to
-                     #   a github.com blob URL. A new doc does not join the site by existing.
-packaging/           # What a `v*` tag ships (ADR-0038) — zips, plus the Linux .tar.gz (ADR-0131);
-                     #   the release job's guard holds the exact count per kind. macos/ holds
-                     #   bundle.sh — build both Apple targets, lipo, substitute the plist version,
-                     #   ad-hoc sign, zip AND verify — so packaging runs the same on a Mac as in CI,
-                     #   not CI-only magic; linux/stage.sh does the same for the tarball. studio/
-                     #   holds the same recipe for the studio, once per platform, each carrying a
-                     #   player into resources/player/. foobar/ and spout/ stage their pinned SDKs
-                     #   before the build that needs them; windows/stage.ps1 is the exe's recipe and
-                     #   measures it against NFR section 4's cap (ADR-0231), the same way the
-                     #   component's does. Plus the READ-ME-FIRST.md a tester finds in each archive;
-                     #   the site publishes every one but the studio's as its install pages
-                     #   (ADR-0167), and a new one does not join the PUBLISHED map by existing.
+└── conductor/       # The conductor (ADR-0205): zero-dependency Node that runs approved plans in
+                     #   headless sessions to a fast-forwarded main, never pushes, never ships.
+                     #   Operator guide: tools/conductor/README.md.
+site/                # The documentation front end (ADR-0154), live at igorkonovalov.github.io/Ritmolux/;
+                     #   never shipped, nothing shipped depends on it. Its rules: site/README.md.
+packaging/           # What a `v*` tag ships (ADR-0038): the per-platform recipes and each archive's
+                     #   READ-ME-FIRST.md. How a release runs: docs/releasing.md.
 docs/                # Full one-line-per-doc map: README.md "Repository layout". The load-bearing set:
 ├── nfr.md           # The quantified non-functional requirements behind "lightweight".
 ├── presets.md       # THE expression-language reference; preset-guide.md is the entrance.

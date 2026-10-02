@@ -188,21 +188,19 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `CLAUDE.md` becomes an orientation map | dev | parked: size done-when red, CLAUDE.md 26606 bytes against 25000 (Notes) | |
+| 1 — `CLAUDE.md` becomes an orientation map | dev | done | c9205236 (moves 1-4), committed with this row (move 5) |
 | 2 — The plans index keeps only the recent closes | dev | not started | |
 | 3 — The architect skill loads its review and close on demand | human | not started | |
 
 ### Notes
 
-- **Phase 1, size done-when red.** All four moves are made and every other Phase 1 done-when exits
-  0 (`check-doc-links`, `toc --check`, `check-system-counts`, `check-reader-prose`; `check-gate-carriers`
-  is in `scripts/README.md`, `rust-lld` in `docs/developing.md`). `CLAUDE.md` measures 26606 bytes.
-  Per section after the moves: "Where things live" 10.5 KB of which the `docs/` map is about 0.8 KB
-  and the `scripts/` pointer about 0.3 KB; "How we work" 5.9 KB; non-negotiables 4.3 KB; the rest
-  under 2 KB each. Removing the `docs/` map and the setup pointer entirely would still leave about
-  25.4 KB, so 25000 is reachable only by trimming entries or sections the four moves do not name
-  (the `site/`, `packaging/`, `studio/`, `tools/conductor/`, `.claude/hooks/` entries, or "How we
-  work"), which is a choice of what the always-loaded file keeps.
+- **Phase 1 landed in two commits.** Moves 1-4 (c9205236) left `CLAUDE.md` at 26606 bytes and the
+  phase parked; move 5, added to the plan after that park, brought it to 24290.
+- **Move 5, what moved.** To `site/README.md`: the npm-project sentence, reworded to stand in that
+  page. To `docs/releasing.md`: the READ-ME-FIRST / install-pages sentence. The `site/` line in
+  `CLAUDE.md` keeps the live URL, which `site/README.md` does not carry. Every other sentence of the
+  three entries was judged already said by its target and dropped, including the conductor entry's
+  "neither a gate nor a renderer" clause.
 - **`docs/README.md` does not exist.** The "Repository layout" the plan names is in the root
   `README.md`, which is what the `CLAUDE.md` `docs/` entry already pointed at; the layout row for
   `scripts/README.md` went there.
