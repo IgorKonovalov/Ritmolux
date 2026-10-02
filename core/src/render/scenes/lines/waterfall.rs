@@ -5,8 +5,8 @@
 //!
 //! `update` reduces the analysis frame's band array to `elements` levels, shapes
 //! and eases each one through the same helpers the `spectrum` readout uses
-//! ([`downsample`], [`shape_and_ease`]), and hands the eased levels to the
-//! [`Landscape`]. That keeps a ring of past rows and pushes one every
+//! (`downsample`, `shape_and_ease`), and hands the eased levels to the
+//! `Landscape`. That keeps a ring of past rows and pushes one every
 //! `row_period` seconds of injected `dt`, so the rows are spaced in **time**,
 //! not in frames, and the landscape scrolls at the same speed at any display
 //! rate (ADR-0019).
