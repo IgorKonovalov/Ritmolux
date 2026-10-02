@@ -1,7 +1,7 @@
 # scripts/
 
-Repo maintenance. The prose below is the `scripts/` entry of the root `CLAUDE.md`, moved here so a
-session reads it when it edits a gate rather than at every start. The ordered gate roster itself is
+Repo maintenance. Which gate runs where, and the named exceptions to the rule that every `.mjs`
+here is wired into pre-push or CI. The ordered gate roster itself is
 data, in `gates.manifest.mjs`; the steps as the pre-push hook runs them are tabled in
 [Developing](../docs/developing.md#what-it-runs).
 
