@@ -1,6 +1,6 @@
 # 0236 — Space curves, and the camera becomes a shared block
 
-> **Status:** done - Phase 6 owed, ADR-0249 (closed 2026-10-02 by a conductor close). Phases 1-5
+> **Status:** done (closed 2026-10-02 by a conductor close; Phase 6 judged by the owner the same day, three engine findings). Phases 1-5
 > landed in `5ad3413c`, `389984de`, `6869feed`, `0e43b736` and `d5f48400`. The round 1 review found
 > no blockers, no majors and two minors; the `docs/` one was repaired at the close and the
 > `.claude/` one is the owner's. The full suite was green on the merged tree. Version 0.161.0.
@@ -193,7 +193,7 @@ pub(crate) struct FamilyArm3d {
 | 3 — `lissajous_3d`, and the family table | dev | done | 6869feed |
 | 4 — The `seg3d_segments` cap, measured, and the goldens | dev | done | 0e43b736 |
 | 5 — Documentation and the references | dev | done | committed with this row |
-| 6 — The look, judged | human | owed | |
+| 6 — The look, judged | human | done | not kept as is: three things off, see Notes |
 
 ### Notes
 
@@ -257,6 +257,23 @@ pub(crate) struct FamilyArm3d {
   entry's exact `shot` command. No `lissajous_3d` picture was added; the plan asks for one knot.
 - Phase 5's `systems.md` ranges come from the teaching preset and the golden fixtures, because no
   space-curve preset ships yet. The section says so.
+
+- **Phase 6, 2026-10-02, the owner's verdict: depth reads, but it does not feel right.** Judged live
+  on the Arch box with music, from two judging copies outside the repository: a (2, 3) knot and a
+  `lissajous_3d` at `thickness` 7, `fov` 1.35, `focus` 0.45 and `aperture` 18-23, orbiting slowly
+  with heavily smoothed bass. Depth read only once `focus` sat mid-depth; with `focus` at 0 and
+  `aperture` near 8 it read as almost flat. Three things are off, all engine behaviour rather than
+  tuning:
+  - **Strands pass through each other.** The stroke is additive, so a near strand crossing a far one
+    hides nothing and the crossing brightens. There is no over and under, and the figure reads as
+    glowing wire rather than a solid object.
+  - **No fade with distance.** A far strand is as bright and saturated as a near one, and colour runs
+    along the path, not with depth, so nothing atmospheric says "far".
+  - **The blur looks wrong.** A heavily blurred stroke breaks into a comb of streaks across its width
+    instead of a smooth soft band, so the polyline's segments show. It is worst on the nearest, most
+    blurred strands, in `shot` renders on RADV as well as live.
+  No `preset-author` brief was handed over, since none of the three is reachable from a preset.
+  Frame rate was not judged: the conductor's builds held the load average near 28 throughout.
 
 ### Close triggers
 
