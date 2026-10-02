@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { DEFAULT_PLAYER_MODE, type PlayerMode } from '@shared/player-mode'
 import { isKnownPlayerVersion, EXPECTED_PLAYER_VERSION } from '@shared/protocol'
+import type { RenderSettings } from '@shared/render'
 
 import { Banner } from './components/Banner'
 import { Editor } from './views/Editor'
@@ -15,6 +16,7 @@ import { Footer } from './components/Footer'
 import { Preview, type PreviewStats } from './components/Preview'
 import { ProblemsModal } from './components/ProblemsModal'
 import { Rotation } from './components/Rotation'
+import { Render } from './views/Render'
 import { Settings } from './views/Settings'
 import { useHeldRotation } from './hooks/useHeldRotation'
 import { usePlayerActions } from './hooks/usePlayer'
@@ -29,6 +31,7 @@ interface AppInfo {
   settingsFile: string
   playerMode: PlayerMode
   reducedMotion: boolean
+  render?: RenderSettings
 }
 
 export function App(): JSX.Element {
@@ -40,6 +43,7 @@ export function App(): JSX.Element {
   /** The last save's refusal, if it had one; cleared by the next save. */
   const [saveProblem, setSaveProblem] = useState<string>()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [renderOpen, setRenderOpen] = useState(false)
   const [problemsOpen, setProblemsOpen] = useState(false)
 
   /** `ui.reducedMotion` as the settings panel last set it, or as the file held it. */
@@ -74,6 +78,14 @@ export function App(): JSX.Element {
         <h1 className={styles.title}>Ritmolux Studio</h1>
         <span className={styles.preset}>{player.preset?.name ?? 'no preset yet'}</span>
         <Rotation held={rotation.held} onResume={rotation.resume} />
+        <button
+          type="button"
+          className={styles.render}
+          aria-expanded={renderOpen}
+          onClick={() => setRenderOpen((open) => !open)}
+        >
+          render
+        </button>
         <button
           type="button"
           className={styles.settings}
@@ -141,9 +153,16 @@ export function App(): JSX.Element {
             studioVersion={info?.studioVersion ?? '—'}
             reducedMotion={motionReduced}
             onReducedMotion={setReducedMotion}
+            render={info?.render}
             onClose={() => setSettingsOpen(false)}
           />
         )}
+        <Render
+          roster={player.roster}
+          active={player.preset?.name}
+          hidden={!renderOpen}
+          onClose={() => setRenderOpen(false)}
+        />
         <div className={styles.workbench}>
           <Preview stream={player.stream} onStats={onStats} />
           <Editor

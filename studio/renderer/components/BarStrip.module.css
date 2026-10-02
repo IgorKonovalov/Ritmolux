@@ -1,0 +1,175 @@
+.strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* The track, left to right. Every child is placed by a fraction of it. */
+.lane {
+  position: relative;
+  height: 96px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
+  overflow: hidden;
+  user-select: none;
+}
+
+.blend {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.wave {
+  position: absolute;
+  inset: 8px 0;
+  width: 100%;
+  height: calc(100% - 16px);
+  pointer-events: none;
+}
+
+.wave polygon {
+  fill: var(--text-dim);
+  opacity: 0.55;
+}
+
+/* A bar is a thin line with a wider hit area around it. */
+.bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  margin-left: -3px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: copy;
+}
+
+.bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+}
+
+.bar:disabled {
+  cursor: default;
+}
+
+/* Estimated downbeat: solid and bright. */
+.locked::after {
+  background: var(--accent);
+}
+
+/* Fallback counter: dashed and dim, so the two cannot be mistaken. */
+.fallback::after {
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--text-dim) 0 3px,
+    transparent 3px 7px
+  );
+  opacity: 0.6;
+}
+
+.bar:hover:not(:disabled)::after {
+  background: var(--text);
+  opacity: 1;
+}
+
+.marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 2px solid;
+  cursor: grab;
+}
+
+.marker:active {
+  cursor: grabbing;
+}
+
+.flag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #000;
+  border-radius: 0 0 var(--control-radius) 0;
+}
+
+/* A prompt on a bar the grid no longer has, after a new rate. */
+.past {
+  border-left-style: dotted;
+  opacity: 0.6;
+}
+
+.summary {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.prompts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prompt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.promptLabel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.promptBar {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 4.5rem;
+}
+
+.promptText {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.remove {
+  background: none;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 2px var(--space-1);
+  cursor: pointer;
+}
+
+.remove:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+}

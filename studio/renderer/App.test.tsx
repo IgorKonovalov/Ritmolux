@@ -58,6 +58,7 @@ beforeEach(() => {
       },
     },
     preset: { read: vi.fn(), write: vi.fn(), create: vi.fn() },
+    render: { onEvent: () => () => undefined, prepare: vi.fn(), suggestOutput: vi.fn() },
   }
   window.api = api as unknown as typeof window.api
 })

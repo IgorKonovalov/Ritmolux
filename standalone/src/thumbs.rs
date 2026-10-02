@@ -336,8 +336,9 @@ pub(crate) fn is_current(dir: &Path, name: &str, stamp: Stamp) -> bool {
 /// printing** — `crate::preset_dir::startup_preset_names`'s rule, because the
 /// child has to see the roster the parent is showing: a directory that yields at
 /// least one preset replaces the embedded set, and the answer is one list or the
-/// other and never their union.
-fn library() -> Vec<Preset> {
+/// other and never their union. The `--render` mode resolves its preset through
+/// this too, for the same reason.
+pub(crate) fn library() -> Vec<Preset> {
     let dir = match resolve_preset_dir() {
         PresetDir::Override(dir) | PresetDir::Default(dir) => dir,
         PresetDir::Unresolved => PathBuf::new(),

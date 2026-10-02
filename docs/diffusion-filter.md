@@ -97,6 +97,29 @@ to agree with a flag on another process — there is no `-r` to keep in sync and
 way to desynchronize the audio silently. Change the profile, the stride or the
 prompt and the third line of the pipe is still the third line of the pipe.
 
+## From the studio
+
+The studio's **Render** view builds the same pipe for you, with the shipped player's `--render` in
+place of `shot`. It runs the player, then this filter, then `ffmpeg`, as three children joined by OS
+pipes ([ADR-0262](adrs/0262-the-studio-renders-a-clip-by-piping-three-children-and-transcodes-what-the-player-cannot-read.md)).
+The filter is still yours to set up. The studio ships no Python and installs nothing, so build the
+venv as [Setup](#setup) says, then point two keys of the studio's `settings.json` at it:
+
+- `render.diffusion.python`, the venv's interpreter.
+- `render.diffusion.script`, `tools/sd-filter/sd_filter.py` in the checkout.
+
+The Settings view edits both. When the Render view opens, the studio checks that the script exists
+and asks that interpreter the question [Setup](#setup) ends on. The **neural** switch stays off,
+with one line naming the missing key or what `torch` answered, until the answer is `True`.
+
+Prompts are placed on a strip of the track's waveform with the player's own bars drawn over it, so
+each prompt lands on a bar the render has. Start writes the timeline and the player's bar grid
+beside the output and passes both to the filter as `--timeline` and `--bar-grid`, with the profile
+you picked. The progress line shows the encoder's frame count and this filter's own count beside it.
+How long a run takes is in [What it costs](#what-it-costs). The view's job file, its quit prompt and
+everything else it does are in the studio's
+[Rendering a clip](../studio/README.md#rendering-a-clip).
+
 ## Profiles
 
 A profile is a named set of the flags below and nothing else — never a second

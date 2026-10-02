@@ -283,5 +283,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0259](0259-the-swarm-projects-through-the-shared-camera-in-a-frustum-shaped-torus.md) | The swarm projects through the shared camera, in a frustum-shaped torus | proposed 2026-10-01, Plan 0239; supersedes 0044 in part |
 | [0260](0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md) | The attractor's 3D families project through the shared camera, and `perspective` retires | proposed 2026-10-01, Plan 0240; amends 0076, 0257 |
 | [0261](0261-the-conductor-parks-only-on-what-the-owner-must-settle.md) | The conductor parks only on what the owner must settle | accepted 2026-10-01, Plan 0241; amends 0207, 0209, 0248 |
-| [0262](0262-the-studio-renders-a-clip-by-piping-three-children-and-transcodes-what-the-player-cannot-read.md) | The studio renders a clip by piping three children, and transcodes what the player cannot read | proposed 2026-10-01, Plan 0247; amends 0175 |
+| [0262](0262-the-studio-renders-a-clip-by-piping-three-children-and-transcodes-what-the-player-cannot-read.md) | The studio renders a clip by piping three children, and transcodes what the player cannot read | accepted 2026-10-02, Plan 0247; amends 0175 |
 <!-- roster:end -->

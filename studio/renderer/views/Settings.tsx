@@ -14,6 +14,7 @@
 import { useState } from 'react'
 
 import { PLAYER_MODES, type PlayerMode } from '@shared/player-mode'
+import type { RenderSettingKey, RenderSettings } from '@shared/render'
 
 import styles from './Settings.module.css'
 
@@ -27,7 +28,31 @@ export interface SettingsProps {
   reducedMotion: boolean
   /** Apply a new `ui.reducedMotion` to the window; called once the file took it. */
   onReducedMotion: (on: boolean) => void
+  /** The `render` key as the settings file held it at launch. */
+  render?: RenderSettings
   onClose: () => void
+}
+
+/** The `render` keys the panel edits, each a path, and what absent means. */
+const RENDER_FIELDS: { key: RenderSettingKey; label: string; absent: string }[] = [
+  { key: 'ffmpegPath', label: 'ffmpeg', absent: 'ffmpeg on PATH' },
+  { key: 'outputDir', label: 'output folder', absent: 'your Videos folder' },
+  { key: 'diffusion.python', label: 'diffusion python', absent: 'not set: no neural renders' },
+  { key: 'diffusion.script', label: 'diffusion script', absent: 'not set: no neural renders' },
+]
+
+/** One key's value as the settings file holds it, `diffusion.*` read nested. */
+function fileValue(render: RenderSettings, key: RenderSettingKey): string | undefined {
+  switch (key) {
+    case 'ffmpegPath':
+      return render.ffmpegPath
+    case 'outputDir':
+      return render.outputDir
+    case 'diffusion.python':
+      return render.diffusion?.python
+    case 'diffusion.script':
+      return render.diffusion?.script
+  }
 }
 
 const WHAT_IT_DOES: Record<PlayerMode, string> = {
@@ -44,6 +69,7 @@ export function Settings({
   studioVersion,
   reducedMotion,
   onReducedMotion,
+  render,
   onClose,
 }: SettingsProps): JSX.Element {
   /**
@@ -136,6 +162,8 @@ export function Settings({
         )}
       </fieldset>
 
+      <RenderGroup render={render ?? {}} />
+
       <dl className={styles.facts}>
         <dt>player</dt>
         <dd>
@@ -148,5 +176,63 @@ export function Settings({
         </dd>
       </dl>
     </section>
+  )
+}
+
+/**
+ * The `render` keys, each a text field saved on its own button. An empty field
+ * removes the key, which is how a path is given back to its default.
+ */
+function RenderGroup({ render }: { render: RenderSettings }): JSX.Element {
+  /** What each field holds now, starting from the file; `undefined` while untouched. */
+  const [drafts, setDrafts] = useState<Partial<Record<RenderSettingKey, string>>>({})
+  /** What the file took this session; an `undefined` value is a cleared key. */
+  const [saved, setSaved] = useState<Partial<Record<RenderSettingKey, string | undefined>>>({})
+  const [problem, setProblem] = useState<string>()
+
+  const value = (key: RenderSettingKey): string =>
+    drafts[key] ?? (key in saved ? (saved[key] ?? '') : (fileValue(render, key) ?? ''))
+
+  const save = (key: RenderSettingKey): void => {
+    const next = value(key).trim()
+    void window.api.render.setSettings({ [key]: next === '' ? null : next }).then((result) => {
+      setProblem(result.ok ? undefined : result.reason)
+      if (!result.ok) return
+      setSaved((previous) => ({ ...previous, [key]: next === '' ? undefined : next }))
+      setDrafts((previous) => ({ ...previous, [key]: undefined }))
+    })
+  }
+
+  return (
+    <fieldset className={styles.group}>
+      <legend className={styles.legend}>Rendering</legend>
+      {RENDER_FIELDS.map(({ key, label, absent }) => (
+        <div key={key} className={styles.path}>
+          <label className={styles.pathLabel}>
+            <span className={styles.choiceName}>{label}</span>
+            <input
+              className={styles.pathInput}
+              value={value(key)}
+              placeholder={absent}
+              onChange={(event) => setDrafts((previous) => ({ ...previous, [key]: event.target.value }))}
+            />
+          </label>
+          <button type="button" className={styles.close} onClick={() => save(key)}>
+            save
+          </button>
+        </div>
+      ))}
+      <p className={styles.note}>
+        Saved under <code>render</code> in the settings file and used by the next render. Empty
+        means the placeholder. The two diffusion paths point at a checkout&apos;s{' '}
+        <code>tools/sd-filter/sd_filter.py</code> and a venv with torch; the neural switch stays off
+        until both are set and torch sees a CUDA device.
+      </p>
+      {problem !== undefined && (
+        <p className={styles.problem} role="alert">
+          The setting was not written: {problem}
+        </p>
+      )}
+    </fieldset>
   )
 }

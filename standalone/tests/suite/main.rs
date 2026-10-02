@@ -16,6 +16,7 @@ mod common;
 
 mod configuration_doc;
 mod preset_check;
+mod render_cli;
 mod shot_cli;
 mod show_is_the_only_owner;
 mod stream_split;

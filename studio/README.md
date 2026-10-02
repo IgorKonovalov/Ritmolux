@@ -71,6 +71,55 @@ dwell the operator config sets, and an edit lands in whatever arrived last.
 Repeating the hold is safe by contract: `auto` and `hold` are positions rather
 than presses (`docs/specs/0003-studio-control-protocol.md`).
 
+## Rendering a clip
+
+**render** in the header opens the Render view, which turns a track and a preset into an MP4
+(ADR-0262). The studio draws none of it. Main runs three children and joins them with OS pipes:
+the player's `--render`, the diffusion sidecar when **neural** is on, and `ffmpeg`. No frame
+passes through the studio.
+
+1. **Choose a track.** An MP3, a FLAC, a WAV, or anything else `ffmpeg` reads. The studio
+   transcodes it with `ffmpeg` to a 16-bit stereo WAV in `render-cache/` in the studio's per-user
+   directory, keeping the sample rate. That one WAV feeds the bar count, the render and the
+   encoder's audio. The cache is emptied when the studio starts and when it quits.
+2. **The strip.** The track's waveform, with the bars the player's `--bars` counts drawn over it.
+   A bar the downbeat estimator placed is a solid line, and a bar the fallback counter placed is
+   dashed. Most of a track is fallback, and the line under the strip says how much. Changing fps
+   counts the bars again.
+3. **Prompts.** Click a bar to put a prompt on it, drag a marker to move it to another bar, and
+   type or remove the prompt in the list below. The shading between two markers is the blend:
+   the sidecar moves from one prompt to the next across the whole span. A new track starts with
+   one empty prompt on bar 1.
+4. **Preset, fps, size, tier, output.** Any preset in the player's library. The defaults are 30
+   fps, 1920x1080 and tier `rich`. The output defaults to `<track>-<preset>.mp4` in
+   `render.outputDir`, and **output…** picks another.
+5. **neural.** This switch adds `tools/sd-filter/sd_filter.py` to the pipe. It stays disabled,
+   with one line saying why, until `render.diffusion.python` and `render.diffusion.script` are set
+   and that interpreter's `torch` sees a CUDA device. **re-check** asks again after you fix what
+   the line named. With neural on, Start refuses to begin until every prompt has text.
+   `docs/diffusion-filter.md` covers building the venv and what a run costs.
+6. **Start.** The progress bar is the encoder's own count of frames written to the file, against
+   the frame count `--bars` reported, with an estimate of the time left. A neural render also
+   shows the sidecar's own count and its time per frame. **cancel** stops every child and deletes
+   the unfinished file.
+
+**A render belongs to this studio process.** Closing the window while one runs asks first, and
+quitting stops the render and deletes its unfinished file. While a job runs the studio keeps the
+machine from suspending. A crash loses the render, because nothing reattaches to it.
+
+**What a render leaves beside the MP4:**
+
+| File | When | What it is |
+| ---- | ---- | ---------- |
+| `<output>.render.json` | every render | The job: track, preset, fps, size, tier, output and the neural settings with their prompts |
+| `<output>.bars.json` | neural renders | The player's `--bars` grid, the sidecar's `--bar-grid` |
+| `<output>.timeline.json` | neural renders | The prompts as `[{"at_bar": N, "prompt": "..."}]`, the sidecar's `--timeline` |
+| `<output>.render.log` | a failed render | Each stage's command line and the last lines it printed. The view names the stage that failed |
+
+**open job…** reads a `.render.json` and restores the whole view from it. If the track has moved,
+the view asks for it again and keeps the prompts and every other field. A job file written by
+another version of the studio is refused with a message that names both versions.
+
 ## Which configuration covers which directory
 
 | Directory                      | Process   | Bundler                            | TypeScript project        |
@@ -143,6 +192,7 @@ window, which is what they are for.
 | `playerPath` | path                          | An explicit player binary, second in the resolution order above  |
 | `playerMode` | `windowed` or `windowless`    | Which sink the player is spawned with, read at spawn (ADR-0186)  |
 | `ui`         | `{ "reducedMotion": bool }`   | `reducedMotion` (default `false`) stops the window's transitions; applied at once |
+| `render`     | `{ "ffmpegPath": path, "outputDir": path, "diffusion": { "python": path, "script": path } }` | The clip render's encoder (default `ffmpeg` on `PATH`), where its file goes (default the Videos directory), and the diffusion sidecar's interpreter and script (both absent by default, which keeps the neural switch off); read per render |
 
 All are optional, and a file that is missing, is not JSON, or carries a key of
 the wrong shape degrades to "no setting" rather than failing the launch — the

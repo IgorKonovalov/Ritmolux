@@ -46,8 +46,8 @@ pub(crate) struct FlagSpec {
     /// refused rather than passed through, which is the cheaper of the two
     /// mistakes: every value-taking flag is otherwise a place a typo can hide.
     pub(crate) takes_value: bool,
-    /// The flag this one is only read alongside, or `None` when it is read on
-    /// every run.
+    /// The flags this one is only read alongside — **any one of them** is
+    /// enough — or empty when it is read on every run.
     ///
     /// A conditionally-claimed flag is invisible to the roster gate below: the
     /// scanner that would read it returns early when its companion is absent,
@@ -56,10 +56,10 @@ pub(crate) struct FlagSpec {
     /// exists to refuse, one level down, and stating the dependency here is
     /// what lets `unrecognized_flag` see it (ADR-0155).
     ///
-    /// The name must itself be in [`FLAGS`]; `every_requires_names_a_real_flag`
+    /// Each name must itself be in [`FLAGS`]; `every_requires_names_a_real_flag`
     /// is what holds that, since a typo here would refuse the flag on every run
     /// instead of on none.
-    pub(crate) requires: Option<&'static str>,
+    pub(crate) requires: &'static [&'static str],
     /// One line, printed by `--help`. States what the flag does; a `requires`
     /// dependency is rendered from the field above rather than written into
     /// this string, so the two cannot disagree.
@@ -77,158 +77,176 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
     FlagSpec {
         name: "--help",
         takes_value: false,
-        requires: None,
+        requires: &[],
         help: "print this roster and exit",
     },
     FlagSpec {
         name: "--console",
         takes_value: false,
-        requires: None,
+        requires: &[],
         help: "open the operator console at launch",
     },
     FlagSpec {
         name: "--list-devices",
         takes_value: false,
-        requires: None,
+        requires: &[],
         help: "print the audio capture endpoints and exit (Windows-only)",
     },
     FlagSpec {
         name: "--preview",
         takes_value: true,
-        requires: None,
+        requires: &[],
         help: "<stdout[@WxH]> mirror the windowed show as a fixed-size copy to a parent",
     },
     FlagSpec {
         name: "--events",
         takes_value: false,
-        requires: None,
+        requires: &[],
         help: "report as JSON lines on stderr, for a parent process",
     },
     FlagSpec {
         name: "--schema",
         takes_value: false,
-        requires: None,
+        requires: &[],
         help: "print the preset schema as JSON and exit",
     },
     FlagSpec {
         name: "--check",
         takes_value: true,
-        requires: None,
+        requires: &[],
         help: "<path> check a preset file, or a directory of them, and exit",
     },
     FlagSpec {
         name: "--strict",
         takes_value: false,
-        requires: Some("--check"),
+        requires: &["--check"],
         help: "exit non-zero on a warning as well as on an error",
     },
     FlagSpec {
         name: "--list-adapters",
         takes_value: false,
-        requires: None,
+        requires: &[],
         help: "print the renderer and Spout adapter rosters and exit",
     },
     FlagSpec {
         name: "--list-presets",
         takes_value: false,
-        requires: None,
+        requires: &[],
         help: "print the presets this launch would load, with each file's status, and exit",
     },
     FlagSpec {
         name: "--input",
         takes_value: true,
-        requires: None,
+        requires: &[],
         help: "<loopback|line-in> where audio comes from",
     },
     FlagSpec {
         name: "--device",
         takes_value: true,
-        requires: None,
+        requires: &[],
         help: "<name> which capture endpoint to open (see --list-devices)",
     },
     FlagSpec {
         name: "--tier",
         takes_value: true,
-        requires: None,
+        requires: &[],
         help: "<floor|rich> pin the quality tier instead of letting the engine pick",
     },
     FlagSpec {
         name: "--grid-scale",
         takes_value: true,
-        requires: None,
+        requires: &[],
         help: "<0.25..1|auto> draw the internal grids at this fraction of the frame",
     },
     FlagSpec {
         name: "--osc",
         takes_value: true,
-        requires: None,
+        requires: &[],
         help: "<host:port> publish analyzer telemetry as OSC over UDP",
     },
     FlagSpec {
         name: "--control",
         takes_value: true,
-        requires: None,
+        requires: &[],
         help: "<host:port> listen for studio control messages as OSC over UDP",
     },
     FlagSpec {
         name: "--soak",
         takes_value: true,
-        requires: None,
+        requires: &[],
         help: "[path] write a long-run frame-time trace; bare, it uses a default path",
     },
     FlagSpec {
         name: "--downbeat-log",
         takes_value: true,
-        requires: None,
+        requires: &[],
         help: "[path] write the per-beat downbeat decomposition; bare, a default path",
     },
     FlagSpec {
         name: "--stream",
         takes_value: false,
-        requires: None,
+        requires: &[],
         help: "run headless and publish every frame to a sink (see --sink)",
     },
     FlagSpec {
         name: "--size",
         takes_value: true,
-        requires: Some("--stream"),
-        help: "<WxH> published frame size (default 1280x720)",
+        requires: &["--stream", "--render"],
+        help: "<WxH> published or rendered frame size (default 1280x720)",
     },
     FlagSpec {
         name: "--fps",
         takes_value: true,
-        requires: Some("--stream"),
-        help: "<n> published frame rate (default 60)",
+        requires: &["--stream", "--render", "--bars"],
+        help: "<n> published or rendered frame rate (default 60)",
     },
     FlagSpec {
         name: "--gpu",
         takes_value: true,
-        requires: None,
+        requires: &[],
         help: "<name|index> which graphics adapter to render on",
     },
     FlagSpec {
         name: "--sink",
         takes_value: true,
-        requires: Some("--stream"),
+        requires: &["--stream"],
         help: "<spout|stdout> where the published frames go (default spout)",
     },
     FlagSpec {
         name: "--sender",
         takes_value: true,
-        requires: Some("--stream"),
+        requires: &["--stream"],
         help: "<name> the published Spout sender name (default Ritmolux)",
     },
     FlagSpec {
         name: "--preset",
         takes_value: true,
-        requires: None,
+        requires: &[],
         help: "<name> hold one scene and disable rotation",
     },
     FlagSpec {
         name: "--frames",
         takes_value: true,
-        requires: Some("--stream"),
+        requires: &["--stream"],
         help: "<n> stop after this many frames",
+    },
+    FlagSpec {
+        name: "--render",
+        takes_value: true,
+        requires: &[],
+        help: "<wav> render --preset over a 16-bit PCM WAV as Y4M video on stdout and exit",
+    },
+    FlagSpec {
+        name: "--bars",
+        takes_value: true,
+        requires: &[],
+        help: "<wav> write the bar grid a --render of this WAV would draw to --out and exit",
+    },
+    FlagSpec {
+        name: "--out",
+        takes_value: true,
+        requires: &["--bars"],
+        help: "<path> the file the bar grid's JSON is written to",
     },
 ];
 
@@ -244,7 +262,7 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
 pub(crate) const INTERNAL_FLAGS: &[FlagSpec] = &[FlagSpec {
     name: "--thumb",
     takes_value: true,
-    requires: None,
+    requires: &[],
     help: "<name> render one preset's browser thumbnail into the cache and exit",
 }];
 
@@ -288,8 +306,8 @@ pub(crate) fn help_text() -> String {
         // one field feeds both the printed line and the refusal below, so a
         // flag's documented coupling and its enforced one are the same fact.
         let needs = match spec.requires {
-            Some(other) => format!(" [requires {other}]"),
-            None => String::new(),
+            [] => String::new(),
+            companions => format!(" [requires {}]", companions.join(" or ")),
         };
         text.push_str(&format!("  {:<17} {}{}\n", spec.name, spec.help, needs));
     }
@@ -402,8 +420,10 @@ pub(crate) fn walk_flags(args: impl Iterator<Item = String>) -> Vec<Claimed> {
     seen
 }
 
-/// The first rostered flag whose `requires` companion is absent, with that
-/// companion's name.
+/// The first rostered flag none of whose `requires` companions is present,
+/// with those companions' names joined by `` ` or ` ``, so a caller that
+/// quotes the result in backticks quotes each name (`` `--stream` or
+/// `--render` ``).
 ///
 /// The gap ADR-0148 left: a flag claimed only when another flag is present is
 /// walked past as recognized, and then the scanner that would read it returns
@@ -412,17 +432,16 @@ pub(crate) fn walk_flags(args: impl Iterator<Item = String>) -> Vec<Claimed> {
 /// end (ADR-0155).
 pub(crate) fn missing_companion(
     args: impl Iterator<Item = String>,
-) -> Option<(&'static FlagSpec, &'static str)> {
+) -> Option<(&'static FlagSpec, String)> {
     let seen = walk_flags(args);
     let present = |name: &str| {
         seen.iter()
             .any(|claimed| matches!(claimed, Claimed::Known(spec) if spec.name == name))
     };
     seen.iter().find_map(|claimed| match claimed {
-        Claimed::Known(spec) => spec
-            .requires
-            .filter(|companion| !present(companion))
-            .map(|companion| (*spec, companion)),
+        Claimed::Known(spec) => (!spec.requires.is_empty()
+            && !spec.requires.iter().any(|companion| present(companion)))
+        .then(|| (*spec, spec.requires.join("` or `"))),
         // A malformed occurrence satisfies nothing and asks for nothing: it is
         // refused before this runs, and counting it as present would let
         // `--stream=1 --fps 30` past on the strength of the very token that is
@@ -1283,7 +1302,7 @@ pub(crate) mod tests {
 
     /// [`missing_companion`] reduced to the pair of names the operator is
     /// shown.
-    fn orphaned(args: &[&str]) -> Option<(&'static str, &'static str)> {
+    fn orphaned(args: &[&str]) -> Option<(&'static str, String)> {
         let argv = args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
         missing_companion(argv.into_iter()).map(|(spec, needs)| (spec.name, needs))
     }
@@ -1295,12 +1314,24 @@ pub(crate) mod tests {
     /// it (design-backlog 0167).
     #[test]
     fn a_flag_whose_companion_is_absent_is_refused_and_both_are_named() {
-        assert_eq!(orphaned(&["--fps", "30"]), Some(("--fps", "--stream")));
-        assert_eq!(orphaned(&["--sender=rig"]), Some(("--sender", "--stream")));
+        assert_eq!(
+            orphaned(&["--fps", "30"]),
+            Some(("--fps", "--stream` or `--render` or `--bars".to_owned()))
+        );
+        assert_eq!(
+            orphaned(&["--sender=rig"]),
+            Some(("--sender", "--stream".to_owned()))
+        );
+        assert_eq!(
+            orphaned(&["--out", "grid.json"]),
+            Some(("--out", "--bars".to_owned()))
+        );
 
         // With the companion present each is read by the scanner that claims
-        // it, which is the whole condition.
+        // it, which is the whole condition — and any one companion is enough.
         assert_eq!(orphaned(&["--stream", "--fps", "30"]), None);
+        assert_eq!(orphaned(&["--render", "clip.wav", "--fps", "30"]), None);
+        assert_eq!(orphaned(&["--bars", "clip.wav", "--fps", "30"]), None);
         // Order does not matter: the walk collects before it judges.
         assert_eq!(orphaned(&["--fps", "30", "--stream"]), None);
     }
@@ -1356,8 +1387,8 @@ pub(crate) mod tests {
         );
         assert_eq!(refused(&["--stream=1", "--fps", "30"]), None);
         assert_eq!(
-            orphaned(&["--stream=1", "--fps", "30"]),
-            Some(("--fps", "--stream")),
+            orphaned(&["--stream=1", "--sender", "rig"]),
+            Some(("--sender", "--stream".to_owned())),
             "a malformed `--stream` must not satisfy another flag's dependency"
         );
 
@@ -1374,8 +1405,8 @@ pub(crate) mod tests {
     #[test]
     fn a_companion_hiding_in_a_value_does_not_count() {
         assert_eq!(
-            orphaned(&["--device=--stream", "--fps", "30"]),
-            Some(("--fps", "--stream")),
+            orphaned(&["--device=--stream", "--sender", "rig"]),
+            Some(("--sender", "--stream".to_owned())),
             "`--stream` inside an `=` value is text, not a flag occurrence"
         );
     }
@@ -1386,19 +1417,18 @@ pub(crate) mod tests {
     #[test]
     fn every_requires_names_a_real_flag() {
         for spec in FLAGS.iter().chain(INTERNAL_FLAGS) {
-            let Some(companion) = spec.requires else {
-                continue;
-            };
-            assert!(
-                rostered(companion).is_some(),
-                "`{}` requires `{companion}`, which is in neither roster",
-                spec.name
-            );
-            assert_ne!(
-                spec.name, companion,
-                "`{}` requires itself, which no argument list can satisfy",
-                spec.name
-            );
+            for &companion in spec.requires {
+                assert!(
+                    rostered(companion).is_some(),
+                    "`{}` requires `{companion}`, which is in neither roster",
+                    spec.name
+                );
+                assert_ne!(
+                    spec.name, companion,
+                    "`{}` requires itself, which no argument list can satisfy",
+                    spec.name
+                );
+            }
         }
     }
 
@@ -1527,6 +1557,7 @@ pub(crate) mod tests {
             ("cli.rs", include_str!("cli.rs")),
             ("run.rs", include_str!("run.rs")),
             ("stream.rs", include_str!("stream.rs")),
+            ("render_mode.rs", include_str!("render_mode.rs")),
         ];
         for (file, source) in sources {
             let literals = scanner_flag_literals(source);
@@ -1631,24 +1662,27 @@ pub(crate) mod tests {
                 .find(|line| line.trim_start().starts_with(spec.name))
                 .unwrap_or_else(|| panic!("--help has no line for `{}`", spec.name));
             match spec.requires {
-                Some(companion) => {
-                    assert!(
-                        line.contains(&format!("[requires {companion}]")),
-                        "`{}` does not state its dependency: {line}",
-                        spec.name
-                    );
-                    assert_eq!(
-                        line.matches(companion).count(),
-                        1,
-                        "`{}` names `{companion}` more than once: {line}",
-                        spec.name
-                    );
-                }
-                None => assert!(
+                [] => assert!(
                     !line.contains("[requires "),
                     "`{}` states a dependency it does not have: {line}",
                     spec.name
                 ),
+                companions => {
+                    let stated = format!("[requires {}]", companions.join(" or "));
+                    assert!(
+                        line.contains(&stated),
+                        "`{}` does not state its dependency as `{stated}`: {line}",
+                        spec.name
+                    );
+                    for companion in companions {
+                        assert_eq!(
+                            line.matches(companion).count(),
+                            1,
+                            "`{}` names `{companion}` more than once: {line}",
+                            spec.name
+                        );
+                    }
+                }
             }
             assert!(
                 !spec.help.contains("[requires "),

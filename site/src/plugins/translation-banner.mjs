@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
@@ -16,6 +17,13 @@ import path from 'node:path';
  * would show its title twice. This plugin therefore runs FIRST in the remark
  * chain, and inserts its notice after the leading heading so the strip still
  * finds it.
+ *
+ * A SPLIT TRANSLATION CARRIES ITS STAMP ON ITS FIRST PAGE ONLY. A `.ru.md` past
+ * the splitter's threshold is rendered as one page per section (ADR-0166), and
+ * every page but the index opens with a section heading, not the stamp. Such a
+ * page is recognised by the stamp on line 1 of a file on disk past that
+ * threshold: it passes, and
+ * carries no notice, which the document's index page already shows.
  *
  * WHAT THIS DELIBERATELY DOES NOT DO: fail a build because a translation has
  * drifted. Drift is an advisory - `scripts/check-translations.mjs` prints a row
@@ -42,6 +50,29 @@ const SUFFIX = '.ru.md';
 
 /** Line 1 of a translation. The same rule `scripts/check-translations.mjs` gates. */
 const STAMP = /^<!--\s*translated-from:\s*([0-9a-f]{7,40})\s*-->\s*$/;
+
+/**
+ * `DOCUMENT_SPLIT_BYTES` in `split-document.mjs`, restated because that module
+ * imports `github-slugger` and this one is loaded by
+ * `scripts/check-translations.mjs --self-test` where no site dependency is
+ * installed. The two must stay equal.
+ */
+const SPLIT_BYTES = 40_000;
+
+/**
+ * The stamp on line 1 of the file at `filePath` when that file is large enough
+ * to split, or null. A file under the threshold renders as one page whose tree
+ * must carry the stamp itself, so it never earns the split pages' exemption.
+ */
+const splitStamp = memo((filePath) => {
+  try {
+    const text = readFileSync(filePath, 'utf8');
+    if (Buffer.byteLength(text, 'utf8') <= SPLIT_BYTES) return null;
+    return STAMP.exec(text.split(/\r?\n/, 1)[0].trim());
+  } catch {
+    return null;
+  }
+});
 
 /** `{ sha, date }` of the commit that last touched `source`, or null. */
 const lastCommit = memo((source) => {
@@ -108,6 +139,7 @@ export function translationBanner() {
 
     const first = tree.children[0];
     const match = first?.type === 'html' ? STAMP.exec(first.value.trim()) : null;
+    if (match === null && splitStamp(file.path) !== null) return;
     if (match === null) {
       throw new Error(
         `translation-banner: ${file.path} does not open with a ` +
