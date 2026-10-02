@@ -37,15 +37,18 @@ telemetry.
 | `--downbeat-log` | `[path]` | Write the per-beat downbeat decomposition; bare, a default path |
 | `--stream` | — | Run headless and publish every frame to a sink |
 | `--sink` | `spout` \| `stdout` | Where the published frames go, default `spout`. Needs `--stream` |
-| `--size` | `WxH` | Published frame size; default `1280x720` on `--sink spout`, `640x360` on `--sink stdout`. Needs `--stream` |
-| `--fps` | `<n>` | Published frame rate; default `60` on `--sink spout`, `30` on `--sink stdout`. Needs `--stream` |
+| `--size` | `WxH` | Published frame size; default `1280x720` on `--sink spout`, `640x360` on `--sink stdout`. Under `--render`, the rendered size, default `1280x720`. Needs `--stream` or `--render` |
+| `--fps` | `<n>` | Published frame rate; default `60` on `--sink spout`, `30` on `--sink stdout`. Under `--render` and `--bars`, the rendered rate — a whole number or an exact `num/den` such as `30000/1001` — default `60`. Needs `--stream`, `--render` or `--bars` |
 | `--sender` | `<name>` | The published Spout sender name, default `ritmolux`. Needs `--stream` |
 | `--frames` | `<n>` | Stop after this many frames. Needs `--stream` |
 | `--gpu` | `<name\|index>` | Which graphics adapter to render on — the window and `--stream` both. Overrides `[output] gpu` for one run |
-| `--preset` | `<name>` | Hold one scene and disable rotation |
+| `--preset` | `<name>` | Hold one scene and disable rotation; under `--render`, the preset to render |
+| `--render` | `<clip.wav>` | Render `--preset` over a 16-bit PCM WAV as a Y4M video stream on stdout, and exit |
+| `--bars` | `<clip.wav>` | Write the bar grid a `--render` of the same WAV draws, as JSON, to `--out`, and exit |
+| `--out` | `<path>` | The file `--bars` writes. Needs `--bars` |
 
-A flag marked *Needs `--stream`* passed without it is a startup error naming both flags, rather
-than silence.
+A flag marked *Needs* passed without any of the flags it names is a startup error naming them,
+rather than silence.
 
 ### The ones that need a paragraph
 
@@ -260,6 +263,21 @@ target in `config.toml` degrades to no sink and says so, because a config file m
 show. Sends are **non-blocking and dropped on failure**: a broken link costs the telemetry, never a
 frame, and the app prints one line when it starts failing and one when it recovers rather than a
 line per frame.
+
+**`--render <clip.wav> --preset <name>`** renders one preset over a 16-bit PCM WAV, offline, and
+writes the frames to **standard output** as a Y4M stream an encoder such as `ffmpeg` reads with
+`-f yuv4mpegpipe -i pipe:0`. It also reads `--fps`, `--size` and `--tier`, and nothing else: any
+other flag on the line is refused. Unpinned, the tier is `floor` rather than the engine's pick,
+because a render is meant to come out the same on every machine. The preset is looked up in the
+library this launch would load — the per-user directory or `RLX_PRESET_DIR`, else the shipped set.
+Progress and a summary go to standard error, and nothing else is written to standard output.
+**`--bars <clip.wav> --out <path>`** writes the bar grid such a render is drawn against — the frame
+each bar starts on, and whether the downbeat estimator placed it — as JSON, without drawing a frame
+and without touching the GPU. Both modes exist for the studio, which pipes the first into
+`ffmpeg` and places prompts on the second; [Capturing](capturing.md) describes the same render
+through `shot`. Like `--check`, they exit `2` when the command is wrong in shape, a preset no
+library holds included, and `1` when a recognised request fails, such as a WAV that is not 16-bit
+PCM. Either way stderr gets one line saying what was wrong.
 
 ### The one flag `--help` does not print
 

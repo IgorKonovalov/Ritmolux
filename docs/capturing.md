@@ -324,6 +324,13 @@ cargo run -p standalone --example shot -- \
   --ffmpeg ffmpeg --out track.mp4
 ```
 
+**The shipped player has a twin of this mode.** `ritmolux --render track.wav --preset <name>`
+runs the same walk and writes the same Y4M stream to stdout, byte for byte, for the same preset,
+clip, `--fps`, `--size` and `--tier`; `ritmolux --bars` writes the file `--bar-grid` does. It is
+what the studio renders a clip through, so it needs no source checkout. It takes no encoder flag
+of its own: you pipe its stdout into `ffmpeg` yourself. Its flags are listed in
+[Configuration](configuration.md#the-flags).
+
 **A `--preset` that names nothing costs nothing.** The name is checked against
 the roster before the encoder is spawned and before a GPU device is built, so a
 typo exits 1, lists the roster's keys, and **writes no file at all**. That check

@@ -35,6 +35,7 @@ mod input;
 #[cfg(windows)]
 mod nowplaying_win;
 mod preset_dir;
+mod render_mode;
 mod run;
 mod show;
 mod soak;
@@ -54,6 +55,12 @@ fn main() {
     // socket and starts no capture client, so it must not travel through a path
     // that does.
     if let Some(code) = thumbs::child_mode() {
+        std::process::exit(code);
+    }
+    // The two offline modes over a WAV (ADR-0262), for the same reason and in
+    // the same place: each answers on stdout or in a file and exits, and the
+    // process asking is the studio rather than an operator.
+    if let Some(code) = render_mode::mode() {
         std::process::exit(code);
     }
     run::run();

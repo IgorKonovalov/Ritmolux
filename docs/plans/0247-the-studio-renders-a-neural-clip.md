@@ -1,6 +1,6 @@
 # 0247 — The studio renders a neural clip
 
-> **Status:** approved (2026-10-01)
+> **Status:** in-progress (2026-10-02)
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, studio-builder, human
 > **Related ADRs:** [0262](../adrs/0262-the-studio-renders-a-clip-by-piping-three-children-and-transcodes-what-the-player-cannot-read.md)
@@ -260,11 +260,11 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 
 ## Implementation log
 
-**Lane:** _(not started)_
+**Lane:** branch `plan-0247-the-studio-renders-a-neural-clip`, worktree `/home/igor/Work/rlx-plan-0247`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The player renders and reports bars | dev | not started | |
+| 1 — The player renders and reports bars | dev | done | committed with this row |
 | 2 — A plain clip from the studio | studio-builder | not started | |
 | 3 — The strip and the prompts | studio-builder | not started | |
 | 4 — The neural toggle | studio-builder | not started | |
@@ -272,6 +272,22 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 | 6 — A real neural clip, judged | human | not started | |
 
 ### Notes
+
+- Phase 1, outside the file list: `standalone/src/thumbs.rs` (`library()` made `pub(crate)` so
+  `--render` resolves through it) and `standalone/tests/suite/main.rs` (registers the new
+  `render_cli` module).
+- Phase 1, `cli.rs`: `FlagSpec::requires` became a list read as "any one of", so `--size` reads
+  `[requires --stream or --render]` and `--fps` adds `--bars`. A third new flag, `--out`
+  (`[requires --bars]`), carries `--bars`' path. `run.rs` is unchanged.
+- Phase 1, defaults the plan left open: with no flag, `--render` takes `shot`'s 60 fps, 1280x720
+  and tier `floor`, and `--preset` is required.
+- Phase 1, the structural `--bars` check is a source-reading unit test,
+  `render_mode::tests::the_bars_mode_holds_no_gpu_type`. It asserts that the bodies of `fn bars`
+  and `fn read_clip` name none of `Renderer`, `renderer`, `render::run`, `wgpu`, `Tier` or
+  `adapter`, and that `fn render_clip` names `render::run`.
+- Phase 1, binary size: `target/release/ritmolux` from `cargo build --release -p standalone --bin
+  ritmolux`, Linux. 12,854,504 B at `f77a476a`, before the phase. 12,928,352 B after it, which is
+  77.1 % of NFR §4's 16,777,216 B cap.
 
 ### Close triggers
 
