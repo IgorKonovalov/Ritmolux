@@ -38,12 +38,15 @@ use std::rc::Rc;
 use super::super::common;
 use super::super::{FALLBACK_DT, Phase, Scene};
 use super::biarc::Piece;
-use super::renderer::{ArcInstance, LineRenderer, SegmentInstance, StrokeMetric};
+use super::renderer::{
+    ArcInstance, LineRenderer, Segment3dInstance, SegmentInstance, StrokeMetric,
+};
 use super::{
     CapOverflow, ColorRamp, CurveFamily, GeneratorConfig, MirrorSpec, OverflowContext,
     ViewTransform, curves, replicate_mirror,
 };
 use crate::dsp::AnalysisFrame;
+use crate::render::camera::{self, CameraParams};
 use crate::render::palette::Palette;
 use crate::render::scenes::{
     FamilyParam, FamilyRange, ParamGroup, ParamKind, ParamSpec, default_of,
@@ -63,6 +66,7 @@ const DEFAULT_SYM: f32 = default_of(PARAMS, "sym");
 const DEFAULT_SHARPNESS: f32 = default_of(PARAMS, "sharpness");
 const DEFAULT_LOBE: f32 = default_of(PARAMS, "lobe");
 const DEFAULT_DECAY: f32 = default_of(PARAMS, "decay");
+const DEFAULT_TUBE: f32 = default_of(PARAMS, "tube");
 const DEFAULT_SAMPLES: f32 = default_of(PARAMS, "samples");
 const DEFAULT_THICKNESS: f32 = 2.0;
 const DEFAULT_HUE: f32 = 0.6;
@@ -169,13 +173,62 @@ pub struct ParametricCurveScene {
     zoom: f32,
     mirror_order: f32,
     mirror_reflect: f32,
+    tube: f32,
+
+    /// The space families' own renderer (ADR-0258): the `seg3d` pipeline and
+    /// an instance buffer of the tier's
+    /// [`seg3d_segments`](crate::render::TierConfig::seg3d_segments), built
+    /// with the scene so a frame that switches to a space family allocates
+    /// nothing. The shared 2D renderer above has no `seg3d` pipeline.
+    lines3d: LineRenderer,
+    /// The tier's `seg3d_segments`: the most chords a space walk draws.
+    seg3d_cap: usize,
+    /// The tier's cap on the circle of confusion, in pixels.
+    max_coc: f32,
+    /// The render target's size in pixels, handed in every frame.
+    target: (u32, u32),
+    /// The shared camera block, live on the space families only.
+    camera: CameraParams,
+    /// This frame's space walk in world units, preallocated to
+    /// `seg3d_cap + 1` (a walk has one more point than chords).
+    points3d: Vec<[f32; 3]>,
+    /// Whether [`points3d`](Self::points3d) closes on itself.
+    closed3d: bool,
+    /// The bounding radius of the whole space figure, which `focus` is
+    /// normalized across.
+    extent3d: f32,
+    /// The `samples` this frame's space walk was taken at, after the cap:
+    /// the colour ramp's divisor.
+    samples3d: usize,
+    /// Reused 3D instance buffer, preallocated to `seg3d_cap`.
+    instances3d: Vec<Segment3dInstance>,
 }
 
 impl ParametricCurveScene {
     /// Build the scene over the shared line renderer, preallocating its segment
-    /// buffer to the cap.
-    pub fn new(renderer: Rc<RefCell<LineRenderer>>, max_segments: usize) -> Self {
+    /// buffer to the cap, and the space families' own `seg3d` renderer with
+    /// `seg3d_cap` instances and blur held to `max_coc` pixels — the tier's
+    /// caps.
+    pub fn new(
+        renderer: Rc<RefCell<LineRenderer>>,
+        max_segments: usize,
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        seg3d_cap: usize,
+        max_coc: f32,
+    ) -> Self {
         Self {
+            lines3d: LineRenderer::new_3d(device, surface_format, seg3d_cap, "parametric-3d"),
+            seg3d_cap,
+            max_coc,
+            target: (1, 1),
+            camera: CameraParams::default(),
+            points3d: Vec::with_capacity(seg3d_cap + 1),
+            closed3d: false,
+            extent3d: 1.0,
+            samples3d: 0,
+            instances3d: Vec::with_capacity(seg3d_cap),
+            tube: DEFAULT_TUBE,
             renderer,
             segments: Vec::with_capacity(max_segments),
             single_buf: Vec::with_capacity(max_segments),
@@ -335,6 +388,135 @@ impl ParametricCurveScene {
             }
         }
     }
+
+    /// The colour ramp this frame's palette knobs describe.
+    fn ramp(&self) -> ColorRamp {
+        ColorRamp {
+            hue: self.colour.hue,
+            hue_spread: self.hue_spread,
+            palette_mix: self.colour.mix,
+            palette_steps: self.colour.steps,
+            saturation: self.colour.saturation,
+            brightness: self.colour.brightness,
+        }
+    }
+
+    /// The walk's parameters at `samples` points, turned by `rotation`, with
+    /// the sampler's flat `color` and stroke `width`.
+    fn curve_params(
+        &self,
+        samples: usize,
+        rotation: f32,
+        color: [f32; 3],
+        width: f32,
+    ) -> curves::CurveParams {
+        curves::CurveParams {
+            n: self.n,
+            d: self.d,
+            phase: self.phase,
+            radial_offset: self.radial_offset,
+            samples,
+            scale: self.scale,
+            rotation,
+            draw_progress: self.draw_progress,
+            color,
+            width,
+            levers: curves::Levers {
+                pen: self.pen,
+                sym: self.sym,
+                sharpness: self.sharpness,
+                lobe: self.lobe,
+                decay: self.decay,
+                tube: self.tube,
+            },
+        }
+    }
+
+    /// A space family's frame (ADR-0258): the walk in 3D, at `samples` held to
+    /// the `seg3d` cap. No rotation, no fit and no mirror reach it, and the
+    /// flat buffers are emptied so nothing 2D is drawn beside it.
+    fn update_space(&mut self, arm: curves::FamilyArm3d) {
+        let samples = (self.samples.max(0.0) as usize).min(self.seg3d_cap);
+        let params = self.curve_params(samples, 0.0, [0.0; 3], 0.0);
+        self.closed3d = (arm.sample)(&params, &mut self.points3d);
+        self.extent3d = (arm.extent)(&params);
+        self.samples3d = samples;
+        self.segments.clear();
+        self.arcs.clear();
+        self.mirror_overflow = None;
+    }
+
+    /// Draw the space walk through the shared camera: each chord clipped
+    /// against the near plane, culled when wholly off one edge of the frame,
+    /// coloured by its place along the walk (ADR-0059) and stroked `thickness`
+    /// pixels wide at the focal plane.
+    fn render_space(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        aspect: f32,
+    ) {
+        // The aspect is the render target's, handed in here (ADR-0037).
+        let frame = self.camera.frame(
+            aspect,
+            self.zoom,
+            [self.pan.x, self.pan.y],
+            self.target,
+            self.extent3d,
+            self.max_coc,
+        );
+        if self.mirror_overflow.is_none() {
+            self.mirror_overflow = frame.blur;
+        }
+        let ramp = self.ramp();
+        let width = if self.thickness.is_finite() {
+            self.thickness.max(0.0)
+        } else {
+            DEFAULT_THICKNESS
+        };
+        // The full walk's chord count is the divisor, as on the flat path
+        // (`color_along_path`), so a reveal draws the gradient on.
+        let span = self.samples3d.saturating_sub(1).max(1) as f32;
+        let n = self.points3d.len();
+        let chords = if self.closed3d {
+            n
+        } else {
+            n.saturating_sub(1)
+        };
+
+        let mut instances = std::mem::take(&mut self.instances3d);
+        instances.clear();
+        for k in 0..chords {
+            let (Some(&pa), Some(&pb)) = (self.points3d.get(k), self.points3d.get((k + 1) % n))
+            else {
+                continue;
+            };
+            let Some((a, b)) = frame.view.clip_near(pa, pb) else {
+                continue;
+            };
+            if frame.view.outside(a, b, frame.margin) {
+                continue;
+            }
+            instances.push(Segment3dInstance {
+                a,
+                b,
+                color: ramp.at(&self.palette, k as f32 / span),
+                width,
+                alpha: 1.0,
+            });
+        }
+        self.lines3d.draw_3d(
+            queue,
+            encoder,
+            view,
+            &frame.uniform,
+            self.glow,
+            self.softness,
+            &instances,
+        );
+        self.instances3d = instances;
+    }
 }
 
 /// Colour each chord by **how far along the traced path it sits** (ADR-0059's
@@ -453,6 +635,16 @@ pub const PARAMS: &[ParamSpec] = &[
         main: false,
     },
     ParamSpec {
+        name: "tube",
+        default: 0.4,
+        range: Some([0.05, 0.9]),
+        doc: "How far a knot's strand winds out from the torus's core circle, as a fraction of \
+               that circle's radius.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
+    },
+    ParamSpec {
         name: "samples",
         default: 361.0,
         range: Some([16.0, 2048.0]),
@@ -482,20 +674,73 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
     crate::render::scenes::lines::GLOW,
     crate::render::scenes::lines::SOFTNESS,
-    crate::render::scenes::lines::STROKE_BLEND,
+    STROKE_BLEND,
     crate::render::scenes::lines::DRAW_PROGRESS,
     crate::render::scenes::common::zoom(DEFAULT_ZOOM),
     crate::render::scenes::common::PAN_X,
     crate::render::scenes::common::PAN_Y,
-    crate::render::scenes::lines::MIRROR_ORDER,
-    crate::render::scenes::lines::MIRROR_REFLECT,
+    MIRROR_ORDER,
+    MIRROR_REFLECT,
+    YAW,
+    PITCH,
+    DISTANCE,
+    FOV,
+    FOCUS,
+    APERTURE,
 ];
+
+// The shared specs whose reading depends on the family, re-declared with a doc
+// line of this system's own. The editor schema keys a family row by the whole
+// declaration, so one shared with another system would print this system's
+// families on that system's hover. Default, range and kind stay the shared
+// block's, so only the wording can differ.
+const STROKE_BLEND: ParamSpec = ParamSpec {
+    doc: "Moves a flat figure's stroke from additive light toward opaque paint, so crossings \
+          stop brightening.",
+    ..crate::render::scenes::lines::STROKE_BLEND
+};
+const MIRROR_ORDER: ParamSpec = ParamSpec {
+    doc: "Repeats a flat figure this many times around the centre; 1 draws it once.",
+    ..crate::render::scenes::lines::MIRROR_ORDER
+};
+const MIRROR_REFLECT: ParamSpec = ParamSpec {
+    doc: "Alternates a flat figure's repeats into mirror images rather than plain rotations.",
+    ..crate::render::scenes::lines::MIRROR_REFLECT
+};
+const YAW: ParamSpec = ParamSpec {
+    doc: "Turns the camera around a space curve, in radians; bind it to a slow clock to orbit.",
+    ..camera::YAW
+};
+const PITCH: ParamSpec = ParamSpec {
+    doc: "Raises the camera above a space curve, in radians; negative looks up from below.",
+    ..camera::PITCH
+};
+const DISTANCE: ParamSpec = ParamSpec {
+    doc: "How far the camera sits from a space curve's centre; nearer exaggerates the \
+          perspective.",
+    ..camera::DISTANCE
+};
+const FOV: ParamSpec = ParamSpec {
+    doc: "The camera's vertical field of view onto a space curve, in radians; zoom divides it.",
+    ..camera::FOV
+};
+const FOCUS: ParamSpec = ParamSpec {
+    doc: "Where the focal plane sits in a space curve's depth: 0 at its nearest point, 1 at its \
+          farthest.",
+    ..camera::FOCUS
+};
+const APERTURE: ParamSpec = ParamSpec {
+    doc: "The blur of a space curve's far side, in pixels; strokes nearer than the focal plane \
+          blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
+    ..camera::APERTURE
+};
 
 /// One row of [`FAMILY_PARAMS`], its ranges in [`CurveFamily::ALL`]'s order:
 /// the rose, the Lissajous, the hypotrochoid, the superformula, the
-/// harmonograph. `None` is a family that does not read the parameter.
+/// harmonograph, the torus knot. `None` is a family that does not read the
+/// parameter.
 macro_rules! per_family {
-    ($name:literal: $rose:expr, $lissajous:expr, $hypotrochoid:expr, $superformula:expr, $harmonograph:expr $(,)?) => {
+    ($name:expr; $rose:expr, $lissajous:expr, $hypotrochoid:expr, $superformula:expr, $harmonograph:expr, $torus_knot:expr $(,)?) => {
         FamilyParam {
             name: $name,
             ranges: &[
@@ -519,8 +764,30 @@ macro_rules! per_family {
                     family: "harmonograph",
                     range: $harmonograph,
                 },
+                FamilyRange {
+                    family: "torus_knot",
+                    range: $torus_knot,
+                },
             ],
         }
+    };
+}
+
+/// A row read by the space families only (ADR-0258): the camera block, inert
+/// on every flat family.
+macro_rules! space_only {
+    ($spec:expr) => {
+        per_family!($spec.name; None, None, None, None, None, $spec.range)
+    };
+}
+
+/// A row read by the flat families only: what `seg3d` does not draw (ADR-0258)
+/// — the mirror, the opaque `stroke_blend` path and the in-plane `spin` —
+/// declared with its spec range on every flat family and inert on the space
+/// ones.
+macro_rules! flat_only {
+    ($spec:expr) => {
+        per_family!($spec.name; $spec.range, $spec.range, $spec.range, $spec.range, $spec.range, None)
     };
 }
 
@@ -533,18 +800,33 @@ macro_rules! per_family {
 /// [`ParamSpec::range`] is one of its families' ranges, and the families are
 /// [`CurveFamily::ALL`] by name and in order — both held by this module's tests.
 pub const FAMILY_PARAMS: &[FamilyParam] = &[
-    per_family!("n":
-        Some([1.0, 24.0]), Some([1.0, 12.0]), Some([-8.0, 8.0]), None, Some([1.0, 12.0])),
-    per_family!("d":
-        Some([1.0, 360.0]), Some([1.0, 12.0]), Some([1.0, 24.0]), Some([0.25, 4.0]), Some([1.0, 12.0])),
-    per_family!("phase":
-        Some([0.0, 1.0]), Some([0.0, 1.0]), Some([0.0, 1.0]), None, Some([0.0, 1.0])),
-    per_family!("radial_offset": Some([-1.0, 1.0]), None, None, None, None),
-    per_family!("pen": None, None, Some([0.0, 2.0]), None, None),
-    per_family!("sym": None, None, None, Some([1.0, 24.0]), None),
-    per_family!("sharpness": None, None, None, Some([0.1, 20.0]), None),
-    per_family!("lobe": None, None, None, Some([0.1, 10.0]), None),
-    per_family!("decay": None, None, None, None, Some([0.0, 0.5])),
+    per_family!("n";
+        Some([1.0, 24.0]), Some([1.0, 12.0]), Some([-8.0, 8.0]), None, Some([1.0, 12.0]),
+        Some([1.0, 12.0])),
+    per_family!("d";
+        Some([1.0, 360.0]), Some([1.0, 12.0]), Some([1.0, 24.0]), Some([0.25, 4.0]), Some([1.0, 12.0]),
+        Some([1.0, 12.0])),
+    per_family!("phase";
+        Some([0.0, 1.0]), Some([0.0, 1.0]), Some([0.0, 1.0]), None, Some([0.0, 1.0]), None),
+    per_family!("radial_offset"; Some([-1.0, 1.0]), None, None, None, None, None),
+    per_family!("pen"; None, None, Some([0.0, 2.0]), None, None, None),
+    per_family!("sym"; None, None, None, Some([1.0, 24.0]), None, None),
+    per_family!("sharpness"; None, None, None, Some([0.1, 20.0]), None, None),
+    per_family!("lobe"; None, None, None, Some([0.1, 10.0]), None, None),
+    per_family!("decay"; None, None, None, None, Some([0.0, 0.5]), None),
+    per_family!("tube"; None, None, None, None, None, Some([0.05, 0.9])),
+    per_family!("spin";
+        Some([-2.0, 2.0]), Some([-2.0, 2.0]), Some([-2.0, 2.0]), Some([-2.0, 2.0]),
+        Some([-2.0, 2.0]), None),
+    flat_only!(STROKE_BLEND),
+    flat_only!(MIRROR_ORDER),
+    flat_only!(MIRROR_REFLECT),
+    space_only!(YAW),
+    space_only!(PITCH),
+    space_only!(DISTANCE),
+    space_only!(FOV),
+    space_only!(FOCUS),
+    space_only!(APERTURE),
 ];
 
 impl Scene for ParametricCurveScene {
@@ -582,12 +864,19 @@ impl Scene for ParametricCurveScene {
         self.zoom = DEFAULT_ZOOM;
         self.mirror_order = DEFAULT_MIRROR_ORDER;
         self.mirror_reflect = DEFAULT_MIRROR_REFLECT;
+        self.tube = DEFAULT_TUBE;
+        self.camera.reset();
+    }
+
+    fn set_target_size(&mut self, width: u32, height: u32) {
+        self.target = (width, height);
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
         // The shared param blocks first, this scene's own names after
-        // (`scenes::common`).
-        if self.colour.set(name, value) || self.pan.set(name, value) {
+        // (`scenes::common`, `render::camera`).
+        if self.colour.set(name, value) || self.pan.set(name, value) || self.camera.set(name, value)
+        {
             return;
         }
         match name {
@@ -600,6 +889,7 @@ impl Scene for ParametricCurveScene {
             "sharpness" => self.sharpness = value,
             "lobe" => self.lobe = value,
             "decay" => self.decay = value,
+            "tube" => self.tube = value,
             "samples" => self.samples = value,
             "thickness" => self.thickness = value,
             "hue_spread" => self.hue_spread = value,
@@ -639,6 +929,10 @@ impl Scene for ParametricCurveScene {
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {
+        if let Some(arm) = curves::arm3d(self.family) {
+            self.update_space(arm);
+            return;
+        }
         // Per-frame defensive clamp: a huge `samples` can never overrun the
         // preallocated buffer (ADR-0007 cap is explicit). Unlike the generator
         // scenes' load-time build, `samples` is an expression evaluated every
@@ -648,39 +942,14 @@ impl Scene for ParametricCurveScene {
         let samples = (self.samples.max(0.0) as usize).min(self.max_segments);
         self.spin_phase.step(self.spin, self.dt);
         let rotation = self.spin_phase.get();
-        let ramp = ColorRamp {
-            hue: self.colour.hue,
-            hue_spread: self.hue_spread,
-            palette_mix: self.colour.mix,
-            palette_steps: self.colour.steps,
-            saturation: self.colour.saturation,
-            brightness: self.colour.brightness,
-        };
+        let ramp = self.ramp();
         // The sampler paints the whole web in the walk's starting colour; the
         // pass below walks it along the path. Keeping the sampler colour-agnostic
         // is what leaves the curve maths free of any palette knowledge.
         let color = ramp.at(&self.palette, 0.0);
         let width = super::half_width(self.thickness);
 
-        let params = curves::CurveParams {
-            n: self.n,
-            d: self.d,
-            phase: self.phase,
-            radial_offset: self.radial_offset,
-            samples,
-            scale: self.scale,
-            rotation,
-            draw_progress: self.draw_progress,
-            color,
-            width,
-            levers: curves::Levers {
-                pen: self.pen,
-                sym: self.sym,
-                sharpness: self.sharpness,
-                lobe: self.lobe,
-                decay: self.decay,
-            },
-        };
+        let params = self.curve_params(samples, rotation, color, width);
 
         // Sample the single curve, then replicate it under the geometry mirror.
         // At the default identity spec this is a 1:1 copy, so an un-mirrored
@@ -755,6 +1024,10 @@ impl Scene for ParametricCurveScene {
         view: &wgpu::TextureView,
         aspect: f32,
     ) {
+        if self.family.is_space() {
+            self.render_space(queue, encoder, view, aspect);
+            return;
+        }
         // Segments carry brightness in their colour; `glow` is the renderer's
         // separate per-segment falloff multiplier (Plan 0038 Phase 1).
         let xform = ViewTransform {
@@ -1018,11 +1291,13 @@ mod tests {
                 "sharpness" => l.sharpness = 7.0,
                 "lobe" => l.lobe = 4.0,
                 "decay" => l.decay = 0.3,
+                "tube" => l.tube = 0.7,
                 other => panic!("no lever called `{other}`"),
             }
             l
         };
-        let walk = |family: CurveFamily, levers: curves::Levers| {
+        // A flat walk lifted to `z = 0`, or a space family's own 3D walk.
+        let walk = |family: CurveFamily, levers: curves::Levers| -> Vec<[f32; 3]> {
             let p = curves::CurveParams {
                 n: 3.0,
                 d: 2.0,
@@ -1036,12 +1311,17 @@ mod tests {
                 width: 0.01,
                 levers,
             };
+            if let Some(arm) = curves::arm3d(family) {
+                let mut points = Vec::new();
+                (arm.sample)(&p, &mut points);
+                return points;
+            }
             let (mut points, mut pieces, mut at) = (Vec::new(), Vec::new(), Vec::new());
             curves::fit_walk(family, p, &mut points, &mut pieces, &mut at);
-            points
+            points.iter().map(|&[x, y]| [x, y, 0.0]).collect()
         };
         let mut inert_checked = 0;
-        for name in ["pen", "sym", "sharpness", "lobe", "decay"] {
+        for name in ["pen", "sym", "sharpness", "lobe", "decay", "tube"] {
             let row = FAMILY_PARAMS
                 .iter()
                 .find(|row| row.name == name)
@@ -1064,7 +1344,11 @@ mod tests {
                 }
             }
         }
-        assert_eq!(inert_checked, 5 * 4, "each lever is inert on four families");
+        assert_eq!(
+            inert_checked,
+            6 * (CurveFamily::ALL.len() - 1),
+            "each lever is inert on every family but its own"
+        );
     }
 
     /// `spin` integrates rather than multiplying the clock (ADR-0135), and at a

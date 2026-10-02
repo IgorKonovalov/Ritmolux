@@ -1,0 +1,34 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `torus_knot` space family through the shared camera, from a fixed
+# oblique camera with an open aperture.
+#
+#  - A (2, 3) knot on a slim tube, so the strand reads as one continuous line.
+#  - `spin` bound to 0 and every camera param bound, so neither a change of
+#    default nor the scene clock can move this baseline.
+#  - `focus` at the near side and `aperture` open, so the far side of the knot
+#    takes the widened, blurred stroke and the near side stays sharp.
+system = "parametric_curve"
+name   = "fixture_parametric_torus_knot"
+
+[curve]
+family = "torus_knot"
+
+[params]
+n             = "2"
+d             = "3"
+tube          = "0.35"
+samples       = "480"
+scale         = "0.9"
+spin          = "0"
+thickness     = "2.5"
+hue           = "0.55"
+hue_spread    = "0.6"
+brightness    = "1.0"
+draw_progress = "1"
+yaw           = "0.4"
+pitch         = "0.7"
+distance      = "3.2"
+fov           = "0.9"
+focus         = "0.1"
+aperture      = "8"

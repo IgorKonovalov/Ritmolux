@@ -707,6 +707,22 @@ pub struct TierConfig {
     /// ([`OverflowContext::Blur`](super::scenes::OverflowContext::Blur)).
     /// Measured with [`plexus_points`](Self::plexus_points).
     pub max_coc_px: u32,
+
+    /// The most 3D segments a non-plexus line system draws in a frame: the size
+    /// of the `seg3d` instance buffer each such scene owns (ADR-0258), and so
+    /// the blurred fill it can cost.
+    ///
+    /// One cap shared by every 3D line system but the plexus, whose edge cap
+    /// is its own. A frame asking for more is clamped and announced, never
+    /// silently cut (ADR-0045).
+    ///
+    /// # Where the numbers come from
+    ///
+    /// **Provisional, not yet measured.** Both values are starting points
+    /// sized to the curve families' own `samples` range with room for the
+    /// systems that will share the cap; `Floor`'s is to be measured at the
+    /// worst-case aperture and `max_coc_px`.
+    pub seg3d_segments: u32,
 }
 
 impl TierConfig {
@@ -731,6 +747,7 @@ impl TierConfig {
         plexus_points: 600,
         plexus_edges: 6_000,
         max_coc_px: 12,
+        seg3d_segments: 8_000,
     };
 
     /// The midrange-discrete tier.
@@ -761,6 +778,7 @@ impl TierConfig {
         plexus_points: 1_500,
         plexus_edges: 20_000,
         max_coc_px: 24,
+        seg3d_segments: 20_000,
     };
 
     /// The config for `tier`.

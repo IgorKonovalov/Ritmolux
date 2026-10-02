@@ -1215,3 +1215,121 @@ fn draw_progress_sweeps_the_harmonograph_from_start_to_end() {
         "a full reveal of an open trace draws every sample and both ends"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The space families
+// ---------------------------------------------------------------------------
+
+/// A torus knot at `(p, q)` on a tube of `tube`, unscaled.
+fn knot(p: f32, q: f32, tube: f32) -> CurveParams {
+    CurveParams {
+        n: p,
+        d: q,
+        samples: 400,
+        scale: 1.0,
+        levers: Levers {
+            tube,
+            ..Levers::default()
+        },
+        ..rose()
+    }
+}
+
+/// A space family's walk, through its 3D arm.
+fn walk3d(family: CurveFamily, p: CurveParams) -> (bool, Vec<[f32; 3]>) {
+    let arm = arm3d(family).expect("a space family has a 3D arm");
+    let mut points = Vec::new();
+    let closed = (arm.sample)(&p, &mut points);
+    (closed, points)
+}
+
+/// Plan 0236 Phase 2's done-when: every sampled point of a `(2, 3)` knot lies
+/// `tube` from the torus's core circle — the unit circle in the `xy` plane —
+/// so `1 - tube <= sqrt(x^2 + y^2) <= 1 + tube` on every one. And the walk is
+/// the knot it names: it winds twice round the axis.
+#[test]
+fn a_two_three_knot_lies_on_its_torus() {
+    let tube = 0.35;
+    let (closed, points) = walk3d(CurveFamily::TorusKnot, knot(2.0, 3.0, tube));
+    assert!(closed, "whole windings close over one turn");
+    assert_eq!(
+        points.len(),
+        400,
+        "a closed walk leaves out the repeated start"
+    );
+    for (k, &[x, y, z]) in points.iter().enumerate() {
+        let ring = (x * x + y * y).sqrt();
+        let from_core = ((ring - 1.0).powi(2) + z * z).sqrt();
+        assert!(
+            (from_core - tube).abs() < 1e-5,
+            "sample {k} at {:?} is {from_core} from the core circle, not {tube}",
+            [x, y, z]
+        );
+        assert!(
+            (1.0 - tube - 1e-5..=1.0 + tube + 1e-5).contains(&ring),
+            "sample {k} sits {ring} from the axis, outside 1 +- {tube}"
+        );
+    }
+    // The winding about the axis: the azimuth's unwrapped total over the walk.
+    let mut turned = 0.0f32;
+    for k in 0..points.len() {
+        let (a, b) = (points[k], points[(k + 1) % points.len()]);
+        let step = b[1].atan2(b[0]) - a[1].atan2(a[0]);
+        turned +=
+            (step + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+    }
+    assert!(
+        (turned / std::f32::consts::TAU - 2.0).abs() < 1e-3,
+        "a (2, 3) knot winds twice round the axis, not {}",
+        turned / std::f32::consts::TAU
+    );
+}
+
+/// `n` and `d` are read as whole windings, `scale` sizes the knot, and the
+/// extent the camera focuses across is the whole torus's, whatever the
+/// reveal: a half-drawn knot is the prefix of the whole one, open, and its
+/// focal plane does not move.
+#[test]
+fn a_knot_rounds_its_windings_scales_and_reveals_a_prefix() {
+    let (_, whole) = walk3d(CurveFamily::TorusKnot, knot(2.0, 3.0, 0.3));
+    let (_, rounded) = walk3d(CurveFamily::TorusKnot, knot(2.4, 2.6, 0.3));
+    assert_eq!(whole, rounded, "2.4 and 2.6 round to the (2, 3) knot");
+
+    let scaled = CurveParams {
+        scale: 0.5,
+        ..knot(2.0, 3.0, 0.3)
+    };
+    let (_, small) = walk3d(CurveFamily::TorusKnot, scaled);
+    for (a, b) in whole.iter().zip(&small) {
+        for axis in 0..3 {
+            assert!((a[axis] * 0.5 - b[axis]).abs() < 1e-6);
+        }
+    }
+    let arm = arm3d(CurveFamily::TorusKnot).expect("space arm");
+    assert!(((arm.extent)(&scaled) - 0.5 * 1.3).abs() < 1e-6);
+
+    let half = CurveParams {
+        draw_progress: 0.5,
+        ..knot(2.0, 3.0, 0.3)
+    };
+    let (closed, prefix) = walk3d(CurveFamily::TorusKnot, half);
+    assert!(!closed, "a partial reveal is open");
+    assert_eq!(prefix.len(), 201, "half of 400 chords, plus the start");
+    assert_eq!(prefix[..], whole[..201]);
+    assert_eq!((arm.extent)(&half), (arm.extent)(&knot(2.0, 3.0, 0.3)));
+}
+
+/// Every flat family has no 3D arm and every space family has one, so the
+/// scene's one branch on [`arm3d`] is [`CurveFamily::is_space`].
+#[test]
+fn the_space_arms_are_exactly_the_space_families() {
+    for family in CurveFamily::ALL {
+        assert_eq!(
+            arm3d(family).is_some(),
+            family.is_space(),
+            "{}",
+            family.as_str()
+        );
+    }
+    assert!(CurveFamily::ALL.iter().any(|f| f.is_space()));
+}

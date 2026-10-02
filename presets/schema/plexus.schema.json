@@ -31,10 +31,10 @@
         "drift": { "$ref": "#/definitions/param.drift.plexus" },
         "wave": { "$ref": "#/definitions/param.wave" },
         "wave_scale": { "$ref": "#/definitions/param.wave_scale" },
-        "yaw": { "$ref": "#/definitions/param.yaw" },
-        "pitch": { "$ref": "#/definitions/param.pitch" },
-        "distance": { "$ref": "#/definitions/param.distance" },
-        "fov": { "$ref": "#/definitions/param.fov" },
+        "yaw": { "$ref": "#/definitions/param.yaw.plexus" },
+        "pitch": { "$ref": "#/definitions/param.pitch.plexus" },
+        "distance": { "$ref": "#/definitions/param.distance.plexus" },
+        "fov": { "$ref": "#/definitions/param.fov.plexus" },
         "focus": { "$ref": "#/definitions/param.focus.plexus" },
         "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
         "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
@@ -319,7 +319,7 @@
       "properties": {
         "family": {
           "type": "string",
-          "enum": ["maurer_rose", "lissajous", "hypotrochoid", "superformula", "harmonograph"],
+          "enum": ["maurer_rose", "lissajous", "hypotrochoid", "superformula", "harmonograph", "torus_knot"],
           "description": "The curve family. Required."
         }
       }
@@ -810,22 +810,22 @@
       "description": "How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop.",
       "markdownDescription": "How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop.\n\n- default `1.0`\n- typical range depends on the family: `sheet` `0.3` to `3.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cloud` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.yaw": {
+    "param.yaw.plexus": {
       "type": "string",
       "description": "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.",
       "markdownDescription": "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.\n\n- default `0.0`\n- typical range `-3.1415927` to `3.1415927` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.pitch": {
+    "param.pitch.plexus": {
       "type": "string",
       "description": "Raises the camera above the scene's volume, in radians; negative looks up from below.",
       "markdownDescription": "Raises the camera above the scene's volume, in radians; negative looks up from below.\n\n- default `0.25`\n- typical range `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.distance": {
+    "param.distance.plexus": {
       "type": "string",
       "description": "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.",
       "markdownDescription": "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.\n\n- default `3.5`\n- typical range `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.fov": {
+    "param.fov.plexus": {
       "type": "string",
       "description": "The camera's vertical field of view in radians; zoom divides it.",
       "markdownDescription": "The camera's vertical field of view in radians; zoom divides it.\n\n- default `0.8`\n- typical range `0.2` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."

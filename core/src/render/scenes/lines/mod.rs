@@ -293,18 +293,31 @@ pub enum CurveFamily {
     /// amplitude dies away by `decay` along the trace, so it spirals inward
     /// rather than closing.
     Harmonograph,
+    /// A **space curve** (ADR-0258): the `(p, q)` torus knot, winding `p` times
+    /// round the torus's axis and `q` times through its hole, on a tube of
+    /// radius `tube`. Drawn through the shared camera, not the 2D stroke.
+    TorusKnot,
 }
 
 impl CurveFamily {
     /// Every family, in roster order — the closed set, and the list the schema
     /// export renders rather than restating.
-    pub const ALL: [CurveFamily; 5] = [
+    pub const ALL: [CurveFamily; 6] = [
         CurveFamily::MaurerRose,
         CurveFamily::Lissajous,
         CurveFamily::Hypotrochoid,
         CurveFamily::Superformula,
         CurveFamily::Harmonograph,
+        CurveFamily::TorusKnot,
     ];
+
+    /// Whether this family is a **space curve**, sampled in 3D and drawn
+    /// through the shared camera's `seg3d` pipeline rather than the 2D stroke
+    /// (ADR-0258). On one, the biarc fit, the mirror, `stroke_blend` and the
+    /// in-plane rotation are unavailable.
+    pub fn is_space(self) -> bool {
+        matches!(self, CurveFamily::TorusKnot)
+    }
 
     /// Parse a `[curve] family` name, or `None` if unknown.
     pub fn from_name(name: &str) -> Option<Self> {
@@ -314,6 +327,7 @@ impl CurveFamily {
             "hypotrochoid" => CurveFamily::Hypotrochoid,
             "superformula" => CurveFamily::Superformula,
             "harmonograph" => CurveFamily::Harmonograph,
+            "torus_knot" => CurveFamily::TorusKnot,
             _ => return None,
         })
     }
@@ -327,6 +341,7 @@ impl CurveFamily {
             CurveFamily::Hypotrochoid => "hypotrochoid",
             CurveFamily::Superformula => "superformula",
             CurveFamily::Harmonograph => "harmonograph",
+            CurveFamily::TorusKnot => "torus_knot",
         }
     }
 }

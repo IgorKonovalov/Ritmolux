@@ -59,6 +59,7 @@ mod preset;
 mod preset_schema;
 mod saturation;
 mod seed;
+mod space_curve;
 mod spectrum;
 mod tempo_probe;
 mod tier_switch;

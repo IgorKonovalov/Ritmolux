@@ -185,8 +185,8 @@ pub(crate) struct FamilyArm3d {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The camera becomes a shared block | dev | done | committed with this row |
-| 2 — Walking skeleton: a torus knot in perspective | dev | not started | |
+| 1 — The camera becomes a shared block | dev | done | 5ad3413c |
+| 2 — Walking skeleton: a torus knot in perspective | dev | done | committed with this row |
 | 3 — `lissajous_3d`, and the family table | dev | not started | |
 | 4 — The `seg3d_segments` cap, measured, and the goldens | dev | not started | |
 | 5 — Documentation and the references | dev | not started | |
@@ -200,6 +200,25 @@ pub(crate) struct FamilyArm3d {
   by the same switch, and differs in the same five doc strings.
 - Phase 1's goldens were read on llvmpipe, where the plexus baselines were blessed: `plexus` and
   `plexus_sheet` both read mean 0.0000, outlier 0. WARP was not run.
+- Phase 2 declares `spin` inert on the space family, since the curve has no `rotation` param and
+  `spin` is what drives its in-plane rotation.
+- Phase 2: `every_family_row_declaration_belongs_to_one_roster` refuses a family row on a
+  `ParamSpec` that another system also declares. So `parametric_curve` re-declares the six camera
+  specs, `stroke_blend`, `mirror_order` and `mirror_reflect` with a doc line of its own and the
+  shared block's default, range and kind (`..camera::YAW`). The camera's wording on this system
+  therefore differs from plexus's.
+- Phase 2 widens `per_family!` to six families already, because the family table test requires
+  every row to list every family in `CurveFamily::ALL`. It also regenerates `presets/README.md`,
+  `presets/schema/`, `presets/preset.schema.json` and `docs/specs/player-schema.json`, because the
+  generated-file tests fail otherwise. It does not touch `core/src/preset/schema/load.rs`.
+- Phase 2: `curves::arm` gives `torus_knot` an empty flat walk, and the scene branches on `arm3d`
+  before reaching it.
+- Phase 2's `shot` check was run by hand: `cargo run -p standalone --example shot --
+  --preset-file core/tests/fixtures/parametric_torus_knot.toml --frames 30 --size 640x360` drew a
+  trefoil. `space_curve::an_open_aperture_strokes_the_far_side_wider_than_the_focal_side` read
+  2 px near and 1 px far through a pinhole, and 7 px near and 20 px far at an aperture of 12, on
+  llvmpipe. The golden readings, `parametric_curve` included, were identical to Phase 1's on
+  llvmpipe.
 
 ### Close triggers
 

@@ -295,6 +295,7 @@
             "sharpness": { "$ref": "#/definitions/param.sharpness" },
             "lobe": { "$ref": "#/definitions/param.lobe" },
             "decay": { "$ref": "#/definitions/param.decay.parametric_curve" },
+            "tube": { "$ref": "#/definitions/param.tube" },
             "samples": { "$ref": "#/definitions/param.samples" },
             "thickness": { "$ref": "#/definitions/param.thickness.parametric_curve" },
             "hue": { "$ref": "#/definitions/param.hue.parametric_curve" },
@@ -308,13 +309,19 @@
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "glow": { "$ref": "#/definitions/param.glow.parametric_curve" },
             "softness": { "$ref": "#/definitions/param.softness" },
-            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend" },
+            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend.parametric_curve" },
             "draw_progress": { "$ref": "#/definitions/param.draw_progress" },
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
-            "mirror_order": { "$ref": "#/definitions/param.mirror_order" },
-            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect" },
+            "mirror_order": { "$ref": "#/definitions/param.mirror_order.parametric_curve" },
+            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect.parametric_curve" },
+            "yaw": { "$ref": "#/definitions/param.yaw.parametric_curve" },
+            "pitch": { "$ref": "#/definitions/param.pitch.parametric_curve" },
+            "distance": { "$ref": "#/definitions/param.distance.parametric_curve" },
+            "fov": { "$ref": "#/definitions/param.fov.parametric_curve" },
+            "focus": { "$ref": "#/definitions/param.focus.parametric_curve" },
+            "aperture": { "$ref": "#/definitions/param.aperture.parametric_curve" },
             "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
             "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
             "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
@@ -389,9 +396,9 @@
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
-            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend" },
-            "mirror_order": { "$ref": "#/definitions/param.mirror_order" },
-            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect" },
+            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend.lsystem" },
+            "mirror_order": { "$ref": "#/definitions/param.mirror_order.lsystem" },
+            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect.lsystem" },
             "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
             "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
             "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
@@ -463,12 +470,12 @@
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "glow": { "$ref": "#/definitions/param.glow.parametric_curve" },
             "softness": { "$ref": "#/definitions/param.softness" },
-            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend" },
+            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend.lsystem" },
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
-            "mirror_order": { "$ref": "#/definitions/param.mirror_order" },
-            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect" },
+            "mirror_order": { "$ref": "#/definitions/param.mirror_order.lsystem" },
+            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect.lsystem" },
             "ring_phase": { "$ref": "#/definitions/param.ring_phase" },
             "ring_spread": { "$ref": "#/definitions/param.ring_spread" },
             "ring_scale": { "$ref": "#/definitions/param.ring_scale" },
@@ -714,12 +721,12 @@
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "glow": { "$ref": "#/definitions/param.glow.parametric_curve" },
             "softness": { "$ref": "#/definitions/param.softness" },
-            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend" },
+            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend.lsystem" },
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
-            "mirror_order": { "$ref": "#/definitions/param.mirror_order" },
-            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect" },
+            "mirror_order": { "$ref": "#/definitions/param.mirror_order.lsystem" },
+            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect.lsystem" },
             "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
             "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
             "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
@@ -1299,10 +1306,10 @@
             "drift": { "$ref": "#/definitions/param.drift.plexus" },
             "wave": { "$ref": "#/definitions/param.wave" },
             "wave_scale": { "$ref": "#/definitions/param.wave_scale" },
-            "yaw": { "$ref": "#/definitions/param.yaw" },
-            "pitch": { "$ref": "#/definitions/param.pitch" },
-            "distance": { "$ref": "#/definitions/param.distance" },
-            "fov": { "$ref": "#/definitions/param.fov" },
+            "yaw": { "$ref": "#/definitions/param.yaw.plexus" },
+            "pitch": { "$ref": "#/definitions/param.pitch.plexus" },
+            "distance": { "$ref": "#/definitions/param.distance.plexus" },
+            "fov": { "$ref": "#/definitions/param.fov.plexus" },
             "focus": { "$ref": "#/definitions/param.focus.plexus" },
             "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
@@ -1440,6 +1447,7 @@
             "sharpness": { "$ref": "#/definitions/param.sharpness" },
             "lobe": { "$ref": "#/definitions/param.lobe" },
             "decay": { "$ref": "#/definitions/param.decay.parametric_curve" },
+            "tube": { "$ref": "#/definitions/param.tube" },
             "samples": { "$ref": "#/definitions/param.samples" },
             "thickness": { "$ref": "#/definitions/param.thickness.parametric_curve" },
             "hue": { "$ref": "#/definitions/param.hue.parametric_curve" },
@@ -1453,13 +1461,19 @@
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "glow": { "$ref": "#/definitions/param.glow.parametric_curve" },
             "softness": { "$ref": "#/definitions/param.softness" },
-            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend" },
+            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend.parametric_curve" },
             "draw_progress": { "$ref": "#/definitions/param.draw_progress" },
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
-            "mirror_order": { "$ref": "#/definitions/param.mirror_order" },
-            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect" }
+            "mirror_order": { "$ref": "#/definitions/param.mirror_order.parametric_curve" },
+            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect.parametric_curve" },
+            "yaw": { "$ref": "#/definitions/param.yaw.parametric_curve" },
+            "pitch": { "$ref": "#/definitions/param.pitch.parametric_curve" },
+            "distance": { "$ref": "#/definitions/param.distance.parametric_curve" },
+            "fov": { "$ref": "#/definitions/param.fov.parametric_curve" },
+            "focus": { "$ref": "#/definitions/param.focus.parametric_curve" },
+            "aperture": { "$ref": "#/definitions/param.aperture.parametric_curve" }
           } } } } } }
     },
     {
@@ -1485,9 +1499,9 @@
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
-            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend" },
-            "mirror_order": { "$ref": "#/definitions/param.mirror_order" },
-            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect" }
+            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend.lsystem" },
+            "mirror_order": { "$ref": "#/definitions/param.mirror_order.lsystem" },
+            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect.lsystem" }
           } } } } } }
     },
     {
@@ -1510,12 +1524,12 @@
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "glow": { "$ref": "#/definitions/param.glow.parametric_curve" },
             "softness": { "$ref": "#/definitions/param.softness" },
-            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend" },
+            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend.lsystem" },
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
-            "mirror_order": { "$ref": "#/definitions/param.mirror_order" },
-            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect" },
+            "mirror_order": { "$ref": "#/definitions/param.mirror_order.lsystem" },
+            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect.lsystem" },
             "ring_phase": { "$ref": "#/definitions/param.ring_phase" },
             "ring_spread": { "$ref": "#/definitions/param.ring_spread" },
             "ring_scale": { "$ref": "#/definitions/param.ring_scale" }
@@ -1621,12 +1635,12 @@
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "glow": { "$ref": "#/definitions/param.glow.parametric_curve" },
             "softness": { "$ref": "#/definitions/param.softness" },
-            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend" },
+            "stroke_blend": { "$ref": "#/definitions/param.stroke_blend.lsystem" },
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
-            "mirror_order": { "$ref": "#/definitions/param.mirror_order" },
-            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect" }
+            "mirror_order": { "$ref": "#/definitions/param.mirror_order.lsystem" },
+            "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect.lsystem" }
           } } } } } }
     },
     {
@@ -1863,10 +1877,10 @@
             "drift": { "$ref": "#/definitions/param.drift.plexus" },
             "wave": { "$ref": "#/definitions/param.wave" },
             "wave_scale": { "$ref": "#/definitions/param.wave_scale" },
-            "yaw": { "$ref": "#/definitions/param.yaw" },
-            "pitch": { "$ref": "#/definitions/param.pitch" },
-            "distance": { "$ref": "#/definitions/param.distance" },
-            "fov": { "$ref": "#/definitions/param.fov" },
+            "yaw": { "$ref": "#/definitions/param.yaw.plexus" },
+            "pitch": { "$ref": "#/definitions/param.pitch.plexus" },
+            "distance": { "$ref": "#/definitions/param.distance.plexus" },
+            "fov": { "$ref": "#/definitions/param.fov.plexus" },
             "focus": { "$ref": "#/definitions/param.focus.plexus" },
             "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
@@ -2007,7 +2021,7 @@
       "properties": {
         "family": {
           "type": "string",
-          "enum": ["maurer_rose", "lissajous", "hypotrochoid", "superformula", "harmonograph"],
+          "enum": ["maurer_rose", "lissajous", "hypotrochoid", "superformula", "harmonograph", "torus_knot"],
           "description": "The curve family. Required."
         }
       }
@@ -2606,47 +2620,52 @@
     "param.n": {
       "type": "string",
       "description": "The figure's first number, read as a real value per family: the rose's petal number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed radius ratio.",
-      "markdownDescription": "The figure's first number, read as a real value per family: the rose's petal number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed radius ratio.\n\n- default `6.0`\n- typical range depends on the family: `maurer_rose` `1.0` to `24.0`, `lissajous` `1.0` to `12.0`, `hypotrochoid` `-8.0` to `8.0`, `harmonograph` `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `superformula` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The figure's first number, read as a real value per family: the rose's petal number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed radius ratio.\n\n- default `6.0`\n- typical range depends on the family: `maurer_rose` `1.0` to `24.0`, `lissajous` `1.0` to `12.0`, `hypotrochoid` `-8.0` to `8.0`, `harmonograph` `1.0` to `12.0`, `torus_knot` `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `superformula` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.d.parametric_curve": {
       "type": "string",
       "description": "The figure's second number, per family: the rose's sampling step in degrees, the Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the superformula's lobe skew.",
-      "markdownDescription": "The figure's second number, per family: the rose's sampling step in degrees, the Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the superformula's lobe skew.\n\n- default `71.0`\n- typical range depends on the family: `maurer_rose` `1.0` to `360.0`, `lissajous` `1.0` to `12.0`, `hypotrochoid` `1.0` to `24.0`, `superformula` `0.25` to `4.0`, `harmonograph` `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The figure's second number, per family: the rose's sampling step in degrees, the Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the superformula's lobe skew.\n\n- default `71.0`\n- typical range depends on the family: `maurer_rose` `1.0` to `360.0`, `lissajous` `1.0` to `12.0`, `hypotrochoid` `1.0` to `24.0`, `superformula` `0.25` to `4.0`, `harmonograph` `1.0` to `12.0`, `torus_knot` `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.phase": {
       "type": "string",
       "description": "Offsets where the figure starts: inside the rose's sine, between the Lissajous and harmonograph axes, and at the hypotrochoid's pen.",
-      "markdownDescription": "Offsets where the figure starts: inside the rose's sine, between the Lissajous and harmonograph axes, and at the hypotrochoid's pen.\n\n- default `0.0`\n- typical range depends on the family: `maurer_rose` `0.0` to `1.0`, `lissajous` `0.0` to `1.0`, `hypotrochoid` `0.0` to `1.0`, `harmonograph` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `superformula` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Offsets where the figure starts: inside the rose's sine, between the Lissajous and harmonograph axes, and at the hypotrochoid's pen.\n\n- default `0.0`\n- typical range depends on the family: `maurer_rose` `0.0` to `1.0`, `lissajous` `0.0` to `1.0`, `hypotrochoid` `0.0` to `1.0`, `harmonograph` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `superformula`, `torus_knot` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.radial_offset": {
       "type": "string",
       "description": "Pushes every point out from the centre, opening the figure into a ring.",
-      "markdownDescription": "Pushes every point out from the centre, opening the figure into a ring.\n\n- default `0.0`\n- typical range depends on the family: `maurer_rose` `-1.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Pushes every point out from the centre, opening the figure into a ring.\n\n- default `0.0`\n- typical range depends on the family: `maurer_rose` `-1.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `lissajous`, `hypotrochoid`, `superformula`, `harmonograph`, `torus_knot` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.pen": {
       "type": "string",
       "description": "How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops.",
-      "markdownDescription": "How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops.\n\n- default `1.0`\n- typical range depends on the family: `hypotrochoid` `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops.\n\n- default `1.0`\n- typical range depends on the family: `hypotrochoid` `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `superformula`, `harmonograph`, `torus_knot` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.sym": {
       "type": "string",
       "description": "How many lobes the figure repeats around its centre, as a whole number.",
-      "markdownDescription": "How many lobes the figure repeats around its centre, as a whole number.\n\n- default `5.0`\n- typical range depends on the family: `superformula` `1.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How many lobes the figure repeats around its centre, as a whole number.\n\n- default `5.0`\n- typical range depends on the family: `superformula` `1.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph`, `torus_knot` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.sharpness": {
       "type": "string",
       "description": "How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle.",
-      "markdownDescription": "How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle.\n\n- default `1.0`\n- typical range depends on the family: `superformula` `0.1` to `20.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle.\n\n- default `1.0`\n- typical range depends on the family: `superformula` `0.1` to `20.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph`, `torus_knot` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.lobe": {
       "type": "string",
       "description": "How the lobes swell between their tips: low pinches them thin, high fills them into a polygon.",
-      "markdownDescription": "How the lobes swell between their tips: low pinches them thin, high fills them into a polygon.\n\n- default `1.0`\n- typical range depends on the family: `superformula` `0.1` to `10.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How the lobes swell between their tips: low pinches them thin, high fills them into a polygon.\n\n- default `1.0`\n- typical range depends on the family: `superformula` `0.1` to `10.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph`, `torus_knot` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.decay.parametric_curve": {
       "type": "string",
       "description": "How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward.",
-      "markdownDescription": "How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward.\n\n- default `0.1`\n- typical range depends on the family: `harmonograph` `0.0` to `0.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward.\n\n- default `0.1`\n- typical range depends on the family: `harmonograph` `0.0` to `0.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `torus_knot` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.tube": {
+      "type": "string",
+      "description": "How far a knot's strand winds out from the torus's core circle, as a fraction of that circle's radius.",
+      "markdownDescription": "How far a knot's strand winds out from the torus's core circle, as a fraction of that circle's radius.\n\n- default `0.4`\n- typical range depends on the family: `torus_knot` `0.05` to `0.9` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.samples": {
       "type": "string",
@@ -2671,7 +2690,7 @@
     "param.spin.parametric_curve": {
       "type": "string",
       "description": "Turns per second the whole figure rotates by.",
-      "markdownDescription": "Turns per second the whole figure rotates by.\n\n- default `0.1`\n- typical range `-2.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Turns per second the whole figure rotates by.\n\n- default `0.1`\n- typical range depends on the family: `maurer_rose` `-2.0` to `2.0`, `lissajous` `-2.0` to `2.0`, `hypotrochoid` `-2.0` to `2.0`, `superformula` `-2.0` to `2.0`, `harmonograph` `-2.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `torus_knot` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.scale.parametric_curve": {
       "type": "string",
@@ -2693,25 +2712,55 @@
       "description": "How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core.",
       "markdownDescription": "How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core.\n\n- default `0.25`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.stroke_blend": {
+    "param.stroke_blend.parametric_curve": {
       "type": "string",
-      "description": "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.",
-      "markdownDescription": "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Moves a flat figure's stroke from additive light toward opaque paint, so crossings stop brightening.",
+      "markdownDescription": "Moves a flat figure's stroke from additive light toward opaque paint, so crossings stop brightening.\n\n- default `0.0`\n- typical range depends on the family: `maurer_rose` `0.0` to `1.0`, `lissajous` `0.0` to `1.0`, `hypotrochoid` `0.0` to `1.0`, `superformula` `0.0` to `1.0`, `harmonograph` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `torus_knot` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.draw_progress": {
       "type": "string",
       "description": "How much of the figure is drawn, from its start; below 1 the line is still arriving.",
       "markdownDescription": "How much of the figure is drawn, from its start; below 1 the line is still arriving.\n\n- default `1.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.mirror_order": {
+    "param.mirror_order.parametric_curve": {
       "type": "string",
-      "description": "Repeats the geometry this many times around the centre; 1 draws it once.",
-      "markdownDescription": "Repeats the geometry this many times around the centre; 1 draws it once.\n\n- default `1.0`\n- typical range `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "description": "Repeats a flat figure this many times around the centre; 1 draws it once.",
+      "markdownDescription": "Repeats a flat figure this many times around the centre; 1 draws it once.\n\n- default `1.0`\n- typical range depends on the family: `maurer_rose` `1.0` to `12.0`, `lissajous` `1.0` to `12.0`, `hypotrochoid` `1.0` to `12.0`, `superformula` `1.0` to `12.0`, `harmonograph` `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `torus_knot` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
-    "param.mirror_reflect": {
+    "param.mirror_reflect.parametric_curve": {
       "type": "string",
-      "description": "Alternates the repeats into mirror images rather than plain rotations.",
-      "markdownDescription": "Alternates the repeats into mirror images rather than plain rotations.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Alternates a flat figure's repeats into mirror images rather than plain rotations.",
+      "markdownDescription": "Alternates a flat figure's repeats into mirror images rather than plain rotations.\n\n- default `0.0`\n- typical range depends on the family: `maurer_rose` `0.0` to `1.0`, `lissajous` `0.0` to `1.0`, `hypotrochoid` `0.0` to `1.0`, `superformula` `0.0` to `1.0`, `harmonograph` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `torus_knot` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.yaw.parametric_curve": {
+      "type": "string",
+      "description": "Turns the camera around a space curve, in radians; bind it to a slow clock to orbit.",
+      "markdownDescription": "Turns the camera around a space curve, in radians; bind it to a slow clock to orbit.\n\n- default `0.0`\n- typical range depends on the family: `torus_knot` `-3.1415927` to `3.1415927` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.pitch.parametric_curve": {
+      "type": "string",
+      "description": "Raises the camera above a space curve, in radians; negative looks up from below.",
+      "markdownDescription": "Raises the camera above a space curve, in radians; negative looks up from below.\n\n- default `0.25`\n- typical range depends on the family: `torus_knot` `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.distance.parametric_curve": {
+      "type": "string",
+      "description": "How far the camera sits from a space curve's centre; nearer exaggerates the perspective.",
+      "markdownDescription": "How far the camera sits from a space curve's centre; nearer exaggerates the perspective.\n\n- default `3.5`\n- typical range depends on the family: `torus_knot` `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.fov.parametric_curve": {
+      "type": "string",
+      "description": "The camera's vertical field of view onto a space curve, in radians; zoom divides it.",
+      "markdownDescription": "The camera's vertical field of view onto a space curve, in radians; zoom divides it.\n\n- default `0.8`\n- typical range depends on the family: `torus_knot` `0.2` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.focus.parametric_curve": {
+      "type": "string",
+      "description": "Where the focal plane sits in a space curve's depth: 0 at its nearest point, 1 at its farthest.",
+      "markdownDescription": "Where the focal plane sits in a space curve's depth: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range depends on the family: `torus_knot` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.aperture.parametric_curve": {
+      "type": "string",
+      "description": "The blur of a space curve's far side, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
+      "markdownDescription": "The blur of a space curve's far side, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.\n\n- default `0.0`\n- typical range depends on the family: `torus_knot` `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.visible_depth": {
       "type": "string",
@@ -2737,6 +2786,21 @@
       "type": "string",
       "description": "Size of the figure within the frame, before the shared zoom is applied.",
       "markdownDescription": "Size of the figure within the frame, before the shared zoom is applied.\n\n- default `1.0`\n- typical range `0.1` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.stroke_blend.lsystem": {
+      "type": "string",
+      "description": "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.",
+      "markdownDescription": "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.mirror_order.lsystem": {
+      "type": "string",
+      "description": "Repeats the geometry this many times around the centre; 1 draws it once.",
+      "markdownDescription": "Repeats the geometry this many times around the centre; 1 draws it once.\n\n- default `1.0`\n- typical range `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.mirror_reflect.lsystem": {
+      "type": "string",
+      "description": "Alternates the repeats into mirror images rather than plain rotations.",
+      "markdownDescription": "Alternates the repeats into mirror images rather than plain rotations.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.variant": {
       "type": "string",
@@ -3578,22 +3642,22 @@
       "description": "How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop.",
       "markdownDescription": "How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop.\n\n- default `1.0`\n- typical range depends on the family: `sheet` `0.3` to `3.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cloud` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.yaw": {
+    "param.yaw.plexus": {
       "type": "string",
       "description": "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.",
       "markdownDescription": "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.\n\n- default `0.0`\n- typical range `-3.1415927` to `3.1415927` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.pitch": {
+    "param.pitch.plexus": {
       "type": "string",
       "description": "Raises the camera above the scene's volume, in radians; negative looks up from below.",
       "markdownDescription": "Raises the camera above the scene's volume, in radians; negative looks up from below.\n\n- default `0.25`\n- typical range `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.distance": {
+    "param.distance.plexus": {
       "type": "string",
       "description": "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.",
       "markdownDescription": "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.\n\n- default `3.5`\n- typical range `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.fov": {
+    "param.fov.plexus": {
       "type": "string",
       "description": "The camera's vertical field of view in radians; zoom divides it.",
       "markdownDescription": "The camera's vertical field of view in radians; zoom divides it.\n\n- default `0.8`\n- typical range `0.2` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."

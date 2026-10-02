@@ -1283,6 +1283,10 @@ fn create(
         SystemKind::ParametricCurve => Box::new(lines::ParametricCurveScene::new(
             line_renderer(),
             tier.max_segments,
+            device,
+            surface_format,
+            tier.seg3d_segments as usize,
+            tier.max_coc_px as f32,
         )),
         SystemKind::LSystem => {
             Box::new(lines::LSystemScene::new(line_renderer(), tier.max_segments))

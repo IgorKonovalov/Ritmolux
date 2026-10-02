@@ -323,7 +323,7 @@
       "properties": {
         "family": {
           "type": "string",
-          "enum": ["maurer_rose", "lissajous", "hypotrochoid", "superformula", "harmonograph"],
+          "enum": ["maurer_rose", "lissajous", "hypotrochoid", "superformula", "harmonograph", "torus_knot"],
           "description": "The curve family. Required."
         }
       }

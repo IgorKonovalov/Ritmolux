@@ -112,6 +112,8 @@ pub struct Levers {
     /// Harmonograph: the pendulums' damping, per radian of `t` — the
     /// amplitude at `t` is `exp(-decay * t)`.
     pub decay: f32,
+    /// Torus knot: the tube's radius, as a fraction of the core circle's.
+    pub tube: f32,
 }
 
 impl Default for Levers {
@@ -125,6 +127,7 @@ impl Default for Levers {
             sharpness: default_of(PARAMS, "sharpness"),
             lobe: default_of(PARAMS, "lobe"),
             decay: default_of(PARAMS, "decay"),
+            tube: default_of(PARAMS, "tube"),
         }
     }
 }
@@ -343,7 +346,134 @@ pub(crate) fn arm(family: CurveFamily) -> FamilyArm {
             },
             polyline: polyline_of,
         },
+        // A space family has no flat walk: the scene draws it through
+        // [`arm3d`] and never reaches here. The empty walk is what a stray call
+        // gets, so it draws nothing rather than a flattened knot.
+        CurveFamily::TorusKnot => FamilyArm {
+            sample: |_, points| {
+                points.clear();
+                false
+            },
+            fits: |_, _| true,
+            polyline: polyline_of,
+        },
     }
+}
+
+/// What one **space** family contributes to `parametric_curve` (ADR-0258): a
+/// walk in 3D and the radius of the volume it lies in. There is no fit verdict
+/// and no polyline choice: a space curve is always drawn as its dense polyline
+/// through the camera's `seg3d` pipeline, which has no arc primitive.
+#[derive(Clone, Copy)]
+pub(crate) struct FamilyArm3d {
+    /// Fill `points` (cleared first) with the walk in world units, and say
+    /// whether it **closes**, as [`FamilyArm::sample`] does. A closed walk
+    /// leaves the repeated start out.
+    pub sample: fn(&CurveParams, &mut Vec<[f32; 3]>) -> bool,
+    /// The bounding radius of the whole figure about the origin, in world
+    /// units — what `focus` is normalized across. A property of the figure,
+    /// not of the revealed prefix, so a `draw_progress` reveal does not move
+    /// the focal plane.
+    pub extent: fn(&CurveParams) -> f32,
+}
+
+/// The 3D arm `family` draws through, or `None` for a flat family.
+pub(crate) fn arm3d(family: CurveFamily) -> Option<FamilyArm3d> {
+    match family {
+        CurveFamily::TorusKnot => Some(FamilyArm3d {
+            sample: |p, points| {
+                let knot = Knot::of(p);
+                periodic_walk_3d(p, std::f32::consts::TAU, |t| knot.point(t), points)
+            },
+            extent: |p| (1.0 + Knot::of(p).tube) * finite_or_zero(p.scale).abs(),
+        }),
+        CurveFamily::MaurerRose
+        | CurveFamily::Lissajous
+        | CurveFamily::Hypotrochoid
+        | CurveFamily::Superformula
+        | CurveFamily::Harmonograph => None,
+    }
+}
+
+/// The largest winding a torus knot honours on either axis — a ceiling on the
+/// walk, not on the figure: past it the strands are finer than any `samples`
+/// resolves.
+const MAX_WINDING: f32 = 64.0;
+
+/// The largest tube a torus knot honours, as a fraction of the core radius.
+/// At `1` the tube reaches the axis and the strands meet in its middle.
+const MAX_TUBE: f32 = 0.95;
+
+/// The `(p, q)` torus knot, resolved once from the parameters: `p` and `q`
+/// from `n` and `d`, rounded to whole windings, and the tube from `tube`.
+#[derive(Clone, Copy)]
+struct Knot {
+    /// Turns round the torus's axis, a whole number in `1..=MAX_WINDING`.
+    p: f32,
+    /// Turns through the torus's hole, a whole number in `1..=MAX_WINDING`.
+    q: f32,
+    /// The tube's radius, the core circle's being `1`.
+    tube: f32,
+}
+
+impl Knot {
+    fn of(p: &CurveParams) -> Self {
+        let winding = |v: f32| finite_or_zero(v).round().clamp(1.0, MAX_WINDING);
+        Self {
+            p: winding(p.n),
+            q: winding(p.d),
+            tube: finite_or_zero(p.levers.tube).clamp(0.0, MAX_TUBE),
+        }
+    }
+
+    /// The knot at `t` in `[0, TAU)`: a point on the core circle of radius `1`
+    /// in the `xy` plane, at angle `p t`, offset by `tube` along the tube's own
+    /// circle at angle `q t` — so every point lies exactly `tube` from the core
+    /// circle. Whole `p` and `q` close over one `TAU`.
+    fn point(self, t: f32) -> [f32; 3] {
+        let (sp, cp) = (self.p * t).sin_cos();
+        let (sq, cq) = (self.q * t).sin_cos();
+        let ring = 1.0 + self.tube * cq;
+        [ring * cp, ring * sp, self.tube * sq]
+    }
+}
+
+/// [`periodic_walk`] in 3D: `samples` equal steps of `t` over `[0, period]`,
+/// of which a `draw_progress` reveal takes the first `drawn`, scaled by
+/// `scale` and closed by the same rule. There is no rotation: a space curve
+/// turns by the camera's `yaw`, not in the screen's plane.
+fn periodic_walk_3d(
+    p: &CurveParams,
+    period: f32,
+    point: impl Fn(f32) -> [f32; 3],
+    points: &mut Vec<[f32; 3]>,
+) -> bool {
+    points.clear();
+    if p.samples == 0 {
+        return false;
+    }
+    let scale = finite_or_zero(p.scale);
+    let place = |t: f32| {
+        let [x, y, z] = point(t);
+        [x * scale, y * scale, z * scale]
+    };
+    let drawn = drawn(p);
+    let step = period / p.samples as f32;
+    for k in 0..=drawn {
+        points.push(place(step * k as f32));
+    }
+    let returns =
+        |a: Option<&[f32; 3]>, b: [f32; 3]| a.is_some_and(|&a| dist3(a, b) <= CLOSE_TOLERANCE);
+    let closes = drawn == p.samples
+        && points.len() > 3
+        && points
+            .last()
+            .is_some_and(|&end| returns(points.first(), end))
+        && returns(points.get(1), place(step * (p.samples + 1) as f32));
+    if closes {
+        points.pop();
+    }
+    closes
 }
 
 /// A fitted walk's outcome: whether the arc chain was built, and whether the
@@ -734,6 +864,11 @@ fn finite_or_zero(v: f32) -> f32 {
 fn dist(a: [f32; 2], b: [f32; 2]) -> f32 {
     let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
     (dx * dx + dy * dy).sqrt()
+}
+
+fn dist3(a: [f32; 3], b: [f32; 3]) -> f32 {
+    let (dx, dy, dz) = (b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    (dx * dx + dy * dy + dz * dz).sqrt()
 }
 
 #[cfg(test)]
