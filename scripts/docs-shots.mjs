@@ -402,6 +402,16 @@ const IMAGES = [
     size: "1280x720",
     tier: "rich",
   })),
+  // The one space family the guide pictures: a trefoil through the shared
+  // camera, its far loops softened by an open aperture.
+  {
+    out: "docs/images/curves/torus_knot.png",
+    presetFile: "docs/examples/curves/torus_knot.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
 
   // --- the analytic field's families beyond the plate ----------------------
   //

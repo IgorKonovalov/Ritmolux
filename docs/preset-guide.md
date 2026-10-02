@@ -123,9 +123,9 @@ itself, not just its colour and scale.
 
 **Reach for this when** you want precise line art whose geometry is the reaction.
 
-The picture above is the **Maurer rose**, one of five **curve families** a `[curve] family` line
-picks between. The other four are below, each rendered from a small teaching preset — the file under
-the picture is the whole recipe. What `n`, `d` and `phase` mean on each family, and which levers
+The picture above is the **Maurer rose**, one of seven **curve families** a `[curve] family` line
+picks between: five flat ones and two that live in space. Five more are below, each rendered from a
+small teaching preset — the file under the picture is the whole recipe. What `n`, `d` and `phase` mean on each family, and which levers
 belong to which, is the [`[curve]` table](presets.md#the-curve-table) in the grammar reference.
 
 ![A 3:2 Lissajous figure: one closed looping line crossing itself seven times, shading from orange
@@ -160,6 +160,18 @@ several turns, green on the outside shading to pink at the centre](images/curves
 Two damped pendulums: a Lissajous figure whose swing dies away along the trace, so it spirals inward
 rather than closing. It is the family that best rewards `draw_progress`, which draws the trace on
 from the outside in.
+
+![A trefoil knot seen from above at an angle: one closed strand looping three times through itself,
+orange shading through yellow and green to teal and magenta, its near loops sharp and its far loops
+softly blurred, on black](images/curves/torus_knot.png)
+
+*`family = "torus_knot"` — [`docs/examples/curves/torus_knot.toml`](examples/curves/torus_knot.toml)*
+
+A strand wound round a doughnut, drawn in three dimensions and seen through a camera. `yaw`,
+`pitch` and `distance` place that camera, so a slow clock on `yaw` orbits the knot, and `focus` with
+`aperture` blur the strand away from a focal plane. Its sibling `lissajous_3d` adds a depth axis to
+the Lissajous figure. `mirror_order`, `mirror_reflect`, `spin` and `stroke_blend` belong to the flat
+families and do nothing on these two.
 
 ### `lsystem`
 

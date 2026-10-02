@@ -201,7 +201,7 @@ that table is maintained alongside the presets and is the authoritative list.
 |-------------|---------------|
 | `fragment_field` | A fullscreen domain-warped light field (fragment shader). |
 | `swarm` | ~10k CPU-simulated particles on an evolving flow field. |
-| `parametric_curve` | A sampled line curve from one of five families — the Maurer rose, Lissajous, hypotrochoid, superformula or harmonograph ([below](#the-curve-table)). |
+| `parametric_curve` | A sampled line curve from one of seven families — the Maurer rose, Lissajous, hypotrochoid, superformula or harmonograph in the plane, or a torus knot or 3D Lissajous figure in space ([below](#the-curve-table)). |
 | `lsystem` | An L-system turtle figure, precomputed per depth. |
 | `star_pattern` | A Hankin star pattern over a regular tiling. |
 | `reaction_diffusion` | A Gray-Scott reaction-diffusion field. |
@@ -293,17 +293,17 @@ A `parametric_curve` preset picks its figure with one line:
 system = "parametric_curve"
 
 [curve]
-family = "superformula"   # one of the five below; any other name is a load error
+family = "superformula"   # one of the seven below; any other name is a load error
 ```
 
 `family` is read once, at load, and is **not bindable** — the params animate the
 figure, they do not choose it. A preset with no `[curve]` table draws the Maurer
 rose.
 
-The five families share one parameter surface, following
+The seven families share one parameter surface, following
 [ADR-0180](adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md):
-**`n`, `d` and `phase` mean something different on each**, and five further levers
-are read by one family only and do nothing on the rest.
+**`n`, `d` and `phase` mean something different on each**, and the levers in the last column
+are each read by one family only and do nothing on the rest.
 
 | `family` | The figure | `n` | `d` | `phase` | Its own levers |
 |---|---|---|---|---|---|
@@ -312,6 +312,8 @@ are read by one family only and do nothing on the rest.
 | `hypotrochoid` | a circle rolling inside the fixed one (outside, for a negative `n`), traced by a pen | signed radius ratio: positive rolls inside, negative draws the epicycloid | cusps walked | where the pen starts on the rolling circle, as a fraction of a turn | `pen` |
 | `superformula` | Gielis' `r = (\|cos(m θ/4)\|^n2 + \|sin(m θ/4)\|^n3)^(-1/n1)` | inert | skew between the lobe exponents, `n3 = lobe * d` | inert | `sym` (`m`), `sharpness` (`n1`), `lobe` (`n2`) |
 | `harmonograph` | the Lissajous figure damped by `exp(-decay t)` over four turns, spiralling inward | x frequency | y frequency | offset between the axes, as a fraction of a turn | `decay` |
+| `torus_knot` | a strand wound round a torus, in space | whole turns round the torus's axis | whole turns through its hole | inert | `tube` |
+| `lissajous_3d` | `x = sin(n t + phase)`, `y = sin(d t)`, `z = sin(m t + phase_z)`, in space | x frequency | y frequency | offset between x and y, as a fraction of a turn | `m`, `phase_z` |
 
 Three things about the table are worth saying out loud:
 
@@ -325,6 +327,17 @@ Three things about the table are worth saying out loud:
 - **The four new families are drawn as smooth arcs, not chords.** The rose keeps its chord web at a
   large step. The harmonograph falls back to chords only when a hard `decay` has collapsed its inner
   turns below what the fit can resolve.
+
+**The two space families are seen through a camera.** `torus_knot` and `lissajous_3d` are drawn in
+three dimensions through the shared camera the `plexus` system also uses
+([ADR-0258](adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md)):
+`yaw`, `pitch`, `distance` and `fov` place it, and `focus` with `aperture` blur the strand away from
+the focal plane. Those six do nothing on the flat families. The flat
+families' `mirror_order`, `mirror_reflect`, `spin` and `stroke_blend` do nothing on the space
+families in turn: a space curve is one figure with no rotation of its own, so a slow clock on `yaw`
+is what turns it. **`aperture` costs fill**, since every blurred stroke is wider, and the tier caps
+both the blur and how many points a space curve is drawn from; a `samples` past that cap is clamped
+and the app says so. A `lissajous_3d` with `m` and `phase_z` both at `0` lies flat.
 
 The range that reads for each of these parameters **on each family** is printed in the
 `parametric_curve` table of [`presets/README.md`](../presets/README.md), which also marks every

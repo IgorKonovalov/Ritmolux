@@ -1,0 +1,26 @@
+# The `torus_knot` space family, for the illustrated guide's picture of it.
+# Teaching material, not a shipped preset: every number is a constant except
+# the ones that make the figure breathe, so the picture shows the family.
+# The camera sits above the knot's plane with the focal plane near the front,
+# so the far loops take the open aperture's blur.
+system = "parametric_curve"
+name = "Trefoil knot"
+
+[curve]
+family = "torus_knot"
+
+[params]
+n          = "2"
+d          = "3"
+tube       = "0.45"
+samples    = "720"
+spin       = "0"
+thickness  = "4"
+hue        = "0.55"
+hue_spread = "0.5"
+yaw        = "time * 0.05"
+pitch      = "0.5"
+distance   = "3.0"
+fov        = "0.9"
+focus      = "0.2"
+aperture   = "10 + clamp(bass * 2, 0, 2)"

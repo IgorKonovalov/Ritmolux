@@ -64,8 +64,8 @@ life comes through the bindings. Draws **opaquely**, so `bg_*` has no visible ef
 
 ## `parametric_curve` — line curves
 *Precise, geometric, hypnotic.* `[curve]` is optional; inside it `family` is required and names
-one of five: `maurer_rose` (the default when the table is absent), `lissajous`, `hypotrochoid`,
-`superformula`, `harmonograph`. The outside-rolling epitrochoid is the same family as
+one of seven: `maurer_rose` (the default when the table is absent), `lissajous`, `hypotrochoid`,
+`superformula`, `harmonograph`, and the two space families `torus_knot` and `lissajous_3d`. The outside-rolling epitrochoid is the same family as
 `hypotrochoid` with a **negative `n`** — the sign picks which circle rolls.
 
 **`n` and `d` mean something different in every family**, and so do `pen`, `sym`, `sharpness`,
@@ -90,6 +90,25 @@ from a copy here, which is how this section went stale in the first place. The r
 | `scale` | `0.9` | `0.6 – 1.0` | size in frame. |
 | `brightness` | `1.0` | `0.8 – 1.6` | multiplier. |
 | `draw_progress` | `1.0` | `0 – 1` | line-draw-on reveal; ride `bar` for a per-beat redraw. |
+
+**The space families, `torus_knot` and `lissajous_3d`**, draw one figure in 3D through the shared
+camera (ADR-0258), the same block and the same 0-nearest `focus` scale as `plexus` below. **No
+preset ships yet**: the ranges come from `docs/examples/curves/torus_knot.toml` and the golden
+fixtures, so treat them as a starting point and sweep. `mirror_order`, `mirror_reflect`, `spin` and
+`stroke_blend` are inert on both, so a slow clock on `yaw` is what turns the figure; the six camera
+params are inert on the flat families.
+
+| Param | Typical | Controls / natural driver |
+|-------|---------|---------------------------|
+| `n` / `d` (knot) | `2 / 3`, `2 / 5`, `3 / 4` | Whole turns round the axis and through the hole. Small coprime pairs read as one clean knot. |
+| `tube` (knot) | `0.3 – 0.5` | How far the strand winds out from the core circle. Thin reads as a ring with a wobble, fat as a tangle. |
+| `m` / `phase_z` (3D Lissajous) | `1 – 4` / `0.25` | The depth axis's frequency and offset. `m = 0` with `phase_z = 0` lays the figure flat. |
+| `yaw` | `time * 0.03 – 0.06` | A slow orbit. Faster reads as a spinning object rather than a sculpture. |
+| `pitch` / `distance` | `0.4 – 0.8` / `2.8 – 3.5` | Height and range of the camera. Under about `2.5` the near loops leave the frame. |
+| `focus` | `0.1 – 0.3` | Near the front, so the far loops take the blur and the near strand stays crisp. |
+| `aperture` | `8 – 12` px | **The far side's blur, and it costs fill**: every blurred stroke is wider. At `12` or under it draws as written on every tier, and only an `aperture` past the tier's cap is announced. |
+| `thickness` | `2.5 – 4` | Pixels at the focal plane; the blurred far side spreads this width thinner. |
+| `samples` | `480 – 720` | Smooth at these counts; the tier's `seg3d_segments` cap clamps a space curve's points and says so. |
 
 ## `lsystem` — branching L-system growth
 *Organic, botanical, growing.* `[generator]` **required** (axiom / rules / `angle_deg` /

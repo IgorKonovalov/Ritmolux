@@ -188,8 +188,8 @@ pub(crate) struct FamilyArm3d {
 | 1 — The camera becomes a shared block | dev | done | 5ad3413c |
 | 2 — Walking skeleton: a torus knot in perspective | dev | done | 389984de |
 | 3 — `lissajous_3d`, and the family table | dev | done | 6869feed |
-| 4 — The `seg3d_segments` cap, measured, and the goldens | dev | done | committed with this row |
-| 5 — Documentation and the references | dev | not started | |
+| 4 — The `seg3d_segments` cap, measured, and the goldens | dev | done | 0e43b736 |
+| 5 — Documentation and the references | dev | done | committed with this row |
 | 6 — The look, judged | human | not started | |
 
 ### Notes
@@ -244,15 +244,30 @@ pub(crate) struct FamilyArm3d {
 - Phase 4's `lissajous_3d` fixture, rendered through `shot` at 640x360 on RADV, shows bright dots
   at chord joints along its blurred stretch, where additive chords overlap.
 
+- Phase 5 was done by an interactive session at the owner's request, after the conductor parked the
+  plan `claude_dir` on `.claude/skills/preset-author/references/systems.md`. Its regeneration step
+  changed nothing: Phases 2 and 3 had already regenerated `presets/README.md`, `presets/schema/` and
+  `.taplo.toml`, and both generated-file tests pass on them as committed.
+- Phase 5 touched two files outside its list. The knot picture is rendered from a new teaching preset,
+  `docs/examples/curves/torus_knot.toml`, as the four flat families' pictures are, and
+  `scripts/docs-shots.mjs` gains its manifest entry. The picture was rendered on RADV with that
+  entry's exact `shot` command. No `lissajous_3d` picture was added; the plan asks for one knot.
+- Phase 5's `systems.md` ranges come from the teaching preset and the golden fixtures, because no
+  space-curve preset ships yet. The section says so.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** generated files only: `presets/README.md`, `presets/schema/*.schema.json`
+  and `presets/preset.schema.json`, regenerated in Phases 1-3. No preset added or removed.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature: two space curve families, `torus_knot` and `lissajous_3d`, and the
+  camera as a shared param block.
+- **Operator docs touched:** `docs/presets.md`, `docs/preset-guide.md` (one new picture),
+  `presets/README.md` (generated), `.claude/skills/preset-author/references/systems.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 55 reductions across 27 live
+  entries (3 unprobeable).
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** Phase 6, the look judged.
 
 ## Followups (after this lands)
 
