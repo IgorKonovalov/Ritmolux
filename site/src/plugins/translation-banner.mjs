@@ -21,7 +21,8 @@ import path from 'node:path';
  * A SPLIT TRANSLATION CARRIES ITS STAMP ON ITS FIRST PAGE ONLY. A `.ru.md` past
  * the splitter's threshold is rendered as one page per section (ADR-0166), and
  * every page but the index opens with a section heading, not the stamp. Such a
- * page is recognised by the stamp on line 1 of the file on disk: it passes, and
+ * page is recognised by the stamp on line 1 of a file on disk past that
+ * threshold: it passes, and
  * carries no notice, which the document's index page already shows.
  *
  * WHAT THIS DELIBERATELY DOES NOT DO: fail a build because a translation has
@@ -50,10 +51,24 @@ const SUFFIX = '.ru.md';
 /** Line 1 of a translation. The same rule `scripts/check-translations.mjs` gates. */
 const STAMP = /^<!--\s*translated-from:\s*([0-9a-f]{7,40})\s*-->\s*$/;
 
-/** The stamp on line 1 of the file at `filePath`, or null: what a split document's later pages share. */
-const fileStamp = memo((filePath) => {
+/**
+ * `DOCUMENT_SPLIT_BYTES` in `split-document.mjs`, restated because that module
+ * imports `github-slugger` and this one is loaded by
+ * `scripts/check-translations.mjs --self-test` where no site dependency is
+ * installed. The two must stay equal.
+ */
+const SPLIT_BYTES = 40_000;
+
+/**
+ * The stamp on line 1 of the file at `filePath` when that file is large enough
+ * to split, or null. A file under the threshold renders as one page whose tree
+ * must carry the stamp itself, so it never earns the split pages' exemption.
+ */
+const splitStamp = memo((filePath) => {
   try {
-    return STAMP.exec(readFileSync(filePath, 'utf8').split(/\r?\n/, 1)[0].trim());
+    const text = readFileSync(filePath, 'utf8');
+    if (Buffer.byteLength(text, 'utf8') <= SPLIT_BYTES) return null;
+    return STAMP.exec(text.split(/\r?\n/, 1)[0].trim());
   } catch {
     return null;
   }
@@ -124,7 +139,7 @@ export function translationBanner() {
 
     const first = tree.children[0];
     const match = first?.type === 'html' ? STAMP.exec(first.value.trim()) : null;
-    if (match === null && fileStamp(file.path) !== null) return;
+    if (match === null && splitStamp(file.path) !== null) return;
     if (match === null) {
       throw new Error(
         `translation-banner: ${file.path} does not open with a ` +
