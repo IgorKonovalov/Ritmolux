@@ -2,7 +2,7 @@
 
 > **Status:** accepted 2026-10-02 (Plan 0236)
 > **Date:** 2026-10-01
-> **Related plan(s):** [0236](../plans/done/0236-space-curves-and-the-camera-becomes-a-shared-block.md), [0237](../plans/0237-the-l-system-turtle-turns-in-space.md), [0238](../plans/0238-the-waterfall-system.md), [0239](../plans/0239-the-swarm-moves-into-a-real-camera.md), [0240](../plans/0240-the-attractor-projects-through-the-shared-camera.md)
+> **Related plan(s):** [0236](../plans/done/0236-space-curves-and-the-camera-becomes-a-shared-block.md), [0237](../plans/0237-the-l-system-turtle-turns-in-space.md), [0238](../plans/done/0238-the-waterfall-system.md), [0239](../plans/0239-the-swarm-moves-into-a-real-camera.md), [0240](../plans/0240-the-attractor-projects-through-the-shared-camera.md)
 
 ## Context
 

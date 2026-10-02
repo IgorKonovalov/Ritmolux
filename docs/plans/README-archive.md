@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0238 - The waterfall system](#0238---the-waterfall-system)
   - [0247 - The studio renders a neural clip](#0247---the-studio-renders-a-neural-clip)
   - [0236 - Space curves, and the camera becomes a shared block](#0236---space-curves-and-the-camera-becomes-a-shared-block)
   - [0244 - Sessions start lighter](#0244---sessions-start-lighter)
@@ -285,6 +286,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0212 - The diffused render gains a timeline](done/0212-the-diffused-render-gains-a-timeline.md) - closed 2026-09-28. Review: **two rounds; one major (fixed), five minors (four fixed).** Version: **0.152.0**. ADR-0236 accepted. Closes 0126. [Write-up](README-archive.md).
 - [0211 - The diffused frame's resolution is measured before it is designed](done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) - closed 2026-09-27. Review: **no blockers, no majors, three minors (two fixed).** Version: none. Closes 0125; filed 0262. [Write-up](README-archive.md).
 - [0208 - The conductor's safety claims get their evidence](done/0208-the-conductors-safety-claims-get-their-evidence.md) - closed 2026-09-27. Review: **three rounds; 3 majors (fixed), one minor, one nit (fixed).** Version: none. ADR-0233 accepted, Outcome. Closed 0236, 0237, 0241. [Write-up](README-archive.md).
 - [0209 - A system joins the instruments by existing](done/0209-a-system-joins-the-instruments-by-existing.md) - closed 2026-09-26. Review: **no blockers, no majors, three minors (two fixed), one nit (fixed).** Version: none. ADR-0234 accepted. Closes 0258. [Write-up](README-archive.md).
@@ -488,6 +490,24 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0238 - The waterfall system](done/0238-the-waterfall-system.md)
+
+- closed 2026-10-02 by a conductor close on the lane `plan-0238-the-waterfall-system`. The phases
+landed in `76976a1e` (Phase 1), `89aa720d` (2) and `6e9b371f` (3). **Phase 4, the owner judging the
+look live, is owed** (`Blocks merge: no`, ADR-0249). The round 1 review found **no blockers, no
+majors, two minors**. The implementation log that outweighed the phases was tightened at the close in
+`de7e2f38`; the sanity gate that renders no waterfall frame is test code and stays open. Version:
+**0.163.0** (minor: a feature). ADR-0258 was already accepted by Plan 0236. The close closes no
+backlog entry. Upstream CI read green. The full review is the plan's own `## Close review`.
+- **What landed.** A new `SystemKind::Waterfall`: the eased spectrum pushed into a preallocated ring
+  every `row_period` seconds and drawn as receding rows through a scene-owned `seg3d` renderer and
+  the shared camera block, with the scroll continuous at any display rate. `spectrum` and
+  `waterfall` share one `shape_and_ease` step. An over-cap `rows` is clamped and announced through
+  `OverflowContext::Rows`.
+- **Open.** `core/tests/sanity.rs` holds a guessed coverage floor for the waterfall and renders no
+  waterfall frame until a preset ships. The two goldens' first WARP reading is the Windows golden job
+  after the push.
 
 ### [0247 - The studio renders a neural clip](done/0247-the-studio-renders-a-neural-clip.md)
 

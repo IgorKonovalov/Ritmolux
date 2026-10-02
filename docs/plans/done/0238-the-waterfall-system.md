@@ -1,9 +1,11 @@
 # 0238 — The waterfall system
 
-> **Status:** in-progress (2026-10-02). Runs after Plan 0236 closes.
+> **Status:** done - Phase 4 owed, ADR-0249 (closed 2026-10-02). Phases 1-3 landed in `76976a1e`,
+> `89aa720d` and `6e9b371f`; the round 1 close review found no blockers, no majors and two minors,
+> one repaired at the close. Released as 0.163.0.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0040](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md), [ADR-0019](../adrs/0019-eased-parameters.md)
+> **Related ADRs:** [ADR-0258](../../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (accepted), [ADR-0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0040](../../adrs/0040-spectrum-level-curve-applies-before-the-easing.md), [ADR-0019](../../adrs/0019-eased-parameters.md)
 
 ## TL;DR
 
@@ -259,6 +261,148 @@ struct Ring {
   entries (3 unprobeable), on the lane before it merges `main`.
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
 - **Outstanding `human` phases:** Phase 4, the look judged.
+
+## Close review
+
+Closed 2026-10-02 by a conductor close, round 1, at version 0.163.0 (minor: a feature). **Phase 4
+is owed** (`Blocks merge: no`, ADR-0249): nobody has yet judged live, at 60 Hz and at the display's
+native rate, whether the scroll reads as time passing, whether the far rows' softness reads as
+distance, or whether the frame rate holds; no `preset-author` brief exists until it is.
+
+Close notes: upstream CI read green (run 36987647540 on `main` at `cf90687`). Backlog probes exit 0,
+60 reductions across 30 live entries, 4 unprobeable. The translation advisory names no stale row.
+Curation: `presets/` was touched by generated files only and no preset header cites this plan, so
+the set needs nothing. ADR-0258 was already accepted by Plan 0236. No earlier round raised a finding.
+Minor 2 was repaired in `de7e2f38`; minor 1 is test code and stays open.
+
+The round 1 review, in full:
+
+### Plan 0238 — The waterfall system: close review, round 1
+
+Graded at tip `03d5ea6e6d166a865aadca7a4686b4df215e5e80` on `plan-0238-the-waterfall-system`
+(lane `/home/igor/Work/rlx-plan-0238`, `main` already merged in at `74b05ea8`).
+
+**Verdict: Plan 0238 landed cleanly; no blockers, no majors, two minor items.** Phases 1-3 are built
+as the plan describes, and Phase 4 (`human`, `Blocks merge: no`) is correctly `owed` (ADR-0249).
+
+#### Evidence run in this session
+
+- **Full suite**: `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 84dc2a6 is green in the suite ledger, run by
+  gate 0238-pre-review-after-repair-1 at 2026-10-02T09:36:18.170Z: 1955 tests run: 1955 passed
+  (8 slow), 8 skipped`. That ledger record is lens 1's full-suite evidence (ADR-0207). The log's
+  `Full suite:` bullet defers to that gate, which is correct in conductor mode.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: green.
+- `cargo fmt --all -- --check`: clean. `cargo clippy --workspace --all-targets -- -D warnings`: clean.
+- Phase 3's done-when checks, each run alone: `node scripts/toc.mjs --check` OK (7 blocks, current);
+  `node scripts/check-doc-links.mjs` OK; `node scripts/check-reader-prose.mjs` OK (0 bare citations);
+  `node scripts/check-system-counts.mjs` OK. The schema and param-reference tests are in the green
+  suite above.
+- `node scripts/check-comment-hygiene.mjs` OK. `node scripts/check-backlog-claims.mjs` exit 0,
+  60 reductions across 30 live entries, 4 unprobeable.
+
+#### Lens 1 — alignment with the plan
+
+- **Owner tags**: every phase carries one in-vocabulary `**Owner skill:**`; Phase 4's
+  `**Blocks merge:** no` sits on a `human` phase whose output no later phase reads.
+- **Phase 1.** `shape_and_ease` (`core/src/render/scenes/lines/spectrum.rs:375`) is
+  `easing.step(held, curve_level(raw, curve), dt)`, the exact expression `spectrum`'s `update` computed
+  before, so `spectrum` is unchanged in arithmetic; no file under `core/tests/golden/spectrum*` or the
+  spectrum fixtures appears in `git diff main...HEAD`. `SystemKind::Waterfall`, its `TABLE` row,
+  `RawWaterfall` (validation of `elements` 2..=64, `rows` 2..=1024, `row_period` 0.01..=2 s, NaN
+  refused by `contains`) and the scene are present. The ring is allocated only in
+  `Landscape::resize`, reached from `configure`; `step` and `render` do not allocate (the instance
+  `Vec` is taken and returned). The hot-path pragma is on `waterfall.rs:40`, and
+  `hygiene.rs` now asserts the scan reaches `lines/waterfall.rs`.
+  The 60/144 Hz done-when is `the_same_input_at_60_and_144_hz_leaves_the_same_rows`
+  (`waterfall.rs:733`): it asserts four rows pushed at both rates, each band within 1e-4, that the
+  rows differ (non-vacuity), that `frac` is 0.8 (so the offset compared is not a trivial zero), and
+  that the depth offsets agree within `row_spacing * 1e-3` — the done-when's own tolerance. The
+  choice of `row_period = 5/12` s and windowed input is argued in the log and is sound: a period that
+  is not a whole number of frames at both rates samples different instants, which no implementation
+  can make equal.
+- **Phase 2.** `rows_clamp` (`waterfall.rs:446`) holds rows to `cap / (elements - 1)` and returns a
+  `CapOverflow` with the new `OverflowContext::Rows(asked, per_row)`; `suite/waterfall.rs` asserts the
+  notice reaches the renderer with the asked count, the cap, the dropped segments, the kept rows and
+  the `--tier rich` remedy, and that rows at the cap announce nothing. The new context was an
+  unlisted edit to `scenes/mod.rs`, recorded in the log. `the_same_frames_give_the_same_ring_after_600_frames`
+  compares two runs bit for bit (there is no RNG in the system, so "same seed" reduces to purity).
+  The ramped golden (`golden.rs`, `the_waterfall_holds_a_ramped_ring`) scales
+  `fixed_frame_spectrum()` by a per-frame ramp, and 60 frames at 1/60 s outlast the fixture's 23
+  pushes at 0.04 s, so the ring is full and its rows differ. The animation branch finding is pinned
+  by `the_waterfall_passes_on_the_driven_branch_once_its_ring_is_full`, which asserts both readings,
+  and follows `spectrum`'s precedent as the plan asked. The cost probe's figures (1.19x and 1.54x,
+  0.82 ms and 1.41 ms blurred against NFR section 1's 16.67 ms) are in the log with the adapter named;
+  the ladder stopped before rung 1, so `tier.rs` changed in its doc comment only.
+- **Phase 3.** `docs/presets.md` carries the `[waterfall]` table and the system-table row;
+  `docs/preset-guide.md` the picture (the Phase 1 gallery image, as the log says);
+  `docs/on-device-validation.md` the two checks; `systems.md` the `## waterfall` section with
+  `row_period`, `rows` and `aperture` ranges; the generated files are current (suite green).
+- **Unplanned surface**, all logged: `curve`, `zoom`, `pan_x`, `pan_y`, a `[waterfall] smoothing` key,
+  and the teaching preset plus gallery image `hygiene::every_system_has_a_gallery_image` requires.
+  Each is the minimum the shared helpers or an existing gate need; none widens a seam.
+
+#### Lens 2 — layering, coupling, real-time safety
+
+No audio-source or platform type in `core/`; no raw GPU call outside the wgpu layer (the scene draws
+through `LineRenderer::new_3d`). No C ABI change, no control-protocol change. `kind_info` answers
+`shares_line_renderer = false` for the waterfall, with a comment saying why.
+
+#### Lens 3 — docs and bookkeeping owed by the close
+
+- Plan → `Status: done - Phase 4 owed, ADR-0249`, `git mv` to `done/`, link repair, plans index.
+- ADR-0258 is `proposed`; the close flips it to `accepted` and refreshes `docs/adrs/README.md`.
+- **Version bump owed: minor** (a feature plan: a new system).
+- `presets/` touched by generated files only; no preset added, so no curation sweep beyond a one-line
+  verdict.
+- Operator docs swept as listed in the close triggers; `docs/configuration.md` is untouched
+  correctly, since the plan adds no flag, env var or config key.
+
+#### Lens 4 — correctness and determinism
+
+- The aspect is the render target's (`render`'s `aspect` argument, `waterfall.rs:550`), and the
+  circle-of-confusion uses `self.target`; no aspect derived from a grid.
+- The scroll is continuous at both ends of the ring: at a push, the new row 0 enters at depth 0 with
+  `alpha = frac = 0` on top of the live row, the old row 0 becomes row 1 at the same depth, and the
+  oldest row of a full ring leaves at `alpha = 1 - frac` → 0. The transition from filling to full is
+  also seamless (the row that becomes the oldest keeps `alpha = 1` across the push).
+- The segment count is bounded by construction: `rows * (elements - 1) <= seg3d_cap`, and the
+  `instances.len() >= seg3d_cap` guard is a second stop.
+- Numeric assertions are properties (bit equality, exact counts, tolerances from the plan's own
+  wording); the 0.0000 / 0.3883 animation readings are printed, not asserted as frozen numbers.
+
+#### Lens 5 — design integrity
+
+A new `SystemKind` under ADR-0180 rule 1 rather than a `spectrum` layout, as decided. Adding it
+touched the registry's match arms and nothing in the engine's core logic. `spectrum` and `waterfall`
+share one easing step rather than two copies.
+
+#### Findings
+
+##### Minor
+
+1. **The sanity gate never draws a waterfall frame.** `core/tests/sanity.rs:536` sets the
+   waterfall's coverage floor to `0.02`, and the comment says it is a guess. `draws_a_real_shape`
+   sweeps only the shipped library, which holds no waterfall preset, so nothing in `sanity.rs`
+   renders the system. Phase 2's done-when asks that the sanity suite "pass with the system in [its]
+   roster". The suite does pass, but it does so without looking. Reactivity met the same gap with a
+   fixture test (`the_waterfall_fixture_reacts_to_at_least_one_band`), and sanity has no
+   counterpart. The floor's 2.2x slack check will force a re-derivation when the first preset ships,
+   so this is not a latent wrong answer; it is a gate that is idle for now. **Fix:** add a sanity
+   reading of `core/tests/fixtures/waterfall.toml` against `coverage_floor(SystemKind::Waterfall)`,
+   shaped like the reactivity fixture test, or record the gap in the backlog against the first
+   preset. **Open** at the close: test code.
+2. **The implementation log outweighs the contract.** Measured from the headings, `## Implementation
+   log` is 7,818 bytes and `## Implementation phases` is 5,979. The notes are accurate and useful,
+   but the review rule caps the report at the contract's size. **Fix (close-repairable, Markdown
+   prose):** tighten the Phase 1 and Phase 2 notes. For example, fold the four "touched files outside
+   its list" notes into one list, and drop the parts of the cost-probe and golden-provenance prose
+   that restate the plan. **Fixed** in `de7e2f38` (the log is now about 4,400 bytes).
+
+No blockers, no majors, no nits.
+
+Correction at the close: lens 3's "ADR-0258 is `proposed`" was stale; Plan 0236's close had already
+accepted it, so this close changed only the plan header's status note and the ADR's link to this plan.
 
 ## Followups (after this lands)
 

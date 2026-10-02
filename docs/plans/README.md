@@ -46,7 +46,6 @@ place. The plan file carries the real link.
 | [0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) | The rig session measures the wave modes and judges the fourth gate | approved | human, dev | 0202's Phases 4-7. Not queued until the owner has the Windows rig; commit Phase 1's eight rows on main, then queue. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0237](0237-the-l-system-turtle-turns-in-space.md) | The L-system turtle turns in space, and can grow without end | approved | dev, human | ADR-0258. After 0236. `turtle = "space"` and `growth = "endless"` (a streamed vine the camera follows), both opt-in; shipped L-systems keep their bytes. |
-| [0238](0238-the-waterfall-system.md) | The waterfall system | approved | dev, human | ADR-0258, ADR-0180 rule 1: a new `SystemKind`, spectrum history as a receding landscape. After 0236. |
 | [0239](0239-the-swarm-moves-into-a-real-camera.md) | The swarm moves into a real camera | approved | dev, human | ADR-0259 (proposed) supersedes 0044's depth model. After 0236. Every swarm preset changes look; Phase 6 (owner's judgement) blocks the merge. |
 | [0240](0240-the-attractor-projects-through-the-shared-camera.md) | The attractor projects through the shared camera | approved | dev, human | ADR-0260 (proposed): `perspective` retires, presets migrate by exact mapping, re-curation owed after merge. After 0236. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
@@ -1041,6 +1040,7 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 [Closed earlier (index bullets)](README-archive.md#closed-earlier-index-bullets).
 
 <!-- roster:begin cap=320 -->
+- [0238 - The waterfall system](done/0238-the-waterfall-system.md) - closed 2026-10-02, Phase 4 owed. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.163.0**. [Write-up](README-archive.md).
 - [0247 - The studio renders a neural clip](done/0247-the-studio-renders-a-neural-clip.md) - closed 2026-10-02, Phase 6 owed. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.162.0**. ADR-0262 accepted. [Write-up](README-archive.md).
 - [0236 - Space curves, and the camera becomes a shared block](done/0236-space-curves-and-the-camera-becomes-a-shared-block.md) - closed 2026-10-02, Phase 6 judged: three engine findings. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.161.0**. ADR-0258 accepted. [Write-up](README-archive.md).
 - [0244 - Sessions start lighter](done/0244-sessions-start-lighter.md) - closed 2026-10-02, Phase 3 done the same day. Review: **no blockers, no majors, one minor, one nit (both fixed).** Version: none. [Write-up](README-archive.md).
@@ -1055,7 +1055,6 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 - [0231 - The interface is audited, then learns one look](done/0231-the-interface-is-audited-then-learns-one-look.md) - closed 2026-09-30. Review: **no blockers, no majors, two minors (fixed), two nits (one fixed).** Version: **0.154.0**. ADR-0252 + 0256 accepted. [Write-up](README-archive.md).
 - [0233 - The close reviews' small findings are repaired](done/0233-the-close-reviews-small-findings-are-repaired.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.153.0**. Closes 0263-0272 bar 0267. [Write-up](README-archive.md).
 - [0234 - A conductor session writes only where it works](done/0234-a-conductor-session-writes-only-where-it-works.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (fixed), two nits.** Version: none. ADR-0255 accepted, Outcome. Closes 0273. [Write-up](README-archive.md).
-- [0212 - The diffused render gains a timeline](done/0212-the-diffused-render-gains-a-timeline.md) - closed 2026-09-28. Review: **two rounds; one major (fixed), five minors (four fixed).** Version: **0.152.0**. ADR-0236 accepted. Closes 0126. [Write-up](README-archive.md).
 
 <!-- roster:end -->
 
