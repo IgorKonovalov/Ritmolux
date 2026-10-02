@@ -47,6 +47,9 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen](#0276--a-collage-elements-own-drift-and-spin-are-too-slow-for-the-animation-gate-to-see-so-a-sparse-canvas-reads-as-frozen)
 - [0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`](#0277--the-owners-hotkey-walk-and-the-live-retune-loop-exist-only-as-scratch-scripts-under-target)
 - [0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated](#0278--plexus-lays-its-points-in-a-cube-or-on-a-plane-so-a-turning-wire-sphere-is-only-approximated)
+- [0279 — a 3-D stroke is additive light with no depth test, so a near strand never hides a far one](#0279--a-3-d-stroke-is-additive-light-with-no-depth-test-so-a-near-strand-never-hides-a-far-one)
+- [0280 — a space curve does not fade or shift with distance, so nothing atmospheric says "far"](#0280--a-space-curve-does-not-fade-or-shift-with-distance-so-nothing-atmospheric-says-far)
+- [0281 — a heavily blurred 3-D stroke breaks into a comb of segment streaks](#0281--a-heavily-blurred-3-d-stroke-breaks-into-a-comb-of-segment-streaks)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1723,3 +1726,66 @@ entry up then, or when a second look asks for a closed 3-D surface.
 - **Verified 2026-10-01** — the two layouts, and no third:
   `present: ALL: \[PlexusLayout; 2\] in: core/src/render/scenes/plexus/mod.rs`
 - **Verified 2026-10-01** — `absent: Sphere|Shell in: core/src/render/scenes/plexus/mod.rs`
+
+## 0279 — a 3-D stroke is additive light with no depth test, so a near strand never hides a far one
+
+Plan 0236 Phase 6: the owner judged the two space curve families live and found that strands pass
+through each other. Where a near strand crosses a far one, both stay visible and the crossing gets
+brighter. There is no over and under, so a knot reads as glowing wire rather than a solid object,
+and the shared camera's perspective and depth of field cannot rescue that on their own. The cause is
+the `seg3d` pipeline itself. `LineRenderer::new_3d` builds it with
+`gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE` and `depth_stencil: None`, so draw order and depth decide
+nothing. `plexus` draws through the same pipeline and has the same property, which a cloud of fine
+links hides and a single thick strand does not. The design question is which of three shapes buys
+occlusion: a depth buffer with an opaque or premultiplied-over stroke, a back-to-front sort of the
+segments, or a cheap "darken what is behind" pass. Each one costs differently against additive
+glow, which is the look every 2-D line scene keeps.
+
+- **Raised:** 2026-10-02 by the owner at Plan 0236 Phase 6, checked by `architect` the same day.
+  **Owner if taken:** `architect` (an ADR: which occlusion model, and whether it is per system or
+  per preset), then `dev`. Touches every `seg3d` user: `parametric_curve`'s space families,
+  `plexus`, and whatever Plans 0237 to 0240 put through the shared camera.
+- **Verified 2026-10-02** — the line renderer creates no depth target:
+  `absent: Depth32Float|Depth24Plus in: core/src/render/scenes/lines/renderer.rs`
+- **Verified 2026-10-02** — the blend the `seg3d` pipeline is built with:
+  `present: blend: Some\(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE\) in: core/src/render/scenes/lines/renderer.rs`
+
+## 0280 — a space curve does not fade or shift with distance, so nothing atmospheric says "far"
+
+Plan 0236 Phase 6, same sitting as 0279: a far strand is as bright and as saturated as a near one.
+The only depth cues a space curve has are perspective and the depth-of-field blur, and the blur
+needs `focus` mid-depth and an `aperture` near 18 before depth reads at all. Colour cannot help
+either. `parametric_curve` colours by position along the traced path (ADR-0059), and that is the
+right axis for the flat families. `plexus` does colour by depth, which is part of why it reads as a
+volume and the curves do not. The asks are a depth falloff of brightness (a fog toward a ground
+colour), a choice of depth as the colour axis on the space families, or both, each as a declared
+param inert on the flat families.
+
+- **Raised:** 2026-10-02 by the owner at Plan 0236 Phase 6, checked by `architect` the same day.
+  **Owner if taken:** `architect` (does a depth fade belong to the shared camera block, so `plexus`
+  and the later camera plans get it too, or to each system), then `dev`.
+- **Verified 2026-10-02** — the curve scene's colour axis is the path, not depth:
+  `present: The colour axis: \*\*position along the traced path\*\* in: core/src/render/scenes/lines/parametric.rs`
+- **Verified 2026-10-02** — the line renderer has no distance falloff:
+  `absent: fog|depth_fade in: core/src/render/scenes/lines/renderer.rs`
+
+## 0281 — a heavily blurred 3-D stroke breaks into a comb of segment streaks
+
+Plan 0236 Phase 6, same sitting, and seen in `shot` renders on RADV as well as live: at an
+`aperture` near 18 the nearest, most blurred strands break into a comb of streaks across their
+width instead of drawing one smooth soft band. Plan 0236 Phase 4's log already noted bright dots at
+chord joints on `lissajous_3d`. The likely mechanism is the joints. Each `Segment3dInstance` is
+drawn as its own trapezoid, half-width `w + coc` at each end, with none of the `ext_a`/`ext_b` join
+extensions the 2-D `SegmentInstance` carries (ADR-0158). Neighbouring blurred quads therefore
+overlap at every joint, and additive blending sums each overlap into a ridge. The wider the blur,
+the wider the overlap, so the comb is worst exactly where the blur is largest. The candidate fixes
+are joins for the 3-D segment, or a stroke drawn as one strip rather than per-segment quads. This
+one is contained to the line renderer, and it is the cheapest of the three to take.
+
+- **Raised:** 2026-10-02 by the owner at Plan 0236 Phase 6, checked by `architect` the same day.
+  **Owner if taken:** `dev`, through a short plan; the mechanism above is a reading, not yet a
+  measurement.
+- **Verified 2026-10-02** — each end of a 3-D segment widens by its own circle of confusion, with no
+  join extension: `present: let hw_true = mix\(hw_a \+ coc_a, hw_b \+ coc_b, c\.x\) in: core/src/render/scenes/lines/renderer.rs`
+- **Verified 2026-10-02** — `unprobeable: that the comb is the joint overlap is a reading of the
+  renders and the shader; no committed render or test measures the stroke's profile across a joint`
