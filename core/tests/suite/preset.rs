@@ -2473,7 +2473,8 @@ const STRUCTURAL: &[(&str, &str)] = &[
     // `Grammar::from_param` / `Roster::from_param`: round into a closed set.
     ("shape_collage", "layout"),
     ("shape_collage", "roster"),
-    // `echo_orientation`: rounds, then wraps modulo the four flips.
+    // `echo_orientation`: truncates toward zero as the reference's `(int)` cast
+    // does, then takes C's sign-keeping remainder over the four flips.
     ("warp_mesh", "echo_orient"),
     // `warp_mesh::colour_source`: rounds, on the same argument one set smaller —
     // a selector between two whole colour paths, and half of one is not a

@@ -43,7 +43,6 @@ place. The plan file carries the real link.
 | [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | approved | human | 0103's Phases 5-6 plus the release they stand on. v0.143.0-v0.146.0 each shipped six artifacts, `foobar` green; v0.146.1 and v0.147.x lost the macOS pair to ADR-0251's break, repaired in 0227. |
 | [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | approved | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four are `human`. Unblocked: 0120 closed 2026-09-22. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
-| [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | in-progress | dev | Split 2026-10-01: closes on Phases 1-3 (rate candidate falsified, echo orientation fixed); the rig and corpus phases moved to 0246. |
 | [0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) | The rig session measures the wave modes and judges the fourth gate | approved | human, dev | 0202's Phases 4-7. Not queued until the owner has the Windows rig; commit Phase 1's eight rows on main, then queue. |
 | [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
 | [0236](0236-space-curves-and-the-camera-becomes-a-shared-block.md) | Space curves, and the camera becomes a shared block | approved | dev, human | ADR-0258 (proposed). 0235 closed 2026-10-01. Its Phase 1 extracts the camera block that 0237-0240 splice, and its Phase 4 measures `seg3d_segments`. |
@@ -322,8 +321,11 @@ makes it the safe parallel rather than a second editor of the same files.
   off the queue, [0202] and [0212] remain.
 - **[0212] closed 2026-09-28.** Its human phase was taken interactively, and it was queued for its
   review and close. Of the plans the first note kept off the queue, only [0202] remains.
+- **[0202] closed 2026-10-02** at Phase 3, its rig and corpus phases split to [0246]. Of the plans
+  the first note kept off the queue, none remains.
 
-[0202]: 0202-the-three-mechanisms-get-their-gate.md
+[0202]: done/0202-the-three-mechanisms-get-their-gate.md
+[0246]: 0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md
 [0206]: done/0206-the-browser-shows-the-look.md
 [0207]: done/0207-the-commitments-get-their-instruments.md
 [0211]: done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md
@@ -417,7 +419,7 @@ round's shape, since most of what it decided was sequencing:
 [0198]: done/0198-the-control-path-stops-failing-quietly.md
 [0199]: 0199-the-gates-cost-is-measured-before-it-is-cut.md
 [0201]: done/0201-the-warp-surface-stops-lying.md
-[0202]: 0202-the-three-mechanisms-get-their-gate.md
+[0202]: done/0202-the-three-mechanisms-get-their-gate.md
 [0203]: done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md
 
 **Added 2026-09-16, at [0180]'s close - the conductor's stand-down is lifted and the first
@@ -1041,8 +1043,9 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0202 - The three mechanisms get their gate](done/0202-the-three-mechanisms-get-their-gate.md) - closed 2026-10-02 at Phase 3. Review: **no blockers, no majors, five minors (four fixed).** Version: **0.160.2**. [Write-up](README-archive.md).
 - [0245 - A gate that runs a built binary checks it is current](done/0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) - closed 2026-10-01. Review: **two rounds; 1 major, 3 minors (all fixed).** Version: **0.160.1**. [Write-up](README-archive.md).
-- [0242 - Readiness is read when the plan is approved](done/0242-readiness-is-read-when-the-plan-is-approved.md) - closed 2026-10-01, Phase 3 owed. Review: **no blockers, no majors, one minor, one nit (both open).** Version: **0.160.0**. [Write-up](README-archive.md).
+- [0242 - Readiness is read when the plan is approved](done/0242-readiness-is-read-when-the-plan-is-approved.md) - closed 2026-10-01, Phase 3 done 2026-10-02. Review: **no blockers, no majors, one minor (fixed), one nit (open).** Version: **0.160.0**. [Write-up](README-archive.md).
 - [0204 - The library learns from the corpus it will not ship](done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) - closed 2026-10-01. Review: **no blockers, no majors, one minor (fixed), one nit.** Version: **0.159.0**. ADR-0227 accepted, Outcome. [Write-up](README-archive.md).
 - [0232 - The library is walked, cut and refilled](done/0232-the-library-is-walked-cut-and-refilled.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (one fixed), two nits (fixed).** Version: **0.158.0**. ADR-0253 accepted. Closed 0038. [Write-up](README-archive.md).
 - [0241 - The conductor parks only on what the owner must settle](done/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (two fixed), one nit (fixed).** Version: **0.157.0**. ADR-0261 accepted. [Write-up](README-archive.md).

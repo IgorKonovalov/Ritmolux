@@ -912,7 +912,7 @@ changed what a converted preset renders. Whoever takes this re-runs `milkconv --
 over the corpus before touching anything; the numbers in *The finding* are what was true then, not a
 present-day residual.
 
-**Half taken 2026-09-19** — [Plan 0202](plans/0202-the-three-mechanisms-get-their-gate.md) Phase 6
+**Half taken 2026-09-19** — [Plan 0202](plans/done/0202-the-three-mechanisms-get-their-gate.md) Phase 6
 takes exactly the re-census the paragraph above instructs, and nothing else: it re-runs
 `milkconv --report`/`--render` at that plan's tip and writes the present-day tables into
 `docs/milkdrop-conversion.md` beside the earlier eras. The array lowering and the blank-render hunt
@@ -1028,7 +1028,7 @@ fourth gate has a route rather than a re-ask, and this entry's trigger is that v
 else.
 
 **The fourth gate is now scheduled, 2026-09-19.**
-[Plan 0202](plans/0202-the-three-mechanisms-get-their-gate.md) takes the three mechanisms the third
+[Plan 0202](plans/done/0202-the-three-mechanisms-get-their-gate.md) takes the three mechanisms the third
 `Outcome` names — the rate candidate, *Songflower*'s echo, and the per-mode waveform scale — and
 re-runs the same seven pairs against the same rig as its Phase 5. **That verdict is this entry's
 trigger and the plan does not touch the reach question**: no ADR, no interview, no change to the

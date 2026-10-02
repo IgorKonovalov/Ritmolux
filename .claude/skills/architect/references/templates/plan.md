@@ -47,7 +47,7 @@ phase; it is invalid on `dev` and `studio-builder`.
 
 ### Phase 1 — <name>
 - **Owner skill:** <dev | studio-builder | human>
-- **Blocks merge:** no  _(human phases only, and only when nothing after it reads its output; otherwise omit)_
+- **Blocks merge:** no  _(human phases only. The default for a judgement, an on-device check or a rig session: write it unless a later phase reads this phase's output. Omit it on an input such as a certificate, a corpus or a threshold measurement.)_
 - **What:** One sentence on what this phase produces.
 - **Files touched:** Rough list — `core/src/dsp/fft.rs`, `standalone/src/main.rs`, etc.
 - **Done when:** Concrete acceptance — "`cargo run -p standalone` shows spectrum bars reacting

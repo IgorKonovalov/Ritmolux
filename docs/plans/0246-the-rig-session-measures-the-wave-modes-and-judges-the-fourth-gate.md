@@ -3,7 +3,7 @@
 > **Status:** approved (2026-10-01, carried over from Plan 0202's approval of 2026-09-19). **Not
 > queued until the owner has the Windows rig**: Phase 1 is an input to Phase 2, so it blocks, and a
 > lane opened before it would only park.
-> **Created:** 2026-10-01, split out of [Plan 0202](0202-the-three-mechanisms-get-their-gate.md)
+> **Created:** 2026-10-01, split out of [Plan 0202](done/0202-the-three-mechanisms-get-their-gate.md)
 > **Owner skill(s):** human, dev
 > **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
 > (its third `Outcome` is the brief), [0199](../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)

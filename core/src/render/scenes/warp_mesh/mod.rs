@@ -394,16 +394,26 @@ const DEFAULT_ECHO_ORIENT: f32 = default_of(PARAMS, "echo_orient");
 /// format stores an integer, but it reaches here as an `f32` that a per-frame
 /// program can compute and that a preset's own smoothing can sweep *between*
 /// states; deciding what `1.5` means in the shader would mean deciding it four
-/// times. Out of range **wraps** rather than clamping, so a preset animating the
-/// orientation by counting gets a cycle rather than a value stuck at `3`. Total
-/// on every input, `NaN` included, because a non-finite orientation is not a
-/// reason to lose the echo.
+/// times.
+///
+/// The rule is the reference's, `(int)v % 4` followed by `n % 2` for the x flip
+/// and `n >= 2` for the y flip (MilkDrop 2 `d4c843a`, `milkdropfs.cpp` l.4149
+/// and l.4195-4198). So the value **truncates toward zero**, never rounds: `0.99`
+/// is unflipped and `1.0`-`1.99` flip x, which is what a per-frame sweep around
+/// `1` shows there. Above `3` it **wraps**, so a preset counting upward gets a
+/// cycle. Below zero C's remainder keeps the dividend's sign, `-3..=-1`, and the
+/// reference's two tests read those as: `-1` and `-3` flip x only, `-2` flips
+/// nothing, and no negative value ever flips y. `(-1, 0)` truncates to `0`.
+/// `f32` `%` is C's `fmod`, exact and sign-keeping, so the remainder is taken
+/// before any integer cast and a huge value cannot overflow one. Total on every
+/// input, `NaN` included, because a non-finite orientation is not a reason to
+/// lose the echo.
 fn echo_orientation(v: f32) -> u8 {
     if !v.is_finite() {
         return 0;
     }
-    match v.round().rem_euclid(4.0) as i32 {
-        1 => 1,
+    match (v.trunc() % 4.0) as i32 {
+        1 | -1 | -3 => 1,
         2 => 2,
         3 => 3,
         _ => 0,
@@ -759,10 +769,11 @@ const DEFAULT_COVERAGE_THRESHOLD: f32 = default_of(PARAMS, "coverage_threshold")
 
 /// `color_source` as the two shaders read it — **0 or 1 exactly**.
 ///
-/// Rounded here for `echo_orientation`'s reason on a smaller set: the value is a
-/// selector between two whole colour paths, a `[smoothing]` entry or a preset
-/// dissolve sweeps a binding continuously between them, and half of one path is
-/// not a picture. Clamped rather than wrapped — two states are not a cycle — and
+/// Quantized here, as `echo_orientation` quantizes its four states, but by
+/// rounding: this is not a reference value with a reference's cast to match, and
+/// the value is a selector between two whole colour paths that a `[smoothing]`
+/// entry or a preset dissolve sweeps continuously between, where half of one
+/// path is not a picture. Clamped rather than wrapped — two states are not a cycle — and
 /// total on a non-finite input, which falls back to today's path.
 fn colour_source(v: f32) -> f32 {
     if v.is_finite() {

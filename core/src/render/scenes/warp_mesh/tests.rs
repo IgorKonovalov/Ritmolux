@@ -1132,7 +1132,7 @@ fn mesh_cost_by_grid() {
 }
 
 /// **The echo orientation is four states, and a continuous value picks one** —
-/// Plan 0109 Phase 3.
+/// Plan 0109 Phase 3, picked by the reference's truncation per Plan 0202 Phase 3.
 ///
 /// The source format stores an integer, but the value reaches the scene as an
 /// `f32` that a per-frame program computes and that a preset's own `[smoothing]`
@@ -1141,15 +1141,20 @@ fn mesh_cost_by_grid() {
 /// the kaleidoscope's seam took: an eased param is continuous even when its
 /// meaning is not.
 #[test]
-fn the_echo_orientation_quantizes_to_four_states() {
-    // The four states, and the halves that round into them.
+fn the_echo_orientation_truncates_to_four_states() {
+    // The four states, and the fractions that truncate into them as the
+    // reference's `(int)v` does (MilkDrop 2 `d4c843a`, `milkdropfs.cpp`
+    // l.4149). `0.76` and `1.24` are the ends of *Songflower (Moss Posy)*'s
+    // `echo_orient = 1 + 16*pfdy_r` sweep: unflipped below 1, x-flipped above.
     for (input, want) in [
         (0.0, 0),
-        (0.4, 0),
+        (0.76, 0),
+        (0.99, 0),
         (1.0, 1),
-        (0.6, 1),
-        (1.49, 1),
+        (1.24, 1),
+        (1.99, 1),
         (2.0, 2),
+        (2.5, 2),
         (3.0, 3),
     ] {
         assert_eq!(
@@ -1161,7 +1166,15 @@ fn the_echo_orientation_quantizes_to_four_states() {
     // Out of range wraps, so counting animates rather than sticking.
     assert_eq!(echo_orientation(4.0), 0, "4 is 0 again");
     assert_eq!(echo_orientation(5.0), 1);
-    assert_eq!(echo_orientation(-1.0), 3, "counting down wraps too");
+    // Negative: C's `%` keeps the dividend's sign, and the reference's flip
+    // tests `n % 2` (x) and `n >= 2` (y) at `milkdropfs.cpp` l.4195-4198 read
+    // -1 and -3 as x only, -2 as no flip, and never flip y.
+    assert_eq!(echo_orientation(-0.5), 0, "(-1, 0) truncates to 0");
+    assert_eq!(echo_orientation(-1.0), 1, "-1 flips x only");
+    assert_eq!(echo_orientation(-2.0), 0, "-2 flips nothing");
+    assert_eq!(echo_orientation(-3.5), 1, "-3 flips x only");
+    assert_eq!(echo_orientation(-4.0), 0, "-4 is 0 again");
+    assert_eq!(echo_orientation(-5.0), 1, "-5 is -1");
     // Total: a non-finite orientation loses the flip, never the echo.
     assert_eq!(echo_orientation(f32::NAN), 0);
     assert_eq!(echo_orientation(f32::INFINITY), 0);

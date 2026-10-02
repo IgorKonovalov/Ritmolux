@@ -76,17 +76,23 @@ flowchart LR
      helper. The rule "every `.mjs` is wired into pre-push or CI, with named exceptions" moves with
      it.
   2. **The `docs/` entry** keeps the load-bearing set as one line per document and points at
-     `docs/README.md` "Repository layout" for the rest.
+     the root `README.md` "Repository layout" for the rest.
   3. **"Machine setup: the linker override" and "Dependencies compile with no debug info"** move
      verbatim into `docs/developing.md`, under "Building". Where a sentence repeats what that page
      already says, the moved copy keeps the page's existing wording rather than adding a second one.
   4. **The plans-index line** "Read this first each session" becomes "Read this first in a
      human-started session; a conductor session is handed its plan."
+  5. **Three directory entries become one-line pointers** (amended 2026-10-02, after the four moves
+     above measured 26606 bytes): `site/` points at `site/README.md`, `tools/conductor/` at
+     `tools/conductor/README.md`, and `packaging/` at `docs/releasing.md`. Each entry keeps one line
+     saying what the directory is and that nothing shipped depends on it where that holds. A
+     sentence the target does not already say moves there verbatim; one it already says is dropped.
 
   Every top-level directory stays named in `CLAUDE.md`, and the cross-cutting non-negotiables, commit
   hygiene and pitfalls stay whole.
-- **Files touched:** `CLAUDE.md`, `scripts/README.md` (new), `docs/developing.md`, `docs/README.md`
-  (the layout row for `scripts/README.md`).
+- **Files touched:** `CLAUDE.md`, `scripts/README.md` (new), `docs/developing.md`, `README.md`
+  (the layout row for `scripts/README.md`), `site/README.md`, `tools/conductor/README.md`,
+  `docs/releasing.md`.
 - **Done when:**
   - **Size:** `node -e "console.log(require('fs').statSync('CLAUDE.md').size)"` prints a number at or
     below 25000.
