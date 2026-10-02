@@ -9,7 +9,8 @@
 //! the golden baselines were blessed on.
 
 use rlx_core::preset::Preset;
-use rlx_core::render::{CaptureImage, Renderer, metrics::frame_diff};
+use rlx_core::render::scenes::OverflowContext;
+use rlx_core::render::{CaptureImage, Renderer, TierConfig, metrics::frame_diff};
 
 use crate::common;
 
@@ -133,4 +134,44 @@ fn an_open_aperture_strokes_the_far_side_wider_than_the_focal_side() {
         "an aperture of 12 px draws the far side {far} px wide against the focal \
          side's {near}"
     );
+}
+
+/// Plan 0236 Phase 4's done-when: a space family's `samples` past the tier's
+/// `seg3d_segments` is clamped **with a notice** that reaches the renderer,
+/// names what was asked and carries the cap that bit; one within the cap
+/// announces nothing.
+#[test]
+fn an_over_cap_space_walk_is_clamped_with_a_notice() {
+    let Some(mut renderer) = common::headless(64, 64) else {
+        return;
+    };
+    let cap = TierConfig::FLOOR.seg3d_segments;
+    let asked = cap + 500;
+    for family in ["torus_knot", "lissajous_3d"] {
+        let preset = |samples: u32| {
+            format!(
+                "system = \"parametric_curve\"\nname = \"dense_{family}_{samples}\"\n\
+                 [curve]\nfamily = \"{family}\"\n[params]\nsamples = \"{samples}\"\n"
+            )
+        };
+        capture(&mut renderer, &preset(asked));
+        let notice = renderer
+            .cap_overflow()
+            .copied()
+            .unwrap_or_else(|| panic!("{family}: the clamp must reach the renderer"));
+        assert_eq!(notice.context, OverflowContext::Samples(asked), "{family}");
+        assert_eq!(notice.cap, cap as usize, "{family}");
+        assert_eq!(notice.dropped, 500, "{family}");
+        assert!(
+            notice.to_string().contains("pin --tier rich"),
+            "{family}: Floor's cap is under Rich's, so the remedy names it: {notice}"
+        );
+
+        capture(&mut renderer, &preset(cap));
+        assert_eq!(
+            renderer.cap_overflow(),
+            None,
+            "{family}: samples at the cap is not an overflow"
+        );
+    }
 }

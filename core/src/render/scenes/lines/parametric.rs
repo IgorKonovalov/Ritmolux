@@ -443,15 +443,19 @@ impl ParametricCurveScene {
     /// A space family's frame (ADR-0258): the walk in 3D, at `samples` held to
     /// the `seg3d` cap. No rotation, no fit and no mirror reach it, and the
     /// flat buffers are emptied so nothing 2D is drawn beside it.
+    ///
+    /// **The cap is announced, not silent** (ADR-0045): unlike the flat path's
+    /// backstop it is a tier value a bound `samples` can reach, so a clamp
+    /// is reported through [`OverflowContext::Samples`] for the frame it bit.
     fn update_space(&mut self, arm: curves::FamilyArm3d) {
-        let samples = (self.samples.max(0.0) as usize).min(self.seg3d_cap);
+        let (samples, overflow) = space_samples(self.samples, self.seg3d_cap);
         let params = self.curve_params(samples, 0.0, [0.0; 3], 0.0);
         self.closed3d = (arm.sample)(&params, &mut self.points3d);
         self.extent3d = (arm.extent)(&params);
         self.samples3d = samples;
         self.segments.clear();
         self.arcs.clear();
-        self.mirror_overflow = None;
+        self.mirror_overflow = overflow;
     }
 
     /// Draw the space walk through the shared camera: each chord clipped
@@ -525,6 +529,23 @@ impl ParametricCurveScene {
         );
         self.instances3d = instances;
     }
+}
+
+/// A bound `samples` held to a space walk's `cap`, and the overflow to
+/// announce when the cap bit. A negative or `NaN` value walks nothing.
+pub(crate) fn space_samples(samples: f32, cap: usize) -> (usize, Option<CapOverflow>) {
+    let asked = samples.max(0.0) as usize;
+    if asked <= cap {
+        return (asked, None);
+    }
+    (
+        cap,
+        Some(CapOverflow {
+            dropped: asked - cap,
+            context: OverflowContext::Samples(u32::try_from(asked).unwrap_or(u32::MAX)),
+            cap,
+        }),
+    )
 }
 
 /// Colour each chord by **how far along the traced path it sits** (ADR-0059's

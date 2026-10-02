@@ -141,13 +141,18 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 ///   every blurred branch of the two 3D pipelines: the widened trapezoid, the
 ///   per-fragment energy ratio and the node area factor. The only baseline with
 ///   an open aperture.
+/// - `parametric_torus_knot` and `parametric_lissajous_3d` — the rostered
+///   `parametric_curve.toml` draws a flat Maurer rose through the shared 2D
+///   renderer, so the space families' 3D walks, the scene's own `seg3d`
+///   renderer and the camera block are unreached by it. One per space family,
+///   each through a fixed camera with an open aperture.
 ///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 15] = [
+const EXTRA_FIXTURES: [(&str, &str); 17] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -187,6 +192,14 @@ const EXTRA_FIXTURES: [(&str, &str); 15] = [
         include_str!("fixtures/cellular_cyclic.toml"),
     ),
     ("plexus_sheet", include_str!("fixtures/plexus_sheet.toml")),
+    (
+        "parametric_torus_knot",
+        include_str!("fixtures/parametric_torus_knot.toml"),
+    ),
+    (
+        "parametric_lissajous_3d",
+        include_str!("fixtures/parametric_lissajous_3d.toml"),
+    ),
 ];
 
 /// The stroke fixture's text, named once so the roster entry above and the guard

@@ -718,10 +718,13 @@ pub struct TierConfig {
     ///
     /// # Where the numbers come from
     ///
-    /// **Provisional, not yet measured.** Both values are starting points
-    /// sized to the curve families' own `samples` range with room for the
-    /// systems that will share the cap; `Floor`'s is to be measured at the
-    /// worst-case aperture and `max_coc_px`.
+    /// `Floor`'s 8000 was **measured** (Plan 0236 Phase 4): a `parametric_curve`
+    /// space walk of 8000 chords, 12 px thick, with an aperture past the blur
+    /// cap so every far chord is widened by the whole of
+    /// [`max_coc_px`](Self::max_coc_px), filling up to 70 % of the frame, costs
+    /// about 1.1 ms a frame at 1080p on an integrated GPU — far inside the frame
+    /// budget, which leaves the systems that share this cap their own headroom.
+    /// `Rich`'s 20 000 is not measured.
     pub seg3d_segments: u32,
 }
 

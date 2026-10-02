@@ -612,6 +612,11 @@ pub enum OverflowContext {
     /// saturation is the lens's ceiling, not an overflow, and is never
     /// announced (ADR-0257).
     Blur(u32),
+    /// A space curve's `samples` asked for past the tier's
+    /// [`seg3d_segments`](crate::render::TierConfig::seg3d_segments) — per
+    /// frame, since `samples` is bindable. Carries what was asked. A clamp of
+    /// content: the curve is walked from fewer points, so it is coarser.
+    Samples(u32),
 }
 
 impl std::fmt::Display for OverflowContext {
@@ -628,6 +633,7 @@ impl std::fmt::Display for OverflowContext {
             OverflowContext::Points(asked) => write!(f, "points {asked}"),
             OverflowContext::Edges(linked) => write!(f, "{linked} links"),
             OverflowContext::Blur(asked) => write!(f, "an aperture of {asked} px"),
+            OverflowContext::Samples(asked) => write!(f, "samples {asked}"),
         }
     }
 }
@@ -704,6 +710,13 @@ impl std::fmt::Display for CapOverflow {
                  (ask for {} or fewer{pin})",
                 self.context, self.cap, self.cap, self.cap
             ),
+            OverflowContext::Samples(_) => write!(
+                f,
+                "{} is past this quality tier's cap of {}; the space curve is walked from {} \
+                 points instead, so it is coarser than the preset asked \
+                 (ask for {} or fewer{pin})",
+                self.context, self.cap, self.cap, self.cap
+            ),
             OverflowContext::Mirror(_) | OverflowContext::Depth(_) => write!(
                 f,
                 "geometry exceeded the {}-segment cap at {} (dropped {} segment(s)); \
@@ -732,6 +745,7 @@ impl CapOverflow {
             OverflowContext::Points(_) => rich.plexus_points as usize,
             OverflowContext::Edges(_) => rich.plexus_edges as usize,
             OverflowContext::Blur(_) => rich.max_coc_px as usize,
+            OverflowContext::Samples(_) => rich.seg3d_segments as usize,
         };
         self.cap < top
     }
@@ -784,6 +798,12 @@ impl std::fmt::Display for Recovered<'_> {
             }
             OverflowContext::Blur(_) => {
                 write!(f, "the aperture is back within this tier's cap of {cap} px")
+            }
+            OverflowContext::Samples(_) => {
+                write!(
+                    f,
+                    "the sample count is back within this tier's cap of {cap}"
+                )
             }
         }
     }
@@ -1425,6 +1445,10 @@ mod tests {
             (OverflowContext::Points(9000), rich.plexus_points as usize),
             (OverflowContext::Edges(90_000), rich.plexus_edges as usize),
             (OverflowContext::Blur(30), rich.max_coc_px as usize),
+            (
+                OverflowContext::Samples(90_000),
+                rich.seg3d_segments as usize,
+            ),
         ] {
             let below = CapOverflow {
                 dropped: 1,
@@ -1463,6 +1487,7 @@ mod tests {
             (OverflowContext::Points(900), "point count"),
             (OverflowContext::Edges(30_000), "links"),
             (OverflowContext::Blur(30), "aperture"),
+            (OverflowContext::Samples(30_000), "sample count"),
         ] {
             let overflow = CapOverflow {
                 dropped: 0,
@@ -1486,6 +1511,7 @@ mod tests {
                     | OverflowContext::Points(_)
                     | OverflowContext::Edges(_)
                     | OverflowContext::Blur(_)
+                    | OverflowContext::Samples(_)
             );
             if structural {
                 assert!(

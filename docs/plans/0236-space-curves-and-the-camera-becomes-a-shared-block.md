@@ -187,8 +187,8 @@ pub(crate) struct FamilyArm3d {
 |---|---|---|---|
 | 1 — The camera becomes a shared block | dev | done | 5ad3413c |
 | 2 — Walking skeleton: a torus knot in perspective | dev | done | 389984de |
-| 3 — `lissajous_3d`, and the family table | dev | done | committed with this row |
-| 4 — The `seg3d_segments` cap, measured, and the goldens | dev | not started | |
+| 3 — `lissajous_3d`, and the family table | dev | done | 6869feed |
+| 4 — The `seg3d_segments` cap, measured, and the goldens | dev | done | committed with this row |
 | 5 — Documentation and the references | dev | not started | |
 | 6 — The look, judged | human | not started | |
 
@@ -223,6 +223,26 @@ pub(crate) struct FamilyArm3d {
   not hold. The list was added in `core/src/preset/schema/raw/generator.rs`, where the error is
   raised, not in `load.rs`. Phase 3 also rewords the `n`, `d` and `phase` doc lines to name the
   space families, and regenerates the same generated files as Phase 2.
+- Phase 4 measured frame cost with `shot --report family=parametric_curve --tier floor`, release
+  profile, 1920x1080, on AMD Radeon Graphics (RADV RENOIR) iGPU with Mesa 26.2.2. The presets were
+  scratch files under `target/seg3d-measure/`: `samples 8000` (the cap), `thickness 12`,
+  `distance 1.5`, `fov 1.2`, `focus 0`, `aperture 40` (past the 12 px cap), and `n 12, d 11`.
+  Results: torus knot (`tube 0.9`) 1.053 ms with 57 % cover, `lissajous_3d` (`m 10`) 1.119 ms
+  with 70 % cover, and the same knot at `aperture 0` 0.936 ms. The budget in NFR section 1 is
+  16.67 ms. `Floor`'s provisional 8000 stands. `Rich`'s 20000 was not measured.
+- Phase 4 announces the over-cap clamp through a new `OverflowContext::Samples`, with its onset
+  and recovery sentences and Rich's cap in `top_tier_lifts`. That is an edit to
+  `core/src/render/scenes/mod.rs`, outside the phase list. No existing context names the
+  `seg3d_segments` cap.
+- Phase 4's two goldens, `parametric_torus_knot.png` and `parametric_lissajous_3d.png`, were
+  written on llvmpipe, not on WARP. The route was an uncommitted local change to `golden.rs` that
+  wrote only a missing baseline, as Plan 0235 did for the plexus. It was reverted before the
+  commit, and no existing baseline was rewritten. Both read mean 0.0000, outlier 0 on llvmpipe.
+  Windows CI's golden job is the first WARP reading of them. It is also the first WARP reading of
+  the baselines captured after `parametric_curve` now that that scene builds a `seg3d` renderer at
+  construction.
+- Phase 4's `lissajous_3d` fixture, rendered through `shot` at 640x360 on RADV, shows bright dots
+  at chord joints along its blurred stretch, where additive chords overlap.
 
 ### Close triggers
 

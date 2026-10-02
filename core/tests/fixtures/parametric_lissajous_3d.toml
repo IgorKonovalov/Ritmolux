@@ -1,0 +1,37 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `lissajous_3d` space family through the shared camera, from a fixed
+# oblique camera with an open aperture.
+#
+#  - A 3:2 figure given a depth axis at m = 1, a quarter turn out of phase, so
+#    the curve fills the cube rather than lying in a plane.
+#  - `spin` bound to 0 and every camera param bound, so neither a change of
+#    default nor the scene clock can move this baseline.
+#  - `focus` behind the centre and `aperture` open, so both the near and the
+#    far ends of the figure take the widened, blurred stroke.
+system = "parametric_curve"
+name   = "fixture_parametric_lissajous_3d"
+
+[curve]
+family = "lissajous_3d"
+
+[params]
+n             = "3"
+d             = "2"
+m             = "1"
+phase         = "0"
+phase_z       = "0.25"
+samples       = "480"
+scale         = "0.75"
+spin          = "0"
+thickness     = "2.5"
+hue           = "0.2"
+hue_spread    = "0.7"
+brightness    = "1.0"
+draw_progress = "1"
+yaw           = "0.6"
+pitch         = "0.35"
+distance      = "3.4"
+fov           = "0.9"
+focus         = "0.6"
+aperture      = "6"
