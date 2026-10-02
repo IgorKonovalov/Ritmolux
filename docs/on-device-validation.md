@@ -262,6 +262,15 @@ footprint so the vendor spread is on record.
       points drift, and, on the sheet, whether the ripple reads as cloth rather than as a mesh
       rewiring. Then bind `aperture` to a live control and sweep it, and say whether a blurred line
       dims as it spreads rather than flaring.
+- [ ] **The space curve families at the Floor cap, on the low-end box, 1080p.** Plan 0236 added
+      `torus_knot` and `lissajous_3d` to `parametric_curve`, drawn through the shared camera and
+      sized by `seg3d_segments` — Floor **8000**, measured at about 1.1 ms a frame on the
+      development box's integrated GPU (headless, release build), and Rich **20000**, not measured
+      at all. Load `docs/examples/curves/torus_knot.toml` with `samples = "8000"`,
+      `thickness = "12"` and `aperture = "24"`. Overlay on (`F3`), report **(a)** whether fps holds
+      ≥ 60 @ 1080p, **(b)** the p99, and **(c)** what the standalone prints about the clamps. **If
+      it misses, the lever is the `seg3d_segments` cap**, which Plans 0237 and 0238 also size from,
+      so it routes to `architect` with the numbers.
 ### Displays, inputs and outputs
 
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
