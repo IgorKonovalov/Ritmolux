@@ -8,6 +8,7 @@
 //   node tools/conductor/conductor.mjs run [--lane a|b] [--once | --until-idle]
 //   node tools/conductor/conductor.mjs status
 //   node tools/conductor/conductor.mjs digest [--history]
+//   node tools/conductor/conductor.mjs readiness NNNN
 //   node tools/conductor/conductor.mjs resume NNNN
 //   node tools/conductor/conductor.mjs park NNNN
 //   node tools/conductor/conductor.mjs finding NNNN [<ref> --done|--wontfix|--filed <reason>]
@@ -23,15 +24,16 @@
 
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { pidAlive } from "./with-lock.mjs";
 import { adoptedClose, verifyClose } from "./lib/close.mjs";
 import { settledPark, writeDigest, writeHistory } from "./lib/digest.mjs";
-import { currentBranch, head } from "./lib/git.mjs";
+import { currentBranch, git, head } from "./lib/git.mjs";
 import { appendPark, dirtyWorktree } from "./lib/inbox.mjs";
-import { parkStillTrue, runLanes } from "./lib/lane.mjs";
+import { approvalReadiness, parkStillTrue, runLanes } from "./lib/lane.mjs";
+import { findPlan } from "./lib/plan.mjs";
 import { ascii } from "./lib/live.mjs";
 import { loadLocal, loadQueue, pruneQueue, readQueue, startedPlans } from "./lib/queue.mjs";
 import { changedSources, clearSources, recordSources, sourceDigest, staleLine, staleSince } from "./lib/sources.mjs";
@@ -674,7 +676,94 @@ function cmdPrune(args, o) {
   return 0;
 }
 
-const COMMANDS = { run: cmdRun, status: cmdStatus, digest: cmdDigest, resume: cmdResume, park: cmdPark, finding: cmdFinding, "adopt-close": cmdAdoptClose, pause: cmdPause, abort: cmdAbort, prune: cmdPrune, check: cmdCheck };
+/**
+ * `readiness NNNN` runs ADR-0248's readiness session from the main checkout at approval time, while
+ * the plan's author is still in the session that wrote it, and appends the verdict to
+ * state/readiness.jsonl against the plan's contract hash. A lane that later finds a `ready` there on
+ * the same hash runs no readiness session of its own. The hash must be of committed text, so a plan
+ * file that is untracked or differs from HEAD is refused. It writes no conductor.json, which is why it
+ * may run beside a live `run`.
+ */
+async function cmdReadiness(args, o) {
+  const p = o.p;
+  const [plan] = args;
+  if (!isPlan(plan)) {
+    o.err("usage: conductor.mjs readiness NNNN");
+    return 2;
+  }
+  const found = findPlan(p.repo, plan);
+  if (!found || found.done) {
+    o.err(`conductor: plan ${plan} is not an open plan under docs/plans/ in ${p.repo}`);
+    return 1;
+  }
+  const rel = relative(p.repo, found.path).replace(/\\/g, "/");
+  if (git(["ls-files", "--error-unmatch", "--", rel], p.repo).code !== 0) {
+    o.err(`conductor: ${rel} is not committed; the verdict is keyed on committed text, so commit the plan first`);
+    return 1;
+  }
+  const dirty = git(["status", "--porcelain", "--", rel], p.repo);
+  if (dirty.code !== 0 || dirty.stdout) {
+    o.err(`conductor: ${rel} has uncommitted changes; the verdict is keyed on committed text, so commit them first`);
+    return 1;
+  }
+  const { errors, local } = loadLocal(p.local);
+  const command = o.claude ?? local?.claude ?? ["claude"];
+  const v = claudeVersion(command);
+  if (v.error) errors.push(v.error);
+  else {
+    const verdict = cliVerdict(v.version);
+    if (verdict.error) errors.push(verdict.error);
+    if (verdict.warning) o.err(`conductor: warning: ${verdict.warning}`);
+  }
+  if (errors.length) {
+    for (const e of errors) o.err(`conductor: ${e}`);
+    return 1;
+  }
+  const queue = readQueue(p.queue);
+  const r = await approvalReadiness(
+    {
+      repo: p.repo,
+      stateDir: p.stateDir,
+      promptsDir: p.prompts,
+      settingsFile: p.settings,
+      withLockPath: p.withLock,
+      claude: command,
+      local,
+      queue: { plans: queue.value?.plans ?? {} },
+      lockDir: o.lockDir,
+    },
+    plan,
+  );
+  const where = r.transcript ? ` (transcript: ${r.transcript})` : "";
+  if (r.verdict === "ready") {
+    o.log(`conductor: plan ${plan} is ready; recorded against contract ${r.hash.slice(0, 12)}, so its lane runs no readiness session unless the plan changes`);
+    // Advisories never park and never fail the command; they are for the author to answer now.
+    for (const a of r.advisories) o.log(`conductor: advisory (never parks): ${a}`);
+    return 0;
+  }
+  if (!r.recorded) {
+    o.err(`conductor: plan ${plan}: ${r.detail}${where}`);
+    return 1;
+  }
+  o.err(`conductor: plan ${plan} is not ready (${r.verdict}${r.phase ? `, Phase ${r.phase}` : ""}): ${r.detail}${where}`);
+  o.err("conductor: fix the plan, commit it, and run `readiness` again");
+  return 1;
+}
+
+const COMMANDS = {
+  run: cmdRun,
+  status: cmdStatus,
+  digest: cmdDigest,
+  readiness: cmdReadiness,
+  resume: cmdResume,
+  park: cmdPark,
+  finding: cmdFinding,
+  "adopt-close": cmdAdoptClose,
+  pause: cmdPause,
+  abort: cmdAbort,
+  prune: cmdPrune,
+  check: cmdCheck,
+};
 
 /**
  * `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs,
@@ -691,7 +780,7 @@ export async function main(argv, overrides = {}) {
   const fn = COMMANDS[command];
   if (!fn) {
     o.err(
-      "usage: node tools/conductor/conductor.mjs run [--lane a|b] [--once | --until-idle] | status | digest [--history] | " +
+      "usage: node tools/conductor/conductor.mjs run [--lane a|b] [--once | --until-idle] | status | digest [--history] | readiness NNNN | " +
         `resume NNNN | park NNNN | finding NNNN [<ref> --${FINDING_VERBS.join("|--")} <reason>] | adopt-close NNNN | pause [--off] | abort | prune | check`,
     );
     return 2;

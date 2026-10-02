@@ -6,10 +6,11 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { pathToFileURL } from "node:url";
 
 import { VERIFIED_CLI, cliVerdict, main, paths } from "../conductor.mjs";
 import { resumeCommand } from "../lib/inbox.mjs";
-import { loadState, statePaths } from "../lib/state.mjs";
+import { loadState, planContractHash, readinessRecords, statePaths } from "../lib/state.mjs";
 import { FAKE, TEST_DIR, TOOL_DIR, tmp, writePlan } from "./helpers.mjs";
 
 const QUEUE_NOTICE = "conductor: notice: plan 0090: already merged (0090-fixture.md is under docs/plans/done/); `prune` drops it from the queue";
@@ -931,4 +932,56 @@ test("resume while a run is live leaves an ask for it rather than writing the re
     readFileSync(statePaths(p.stateDir).resumeAsks, "utf8").trim().split("\n").map((l) => JSON.parse(l).plan),
     ["0101"],
   );
+});
+
+// Plan 0242 Phase 1: the readiness check run at approval, from the main checkout.
+
+test("readiness NNNN on a committed plan records one ready line with the plan's contract hash, and writes no conductor.json", async () => {
+  const { repo, p, cli } = setup([{ number: "0999", phases: [dev("1")] }], { a: [] });
+  const r = await cli("readiness", "0999");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  assert.match(r.out.join("\n"), /plan 0999 is ready/);
+  const hash = planContractHash(readFileSync(join(repo, "docs", "plans", "0999-fixture.md"), "utf8"));
+  const records = readinessRecords(p.stateDir, "0999");
+  assert.equal(records.length, 1);
+  assert.equal(records[0].verdict, "ready");
+  assert.equal(records[0].hash, hash);
+  assert.equal(existsSync(statePaths(p.stateDir).file), false, "the live run's record is never written");
+  assert.equal(sh(["status", "--porcelain"], repo), "", "the main checkout is untouched");
+});
+
+test("readiness NNNN refuses a plan file with uncommitted changes and records nothing", async () => {
+  const { repo, p, cli } = setup([{ number: "0999", phases: [dev("1")] }], { a: [] });
+  const planPath = join(repo, "docs", "plans", "0999-fixture.md");
+  writeFileSync(planPath, readFileSync(planPath, "utf8").replace("- **What:** phase 1.", "- **What:** phase 1, edited."));
+  const r = await cli("readiness", "0999");
+  assert.notEqual(r.code, 0);
+  assert.match(r.err.join("\n"), /0999-fixture\.md has uncommitted changes/);
+  assert.deepEqual(readinessRecords(p.stateDir, "0999"), []);
+  assert.equal(existsSync(join(p.toolDir, "events.jsonl")), false, "no session started");
+});
+
+test("readiness NNNN whose session leaves the main checkout's status changed is a disagreement and records nothing", async () => {
+  const { repo, p, cli } = setup([{ number: "0999", phases: [dev("1")] }], { a: [] });
+  // A session that reads `ready` but leaves a stray file in the checkout it was handed.
+  const scenario = join(p.toolDir, "stray-scenario.mjs");
+  writeFileSync(
+    scenario,
+    [
+      'import { writeFileSync } from "node:fs";',
+      'import { join } from "node:path";',
+      `import base from ${JSON.stringify(pathToFileURL(join(TEST_DIR, "lane-scenario.mjs")).href)};`,
+      "export default async (a) => {",
+      '  writeFileSync(join(a.cwd, "stray.txt"), "left behind\\n");',
+      "  return base(a);",
+      "};",
+      "",
+    ].join("\n"),
+  );
+  process.env.FAKE_CLAUDE_SCENARIO = scenario;
+  const r = await cli("readiness", "0999");
+  assert.equal(r.code, 1);
+  assert.match(r.err.join("\n"), /HEAD or git status changed during the readiness session/);
+  assert.deepEqual(readinessRecords(p.stateDir, "0999"), []);
+  assert.match(sh(["status", "--porcelain"], repo), /stray\.txt/, "the stray file is left as evidence, not removed");
 });

@@ -50,7 +50,21 @@ import { CLOSE, take } from "./locks.mjs";
 import { fastForwardMain, mergeMainInto } from "./merge.mjs";
 import { CLAUDE_DIR, CLI_CONTRACT, STUDIO_INSTALL } from "./outcome.mjs";
 import { claudePaths, donePhases, findPlan, nextStep, rangeLabel, readPlanFile, settledPhase } from "./plan.mjs";
-import { adoptClose, clearPark, endStep, planContractHash, planRecord, saveState, spendSince, startStep, statePaths, takeResumeAsks } from "./state.mjs";
+import {
+  adoptClose,
+  appendReadiness,
+  clearPark,
+  endStep,
+  loadState,
+  planContractHash,
+  planRecord,
+  readinessFor,
+  saveState,
+  spendSince,
+  startStep,
+  statePaths,
+  takeResumeAsks,
+} from "./state.mjs";
 import { USAGE_LIMIT, renderPromptFile, runStep } from "./step.mjs";
 
 export const MAX_FIX_ROUNDS = 2;
@@ -681,12 +695,21 @@ async function mergeMain(ctx, rec, where) {
  * the plan's first implement session, and again only when the plan's contract (planContractHash) has
  * changed since a `ready`: a park is never remembered as passing, so a plan resumed after one is read
  * again. A plan with implement steps and no readiness record predates the check and is not stopped
- * for it. Returns a park, or null.
+ * for it. A `ready` the owner already recorded at approval (`conductor readiness NNNN`) against the
+ * same contract hash stands in for the session, and is copied into the record. Returns a park, or null.
  */
 async function readiness(ctx, rec, file) {
   const hash = planContractHash(readFileSync(file.path, "utf8"));
   if (rec.readiness?.hash === hash) return null;
   if (!rec.readiness && rec.steps.some((s) => s.kind === "implement")) return null;
+  const approved = readinessFor(ctx.stateDir, rec.plan, hash);
+  if (approved?.verdict === "ready") {
+    rec.readiness = { hash, at: approved.at, approval: true, ...advisoriesOf(approved) };
+    live(ctx, rec.plan, `  lane   readiness read ready at approval (${approved.at}) on this contract; no session`);
+    liveAdvisories(ctx, rec);
+    save(ctx);
+    return null;
+  }
   const wt = rec.worktree;
   const before = head(wt);
   const r = await session(ctx, rec, "readiness", {
@@ -700,9 +723,72 @@ async function readiness(ctx, rec, file) {
   if (head(wt) !== before || !isClean(wt)) {
     return { reason: "disagreement", detail: "the readiness session changed the lane; it reads and changes nothing", read: r.transcript };
   }
-  rec.readiness = { hash, at: now() };
+  rec.readiness = { hash, at: now(), ...advisoriesOf(r.outcome) };
+  liveAdvisories(ctx, rec);
   save(ctx);
   return null;
+}
+
+/** `{ advisories }` when a ready verdict carries any, else nothing: the key is absent on a plain ready. */
+const advisoriesOf = (v) => (v?.advisories?.length ? { advisories: [...v.advisories] } : {});
+
+/** One live line per readiness advisory. An advisory is shown and never acted on: it parks nothing. */
+function liveAdvisories(ctx, rec) {
+  for (const a of rec.readiness?.advisories ?? []) live(ctx, rec.plan, `  lane   readiness advisory (never parks): ${a}`);
+}
+
+/** `git status --porcelain` of `cwd`, untracked files included, or null when git failed. */
+function porcelain(cwd) {
+  const r = git(["status", "--porcelain", "--untracked-files=all"], cwd);
+  return r.code === 0 ? r.stdout : null;
+}
+
+/**
+ * The readiness check run at approval, from the main checkout (`conductor readiness NNNN`): the same
+ * session the lane runs, with the main checkout as its lane. It runs against a scratch record under
+ * state/readiness/, so it never writes the conductor.json a live run owns. The checkout is shared with
+ * whatever else the owner is doing there, so it is compared rather than required clean: HEAD and
+ * `git status --porcelain` must read the same after the session as before it. A change from any
+ * source refuses the record, which is the safe direction - the command is re-run.
+ *
+ * `ctx`: { repo, stateDir, promptsDir, settingsFile, withLockPath, claude, local, queue, live? }; the
+ * caller has already checked that the plan file is committed and clean. Resolves to
+ * { verdict, detail, phase, hash, transcript, advisories, recorded }: `ready` and every park reason the session
+ * ends on are appended to state/readiness.jsonl; a `disagreement` is not.
+ */
+export async function approvalReadiness(ctx, plan) {
+  const file = planFileIn(ctx.repo, plan);
+  const hash = planContractHash(readFileSync(file.path, "utf8"));
+  const scratchDir = statePaths(ctx.stateDir).readinessScratch;
+  const sctx = { ...ctx, stateDir: scratchDir, state: loadState(scratchDir), onChange: undefined, checkCli: undefined, events: undefined };
+  const rec = planRecord(sctx.state, plan);
+  rec.lane = "approval";
+  rec.worktree = ctx.repo;
+  rec.branch = currentBranch(ctx.repo);
+  const before = { head: head(ctx.repo), status: porcelain(ctx.repo) };
+  const r = await session(sctx, rec, "readiness", {
+    owner: "architect",
+    prompt: `/architect conductor readiness plan ${plan}`,
+    vars: { plan, plan_file: file.rel, lane: ctx.repo, branch: rec.branch, settings: ctx.settingsFile },
+    budget: ctx.local.budget_usd.readiness,
+  });
+  const base = { hash, transcript: r.transcript ?? null, phase: r.outcome?.phase ?? null };
+  if (head(ctx.repo) !== before.head || porcelain(ctx.repo) !== before.status) {
+    return {
+      ...base,
+      verdict: "disagreement",
+      detail: "the main checkout's HEAD or git status changed during the readiness session, which reads and changes nothing; nothing was recorded - re-run the command",
+      recorded: false,
+    };
+  }
+  if (r.status !== "parked" && r.outcome.kind !== "ready") {
+    return { ...base, verdict: "disagreement", detail: `readiness returned a ${r.outcome.kind} outcome; nothing was recorded`, recorded: false };
+  }
+  const verdict = r.status === "parked" ? r.reason : "ready";
+  const detail = r.status === "parked" ? r.detail : null;
+  const advisories = r.status === "parked" ? {} : advisoriesOf(r.outcome);
+  appendReadiness(ctx.stateDir, { plan, hash, verdict, detail, ...advisories, at: now() });
+  return { ...base, verdict, detail, advisories: advisories.advisories ?? [], recorded: true };
 }
 
 function planFileIn(cwd, plan) {

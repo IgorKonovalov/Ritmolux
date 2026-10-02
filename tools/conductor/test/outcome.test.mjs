@@ -37,3 +37,21 @@ test("fixed_in is refused on a verdict outcome, as a non-SHA, and on anything bu
   const nitOk = parseOutcome(outcomeBlock(closed([{ severity: "nit", file: "a.rs", line: 1, what: "x", fixed_in: "a1b2c3d" }])));
   assert.equal(nitOk.ok, true);
 });
+
+test("a ready outcome may carry advisories as one-line strings, and still parses with none", () => {
+  const withOne = parseOutcome(outcomeBlock({ kind: "ready", plan: "0999", advisories: ["Phase 3 (human) has no Blocks merge: no, and no later phase reads its output"] }));
+  assert.equal(withOne.ok, true, withOne.error);
+  assert.deepEqual(withOne.outcome.advisories, ["Phase 3 (human) has no Blocks merge: no, and no later phase reads its output"]);
+  const without = parseOutcome(outcomeBlock({ kind: "ready", plan: "0999" }));
+  assert.equal(without.ok, true, without.error);
+  assert.equal(without.outcome.advisories, undefined);
+  assert.equal(parseOutcome(outcomeBlock({ kind: "ready", plan: "0999", advisories: [] })).ok, true);
+});
+
+test("advisories that are not an array of one-line strings are refused", () => {
+  for (const advisories of ["Phase 3 ...", { 0: "Phase 3 ..." }, [3], ["Phase 3", null], [""], ["Phase 3\nPhase 4"], null]) {
+    const r = parseOutcome(outcomeBlock({ kind: "ready", plan: "0999", advisories }));
+    assert.equal(r.ok, false, JSON.stringify(advisories));
+    assert.match(r.error, /ready\.advisories is not a list of one-line strings/);
+  }
+});
