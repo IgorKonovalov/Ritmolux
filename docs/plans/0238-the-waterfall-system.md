@@ -206,7 +206,7 @@ struct Ring {
 | 1 — Walking skeleton: a scrolling landscape | dev | done | 76976a1e |
 | 2 — Caps, the golden and determinism | dev | done | 89aa720d |
 | 3 — Documentation and the references | dev | done | committed with this row |
-| 4 — The look, judged | human | not started | |
+| 4 — The look, judged | human | owed | |
 
 ### Notes
 
