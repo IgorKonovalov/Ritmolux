@@ -4,6 +4,7 @@ import { ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import type { SchemaResult, SettingsResult } from '../../ipc/appHandlers'
 import type { PlayerMode } from '@shared/player-mode'
+import type { RenderSettings } from '@shared/render'
 
 export interface AppInfo {
   studioVersion: string
@@ -12,6 +13,7 @@ export interface AppInfo {
   settingsFile: string
   playerMode: PlayerMode
   reducedMotion: boolean
+  render: RenderSettings
 }
 
 export const appApi = {

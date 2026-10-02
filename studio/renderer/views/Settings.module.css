@@ -95,6 +95,24 @@
   font-size: 11px;
 }
 
+.path {
+  display: flex;
+  align-items: end;
+  gap: var(--space-1);
+}
+
+.pathLabel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pathInput {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
 .facts {
   display: grid;
   grid-template-columns: max-content 1fr;

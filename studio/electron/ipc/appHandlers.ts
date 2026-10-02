@@ -8,6 +8,7 @@ import { ipcMain, shell } from 'electron'
 
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import { isPlayerMode, type PlayerMode } from '@shared/player-mode'
+import type { RenderSettings } from '@shared/render'
 import type { SchemaDocument } from '@shared/schema'
 
 export interface AppInfo {
@@ -21,6 +22,8 @@ export interface AppInfo {
   playerMode: PlayerMode
   /** `ui.reducedMotion` as the settings file holds it now. */
   reducedMotion: boolean
+  /** The `render` key as the settings file holds it now. */
+  render: RenderSettings
 }
 
 /** What the renderer gets back when the schema could not be read. */

@@ -1,0 +1,133 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--scanlines), var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  animation: rlx-enter var(--motion-long) var(--ease);
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+.bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.heading {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.field input,
+.field select {
+  font-family: var(--mono);
+  font-size: 12px;
+  min-width: 8rem;
+}
+
+.field input[aria-invalid='true'] {
+  border-color: var(--warn);
+}
+
+.quiet,
+.button,
+.primary {
+  background: none;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.primary {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.quiet:hover,
+.button:hover:not(:disabled),
+.primary:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.button:disabled,
+.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.path {
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.problem {
+  margin: 0;
+  color: var(--warn);
+  font-size: 11px;
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0);
+}
+
+.progress progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.failure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0);
+}
+
+.tail {
+  margin: 0;
+  max-height: 10rem;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+}

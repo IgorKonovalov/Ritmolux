@@ -9,8 +9,9 @@
  * footer's number means.
  */
 import type { BrowserWindow } from 'electron'
-import { app, MessageChannelMain } from 'electron'
+import { app, dialog, MessageChannelMain } from 'electron'
 import { accessSync, constants, statSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import type { PlayerEvent } from '@shared/protocol'
@@ -18,6 +19,9 @@ import type { PlayerEvent } from '@shared/protocol'
 import { registerAppHandlers, type AppInfo } from './ipc/appHandlers'
 import { registerPlayerHandlers } from './ipc/playerHandlers'
 import { registerPresetHandlers, type PresetScope } from './ipc/presetHandlers'
+import { registerRenderHandlers, renderEmitter, stayAwake } from './ipc/renderHandlers'
+import { RenderService } from './render/service'
+import { TranscodeCache } from './render/transcode'
 import { SchemaCache } from './player/schema'
 import { ControlSender } from './player/control'
 import { playerArgs, PlayerSupervisor } from './player/supervisor'
@@ -25,10 +29,13 @@ import { resolvePlayer, type ResolvedPlayer } from './player/resolve'
 import type { PlayerMode } from '@shared/player-mode'
 
 import {
+  ffmpegOf,
+  outputDirOf,
   playerModeOf,
   readSettings,
   reducedMotionOf,
   settingsFile,
+  withRender,
   writeSettings,
   type StudioSettings,
 } from './settings'
@@ -38,6 +45,7 @@ import { captureRequest, runCapture } from './capture'
 const isDev = process.env.ELECTRON_RENDERER_URL !== undefined
 
 let supervisor: PlayerSupervisor | undefined
+let render: { service: RenderService; cache: TranscodeCache } | undefined
 const control = new ControlSender()
 let resolved: ResolvedPlayer | undefined
 /** Events seen before the renderer loaded, replayed to it in arrival order. */
@@ -94,6 +102,7 @@ function start(): void {
     settingsFile: file,
     playerMode: mode,
     reducedMotion: reducedMotionOf(settings),
+    render: settings.render ?? {},
   })
   const schema = new SchemaCache(resolved?.path)
   // Merged onto what was read, because `writeSettings` writes what it is handed
@@ -114,12 +123,45 @@ function start(): void {
     (reason) => console.warn(`[studio] refused an action from the renderer: ${reason}`),
   )
 
+  // The settings are read per call, so a path changed in the panel applies to
+  // the next render without a relaunch.
+  let shown: BrowserWindow | undefined
+  const cache = new TranscodeCache(join(app.getPath('userData'), 'render-cache'), () =>
+    ffmpegOf(settings),
+  )
+  const service = new RenderService({
+    player: () => resolved?.path,
+    ffmpeg: () => ffmpegOf(settings),
+    outputDir: () => outputDirOf(settings, app.getPath('videos')),
+    cache,
+    emit: renderEmitter(() => shown),
+    stayAwake,
+  })
+  render = { service, cache }
+  registerRenderHandlers(service, () => shown, (next) => update(withRender(settings, next)))
+
   installCsp(isDev)
   const { rendererFile, preloadPath } = getRendererPaths()
   const window = createWindow({
     preloadPath,
     rendererFile,
     rendererUrl: isDev ? DEV_SERVER_ORIGIN : undefined,
+  })
+  shown = window
+
+  // A render is a child of this process and dies with it (ADR-0262), so closing
+  // the window while one runs asks first.
+  window.on('close', (event) => {
+    if (!service.busy) return
+    const choice = dialog.showMessageBoxSync(window, {
+      type: 'warning',
+      buttons: ['Keep rendering', 'Quit and lose the render'],
+      defaultId: 0,
+      cancelId: 0,
+      message: 'A clip is still rendering.',
+      detail: 'Quitting stops it and deletes the unfinished file.',
+    })
+    if (choice === 0) event.preventDefault()
   })
 
   window.webContents.on('did-finish-load', () => {
@@ -180,4 +222,7 @@ app.on('window-all-closed', () => app.quit())
 app.on('will-quit', () => {
   supervisor?.stop()
   control.close()
+  // A render still running here was confirmed away by the close prompt.
+  render?.service.abandon()
+  render?.cache.clear()
 })

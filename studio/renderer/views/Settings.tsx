@@ -14,6 +14,7 @@
 import { useState } from 'react'
 
 import { PLAYER_MODES, type PlayerMode } from '@shared/player-mode'
+import type { RenderSettings } from '@shared/render'
 
 import styles from './Settings.module.css'
 
@@ -27,8 +28,16 @@ export interface SettingsProps {
   reducedMotion: boolean
   /** Apply a new `ui.reducedMotion` to the window; called once the file took it. */
   onReducedMotion: (on: boolean) => void
+  /** The `render` key as the settings file held it at launch. */
+  render?: RenderSettings
   onClose: () => void
 }
+
+/** The `render` keys the panel edits, each a path, and what absent means. */
+const RENDER_FIELDS: { key: keyof RenderSettings; label: string; absent: string }[] = [
+  { key: 'ffmpegPath', label: 'ffmpeg', absent: 'ffmpeg on PATH' },
+  { key: 'outputDir', label: 'output folder', absent: 'your Videos folder' },
+]
 
 const WHAT_IT_DOES: Record<PlayerMode, string> = {
   windowed:
@@ -44,6 +53,7 @@ export function Settings({
   studioVersion,
   reducedMotion,
   onReducedMotion,
+  render,
   onClose,
 }: SettingsProps): JSX.Element {
   /**
@@ -136,6 +146,8 @@ export function Settings({
         )}
       </fieldset>
 
+      <RenderGroup render={render ?? {}} />
+
       <dl className={styles.facts}>
         <dt>player</dt>
         <dd>
@@ -148,5 +160,60 @@ export function Settings({
         </dd>
       </dl>
     </section>
+  )
+}
+
+/**
+ * The `render` keys, each a text field saved on its own button. An empty field
+ * removes the key, which is how a path is given back to its default.
+ */
+function RenderGroup({ render }: { render: RenderSettings }): JSX.Element {
+  /** What each field holds now, starting from the file; `undefined` while untouched. */
+  const [drafts, setDrafts] = useState<Partial<Record<keyof RenderSettings, string>>>({})
+  const [saved, setSaved] = useState<Partial<RenderSettings>>({})
+  const [problem, setProblem] = useState<string>()
+
+  const value = (key: keyof RenderSettings): string =>
+    drafts[key] ?? (key in saved ? (saved[key] ?? '') : (render[key] ?? ''))
+
+  const save = (key: keyof RenderSettings): void => {
+    const next = value(key).trim()
+    void window.api.render.setSettings({ [key]: next === '' ? null : next }).then((result) => {
+      setProblem(result.ok ? undefined : result.reason)
+      if (!result.ok) return
+      setSaved((previous) => ({ ...previous, [key]: next === '' ? undefined : next }))
+      setDrafts((previous) => ({ ...previous, [key]: undefined }))
+    })
+  }
+
+  return (
+    <fieldset className={styles.group}>
+      <legend className={styles.legend}>Rendering</legend>
+      {RENDER_FIELDS.map(({ key, label, absent }) => (
+        <div key={key} className={styles.path}>
+          <label className={styles.pathLabel}>
+            <span className={styles.choiceName}>{label}</span>
+            <input
+              className={styles.pathInput}
+              value={value(key)}
+              placeholder={absent}
+              onChange={(event) => setDrafts((previous) => ({ ...previous, [key]: event.target.value }))}
+            />
+          </label>
+          <button type="button" className={styles.close} onClick={() => save(key)}>
+            save
+          </button>
+        </div>
+      ))}
+      <p className={styles.note}>
+        Saved as <code>render.ffmpegPath</code> and <code>render.outputDir</code>, and used by the
+        next render. Empty means the placeholder.
+      </p>
+      {problem !== undefined && (
+        <p className={styles.problem} role="alert">
+          The setting was not written: {problem}
+        </p>
+      )}
+    </fieldset>
   )
 }

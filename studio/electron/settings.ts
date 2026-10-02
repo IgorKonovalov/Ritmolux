@@ -12,6 +12,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 import { DEFAULT_PLAYER_MODE, isPlayerMode, type PlayerMode } from '@shared/player-mode'
+import type { RenderSettings } from '@shared/render'
 
 export interface StudioSettings {
   /** An explicit player binary, second in ADR-0178's resolution order. */
@@ -20,6 +21,8 @@ export interface StudioSettings {
   playerMode?: PlayerMode
   /** How the window looks and moves; nothing in it reaches the player. */
   ui?: UiSettings
+  /** Where a clip render finds its encoder and puts its file (ADR-0262). */
+  render?: RenderSettings
 }
 
 export interface UiSettings {
@@ -39,6 +42,55 @@ export function playerModeOf(settings: StudioSettings): PlayerMode {
 /** Whether the studio's own motion is off — the one place its default is applied. */
 export function reducedMotionOf(settings: StudioSettings): boolean {
   return settings.ui?.reducedMotion ?? false
+}
+
+/** A path-valued key: a non-empty string, or absent. */
+function pathValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() !== '' ? value : undefined
+}
+
+/**
+ * The `render` object, keeping each key that has the right shape and dropping
+ * the rest, so a mistyped `outputDir` costs that key and not `ffmpegPath`.
+ */
+function readRender(value: unknown): RenderSettings | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  const render: RenderSettings = {}
+  const ffmpegPath = pathValue(record.ffmpegPath)
+  if (ffmpegPath !== undefined) render.ffmpegPath = ffmpegPath
+  const outputDir = pathValue(record.outputDir)
+  if (outputDir !== undefined) render.outputDir = outputDir
+  return Object.keys(render).length === 0 ? undefined : render
+}
+
+/** The `ffmpeg` a render runs — the one place its default is applied. */
+export function ffmpegOf(settings: StudioSettings): string {
+  return settings.render?.ffmpegPath ?? 'ffmpeg'
+}
+
+/** Where a render's file goes by default, given the user's Videos directory. */
+export function outputDirOf(settings: StudioSettings, videos: string): string {
+  return settings.render?.outputDir ?? videos
+}
+
+/**
+ * `next` merged onto the `render` key of `settings`, with an empty or `null`
+ * value removing its key: clearing a field in the panel means "the default".
+ */
+export function withRender(
+  settings: StudioSettings,
+  next: Record<string, string | null>,
+): StudioSettings {
+  const merged: Record<string, unknown> = { ...settings.render }
+  for (const [key, value] of Object.entries(next)) {
+    if (value === null || value.trim() === '') delete merged[key]
+    else merged[key] = value
+  }
+  const render = readRender(merged)
+  const rest: StudioSettings = { ...settings }
+  delete rest.render
+  return render === undefined ? rest : { ...rest, render }
 }
 
 export function readSettings(file: string): StudioSettings {
@@ -62,6 +114,8 @@ export function readSettings(file: string): StudioSettings {
       const reducedMotion = (ui as Record<string, unknown>).reducedMotion
       if (typeof reducedMotion === 'boolean') settings.ui = { reducedMotion }
     }
+    const render = readRender(record.render)
+    if (render !== undefined) settings.render = render
     return settings
   } catch {
     return {}

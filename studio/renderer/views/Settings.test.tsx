@@ -147,6 +147,44 @@ describe('reduced motion', () => {
   })
 })
 
+describe('the render paths', () => {
+  it('shows the file values, writes an edit, and clears a key with an empty field', async () => {
+    const setSettings = vi.fn(() => Promise.resolve({ ok: true as const, value: null }))
+    Object.assign(window, { api: { app: { setPlayerMode, setReducedMotion }, render: { setSettings } } })
+    render(
+      <Settings
+        running="windowed"
+        playerPath="/opt/ritmolux"
+        playerSource="bundled"
+        studioVersion="0.113.0"
+        reducedMotion={false}
+        onReducedMotion={onReducedMotion}
+        render={{ ffmpegPath: '/opt/ffmpeg' }}
+        onClose={vi.fn()}
+      />,
+    )
+    const ffmpeg = screen.getByLabelText('ffmpeg') as HTMLInputElement
+    const folder = screen.getByLabelText('output folder') as HTMLInputElement
+    expect(ffmpeg.value).toBe('/opt/ffmpeg')
+    // Absent says what it falls back to rather than showing nothing.
+    expect(folder.placeholder).toMatch(/Videos/)
+
+    fireEvent.change(folder, { target: { value: '/data/clips' } })
+    const [saveFfmpeg, saveFolder] = screen.getAllByRole('button', { name: 'save' })
+    await act(async () => {
+      fireEvent.click(saveFolder)
+    })
+    expect(setSettings).toHaveBeenLastCalledWith({ outputDir: '/data/clips' })
+
+    fireEvent.change(ffmpeg, { target: { value: '' } })
+    await act(async () => {
+      fireEvent.click(saveFfmpeg)
+    })
+    expect(setSettings).toHaveBeenLastCalledWith({ ffmpegPath: null })
+    expect(ffmpeg.value).toBe('')
+  })
+})
+
 describe('what else the panel states', () => {
   it('names the player it resolved and where it came from', () => {
     panel()

@@ -66,6 +66,33 @@ export const IPC_CHANNELS = {
    * message of the control protocol.
    */
   PRESET_CREATE: 'preset:create',
+  /**
+   * The clip render's OS surface (ADR-0262). None of these carries a message of
+   * the control protocol: a render is three short-lived children main spawns,
+   * a dialog, and files, which the sandboxed renderer can reach no other way.
+   *
+   * A path the renderer hands back is accepted only when main produced it — a
+   * dialog's answer, or the output path main suggested — for the reason the
+   * preset channels guard theirs: otherwise main is a file writer the renderer
+   * aims anywhere.
+   */
+  /** The open dialog for a track; the answer is the path main will transcode. */
+  RENDER_PICK_AUDIO: 'render:pick-audio',
+  /** Transcode a picked track and run `--bars` over it at one rate. */
+  RENDER_PREPARE: 'render:prepare',
+  /** The default output path for a track and a preset, in `render.outputDir`. */
+  RENDER_SUGGEST_OUTPUT: 'render:suggest-output',
+  /** The save dialog for the output file. */
+  RENDER_PICK_OUTPUT: 'render:pick-output',
+  /** Start one job; refused while one runs. */
+  RENDER_START: 'render:start',
+  /** Stop the running job and remove its partial file. */
+  RENDER_CANCEL: 'render:cancel',
+  /** Main to renderer: one `RenderEvent` — progress, or how a job ended. */
+  RENDER_EVENT: 'render:event',
+  /** Write the `render` key of the studio's settings file (ADR-0240). */
+  RENDER_SET_SETTINGS: 'render:set-settings',
+
   /** `shell.openExternal`, the only way a link leaves the window. */
   SHELL_OPEN_EXTERNAL: 'shell:open-external',
 } as const

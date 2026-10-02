@@ -12,10 +12,13 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_PLAYER_MODE } from '@shared/player-mode'
 
 import {
+  ffmpegOf,
+  outputDirOf,
   playerModeOf,
   readSettings,
   reducedMotionOf,
   settingsFile,
+  withRender,
   writeSettings,
 } from './settings'
 
@@ -112,6 +115,46 @@ describe('the mode the studio spawns with', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'rlx-studio-')), 'nested', 'settings.json')
     writeSettings(file, { playerMode: 'windowless' })
     expect(playerModeOf(readSettings(file))).toBe('windowless')
+  })
+})
+
+describe('the render keys', () => {
+  it('read ffmpegPath and outputDir, and default both when absent', () => {
+    const settings = readSettings(
+      withContent('{"render":{"ffmpegPath":"/opt/ffmpeg/bin/ffmpeg","outputDir":"/data/clips"}}'),
+    )
+    expect(settings.render).toEqual({
+      ffmpegPath: '/opt/ffmpeg/bin/ffmpeg',
+      outputDir: '/data/clips',
+    })
+    expect(ffmpegOf(settings)).toBe('/opt/ffmpeg/bin/ffmpeg')
+    expect(outputDirOf(settings, '/home/vj/Videos')).toBe('/data/clips')
+
+    expect(ffmpegOf({})).toBe('ffmpeg')
+    expect(outputDirOf({}, '/home/vj/Videos')).toBe('/home/vj/Videos')
+  })
+
+  it('drop a key of the wrong shape and keep the other', () => {
+    expect(readSettings(withContent('{"render":{"ffmpegPath":7,"outputDir":"/clips"}}'))).toEqual({
+      render: { outputDir: '/clips' },
+    })
+    expect(readSettings(withContent('{"render":{"ffmpegPath":""}}'))).toEqual({})
+    expect(readSettings(withContent('{"render":"ffmpeg"}'))).toEqual({})
+  })
+
+  it('survive a restart beside the other keys, and an empty value clears one', () => {
+    const file = withContent('{"playerPath":"/opt/ritmolux","ui":{"reducedMotion":true}}')
+    writeSettings(file, withRender(readSettings(file), { ffmpegPath: '/opt/ffmpeg', outputDir: '/clips' }))
+
+    const after = readSettings(file)
+    expect(after.render).toEqual({ ffmpegPath: '/opt/ffmpeg', outputDir: '/clips' })
+    expect(after.playerPath).toBe('/opt/ritmolux')
+    expect(reducedMotionOf(after)).toBe(true)
+
+    writeSettings(file, withRender(after, { outputDir: '' }))
+    expect(readSettings(file).render).toEqual({ ffmpegPath: '/opt/ffmpeg' })
+    writeSettings(file, withRender(readSettings(file), { ffmpegPath: null }))
+    expect(readSettings(file).render).toBeUndefined()
   })
 })
 

@@ -11,11 +11,13 @@ import { FRAME_PORT_SENTINEL, IPC_CHANNELS } from '@shared/ipc-channels'
 import { appApi } from './api/app'
 import { presetApi } from './api/preset'
 import { playerApi } from './api/player'
+import { renderApi } from './api/render'
 
 const api = {
   app: appApi,
   player: playerApi,
   preset: presetApi,
+  render: renderApi,
 } as const
 
 contextBridge.exposeInMainWorld('api', api)

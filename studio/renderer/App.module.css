@@ -26,6 +26,7 @@
   font-size: 11px;
 }
 
+.render,
 .settings {
   /* Pushed to the far end, so the preset name stays beside the title. */
   margin-left: auto;
@@ -38,6 +39,12 @@
   cursor: pointer;
 }
 
+.render + .settings {
+  margin-left: 0;
+}
+
+.render:hover,
+.render[aria-expanded='true'],
 .settings:hover,
 .settings[aria-expanded='true'] {
   color: var(--text);

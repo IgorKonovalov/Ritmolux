@@ -265,7 +265,7 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The player renders and reports bars | dev | done | committed with this row |
-| 2 — A plain clip from the studio | studio-builder | not started | |
+| 2 — A plain clip from the studio | studio-builder | done | committed with this row |
 | 3 — The strip and the prompts | studio-builder | not started | |
 | 4 — The neural toggle | studio-builder | not started | |
 | 5 — The job is a file, and the docs say so | studio-builder | not started | |
@@ -288,6 +288,30 @@ Beside it at render time: `<output>.bars.json` (the player's `--bars`), `<output
 - Phase 1, binary size: `target/release/ritmolux` from `cargo build --release -p standalone --bin
   ritmolux`, Linux. 12,854,504 B at `f77a476a`, before the phase. 12,928,352 B after it, which is
   77.1 % of NFR §4's 16,777,216 B cap.
+- Phase 2, outside the file list: `studio/shared/render.ts` (the request, grid and event shapes,
+  in `shared/` because the renderer's project type-checks the preload's imports and cannot see
+  Node), `studio/electron/render/service.ts` (the rules, kept free of Electron so they test
+  plainly), `studio/electron/render/commands.ts`, `studio/electron/ipc/appHandlers.ts` and
+  `preload/api/app.ts` (`AppInfo` carries `render`), the two new and two touched CSS modules,
+  `studio/renderer/App.test.tsx` (its `window.api` stub gains `render`), and `studio/README.md`:
+  `settings.doc.test.ts` holds the settings table to `StudioSettings`, so the `render` row lands
+  with the key.
+- Phase 2, the IPC surface: eight OS channels under `render:` (pick-audio, prepare,
+  suggest-output, pick-output, start, cancel, event, set-settings). No domain channel was added.
+  A path the renderer sends back is accepted only when main produced it, a dialog's answer or the
+  output it suggested, which is the preset channels' guard applied to a second pair of paths.
+- Phase 2, the encode: `encoderArgs` is `shot::render::ffmpeg_args` at CRF 18 plus
+  `-progress pipe:3`. `commands.test.ts` reads the Rust function's string literals and holds the
+  TypeScript list to them in order.
+- Phase 2, verdicts the plan left open. The first stage to exit badly is named, and the others
+  are stopped. An upstream stage that dies after the encoder finished cleanly is not blamed,
+  because `-shortest` can close the encoder's stdin a frame early. An encoder that exits 0
+  without `progress=end` fails. A failed job removes its partial MP4 as well as writing the log,
+  because a file cut off before its index does not play. The transcode cache is emptied at
+  start as well as at quit, so a crash leaves nothing behind for a later session.
+- Phase 2, wiring checked by hand before it was written: Node's `stdio: [child.stdout, ...]`
+  with the parent's copy destroyed moved 50,000,000 bytes from `head` to `wc -c` intact. With
+  the reader exiting early, the writer saw `SIGPIPE` rather than blocking.
 
 ### Close triggers
 
