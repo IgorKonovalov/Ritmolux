@@ -1,0 +1,33 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The waterfall landscape through the shared camera, from a fixed camera
+# looking down the rows with an open aperture.
+#
+#  - Every camera param bound, so a change of default cannot move this
+#    baseline; `pitch` raised so the rows recede up the frame.
+#  - `focus` near the front edge and `aperture` open, so the far rows take the
+#    widened, blurred stroke and the near rows stay sharp.
+#  - A short `row_period` and few rows, so the ring fills inside the golden
+#    harness's warm-up and every drawn row is a pushed one.
+system = "waterfall"
+name   = "fixture_waterfall"
+
+[waterfall]
+elements   = 32
+rows       = 24
+row_period = 0.04
+
+[params]
+height      = "0.7"
+row_spacing = "0.12"
+fade        = "0.7"
+line_width  = "2"
+hue         = "0.55"
+hue_spread  = "0.6"
+brightness  = "1.0"
+yaw         = "0"
+pitch       = "0.45"
+distance    = "3.4"
+fov         = "0.9"
+focus       = "0.25"
+aperture    = "6"

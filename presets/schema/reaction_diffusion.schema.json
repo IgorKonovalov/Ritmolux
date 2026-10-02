@@ -164,6 +164,10 @@
       "$ref": "#/definitions/plexus",
       "description": "The arrangement, count and seed of the plexus system's points."
     },
+    "waterfall": {
+      "$ref": "#/definitions/waterfall",
+      "description": "How many bands and rows the waterfall landscape holds, and how often a row is pushed."
+    },
     "milk": {
       "$ref": "#/definitions/milk",
       "description": "A converted MilkDrop preset's compiled programs and shaders."
@@ -197,7 +201,7 @@
       "properties": {
         "system": {
           "type": "string",
-          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus"],
+          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus", "waterfall"],
           "description": "Which built-in scene the layer draws. Required."
         },
         "join": {
@@ -285,6 +289,10 @@
         "plexus": {
           "$ref": "#/definitions/plexus",
           "description": "The layer's plexus arrangement, point count and seed."
+        },
+        "waterfall": {
+          "$ref": "#/definitions/waterfall",
+          "description": "The layer's waterfall bands, rows and push period."
         }
       }
     },
@@ -563,6 +571,36 @@
         "seed": {
           "type": "integer",
           "description": "What the points and their drift are drawn from; absent, the preset's own seed."
+        }
+      }
+    },
+    "waterfall": {
+      "description": "How many bands a row of the landscape holds, how many rows it keeps, how often a row is pushed, and how fast each band follows its level.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "elements": {
+          "type": "integer",
+          "description": "Bands across a row. A row finer than the band array is refused.",
+          "markdownDescription": "Bands across a row. A row finer than the band array is refused.\n\nDefault `48`."
+        },
+        "rows": {
+          "type": "integer",
+          "description": "Rows the landscape draws, the live front row included; the quality tier may draw fewer, and says so.",
+          "markdownDescription": "Rows the landscape draws, the live front row included; the quality tier may draw fewer, and says so.\n\nDefault `64`."
+        },
+        "row_period": {
+          "type": "number",
+          "description": "Seconds between two rows, so rows times row_period is how much of the music the landscape shows.",
+          "markdownDescription": "Seconds between two rows, so rows times row_period is how much of the music the landscape shows.\n\nDefault `0.04`."
+        },
+        "smoothing": {
+          "anyOf": [
+            { "type": "number" },
+            { "type": "object", "additionalProperties": false, "properties": { "attack": { "type": "number" }, "release": { "type": "number" } } }
+          ],
+          "description": "Per-band easing in seconds, in the [smoothing] table's own vocabulary.",
+          "markdownDescription": "Per-band easing in seconds, in the [smoothing] table's own vocabulary.\n\nDefault `0`."
         }
       }
     },

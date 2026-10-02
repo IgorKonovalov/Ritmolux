@@ -67,6 +67,7 @@ impl Preset {
             raw.field,
             raw.cellular,
             raw.plexus,
+            raw.waterfall,
             raw.milk,
             pinned_salt,
         )?;
@@ -649,6 +650,7 @@ pub(super) fn build_layer(
         raw.field,
         raw.cellular,
         raw.plexus,
+        raw.waterfall,
         // A `[layer]` carries no `[milk]` table: a converted preset is a whole
         // preset, and layering one under another is a composition nothing in the
         // corpus asks for. A layer warp mesh drives its mesh from `[layer.params]`
@@ -707,6 +709,7 @@ pub(super) fn build_config(
     field: Option<RawField>,
     cellular: Option<RawCellular>,
     plexus: Option<RawPlexus>,
+    waterfall: Option<RawWaterfall>,
     milk: Option<RawMilk>,
     salt: u32,
 ) -> Result<Option<GeneratorConfig>, PresetError> {
@@ -812,6 +815,12 @@ pub(super) fn build_config(
         SystemKind::Plexus => Ok(Some(GeneratorConfig::Plexus(
             plexus.unwrap_or_default().into_config(salt)?,
         ))),
+        // The band count, row count and push period are structural: they size
+        // the row ring, which an eased value would resize mid-frame. Config is
+        // always `Some` so `configure` runs on every preset switch and clears
+        // the ring — the outgoing preset's landscape never scrolls on under the
+        // incoming one.
+        SystemKind::Waterfall => Ok(Some(waterfall.unwrap_or_default().into_config()?)),
         // Reaction-diffusion drives its regime through named params (feed/kill/
         // flow), not a declarative structural table. `shape_collage`'s structure
         // is an authored element list compiled into the scene, and its seeded

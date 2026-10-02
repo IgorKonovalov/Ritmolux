@@ -249,6 +249,7 @@ pub const TABLES: &[&TableDesc] = &[
     &super::raw::FIELD,
     &super::raw::CELLULAR,
     &super::raw::PLEXUS,
+    &super::raw::WATERFALL,
     &super::raw::MILK,
     &super::raw::MILK_ELEMENT,
     &super::raw::FEEDBACK,

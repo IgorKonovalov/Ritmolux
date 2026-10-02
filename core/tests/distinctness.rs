@@ -192,4 +192,5 @@ family_tests! {
     distinctness_analytic_field => AnalyticField,
     distinctness_cellular => Cellular,
     distinctness_plexus => Plexus,
+    distinctness_waterfall => Waterfall,
 }

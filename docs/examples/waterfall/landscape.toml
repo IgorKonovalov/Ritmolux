@@ -1,0 +1,23 @@
+# The waterfall system's landscape, for the gallery's picture of it. Teaching
+# material, not a shipped preset: the last two and a half seconds of the
+# spectrum lie on the ground, the newest row at the front, the camera looking
+# down the rows from a little above.
+system = "waterfall"
+name = "Waterfall Landscape"
+
+[waterfall]
+elements   = 48
+rows       = 64
+row_period = 0.04
+smoothing  = 0.05
+
+[params]
+height      = "0.8"
+row_spacing = "0.06"
+fade        = "0.75"
+line_width  = "1.6"
+hue         = "0.55"
+hue_spread  = "0.6"
+brightness  = "1.1"
+pitch       = "0.4"
+distance    = "3.0"

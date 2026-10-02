@@ -2231,6 +2231,10 @@ fn declared_params_match_set_param() {
             src.join("render/scenes/plexus/mod.rs"),
             SystemKind::Plexus.param_names(),
         ),
+        (
+            src.join("render/scenes/lines/waterfall.rs"),
+            SystemKind::Waterfall.param_names(),
+        ),
         // The global compositing stages, declared the same way.
         (
             src.join("render/background.rs"),
@@ -2535,6 +2539,7 @@ const STRUCTURAL: &[(&str, &str)] = &[
     ("cellular", "states"),
     ("cellular", "threshold"),
     ("plexus", "palette_steps"),
+    ("waterfall", "palette_steps"),
     // `fold_order` / `fold_edge`: the kaleidoscope's two stepped params.
     ("kaleidoscope", "kaleido_order"),
     ("kaleidoscope", "kaleido_edge"),

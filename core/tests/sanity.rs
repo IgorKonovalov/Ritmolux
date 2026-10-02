@@ -528,6 +528,12 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // guess sat 21.96x under it, past the 2.2x slack this file allows. Half
         // that minimum, like every floor above.
         SystemKind::Plexus => 0.22,
+        // **Not derived from a distribution**: the system ships no preset
+        // content. Set low because a landscape of fine lines over a dark ground
+        // lights little of the frame — a guess, not a measurement.
+        // **Re-derive it from this test's printed distribution when the first
+        // preset ships**, at half the family minimum like every floor above.
+        SystemKind::Waterfall => 0.02,
     }
 }
 
@@ -663,6 +669,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::AnalyticField => "analytic_field",
         SystemKind::Cellular => "cellular",
         SystemKind::Plexus => "plexus",
+        SystemKind::Waterfall => "waterfall",
     }
 }
 

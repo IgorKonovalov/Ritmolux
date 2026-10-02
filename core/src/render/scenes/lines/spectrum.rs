@@ -137,8 +137,8 @@ const DEFAULT_CURVE: f32 = default_of(PARAMS, "curve");
 /// This runs per element per frame on the render path, where a `NaN` or an
 /// infinite length must not reach the geometry. A floor strictly above zero is
 /// what rules out `pow(0, 0)` and `pow(0, -1)` for every author expression.
-const CURVE_MIN: f32 = 0.05;
-const CURVE_MAX: f32 = 4.0;
+pub(crate) const CURVE_MIN: f32 = 0.05;
+pub(crate) const CURVE_MAX: f32 = 4.0;
 const DEFAULT_ROTATION: f32 = default_of(PARAMS, "rotation");
 // Shared view transform (ADR-0018): identity by default.
 const DEFAULT_ZOOM: f32 = 1.0;
@@ -366,6 +366,14 @@ pub(crate) fn curve_level(level: f32, curve: f32) -> f32 {
         curve.clamp(CURVE_MIN, CURVE_MAX)
     };
     level.max(0.0).powf(exponent)
+}
+
+/// One band's per-frame step: shape the raw downsampled level by `curve`, then
+/// ease the held level toward it over `dt` real seconds — in that order, which
+/// is ADR-0040's decision (see [`SpectrumScene`]'s `update`). The one place the
+/// two readouts of the band array, `spectrum` and `waterfall`, take it from.
+pub(crate) fn shape_and_ease(held: f32, raw: f32, curve: f32, easing: Easing, dt: f32) -> f32 {
+    easing.step(held, curve_level(raw, curve), dt)
 }
 
 /// The world-space length an element reaches, `base + scale * level`, floored at
@@ -801,9 +809,9 @@ impl Scene for SpectrumScene {
         let (easing, dt) = (self.easing, self.dt);
         for i in 0..self.levels.len() {
             let raw = self.raw_levels.get(i).copied().unwrap_or(0.0);
-            let shaped = curve_level(raw, self.series_value(SERIES_CURVE, i, self.curve));
+            let curve = self.series_value(SERIES_CURVE, i, self.curve);
             if let Some(held) = self.levels.get_mut(i) {
-                *held = easing.step(*held, shaped, dt);
+                *held = shape_and_ease(*held, raw, curve, easing, dt);
             }
         }
 

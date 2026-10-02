@@ -202,7 +202,10 @@ fn draws_segments(system: SystemKind) -> bool {
         // The plexus strokes 3D segments through the camera's own pipeline,
         // which the extent diagnostic does not read: its frame is the camera's
         // frustum, and an edge outside it is culled before it is drawn.
-        | SystemKind::Plexus => false,
+        | SystemKind::Plexus
+        // The waterfall's rows are the plexus's case: 3D segments through its
+        // own `seg3d` pipeline, culled against the camera's frustum.
+        | SystemKind::Waterfall => false,
     }
 }
 

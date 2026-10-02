@@ -530,6 +530,11 @@ pub enum GeneratorConfig {
     /// count and the seed. Always `Some` for that system, so `configure` runs on
     /// every preset switch and the incoming preset starts from its own points.
     Plexus(plexus::PlexusConfig),
+    /// The waterfall's `[waterfall]` table (ADR-0180 rule 1): the band count,
+    /// the row count, the push period and the per-band easing. Always `Some`
+    /// for that system, so `configure` runs on every preset switch and the
+    /// incoming preset starts from an empty ring.
+    Waterfall(lines::waterfall::WaterfallConfig),
 }
 
 impl GeneratorConfig {
@@ -551,7 +556,8 @@ impl GeneratorConfig {
             | GeneratorConfig::Path { .. }
             | GeneratorConfig::Field(_)
             | GeneratorConfig::Cellular(_)
-            | GeneratorConfig::Plexus(_) => 0,
+            | GeneratorConfig::Plexus(_)
+            | GeneratorConfig::Waterfall(_) => 0,
         }
     }
 }
@@ -1250,6 +1256,8 @@ pub(crate) struct SceneKindInfo {
 /// fourteen-arm match of its own — that accumulation is what ADR-0238 part 3
 /// ended.
 pub(crate) fn kind_info(kind: SystemKind) -> SceneKindInfo {
+    // `waterfall` is a line system that answers `false`: it draws through a
+    // `seg3d` renderer of its own and never borrows the shared 2D one.
     let shares_line_renderer = match kind {
         SystemKind::ParametricCurve
         | SystemKind::LSystem
@@ -1265,7 +1273,8 @@ pub(crate) fn kind_info(kind: SystemKind) -> SceneKindInfo {
         | SystemKind::ShapeCollage
         | SystemKind::AnalyticField
         | SystemKind::Cellular
-        | SystemKind::Plexus => false,
+        | SystemKind::Plexus
+        | SystemKind::Waterfall => false,
     };
     SceneKindInfo {
         shares_line_renderer,
@@ -1359,6 +1368,12 @@ fn create(
             surface_format,
             tier.plexus_points as usize,
             tier.plexus_edges as usize,
+            tier.max_coc_px as f32,
+        )),
+        SystemKind::Waterfall => Box::new(lines::WaterfallScene::new(
+            device,
+            surface_format,
+            tier.seg3d_segments as usize,
             tier.max_coc_px as f32,
         )),
     }
@@ -1607,6 +1622,7 @@ mod tests {
             SystemKind::AnalyticField => "analytic field",
             SystemKind::Cellular => "cellular",
             SystemKind::Plexus => "plexus",
+            SystemKind::Waterfall => "waterfall",
         }
     }
 
@@ -1901,6 +1917,7 @@ mod tests {
             SystemKind::AnalyticField,
             SystemKind::Cellular,
             SystemKind::Plexus,
+            SystemKind::Waterfall,
         ];
         for (i, a) in independent.iter().enumerate() {
             for b in independent.iter().skip(i + 1).chain(lines.iter()) {

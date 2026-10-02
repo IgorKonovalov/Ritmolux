@@ -7,7 +7,7 @@
   "properties": {
     "system": {
       "type": "string",
-      "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus"],
+      "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus", "waterfall"],
       "description": "Which built-in scene this preset drives. Required."
     },
     "name": {
@@ -95,6 +95,10 @@
     "plexus": {
       "$ref": "#/definitions/plexus",
       "description": "The arrangement, count and seed of the plexus system's points."
+    },
+    "waterfall": {
+      "$ref": "#/definitions/waterfall",
+      "description": "How many bands and rows the waterfall landscape holds, and how often a row is pushed."
     },
     "milk": {
       "$ref": "#/definitions/milk",
@@ -622,7 +626,7 @@
             "size": { "$ref": "#/definitions/param.size.attractor" },
             "hue": { "$ref": "#/definitions/param.hue.fragment_field" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
-            "fade": { "$ref": "#/definitions/param.fade" },
+            "fade": { "$ref": "#/definitions/param.fade.attractor" },
             "hue_spread": { "$ref": "#/definitions/param.hue_spread.attractor" },
             "hue_center": { "$ref": "#/definitions/param.hue_center.attractor" },
             "saturation": { "$ref": "#/definitions/param.saturation" },
@@ -1375,6 +1379,84 @@
           } } } }
     },
     {
+      "if": { "required": ["system"], "properties": { "system": { "const": "waterfall" } } },
+      "then": { "properties": { "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "height": { "$ref": "#/definitions/param.height" },
+            "row_spacing": { "$ref": "#/definitions/param.row_spacing" },
+            "curve": { "$ref": "#/definitions/param.curve" },
+            "fade": { "$ref": "#/definitions/param.fade.waterfall" },
+            "line_width": { "$ref": "#/definitions/param.line_width.waterfall" },
+            "glow": { "$ref": "#/definitions/param.glow.parametric_curve" },
+            "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
+            "hue": { "$ref": "#/definitions/param.hue.spectrum" },
+            "hue_spread": { "$ref": "#/definitions/param.hue_spread.waterfall" },
+            "saturation": { "$ref": "#/definitions/param.saturation" },
+            "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
+            "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
+            "yaw": { "$ref": "#/definitions/param.yaw.plexus" },
+            "pitch": { "$ref": "#/definitions/param.pitch.waterfall" },
+            "distance": { "$ref": "#/definitions/param.distance.plexus" },
+            "fov": { "$ref": "#/definitions/param.fov.plexus" },
+            "focus": { "$ref": "#/definitions/param.focus.plexus" },
+            "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+            "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
+            "pan_x": { "$ref": "#/definitions/param.pan_x" },
+            "pan_y": { "$ref": "#/definitions/param.pan_y" },
+            "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
+            "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
+            "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
+            "bg_angle": { "$ref": "#/definitions/param.bg_angle" },
+            "bg_hue_span": { "$ref": "#/definitions/param.bg_hue_span" },
+            "bg_coord_mode": { "$ref": "#/definitions/param.bg_coord_mode" },
+            "bg_center_x": { "$ref": "#/definitions/param.bg_center_x" },
+            "bg_center_y": { "$ref": "#/definitions/param.bg_center_y" },
+            "bg_shade": { "$ref": "#/definitions/param.bg_shade" },
+            "bg_shade_end": { "$ref": "#/definitions/param.bg_shade_end" },
+            "bg_ramp_gamma": { "$ref": "#/definitions/param.bg_ramp_gamma" },
+            "bg_band_amount": { "$ref": "#/definitions/param.bg_band_amount" },
+            "bg_band_angle": { "$ref": "#/definitions/param.bg_band_angle" },
+            "bg_band_pos": { "$ref": "#/definitions/param.bg_band_pos" },
+            "bg_band_width": { "$ref": "#/definitions/param.bg_band_width" },
+            "bg_band_curve": { "$ref": "#/definitions/param.bg_band_curve" },
+            "bg_band_hue": { "$ref": "#/definitions/param.bg_band_hue" },
+            "bg_band_hue_span": { "$ref": "#/definitions/param.bg_band_hue_span" },
+            "trails": { "$ref": "#/definitions/param.trails" },
+            "fb_zoom": { "$ref": "#/definitions/param.fb_zoom.trails" },
+            "fb_rotate": { "$ref": "#/definitions/param.fb_rotate.trails" },
+            "fb_dx": { "$ref": "#/definitions/param.fb_dx.trails" },
+            "fb_dy": { "$ref": "#/definitions/param.fb_dy.trails" },
+            "fb_center_x": { "$ref": "#/definitions/param.fb_center_x.trails" },
+            "fb_center_y": { "$ref": "#/definitions/param.fb_center_y.trails" },
+            "fb_warp": { "$ref": "#/definitions/param.fb_warp.trails" },
+            "kaleido_order": { "$ref": "#/definitions/param.kaleido_order" },
+            "kaleido_angle": { "$ref": "#/definitions/param.kaleido_angle" },
+            "kaleido_center_x": { "$ref": "#/definitions/param.kaleido_center_x" },
+            "kaleido_center_y": { "$ref": "#/definitions/param.kaleido_center_y" },
+            "kaleido_edge": { "$ref": "#/definitions/param.kaleido_edge" },
+            "kaleido_tile": { "$ref": "#/definitions/param.kaleido_tile" },
+            "kaleido_radial": { "$ref": "#/definitions/param.kaleido_radial" },
+            "kaleido_spiral": { "$ref": "#/definitions/param.kaleido_spiral" },
+            "kaleido_zoom": { "$ref": "#/definitions/param.kaleido_zoom" },
+            "kaleido_inner": { "$ref": "#/definitions/param.kaleido_inner" },
+            "bloom_amount": { "$ref": "#/definitions/param.bloom_amount" },
+            "bloom_threshold": { "$ref": "#/definitions/param.bloom_threshold" },
+            "bloom_radius": { "$ref": "#/definitions/param.bloom_radius" },
+            "occlude": { "$ref": "#/definitions/param.occlude" },
+            "exposure": { "$ref": "#/definitions/param.exposure" },
+            "ink_amount": { "$ref": "#/definitions/param.ink_amount" },
+            "paper_hue": { "$ref": "#/definitions/param.paper_hue" },
+            "paper_sat": { "$ref": "#/definitions/param.paper_sat" },
+            "paper_bright": { "$ref": "#/definitions/param.paper_bright" },
+            "ink_hue": { "$ref": "#/definitions/param.ink_hue" },
+            "ink_sat": { "$ref": "#/definitions/param.ink_sat" },
+            "ink_bright": { "$ref": "#/definitions/param.ink_bright" },
+            "ink_gamma": { "$ref": "#/definitions/param.ink_gamma" }
+          } } } }
+    },
+    {
       "if": { "required": ["layer"], "properties": { "layer": { "required": ["system"], "properties": { "system": { "const": "fragment_field" } } } } },
       "then": { "properties": { "layer": { "properties": { "params": {
           "type": "object",
@@ -1580,7 +1662,7 @@
             "size": { "$ref": "#/definitions/param.size.attractor" },
             "hue": { "$ref": "#/definitions/param.hue.fragment_field" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
-            "fade": { "$ref": "#/definitions/param.fade" },
+            "fade": { "$ref": "#/definitions/param.fade.attractor" },
             "hue_spread": { "$ref": "#/definitions/param.hue_spread.attractor" },
             "hue_center": { "$ref": "#/definitions/param.hue_center.attractor" },
             "saturation": { "$ref": "#/definitions/param.saturation" },
@@ -1897,6 +1979,35 @@
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" }
           } } } } } }
+    },
+    {
+      "if": { "required": ["layer"], "properties": { "layer": { "required": ["system"], "properties": { "system": { "const": "waterfall" } } } } },
+      "then": { "properties": { "layer": { "properties": { "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "height": { "$ref": "#/definitions/param.height" },
+            "row_spacing": { "$ref": "#/definitions/param.row_spacing" },
+            "curve": { "$ref": "#/definitions/param.curve" },
+            "fade": { "$ref": "#/definitions/param.fade.waterfall" },
+            "line_width": { "$ref": "#/definitions/param.line_width.waterfall" },
+            "glow": { "$ref": "#/definitions/param.glow.parametric_curve" },
+            "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
+            "hue": { "$ref": "#/definitions/param.hue.spectrum" },
+            "hue_spread": { "$ref": "#/definitions/param.hue_spread.waterfall" },
+            "saturation": { "$ref": "#/definitions/param.saturation" },
+            "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
+            "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
+            "yaw": { "$ref": "#/definitions/param.yaw.plexus" },
+            "pitch": { "$ref": "#/definitions/param.pitch.waterfall" },
+            "distance": { "$ref": "#/definitions/param.distance.plexus" },
+            "fov": { "$ref": "#/definitions/param.fov.plexus" },
+            "focus": { "$ref": "#/definitions/param.focus.plexus" },
+            "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+            "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
+            "pan_x": { "$ref": "#/definitions/param.pan_x" },
+            "pan_y": { "$ref": "#/definitions/param.pan_y" }
+          } } } } } }
     }
   ],
   "definitions": {
@@ -1907,7 +2018,7 @@
       "properties": {
         "system": {
           "type": "string",
-          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus"],
+          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus", "waterfall"],
           "description": "Which built-in scene the layer draws. Required."
         },
         "join": {
@@ -1995,6 +2106,10 @@
         "plexus": {
           "$ref": "#/definitions/plexus",
           "description": "The layer's plexus arrangement, point count and seed."
+        },
+        "waterfall": {
+          "$ref": "#/definitions/waterfall",
+          "description": "The layer's waterfall bands, rows and push period."
         }
       }
     },
@@ -2273,6 +2388,36 @@
         "seed": {
           "type": "integer",
           "description": "What the points and their drift are drawn from; absent, the preset's own seed."
+        }
+      }
+    },
+    "waterfall": {
+      "description": "How many bands a row of the landscape holds, how many rows it keeps, how often a row is pushed, and how fast each band follows its level.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "elements": {
+          "type": "integer",
+          "description": "Bands across a row. A row finer than the band array is refused.",
+          "markdownDescription": "Bands across a row. A row finer than the band array is refused.\n\nDefault `48`."
+        },
+        "rows": {
+          "type": "integer",
+          "description": "Rows the landscape draws, the live front row included; the quality tier may draw fewer, and says so.",
+          "markdownDescription": "Rows the landscape draws, the live front row included; the quality tier may draw fewer, and says so.\n\nDefault `64`."
+        },
+        "row_period": {
+          "type": "number",
+          "description": "Seconds between two rows, so rows times row_period is how much of the music the landscape shows.",
+          "markdownDescription": "Seconds between two rows, so rows times row_period is how much of the music the landscape shows.\n\nDefault `0.04`."
+        },
+        "smoothing": {
+          "anyOf": [
+            { "type": "number" },
+            { "type": "object", "additionalProperties": false, "properties": { "attack": { "type": "number" }, "release": { "type": "number" } } }
+          ],
+          "description": "Per-band easing in seconds, in the [smoothing] table's own vocabulary.",
+          "markdownDescription": "Per-band easing in seconds, in the [smoothing] table's own vocabulary.\n\nDefault `0`."
         }
       }
     },
@@ -2921,7 +3066,7 @@
       "description": "Size of each particle's deposit into the accumulation.",
       "markdownDescription": "Size of each particle's deposit into the accumulation.\n\n- default `1.0`\n- typical range `0.0` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.fade": {
+    "param.fade.attractor": {
       "type": "string",
       "description": "How much of the accumulation survives each second; near 1 the figure builds up for a long time.",
       "markdownDescription": "How much of the accumulation survives each second; near 1 the figure builds up for a long time.\n\n- default `0.94`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
@@ -3695,6 +3840,36 @@
       "type": "string",
       "description": "How far along the palette the colour travels from the nearest part of the volume to the farthest.",
       "markdownDescription": "How far along the palette the colour travels from the nearest part of the volume to the farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.height": {
+      "type": "string",
+      "description": "How tall a full band stands above the ground, in world units; a row is 2 across.",
+      "markdownDescription": "How tall a full band stands above the ground, in world units; a row is 2 across.\n\n- default `0.6`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.row_spacing": {
+      "type": "string",
+      "description": "How far behind each row the next one lies, in world units; with rows, how deep the landscape reaches.",
+      "markdownDescription": "How far behind each row the next one lies, in world units; with rows, how deep the landscape reaches.\n\n- default `0.06`\n- typical range `0.01` to `0.3` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.fade.waterfall": {
+      "type": "string",
+      "description": "How much light the farthest row has lost against the front edge; 0 keeps every row as bright as the newest.",
+      "markdownDescription": "How much light the farthest row has lost against the front edge; 0 keeps every row as bright as the newest.\n\n- default `0.8`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.line_width.waterfall": {
+      "type": "string",
+      "description": "Line width in pixels at the focal plane; nearer rows are wider and farther ones thinner.",
+      "markdownDescription": "Line width in pixels at the focal plane; nearer rows are wider and farther ones thinner.\n\n- default `1.5`\n- typical range `0.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.hue_spread.waterfall": {
+      "type": "string",
+      "description": "How far along the palette the colour travels from the lowest band to the highest.",
+      "markdownDescription": "How far along the palette the colour travels from the lowest band to the highest.\n\n- default `0.6`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.pitch.waterfall": {
+      "type": "string",
+      "description": "Raises the camera above the scene's volume, in radians; negative looks up from below.",
+      "markdownDescription": "Raises the camera above the scene's volume, in radians; negative looks up from below.\n\n- default `0.35`\n- typical range `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.bg_hue": {
       "type": "string",

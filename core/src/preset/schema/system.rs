@@ -55,6 +55,12 @@ pub enum SystemKind {
     /// arrangement of the points as a `[plexus] layout` rather than a system
     /// each.
     Plexus,
+    /// The recent spectrum as a landscape: one row per moment, receding from
+    /// the camera as it ages, seen through the shared perspective camera
+    /// (ADR-0258). Its own system rather than a `spectrum` layout, because it
+    /// keeps a history of rows and draws through a renderer of its own
+    /// (ADR-0180 rule 1).
+    Waterfall,
 }
 
 /// **The** roster of built-in systems: every variant, its canonical name, its
@@ -164,6 +170,12 @@ const TABLE: [(SystemKind, &str, &str, &[ParamSpec]); SystemKind::VARIANT_COUNT]
             "plexus",
             scenes::plexus::PARAMS,
         ),
+        (
+            SystemKind::Waterfall,
+            "waterfall",
+            "waterfall",
+            scenes::lines::waterfall::PARAMS,
+        ),
     ]
 };
 
@@ -251,7 +263,7 @@ impl SystemKind {
     /// typed off this count, so bumping the count without adding a row does not
     /// compile either. Both are module-private, so this names them rather than
     /// linking them.
-    pub const VARIANT_COUNT: usize = 15;
+    pub const VARIANT_COUNT: usize = 16;
 
     /// This variant's index into [`TABLE`].
     ///
@@ -276,6 +288,7 @@ impl SystemKind {
             SystemKind::AnalyticField => 12,
             SystemKind::Cellular => 13,
             SystemKind::Plexus => 14,
+            SystemKind::Waterfall => 15,
         }
     }
 

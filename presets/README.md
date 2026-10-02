@@ -1028,6 +1028,39 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
 
+### System: `waterfall`
+
+**Structural**
+
+| Parameter | Default | Range | What it does | Group |
+|---|---|---|---|---|
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. | colour |
+
+**Modal**
+
+| Parameter | Default | Range | What it does | Group |
+|---|---|---|---|---|
+| `height` | `0.6` | `0` – `2` | How tall a full band stands above the ground, in world units; a row is 2 across. | shape, main |
+| `row_spacing` | `0.06` | `0.01` – `0.3` | How far behind each row the next one lies, in world units; with rows, how deep the landscape reaches. | shape, main |
+| `curve` | `1` | `0.05` – `4` | Exponent on each band's level: 1 is linear, below 1 lifts quiet detail, above 1 pushes it down. | shape |
+| `fade` | `0.8` | `0` – `1` | How much light the farthest row has lost against the front edge; 0 keeps every row as bright as the newest. | light, main |
+| `line_width` | `1.5` | `0.5` – `8` | Line width in pixels at the focal plane; nearer rows are wider and farther ones thinner. | shape, main |
+| `glow` | `1` | `0` – `4` | Brightness of the halo around each stroke, on top of the stroke itself. | light, main |
+| `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
+| `hue` | `0.55` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. | colour, main |
+| `hue_spread` | `0.6` | `0` – `1` | How far along the palette the colour travels from the lowest band to the highest. | colour |
+| `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. | colour |
+| `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. | colour |
+| `yaw` | `0` | `-3.1415927` – `3.1415927` | Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit. | motion |
+| `pitch` | `0.35` | `-1.55` – `1.55` | Raises the camera above the scene's volume, in radians; negative looks up from below. | motion |
+| `distance` | `3.5` | `1.5` – `8` | How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective. | motion |
+| `fov` | `0.8` | `0.2` – `2` | The camera's vertical field of view in radians; zoom divides it. | motion |
+| `focus` | `0.5` | `0` – `1` | Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest. | light, main |
+| `aperture` | `0` | `0` – `24` | The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill. | light, main |
+| `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. | shape |
+| `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
+| `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
+
 ### Engine stage: `background`
 
 **Structural**

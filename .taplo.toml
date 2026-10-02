@@ -182,6 +182,15 @@ include = [
 schema.path = "presets/schema/plexus.schema.json"
 
 [[rule]]
+name = "ritmolux-waterfall"
+include = [
+  "/**/presets/waterfall_*.toml",
+  "/**/presets/proposed/waterfall_*.toml",
+  "/**/presets/pending/waterfall_*.toml",
+]
+schema.path = "presets/schema/waterfall.schema.json"
+
+[[rule]]
 name = "ritmolux-preset"
 include = [
   "/**/presets/*.toml",
@@ -235,5 +244,8 @@ exclude = [
   "/**/presets/plexus_*.toml",
   "/**/presets/proposed/plexus_*.toml",
   "/**/presets/pending/plexus_*.toml",
+  "/**/presets/waterfall_*.toml",
+  "/**/presets/proposed/waterfall_*.toml",
+  "/**/presets/pending/waterfall_*.toml",
 ]
 schema.path = "presets/preset.schema.json"

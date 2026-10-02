@@ -59,6 +59,11 @@ pub(in crate::preset::schema) struct RawPreset {
     /// arrangement, count and seed of the plexus system's points.
     #[serde(default)]
     pub(in crate::preset::schema) plexus: Option<RawPlexus>,
+    /// The optional `[waterfall]` structural-config table (ADR-0180 rule 1):
+    /// the band count, row count, push period and per-band easing of the
+    /// waterfall landscape.
+    #[serde(default)]
+    pub(in crate::preset::schema) waterfall: Option<RawWaterfall>,
     /// The optional `[per_vertex]` table (Plan 0100): bindings evaluated once
     /// per mesh vertex, with `x`/`y`/`rad`/`ang` in scope.
     #[serde(default)]
@@ -157,6 +162,8 @@ pub(in crate::preset::schema) struct RawLayer {
     pub(in crate::preset::schema) cellular: Option<RawCellular>,
     #[serde(default)]
     pub(in crate::preset::schema) plexus: Option<RawPlexus>,
+    #[serde(default)]
+    pub(in crate::preset::schema) waterfall: Option<RawWaterfall>,
     /// `[layer.per_vertex]` — the same per-vertex surface as the top level, for
     /// a layer whose system is the warp mesh (Plan 0100 Phase 1).
     #[serde(default)]
@@ -361,6 +368,13 @@ pub(in crate::preset::schema) const PRESET: TableDesc = TableDesc {
             doc: "The arrangement, count and seed of the plexus system's points.",
         },
         KeyDesc {
+            name: "waterfall",
+            kind: KeyKind::Table("waterfall"),
+            default: "",
+            doc: "How many bands and rows the waterfall landscape holds, and how often a row \
+                  is pushed.",
+        },
+        KeyDesc {
             name: "milk",
             kind: KeyKind::Table("milk"),
             default: "",
@@ -508,6 +522,12 @@ pub(in crate::preset::schema) const LAYER: TableDesc = TableDesc {
             kind: KeyKind::Table("plexus"),
             default: "",
             doc: "The layer's plexus arrangement, point count and seed.",
+        },
+        KeyDesc {
+            name: "waterfall",
+            kind: KeyKind::Table("waterfall"),
+            default: "",
+            doc: "The layer's waterfall bands, rows and push period.",
         },
     ],
 };

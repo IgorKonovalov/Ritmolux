@@ -241,6 +241,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::AnalyticField => "analytic_field",
         SystemKind::Cellular => "cellular",
         SystemKind::Plexus => "plexus",
+        SystemKind::Waterfall => "waterfall",
     }
 }
 

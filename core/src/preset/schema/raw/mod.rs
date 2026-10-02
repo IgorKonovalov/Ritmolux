@@ -20,6 +20,7 @@ mod plexus;
 mod preset;
 mod smoothing;
 mod spectrum;
+mod waterfall;
 
 pub(super) use cellular::*;
 pub(super) use feedback::*;
@@ -35,3 +36,4 @@ pub(super) use plexus::*;
 pub(super) use preset::*;
 pub(super) use smoothing::*;
 pub(super) use spectrum::*;
+pub(super) use waterfall::*;

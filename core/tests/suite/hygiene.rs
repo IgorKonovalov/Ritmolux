@@ -305,13 +305,19 @@ fn hot_path_modules_carry_the_panic_pragma() {
     }
     assert!(!files.is_empty(), "found no hot-path source files to check");
     // A scene directory joins the set by being under `render/`, which is
-    // scanned recursively; this names the newest one so a change to that walk
+    // scanned recursively; this names the newest ones so a change to that walk
     // that stopped reaching nested scene directories fails here.
     assert!(
         files
             .iter()
             .any(|f| f.ends_with(Path::new("scenes").join("plexus").join("mod.rs"))),
         "the scan no longer reaches `render/scenes/plexus/`"
+    );
+    assert!(
+        files
+            .iter()
+            .any(|f| f.ends_with(Path::new("scenes").join("lines").join("waterfall.rs"))),
+        "the scan no longer reaches `render/scenes/lines/waterfall.rs`"
     );
 
     for file in &files {

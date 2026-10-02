@@ -1,6 +1,6 @@
 # 0238 — The waterfall system
 
-> **Status:** approved (2026-10-01). Runs after Plan 0236 closes.
+> **Status:** in-progress (2026-10-02). Runs after Plan 0236 closes.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0040](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md), [ADR-0019](../adrs/0019-eased-parameters.md)
@@ -199,16 +199,52 @@ struct Ring {
 
 ## Implementation log
 
-**Lane:**
+**Lane:** `plan-0238-the-waterfall-system`, worktree `/home/igor/Work/rlx-plan-0238`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: a scrolling landscape | dev | not started | |
+| 1 — Walking skeleton: a scrolling landscape | dev | done | committed with this row |
 | 2 — Caps, the golden and determinism | dev | not started | |
 | 3 — Documentation and the references | dev | not started | |
 | 4 — The look, judged | human | not started | |
 
 ### Notes
+
+- Phase 1: `downsample` and `curve_level` were already `pub(crate)`. The new shared step is
+  `shape_and_ease` in `spectrum.rs`, which `spectrum`'s `update` now calls; `CURVE_MIN` and
+  `CURVE_MAX` became `pub(crate)` so the waterfall's `curve` spec shares their range.
+- Phase 1 adds surface the plan's param list does not name: `curve` (so the shared `curve_level`
+  step has a lever), `zoom`, `pan_x` and `pan_y` (the camera block's frame takes them, as on the
+  plexus), and a `smoothing` key in `[waterfall]` (so the shared easing step has a constant). The
+  palette set is `saturation`, `palette_mix` and `palette_steps`, as on the plexus.
+- Phase 1, the risk on a long `row_period`: the front row is the live eased level, drawn every
+  frame at depth 0; a pushed row is born on it and fades in over its first period (`alpha = frac`),
+  and the oldest row of a full ring fades out over its last. So `rows` counts the live row, and the
+  ring holds `rows - 1`. Decided from `shot` renders of the fixture, not live.
+- Phase 1: "cleared on `configure` and `resize`" is read as the scene's own buffer-sizing step, as
+  `spectrum`'s `resize` is. A render-target resize does not clear the ring.
+- Phase 1: the 60/144 Hz test runs at `row_period = 5/12` s, a whole number of frames at both
+  rates, with the band array held over 1/12 s windows. A period that is not a whole number of
+  frames at both rates pushes at different instants on the two rates and samples different levels;
+  that is the push cadence's nature, not a tolerance. Two seconds is 4.8 periods, so the compared
+  offset is 0.8 of a row, not zero.
+- Phase 1: `rows` past `seg3d_segments / (elements - 1)` is clamped silently here; Phase 2
+  announces it.
+- Phase 1 touched files outside its list, because the build or a gate needs them:
+  `core/src/preset/schema/raw/preset.rs` (the `[waterfall]` field and key in the root and
+  `[layer]`), `core/src/preset/schema/export.rs` (`TABLES`), `core/src/preset/schema/tests.rs`
+  (descriptor pairs), `core/src/render/mod.rs` (`active_family_key`). It regenerates
+  `presets/README.md`, `presets/schema/`, `presets/preset.schema.json`, `.taplo.toml` and
+  `docs/specs/player-schema.json`, because the generated-file tests fail otherwise. And
+  `hygiene::every_system_has_a_gallery_image` needs a gallery picture, so it adds the teaching
+  preset `docs/examples/waterfall/landscape.toml`, its `scripts/docs-shots.mjs` entry, and
+  `docs/images/gallery/waterfall.png`, rendered on RADV with that entry's exact `shot` command.
+- Phase 1's `shot` check: `shot --preset-file core/tests/fixtures/waterfall.toml --signal
+  dynamic:110 --size 640x360` drew the landscape changing across the filmstrip.
+- Phase 1's spectrum check: `core/tests/golden/spectrum*.png` and the spectrum fixtures are not
+  touched. The `spectrum` golden reads mean 0.0000, outlier 1 on llvmpipe; WARP was not run.
+- Phase 1 adds the rostered golden fixture `core/tests/fixtures/waterfall.toml` but no baseline;
+  `golden` fails on the missing `waterfall.png` until Phase 2 writes it.
 
 ### Close triggers
 

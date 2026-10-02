@@ -33,6 +33,7 @@ pub mod renderer;
 pub mod spectrum;
 pub mod star;
 pub mod turtle;
+pub mod waterfall;
 
 pub use lsystem::LSystemScene;
 pub use parametric::ParametricCurveScene;
@@ -42,6 +43,7 @@ pub use renderer::{
 };
 pub use spectrum::{SpectrumLayout, SpectrumScene};
 pub use star::StarPatternScene;
+pub use waterfall::WaterfallScene;
 
 /// The shared structural-config and cap-overflow types now live one level up, in
 /// [`scenes`](super) — every scene family can see them there without the line

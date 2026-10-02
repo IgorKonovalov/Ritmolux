@@ -1,13 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Ritmolux preset: star_pattern",
-  "description": "The schema for a preset driving `star_pattern`, selected by a library filename beginning `star_`. Generated from the engine's own parameter and table declarations. Do not edit by hand: re-run the core test suite with RLX_UPDATE_PRESET_SCHEMA=1.",
+  "title": "Ritmolux preset: waterfall",
+  "description": "The schema for a preset driving `waterfall`, selected by a library filename beginning `waterfall_`. Generated from the engine's own parameter and table declarations. Do not edit by hand: re-run the core test suite with RLX_UPDATE_PRESET_SCHEMA=1.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "system": {
       "type": "string",
-      "const": "star_pattern",
+      "const": "waterfall",
       "description": "Which built-in scene this preset drives. Required."
     },
     "name": {
@@ -23,29 +23,27 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "variant": { "$ref": "#/definitions/param.variant" },
-        "rotation": { "$ref": "#/definitions/param.rotation.star_pattern" },
-        "hue": { "$ref": "#/definitions/param.hue.star_pattern" },
-        "hue_spread": { "$ref": "#/definitions/param.hue_spread.parametric_curve" },
+        "height": { "$ref": "#/definitions/param.height" },
+        "row_spacing": { "$ref": "#/definitions/param.row_spacing" },
+        "curve": { "$ref": "#/definitions/param.curve" },
+        "fade": { "$ref": "#/definitions/param.fade.waterfall" },
+        "line_width": { "$ref": "#/definitions/param.line_width.waterfall" },
+        "glow": { "$ref": "#/definitions/param.glow.parametric_curve" },
+        "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
+        "hue": { "$ref": "#/definitions/param.hue.spectrum" },
+        "hue_spread": { "$ref": "#/definitions/param.hue_spread.waterfall" },
         "saturation": { "$ref": "#/definitions/param.saturation" },
         "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
         "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
-        "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
-        "draw_progress": { "$ref": "#/definitions/param.draw_progress" },
-        "thickness": { "$ref": "#/definitions/param.thickness.parametric_curve" },
-        "scale": { "$ref": "#/definitions/param.scale.lsystem" },
-        "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
-        "glow": { "$ref": "#/definitions/param.glow.parametric_curve" },
-        "softness": { "$ref": "#/definitions/param.softness" },
-        "stroke_blend": { "$ref": "#/definitions/param.stroke_blend.lsystem" },
+        "yaw": { "$ref": "#/definitions/param.yaw.plexus" },
+        "pitch": { "$ref": "#/definitions/param.pitch.waterfall" },
+        "distance": { "$ref": "#/definitions/param.distance.plexus" },
+        "fov": { "$ref": "#/definitions/param.fov.plexus" },
+        "focus": { "$ref": "#/definitions/param.focus.plexus" },
+        "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
         "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
         "pan_x": { "$ref": "#/definitions/param.pan_x" },
         "pan_y": { "$ref": "#/definitions/param.pan_y" },
-        "mirror_order": { "$ref": "#/definitions/param.mirror_order.lsystem" },
-        "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect.lsystem" },
-        "ring_phase": { "$ref": "#/definitions/param.ring_phase" },
-        "ring_spread": { "$ref": "#/definitions/param.ring_spread" },
-        "ring_scale": { "$ref": "#/definitions/param.ring_scale" },
         "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
         "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
         "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
@@ -803,21 +801,6 @@
       "description": "Quantizes the palette into this many flat bands; 0 leaves it continuous.",
       "markdownDescription": "Quantizes the palette into this many flat bands; 0 leaves it continuous.\n\n- default `0.0`\n- typical range `0.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
     },
-    "param.palette_contour": {
-      "type": "string",
-      "description": "Draws a line at each band edge when the palette is stepped; 0 draws none.",
-      "markdownDescription": "Draws a line at each band edge when the palette is stepped; 0 draws none.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.thickness.parametric_curve": {
-      "type": "string",
-      "description": "Stroke width in pixels at the render target, before softness widens the falloff.",
-      "markdownDescription": "Stroke width in pixels at the render target, before softness widens the falloff.\n\n- default `2.0`\n- typical range `0.5` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.hue_spread.parametric_curve": {
-      "type": "string",
-      "description": "How far along the palette the colour travels from one end of the figure to the other.",
-      "markdownDescription": "How far along the palette the colour travels from one end of the figure to the other.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
     "param.brightness.parametric_curve": {
       "type": "string",
       "description": "The scene's overall light level, multiplying what it draws before the composite.",
@@ -828,65 +811,70 @@
       "description": "Brightness of the halo around each stroke, on top of the stroke itself.",
       "markdownDescription": "Brightness of the halo around each stroke, on top of the stroke itself.\n\n- default `1.0`\n- typical range `0.0` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.softness": {
+    "param.curve": {
       "type": "string",
-      "description": "How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core.",
-      "markdownDescription": "How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core.\n\n- default `0.25`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Exponent on each band's level: 1 is linear, below 1 lifts quiet detail, above 1 pushes it down.",
+      "markdownDescription": "Exponent on each band's level: 1 is linear, below 1 lifts quiet detail, above 1 pushes it down.\n\n- default `1.0`\n- typical range `0.05` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.draw_progress": {
-      "type": "string",
-      "description": "How much of the figure is drawn, from its start; below 1 the line is still arriving.",
-      "markdownDescription": "How much of the figure is drawn, from its start; below 1 the line is still arriving.\n\n- default `1.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.scale.lsystem": {
-      "type": "string",
-      "description": "Size of the figure within the frame, before the shared zoom is applied.",
-      "markdownDescription": "Size of the figure within the frame, before the shared zoom is applied.\n\n- default `1.0`\n- typical range `0.1` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.stroke_blend.lsystem": {
-      "type": "string",
-      "description": "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.",
-      "markdownDescription": "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.mirror_order.lsystem": {
-      "type": "string",
-      "description": "Repeats the geometry this many times around the centre; 1 draws it once.",
-      "markdownDescription": "Repeats the geometry this many times around the centre; 1 draws it once.\n\n- default `1.0`\n- typical range `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.mirror_reflect.lsystem": {
-      "type": "string",
-      "description": "Alternates the repeats into mirror images rather than plain rotations.",
-      "markdownDescription": "Alternates the repeats into mirror images rather than plain rotations.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.variant": {
-      "type": "string",
-      "description": "Moves the construction's contact angle, continuously: this is an angle offset rather than an index into a list.",
-      "markdownDescription": "Moves the construction's contact angle, continuously: this is an angle offset rather than an index into a list.\n\n- default `1.0`\n- typical range `0.0` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.rotation.star_pattern": {
-      "type": "string",
-      "description": "Turns the whole pattern, in radians.",
-      "markdownDescription": "Turns the whole pattern, in radians.\n\n- default `0.0`\n- typical range `0.0` to `6.2831855` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.hue.star_pattern": {
+    "param.hue.spectrum": {
       "type": "string",
       "description": "Where this scene reads from the palette, as a coordinate along it rather than a colour.",
-      "markdownDescription": "Where this scene reads from the palette, as a coordinate along it rather than a colour.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Where this scene reads from the palette, as a coordinate along it rather than a colour.\n\n- default `0.55`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.ring_phase": {
+    "param.yaw.plexus": {
       "type": "string",
-      "description": "Rotates each concentric ring against its neighbour.",
-      "markdownDescription": "Rotates each concentric ring against its neighbour.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.",
+      "markdownDescription": "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.\n\n- default `0.0`\n- typical range `-3.1415927` to `3.1415927` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.ring_spread": {
+    "param.distance.plexus": {
       "type": "string",
-      "description": "How far apart the rings sit radially.",
-      "markdownDescription": "How far apart the rings sit radially.\n\n- default `1.0`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.",
+      "markdownDescription": "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.\n\n- default `3.5`\n- typical range `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.ring_scale": {
+    "param.fov.plexus": {
       "type": "string",
-      "description": "How much each ring grows over the one inside it.",
-      "markdownDescription": "How much each ring grows over the one inside it.\n\n- default `1.0`\n- typical range `0.25` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "The camera's vertical field of view in radians; zoom divides it.",
+      "markdownDescription": "The camera's vertical field of view in radians; zoom divides it.\n\n- default `0.8`\n- typical range `0.2` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.focus.plexus": {
+      "type": "string",
+      "description": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.",
+      "markdownDescription": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.aperture.plexus": {
+      "type": "string",
+      "description": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
+      "markdownDescription": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.height": {
+      "type": "string",
+      "description": "How tall a full band stands above the ground, in world units; a row is 2 across.",
+      "markdownDescription": "How tall a full band stands above the ground, in world units; a row is 2 across.\n\n- default `0.6`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.row_spacing": {
+      "type": "string",
+      "description": "How far behind each row the next one lies, in world units; with rows, how deep the landscape reaches.",
+      "markdownDescription": "How far behind each row the next one lies, in world units; with rows, how deep the landscape reaches.\n\n- default `0.06`\n- typical range `0.01` to `0.3` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.fade.waterfall": {
+      "type": "string",
+      "description": "How much light the farthest row has lost against the front edge; 0 keeps every row as bright as the newest.",
+      "markdownDescription": "How much light the farthest row has lost against the front edge; 0 keeps every row as bright as the newest.\n\n- default `0.8`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.line_width.waterfall": {
+      "type": "string",
+      "description": "Line width in pixels at the focal plane; nearer rows are wider and farther ones thinner.",
+      "markdownDescription": "Line width in pixels at the focal plane; nearer rows are wider and farther ones thinner.\n\n- default `1.5`\n- typical range `0.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.hue_spread.waterfall": {
+      "type": "string",
+      "description": "How far along the palette the colour travels from the lowest band to the highest.",
+      "markdownDescription": "How far along the palette the colour travels from the lowest band to the highest.\n\n- default `0.6`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.pitch.waterfall": {
+      "type": "string",
+      "description": "Raises the camera above the scene's volume, in radians; negative looks up from below.",
+      "markdownDescription": "Raises the camera above the scene's volume, in radians; negative looks up from below.\n\n- default `0.35`\n- typical range `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.bg_hue": {
       "type": "string",

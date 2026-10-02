@@ -1463,7 +1463,8 @@ impl Renderer {
             | GeneratorConfig::Star { .. }
             | GeneratorConfig::Spectrum { .. }
             | GeneratorConfig::WarpMesh { .. }
-            | GeneratorConfig::Path { .. } => None,
+            | GeneratorConfig::Path { .. }
+            | GeneratorConfig::Waterfall(_) => None,
         }
     }
 

@@ -591,6 +591,7 @@ fn descriptor_pairs() -> Vec<DescriptorPair> {
         (&raw::FIELD, serde_fields::<raw::RawField>()),
         (&raw::CELLULAR, serde_fields::<raw::RawCellular>()),
         (&raw::PLEXUS, serde_fields::<raw::RawPlexus>()),
+        (&raw::WATERFALL, serde_fields::<raw::RawWaterfall>()),
         (&raw::MILK, serde_fields::<raw::RawMilk>()),
         (&raw::MILK_ELEMENT, serde_fields::<raw::RawMilkElement>()),
         (&raw::FEEDBACK, serde_fields::<raw::RawFeedback>()),
