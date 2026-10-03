@@ -1749,6 +1749,12 @@ glow, which is the look every 2-D line scene keeps.
   `absent: Depth32Float|Depth24Plus in: core/src/render/scenes/lines/renderer.rs`
 - **Verified 2026-10-02** — the blend the `seg3d` pipeline is built with:
   `present: blend: Some\(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE\) in: core/src/render/scenes/lines/renderer.rs`
+- **Updated 2026-10-03** — Plan 0238 Phase 4: the `waterfall` shows this worst, because it is a
+  surface. A near row's peaks are drawn across the rows behind them, so the landscape reads as
+  tangled lines wherever a peak rises. The waterfall has a cheaper fix than the general case: draw
+  its rows back to front, each with a black filled skirt under its line, so every row covers what
+  is behind it. That is classic hidden-line removal for a ridgeline, it needs no depth buffer, and it
+  is worth weighing beside the three general shapes above.
 
 ## 0280 — a space curve does not fade or shift with distance, so nothing atmospheric says "far"
 

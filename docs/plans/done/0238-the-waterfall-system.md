@@ -1,6 +1,6 @@
 # 0238 — The waterfall system
 
-> **Status:** done - Phase 4 owed, ADR-0249 (closed 2026-10-02). Phases 1-3 landed in `76976a1e`,
+> **Status:** done (closed 2026-10-02; Phase 4 judged by the owner 2026-10-03: rows show through each other, backlog 0279). Phases 1-3 landed in `76976a1e`,
 > `89aa720d` and `6e9b371f`; the round 1 close review found no blockers, no majors and two minors,
 > one repaired at the close. Released as 0.163.0.
 > **Created:** 2026-10-01
@@ -208,7 +208,7 @@ struct Ring {
 | 1 — Walking skeleton: a scrolling landscape | dev | done | 76976a1e |
 | 2 — Caps, the golden and determinism | dev | done | 89aa720d |
 | 3 — Documentation and the references | dev | done | committed with this row |
-| 4 — The look, judged | human | owed | |
+| 4 — The look, judged | human | done | reads, but rows show through each other, see Notes |
 
 ### Notes
 
@@ -248,6 +248,20 @@ struct Ring {
   `systems.md`. Regeneration changed nothing; `toc.mjs` added `presets/README.md`'s `waterfall`
   row. The guide picture is the Phase 1 gallery image. `systems.md`'s ranges come from the teaching
   preset, the fixture and the cost probes, and the section says so.
+
+- **Phase 4, 2026-10-03, the owner's verdict: the landscape reads, but rows show through each
+  other.** Judged live on the Arch box from two judging copies outside the repository, the teaching
+  preset `docs/examples/waterfall/landscape.toml` and an orbiting variant, with the machine idle.
+  Where a peak rises, the rows behind it stay visible through it: a near row's bass hump is drawn
+  straight across the flat rows behind it, and treble spikes on the near rows tangle with the rows
+  behind them. It is worst where the rows are dense but it appears wherever a peak rises, so fewer
+  rows or a lower `height` makes it rarer and does not remove it. The cause is
+  [backlog 0279](../../design-backlog.md): the `seg3d` stroke is additive with no depth test, and
+  a waterfall is the one system that is a surface, so the missing hidden-line removal shows most
+  here. The orbiting variant also needed `brightness` 1.8, `glow` 2, `fade` 0.5 and `aperture` 3
+  before it read as bright enough, and `pan_y` -0.2 with `pitch` 0.5 to sit the landscape on the
+  bottom of the frame instead of mid-frame with its peaks clipped. No `preset-author` brief was
+  handed over until the occlusion is settled.
 
 ### Close triggers
 
