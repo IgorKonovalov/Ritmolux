@@ -48,7 +48,7 @@ place. The plan file carries the real link.
 | [0237](0237-the-l-system-turtle-turns-in-space.md) | The L-system turtle turns in space, and can grow without end | approved | dev, human | ADR-0258. After 0236. `turtle = "space"` and `growth = "endless"` (a streamed vine the camera follows), both opt-in; shipped L-systems keep their bytes. |
 | [0239](0239-the-swarm-moves-into-a-real-camera.md) | The swarm moves into a real camera | approved | dev, human | ADR-0259 (proposed) supersedes 0044's depth model. After 0236. Every swarm preset changes look; Phase 6 (owner's judgement) blocks the merge. |
 | [0240](0240-the-attractor-projects-through-the-shared-camera.md) | The attractor projects through the shared camera | approved | dev, human | ADR-0260 (proposed): `perspective` retires, presets migrate by exact mapping, re-curation owed after merge. After 0236. |
-| [0248](0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) | 3D strokes gain joins, depth cues and a solid mode | draft | dev, human | ADR-0263 (proposed). Closes backlog 0279-0281 from the 0236/0238 verdicts. Runs before 0237, 0239, 0240. |
+| [0248](0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) | 3D strokes gain joins, depth cues and a solid mode | approved | dev, human | ADR-0263 (proposed). Closes backlog 0279-0281 from the 0236/0238 verdicts. Runs before 0237, 0239, 0240. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
 <!-- roster:end -->
 

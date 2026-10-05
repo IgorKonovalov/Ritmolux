@@ -1,7 +1,8 @@
 # 0248 — 3D strokes gain joins, depth cues and a solid mode
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-10-05
+> **Approved:** 2026-10-05 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0263](../adrs/0263-a-3d-stroke-may-be-solid-by-a-back-to-front-sort-and-depth-cues-ride-the-shared-camera.md)
 > (proposed; this plan's decision), [0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md),

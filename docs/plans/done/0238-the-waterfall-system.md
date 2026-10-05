@@ -256,7 +256,7 @@ struct Ring {
   straight across the flat rows behind it, and treble spikes on the near rows tangle with the rows
   behind them. It is worst where the rows are dense but it appears wherever a peak rises, so fewer
   rows or a lower `height` makes it rarer and does not remove it. The cause is
-  [backlog 0279](../../design-backlog.md): the `seg3d` stroke is additive with no depth test, and
+  [backlog 0279](../../design-backlog-archive.md): the `seg3d` stroke is additive with no depth test, and
   a waterfall is the one system that is a surface, so the missing hidden-line removal shows most
   here. The orbiting variant also needed `brightness` 1.8, `glow` 2, `fade` 0.5 and `aperture` 3
   before it read as bright enough, and `pan_y` -0.2 with `pitch` 0.5 to sit the landscape on the

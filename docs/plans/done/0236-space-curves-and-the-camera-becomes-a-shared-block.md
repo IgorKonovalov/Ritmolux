@@ -273,7 +273,7 @@ pub(crate) struct FamilyArm3d {
     instead of a smooth soft band, so the polyline's segments show. It is worst on the nearest, most
     blurred strands, in `shot` renders on RADV as well as live.
   No `preset-author` brief was handed over, since none of the three is reachable from a preset.
-  They are filed as [backlog 0279, 0280 and 0281](../../design-backlog.md).
+  They are filed as [backlog 0279, 0280 and 0281](../../design-backlog-archive.md).
   Frame rate was not judged: the conductor's builds held the load average near 28 throughout.
 
 ### Close triggers
