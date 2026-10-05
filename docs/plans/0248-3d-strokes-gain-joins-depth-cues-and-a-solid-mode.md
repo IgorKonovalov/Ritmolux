@@ -239,8 +239,8 @@ Field order is shader-location order, so new fields go at the end.
 |---|---|---|---|
 | 1 — A 3D joint is mitred, and the comb goes | dev | done | d4e48373 |
 | 2 — Fog, and a depth colour axis for the space curves | dev | done | cb0b0454 |
-| 3 — Solid: far to near, near over far | dev | done | committed with this row |
-| 4 — The waterfall's rows hide what is behind them | dev | not started | |
+| 3 — Solid: far to near, near over far | dev | done | 9ef1719c |
+| 4 — The waterfall's rows hide what is behind them | dev | done | committed with this row |
 | 5 — Documentation | dev | not started | |
 | 6 — The preset-author reference | human | not started | |
 | 7 — The moved baselines are blessed | human | not started | |
@@ -294,6 +294,26 @@ Field order is shader-location order, so new fields go at the end.
   (8,000) glow 1.461 ms, solid 1.718 ms; Rich (20,000) glow 2.603 ms, solid 3.585 ms. Headless,
   so a comparison on one adapter rather than an app frame time; both solid readings are under NFR
   section 1's 16.67 ms.
+- **Phase 4, the waterfall's solid order is keyed at each segment's foot**, not at its midpoint as
+  Phase 3 states for the general sort: `LineRenderer::draw_3d_terrain` names the ground plane
+  (`y = 0`), a solid frame through it sorts by the depth of each midpoint's foot on that plane
+  (`sort_painter`), and a skirt sorts before the line it lies under at one key. Keyed at the
+  midpoint, a tall peak several rows back sorts nearer than a low row in front of it, because
+  raising a point toward a camera that looks down shortens its depth. The ground also rides the
+  `seg3d` stroke uniform's `w` lane, which is `0.0` for every glow draw, as before.
+- **Phase 4, the row clamp in solid mode is per frame**: the ring is still sized at load at the
+  glow cost, and each solid frame holds the drawn rows to `seg3d_segments / (2 * (elements - 1))`,
+  nearest first, announcing `OverflowContext::Rows` through the scene's per-frame clamp ahead of
+  the blur clamp. A preset's glow rows are not clamped any harder than before.
+- **Phase 4, outside the file list:** the new `skirt` field is added as `0.0` to the
+  `Segment3dInstance` literals in `parametric.rs`, `plexus/mod.rs` and
+  `renderer/tests.rs`. The tests are in `core/tests/suite/waterfall.rs`; the two-row probe uses
+  three rows (two pushed flat, a live peak) so the row behind the peak is the newest pushed one at
+  0.95 alpha. Glow reads 136 on that row's line, solid 0. All 76 fixtures are byte-identical
+  between the Phase 3 and Phase 4 builds on this box's Vulkan adapter.
+- **Phase 4, a joint notch to look for in Phase 8:** where a row's next segment sorts farther than
+  the one before it (any yaw but 0), the nearer segment's skirt is drawn after the farther line and
+  can cover a pixel-scale sliver of that line's lower half beside the shared joint.
 
 ### Close triggers
 

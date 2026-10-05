@@ -552,6 +552,7 @@ impl ParametricCurveScene {
                 alpha: 1.0,
                 prev,
                 next,
+                skirt: 0.0,
             });
         }
         self.lines3d.draw_3d(

@@ -277,6 +277,13 @@ pub struct Segment3dInstance {
     /// The polyline's point after [`b`](Self::b), or `b` itself where `b` is a
     /// free end. The `b`-end counterpart of [`prev`](Self::prev).
     pub next: [f32; 3],
+    /// `1.0` on a **skirt**: not a stroke but a filled band from `a -> b` down
+    /// to the ground plane the draw names
+    /// ([`LineRenderer::draw_3d_terrain`]), at full coverage times
+    /// [`alpha`](Self::alpha) in [`color`](Self::color). A solid waterfall
+    /// row lays one under each of its segments, so a near row hides what lies
+    /// behind it (ADR-0263). `0.0` on every stroke.
+    pub skirt: f32,
 }
 
 /// The chord `pa -> pb` of a polyline, clipped against `view`'s near plane, as
@@ -738,15 +745,19 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// 3D stroke and a 2D one fall off across their width by one definition.
 ///
 /// [`MITER_LIMIT`] is written into it from the one Rust constant, so a 3D
-/// joint and a 2D one fall back to the bevel at the same corner.
+/// joint and a 2D one fall back to the bevel at the same corner, and
+/// [`NEAR`](crate::render::camera::NEAR) likewise, so a skirt's foot is held to
+/// the plane the CPU clips at.
 ///
 /// Runs once per [`LineRenderer::new_3d`] (pipeline build, not the hot path).
 pub(crate) fn seg3d_shader_source() -> String {
     format!(
         "{PROFILE_WGSL}
 const MITER_LIMIT: f32 = {MITER_LIMIT:?};
+const NEAR_DEPTH: f32 = {:?};
 {}
 {SEG3D_SHADER}",
+        crate::render::camera::NEAR,
         crate::render::camera::CAMERA_WGSL
     )
 }
@@ -818,9 +829,9 @@ const MITER_LIMIT: f32 = {MITER_LIMIT:?};
 /// against the endpoints' depths would bend the across-the-stroke coordinate.
 const SEG3D_SHADER: &str = r#"
 struct Stroke {
-    // x: glow multiplier, y: softness (ADR-0124), z: fog (ADR-0263), w:
-    // unused. The vertex stage reads the softness too, to widen it toward a
-    // blurred end.
+    // x: glow multiplier, y: softness (ADR-0124), z: fog (ADR-0263), w: the
+    // world y of the ground plane a skirt reaches down to. The vertex stage
+    // reads the softness too, to widen it toward a blurred end.
     v: vec4<f32>,
 }
 
@@ -843,6 +854,8 @@ struct Seg3dOut {
     // 1 when either end is blurred, 0 otherwise. Flat, so a sharp stroke reads
     // the uniform softness itself rather than an interpolation of copies of it.
     @location(4) @interpolate(flat) blurred: f32,
+    // 1 on a skirt, which fills at full coverage rather than stroking.
+    @location(8) @interpolate(flat) skirt: f32,
 }
 
 // The profile's integral across a unit half-width at softness `s`.
@@ -897,6 +910,7 @@ fn vs_main(
     @location(4) alpha: f32,
     @location(5) prev: vec3<f32>,
     @location(6) next: vec3<f32>,
+    @location(7) skirt: f32,
 ) -> Seg3dOut {
     // (along, side): along runs a->b, side spans -1..1 across the width.
     var corners = array<vec2<f32>, 6>(
@@ -959,8 +973,21 @@ fn vs_main(
     // light and never the coverage, and at fog 0 it is exactly 1.
     let fogged = fog_light(cam, stroke.v.z, select(ca.w, cb.w, at_b));
 
+    // A skirt (ADR-0263) is the band under this end: its `side = +1` corners
+    // on the segment, its `side = -1` corners straight below on the ground
+    // plane, each projected on its own. No width, no join and no blur reach
+    // it; the fragment fills it.
+    let is_skirt = skirt > 0.5;
+    if (is_skirt) {
+        let top = select(a, b, at_b);
+        let foot = vec3<f32>(top.x, stroke.v.w, top.z);
+        let corner = project(cam, select(foot, top, c.y > 0.0));
+        p = clip_to_px(cam, vec4<f32>(corner.xyz, max(corner.w, NEAR_DEPTH)));
+    }
+
     var out: Seg3dOut;
     out.pos = vec4<f32>(px_to_ndc(cam, p), 0.0, 1.0);
+    out.skirt = select(0.0, 1.0, is_skirt);
     out.side = c.y;
     out.color = color * (hw_true / hw) * fogged;
     out.alpha = alpha;
@@ -992,11 +1019,16 @@ fn fs_main(in: Seg3dOut) -> @location(0) vec4<f32> {
         blurred && spread > 0.0,
     );
     // Premultiplied (ADR-0056): the glow scales the light, not the coverage.
-    return vec4<f32>(in.color * g * stroke.v.x * keep, g);
+    // A skirt covers its whole band at its alpha; it is chosen after the
+    // stroke is computed rather than branched to, because `fwidth` above must
+    // stay in uniform control flow.
+    let lit = vec4<f32>(in.color * g * stroke.v.x * keep, g);
+    let fill = vec4<f32>(in.color * stroke.v.x * in.alpha, in.alpha);
+    return select(lit, fill, in.skirt > 0.5);
 }
 "#;
 
-/// The `seg3d` stroke uniform: `[glow, softness, fog, unused]`.
+/// The `seg3d` stroke uniform: `[glow, softness, fog, ground y]`.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Stroke3dUniform {
@@ -1043,19 +1075,43 @@ pub(crate) fn sort_far_to_near(
     keys: &mut Vec<(f32, u32)>,
     out: &mut Vec<Segment3dInstance>,
 ) {
+    sort_painter(view, segments, None, keys, out);
+}
+
+/// [`sort_far_to_near`], with the depth each segment sorts by taken at its
+/// midpoint's **foot** on the plane `y = ground` when one is named.
+///
+/// A heightfield's rows are what occlude one another, not its peaks: keyed at
+/// the midpoint itself, a tall peak several rows back sorts nearer than a low
+/// row in front of it, because raising a point toward a camera that looks down
+/// shortens its depth. Keyed at the foot, every segment of one row sorts by
+/// where the row stands.
+///
+/// At one key, a skirt sorts **before** the stroke it lies under, so the
+/// stroke is drawn over its own band; past that the instance bytes break the
+/// tie.
+pub(crate) fn sort_painter(
+    view: &crate::render::camera::CameraView,
+    segments: &[Segment3dInstance],
+    ground: Option<f32>,
+    keys: &mut Vec<(f32, u32)>,
+    out: &mut Vec<Segment3dInstance>,
+) {
     keys.clear();
     out.clear();
     for (i, s) in segments.iter().enumerate() {
         let mid = [
             0.5 * (s.a[0] + s.b[0]),
-            0.5 * (s.a[1] + s.b[1]),
+            ground.unwrap_or(0.5 * (s.a[1] + s.b[1])),
             0.5 * (s.a[2] + s.b[2]),
         ];
         keys.push((view.depth(mid), i as u32));
     }
+    let skirt = |i: u32| segments.get(i as usize).map_or(0.0, |s| s.skirt);
     let content = |i: u32| segments.get(i as usize).map(bytemuck::bytes_of);
     keys.sort_unstable_by(|x, y| {
         y.0.total_cmp(&x.0)
+            .then_with(|| skirt(y.1).total_cmp(&skirt(x.1)))
             .then_with(|| content(x.1).cmp(&content(y.1)))
     });
     out.extend(
@@ -1165,6 +1221,7 @@ impl Seg3d {
                             4 => Float32,
                             5 => Float32x3,
                             6 => Float32x3,
+                            7 => Float32,
                         ],
                     })],
                 },
@@ -1916,6 +1973,56 @@ impl LineRenderer {
         softness: f32,
         segments: &[Segment3dInstance],
     ) {
+        self.draw_3d_on(queue, encoder, view, frame, glow, softness, None, segments);
+    }
+
+    /// [`draw_3d`](Self::draw_3d) for a **heightfield** standing on the plane
+    /// `y = ground`: a [`skirt`](Segment3dInstance::skirt) instance fills down
+    /// to that plane, and a solid frame orders its segments by their feet on
+    /// it ([`sort_painter`]), so a near row hides a far one whatever either's
+    /// height (ADR-0263).
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "see `draw_3d` — this is that signature plus the ground plane"
+    )]
+    pub(crate) fn draw_3d_terrain(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        frame: &crate::render::camera::CameraFrame,
+        glow: f32,
+        softness: f32,
+        ground: f32,
+        segments: &[Segment3dInstance],
+    ) {
+        self.draw_3d_on(
+            queue,
+            encoder,
+            view,
+            frame,
+            glow,
+            softness,
+            Some(ground),
+            segments,
+        );
+    }
+
+    /// The one body behind [`draw_3d`](Self::draw_3d) and
+    /// [`draw_3d_terrain`](Self::draw_3d_terrain). `ground: None` keys the
+    /// solid sort at each midpoint and puts a stray skirt's foot at `y = 0`.
+    #[allow(clippy::too_many_arguments, reason = "see `draw_3d_terrain`")]
+    fn draw_3d_on(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        frame: &crate::render::camera::CameraFrame,
+        glow: f32,
+        softness: f32,
+        ground: Option<f32>,
+        segments: &[Segment3dInstance],
+    ) {
         let mut pass = gpu::color_pass(encoder, "seg3d-pass", view, wgpu::LoadOp::Load);
         let Some(seg3d) = self.seg3d.as_mut() else {
             return;
@@ -1926,7 +2033,11 @@ impl LineRenderer {
             return; // nothing to stroke; the backdrop shows through
         }
         if frame.solid {
-            sort_far_to_near(&frame.view, drawn, &mut seg3d.keys, &mut seg3d.sorted);
+            let (keys, sorted) = (&mut seg3d.keys, &mut seg3d.sorted);
+            match ground {
+                None => sort_far_to_near(&frame.view, drawn, keys, sorted),
+                Some(_) => sort_painter(&frame.view, drawn, ground, keys, sorted),
+            }
             queue.write_buffer(&seg3d.instances, 0, bytemuck::cast_slice(&seg3d.sorted));
         } else {
             queue.write_buffer(&seg3d.instances, 0, bytemuck::cast_slice(drawn));
@@ -1936,7 +2047,7 @@ impl LineRenderer {
             &seg3d.stroke,
             0,
             bytemuck::bytes_of(&Stroke3dUniform {
-                v: [glow, softness, frame.fog, 0.0],
+                v: [glow, softness, frame.fog, ground.unwrap_or(0.0)],
             }),
         );
         pass.set_pipeline(if frame.solid {

@@ -2236,6 +2236,7 @@ mod seg3d {
             alpha: 1.0,
             prev: a,
             next: b,
+            skirt: 0.0,
         };
         render_segments(ctx, aperture, 0.0, &[segment])
     }
@@ -2454,6 +2455,7 @@ mod seg3d {
                     alpha: 1.0,
                     prev,
                     next,
+                    skirt: 0.0,
                 }
             })
             .collect()
@@ -2623,6 +2625,7 @@ mod seg3d {
             alpha: 1.0,
             prev: a,
             next: b,
+            skirt: 0.0,
         };
         let near = stroke([-1.5, 0.0, -1.0], [1.5, 0.0, -1.0], [0.5, 0.0, 0.0]);
         let far = stroke([0.0, -1.5, -3.0], [0.0, 1.5, -3.0], [0.0, 0.5, 0.0]);
@@ -2664,6 +2667,7 @@ mod seg3d {
             alpha: 1.0,
             prev: a,
             next: b,
+            skirt: 0.0,
         };
         let clear = render_segments(&ctx, 0.0, 0.0, &[segment]);
         let fogged = render_segments(&ctx, 0.0, 1.0, &[segment]);
@@ -2824,6 +2828,7 @@ mod solid_order {
                 alpha: 1.0,
                 prev: a,
                 next: b,
+                skirt: 0.0,
             });
             if k % 8 == 0 {
                 // An exact duplicate: the tie the content order has to break

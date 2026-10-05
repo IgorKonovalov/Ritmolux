@@ -524,6 +524,7 @@ impl Scene for PlexusScene {
                 // A link is its own stroke: both ends free (ADR-0263).
                 prev: a,
                 next: b,
+                skirt: 0.0,
             });
         }
 
