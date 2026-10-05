@@ -1,0 +1,27 @@
+# The waterfall landscape drawn solid, the variant of `landscape.toml` that
+# reads as terrain. Teaching material, not a shipped preset: the same rows and
+# camera, turned a little so the ridges overlap, with `solid` on. Each row lays
+# a black band under itself down to the ground, so a near ridge hides the rows
+# behind it instead of letting them show through. A solid row costs twice the
+# segments, and 64 rows of 48 bands still fit the Floor tier's budget.
+system = "waterfall"
+name = "Waterfall Terrain"
+
+[waterfall]
+elements   = 48
+rows       = 64
+row_period = 0.04
+smoothing  = 0.05
+
+[params]
+height      = "0.8"
+row_spacing = "0.06"
+fade        = "0.75"
+line_width  = "1.6"
+hue         = "0.55"
+hue_spread  = "0.6"
+brightness  = "1.1"
+yaw         = "0.3"
+pitch       = "0.4"
+distance    = "3.0"
+solid       = "1"

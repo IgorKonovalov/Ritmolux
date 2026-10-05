@@ -285,6 +285,19 @@ footprint so the vendor spread is on record.
       `docs/examples/waterfall/landscape.toml` and say whether a sustained note reads as a ridge
       running away from the camera and a hit as a crest that recedes, whether rows arrive and leave
       without popping, and whether the landscape reads as depth or as flat stacked lines.
+- [ ] **The solid 3D stroke's sort at the Floor cap, on the low-end box, 1080p.** Plan 0248 gave
+      the camera block `solid`, which orders a frame's lines far to near on the CPU every frame
+      before they are drawn. Measured on the development box's integrated GPU (headless, release
+      build, 1920x1080), a torus knot at the full Floor cap of 8000 lines cost 1.72 ms a frame solid
+      against 1.46 glow, and at Rich's 20000 3.59 against 2.60. Load
+      `docs/examples/curves/torus_knot_solid.toml` with `samples = "8000"` and
+      `aperture = "24"`, then the same file with `solid = "0"`; then
+      `docs/examples/waterfall/landscape_solid.toml` with `elements = 64` and `rows = 1024`, whose
+      skirts double every row's cost so the solid row clamp bites. Overlay on (`F3`), report
+      **(a)** whether fps holds ≥ 60 @ 1080p solid, **(b)** the p99 solid against glow, and
+      **(c)** what the standalone prints about the row clamp. **If solid misses, the lever is a
+      coarser sort key** (a quantized depth bucket sort), not a smaller cap, so it routes to
+      `architect` with the numbers.
 ### Displays, inputs and outputs
 
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages

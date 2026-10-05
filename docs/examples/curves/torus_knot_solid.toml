@@ -1,0 +1,31 @@
+# The `torus_knot` space family drawn solid and fogged, for the illustrated
+# guide's picture of the depth cues. Teaching material, not a shipped preset:
+# the same trefoil and camera as `torus_knot.toml`, with a thicker strand and
+# three more lines. `solid` paints the near loops over the far ones, so the
+# strand reads as an object instead of glowing wire; `fog` darkens the far
+# side; and `hue_axis` colours the strand by depth, so a loop passing in front
+# of another changes colour where it crosses.
+system = "parametric_curve"
+name = "Solid trefoil knot"
+
+[curve]
+family = "torus_knot"
+
+[params]
+n          = "2"
+d          = "3"
+tube       = "0.45"
+samples    = "720"
+spin       = "0"
+thickness  = "12"
+hue        = "0.55"
+hue_spread = "0.5"
+yaw        = "time * 0.05"
+pitch      = "0.5"
+distance   = "3.0"
+fov        = "0.9"
+focus      = "0.2"
+aperture   = "10 + clamp(bass * 2, 0, 2)"
+solid      = "1"
+fog        = "0.7"
+hue_axis   = "1"

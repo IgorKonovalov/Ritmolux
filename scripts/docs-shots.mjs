@@ -412,6 +412,16 @@ const IMAGES = [
     size: "1280x720",
     tier: "rich",
   },
+  // The same trefoil drawn solid and fogged, coloured by depth: the guide's
+  // one picture of the camera block's depth cues.
+  {
+    out: "docs/images/curves/torus_knot_solid.png",
+    presetFile: "docs/examples/curves/torus_knot_solid.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
 
   // --- the analytic field's families beyond the plate ----------------------
   //

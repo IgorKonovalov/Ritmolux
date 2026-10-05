@@ -340,6 +340,13 @@ is what turns it. **`aperture` costs fill**, since every blurred stroke is wider
 both the blur and how many points a space curve is drawn from; a `samples` past that cap is clamped
 and the app says so. A `lissajous_3d` with `m` and `phase_z` both at `0` lies flat.
 
+`fog` and `solid` work on a space curve as they do on [`plexus`](#the-plexus-table): fog darkens
+the far side of the strand, and `solid = "1"` paints its near loops over its far ones, so a knot
+reads as a knot rather than as glowing wire. One more parameter is the space curves' own:
+`hue_axis`, `0` to `1`, moves the colour from running along the strand (`0`, the default) to
+running with depth (`1`, nearest first), so a strand passing in front of itself changes colour
+where it crosses. Between the two it mixes them. All three do nothing on the flat families.
+
 The range that reads for each of these parameters **on each family** is printed in the
 `parametric_curve` table of [`presets/README.md`](../presets/README.md), which also marks every
 family a parameter is inert on.
@@ -571,6 +578,26 @@ That is the lens's ceiling and is not reported. An `aperture` past the cap, wher
 itself draws sharper than asked, draws at the cap and **says so**. The same pair of parameters
 blurs the attractor's 3D families.
 
+**Fog and solid strokes.** Two more camera parameters make depth read, and both are off until a
+preset sets them. They work the same on `plexus`, on the two space families of `parametric_curve`
+and on `waterfall`.
+
+- `fog`, `0` to `1`, fades light toward black with depth, on the same nearest-to-farthest scale
+  `focus` uses: at `1` the farthest point of the volume is black and the nearest keeps all its
+  light, and in between a line darkens along its length. It changes how bright a line is and not how
+  wide, and it costs nothing measurable.
+- `solid`, `0` or `1`, chooses how lines combine. At `0` they add as light, so a crossing glows
+  brighter, which is how every shipped 3D preset draws. At `1` the near line is painted over the
+  far one, so the figure reads as an object and crossings stop brightening. A blurred near line
+  lies over what is behind it as a soft veil. Anything from `0.5` up counts as `1`, so a binding
+  that switches it should give `0` or `1`.
+
+**Solid costs a sort every frame.** The lines are ordered far to near on the CPU before they are
+drawn. Measured headless at 1920x1080 on an integrated GPU, a full Floor budget of 8,000 lines cost
+1.7 ms a frame solid against 1.5 glow, and a full Rich budget of 20,000 cost 3.6 against 2.6. Lines
+are ordered whole, so where two lines cross each other in depth along their length, the crossing
+can be wrong by a pixel or so.
+
 `line_width` and `node_size` are pixels **at the focal plane**: nearer lines are wider and farther
 ones thinner. `node_size = "0"` draws no dots at all. Lines and dots take their colour from their
 depth, near to far, through `hue_center` and `hue_spread`, so `palette_steps` bands the network by
@@ -718,12 +745,25 @@ Three things are worth knowing before you tune one:
   two rows, so a long history at a wide spacing reaches far behind the camera's focus. `fade` dims
   the far rows against the front edge, and `line_width` narrows with distance.
 - **The tier caps the rows.** A landscape is drawn from the same per-tier segment budget as the other
-  3D line systems, `elements - 1` segments per row, so a `rows` past what the tier allows is clamped
-  and the app says so. A wide, deep landscape at a large `aperture` is the expensive case.
+  3D line systems, `elements - 1` segments per row and twice that when solid, so a `rows` past what
+  the tier allows is clamped and the app says so. A wide, deep landscape at a large `aperture` is
+  the expensive case.
 
-The camera is the shared one: `yaw`, `pitch`, `distance`, `fov`, `focus` and `aperture` behave as on
-`plexus`. The full parameter list is the `waterfall` table of
-[`presets/README.md`](../presets/README.md).
+The camera is the shared one: `yaw`, `pitch`, `distance`, `fov`, `focus`, `aperture`, `fog` and
+`solid` behave as on [`plexus`](#the-plexus-table). The full parameter list is the `waterfall` table
+of [`presets/README.md`](../presets/README.md).
+
+**A solid landscape reads as terrain.** With `solid = "1"` each row also lays a black band under
+itself down to the ground, so a near row hides the rows behind it the way a ridge hides the valley
+past it. Rows are ordered by where they stand, not by how tall they are, so a far peak never shows
+through a nearer row. The bands cost segments too: a solid row draws twice the segments of a glowing
+one, so the tier holds a solid landscape to half the rows, nearest first, and the app says so when
+that bites.
+
+**`fog` and `fade` are different dimmers.** `fade` dims a row by its age, oldest darkest. `fog`
+dims anything by its distance from the camera. Seen from the front, the oldest rows are also the
+farthest, so the two look alike. From the side they are not: fog darkens the far end of every row,
+new ones included.
 
 ### The `[feedback]` table
 

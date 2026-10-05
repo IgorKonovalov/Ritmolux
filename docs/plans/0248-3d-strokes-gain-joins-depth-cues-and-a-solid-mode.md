@@ -240,8 +240,8 @@ Field order is shader-location order, so new fields go at the end.
 | 1 — A 3D joint is mitred, and the comb goes | dev | done | d4e48373 |
 | 2 — Fog, and a depth colour axis for the space curves | dev | done | cb0b0454 |
 | 3 — Solid: far to near, near over far | dev | done | 9ef1719c |
-| 4 — The waterfall's rows hide what is behind them | dev | done | committed with this row |
-| 5 — Documentation | dev | not started | |
+| 4 — The waterfall's rows hide what is behind them | dev | done | 19575ade |
+| 5 — Documentation | dev | done | committed with this row |
 | 6 — The preset-author reference | human | not started | |
 | 7 — The moved baselines are blessed | human | not started | |
 | 8 — The looks, judged | human | not started | |
@@ -314,6 +314,35 @@ Field order is shader-location order, so new fields go at the end.
 - **Phase 4, a joint notch to look for in Phase 8:** where a row's next segment sorts farther than
   the one before it (any yaw but 0), the nearer segment's skirt is drawn after the farther line and
   can cover a pixel-scale sliver of that line's lower half beside the shared joint.
+- **Phase 5:** the solid variants are `docs/examples/curves/torus_knot_solid.toml` (the guide's
+  picture, `docs/images/curves/torus_knot_solid.png`, with a `thickness` of 12 against the plain
+  knot's 4 so the crossings read) and `docs/examples/waterfall/landscape_solid.toml`. `plexus`'s
+  two teaching presets got no solid variant: their fine links are the glow look the plan keeps.
+  The cost figures in `docs/presets.md` and `docs/on-device-validation.md` are Phase 3's readings.
+- **Phase 6's text, for `.claude/skills/preset-author/references/systems.md`.** In the
+  `parametric_curve` section, after the sentence ending "the six camera params are inert on the
+  flat families", append: "So are `fog`, `solid` and the space families' own `hue_axis`
+  (ADR-0263)." Then add three rows to its space-family table, after `samples`:
+
+  ```markdown
+  | `fog` | `0.4 – 0.8` | **Darkens the far side toward black**, on the same 0-nearest scale as `focus`; at `1` the farthest point is black. Light only, never width, and free. Pairs with an open `aperture`: soft and dim reads as distance. |
+  | `solid` | `0` or `1` | **`1` paints near loops over far ones**, so a knot reads as an object instead of glowing wire, and crossings stop brightening. Anything from `0.5` up is `1`. Costs a CPU sort each frame, about a millisecond at the Rich cap on the dev box. Thicken the strand (`thickness` `8 – 12`) or the occlusion is too thin to see. |
+  | `hue_axis` | `0` or `1` | Moves the colour from running along the strand (`0`) to running with depth, nearest first (`1`); between mixes the two. At `1` a loop passing in front of another changes colour at the crossing. |
+  ```
+
+  In the `plexus` section, after the paragraph "The same `focus` / `aperture` pair blurs the
+  attractor's 3D families", add: "`fog` (`0 – 1`) darkens lines and dots toward black with depth,
+  and `solid = "1"` paints near links over far ones instead of adding them. The network's look is
+  the additive glow, so leave `solid` at `0` unless the brief is an object rather than a web of
+  light; `fog` at `0.3 – 0.6` helps either."
+
+  In the `waterfall` section, change "`focus` and `aperture` behave as on `plexus`" to "`focus`,
+  `aperture`, `fog` and `solid` behave as on `plexus`", and add two rows after `line_width`:
+
+  ```markdown
+  | `solid` | `0` or `1` | **`1` reads as terrain**: each row lays a black band down to the ground, so a near ridge hides the rows behind it. Rows occlude by where they stand, not by height. Doubles every row's segment cost, so the tier holds a solid landscape to half the rows and says so. |
+  | `fog` | `0 – 0.5` | Dims by distance from the camera, where `fade` dims by age. Seen from the front the two look alike; with `yaw` turned, fog darkens the far end of every row, new ones included. |
+  ```
 
 ### Close triggers
 
