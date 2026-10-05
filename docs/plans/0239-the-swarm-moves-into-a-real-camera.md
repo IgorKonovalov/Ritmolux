@@ -114,8 +114,8 @@ flowchart LR
     (Plan 0218 Phase 2), and give `Rich` its own `swarm_max_coc_px`. If no discrete GPU is reachable
     from the session, the log says `Rich` is unmeasured, as Plan 0235's did, rather than inventing a
     value.
-  - Then re-bless `swarm` and `swarm_shaped` on whatever the ladder settled, and re-run the backdrop
-    fixtures' tests.
+  - Then re-run the `swarm` and `swarm_shaped` goldens and the backdrop fixtures' tests on whatever
+    the ladder settled. Do not re-bless: baselines are blessed on DX12 WARP only, and that is Phase 7.
 - **Files touched:** `core/src/render/tier.rs`, `core/src/render/scenes/swarm.rs`,
   `core/src/render/scenes/swarm/tests.rs`, `core/tests/mark_cost.rs`, `core/tests/golden/`,
   `core/tests/fixtures/`, `core/src/render/post/tests.rs`, `core/tests/`.
@@ -125,8 +125,9 @@ flowchart LR
   - `Rich` carries a measured value, or the log says it is unmeasured.
   - The CoC never exceeds `swarm_max_coc_px` at any `aperture`.
   - If rung 2 was built, its cross-fade test shows no step.
-  - Both goldens hold on the software adapter. The backdrop tests pass, or each one that changed is
-    named in the log with the reason.
+  - The golden suite passes on the session's adapter, and the log says whether `swarm` and
+    `swarm_shaped` moved, quoting the off-WARP drift report. The backdrop tests pass, or each one
+    that changed is named in the log with the reason.
 
 ### Phase 4 — The shipped presets keep rendering
 - **Owner skill:** dev
@@ -163,6 +164,14 @@ flowchart LR
 - **Files touched:** none (the re-tunes are `preset-author`'s commits).
 - **Done when:** each of the five presets is marked in this plan's log, and every one marked re-tune
   has a `preset-author` commit on the lane.
+
+### Phase 7 — The moved baselines are blessed
+- **Owner skill:** human
+- **Blocks merge:** no
+- **What:** re-bless on DX12 WARP whichever of `swarm` and `swarm_shaped` Phase 3's log says moved,
+  and nothing else. If Plan 0218 has moved blessing to lavapipe by then, bless there instead.
+- **Files touched:** `core/tests/golden/swarm.png`, `core/tests/golden/swarm_shaped.png`.
+- **Done when:** the Windows CI golden job is green on `main`.
 
 ## Data shapes
 
@@ -222,6 +231,7 @@ struct Particle {
 | 4 — The shipped presets keep rendering | dev | not started | |
 | 5 — Documentation and the references | dev | not started | |
 | 6 — The five presets, judged and re-tuned | human | not started | |
+| 7 — The moved baselines are blessed | human | not started | |
 
 ### Notes
 
