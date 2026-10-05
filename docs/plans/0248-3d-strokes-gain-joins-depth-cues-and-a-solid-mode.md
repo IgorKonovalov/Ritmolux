@@ -242,9 +242,9 @@ Field order is shader-location order, so new fields go at the end.
 | 3 — Solid: far to near, near over far | dev | done | 9ef1719c |
 | 4 — The waterfall's rows hide what is behind them | dev | done | 19575ade |
 | 5 — Documentation | dev | done | fd1c12ab |
-| 6 — The preset-author reference | human | not started | |
-| 7 — The moved baselines are blessed | human | not started | |
-| 8 — The looks, judged | human | not started | |
+| 6 — The preset-author reference | human | owed | |
+| 7 — The moved baselines are blessed | human | owed | |
+| 8 — The looks, judged | human | owed | |
 
 ### Notes
 
