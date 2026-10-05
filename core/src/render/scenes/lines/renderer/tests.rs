@@ -2249,6 +2249,20 @@ mod seg3d {
         fog: f32,
         segments: &[Segment3dInstance],
     ) -> Vec<f32> {
+        render_rgba(ctx, aperture, fog, false, segments)
+            .into_iter()
+            .map(|[r, _, _, _]| r)
+            .collect()
+    }
+
+    /// [`render_segments`] with `solid` chosen, as every channel of the target.
+    fn render_rgba(
+        ctx: &RenderContext,
+        aperture: f32,
+        fog: f32,
+        solid: bool,
+        segments: &[Segment3dInstance],
+    ) -> Vec<[f32; 4]> {
         let device = &ctx.device;
         let mut lines = LineRenderer::new_3d(device, FORMAT, 16, "seg3d-probe");
         let texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -2282,6 +2296,7 @@ mod seg3d {
             span: FOCAL,
             blur: None,
             fog,
+            solid,
         };
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("seg3d-probe-encoder"),
@@ -2338,7 +2353,10 @@ mod seg3d {
         let data = slice.get_mapped_range().expect("mapped").to_vec();
         readback.unmap();
         data.chunks_exact(8)
-            .map(|px| f16_to_f32(u16::from_le_bytes([px[0], px[1]])))
+            .map(|px| {
+                let channel = |k: usize| f16_to_f32(u16::from_le_bytes([px[2 * k], px[2 * k + 1]]));
+                [channel(0), channel(1), channel(2), channel(3)]
+            })
             .collect()
     }
 
@@ -2587,6 +2605,44 @@ mod seg3d {
         );
     }
 
+    /// **A solid frame paints the near stroke over the far one** (ADR-0263):
+    /// two sharp strokes crossing at the frame's centre at different depths,
+    /// one red and one green. Solid, the crossing pixel is the near stroke's
+    /// colour whichever order the two arrive in; glow, it is the sum of both,
+    /// as it always was.
+    #[test]
+    fn a_solid_crossing_takes_the_near_colour_and_a_glow_one_the_sum() {
+        let Some(ctx) = context() else {
+            return;
+        };
+        let stroke = |a: [f32; 3], b: [f32; 3], color: [f32; 3]| Segment3dInstance {
+            a,
+            b,
+            color,
+            width: NARROW,
+            alpha: 1.0,
+            prev: a,
+            next: b,
+        };
+        let near = stroke([-1.5, 0.0, -1.0], [1.5, 0.0, -1.0], [0.5, 0.0, 0.0]);
+        let far = stroke([0.0, -1.5, -3.0], [0.0, 1.5, -3.0], [0.0, 0.5, 0.0]);
+        let centre = |image: &[[f32; 4]]| image[(H / 2 * W + W / 2) as usize];
+        let solid_near_first = centre(&render_rgba(&ctx, 0.0, 0.0, true, &[near, far]));
+        let solid_far_first = centre(&render_rgba(&ctx, 0.0, 0.0, true, &[far, near]));
+        let glow = centre(&render_rgba(&ctx, 0.0, 0.0, false, &[near, far]));
+        println!("crossing: solid {solid_near_first:?} / {solid_far_first:?}, glow {glow:?}");
+        for solid in [solid_near_first, solid_far_first] {
+            assert!(
+                (solid[0] - 0.5).abs() < 0.01 && solid[1] < 0.01,
+                "solid, the crossing is the near stroke's red alone: {solid:?}"
+            );
+        }
+        assert!(
+            (glow[0] - 0.5).abs() < 0.01 && (glow[1] - 0.5).abs() < 0.01,
+            "glow, the crossing is the sum of red and green: {glow:?}"
+        );
+    }
+
     /// **Full fog blacks out the far end and leaves the near one alone**
     /// (ADR-0263). A segment spanning the volume's whole depth, from its
     /// nearest extent to its farthest, is drawn at `fog = 1` and at `fog = 0`;
@@ -2724,5 +2780,107 @@ mod seg3d {
             "the summed light moves by {spread:.4} while the peak falls {peak_fall:.4}, \
              so the energy is not kept: {blurred:?}"
         );
+    }
+}
+
+// -----------------------------------------------------------------------
+// The solid frame's painter's order (ADR-0263)
+// -----------------------------------------------------------------------
+
+mod solid_order {
+    use super::super::{Segment3dInstance, sort_far_to_near};
+    use crate::render::camera::{Camera3d, CameraView};
+
+    fn view() -> CameraView {
+        Camera3d {
+            yaw: 0.3,
+            pitch: 0.4,
+            distance: 4.0,
+            fov: 0.8,
+            focus: 0.5,
+            aperture: 0.0,
+        }
+        .view(16.0 / 9.0, 1.0, [0.0, 0.0])
+    }
+
+    /// Sixty-four segments from a fixed linear congruential walk, every eighth
+    /// one followed by an exact duplicate of itself — a depth tie.
+    fn segments() -> Vec<Segment3dInstance> {
+        let mut state = 0x2545_f491_u32;
+        let mut next = || {
+            state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (state >> 8) as f32 / (1u32 << 24) as f32 * 2.0 - 1.0
+        };
+        let mut out = Vec::new();
+        for k in 0..64 {
+            let a = [next(), next(), next()];
+            let b = [next(), next(), next()];
+            let color = [next().abs(), next().abs(), next().abs()];
+            out.push(Segment3dInstance {
+                a,
+                b,
+                color,
+                width: 2.0,
+                alpha: 1.0,
+                prev: a,
+                next: b,
+            });
+            if k % 8 == 0 {
+                // An exact duplicate: the tie the content order has to break
+                // the same way whichever copy arrives first.
+                out.push(*out.last().unwrap_or_else(|| panic!("just pushed")));
+            }
+        }
+        out
+    }
+
+    /// **The order a solid frame is drawn in is a function of the set**: the
+    /// same segments emitted forwards, backwards and rotated sort to the same
+    /// sequence, far to near, and the sort reuses the scratch it was handed
+    /// rather than growing it.
+    #[test]
+    fn the_draw_order_does_not_depend_on_the_emission_order() {
+        let view = view();
+        let forward = segments();
+        let mut backward = forward.clone();
+        backward.reverse();
+        let mut rotated = forward.clone();
+        rotated.rotate_left(23);
+
+        let cap = forward.len();
+        let mut keys = Vec::with_capacity(cap);
+        let mut out = Vec::with_capacity(cap);
+        let (keys_at, out_at) = (keys.as_ptr(), out.as_ptr());
+        let mut sorted = |input: &[Segment3dInstance]| {
+            sort_far_to_near(&view, input, &mut keys, &mut out);
+            assert_eq!(keys.as_ptr(), keys_at, "the key scratch was reallocated");
+            assert_eq!(out.as_ptr(), out_at, "the output scratch was reallocated");
+            out.clone()
+        };
+        let a = sorted(&forward);
+        let b = sorted(&backward);
+        let c = sorted(&rotated);
+        assert_eq!(a.len(), cap);
+        assert_eq!(a, b, "a reversed emission draws in another order");
+        assert_eq!(a, c, "a rotated emission draws in another order");
+
+        let depth = |s: &Segment3dInstance| {
+            view.depth([
+                0.5 * (s.a[0] + s.b[0]),
+                0.5 * (s.a[1] + s.b[1]),
+                0.5 * (s.a[2] + s.b[2]),
+            ])
+        };
+        for pair in a.windows(2) {
+            assert!(
+                depth(&pair[0]) >= depth(&pair[1]),
+                "far to near: {} then {}",
+                depth(&pair[0]),
+                depth(&pair[1])
+            );
+        }
+        // Non-vacuity: the emission order was not already far to near.
+        let emitted: Vec<f32> = forward.iter().map(depth).collect();
+        assert!(emitted.windows(2).any(|w| w[0] < w[1]));
     }
 }

@@ -213,6 +213,7 @@ pub const PARAMS: &[ParamSpec] = &[
     camera::FOCUS,
     camera::APERTURE,
     camera::FOG,
+    camera::SOLID,
     crate::render::scenes::common::brightness(1.0),
     ParamSpec {
         name: "hue_center",

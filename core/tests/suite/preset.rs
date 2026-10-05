@@ -2170,7 +2170,7 @@ const PAN_BLOCK: &[&str] = &["pan_x", "pan_y"];
 /// (ADR-0258, ADR-0263); held there by that module's own roster test, and here
 /// by the delegation check below.
 const CAMERA_BLOCK: &[&str] = &[
-    "yaw", "pitch", "distance", "fov", "focus", "aperture", "fog",
+    "yaw", "pitch", "distance", "fov", "focus", "aperture", "fog", "solid",
 ];
 
 /// Drift guard (ADR-0020's flagged risk): each declared `PARAMS` list must be

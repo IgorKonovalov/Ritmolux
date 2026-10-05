@@ -790,6 +790,7 @@ pub const PARAMS: &[ParamSpec] = &[
     FOCUS,
     APERTURE,
     FOG,
+    SOLID,
     HUE_AXIS,
 ];
 
@@ -842,6 +843,12 @@ const FOG: ParamSpec = ParamSpec {
     doc: "Fades a space curve toward black with depth: at 1 its farthest point is black and its \
           nearest keeps its light. 0 is off.",
     ..camera::FOG
+};
+const SOLID: ParamSpec = ParamSpec {
+    doc: "1 paints a space curve's near strands over its far ones, so it reads as an object and \
+          crossings stop brightening; 0 is the additive glow. Solid sorts every chord by depth \
+          each frame.",
+    ..camera::SOLID
 };
 
 /// `hue_axis`: which axis a space curve's palette runs along (ADR-0263) — `0`
@@ -958,6 +965,7 @@ pub const FAMILY_PARAMS: &[FamilyParam] = &[
     space_only!(FOCUS),
     space_only!(APERTURE),
     space_only!(FOG),
+    space_only!(SOLID),
     space_only!(HUE_AXIS),
 ];
 

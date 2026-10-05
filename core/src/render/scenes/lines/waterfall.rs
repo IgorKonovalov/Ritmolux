@@ -212,6 +212,7 @@ pub const PARAMS: &[ParamSpec] = &[
     camera::FOCUS,
     camera::APERTURE,
     camera::FOG,
+    camera::SOLID,
     crate::render::scenes::common::zoom(1.0),
     crate::render::scenes::common::PAN_X,
     crate::render::scenes::common::PAN_Y,

@@ -17,8 +17,9 @@
 //!
 //! Clip space puts the view depth in `w`, so the perspective divide is a divide
 //! by the distance in front of the eye along the view axis. The `z` row is zero:
-//! no 3D pipeline has a depth attachment, because additive light needs no
-//! occlusion (ADR-0044).
+//! no 3D pipeline has a depth attachment. Additive light needs no occlusion
+//! (ADR-0044), and a `solid` frame occludes by drawing its strokes far to near
+//! rather than by a depth test (ADR-0263).
 //!
 //! # Depth of field is per primitive, not per pixel
 //!
@@ -415,6 +416,23 @@ pub(crate) const FOG: ParamSpec = ParamSpec {
     main: false,
 };
 
+/// `solid`, shared: whether the frame's strokes occlude (ADR-0263). Read per
+/// frame, and solid at [`SOLID_AT`] and above; `0` is the additive glow.
+pub(crate) const SOLID: ParamSpec = ParamSpec {
+    name: "solid",
+    default: 0.0,
+    range: Some([0.0, 1.0]),
+    doc: "1 paints near strokes over far ones, so the scene reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every stroke by depth each frame.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Light,
+    main: false,
+};
+
+/// The `solid` value at and above which a frame is drawn solid: the switch is
+/// two-valued, and the threshold sits between its two values so a bound
+/// `select(...)` or an eased value flips once, half-way.
+pub(crate) const SOLID_AT: f32 = 0.5;
+
 /// The camera params a 3D system binds, as one block (ADR-0258), in the
 /// shape of [`PanParams`](crate::render::scenes::common::PanParams): the
 /// `ParamSpec`s declared once here and spliced into each system's `PARAMS`,
@@ -438,6 +456,8 @@ pub(crate) struct CameraParams {
     pub aperture: f32,
     /// `fog`, `0` off and `1` the farthest extent black.
     pub fog: f32,
+    /// `solid`, solid at [`SOLID_AT`] and above.
+    pub solid: f32,
 }
 
 impl Default for CameraParams {
@@ -451,6 +471,7 @@ impl Default for CameraParams {
             focus: rest("focus"),
             aperture: rest("aperture"),
             fog: rest("fog"),
+            solid: rest("solid"),
         }
     }
 }
@@ -473,6 +494,9 @@ pub(crate) struct CameraFrame {
     pub blur: Option<CapOverflow>,
     /// `fog`, made safe: finite and in `[0, 1]`.
     pub fog: f32,
+    /// Whether this frame is drawn solid: near strokes painted over far ones
+    /// in a back-to-front order rather than added (ADR-0263).
+    pub solid: bool,
 }
 
 impl CameraFrame {
@@ -498,7 +522,8 @@ impl CameraFrame {
 
 impl CameraParams {
     /// The specs, in the order a system splices them.
-    pub(crate) const SPECS: [ParamSpec; 7] = [YAW, PITCH, DISTANCE, FOV, FOCUS, APERTURE, FOG];
+    pub(crate) const SPECS: [ParamSpec; 8] =
+        [YAW, PITCH, DISTANCE, FOV, FOCUS, APERTURE, FOG, SOLID];
 
     /// Store `value` if `name` is one of the camera's, and say whether it
     /// was.
@@ -511,6 +536,7 @@ impl CameraParams {
             "focus" => self.focus = value,
             "aperture" => self.aperture = value,
             "fog" => self.fog = value,
+            "solid" => self.solid = value,
             _ => return false,
         }
         true
@@ -586,6 +612,8 @@ impl CameraParams {
             span,
             blur,
             fog,
+            // `NaN >= 0.5` is false, so a non-finite binding draws the glow.
+            solid: self.solid >= SOLID_AT,
         }
     }
 }

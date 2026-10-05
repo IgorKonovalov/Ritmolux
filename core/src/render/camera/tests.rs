@@ -476,6 +476,7 @@ fn the_camera_block_answers_exactly_its_specs() {
             focus: 0.75,
             aperture: 0.75,
             fog: 0.75,
+            solid: 0.75,
         }
     );
     for name in ["zoom", "pan_x", "line_width", "", "Yaw"] {
@@ -491,10 +492,31 @@ fn the_camera_block_answers_exactly_its_specs() {
         rest.focus,
         rest.aperture,
         rest.fog,
+        rest.solid,
     ]) {
         assert_eq!(spec.default, value, "`{}` rests off its spec", spec.name);
     }
     assert_eq!(params, rest);
+}
+
+/// **`solid` is a switch read per frame** (ADR-0263): a frame is solid at
+/// `0.5` and above, the glow below it, and a non-finite binding draws the glow.
+#[test]
+fn solid_switches_at_one_half() {
+    for (value, solid) in [
+        (0.0, false),
+        (0.49, false),
+        (0.5, true),
+        (1.0, true),
+        (f32::NAN, false),
+    ] {
+        let params = CameraParams {
+            solid: value,
+            ..CameraParams::default()
+        };
+        let frame = params.frame(1.6, 1.0, [0.0, 0.0], (1280, 800), 1.0, 16.0);
+        assert_eq!(frame.solid, solid, "solid = {value}");
+    }
 }
 
 /// **The helper resolves the lens as each piece does on its own**: the view
@@ -511,6 +533,7 @@ fn the_lens_helper_is_the_pieces_composed() {
         focus: 0.3,
         aperture: 10.0,
         fog: 0.0,
+        solid: 0.0,
     };
     let (target, radius, max_coc) = ((1280, 800), 1.2, 16.0);
     let frame = params.frame(1.6, 1.25, [0.1, -0.05], target, radius, max_coc);

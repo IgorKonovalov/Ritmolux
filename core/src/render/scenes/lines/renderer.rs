@@ -1007,11 +1007,61 @@ struct Stroke3dUniform {
 /// [`LineRenderer::new_3d`].
 struct Seg3d {
     pipeline: wgpu::RenderPipeline,
+    /// The same pipeline composited **over** rather than added, for a solid
+    /// frame (ADR-0263). Built with the additive one rather than on the first
+    /// solid frame: a resource created mid-run moves what later passes
+    /// resolve to on the WARP software adapter the goldens capture on.
+    over_pipeline: wgpu::RenderPipeline,
     instances: wgpu::Buffer,
     camera: wgpu::Buffer,
     stroke: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     capacity: usize,
+    /// A solid frame's sort keys, `(depth, index)`, preallocated to
+    /// `capacity` so the sort allocates nothing.
+    keys: Vec<(f32, u32)>,
+    /// A solid frame's segments in draw order, far to near, preallocated to
+    /// `capacity`.
+    sorted: Vec<Segment3dInstance>,
+}
+
+/// `segments` in **far-to-near** order into `out`, by the camera depth of each
+/// segment's midpoint under `view` — the painter's order a solid frame draws
+/// in (ADR-0263), so a nearer stroke composites over a farther one.
+///
+/// **The order is a function of the set, not of the order it arrived in.**
+/// Two segments at one depth are ordered by their own bytes, which is a total
+/// order on the instance, so a system that emits the same segments in another
+/// order draws the same frame.
+///
+/// **Allocation-free** while `segments` fits the capacity `keys` and `out`
+/// were reserved to: both are cleared and refilled, and `sort_unstable_by`
+/// sorts in place.
+pub(crate) fn sort_far_to_near(
+    view: &crate::render::camera::CameraView,
+    segments: &[Segment3dInstance],
+    keys: &mut Vec<(f32, u32)>,
+    out: &mut Vec<Segment3dInstance>,
+) {
+    keys.clear();
+    out.clear();
+    for (i, s) in segments.iter().enumerate() {
+        let mid = [
+            0.5 * (s.a[0] + s.b[0]),
+            0.5 * (s.a[1] + s.b[1]),
+            0.5 * (s.a[2] + s.b[2]),
+        ];
+        keys.push((view.depth(mid), i as u32));
+    }
+    let content = |i: u32| segments.get(i as usize).map(bytemuck::bytes_of);
+    keys.sort_unstable_by(|x, y| {
+        y.0.total_cmp(&x.0)
+            .then_with(|| content(x.1).cmp(&content(y.1)))
+    });
+    out.extend(
+        keys.iter()
+            .filter_map(|&(_, i)| segments.get(i as usize).copied()),
+    );
 }
 
 impl Seg3d {
@@ -1094,51 +1144,62 @@ impl Seg3d {
             bind_group_layouts: &[Some(&bind_layout)],
             immediate_size: 0,
         });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some(&format!("{label}-seg3d-pipeline")),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[Some(wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Segment3dInstance>() as u64,
-                    step_mode: wgpu::VertexStepMode::Instance,
-                    attributes: &wgpu::vertex_attr_array![
-                        0 => Float32x3,
-                        1 => Float32x3,
-                        2 => Float32x3,
-                        3 => Float32,
-                        4 => Float32,
-                        5 => Float32x3,
-                        6 => Float32x3,
-                    ],
-                })],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    // The seam every additive line draws through (ADR-0056).
-                    blend: Some(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        // The two pipelines differ in the blend state and nothing else, so they
+        // are built from one closure, as the 2D pair is.
+        let make = |blend: wgpu::BlendState, suffix: &str| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(&format!("{label}-seg3d-pipeline{suffix}")),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<Segment3dInstance>() as u64,
+                        step_mode: wgpu::VertexStepMode::Instance,
+                        attributes: &wgpu::vertex_attr_array![
+                            0 => Float32x3,
+                            1 => Float32x3,
+                            2 => Float32x3,
+                            3 => Float32,
+                            4 => Float32,
+                            5 => Float32x3,
+                            6 => Float32x3,
+                        ],
+                    })],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: surface_format,
+                        blend: Some(blend),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+        // The seam every additive line draws through (ADR-0056), then the
+        // premultiplied OVER a solid frame takes. The fragment is premultiplied
+        // either way, which is why one shader serves both.
+        let pipeline = make(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE, "");
+        let over_pipeline = make(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING, "-over");
         Self {
             pipeline,
+            over_pipeline,
             instances,
             camera,
             stroke,
             bind_group,
             capacity,
+            keys: Vec::with_capacity(capacity),
+            sorted: Vec::with_capacity(capacity),
         }
     }
 }
@@ -1823,7 +1884,7 @@ impl LineRenderer {
     }
 
     /// Draw `segments` through the shared camera (ADR-0257), **loading** over
-    /// the backdrop, in one additive pass of their own. Segments beyond
+    /// the backdrop, in one pass of their own. Segments beyond
     /// [`capacity_3d`](Self::capacity_3d) are dropped defensively; a renderer
     /// without the pipeline draws none.
     ///
@@ -1832,8 +1893,14 @@ impl LineRenderer {
     /// ([`CameraView::clip_near`](crate::render::camera::CameraView::clip_near)).
     ///
     /// `frame` is the camera block's whole frame, not only its uniform: the
-    /// depth cues it carries (`fog`) are the block's, so every system that
-    /// splices the block draws them without naming them.
+    /// depth cues it carries (`fog`, `solid`) are the block's, so every system
+    /// that splices the block draws them without naming them.
+    ///
+    /// **A solid frame** (ADR-0263) is drawn far to near and composited over:
+    /// the segments are sorted by [`sort_far_to_near`] into scratch reserved
+    /// at the buffer's capacity, so the sort allocates nothing, and the over
+    /// pipeline paints each nearer stroke over what it covers. A glow frame
+    /// uploads `segments` as they came, through the additive pipeline.
     #[allow(
         clippy::too_many_arguments,
         reason = "distinct GPU handles plus the per-frame camera and stroke values; bundling \
@@ -1850,7 +1917,7 @@ impl LineRenderer {
         segments: &[Segment3dInstance],
     ) {
         let mut pass = gpu::color_pass(encoder, "seg3d-pass", view, wgpu::LoadOp::Load);
-        let Some(seg3d) = self.seg3d.as_ref() else {
+        let Some(seg3d) = self.seg3d.as_mut() else {
             return;
         };
         let count = segments.len().min(seg3d.capacity);
@@ -1858,7 +1925,12 @@ impl LineRenderer {
         if drawn.is_empty() {
             return; // nothing to stroke; the backdrop shows through
         }
-        queue.write_buffer(&seg3d.instances, 0, bytemuck::cast_slice(drawn));
+        if frame.solid {
+            sort_far_to_near(&frame.view, drawn, &mut seg3d.keys, &mut seg3d.sorted);
+            queue.write_buffer(&seg3d.instances, 0, bytemuck::cast_slice(&seg3d.sorted));
+        } else {
+            queue.write_buffer(&seg3d.instances, 0, bytemuck::cast_slice(drawn));
+        }
         queue.write_buffer(&seg3d.camera, 0, bytemuck::bytes_of(&frame.uniform));
         queue.write_buffer(
             &seg3d.stroke,
@@ -1867,7 +1939,11 @@ impl LineRenderer {
                 v: [glow, softness, frame.fog, 0.0],
             }),
         );
-        pass.set_pipeline(&seg3d.pipeline);
+        pass.set_pipeline(if frame.solid {
+            &seg3d.over_pipeline
+        } else {
+            &seg3d.pipeline
+        });
         pass.set_bind_group(0, &seg3d.bind_group, &[]);
         pass.set_vertex_buffer(0, seg3d.instances.slice(..));
         pass.draw(0..6, 0..count as u32);

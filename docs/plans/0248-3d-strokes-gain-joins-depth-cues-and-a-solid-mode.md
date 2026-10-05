@@ -238,8 +238,8 @@ Field order is shader-location order, so new fields go at the end.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — A 3D joint is mitred, and the comb goes | dev | done | d4e48373 |
-| 2 — Fog, and a depth colour axis for the space curves | dev | done | committed with this row |
-| 3 — Solid: far to near, near over far | dev | not started | |
+| 2 — Fog, and a depth colour axis for the space curves | dev | done | cb0b0454 |
+| 3 — Solid: far to near, near over far | dev | done | committed with this row |
 | 4 — The waterfall's rows hide what is behind them | dev | not started | |
 | 5 — Documentation | dev | not started | |
 | 6 — The preset-author reference | human | not started | |
@@ -275,6 +275,25 @@ Field order is shader-location order, so new fields go at the end.
   attractor shader's own function of that name, which `CAMERA_WGSL` is prepended to.
 - **Phase 2, plexus nodes** fog on the CPU (`CameraFrame::fog_light`) in `plexus/mod.rs`, since
   the node pipeline in `marks.rs` is outside the file list; the links fog in the shader.
+- **Phase 2, the byte-identity criterion** was read with `shot` on this box's Vulkan adapter, not on
+  WARP: all 76 fixtures in `core/tests/fixtures/` captured by a Phase 1 build and a Phase 2 build
+  (640x360, 60 frames) are byte-identical.
+- **Phase 3, outside the file list:** `solid` is spliced into the three systems' `PARAMS`
+  (`parametric.rs` with its own doc line and a `space_only!` row, `waterfall.rs`,
+  `plexus/mod.rs`), and the reference, editor schemas and player schema are regenerated, without
+  which no preset could bind it. `core/src/render/camera/tests.rs` gains `solid` in its literals
+  and a threshold test. `core/tests/suite/hygiene.rs` is unchanged: the sort lives in
+  `renderer.rs`, which already carries the pragma the guard reads.
+- **Phase 3, the over pipeline is built with every `seg3d` renderer**, beside the additive one.
+  Building a pipeline is the allocation-order change the WARP goldens have moved under before; on
+  this box's Vulkan adapter all 76 fixtures are byte-identical between the Phase 2 and Phase 3
+  builds at `solid = 0`, and WARP was not read.
+- **Phase 3, the sort's cost**, on AMD Radeon Graphics (RADV RENOIR, Vulkan, integrated), Mesa
+  26.2.2, release profile, 1920x1080, `shot --report`'s frame-cost block over two scratch torus
+  knots identical but for `solid` (samples 20,000, held to the tier's `seg3d_segments`): Floor
+  (8,000) glow 1.461 ms, solid 1.718 ms; Rich (20,000) glow 2.603 ms, solid 3.585 ms. Headless,
+  so a comparison on one adapter rather than an app frame time; both solid readings are under NFR
+  section 1's 16.67 ms.
 
 ### Close triggers
 
