@@ -436,6 +436,11 @@ options delivered — and its body is in the archive.
   the absence of a whole mechanism rather than of a symbol, and every narrow spelling of it (depth,
   sort, order) is a common word in this tree, so any probe on it could never fail and would read as
   verification while checking nothing`
+- **Updated 2026-10-05** — Plan 0248 (ADR-0263) gives the 3D line stroke a per-preset `solid` mode
+  that sorts its lines far to near and paints near over far, so inside that one renderer something
+  now decides what is in front. It does not answer this entry: the order holds within one stroke,
+  not across the composite, and the composite still adds. The unprobeable line above stays true of
+  the composite.
 
 The original ask was a Solitaire-style cascade of **hearts — red fill, black outline**. Plan 0070
 delivered the silhouette: `shape = heart` on `swarm`/`emitter` draws a heart-shaped *glow*,

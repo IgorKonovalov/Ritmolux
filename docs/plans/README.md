@@ -48,7 +48,6 @@ place. The plan file carries the real link.
 | [0237](0237-the-l-system-turtle-turns-in-space.md) | The L-system turtle turns in space, and can grow without end | approved | dev, human | ADR-0258. After 0236. `turtle = "space"` and `growth = "endless"` (a streamed vine the camera follows), both opt-in; shipped L-systems keep their bytes. |
 | [0239](0239-the-swarm-moves-into-a-real-camera.md) | The swarm moves into a real camera | approved | dev, human | ADR-0259 (proposed) supersedes 0044's depth model. After 0236. Every swarm preset changes look; Phase 6 (owner's judgement) blocks the merge. |
 | [0240](0240-the-attractor-projects-through-the-shared-camera.md) | The attractor projects through the shared camera | approved | dev, human | ADR-0260 (proposed): `perspective` retires, presets migrate by exact mapping, re-curation owed after merge. After 0236. |
-| [0248](0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) | 3D strokes gain joins, depth cues and a solid mode | approved | dev, human | ADR-0263 (proposed). Closes backlog 0279-0281 from the 0236/0238 verdicts. Runs before 0237, 0239, 0240. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
 <!-- roster:end -->
 
@@ -1041,6 +1040,7 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 [Closed earlier (index bullets)](README-archive.md#closed-earlier-index-bullets).
 
 <!-- roster:begin cap=320 -->
+- [0248 - 3D strokes gain joins, depth cues and a solid mode](done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) - closed 2026-10-05, Phases 6-8 owed. Review: **no blockers, no majors, three minors (one fixed), one nit (fixed).** Version: **0.164.0**. ADR-0263 accepted. [Write-up](README-archive.md).
 - [0238 - The waterfall system](done/0238-the-waterfall-system.md) - closed 2026-10-02, Phase 4 judged: rows show through. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.163.0**. [Write-up](README-archive.md).
 - [0247 - The studio renders a neural clip](done/0247-the-studio-renders-a-neural-clip.md) - closed 2026-10-02, Phase 6 owed. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.162.0**. ADR-0262 accepted. [Write-up](README-archive.md).
 - [0236 - Space curves, and the camera becomes a shared block](done/0236-space-curves-and-the-camera-becomes-a-shared-block.md) - closed 2026-10-02, Phase 6 judged: three engine findings. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.161.0**. ADR-0258 accepted. [Write-up](README-archive.md).
@@ -1055,7 +1055,6 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 - [0230 - The Russian slice becomes findable](done/0230-the-russian-slice-becomes-findable.md) - closed 2026-09-30, Phase 4 read 2026-10-01. Review: **no blockers, no majors, no minors, two nits.** Version: **0.155.0**. ADR-0213 accepted, Outcome. [Write-up](README-archive.md).
 - [0231 - The interface is audited, then learns one look](done/0231-the-interface-is-audited-then-learns-one-look.md) - closed 2026-09-30. Review: **no blockers, no majors, two minors (fixed), two nits (one fixed).** Version: **0.154.0**. ADR-0252 + 0256 accepted. [Write-up](README-archive.md).
 - [0233 - The close reviews' small findings are repaired](done/0233-the-close-reviews-small-findings-are-repaired.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.153.0**. Closes 0263-0272 bar 0267. [Write-up](README-archive.md).
-- [0234 - A conductor session writes only where it works](done/0234-a-conductor-session-writes-only-where-it-works.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (fixed), two nits.** Version: none. ADR-0255 accepted, Outcome. Closes 0273. [Write-up](README-archive.md).
 
 <!-- roster:end -->
 

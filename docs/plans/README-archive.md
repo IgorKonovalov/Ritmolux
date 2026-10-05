@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0248 - 3D strokes gain joins, depth cues and a solid mode](#0248---3d-strokes-gain-joins-depth-cues-and-a-solid-mode)
   - [0238 - The waterfall system](#0238---the-waterfall-system)
   - [0247 - The studio renders a neural clip](#0247---the-studio-renders-a-neural-clip)
   - [0236 - Space curves, and the camera becomes a shared block](#0236---space-curves-and-the-camera-becomes-a-shared-block)
@@ -286,6 +287,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0234 - A conductor session writes only where it works](done/0234-a-conductor-session-writes-only-where-it-works.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (fixed), two nits.** Version: none. ADR-0255 accepted, Outcome. Closes 0273. [Write-up](README-archive.md).
 - [0212 - The diffused render gains a timeline](done/0212-the-diffused-render-gains-a-timeline.md) - closed 2026-09-28. Review: **two rounds; one major (fixed), five minors (four fixed).** Version: **0.152.0**. ADR-0236 accepted. Closes 0126. [Write-up](README-archive.md).
 - [0211 - The diffused frame's resolution is measured before it is designed](done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) - closed 2026-09-27. Review: **no blockers, no majors, three minors (two fixed).** Version: none. Closes 0125; filed 0262. [Write-up](README-archive.md).
 - [0208 - The conductor's safety claims get their evidence](done/0208-the-conductors-safety-claims-get-their-evidence.md) - closed 2026-09-27. Review: **three rounds; 3 majors (fixed), one minor, one nit (fixed).** Version: none. ADR-0233 accepted, Outcome. Closed 0236, 0237, 0241. [Write-up](README-archive.md).
@@ -490,6 +492,27 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0248 - 3D strokes gain joins, depth cues and a solid mode](done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md)
+
+- closed 2026-10-05 by a conductor close on the lane
+`plan-0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode`. The phases landed in `d4e48373`
+(Phase 1), `cb0b0454` (2), `9ef1719c` (3), `19575ade` (4) and `fd1c12ab` (5), with `1dee7189` a
+rustdoc repair after the merge. **Phases 6, 7 and 8 are owed** (`Blocks merge: no`, ADR-0249): the
+preset-author reference text, the WARP re-bless of `parametric_lissajous_3d.png`,
+`parametric_torus_knot.png` and `waterfall_ramp.png`, and the owner's judgement of the looks. The
+round 1 review found **no blockers, no majors, three minors and one nit**. The close repaired the
+`plexus` dot caveat and the unmeasured fog cost in `docs/presets.md` in `22ab1ccd`; the `hue_axis`
+test that checks the formula rather than the draw is test code and stays open, as does the log's
+length. Version: **0.164.0** (minor: a feature). ADR-0263 accepted. Closes backlog 0279, 0280 and
+0281. Upstream CI read green. The full review is the plan's own `## Close review`.
+- **What landed.** Mitred 3D joins on `seg3d`, so a blurred strand is one band; `fog` and `solid` on
+  the shared camera block; `hue_axis` on the space curves; a far-to-near CPU sort with a
+  premultiplied-over pipeline for solid frames; and the waterfall's black skirts, keyed at each
+  segment's foot.
+- **Open.** The Windows golden job reads red on the three moved baselines until Phase 7. On a solid
+  `plexus` the dots stay additive and unsorted. Backlog 0069's unprobeable claim now has a per-preset
+  answer for `seg3d` and was not edited.
 
 ### [0238 - The waterfall system](done/0238-the-waterfall-system.md)
 

@@ -344,9 +344,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0279 | A 3-D stroke is additive light with no depth test, so a near strand never hides a far one | [Plan 0248](plans/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) Phases 3-4. **Promoted** |
-| 0280 | A space curve does not fade or shift with distance, so nothing atmospheric says "far" | [Plan 0248](plans/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) Phase 2. **Promoted** |
-| 0281 | A heavily blurred 3-D stroke breaks into a comb of segment streaks | [Plan 0248](plans/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) Phase 1. **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -664,6 +661,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0271 | The missing-player banner does not say where the settings file is | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 8. The banner names the path. **Closed 2026-09-29** |
 | 0272 | `npm run dev` leaves Vite and the watchers running | [Plan 0233](plans/done/0233-the-close-reviews-small-findings-are-repaired.md) Phase 9. `--kill-others`. **Closed 2026-09-29** |
 | 0256 | Nothing asks whether a preset is any good, only whether two look alike | [Plan 0232](plans/done/0232-the-library-is-walked-cut-and-refilled.md) Phase 7. A monthly owner walk; no mechanism. **Closed 2026-10-01** |
+| 0279 | A 3-D stroke is additive light with no depth test, so a near strand never hides a far one | [Plan 0248](plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) Phases 3-4 + ADR-0263. Per-preset `solid`. **Closed 2026-10-05** |
+| 0280 | A space curve does not fade or shift with distance, so nothing atmospheric says "far" | [Plan 0248](plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) Phase 2. `fog` and `hue_axis`. **Closed 2026-10-05** |
+| 0281 | A heavily blurred 3-D stroke breaks into a comb of segment streaks | [Plan 0248](plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) Phase 1. Mitred 3D joins. **Closed 2026-10-05** |
 <!-- roster:end -->
 
 ---
@@ -16774,7 +16774,13 @@ glow, which is the look every 2-D line scene keeps.
   its rows back to front, each with a black filled skirt under its line, so every row covers what
   is behind it. That is classic hidden-line removal for a ridgeline, it needs no depth buffer, and it
   is worth weighing beside the three general shapes above.
-- **Moved to the archive 2026-10-05 on promotion**, when [Plan 0248](plans/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) was approved.
+- **Moved to the archive 2026-10-05 on promotion**, when [Plan 0248](plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) was approved.
+
+**CLOSED 2026-10-05** — [Plan 0248](plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md)
+Phases 3-4 and ADR-0263. Occlusion is per preset: `solid` on the shared camera block sorts the
+`seg3d` segments far to near on the CPU and paints them over, and a solid waterfall lays a black
+skirt under each row, keyed at its foot. Glow stays the default. No depth buffer was added. On
+`plexus` only the links are ordered; the dots stay additive.
 
 ## 0280 — a space curve does not fade or shift with distance, so nothing atmospheric says "far"
 
@@ -16794,7 +16800,12 @@ param inert on the flat families.
   `present: The colour axis: \*\*position along the traced path\*\* in: core/src/render/scenes/lines/parametric.rs`
 - **Verified 2026-10-02** — the line renderer has no distance falloff:
   `absent: fog|depth_fade in: core/src/render/scenes/lines/renderer.rs`
-- **Moved to the archive 2026-10-05 on promotion**, when [Plan 0248](plans/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) was approved.
+- **Moved to the archive 2026-10-05 on promotion**, when [Plan 0248](plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) was approved.
+
+**CLOSED 2026-10-05** — [Plan 0248](plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md)
+Phase 2 and ADR-0263. Both asks landed: `fog` on the shared camera block darkens toward black on
+`focus`'s depth scale, so `plexus` and the waterfall have it too, and `hue_axis` on the space
+families moves the colour coordinate from the path to depth. Both default to off.
 
 ## 0281 — a heavily blurred 3-D stroke breaks into a comb of segment streaks
 
@@ -16816,4 +16827,9 @@ one is contained to the line renderer, and it is the cheapest of the three to ta
   join extension: `present: let hw_true = mix\(hw_a \+ coc_a, hw_b \+ coc_b, c\.x\) in: core/src/render/scenes/lines/renderer.rs`
 - **Verified 2026-10-02** — `unprobeable: that the comb is the joint overlap is a reading of the
   renders and the shader; no committed render or test measures the stroke's profile across a joint`
-- **Moved to the archive 2026-10-05 on promotion**, when [Plan 0248](plans/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) was approved.
+- **Moved to the archive 2026-10-05 on promotion**, when [Plan 0248](plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) was approved.
+
+**CLOSED 2026-10-05** — [Plan 0248](plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md)
+Phase 1. The joint overlap was the mechanism: `Segment3dInstance` carries its neighbours and the
+`seg3d` shader mitres each joined end in screen space. Eight collinear joined segments now render
+identically to one at an open aperture, and a joined right angle has no ridge at its joint.

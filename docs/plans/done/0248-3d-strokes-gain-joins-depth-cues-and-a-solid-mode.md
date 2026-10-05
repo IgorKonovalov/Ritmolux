@@ -1,18 +1,20 @@
 # 0248 — 3D strokes gain joins, depth cues and a solid mode
 
-> **Status:** in-progress
+> **Status:** done - Phases 6, 7, 8 owed, ADR-0249. Closed 2026-10-05 at v0.164.0 by a conductor
+> close: Phases 1-5 in `d4e48373`, `cb0b0454`, `9ef1719c`, `19575ade`, `fd1c12ab`; round 1 review
+> no blockers, no majors, three minors and one nit, two repaired in `22ab1ccd`.
 > **Created:** 2026-10-05
 > **Approved:** 2026-10-05 (user)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0263](../adrs/0263-a-3d-stroke-may-be-solid-by-a-back-to-front-sort-and-depth-cues-ride-the-shared-camera.md)
-> (proposed; this plan's decision), [0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md),
-> [0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md),
-> [0158](../adrs/0158-a-joined-end-carries-its-own-miter-length.md),
-> [0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)
+> **Related ADRs:** [0263](../../adrs/0263-a-3d-stroke-may-be-solid-by-a-back-to-front-sort-and-depth-cues-ride-the-shared-camera.md)
+> (accepted at the close; this plan's decision), [0257](../../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md),
+> [0258](../../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md),
+> [0158](../../adrs/0158-a-joined-end-carries-its-own-miter-length.md),
+> [0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)
 > **Closes:** design-backlog 0279, 0280, 0281
-> **Runs before:** Plans [0237](0237-the-l-system-turtle-turns-in-space.md),
-> [0239](0239-the-swarm-moves-into-a-real-camera.md) and
-> [0240](0240-the-attractor-projects-through-the-shared-camera.md), which splice the camera block this
+> **Runs before:** Plans [0237](../0237-the-l-system-turtle-turns-in-space.md),
+> [0239](../0239-the-swarm-moves-into-a-real-camera.md) and
+> [0240](../0240-the-attractor-projects-through-the-shared-camera.md), which splice the camera block this
 > plan extends.
 
 ## TL;DR
@@ -364,5 +366,162 @@ Field order is shader-location order, so new fields go at the end.
 - **Outstanding `human` phases:** 6 (the preset-author reference, text above), 7 (re-bless
   `parametric_lissajous_3d.png`, `parametric_torus_knot.png`, `waterfall_ramp.png` on WARP),
   8 (the looks, judged) — all three `Blocks merge: no`.
+
+## Close review
+
+Closed 2026-10-05 by a conductor close, round 1. **Three human phases are owed** (ADR-0249) and
+none of what they check has been checked: Phase 6, the preset-author reference text above, applied
+to `.claude/skills/preset-author/references/systems.md`; Phase 7, the WARP re-bless of
+`parametric_lissajous_3d.png`, `parametric_torus_knot.png` and `waterfall_ramp.png`, until which
+the Windows golden job reads red on `main`; Phase 8, the owner's live judgement of the knot and the
+waterfall in glow and solid, with and without fog. The round 1 review follows in full. Its minor 1
+and its nit were repaired at the close in `22ab1ccd`; minors 2 and 3 stay open. No earlier round
+raised a finding.
+
+### Plan 0248 — close review, round 1
+
+**Verdict:** Plan 0248 landed cleanly at `1dee7189`: no blockers, no majors, three minors and one
+nit. All three are documentation or test-depth gaps. The engine work matches ADR-0263 and the plan's
+five `dev` phases. Phases 6, 7 and 8 are `human` with `**Blocks merge:** no`, and the log correctly
+carries them as `owed`.
+
+#### Evidence
+
+- **Full suite (lens 1).** `node /home/igor/Work/Ritmolux/tools/conductor/with-lock.mjs suite --
+  cargo nextest run --workspace` did not re-run. It printed the ledger record:
+  `with-lock: skipped cargo nextest run --workspace: tree 0fa0595 is green in the suite ledger, run by
+  gate 0248-pre-review-after-repair-1 at 2026-10-05T19:49:01.168Z: 1972 tests run: 1972 passed (11
+  slow), 8 skipped`. `git rev-parse HEAD^{tree}` is `0fa05950960caf0e429d9785757c7f60b60ea19e`, which
+  is the graded tip's tree.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: clean.
+- `cargo fmt --all -- --check`: clean. `cargo clippy --workspace --all-targets -- -D warnings`:
+  clean.
+- Phase 5's done-whens all exit 0: `node scripts/toc.mjs --check`,
+  `node scripts/check-doc-links.mjs`, `node scripts/check-reader-prose.mjs` and
+  `node scripts/check-system-counts.mjs`. So does `node scripts/check-comment-hygiene.mjs`.
+- `node scripts/check-backlog-claims.mjs`: exit 0. It reports 55 reductions across 27 live entries
+  and 3 unprobeable claims. The log rightly notes that 0069's unprobeable claim ("nothing in this
+  engine decides what is in front of what") now has a per-preset answer for `seg3d`. That makes it a
+  candidate for correction at the close.
+
+#### Lens 1 — alignment
+
+Every phase carries a single in-vocabulary `**Owner skill:**` tag. Phases 1–5 map to commits
+`d4e48373`, `cb0b0454`, `9ef1719c`, `19575ade` and `fd1c12ab`. `1dee7189` is a rustdoc repair after
+the merge, made because `draw_3d` became `pub(crate)`.
+
+Test bodies read against the done-whens:
+
+- **Phase 1.** `eight_collinear_joined_segments_render_as_one` asserts that the worst pixel
+  difference is exactly `0.0` at aperture 12, which is the property the plan states.
+  `a_joined_right_angle_has_no_ridge_at_its_joint` derives its allowance from half a pixel of the
+  profile's slope plus one f16 step. It is non-vacuous: the unjoined control has to rise more than
+  four allowances. The plexus byte-identity check was run with `shot` captures on Vulkan, as the log
+  says, and is not a committed test. The done-when says "captured", so this is acceptable.
+- **Phase 2.** `full_fog_blacks_out_the_far_end_and_keeps_the_near_one` compares two renders of one
+  geometry, so coverage cancels out of the ratio. That is a property and complies with ADR-0071. The
+  `hue_axis` test is weaker; see minor 2. The byte-identity criterion was read on Vulkan across all 76
+  fixtures, not on WARP, and the log says so.
+- **Phase 3.** `a_solid_crossing_takes_the_near_colour_and_a_glow_one_the_sum` tests both emission
+  orders. `the_draw_order_does_not_depend_on_the_emission_order` adds exact duplicates to force ties,
+  asserts monotone far-to-near depth, and checks the scratch pointers to show nothing was
+  reallocated. The cost is recorded with the machine named (RADV RENOIR, Mesa 26.2.2). Both tiers
+  come in under 16.67 ms.
+- **Phase 4.** `a_solid_near_peak_hides_the_row_behind_it` uses an in-test geometry check to confirm
+  the far row lies between the peak and its foot. It then requires glow's brightest pixel there to be
+  the far row, and requires solid to fall to at most 1/8 of that light.
+  `a_solid_row_count_is_clamped_at_its_skirted_cost` asserts `OverflowContext::Rows(fits, 126)` at the
+  renderer. Phase 4 keys the solid sort at each segment's foot rather than its midpoint. The plan does
+  not say this; the log explains it. It is a sound refinement of Phase 3's key for a heightfield, and
+  `draw_3d` still keys at the midpoint.
+- **Phase 5.** The docs, the two example presets, the guide picture and the on-device row are all
+  present. The Phase 6 text is in `### Notes`, as the plan asks.
+
+#### Lens 2 — layering and real-time safety
+
+No platform types are in `core/`, and the C ABI and the control protocol are untouched. Solid mode's
+scratch (`keys`, `sorted`) is reserved at the `seg3d` capacity, and `sort_unstable_by` sorts in
+place. `waterfall.rs` already reserves `instances` at `seg3d_cap`. Its new emit path checks
+`instances.len() + line + skirt > seg3d_cap` before every push, so the doubled solid cost never
+grows the Vec. The `deny(unwrap_used, ...)` pragma is present on `renderer.rs`, `waterfall.rs`,
+`plexus/mod.rs` and `camera.rs`, and the new code adds no `unwrap`.
+
+#### Lens 3 — docs and bookkeeping owed at the close
+
+- `docs/presets.md`, `docs/preset-guide.md` and `docs/on-device-validation.md` are swept. The
+  generated `presets/README.md`, `presets/schema/*` and `docs/specs/player-schema.json` were
+  regenerated, and the suite's schema and reference tests are green.
+- **Close owes:** ADR-0263 `proposed → accepted`. Design-backlog 0279, 0280 and 0281 to the archive's
+  `### Closed`. Re-read 0069's unprobeable line. A **minor** version bump, since this is a feature.
+  The studio's two version copies. A `## Close review` section. `Status: done - Phases 6, 7, 8 owed,
+  ADR-0249`.
+- **The owed Phase 7 matters before the next tag's CI.** The Windows golden job will read red on
+  `parametric_lissajous_3d.png`, `parametric_torus_knot.png` and `waterfall_ramp.png` until they are
+  re-blessed. The plan's Risks section accepts this, and ADR-0251 makes it advisory.
+- **Preset curation (3b):** no `.toml` in `presets/` changed. Only generated files moved, so there is
+  nothing to curate.
+
+#### Lens 4 — correctness
+
+- `solid` uses `>= 0.5`, so a NaN binding draws glow. `fog` is clamped to a finite value in `[0, 1]`.
+  `hue_axis` is clamped and NaN reads as 0. Sort keys use `total_cmp`, so a NaN depth cannot panic
+  the sort.
+- `joined_chord` takes a neighbour behind the near plane at that chord's own clip point, using the
+  same arguments, so shared corners stay bit-equal. The shader picks values with `select` rather than
+  `mix` for the same reason.
+- No aspect comes from a grid. The waterfall frame takes the `aspect` that `render` is handed.
+- Numeric assertions are properties: exact zero, ratios of one geometry, and slope-derived
+  allowances. The cost figures name the machine they were measured on.
+
+#### Lens 5 — design integrity
+
+The depth cues ride `CameraFrame`, so `draw_3d` takes the whole frame. Each system that splices the
+camera block therefore gets `fog` and `solid` without naming them, which fits ADR-0258's
+one-block shape. `draw_3d_terrain` adds a ground-plane variant without a second pipeline. The
+`Scene` trait is not widened.
+
+#### Findings
+
+##### Minor
+
+1. **`docs/presets.md:582` — solid `plexus` still lets far dots light over near links, and the doc
+   implies it doesn't.** `plexus` draws its dots after all links through `InstancedQuads3d`, which is
+   additive (`core/src/render/scenes/marks.rs:625`) and not sorted with the links. In a solid frame,
+   a far node therefore adds its light on top of a near solid link. The section says fog and solid
+   "work the same on `plexus`" and that solid makes "the figure read as an object", so an author who
+   sets `solid = "1"` on a plexus will see dots through the strands with no warning. Fixing the
+   rendering is out of this plan's file list. **Fix (prose, close-repairable):** after the `solid`
+   bullet, add "On `plexus` only the lines are ordered: its dots stay light and are drawn over every
+   line, so a far dot shows through a near line." Add the same caveat to the owner's Phase 6 text for
+   `systems.md`'s `plexus` paragraph.
+2. **`core/src/render/scenes/lines/parametric.rs` (`a_full_hue_axis_colours_a_knot_by_depth_alone`)
+   — Phase 2's `hue_axis` done-when is tested on the formula, not on the draw.** The test recomputes
+   each chord's depth itself and calls `space_coordinate`. Its pairwise loop compares
+   `space_coordinate(0, d, 1) == d`, so `di == dj ⇔ ui == uj` holds by construction. Nothing checks
+   that `render_space` feeds `space_coordinate` the clipped midpoint's `volume_depth`. If
+   `render_space` passed `along` and depth in swapped order, or used the unclipped chord, this test
+   would stay green. **Fix (test, stays open):** extract the per-chord colour coordinate
+   `render_space` computes into a helper the test calls, or assert on the instances `render_space`
+   emits.
+3. **The plan's `## Implementation log` is longer than its `## Implementation phases`.** The log runs
+   to about 136 lines against about 115 for the phases, and lens 1 caps that. About 25 lines are the
+   Phase 6 text, which the plan put there on purpose. The rest is phase notes that would move to the
+   archive more cheaply. **Fix (prose, close-repairable):** none is required at this size. If the
+   close wants it back under the cap, condense the Phase 3 and Phase 4 notes, or move the Phase 6 text
+   into a `### Phase 6 text` subsection outside the log's narrative bullets.
+
+##### Nit
+
+1. **`docs/presets.md:588` — "it costs nothing measurable" for `fog` is not backed by a
+   measurement.** The log measures the solid sort and never fog. **Fix (prose, close-repairable):**
+   "it adds one multiply per line end and was not measured on its own".
+
+#### Not findings, recorded for the owner
+
+- The byte-identity claims for Phases 1, 2 and 3 at default params were read on the dev box's Vulkan
+  adapter, not on WARP. Phase 7's WARP blessing is where any WARP-only drift would show, including a
+  pipeline-allocation shift from building the `-over` pipeline.
+- The log's Phase 4 note points to a pixel-scale notch at row joints off `yaw = 0`. That is for
+  Phase 8 to judge.
 
 ## Followups (after this lands)
