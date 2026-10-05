@@ -113,12 +113,14 @@ flowchart LR
     `distance = E / p` in model units and `tan(fov / 2)` from the preset's scale and zoom, as ADR-0260
     states. Leave `zoom` at 1 on the camera, since `Camera3d` divides the angle, not its tangent.
   - A `perspective = 0` layer takes a long `distance` and a matching narrow `fov`.
-  - Re-bless `attractor_depth`.
+  - Do not re-bless `attractor_depth`: baselines are blessed on DX12 WARP only, and that is Phase 6.
+    Record in the log whether its capture moved, from the off-WARP drift report the golden run prints.
   - Write a test that holds every migrated 3D preset's framed coverage within the `sanity` floor.
 - **Files touched:** `presets/attractor_*.toml` (the 3D-family set), `presets/fragment_nebula.toml`,
-  `presets/fragment_sumi.toml`, `core/tests/golden/`, `core/tests/`.
+  `presets/fragment_sumi.toml`, `core/tests/`.
 - **Done when:**
-  - `attractor_depth` holds on the software adapter.
+  - The golden suite passes on the session's adapter, and the log says whether `attractor_depth`
+    moved, quoting the drift report.
   - The `sanity`, `animation`, `reactivity` and `distinctness` suites pass on all 22 presets.
   - `git grep -c "perspective" -- presets` finds no binding.
 
@@ -144,6 +146,14 @@ flowchart LR
   The migration already keeps each close to its old picture, so the merge does not wait (ADR-0249).
 - **Files touched:** none.
 - **Done when:** the owner records the brief, or a keep per preset, in this plan's log.
+
+### Phase 6 — The moved baseline is blessed
+- **Owner skill:** human
+- **Blocks merge:** no
+- **What:** if Phase 3's log says `attractor_depth` moved, re-bless it on DX12 WARP, and nothing else.
+  If Plan 0218 has moved blessing to lavapipe by then, bless there instead.
+- **Files touched:** `core/tests/golden/attractor_depth.png`.
+- **Done when:** the Windows CI golden job is green on `main`.
 
 ## Data shapes
 
@@ -191,6 +201,7 @@ struct ModelTransform {
 | 3 — The shipped presets migrate by the mapping | dev | not started | |
 | 4 — Documentation and the references | dev | not started | |
 | 5 — The 3D presets, re-curated in motion | human | not started | |
+| 6 — The moved baseline is blessed | human | not started | |
 
 ### Notes
 

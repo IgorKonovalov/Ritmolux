@@ -25,7 +25,7 @@ target's aspect times a margin of 1.25, so the wrap seam sits off-screen.
 The owner chose to replace that model with a real camera rather than add a mode beside it. ADR-0259
 records the design and its alternatives. The two goldens are `swarm` and `swarm_shaped`. The swarm
 also backs `swarm_lit_backdrop`, `backdrop_band` and `backdrop_ramp`, and `mark_cost` measures 10,000
-sprites. Five presets ship: `braid`, `drift`, `murmuration`, `shatter` and `stipple`.
+sprites. Three presets ship: `braid`, `maelstrom` and `murmuration`.
 
 ## Decision
 
@@ -114,8 +114,8 @@ flowchart LR
     (Plan 0218 Phase 2), and give `Rich` its own `swarm_max_coc_px`. If no discrete GPU is reachable
     from the session, the log says `Rich` is unmeasured, as Plan 0235's did, rather than inventing a
     value.
-  - Then re-bless `swarm` and `swarm_shaped` on whatever the ladder settled, and re-run the backdrop
-    fixtures' tests.
+  - Then re-run the `swarm` and `swarm_shaped` goldens and the backdrop fixtures' tests on whatever
+    the ladder settled. Do not re-bless: baselines are blessed on DX12 WARP only, and that is Phase 7.
 - **Files touched:** `core/src/render/tier.rs`, `core/src/render/scenes/swarm.rs`,
   `core/src/render/scenes/swarm/tests.rs`, `core/tests/mark_cost.rs`, `core/tests/golden/`,
   `core/tests/fixtures/`, `core/src/render/post/tests.rs`, `core/tests/`.
@@ -125,19 +125,21 @@ flowchart LR
   - `Rich` carries a measured value, or the log says it is unmeasured.
   - The CoC never exceeds `swarm_max_coc_px` at any `aperture`.
   - If rung 2 was built, its cross-fade test shows no step.
-  - Both goldens hold on the software adapter. The backdrop tests pass, or each one that changed is
-    named in the log with the reason.
+  - The golden suite passes on the session's adapter, and the log says whether `swarm` and
+    `swarm_shaped` moved, quoting the off-WARP drift report. The backdrop tests pass, or each one
+    that changed is named in the log with the reason.
 
 ### Phase 4 — The shipped presets keep rendering
 - **Owner skill:** dev
-- **What:** bring the five shipped swarm presets onto the new surface mechanically. Remove bindings to
-  params that no longer exist, and replace the seam-clearance comment in `swarm_drift.toml` with one
+- **What:** bring the three shipped swarm presets onto the new surface mechanically. Remove bindings to
+  params that no longer exist, and replace the seam-clearance comment in `swarm_braid.toml` with one
   that describes the frustum torus. Do not judge or re-tune the look; that is Phase 6's and the
   content lane's.
-- **Files touched:** `presets/swarm_braid.toml`, `presets/swarm_drift.toml`,
-  `presets/swarm_murmuration.toml`, `presets/swarm_shatter.toml`, `presets/swarm_stipple.toml`.
-- **Done when:** the `sanity`, `animation`, `reactivity` and `distinctness` suites pass on all five.
-  `git grep -c "parallax" -- presets/swarm_drift.toml` finds no description of the retired arithmetic.
+- **Files touched:** `presets/swarm_braid.toml`, `presets/swarm_maelstrom.toml`,
+  `presets/swarm_murmuration.toml`.
+- **Done when:** the `sanity`, `animation`, `reactivity` and `distinctness` suites pass on all three.
+  `git grep -c "near depth layer" -- presets/swarm_braid.toml` finds no description of the retired
+  arithmetic.
 
 ### Phase 5 — Documentation and the references
 - **Owner skill:** dev
@@ -154,15 +156,23 @@ flowchart LR
   `node scripts/toc.mjs --check`, `node scripts/check-doc-links.mjs` and
   `node scripts/check-reader-prose.mjs` pass.
 
-### Phase 6 — The five presets, judged and re-tuned
+### Phase 6 — The three presets, judged and re-tuned
 - **Owner skill:** human
-- **What:** the owner runs each of the five shipped swarm presets live, with the music track, and
+- **What:** the owner runs each of the three shipped swarm presets live, with the music track, and
   marks each keep, re-tune or cut, writing what is off. The re-tunes go to `preset-author` before the
   merge. This phase blocks the merge because, unlike the attractor's migration, nothing here starts
   near the old picture.
 - **Files touched:** none (the re-tunes are `preset-author`'s commits).
-- **Done when:** each of the five presets is marked in this plan's log, and every one marked re-tune
+- **Done when:** each of the three presets is marked in this plan's log, and every one marked re-tune
   has a `preset-author` commit on the lane.
+
+### Phase 7 — The moved baselines are blessed
+- **Owner skill:** human
+- **Blocks merge:** no
+- **What:** re-bless on DX12 WARP whichever of `swarm` and `swarm_shaped` Phase 3's log says moved,
+  and nothing else. If Plan 0218 has moved blessing to lavapipe by then, bless there instead.
+- **Files touched:** `core/tests/golden/swarm.png`, `core/tests/golden/swarm_shaped.png`.
+- **Done when:** the Windows CI golden job is green on `main`.
 
 ## Data shapes
 
@@ -179,7 +189,7 @@ struct Particle {
 
 ## Risks & open questions
 
-- **The look changes, and the five presets were judged in motion.** Phase 6 is blocking for that
+- **The look changes, and the three presets were judged in motion.** Phase 6 is blocking for that
   reason. A preset the owner marks cut, under Plan 0232's two-per-family floor, may leave the swarm
   short. Then the refill is `preset-author`'s, and the merge waits.
 - **Fill cost, the plan's main hazard.** 10,000 blurred sprites is the largest blurred population in
@@ -221,7 +231,8 @@ struct Particle {
 | 3 — Caps, cost and the goldens | dev | not started | |
 | 4 — The shipped presets keep rendering | dev | not started | |
 | 5 — Documentation and the references | dev | not started | |
-| 6 — The five presets, judged and re-tuned | human | not started | |
+| 6 — The three presets, judged and re-tuned | human | not started | |
+| 7 — The moved baselines are blessed | human | not started | |
 
 ### Notes
 
