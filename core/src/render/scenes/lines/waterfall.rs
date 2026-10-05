@@ -45,7 +45,7 @@
     clippy::unreachable
 )]
 
-use super::renderer::{LineRenderer, Segment3dInstance};
+use super::renderer::{LineRenderer, Segment3dInstance, joined_chord};
 use super::spectrum::{CURVE_MAX, CURVE_MIN, downsample, shape_and_ease};
 use super::{CapOverflow, ColorRamp, GeneratorConfig, OverflowContext};
 use crate::dsp::AnalysisFrame;
@@ -592,13 +592,19 @@ impl Scene for WaterfallScene {
             let z = geometry.z(depth);
             let n = row.len();
             let span = n.saturating_sub(1).max(1) as f32;
+            // A row is one open polyline (ADR-0263): each segment joins its
+            // neighbours across the row, and the two outer bands are free.
+            let point = |j: usize| row.get(j).map(|&l| [geometry.x(j, n), geometry.y(l), z]);
             for (i, pair) in row.windows(2).enumerate() {
                 let (Some(&l0), Some(&l1)) = (pair.first(), pair.get(1)) else {
                     continue;
                 };
                 let pa = [geometry.x(i, n), geometry.y(l0), z];
                 let pb = [geometry.x(i + 1, n), geometry.y(l1), z];
-                let Some((a, b)) = frame.view.clip_near(pa, pb) else {
+                let before = i.checked_sub(1).and_then(point);
+                let Some([prev, a, b, next]) =
+                    joined_chord(&frame.view, before, pa, pb, point(i + 2))
+                else {
                     continue;
                 };
                 if frame.view.outside(a, b, frame.margin) {
@@ -614,6 +620,8 @@ impl Scene for WaterfallScene {
                     color: [r * light, g * light, bl * light],
                     width,
                     alpha,
+                    prev,
+                    next,
                 });
             }
         }

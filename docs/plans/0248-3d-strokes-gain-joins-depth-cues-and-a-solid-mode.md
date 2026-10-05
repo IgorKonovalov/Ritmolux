@@ -1,6 +1,6 @@
 # 0248 — 3D strokes gain joins, depth cues and a solid mode
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-10-05
 > **Approved:** 2026-10-05 (user)
 > **Owner skill(s):** dev, human
@@ -232,11 +232,12 @@ Field order is shader-location order, so new fields go at the end.
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:**
+**Lane:** branch `plan-0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode`, worktree
+`/home/igor/Work/rlx-plan-0248`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — A 3D joint is mitred, and the comb goes | dev | not started | |
+| 1 — A 3D joint is mitred, and the comb goes | dev | done | committed with this row |
 | 2 — Fog, and a depth colour axis for the space curves | dev | not started | |
 | 3 — Solid: far to near, near over far | dev | not started | |
 | 4 — The waterfall's rows hide what is behind them | dev | not started | |
@@ -246,6 +247,23 @@ Field order is shader-location order, so new fields go at the end.
 | 8 — The looks, judged | human | not started | |
 
 ### Notes
+
+- **Phase 1, the moved baselines.** Golden comparisons skip off WARP, so the moved set was read by
+  capturing the 3D fixtures with the release `shot` (640x360, 60 frames) before and after the phase
+  on this Linux box's Vulkan adapter and comparing the PNGs byte for byte. Differ:
+  `parametric_lissajous_3d`, `parametric_torus_knot`. Byte-identical: `plexus`, `plexus_sheet`,
+  `waterfall` (its rows are flat under the roster's silent frame, and a collinear joined chain
+  renders exactly as before), plus the 2D `parametric_curve`, `spectrum` and `lsystem` controls.
+  `waterfall_ramp` (`the_waterfall_holds_a_ramped_ring`) draws ramped, non-collinear rows and is
+  expected to move, but was not captured. Phase 7's set: `parametric_lissajous_3d.png`,
+  `parametric_torus_knot.png`, `waterfall_ramp.png`.
+- **Phase 1, the plexus byte-identity criterion** was checked the same way (`shot` captures of
+  `plexus.toml` and `plexus_sheet.toml`, before and after), not by a committed test.
+- **Phase 1, the bend probe's tolerance.** The right-angle test allows, at each sampled offset, half
+  a pixel of the profile's own cross-stroke slope plus one half-float step: the inside-corner
+  sample reads 0.0644 against 0.0568 on the arms at +0.5 half-widths (allowance 0.0168), and the
+  centre line reads exactly equal. The unjoined control's centre line rises 0.056 there, over 40
+  allowances.
 
 ### Close triggers
 

@@ -2227,8 +2227,28 @@ mod seg3d {
     /// (depth 8), `width` pixels wide at the focal plane and drawn grey at
     /// `aperture`, as the red channel of the target.
     fn render(ctx: &RenderContext, aperture: f32, width: f32) -> Vec<f32> {
+        let (a, b) = ([-1.5, 0.0, 0.0], [1.5, 0.0, -FOCAL]);
+        let segment = Segment3dInstance {
+            a,
+            b,
+            color: [0.25, 0.25, 0.25],
+            width,
+            alpha: 1.0,
+            prev: a,
+            next: b,
+        };
+        render_segments(ctx, aperture, &[segment])
+    }
+
+    /// `segments` drawn through [`view`] at `aperture`, as the red channel of
+    /// the target.
+    fn render_segments(
+        ctx: &RenderContext,
+        aperture: f32,
+        segments: &[Segment3dInstance],
+    ) -> Vec<f32> {
         let device = &ctx.device;
-        let mut lines = LineRenderer::new_3d(device, FORMAT, 4, "seg3d-probe");
+        let mut lines = LineRenderer::new_3d(device, FORMAT, 16, "seg3d-probe");
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("seg3d-probe-target"),
             size: wgpu::Extent3d {
@@ -2251,13 +2271,6 @@ mod seg3d {
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let segment = Segment3dInstance {
-            a: [-1.5, 0.0, 0.0],
-            b: [1.5, 0.0, -FOCAL],
-            color: [0.25, 0.25, 0.25],
-            width,
-            alpha: 1.0,
-        };
         let uniform = CameraUniform::new(&view(), W, H, Lens::new(aperture, FOCAL, CAP));
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("seg3d-probe-encoder"),
@@ -2275,7 +2288,7 @@ mod seg3d {
             &uniform,
             1.0,
             0.5,
-            &[segment],
+            segments,
         );
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo {
@@ -2362,6 +2375,205 @@ mod seg3d {
             }
             Err(e) => panic!("headless context build failed: {e}"),
         }
+    }
+
+    /// The depth every join probe is drawn at: half the focal depth again
+    /// behind it, so the aperture blurs it and the blur is the same along it.
+    const JOIN_Z: f32 = -0.5 * FOCAL;
+
+    /// A world point in pixels of the target, `x` right and `y` down the rows.
+    fn px(p: [f32; 3]) -> [f32; 2] {
+        let c = view().clip(p);
+        [
+            (c[0] / c[3] * 0.5 + 0.5) * W as f32,
+            (0.5 - c[1] / c[3] * 0.5) * H as f32,
+        ]
+    }
+
+    /// `image` at a pixel-space point, bilinear between the four pixel centres
+    /// around it.
+    fn sample(image: &[f32], p: [f32; 2]) -> f32 {
+        let (x, y) = (p[0] - 0.5, p[1] - 0.5);
+        let (x0, y0) = (x.floor(), y.floor());
+        let (fx, fy) = (x - x0, y - y0);
+        let at = |dx: f32, dy: f32| {
+            let (xi, yi) = ((x0 + dx) as usize, (y0 + dy) as usize);
+            image[yi * W as usize + xi]
+        };
+        let top = at(0.0, 0.0) * (1.0 - fx) + at(1.0, 0.0) * fx;
+        let bottom = at(0.0, 1.0) * (1.0 - fx) + at(1.0, 1.0) * fx;
+        top * (1.0 - fy) + bottom * fy
+    }
+
+    /// `points` as one polyline of joined segments, its two outer ends free,
+    /// or as unjoined segments when `joined` is false.
+    fn polyline(points: &[[f32; 3]], width: f32, joined: bool) -> Vec<Segment3dInstance> {
+        (0..points.len() - 1)
+            .map(|k| {
+                let (a, b) = (points[k], points[k + 1]);
+                let prev = if joined && k > 0 { points[k - 1] } else { a };
+                let next = if joined && k + 2 < points.len() {
+                    points[k + 2]
+                } else {
+                    b
+                };
+                Segment3dInstance {
+                    a,
+                    b,
+                    color: [0.25, 0.25, 0.25],
+                    width,
+                    alpha: 1.0,
+                    prev,
+                    next,
+                }
+            })
+            .collect()
+    }
+
+    /// **A straight line split into joined pieces is the same line** (ADR-0263):
+    /// eight collinear joined segments, blurred, render as one segment does, on
+    /// the same adapter in the same run — the property the comb broke.
+    #[test]
+    fn eight_collinear_joined_segments_render_as_one() {
+        let Some(ctx) = context() else {
+            return;
+        };
+        let (a, b) = ([-1.5, 0.1, JOIN_Z], [1.5, 0.1, JOIN_Z]);
+        let points: Vec<[f32; 3]> = (0..=8)
+            .map(|k| {
+                let t = k as f32 / 8.0;
+                [a[0] + (b[0] - a[0]) * t, a[1], a[2]]
+            })
+            .collect();
+        let one = render_segments(&ctx, 12.0, &polyline(&[a, b], NARROW, true));
+        let eight = render_segments(&ctx, 12.0, &polyline(&points, NARROW, true));
+        let peak = one.iter().copied().fold(0.0, f32::max);
+        let worst = one
+            .iter()
+            .zip(&eight)
+            .map(|(x, y)| (x - y).abs())
+            .fold(0.0, f32::max);
+        println!("collinear: peak {peak}, worst pixel difference {worst}");
+        assert!(peak > 0.0, "the line reached the target");
+        assert!(
+            worst == 0.0,
+            "eight joined pieces differ from one segment by up to {worst} against a \
+             peak of {peak}"
+        );
+    }
+
+    /// **A joined right-angle bend has no ridge at its joint** (ADR-0263), the
+    /// 3D counterpart of the 2D `line_joints` property with ridges for holes.
+    ///
+    /// Along the centre line and along two paths half the blurred half-width
+    /// either side of it, the light within one blurred half-width of the joint
+    /// stays at or below the light the two arms carry away from it. The same
+    /// bend drawn **unjoined** is the control: the inside of its corner sums two
+    /// overlapping strokes into a ridge, which is what makes the probe see one.
+    #[test]
+    fn a_joined_right_angle_has_no_ridge_at_its_joint() {
+        let Some(ctx) = context() else {
+            return;
+        };
+        let aperture = 12.0;
+        let p0 = [-1.5, 0.6, JOIN_Z];
+        let v = [0.4, 0.6, JOIN_Z];
+        let p2 = [0.4, -1.4, JOIN_Z];
+        let depth = FOCAL - JOIN_Z;
+        // The blurred half-width at that depth: perspective on the half-width,
+        // plus the circle of confusion.
+        let reach = 0.5 * NARROW * FOCAL / depth + aperture * (depth - FOCAL) / depth;
+        let [sv, s0, s2] = [px(v), px(p0), px(p2)];
+        let unit = |from: [f32; 2], to: [f32; 2]| {
+            let (dx, dy) = (to[0] - from[0], to[1] - from[1]);
+            let len = dx.hypot(dy);
+            [dx / len, dy / len]
+        };
+        let (d1, d2) = (unit(s0, sv), unit(sv, s2));
+        let (n1, n2) = ([-d1[1], d1[0]], [-d2[1], d2[0]]);
+        let dot = |p: [f32; 2], q: [f32; 2]| p[0] * q[0] + p[1] * q[1];
+        assert!(dot(d1, d2).abs() < 1e-3, "the probe bends at a right angle");
+
+        // One path `o` pixels off the centre line: arm one up to the mitre
+        // corner, then arm two from it, sampled each pixel, with the signed
+        // distance from the joint along the path.
+        let path = |image: &[f32], o: f32| -> Vec<(f32, f32)> {
+            let mut out = Vec::new();
+            let end1 = o * dot(n2, d1);
+            let mut s = -3.0 * reach;
+            while s <= end1 {
+                let p = [sv[0] + s * d1[0] + o * n1[0], sv[1] + s * d1[1] + o * n1[1]];
+                out.push((s - end1, sample(image, p)));
+                s += 1.0;
+            }
+            let start2 = o * dot(n1, d2);
+            let mut s = start2;
+            while s <= 3.0 * reach {
+                let p = [sv[0] + s * d2[0] + o * n2[0], sv[1] + s * d2[1] + o * n2[1]];
+                out.push((s - start2, sample(image, p)));
+                s += 1.0;
+            }
+            out
+        };
+        // The highest light within `reach` of the joint, and the highest
+        // between two and three reaches from it on either arm.
+        let ridge = |image: &[f32], o: f32| {
+            let samples = path(image, o);
+            let at_joint = samples
+                .iter()
+                .filter(|(s, _)| s.abs() <= reach)
+                .map(|(_, v)| *v)
+                .fold(0.0, f32::max);
+            let away = samples
+                .iter()
+                .filter(|(s, _)| s.abs() >= 2.0 * reach)
+                .map(|(_, v)| *v)
+                .fold(0.0, f32::max);
+            (at_joint, away)
+        };
+
+        let joined = render_segments(&ctx, aperture, &polyline(&[p0, v, p2], NARROW, true));
+        let unjoined = render_segments(&ctx, aperture, &polyline(&[p0, v, p2], NARROW, false));
+        // How fast the light falls across the stroke at offset `o`, per pixel,
+        // read on arm one well clear of the joint.
+        let slope = |image: &[f32], o: f32| {
+            let at = |q: f32| {
+                let s = -2.5 * reach;
+                sample(
+                    image,
+                    [sv[0] + s * d1[0] + q * n1[0], sv[1] + s * d1[1] + q * n1[1]],
+                )
+            };
+            0.5 * (at(o + 1.0) - at(o - 1.0)).abs()
+        };
+        let offsets = [-0.5 * reach, 0.0, 0.5 * reach];
+        let mut control = 0.0f32;
+        for o in offsets {
+            let (at_joint, away) = ridge(&joined, o);
+            let (bare_joint, bare_away) = ridge(&unjoined, o);
+            // The allowance is the pixel grid's, not the join's: the bilinear
+            // sample at the inside corner of a level set mixes in pixels from
+            // the brighter side, by up to half a pixel of the profile's own
+            // slope there. A half-float target adds its 2^-10 relative step.
+            let allowance = 0.5 * slope(&joined, o) + away / 1024.0;
+            println!(
+                "offset {o:+.2} px: joined {at_joint:.4} at the joint against {away:.4} \
+                 away (allowance {allowance:.4}); unjoined {bare_joint:.4} against \
+                 {bare_away:.4}"
+            );
+            assert!(away > 0.0, "offset {o}: the arms carry light");
+            assert!(
+                at_joint <= away + allowance,
+                "offset {o}: the joined bend peaks at {at_joint} at its joint against \
+                 {away} along its arms, past the sampling allowance {allowance}"
+            );
+            control = control.max((bare_joint - bare_away) / allowance.max(1e-6));
+        }
+        assert!(
+            control > 4.0,
+            "the unjoined control rises only {control} allowances at its joint, so \
+             the probe cannot see a ridge"
+        );
     }
 
     /// **The width varies along one line**: a segment running from the focal

@@ -264,6 +264,50 @@ pub struct Segment3dInstance {
     /// multiplied by this, so a fading edge fades out of the frame rather than
     /// into a dark line.
     pub alpha: f32,
+    /// The polyline's point before [`a`](Self::a), or `a` itself where `a` is
+    /// a free end. A joined end is mitred in screen space against the
+    /// direction it arrives from, so two neighbours meet on one line instead
+    /// of overlapping (ADR-0263); a free end draws flat, as an unjoined stroke
+    /// always did.
+    ///
+    /// **Bit-equal to the neighbour's own `a`**, or the two quads compute the
+    /// shared corner from different numbers and leave a seam:
+    /// [`joined_chord`] is what makes it so, near-plane clip included.
+    pub prev: [f32; 3],
+    /// The polyline's point after [`b`](Self::b), or `b` itself where `b` is a
+    /// free end. The `b`-end counterpart of [`prev`](Self::prev).
+    pub next: [f32; 3],
+}
+
+/// The chord `pa -> pb` of a polyline, clipped against `view`'s near plane, as
+/// `[prev, a, b, next]` for a [`Segment3dInstance`] — or `None` when the whole
+/// chord lies behind the plane.
+///
+/// `before` is the point ahead of `pa` and `after` the point past `pb`, `None`
+/// at an open polyline's ends. A neighbour that reaches behind the plane is
+/// taken where its own chord meets the plane, which is **exactly the point**
+/// that chord's own [`CameraView::clip_near`] cuts to — the same arguments in
+/// the same order — so the two quads still share their corner bit for bit. An
+/// end that was itself cut has no neighbour on screen and is left free.
+///
+/// [`CameraView::clip_near`]: crate::render::camera::CameraView::clip_near
+pub(crate) fn joined_chord(
+    view: &crate::render::camera::CameraView,
+    before: Option<[f32; 3]>,
+    pa: [f32; 3],
+    pb: [f32; 3],
+    after: Option<[f32; 3]>,
+) -> Option<[[f32; 3]; 4]> {
+    let (a, b) = view.clip_near(pa, pb)?;
+    let prev = match before {
+        Some(p) if a == pa => view.clip_near(p, pa).map_or(a, |(cut, _)| cut),
+        _ => a,
+    };
+    let next = match after {
+        Some(n) if b == pb => view.clip_near(pb, n).map_or(b, |(_, cut)| cut),
+        _ => b,
+    };
+    Some([prev, a, b, next])
 }
 
 /// **Which space the stroke is measured in** (ADR-0160) — the half-width, the
@@ -693,10 +737,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// The profile is prepended here for the reason [`arc_shader_source`] gives: a
 /// 3D stroke and a 2D one fall off across their width by one definition.
 ///
+/// [`MITER_LIMIT`] is written into it from the one Rust constant, so a 3D
+/// joint and a 2D one fall back to the bevel at the same corner.
+///
 /// Runs once per [`LineRenderer::new_3d`] (pipeline build, not the hot path).
 pub(crate) fn seg3d_shader_source() -> String {
     format!(
         "{PROFILE_WGSL}
+const MITER_LIMIT: f32 = {MITER_LIMIT:?};
 {}
 {SEG3D_SHADER}",
         crate::render::camera::CAMERA_WGSL
@@ -750,6 +798,14 @@ pub(crate) fn seg3d_shader_source() -> String {
 /// A sharp stroke skips both the factor and the exact coordinate on a flat
 /// flag, so an aperture of `0` draws the bytes a pinhole camera drew.
 ///
+/// # Joins (ADR-0263)
+///
+/// An end whose [`Segment3dInstance::prev`] or [`next`](Segment3dInstance::next)
+/// names a neighbour is mitred in pixel space: its two corners move onto the
+/// line bisecting the turn, where the neighbour's corners also lie, so two
+/// blurred neighbours abut instead of summing their overlap into a ridge. A
+/// corner sharper than [`MITER_LIMIT`] stays flat, as in 2D.
+///
 /// The position leaves the vertex shader already divided (`w = 1`). The quad is
 /// a screen-space shape, and interpolating its varyings perspective-correctly
 /// against the endpoints' depths would bend the across-the-stroke coordinate.
@@ -789,6 +845,40 @@ fn profile_mass(s: f32) -> f32 {
 // Half a pixel: the narrowest half-width a stroke is rasterized at.
 const MIN_HALF_PX: f32 = 0.5;
 
+// The mitred corner offset at `v`, where the polyline arrives from `p0` and
+// leaves for `p1`, for a half-width `hw` - all in pixels. `xy` is the offset of
+// the corner on the left side (`side = +1`), and `z` is 1 when the end is
+// joined, 0 when it is free: a neighbour that coincides with `v` on screen,
+// or a corner sharper than MITER_LIMIT, which draws flat as the bevel
+// fallback does in 2D (ADR-0158).
+//
+// Both quads that share `v` call this with the same three points, in the same
+// roles, so they compute the same corner bit for bit and abut on the mitre
+// line with no pixel covered twice and none missed.
+//
+// The left normal of each arm, summed, is the mitre direction; its corner
+// lies `hw / cos(turn / 2)` along it, and `cos(turn / 2)` is
+// `sqrt((1 + d_in . d_out) / 2)` - the expression `miter_extension_between`
+// takes, with no trigonometry.
+fn mitre_offset(p0: vec2<f32>, v: vec2<f32>, p1: vec2<f32>, hw: f32) -> vec3<f32> {
+    let arm_in = v - p0;
+    let arm_out = p1 - v;
+    let len_in = length(arm_in);
+    let len_out = length(arm_out);
+    if (len_in <= 1e-6 || len_out <= 1e-6) {
+        return vec3<f32>(0.0, 0.0, 0.0);
+    }
+    let d_in = arm_in / len_in;
+    let d_out = arm_out / len_out;
+    let cos_half = sqrt(max((1.0 + dot(d_in, d_out)) * 0.5, 0.0));
+    if (cos_half <= 1.0 / MITER_LIMIT) {
+        return vec3<f32>(0.0, 0.0, 0.0);
+    }
+    let bisector = vec2<f32>(-d_in.y, d_in.x) + vec2<f32>(-d_out.y, d_out.x);
+    let m = bisector / length(bisector);
+    return vec3<f32>(m * (hw / cos_half), 1.0);
+}
+
 @vertex
 fn vs_main(
     @builtin(vertex_index) vi: u32,
@@ -797,6 +887,8 @@ fn vs_main(
     @location(2) color: vec3<f32>,
     @location(3) width: f32,
     @location(4) alpha: f32,
+    @location(5) prev: vec3<f32>,
+    @location(6) next: vec3<f32>,
 ) -> Seg3dOut {
     // (along, side): along runs a->b, side spans -1..1 across the width.
     var corners = array<vec2<f32>, 6>(
@@ -836,7 +928,24 @@ fn vs_main(
         dir = vec2<f32>(1.0, 0.0);
     }
     let nrm = vec2<f32>(-dir.y, dir.x);
-    let p = mix(sa, sb, c.x) + nrm * c.y * hw;
+    var p = mix(sa, sb, c.x) + nrm * c.y * hw;
+
+    // The join (ADR-0263). This corner's end, its neighbour on the far side
+    // and the half-width there are picked with `select` rather than `mix`:
+    // `mix(x, y, 1.0)` need not be `y` to the bit, and the neighbouring quad
+    // reads the same end as its `a`, where it is. A free end keeps the flat
+    // corner above untouched, so a stroke with no neighbours draws the bytes
+    // it drew before joins existed.
+    let at_b = c.x > 0.5;
+    let joint = select(sa, sb, at_b);
+    let before = select(clip_to_px(cam, project(cam, prev)), sa, at_b);
+    let after = select(sb, clip_to_px(cam, project(cam, next)), at_b);
+    let hw_joint = max(select(wide_a, wide_b, at_b), MIN_HALF_PX);
+    let mitre = mitre_offset(before, joint, after, hw_joint);
+    let joined = mitre.z > 0.5;
+    if (joined) {
+        p = joint + mitre.xy * c.y;
+    }
 
     var out: Seg3dOut;
     out.pos = vec4<f32>(px_to_ndc(cam, p), 0.0, 1.0);
@@ -846,7 +955,10 @@ fn vs_main(
     out.soft = mix(soft_a, soft_b, c.x);
     out.sharp_hw = mix(hw_a, hw_b, c.x);
     out.wide_hw = hw_true;
-    out.offset = c.y * hw;
+    // A mitred corner lies `hw_joint` from the centreline across the stroke,
+    // wherever the mitre has slid it along, so the offset stays the true
+    // across-the-stroke distance.
+    out.offset = c.y * select(hw, hw_joint, joined);
     out.blurred = select(0.0, 1.0, max(coc_a, coc_b) > 0.0);
     return out;
 }
@@ -986,6 +1098,8 @@ impl Seg3d {
                         2 => Float32x3,
                         3 => Float32,
                         4 => Float32,
+                        5 => Float32x3,
+                        6 => Float32x3,
                     ],
                 })],
             },

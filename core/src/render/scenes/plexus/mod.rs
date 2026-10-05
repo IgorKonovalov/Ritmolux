@@ -519,6 +519,9 @@ impl Scene for PlexusScene {
                 color: self.colour_at(depth01),
                 width,
                 alpha,
+                // A link is its own stroke: both ends free (ADR-0263).
+                prev: a,
+                next: b,
             });
         }
 

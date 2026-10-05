@@ -39,7 +39,7 @@ use super::super::common;
 use super::super::{FALLBACK_DT, Phase, Scene};
 use super::biarc::Piece;
 use super::renderer::{
-    ArcInstance, LineRenderer, Segment3dInstance, SegmentInstance, StrokeMetric,
+    ArcInstance, LineRenderer, Segment3dInstance, SegmentInstance, StrokeMetric, joined_chord,
 };
 use super::{
     CapOverflow, ColorRamp, CurveFamily, GeneratorConfig, MirrorSpec, OverflowContext,
@@ -504,7 +504,22 @@ impl ParametricCurveScene {
             else {
                 continue;
             };
-            let Some((a, b)) = frame.view.clip_near(pa, pb) else {
+            // The walk is one polyline (ADR-0263): every chord joins the one
+            // before and after it, and a closed walk wraps, so only an open
+            // walk's two outer ends are free.
+            let before = if k > 0 {
+                self.points3d.get(k - 1).copied()
+            } else if self.closed3d {
+                self.points3d.last().copied()
+            } else {
+                None
+            };
+            let after = if k + 2 < n || self.closed3d {
+                self.points3d.get((k + 2) % n).copied()
+            } else {
+                None
+            };
+            let Some([prev, a, b, next]) = joined_chord(&frame.view, before, pa, pb, after) else {
                 continue;
             };
             if frame.view.outside(a, b, frame.margin) {
@@ -516,6 +531,8 @@ impl ParametricCurveScene {
                 color: ramp.at(&self.palette, k as f32 / span),
                 width,
                 alpha: 1.0,
+                prev,
+                next,
             });
         }
         self.lines3d.draw_3d(
