@@ -241,7 +241,7 @@ Field order is shader-location order, so new fields go at the end.
 | 2 — Fog, and a depth colour axis for the space curves | dev | done | cb0b0454 |
 | 3 — Solid: far to near, near over far | dev | done | 9ef1719c |
 | 4 — The waterfall's rows hide what is behind them | dev | done | 19575ade |
-| 5 — Documentation | dev | done | committed with this row |
+| 5 — Documentation | dev | done | fd1c12ab |
 | 6 — The preset-author reference | human | not started | |
 | 7 — The moved baselines are blessed | human | not started | |
 | 8 — The looks, judged | human | not started | |
@@ -346,12 +346,22 @@ Field order is shader-location order, so new fields go at the end.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** yes, generated files only: `presets/README.md` (the parameter
+  reference, phases 2 and 3), `presets/preset.schema.json` and `presets/schema/`
+  (`parametric_curve`, `plexus`, `waterfall`). No preset `.toml` added or changed.
 - **Plan header `Closes:`** design-backlog 0279, 0280, 0281
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature — `fog` and `solid` on the shared camera block, `hue_axis` on the
+  space curves, mitred 3D joins, and the waterfall's skirts.
+- **Operator docs touched:** `docs/presets.md`, `docs/preset-guide.md`,
+  `docs/on-device-validation.md`, `docs/examples/curves/torus_knot_solid.toml`,
+  `docs/examples/waterfall/landscape_solid.toml`, `docs/images/curves/torus_knot_solid.png`,
+  `scripts/docs-shots.mjs`; `docs/specs/player-schema.json` regenerated.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 55 stated reductions hold
+  across 27 live entries, 3 unprobeable; one of those, 0069 ("nothing in this engine decides what
+  is in front of what"), now has a per-preset answer for the `seg3d` stroke and was not edited.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** 6 (the preset-author reference, text above), 7 (re-bless
+  `parametric_lissajous_3d.png`, `parametric_torus_knot.png`, `waterfall_ramp.png` on WARP),
+  8 (the looks, judged) — all three `Blocks merge: no`.
 
 ## Followups (after this lands)
