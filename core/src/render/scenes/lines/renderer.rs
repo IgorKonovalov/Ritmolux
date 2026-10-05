@@ -242,7 +242,7 @@ pub struct ArcInstance {
 /// and an alpha.
 ///
 /// Drawn by the `seg3d` pipeline, which [`LineRenderer::new_3d`] builds and
-/// [`LineRenderer::draw_3d`] selects — a separate pipeline and instance buffer
+/// `LineRenderer::draw_3d` selects — a separate pipeline and instance buffer
 /// rather than a branch in the 2D one, so every 2D line scene keeps its bytes.
 ///
 /// **Field order is shader-location order**, for the reason
@@ -272,14 +272,14 @@ pub struct Segment3dInstance {
     ///
     /// **Bit-equal to the neighbour's own `a`**, or the two quads compute the
     /// shared corner from different numbers and leave a seam:
-    /// [`joined_chord`] is what makes it so, near-plane clip included.
+    /// `joined_chord` is what makes it so, near-plane clip included.
     pub prev: [f32; 3],
     /// The polyline's point after [`b`](Self::b), or `b` itself where `b` is a
     /// free end. The `b`-end counterpart of [`prev`](Self::prev).
     pub next: [f32; 3],
     /// `1.0` on a **skirt**: not a stroke but a filled band from `a -> b` down
     /// to the ground plane the draw names
-    /// ([`LineRenderer::draw_3d_terrain`]), at full coverage times
+    /// (`LineRenderer::draw_3d_terrain`), at full coverage times
     /// [`alpha`](Self::alpha) in [`color`](Self::color). A solid waterfall
     /// row lays one under each of its segments, so a near row hides what lies
     /// behind it (ADR-0263). `0.0` on every stroke.
@@ -1531,7 +1531,7 @@ impl LineRenderer {
     }
 
     /// A renderer for **3D segments only** (ADR-0257): the `seg3d` pipeline and
-    /// a `capacity`-instance buffer for it, drawn with [`draw_3d`](Self::draw_3d).
+    /// a `capacity`-instance buffer for it, drawn with `draw_3d`.
     ///
     /// Its 2D half is built empty — no segment capacity, no arcs, no OVER
     /// pipelines — so a 3D scene owns its renderer outright and the roster's
