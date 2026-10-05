@@ -458,7 +458,7 @@ fn a_non_finite_camera_still_projects() {
     }
 }
 
-/// **The block answers exactly its six specs**, rests at their defaults, and
+/// **The block answers exactly its specs**, rests at their defaults, and
 /// `reset` returns there.
 #[test]
 fn the_camera_block_answers_exactly_its_specs() {
@@ -475,6 +475,7 @@ fn the_camera_block_answers_exactly_its_specs() {
             fov: 0.75,
             focus: 0.75,
             aperture: 0.75,
+            fog: 0.75,
         }
     );
     for name in ["zoom", "pan_x", "line_width", "", "Yaw"] {
@@ -489,6 +490,7 @@ fn the_camera_block_answers_exactly_its_specs() {
         rest.fov,
         rest.focus,
         rest.aperture,
+        rest.fog,
     ]) {
         assert_eq!(spec.default, value, "`{}` rests off its spec", spec.name);
     }
@@ -508,6 +510,7 @@ fn the_lens_helper_is_the_pieces_composed() {
         fov: 0.9,
         focus: 0.3,
         aperture: 10.0,
+        fog: 0.0,
     };
     let (target, radius, max_coc) = ((1280, 800), 1.2, 16.0);
     let frame = params.frame(1.6, 1.25, [0.1, -0.05], target, radius, max_coc);
@@ -516,7 +519,10 @@ fn the_lens_helper_is_the_pieces_composed() {
     assert_eq!(frame.view, view);
     assert_eq!(
         frame.uniform,
-        CameraUniform::new(&view, target.0, target.1, lens)
+        CameraUniform::new(&view, target.0, target.1, lens).with_volume(
+            view.distance - radius,
+            (view.distance + radius) - (view.distance - radius)
+        )
     );
     assert_eq!(frame.near_extent, view.distance - radius);
     assert_eq!(

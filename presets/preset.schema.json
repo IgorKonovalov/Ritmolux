@@ -328,6 +328,8 @@
             "fov": { "$ref": "#/definitions/param.fov.parametric_curve" },
             "focus": { "$ref": "#/definitions/param.focus.parametric_curve" },
             "aperture": { "$ref": "#/definitions/param.aperture.parametric_curve" },
+            "fog": { "$ref": "#/definitions/param.fog.parametric_curve" },
+            "hue_axis": { "$ref": "#/definitions/param.hue_axis" },
             "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
             "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
             "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
@@ -1318,6 +1320,7 @@
             "fov": { "$ref": "#/definitions/param.fov.plexus" },
             "focus": { "$ref": "#/definitions/param.focus.plexus" },
             "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+            "fog": { "$ref": "#/definitions/param.fog.plexus" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "hue_center": { "$ref": "#/definitions/param.hue_center.plexus" },
             "hue_spread": { "$ref": "#/definitions/param.hue_spread.plexus" },
@@ -1402,6 +1405,7 @@
             "fov": { "$ref": "#/definitions/param.fov.plexus" },
             "focus": { "$ref": "#/definitions/param.focus.plexus" },
             "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+            "fog": { "$ref": "#/definitions/param.fog.plexus" },
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
@@ -1559,7 +1563,9 @@
             "distance": { "$ref": "#/definitions/param.distance.parametric_curve" },
             "fov": { "$ref": "#/definitions/param.fov.parametric_curve" },
             "focus": { "$ref": "#/definitions/param.focus.parametric_curve" },
-            "aperture": { "$ref": "#/definitions/param.aperture.parametric_curve" }
+            "aperture": { "$ref": "#/definitions/param.aperture.parametric_curve" },
+            "fog": { "$ref": "#/definitions/param.fog.parametric_curve" },
+            "hue_axis": { "$ref": "#/definitions/param.hue_axis" }
           } } } } } }
     },
     {
@@ -1969,6 +1975,7 @@
             "fov": { "$ref": "#/definitions/param.fov.plexus" },
             "focus": { "$ref": "#/definitions/param.focus.plexus" },
             "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+            "fog": { "$ref": "#/definitions/param.fog.plexus" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "hue_center": { "$ref": "#/definitions/param.hue_center.plexus" },
             "hue_spread": { "$ref": "#/definitions/param.hue_spread.plexus" },
@@ -2004,6 +2011,7 @@
             "fov": { "$ref": "#/definitions/param.fov.plexus" },
             "focus": { "$ref": "#/definitions/param.focus.plexus" },
             "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+            "fog": { "$ref": "#/definitions/param.fog.plexus" },
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" }
@@ -2921,6 +2929,16 @@
       "description": "The blur of a space curve's far side, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
       "markdownDescription": "The blur of a space curve's far side, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.\n\n- default `0.0`\n- typical range depends on the family: `torus_knot` `0.0` to `24.0`, `lissajous_3d` `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
+    "param.fog.parametric_curve": {
+      "type": "string",
+      "description": "Fades a space curve toward black with depth: at 1 its farthest point is black and its nearest keeps its light. 0 is off.",
+      "markdownDescription": "Fades a space curve toward black with depth: at 1 its farthest point is black and its nearest keeps its light. 0 is off.\n\n- default `0.0`\n- typical range depends on the family: `torus_knot` `0.0` to `1.0`, `lissajous_3d` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.hue_axis": {
+      "type": "string",
+      "description": "Moves a space curve's colour from running along its path (0) to running with depth (1), nearest first; between mixes the two.",
+      "markdownDescription": "Moves a space curve's colour from running along its path (0) to running with depth (1), nearest first; between mixes the two.\n\n- default `0.0`\n- typical range depends on the family: `torus_knot` `0.0` to `1.0`, `lissajous_3d` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
     "param.visible_depth": {
       "type": "string",
       "description": "Which recursion generation is drawn, counted from 1 and capped at `max_depth`; a fraction floors to the generation below it, and anything under 2 draws the first.",
@@ -3830,6 +3848,11 @@
       "type": "string",
       "description": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
       "markdownDescription": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.fog.plexus": {
+      "type": "string",
+      "description": "Fades strokes toward black with depth: at 1 the farthest point of the scene's volume is black and the nearest keeps its light. 0 is off.",
+      "markdownDescription": "Fades strokes toward black with depth: at 1 the farthest point of the scene's volume is black and the nearest keeps its light. 0 is off.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.hue_center.plexus": {
       "type": "string",

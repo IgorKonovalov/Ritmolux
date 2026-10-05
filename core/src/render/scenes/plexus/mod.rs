@@ -212,6 +212,7 @@ pub const PARAMS: &[ParamSpec] = &[
     camera::FOV,
     camera::FOCUS,
     camera::APERTURE,
+    camera::FOG,
     crate::render::scenes::common::brightness(1.0),
     ParamSpec {
         name: "hue_center",
@@ -527,7 +528,7 @@ impl Scene for PlexusScene {
 
         let uniform = frame.uniform;
         self.lines
-            .draw_3d(queue, encoder, view, &uniform, 1.0, SOFTNESS, &instances);
+            .draw_3d(queue, encoder, view, &frame, 1.0, SOFTNESS, &instances);
         self.instances = instances;
 
         let mut nodes = std::mem::take(&mut self.node_instances);
@@ -538,7 +539,18 @@ impl Scene for PlexusScene {
             &cam,
             margin,
             self.node_size,
-            |depth| self.colour_at(((depth - near_extent) / span).clamp(0.0, 1.0)),
+            |depth| {
+                let colour = self.colour_at(((depth - near_extent) / span).clamp(0.0, 1.0));
+                // The links fog in the `seg3d` shader; the dots fog here, on
+                // the same scale (ADR-0263). Skipped at fog 0, so an unfogged
+                // dot keeps its bytes.
+                if frame.fog > 0.0 {
+                    let light = frame.fog_light(depth);
+                    colour.map(|c| c * light)
+                } else {
+                    colour
+                }
+            },
         );
         self.nodes.draw(
             queue,

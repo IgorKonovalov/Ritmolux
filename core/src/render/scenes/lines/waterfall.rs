@@ -211,6 +211,7 @@ pub const PARAMS: &[ParamSpec] = &[
     camera::FOV,
     camera::FOCUS,
     camera::APERTURE,
+    camera::FOG,
     crate::render::scenes::common::zoom(1.0),
     crate::render::scenes::common::PAN_X,
     crate::render::scenes::common::PAN_Y,
@@ -630,15 +631,8 @@ impl Scene for WaterfallScene {
         } else {
             DEFAULT_GLOW
         };
-        self.lines.draw_3d(
-            queue,
-            encoder,
-            view,
-            &frame.uniform,
-            glow,
-            SOFTNESS,
-            &instances,
-        );
+        self.lines
+            .draw_3d(queue, encoder, view, &frame, glow, SOFTNESS, &instances);
         self.instances = instances;
     }
 }

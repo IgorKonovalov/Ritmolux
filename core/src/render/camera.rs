@@ -294,15 +294,19 @@ impl Lens {
 pub struct CameraUniform {
     /// [`CameraView::view_proj`].
     pub view_proj: [[f32; 4]; 4],
-    /// `[target width px, target height px, reference depth, unused]`.
+    /// `[target width px, target height px, reference depth, volume's nearest
+    /// view depth]`.
     pub viewport: [f32; 4],
-    /// `[aperture px, focal depth, max circle of confusion px, unused]`.
+    /// `[aperture px, focal depth, max circle of confusion px, volume's depth
+    /// span]`.
     pub lens: [f32; 4],
 }
 
 impl CameraUniform {
     /// The uniform for `view` on a `width` x `height` target through `lens`,
-    /// with pixel widths stated at the lens's focal plane.
+    /// with pixel widths stated at the lens's focal plane. The volume is
+    /// unset, so `volume_depth()` in `CAMERA_WGSL` reads `0` everywhere until
+    /// [`with_volume`](Self::with_volume) names one.
     pub fn new(view: &CameraView, width: u32, height: u32, lens: Lens) -> Self {
         Self {
             view_proj: view.view_proj,
@@ -314,6 +318,15 @@ impl CameraUniform {
             ],
             lens: [lens.aperture, lens.focal_depth, lens.max_coc, 0.0],
         }
+    }
+
+    /// This uniform with the scene's volume spanning view depths
+    /// `near_extent` to `near_extent + span`: the 0-nearest, 1-farthest scale
+    /// `focus` is stated on, which `fog` reads (ADR-0263).
+    pub fn with_volume(mut self, near_extent: f32, span: f32) -> Self {
+        self.viewport[3] = near_extent;
+        self.lens[3] = span;
+        self
     }
 }
 
@@ -390,7 +403,19 @@ pub(crate) const APERTURE: ParamSpec = ParamSpec {
     main: true,
 };
 
-/// The six camera params a 3D system binds, as one block (ADR-0258), in the
+/// `fog`, shared: light falling toward black with depth across the volume
+/// (ADR-0263). `0` is off, and every stroke keeps the light it had.
+pub(crate) const FOG: ParamSpec = ParamSpec {
+    name: "fog",
+    default: 0.0,
+    range: Some([0.0, 1.0]),
+    doc: "Fades strokes toward black with depth: at 1 the farthest point of the scene's volume is black and the nearest keeps its light. 0 is off.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Light,
+    main: false,
+};
+
+/// The camera params a 3D system binds, as one block (ADR-0258), in the
 /// shape of [`PanParams`](crate::render::scenes::common::PanParams): the
 /// `ParamSpec`s declared once here and spliced into each system's `PARAMS`,
 /// and a setter each scene's `set_param` delegates to.
@@ -411,6 +436,8 @@ pub(crate) struct CameraParams {
     pub focus: f32,
     /// `aperture`, in pixels.
     pub aperture: f32,
+    /// `fog`, `0` off and `1` the farthest extent black.
+    pub fog: f32,
 }
 
 impl Default for CameraParams {
@@ -423,6 +450,7 @@ impl Default for CameraParams {
             fov: rest("fov"),
             focus: rest("focus"),
             aperture: rest("aperture"),
+            fog: rest("fog"),
         }
     }
 }
@@ -443,13 +471,36 @@ pub(crate) struct CameraFrame {
     pub span: f32,
     /// The blur clamp to announce when `aperture` is past the tier's cap.
     pub blur: Option<CapOverflow>,
+    /// `fog`, made safe: finite and in `[0, 1]`.
+    pub fog: f32,
+}
+
+impl CameraFrame {
+    /// Where view depth `depth` lies across the volume: `0` at its nearest
+    /// extent, `1` at its farthest, clamped. **Mirrors `volume_depth()` in
+    /// `CAMERA_WGSL`**, so a scene that colours or fogs on the CPU reads the
+    /// scale the `seg3d` pipeline fogs on.
+    pub fn volume_depth(&self, depth: f32) -> f32 {
+        if self.span > 0.0 {
+            ((depth - self.near_extent) / self.span).clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// The share of its light a point at view depth `depth` keeps under this
+    /// frame's `fog`: `1 - fog * volume_depth`. **Mirrors `fog_light()` in
+    /// `CAMERA_WGSL`**, and is exactly `1.0` at `fog = 0`.
+    pub fn fog_light(&self, depth: f32) -> f32 {
+        (1.0 - self.fog * self.volume_depth(depth)).clamp(0.0, 1.0)
+    }
 }
 
 impl CameraParams {
-    /// The six specs, in the order a system splices them.
-    pub(crate) const SPECS: [ParamSpec; 6] = [YAW, PITCH, DISTANCE, FOV, FOCUS, APERTURE];
+    /// The specs, in the order a system splices them.
+    pub(crate) const SPECS: [ParamSpec; 7] = [YAW, PITCH, DISTANCE, FOV, FOCUS, APERTURE, FOG];
 
-    /// Store `value` if `name` is one of the camera's six, and say whether it
+    /// Store `value` if `name` is one of the camera's, and say whether it
     /// was.
     pub(crate) fn set(&mut self, name: &str, value: f32) -> bool {
         match name {
@@ -459,6 +510,7 @@ impl CameraParams {
             "fov" => self.fov = value,
             "focus" => self.focus = value,
             "aperture" => self.aperture = value,
+            "fog" => self.fog = value,
             _ => return false,
         }
         true
@@ -519,13 +571,21 @@ impl CameraParams {
         } else {
             CULL_MARGIN
         };
+        let span = far_extent - near_extent;
+        let fog = if self.fog.is_finite() {
+            self.fog.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         CameraFrame {
             view,
-            uniform: CameraUniform::new(&view, target.0, target.1, lens),
+            uniform: CameraUniform::new(&view, target.0, target.1, lens)
+                .with_volume(near_extent, span),
             margin,
             near_extent,
-            span: far_extent - near_extent,
+            span,
             blur,
+            fog,
         }
     }
 }

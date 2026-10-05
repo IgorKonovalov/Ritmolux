@@ -13,10 +13,12 @@ struct Camera {
     // after the projection, so it moves the picture and not the eye.
     view_proj: mat4x4<f32>,
     // x: render-target width in pixels, y: its height, z: the reference depth
-    // a pixel width is stated at - the focal plane - w: unused.
+    // a pixel width is stated at - the focal plane - w: the view depth of the
+    // scene volume's nearest extent.
     viewport: vec4<f32>,
     // x: aperture in pixels, y: the focal depth, z: the largest circle of
-    // confusion the tier draws, in pixels, w: unused.
+    // confusion the tier draws, in pixels, w: the volume's depth from its
+    // nearest extent to its farthest; 0 when no volume was named.
     lens: vec4<f32>,
 }
 
@@ -51,4 +53,24 @@ fn coc(cam: Camera, depth: f32) -> f32 {
 // perspective: twice as far is half as wide.
 fn at_depth(cam: Camera, px: f32, depth: f32) -> f32 {
     return px * cam.viewport.z / depth;
+}
+
+// Where view depth `depth` lies across the volume: 0 at its nearest extent, 1
+// at its farthest, clamped - the scale `focus` is stated on. 0 everywhere when
+// no volume was named. Mirrored by `CameraFrame::volume_depth`.
+//
+// Every name here shares one namespace with the shader it is prepended to, so
+// these carry the `volume_` / `fog_` stems no pipeline uses for its own.
+fn volume_depth(cam: Camera, depth: f32) -> f32 {
+    if (cam.lens.w > 0.0) {
+        return clamp((depth - cam.viewport.w) / cam.lens.w, 0.0, 1.0);
+    }
+    return 0.0;
+}
+
+// The share of its light a point at view depth `depth` keeps under `fog`:
+// `1 - fog * volume_depth`, exactly 1 at fog 0. Mirrored by
+// `CameraFrame::fog_light`.
+fn fog_light(cam: Camera, fog: f32, depth: f32) -> f32 {
+    return clamp(1.0 - fog * volume_depth(cam, depth), 0.0, 1.0);
 }

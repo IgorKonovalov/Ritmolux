@@ -2189,7 +2189,7 @@ fn the_stroke_is_as_thick_across_as_it_is_along_whatever_the_orientation() {
 mod seg3d {
     use super::super::{LineRenderer, Segment3dInstance};
     use crate::render::RenderError;
-    use crate::render::camera::{Camera3d, CameraUniform, CameraView, Lens};
+    use crate::render::camera::{Camera3d, CameraFrame, CameraUniform, CameraView, Lens};
     use crate::render::context::RenderContext;
     use crate::render::gpu;
 
@@ -2237,14 +2237,16 @@ mod seg3d {
             prev: a,
             next: b,
         };
-        render_segments(ctx, aperture, &[segment])
+        render_segments(ctx, aperture, 0.0, &[segment])
     }
 
-    /// `segments` drawn through [`view`] at `aperture`, as the red channel of
-    /// the target.
+    /// `segments` drawn through [`view`] at `aperture` and `fog`, as the red
+    /// channel of the target. The volume runs from the focal plane (depth 4)
+    /// to twice its depth, the span [`render`]'s segment crosses.
     fn render_segments(
         ctx: &RenderContext,
         aperture: f32,
+        fog: f32,
         segments: &[Segment3dInstance],
     ) -> Vec<f32> {
         let device = &ctx.device;
@@ -2271,7 +2273,16 @@ mod seg3d {
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let uniform = CameraUniform::new(&view(), W, H, Lens::new(aperture, FOCAL, CAP));
+        let frame = CameraFrame {
+            view: view(),
+            uniform: CameraUniform::new(&view(), W, H, Lens::new(aperture, FOCAL, CAP))
+                .with_volume(FOCAL, FOCAL),
+            margin: 0.0,
+            near_extent: FOCAL,
+            span: FOCAL,
+            blur: None,
+            fog,
+        };
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("seg3d-probe-encoder"),
         });
@@ -2285,7 +2296,7 @@ mod seg3d {
             &ctx.queue,
             &mut encoder,
             &target,
-            &uniform,
+            &frame,
             1.0,
             0.5,
             segments,
@@ -2445,8 +2456,8 @@ mod seg3d {
                 [a[0] + (b[0] - a[0]) * t, a[1], a[2]]
             })
             .collect();
-        let one = render_segments(&ctx, 12.0, &polyline(&[a, b], NARROW, true));
-        let eight = render_segments(&ctx, 12.0, &polyline(&points, NARROW, true));
+        let one = render_segments(&ctx, 12.0, 0.0, &polyline(&[a, b], NARROW, true));
+        let eight = render_segments(&ctx, 12.0, 0.0, &polyline(&points, NARROW, true));
         let peak = one.iter().copied().fold(0.0, f32::max);
         let worst = one
             .iter()
@@ -2532,8 +2543,8 @@ mod seg3d {
             (at_joint, away)
         };
 
-        let joined = render_segments(&ctx, aperture, &polyline(&[p0, v, p2], NARROW, true));
-        let unjoined = render_segments(&ctx, aperture, &polyline(&[p0, v, p2], NARROW, false));
+        let joined = render_segments(&ctx, aperture, 0.0, &polyline(&[p0, v, p2], NARROW, true));
+        let unjoined = render_segments(&ctx, aperture, 0.0, &polyline(&[p0, v, p2], NARROW, false));
         // How fast the light falls across the stroke at offset `o`, per pixel,
         // read on arm one well clear of the joint.
         let slope = |image: &[f32], o: f32| {
@@ -2574,6 +2585,53 @@ mod seg3d {
             "the unjoined control rises only {control} allowances at its joint, so \
              the probe cannot see a ridge"
         );
+    }
+
+    /// **Full fog blacks out the far end and leaves the near one alone**
+    /// (ADR-0263). A segment spanning the volume's whole depth, from its
+    /// nearest extent to its farthest, is drawn at `fog = 1` and at `fog = 0`;
+    /// column by column the fogged light is the unfogged light times
+    /// `1 - t`, with `t` the column's place along the quad — `1` at the near
+    /// end, `0` at the far one. A ratio of two renders of one geometry, so
+    /// coverage cancels and the property holds on any adapter.
+    #[test]
+    fn full_fog_blacks_out_the_far_end_and_keeps_the_near_one() {
+        let Some(ctx) = context() else {
+            return;
+        };
+        let (a, b) = ([-1.5, 0.0, 0.0], [1.5, 0.0, -FOCAL]);
+        let segment = Segment3dInstance {
+            a,
+            b,
+            color: [0.25, 0.25, 0.25],
+            width: WIDE,
+            alpha: 1.0,
+            prev: a,
+            next: b,
+        };
+        let clear = render_segments(&ctx, 0.0, 0.0, &[segment]);
+        let fogged = render_segments(&ctx, 0.0, 1.0, &[segment]);
+        let (xa, xb) = (px(a)[0], px(b)[0]);
+        let mut ratios = Vec::new();
+        for col in (xa.ceil() as u32)..(xb.floor() as u32) {
+            let t = (col as f32 + 0.5 - xa) / (xb - xa);
+            let (_, lit, _) = cross_section(&clear, col);
+            let (_, dim, _) = cross_section(&fogged, col);
+            assert!(lit > 0.0, "column {col} carries the stroke");
+            let ratio = dim / lit;
+            assert!(
+                (ratio - (1.0 - t)).abs() < 0.005,
+                "column {col} at t = {t}: fog keeps {ratio} of the light, not {}",
+                1.0 - t
+            );
+            ratios.push(ratio);
+        }
+        let (Some(&near), Some(&far)) = (ratios.first(), ratios.last()) else {
+            panic!("the stroke spans columns");
+        };
+        println!("fog 1: the near column keeps {near}, the far column {far}");
+        assert!(near > 0.98, "the nearest end keeps its light: {near}");
+        assert!(far < 0.02, "the farthest end is black: {far}");
     }
 
     /// **The width varies along one line**: a segment running from the focal

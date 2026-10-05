@@ -2166,10 +2166,12 @@ const PALETTE_BLOCK: &[&str] = &[
     "brightness",
 ];
 const PAN_BLOCK: &[&str] = &["pan_x", "pan_y"];
-/// The six camera names a 3D system delegates to
-/// `render::camera::CameraParams` (ADR-0258); held there by that module's own
-/// roster test, and here by the delegation check below.
-const CAMERA_BLOCK: &[&str] = &["yaw", "pitch", "distance", "fov", "focus", "aperture"];
+/// The camera names a 3D system delegates to `render::camera::CameraParams`
+/// (ADR-0258, ADR-0263); held there by that module's own roster test, and here
+/// by the delegation check below.
+const CAMERA_BLOCK: &[&str] = &[
+    "yaw", "pitch", "distance", "fov", "focus", "aperture", "fog",
+];
 
 /// Drift guard (ADR-0020's flagged risk): each declared `PARAMS` list must be
 /// exactly the set of names its `set_param` match handles. The two sit side by

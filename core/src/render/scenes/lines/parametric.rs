@@ -193,6 +193,8 @@ pub struct ParametricCurveScene {
     target: (u32, u32),
     /// The shared camera block, live on the space families only.
     camera: CameraParams,
+    /// `hue_axis`: the space families' palette axis, path `0` to depth `1`.
+    hue_axis: f32,
     /// This frame's space walk in world units, preallocated to
     /// `seg3d_cap + 1` (a walk has one more point than chords).
     points3d: Vec<[f32; 3]>,
@@ -227,6 +229,7 @@ impl ParametricCurveScene {
             max_coc,
             target: (1, 1),
             camera: CameraParams::default(),
+            hue_axis: DEFAULT_HUE_AXIS,
             points3d: Vec::with_capacity(seg3d_cap + 1),
             closed3d: false,
             extent3d: 1.0,
@@ -460,8 +463,9 @@ impl ParametricCurveScene {
 
     /// Draw the space walk through the shared camera: each chord clipped
     /// against the near plane, culled when wholly off one edge of the frame,
-    /// coloured by its place along the walk (ADR-0059) and stroked `thickness`
-    /// pixels wide at the focal plane.
+    /// coloured by its place along the walk (ADR-0059), or toward its depth by
+    /// `hue_axis` ([`space_coordinate`]), and stroked `thickness` pixels wide at
+    /// the focal plane.
     fn render_space(
         &mut self,
         queue: &wgpu::Queue,
@@ -525,10 +529,25 @@ impl ParametricCurveScene {
             if frame.view.outside(a, b, frame.margin) {
                 continue;
             }
+            let along = k as f32 / span;
+            let u = if self.hue_axis > 0.0 {
+                let mid = [
+                    0.5 * (a[0] + b[0]),
+                    0.5 * (a[1] + b[1]),
+                    0.5 * (a[2] + b[2]),
+                ];
+                space_coordinate(
+                    along,
+                    frame.volume_depth(frame.view.depth(mid)),
+                    self.hue_axis,
+                )
+            } else {
+                along
+            };
             instances.push(Segment3dInstance {
                 a,
                 b,
-                color: ramp.at(&self.palette, k as f32 / span),
+                color: ramp.at(&self.palette, u),
                 width,
                 alpha: 1.0,
                 prev,
@@ -539,13 +558,30 @@ impl ParametricCurveScene {
             queue,
             encoder,
             view,
-            &frame.uniform,
+            &frame,
             self.glow,
             self.softness,
             &instances,
         );
         self.instances3d = instances;
     }
+}
+
+/// A space chord's palette coordinate under `hue_axis` (ADR-0263): `along`, its
+/// place on the walk (ADR-0059), moved toward `depth01`, its place across the
+/// volume's depth, by `hue_axis` clamped to `[0, 1]`. At `1` the coordinate is
+/// the depth alone, so two chords at one depth share a colour wherever they
+/// sit on the walk. A non-finite `hue_axis` is `0`.
+pub(crate) fn space_coordinate(along: f32, depth01: f32, hue_axis: f32) -> f32 {
+    let h = if hue_axis.is_finite() {
+        hue_axis.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    if h >= 1.0 {
+        return depth01;
+    }
+    along + (depth01 - along) * h
 }
 
 /// A bound `samples` held to a space walk's `cap`, and the overflow to
@@ -753,6 +789,8 @@ pub const PARAMS: &[ParamSpec] = &[
     FOV,
     FOCUS,
     APERTURE,
+    FOG,
+    HUE_AXIS,
 ];
 
 // The shared specs whose reading depends on the family, re-declared with a doc
@@ -800,6 +838,25 @@ const APERTURE: ParamSpec = ParamSpec {
           blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
     ..camera::APERTURE
 };
+const FOG: ParamSpec = ParamSpec {
+    doc: "Fades a space curve toward black with depth: at 1 its farthest point is black and its \
+          nearest keeps its light. 0 is off.",
+    ..camera::FOG
+};
+
+/// `hue_axis`: which axis a space curve's palette runs along (ADR-0263) — `0`
+/// the path (ADR-0059), `1` the depth across the volume, and a mix between.
+const HUE_AXIS: ParamSpec = ParamSpec {
+    name: "hue_axis",
+    default: 0.0,
+    range: Some([0.0, 1.0]),
+    doc: "Moves a space curve's colour from running along its path (0) to running with depth \
+          (1), nearest first; between mixes the two.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Colour,
+    main: false,
+};
+const DEFAULT_HUE_AXIS: f32 = default_of(PARAMS, "hue_axis");
 
 /// One row of [`FAMILY_PARAMS`], its ranges in [`CurveFamily::ALL`]'s order:
 /// the rose, the Lissajous, the hypotrochoid, the superformula, the
@@ -900,6 +957,8 @@ pub const FAMILY_PARAMS: &[FamilyParam] = &[
     space_only!(FOV),
     space_only!(FOCUS),
     space_only!(APERTURE),
+    space_only!(FOG),
+    space_only!(HUE_AXIS),
 ];
 
 impl Scene for ParametricCurveScene {
@@ -940,6 +999,7 @@ impl Scene for ParametricCurveScene {
         self.tube = DEFAULT_TUBE;
         self.m = DEFAULT_M;
         self.phase_z = DEFAULT_PHASE_Z;
+        self.hue_axis = DEFAULT_HUE_AXIS;
         self.camera.reset();
     }
 
@@ -967,6 +1027,7 @@ impl Scene for ParametricCurveScene {
             "tube" => self.tube = value,
             "m" => self.m = value,
             "phase_z" => self.phase_z = value,
+            "hue_axis" => self.hue_axis = value,
             "samples" => self.samples = value,
             "thickness" => self.thickness = value,
             "hue_spread" => self.hue_spread = value,
@@ -1607,6 +1668,123 @@ mod tests {
             half[half.len() - 1].color,
             full[full.len() - 1].color,
             "a half-drawn curve must not already show the ramp's far end"
+        );
+    }
+
+    /// **At `hue_axis = 1` a knot is coloured by depth alone** (ADR-0263): over
+    /// every chord of a (2, 3) torus knot seen from an oblique camera, the
+    /// palette coordinate is the chord's place across the volume's depth, so
+    /// two chords at one depth share a coordinate however far apart they sit
+    /// on the walk, and two at different depths do not. At `0` the coordinate
+    /// is the walk position, bit for bit, and the pair of chords farthest apart
+    /// on the walk at the nearest depths shows the two axes disagree.
+    #[test]
+    fn a_full_hue_axis_colours_a_knot_by_depth_alone() {
+        let arm = curves::arm3d(CurveFamily::TorusKnot).unwrap_or_else(|| panic!("a space family"));
+        let samples = 480;
+        let params = curves::CurveParams {
+            n: 2.0,
+            d: 3.0,
+            phase: 0.0,
+            radial_offset: 0.0,
+            samples,
+            scale: 0.9,
+            rotation: 0.0,
+            draw_progress: 1.0,
+            color: [0.0; 3],
+            width: 0.0,
+            levers: curves::Levers {
+                tube: 0.35,
+                ..curves::Levers::default()
+            },
+        };
+        let mut points = Vec::new();
+        let closed = (arm.sample)(&params, &mut points);
+        assert!(closed && points.len() > 100, "a closed knot walk");
+        let camera = CameraParams {
+            yaw: 0.4,
+            pitch: 0.7,
+            distance: 3.2,
+            ..CameraParams::default()
+        };
+        let frame = camera.frame(
+            16.0 / 9.0,
+            1.0,
+            [0.0, 0.0],
+            (1280, 720),
+            (arm.extent)(&params),
+            16.0,
+        );
+        let span = samples.saturating_sub(1).max(1) as f32;
+        let n = points.len();
+        let chords: Vec<(f32, f32)> = (0..n)
+            .map(|k| {
+                let (a, b) = (points[k], points[(k + 1) % n]);
+                let mid = [
+                    0.5 * (a[0] + b[0]),
+                    0.5 * (a[1] + b[1]),
+                    0.5 * (a[2] + b[2]),
+                ];
+                (k as f32 / span, frame.volume_depth(frame.view.depth(mid)))
+            })
+            .collect();
+        for &(along, depth) in &chords {
+            assert_eq!(
+                space_coordinate(along, depth, 0.0).to_bits(),
+                along.to_bits()
+            );
+            assert_eq!(
+                space_coordinate(along, depth, 1.0).to_bits(),
+                depth.to_bits()
+            );
+        }
+        for (i, &(_, di)) in chords.iter().enumerate() {
+            for &(_, dj) in &chords[i + 1..] {
+                let (ui, uj) = (
+                    space_coordinate(0.0, di, 1.0),
+                    space_coordinate(1.0, dj, 1.0),
+                );
+                assert_eq!(
+                    di == dj,
+                    ui == uj,
+                    "depths {di} and {dj} took {ui} and {uj}"
+                );
+            }
+        }
+        // Non-vacuity: the knot does span its depth, and a pair of chords at
+        // nearly one depth sits far apart on the walk, where the path axis
+        // colours them apart.
+        let (lo, hi) = chords
+            .iter()
+            .fold((1.0f32, 0.0f32), |(lo, hi), &(_, d)| (lo.min(d), hi.max(d)));
+        assert!(
+            hi - lo > 0.5,
+            "the knot spans the volume's depth: {lo}..{hi}"
+        );
+        let mut pair = (0, 0, f32::INFINITY);
+        for i in 0..n {
+            // At least a quarter of the closed walk apart, either way round.
+            for j in (i + n / 4)..(i + 3 * n / 4).min(n) {
+                let gap = (chords[i].1 - chords[j].1).abs();
+                if gap < pair.2 {
+                    pair = (i, j, gap);
+                }
+            }
+        }
+        let (i, j, gap) = pair;
+        assert!(
+            gap < 1e-3,
+            "two chords a quarter-walk apart share a depth: {gap}"
+        );
+        let path = |k: usize| space_coordinate(chords[k].0, chords[k].1, 0.0);
+        let depth = |k: usize| space_coordinate(chords[k].0, chords[k].1, 1.0);
+        assert!(
+            (path(i) - path(j)).abs() > 0.2,
+            "the path axis colours them apart"
+        );
+        assert!(
+            (depth(i) - depth(j)).abs() <= gap,
+            "the depth axis colours them alike"
         );
     }
 

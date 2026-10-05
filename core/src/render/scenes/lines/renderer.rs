@@ -806,13 +806,21 @@ const MITER_LIMIT: f32 = {MITER_LIMIT:?};
 /// blurred neighbours abut instead of summing their overlap into a ridge. A
 /// corner sharper than [`MITER_LIMIT`] stays flat, as in 2D.
 ///
+/// # Fog (ADR-0263)
+///
+/// Each end's light is scaled by `fog_light()` at its own depth, `1 - fog * d`
+/// with `d` its place across the volume, and the factor is interpolated along
+/// the quad. Coverage is untouched, so a fogged stroke darkens rather than
+/// thins.
+///
 /// The position leaves the vertex shader already divided (`w = 1`). The quad is
 /// a screen-space shape, and interpolating its varyings perspective-correctly
 /// against the endpoints' depths would bend the across-the-stroke coordinate.
 const SEG3D_SHADER: &str = r#"
 struct Stroke {
-    // x: glow multiplier, y: softness (ADR-0124), zw: unused. The vertex
-    // stage reads the softness too, to widen it toward a blurred end.
+    // x: glow multiplier, y: softness (ADR-0124), z: fog (ADR-0263), w:
+    // unused. The vertex stage reads the softness too, to widen it toward a
+    // blurred end.
     v: vec4<f32>,
 }
 
@@ -947,10 +955,14 @@ fn vs_main(
         p = joint + mitre.xy * c.y;
     }
 
+    // Fog (ADR-0263), per end and interpolated along the quad. It scales the
+    // light and never the coverage, and at fog 0 it is exactly 1.
+    let fogged = fog_light(cam, stroke.v.z, select(ca.w, cb.w, at_b));
+
     var out: Seg3dOut;
     out.pos = vec4<f32>(px_to_ndc(cam, p), 0.0, 1.0);
     out.side = c.y;
-    out.color = color * (hw_true / hw);
+    out.color = color * (hw_true / hw) * fogged;
     out.alpha = alpha;
     out.soft = mix(soft_a, soft_b, c.x);
     out.sharp_hw = mix(hw_a, hw_b, c.x);
@@ -984,7 +996,7 @@ fn fs_main(in: Seg3dOut) -> @location(0) vec4<f32> {
 }
 "#;
 
-/// The `seg3d` stroke uniform: `[glow, softness, unused, unused]`.
+/// The `seg3d` stroke uniform: `[glow, softness, fog, unused]`.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Stroke3dUniform {
@@ -1818,17 +1830,21 @@ impl LineRenderer {
     /// Every endpoint must already be in front of the near plane: the scene
     /// clips on the CPU against the same view the uniform carries
     /// ([`CameraView::clip_near`](crate::render::camera::CameraView::clip_near)).
+    ///
+    /// `frame` is the camera block's whole frame, not only its uniform: the
+    /// depth cues it carries (`fog`) are the block's, so every system that
+    /// splices the block draws them without naming them.
     #[allow(
         clippy::too_many_arguments,
         reason = "distinct GPU handles plus the per-frame camera and stroke values; bundling \
                   them would only shuffle the same values behind a one-use struct"
     )]
-    pub fn draw_3d(
+    pub(crate) fn draw_3d(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
-        camera: &crate::render::camera::CameraUniform,
+        frame: &crate::render::camera::CameraFrame,
         glow: f32,
         softness: f32,
         segments: &[Segment3dInstance],
@@ -1843,12 +1859,12 @@ impl LineRenderer {
             return; // nothing to stroke; the backdrop shows through
         }
         queue.write_buffer(&seg3d.instances, 0, bytemuck::cast_slice(drawn));
-        queue.write_buffer(&seg3d.camera, 0, bytemuck::bytes_of(camera));
+        queue.write_buffer(&seg3d.camera, 0, bytemuck::bytes_of(&frame.uniform));
         queue.write_buffer(
             &seg3d.stroke,
             0,
             bytemuck::bytes_of(&Stroke3dUniform {
-                v: [glow, softness, 0.0, 0.0],
+                v: [glow, softness, frame.fog, 0.0],
             }),
         );
         pass.set_pipeline(&seg3d.pipeline);

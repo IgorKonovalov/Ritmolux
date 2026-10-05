@@ -237,8 +237,8 @@ Field order is shader-location order, so new fields go at the end.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — A 3D joint is mitred, and the comb goes | dev | done | committed with this row |
-| 2 — Fog, and a depth colour axis for the space curves | dev | not started | |
+| 1 — A 3D joint is mitred, and the comb goes | dev | done | d4e48373 |
+| 2 — Fog, and a depth colour axis for the space curves | dev | done | committed with this row |
 | 3 — Solid: far to near, near over far | dev | not started | |
 | 4 — The waterfall's rows hide what is behind them | dev | not started | |
 | 5 — Documentation | dev | not started | |
@@ -264,6 +264,17 @@ Field order is shader-location order, so new fields go at the end.
   sample reads 0.0644 against 0.0568 on the arms at +0.5 half-widths (allowance 0.0168), and the
   centre line reads exactly equal. The unjoined control's centre line rises 0.056 there, over 40
   allowances.
+- **Phase 2, outside the file list:** `core/src/render/camera/tests.rs` (camera.rs's own test
+  module) gains `fog` in its two `CameraParams` literals and `with_volume` in the lens-helper
+  test, and `core/tests/suite/preset.rs`'s `CAMERA_BLOCK` roster gains `fog`. `.taplo.toml` did
+  not change on regeneration.
+- **Phase 2, interface:** `LineRenderer::draw_3d` takes the whole `CameraFrame` instead of its
+  uniform, and is `pub(crate)` because `CameraFrame` is; the fog rides the `seg3d` stroke
+  uniform's `z` lane and the volume rides the camera uniform's two unused `w` lanes, so no buffer
+  changed size. The WGSL helpers are `volume_depth` and `fog_light`: `depth01` collided with the
+  attractor shader's own function of that name, which `CAMERA_WGSL` is prepended to.
+- **Phase 2, plexus nodes** fog on the CPU (`CameraFrame::fog_light`) in `plexus/mod.rs`, since
+  the node pipeline in `marks.rs` is outside the file list; the links fog in the shader.
 
 ### Close triggers
 
