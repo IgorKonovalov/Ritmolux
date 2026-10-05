@@ -585,12 +585,13 @@ and on `waterfall`.
 - `fog`, `0` to `1`, fades light toward black with depth, on the same nearest-to-farthest scale
   `focus` uses: at `1` the farthest point of the volume is black and the nearest keeps all its
   light, and in between a line darkens along its length. It changes how bright a line is and not how
-  wide, and it costs nothing measurable.
+  wide. It adds one multiply per line end and was not measured on its own.
 - `solid`, `0` or `1`, chooses how lines combine. At `0` they add as light, so a crossing glows
   brighter, which is how every shipped 3D preset draws. At `1` the near line is painted over the
   far one, so the figure reads as an object and crossings stop brightening. A blurred near line
   lies over what is behind it as a soft veil. Anything from `0.5` up counts as `1`, so a binding
-  that switches it should give `0` or `1`.
+  that switches it should give `0` or `1`. On `plexus` only the lines are ordered: its dots stay
+  light and are drawn over every line, so a far dot shows through a near line.
 
 **Solid costs a sort every frame.** The lines are ordered far to near on the CPU before they are
 drawn. Measured headless at 1920x1080 on an integrated GPU, a full Floor budget of 8,000 lines cost

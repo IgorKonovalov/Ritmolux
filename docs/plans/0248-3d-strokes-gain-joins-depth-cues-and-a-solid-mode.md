@@ -334,7 +334,8 @@ Field order is shader-location order, so new fields go at the end.
   attractor's 3D families", add: "`fog` (`0 – 1`) darkens lines and dots toward black with depth,
   and `solid = "1"` paints near links over far ones instead of adding them. The network's look is
   the additive glow, so leave `solid` at `0` unless the brief is an object rather than a web of
-  light; `fog` at `0.3 – 0.6` helps either."
+  light; `fog` at `0.3 – 0.6` helps either. Only the lines are ordered: the dots stay light and are
+  drawn over every line, so a far dot shows through a near line."
 
   In the `waterfall` section, change "`focus` and `aperture` behave as on `plexus`" to "`focus`,
   `aperture`, `fog` and `solid` behave as on `plexus`", and add two rows after `line_width`:
