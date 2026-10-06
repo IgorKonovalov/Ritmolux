@@ -356,10 +356,15 @@ the decision that moved it is linked.
   for the ratchet. Disabling it, skipping it, or letting `cargo-llvm-cov` fail to install takes
   every GPU behavioural suite with it. The golden roster skips there: its baselines are lavapipe
   captures ([ADR-0242](adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)).
+  So `check (ubuntu-latest)` runs the `golden` binary in a step of its own after `-P fast`, and that
+  step is the only CI job that asserts the roster.
 - **Live audio** cannot run in CI. **GPU rendering partly can**: a software adapter — Mesa's
   **lavapipe** on Linux, the DX12 **WARP** adapter on Windows — makes headless rendering
   deterministic, which is what the golden suite and the tier-4 chain test ride on. The golden
-  baselines are lavapipe's, so their comparison asserts only there. macOS has no software Metal fallback ([ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)),
+  baselines are lavapipe's, so their comparison asserts only there: on the Ubuntu runner (the
+  suite-module comparisons inside `-P fast`, the roster in its own step) and on a Linux box's full
+  run. The runner's Mesa is not the build the baselines were blessed on, so a red there is first a
+  reading to take. macOS has no software Metal fallback ([ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)),
   so the GPU suites skip there with a printed reason. Real-GPU-vendor and live-loopback checks
   stay manual — see [`on-device-validation.md`](on-device-validation.md).
 - **Coverage ratchet** ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)):

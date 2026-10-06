@@ -71,13 +71,14 @@ dGPU, AMD Vega iGPU, lavapipe from Mesa 26.2.2), with `target/` already built:
 That table is the first green, taken while the golden baselines were still WARP's. Two things
 about a run on this box today:
 
-- **The pinned-baseline tests assert here, and nowhere else does.** The golden baselines are
-  lavapipe captures, blessed on this box
+- **The pinned-baseline tests assert on Linux's lavapipe, and only there.** The golden baselines
+  are lavapipe captures, blessed on this box
   ([ADR-0242](adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)).
   `common::baseline_adapter` asserts a comparison only on Linux's lavapipe. On any other adapter,
   DX12 WARP included, it prints each fixture's reading and skips. So a golden mismatch fails on the
-  Arch box and is only reported on Windows. A rebless (`RLX_BLESS`) runs here too, and is refused
-  anywhere else.
+  Arch box and on CI's `ubuntu-latest` arm, and is only reported on Windows. The runner's Mesa is a
+  different build from this box's, so a red there is first a cross-Mesa reading to take. A rebless
+  (`RLX_BLESS`) is refused off lavapipe, and is done on this box only.
 - **The hardware tests take the high-performance adapter**, which on this laptop is the RTX 3080
   dGPU and not the iGPU
   ([ADR-0243](adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)).
@@ -441,10 +442,11 @@ The test runner **names the skipped binaries itself** on every run, on the profi
 authority, so the narrowing is never silent. **CI runs all of them regardless, but on Windows
 only.** The `check` matrix runs `-P fast` on Windows, macOS and Ubuntu. Since
 [ADR-0073](adrs/0073-the-windows-ci-critical-path.md), the nine run in the `coverage` job alone,
-on `windows-latest`, so one Windows job underwrites that promise. No CI job runs them on Linux.
+on `windows-latest`, so one Windows job underwrites that promise.
 **One of the nine is `golden`, and on Windows it skips**, because its baselines are lavapipe's. So
-the golden roster is asserted only by a full run on a Linux box with lavapipe, which is the Arch
-reference box's own full run. Locally, the full `cargo nextest run --workspace` runs them on any
+`check (ubuntu-latest)` runs that one binary in a step of its own after `-P fast`, and it is the
+only CI job that asserts the golden roster; a full run on a Linux box with lavapipe is the other
+place it asserts. Locally, the full `cargo nextest run --workspace` runs them on any
 machine, and it is green on Arch (see [A fresh Arch Linux checkout](#a-fresh-arch-linux-checkout)).
 
 The **rustdoc step** fails a broken or private intra-doc link in **any of the five workspace
