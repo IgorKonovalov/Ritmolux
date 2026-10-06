@@ -4,9 +4,9 @@
 
 use super::{
     DEFAULT_DEPTH_FADE, DEFAULT_HUE, DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, DEFAULT_SPIN,
-    FALLBACK_DT, MARGIN, PIVOT, Phase, REST_FOV, SEED, SIZE_DEPTH, Scene, SwarmInstance,
-    SwarmScene, TWINKLE_FREQ_HI, TWINKLE_FREQ_LO, Z_FAR, Z_NEAR, Z_SPAN, channel, depth_light,
-    half_extent, hue_coord, size_factor, slab_fade, sway_bound, twinkle_factor, unit,
+    DEFAULT_ZOOM, FALLBACK_DT, MARGIN, PIVOT, Phase, REST_FOV, SEED, SIZE_DEPTH, Scene,
+    SwarmInstance, SwarmScene, TWINKLE_FREQ_HI, TWINKLE_FREQ_LO, Z_FAR, Z_NEAR, Z_SPAN, channel,
+    depth_light, half_extent, hue_coord, size_factor, slab_fade, sway_bound, twinkle_factor, unit,
 };
 use crate::render::palette::Palette;
 use crate::render::scenes::SeededRng;
@@ -83,10 +83,61 @@ fn the_domain_takes_its_shape_from_the_target_at_every_depth() {
     }
 }
 
+/// The lowest `zoom` any shipped swarm preset binds, read from
+/// `presets/swarm_*.toml`, with the file that binds it. A preset that binds
+/// none sits at the scene's default.
+///
+/// **A `zoom` written as an expression fails here**: its minimum is not
+/// readable off the text, and a seam check that skipped it would pass whatever
+/// the expression reached.
+fn lowest_shipped_zoom() -> (f32, String) {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../presets");
+    let mut lowest = (DEFAULT_ZOOM, "the default".to_string());
+    let entries = std::fs::read_dir(&dir).expect("the presets directory");
+    for entry in entries {
+        let path = entry.expect("a directory entry").path();
+        let file = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_string();
+        if !(file.starts_with("swarm_") && file.ends_with(".toml")) {
+            continue;
+        }
+        let src = std::fs::read_to_string(&path).expect("a readable preset");
+        let doc: toml::Table = src.parse().expect("a preset that parses as TOML");
+        let Some(bound) = doc
+            .get("params")
+            .and_then(|params| params.get("zoom"))
+            .and_then(toml::Value::as_str)
+        else {
+            continue;
+        };
+        let zoom: f32 = bound.trim().parse().unwrap_or_else(|_| {
+            panic!(
+                "{file} binds `zoom = {bound:?}`, an expression: this test cannot read the \
+                 lowest zoom it reaches, and below about 0.82 the wrap seam shows. Bind a \
+                 constant zoom, or state the expression's minimum to this test"
+            )
+        });
+        if zoom < lowest.0 {
+            lowest = (zoom, file);
+        }
+    }
+    lowest
+}
+
 /// **Over 600 frames of the default flow, no particle within one sprite radius
 /// of the wrap seam projects inside the frame**, at 1280x800 and at 1920x1080
 /// (Plan 0239 Phase 1, ADR-0037's disagreeing pair) — at rest and with the
-/// camera swayed to [`sway_bound`] in each of the four diagonal directions.
+/// camera swayed to [`sway_bound`] in each of the four diagonal directions at
+/// `zoom = 1`, and at rest at the lowest `zoom` a shipped swarm preset binds
+/// ([`lowest_shipped_zoom`]).
+///
+/// **The shipped zoom is measured at rest only.** No shipped swarm preset binds
+/// `yaw` or `pitch`, and at a zoom near the seam the headroom is small enough
+/// that [`sway_bound`]'s first-order model lets a sprite's edge a few
+/// thousandths of the frame inside it.
 ///
 /// The projection is the camera's own CPU mirror of `project()`, through the
 /// frame `render` would build, so this asserts on what the GPU draws.
@@ -94,73 +145,95 @@ fn the_domain_takes_its_shape_from_the_target_at_every_depth() {
 fn the_wrap_seam_stays_outside_the_frame_at_every_depth() {
     use crate::dsp::AnalysisFrame;
 
-    for (width, height) in TARGETS {
-        let Some((_renderer, mut scene)) = scene(FLOOR_PARTICLES) else {
-            return;
-        };
-        let aspect = width as f32 / height as f32;
-        scene.aspect = aspect;
-        scene.target = (width, height);
+    let (shipped, from) = lowest_shipped_zoom();
+    let mut zooms = vec![(1.0, "zoom = 1, swayed".to_string(), true)];
+    if shipped != 1.0 {
+        zooms.push((
+            shipped,
+            format!("the lowest shipped zoom, from {from}, at rest"),
+            false,
+        ));
+    }
+    for (zoom, source, swayed) in &zooms {
+        let (zoom, swayed) = (*zoom, *swayed);
+        for (width, height) in TARGETS {
+            let Some((_renderer, mut scene)) = scene(FLOOR_PARTICLES) else {
+                return;
+            };
+            let aspect = width as f32 / height as f32;
+            scene.aspect = aspect;
+            scene.target = (width, height);
+            scene.zoom = zoom;
 
-        let [yaw, pitch] = sway_bound(REST_FOV, 1.0, aspect, [0.0, 0.0]);
-        assert!(
-            yaw > 0.02 && pitch > 0.02,
-            "the margin must leave a usable sway at {width}x{height}: yaw {yaw:.4}, pitch {pitch:.4}"
-        );
-        let views: Vec<_> = [
-            (0.0, 0.0),
-            (yaw, pitch),
-            (-yaw, pitch),
-            (yaw, -pitch),
-            (-yaw, -pitch),
-        ]
-        .into_iter()
-        .map(|(y, p)| {
-            // Bound past the limit, so the clamp is what is measured.
-            scene.camera.yaw = y * 2.0;
-            scene.camera.pitch = p * 2.0;
-            scene.camera_frame(aspect, 0.0).view
-        })
-        .collect();
+            let [yaw, pitch] = if swayed {
+                sway_bound(REST_FOV, zoom, aspect, [0.0, 0.0])
+            } else {
+                [0.0, 0.0]
+            };
+            if swayed {
+                assert!(
+                    yaw > 0.02 && pitch > 0.02,
+                    "the margin must leave a usable sway at {width}x{height}: yaw {yaw:.4}, \
+                     pitch {pitch:.4}"
+                );
+            }
+            let views: Vec<_> = [
+                (0.0, 0.0),
+                (yaw, pitch),
+                (-yaw, pitch),
+                (yaw, -pitch),
+                (-yaw, -pitch),
+            ]
+            .into_iter()
+            .map(|(y, p)| {
+                // Bound past the limit, so the clamp is what is measured.
+                scene.camera.yaw = y * 2.0;
+                scene.camera.pitch = p * 2.0;
+                scene.camera_frame(aspect, 0.0).view
+            })
+            .collect();
 
-        let frame = AnalysisFrame::default();
-        let (mut near_seam, mut inside, mut worst) = (0usize, 0usize, f32::INFINITY);
-        for _ in 0..600 {
-            scene.update(&frame);
-            for (p, inst) in scene.particles.iter().zip(&scene.instance_data) {
-                // The sprite's radius in frustum coordinates: its
-                // normalized-device height at this depth over the margin, and
-                // the width over the aspect too, because it is round on screen.
-                let r_ndc = inst.radius * SIZE_DEPTH / p.z;
-                let (ru, rv) = (r_ndc / (aspect * MARGIN), r_ndc / MARGIN);
-                if p.pos[0].abs() < 1.0 - ru && p.pos[1].abs() < 1.0 - rv {
-                    continue;
-                }
-                near_seam += 1;
-                for view in &views {
-                    let [x, y] = ndc(view, inst.center);
-                    let past = x.abs().max(y.abs());
-                    worst = worst.min(past);
-                    if past < 1.0 {
-                        inside += 1;
+            let frame = AnalysisFrame::default();
+            let (mut near_seam, mut inside, mut worst) = (0usize, 0usize, f32::INFINITY);
+            for _ in 0..600 {
+                scene.update(&frame);
+                for (p, inst) in scene.particles.iter().zip(&scene.instance_data) {
+                    // The sprite's radius in frustum coordinates: its
+                    // normalized-device height at this depth over the margin,
+                    // and the width over the aspect too, because it is round on
+                    // screen.
+                    let r_ndc = inst.radius * SIZE_DEPTH / p.z;
+                    let (ru, rv) = (r_ndc / (aspect * MARGIN), r_ndc / MARGIN);
+                    if p.pos[0].abs() < 1.0 - ru && p.pos[1].abs() < 1.0 - rv {
+                        continue;
+                    }
+                    near_seam += 1;
+                    for view in &views {
+                        let [x, y] = ndc(view, inst.center);
+                        let past = x.abs().max(y.abs());
+                        worst = worst.min(past);
+                        if past < 1.0 {
+                            inside += 1;
+                        }
                     }
                 }
             }
+            eprintln!(
+                "{width}x{height} at zoom {zoom} ({source}): {near_seam} particle-frames within \
+                 a sprite radius of the seam, {inside} projected inside the frame; nearest \
+                 {worst:.4} ndc (sway bound yaw {yaw:.4}, pitch {pitch:.4})"
+            );
+            assert!(
+                near_seam > 1000,
+                "too few particles reached the seam at zoom {zoom} for this to measure \
+                 anything: {near_seam}"
+            );
+            assert_eq!(
+                inside, 0,
+                "{inside} particle-frames within one sprite radius of the wrap seam projected \
+                 inside the frame at {width}x{height}, zoom {zoom} ({source})"
+            );
         }
-        eprintln!(
-            "{width}x{height}: {near_seam} particle-frames within a sprite radius of the seam, \
-             {inside} projected inside the frame; nearest {worst:.4} ndc (sway bound \
-             yaw {yaw:.4}, pitch {pitch:.4})"
-        );
-        assert!(
-            near_seam > 1000,
-            "too few particles reached the seam for this to measure anything: {near_seam}"
-        );
-        assert_eq!(
-            inside, 0,
-            "{inside} particle-frames within one sprite radius of the wrap seam projected \
-             inside the frame at {width}x{height}"
-        );
     }
 }
 

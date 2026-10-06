@@ -201,8 +201,8 @@ had already judged the length warranted.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The loader and the reference stop misleading an author | dev | done | `5c53d893` |
-| 2 — The 3D findings | dev | done | committed with this row |
-| 3 — The two gates that cannot see what shipped | dev | not started | |
+| 2 — The 3D findings | dev | done | `449a9b17` |
+| 3 — The two gates that cannot see what shipped | dev | done | committed with this row |
 | 4 — Window names, thumbnail dates, tooling | dev | not started | |
 | 5 — The render service stops leaking | studio-builder | not started | |
 
@@ -223,6 +223,15 @@ had already judged the length warranted.
 - Phase 2: goldens re-blessed by name, `RLX_BLESS=lsystem_endless_flat,lsystem_endless_space`.
 - Phase 2: the README camera row names Plexus Cyanotype (`1.5` at `noise = 0`) as the shipped minimum;
   Lorenz Knot now reaches `1.515`.
+- Phase 3, deviation (0238): no waterfall fixture. `eca27018` shipped Ridgeline and Tidepool, so
+  `sanity_shape_waterfall` already renders waterfall frames and prints their rows. The floor was
+  re-derived from the shipped distribution instead, `0.015` = half of Ridgeline's `0.0312`. Chosen by
+  the owner in-session. `reactivity.rs`'s waterfall-fixture doc still says the system ships no preset.
+- Phase 3, deviation (0275): the lowest shipped zoom (`0.85`, Murmuration) is measured at rest only.
+  Swayed to `sway_bound` there, 233 particle-frames at 1280x800 reached 0.9961 NDC: the bound's
+  first-order model over-allows at small headroom. No shipped swarm preset binds `yaw`/`pitch`. Chosen
+  by the owner in-session; the `sway_bound` overshoot is a followup. `zoom = "0.78"` and an expression
+  `zoom` each turned the test red and were reverted.
 
 ### Close triggers
 

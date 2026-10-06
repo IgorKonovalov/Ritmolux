@@ -528,12 +528,13 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // guess sat 21.96x under it, past the 2.2x slack this file allows. Half
         // that minimum, like every floor above.
         SystemKind::Plexus => 0.22,
-        // **Not derived from a distribution**: the system ships no preset
-        // content. Set low because a landscape of fine lines over a dark ground
-        // lights little of the frame — a guess, not a measurement.
-        // **Re-derive it from this test's printed distribution when the first
-        // preset ships**, at half the family minimum like every floor above.
-        SystemKind::Waterfall => 0.02,
+        // **Derived from the distribution on 2026-10-06**, when the system's
+        // first two presets shipped, from a `0.02` guess set while it shipped
+        // none. The lowest shipped member is `Ridgeline` at 0.0312 — a few
+        // fine ridge lines over a dark ground light little of the frame — and
+        // the guess sat 1.56x under it. Half that minimum, like every floor
+        // above.
+        SystemKind::Waterfall => 0.015,
     }
 }
 
