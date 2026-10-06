@@ -118,7 +118,7 @@ struct Frame {
 /// leaves in exactly the order [`expand`] would write them, at the cost of
 /// one frame per level.
 ///
-/// Built at load; [`next`](Self::next) allocates nothing, since the frame
+/// Built at load; [`next_symbol`](Self::next_symbol) allocates nothing, since the frame
 /// stack is reserved at `depth + 1` and a frame is pushed only below `depth`.
 #[derive(Debug, Clone)]
 pub struct Stream {
