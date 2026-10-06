@@ -64,5 +64,8 @@
     "esbuild@0.28.2": true,
     "electron-winstaller": false,
     "electron@44.4.3": true
+  },
+  "overrides": {
+    "shell-quote": "1.12.0"
   }
 }
