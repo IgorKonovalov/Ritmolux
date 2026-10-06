@@ -448,8 +448,11 @@ and `follow_window`.
 - The lane's tip builds `rlx-core` with a `dead_code` warning on `PreviewService::target` in
   `core/src/render/preview.rs`, which arrived with the merge of `main` (fdac6e6e, a8eab67d), not
   from this plan. Not touched.
-- Phase 7's text for the preset-author reference's `## lsystem` section in
-  `.claude/skills/preset-author/references/systems.md`, for the owner to apply in Phase 9:
+
+### Phase 9 hand-off
+
+Phase 7's text for the preset-author reference's `## lsystem` section in
+`.claude/skills/preset-author/references/systems.md`, for the owner to apply in Phase 9:
 
   > **Two structural modes on `[generator]`, both defaulting to the shipped behaviour.**
   >
