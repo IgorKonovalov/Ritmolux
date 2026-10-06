@@ -341,7 +341,7 @@ blessed, still failing". The same report is the run's job summary. The job
 cannot commit anything. You look at the pictures and commit them:
 
 ```bash
-gh workflow run bless.yml -f baselines=waterfall,waterfall_ramp   # dispatch on the pushed branch
+gh workflow run bless.yml -f baselines=waterfall,waterfall_ramp   # dispatch on main; add --ref <branch> for another
 gh run download <run id> -n blessed-<run id> -D target/blessed      # once the run is done
 cp target/blessed/core/tests/golden/*.png core/tests/golden/        # after reading report.md
 ```
@@ -590,8 +590,9 @@ gate cannot see a hairline. That is the argument for asserting the property
 directly rather than trusting a baseline to notice.
 
 > **`RLX_BLESS=1` is not scoped to the scene you changed** — it rewrites **every**
-> baseline the run touches. Naming the baselines instead (`RLX_BLESS=a,b`) scopes it. `git status` after blessing and `git checkout` the
-> baselines your change had no business moving; committing an incidental re-bless
+> baseline the run touches. Naming the baselines instead (`RLX_BLESS=a,b`)
+> scopes it. `git status` after blessing and `git checkout` the baselines your
+> change had no business moving; committing an incidental re-bless
 > silently retires the drift guard for that scene. (Learned the hard way in Plan
 > 0027, where an over-broad bless moved `fragment_field` and `swarm`.)
 
