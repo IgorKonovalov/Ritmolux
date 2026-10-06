@@ -1,0 +1,84 @@
+# Bless named golden baselines on DX12 WARP (ADR-0264). Dispatched by hand only:
+#
+#   gh workflow run bless.yml -f baselines=waterfall,waterfall_ramp
+#
+# It compares the golden and pinned roster against what is committed, blesses
+# ONLY the named baselines, and uploads them at their repository paths with
+# report.md as the artifact `blessed-<run id>`. Nothing is committed from here:
+# the job reads the repository and a person commits what they have looked at.
+# The owner's commands are in docs/testing.md, "Golden baselines".
+#
+# windows-latest because WARP is the adapter every baseline is a measurement
+# on; anywhere else `RLX_BLESS` panics. The toolchain and cache setup follow
+# ci.yml's `coverage` job, the other job that compares goldens on WARP.
+#
+# Retired by Plan 0218 Phase 2, which moves the reference to lavapipe: delete
+# this file and scripts/bless-report.mjs then.
+name: Bless
+
+on:
+  workflow_dispatch:
+    inputs:
+      baselines:
+        description: Comma-separated baseline stems to bless (file names under core/tests/golden/ without .png)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  # The report reads the tests' own lines out of the logs, so no colour codes.
+  CARGO_TERM_COLOR: never
+
+jobs:
+  bless:
+    runs-on: windows-latest
+    env:
+      # Read by the shell from the environment, never spliced into a script, so
+      # the input cannot become a command.
+      BASELINES: ${{ inputs.baselines }}
+      # The two golden tests and the five pinned modules' baseline tests: every
+      # caller of `bless_requested`.
+      PINNED: >-
+        test(=scenes_match_golden_baselines)
+        | test(=the_waterfall_holds_a_ramped_ring)
+        | test(=attractor_trails::the_attractor_over_the_trails_stage_matches_its_baseline)
+        | test(=composite::composite_stages_match_golden_baselines)
+        | test(=layer::layered_fixtures_match_golden_baselines)
+        | test(=line_joints::the_joined_polyline_holds_its_shape_and_its_pixels)
+        | test(=warp_mesh_wide::the_converted_chain_matches_its_wide_baseline)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # Before anything is built: a list that is not stems with a committed
+      # PNG each fails here rather than after two test runs.
+      - name: Check the names
+        shell: bash
+        run: node scripts/bless-report.mjs --check-names "$BASELINES"
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      # Every baseline against what is committed, before anything is blessed.
+      # Its failure is the reading, so it is tolerated.
+      - name: Compare run
+        shell: bash
+        run: cargo nextest run -p rlx-core --test golden --test suite --no-fail-fast --no-capture 2>&1 | tee compare.log || true
+      # A golden test still compares, and fails on, every baseline it was not
+      # asked to bless, so this step's exit says nothing either. Which named
+      # baselines were written is read from its `blessed` lines by the report.
+      - name: Bless run
+        shell: bash
+        run: RLX_BLESS="$BASELINES" cargo nextest run -p rlx-core --test golden --test suite --no-fail-fast --no-capture -E "$PINNED" 2>&1 | tee bless.log || true
+      # Fails when a named baseline was not blessed. Also writes the job summary.
+      - name: Report and stage
+        shell: bash
+        run: node scripts/bless-report.mjs --names "$BASELINES" --compare compare.log --bless bless.log --out bless-out/report.md --stage bless-out
+      - name: Upload the blessed baselines
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blessed-${{ github.run_id }}
+          path: bless-out/
+          if-no-files-found: error

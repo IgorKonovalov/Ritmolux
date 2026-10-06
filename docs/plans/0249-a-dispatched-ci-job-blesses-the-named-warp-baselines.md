@@ -154,8 +154,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `RLX_BLESS` takes a list of names | dev | done | committed with this row |
-| 2 — `bless.yml` and its report | dev | not started | |
+| 1 — `RLX_BLESS` takes a list of names | dev | done | b88d3fc2 |
+| 2 — `bless.yml` and its report | dev | done | committed with this row |
 | 3 — First bless: 0248's four | human | not started | |
 
 ### Notes
@@ -173,6 +173,24 @@ flowchart LR
   line_joints::`, showing the adapter check precedes the name check): `RLX_BLESS refused: baselines
   are blessed on DX12 WARP only, and this run is on llvmpipe (LLVM 22.1.8, 256 bits) (Vulkan, Cpu),
   driver llvmpipe Mesa 26.2.2-arch1.1 (LLVM 22.1.8)`.
+- Phase 2, beyond the phase text: the report also reads the bless run's log (`--bless`, its
+  `blessed <path>` lines), lists a named baseline the bless run did not write, and exits 1 for it;
+  both test steps tolerate failure, so this is the job's only signal that a bless did not happen. A
+  `--check-names` step runs before the build and refuses `1`, a non-stem, or a stem with no committed
+  PNG. The bless run's filter names the seven tests that call `bless_requested`.
+- Phase 2, the fixture: `compare.log` is real compare output of those seven tests, captured on this
+  session's llvmpipe rather than on WARP (the cargo warning lines above `Finished` trimmed).
+  `bless.log` is written by hand in the tests' `blessed <path>` shape. The pinned modules already
+  print `golden.rs`'s line shape, so none was changed.
+- Phase 2, the YAML check: the lane has no Node YAML parser, so the node one-liner checks the
+  trigger by reading the top-level `on:` block's keys, and validity was checked with PyYAML. Node
+  (exit 0, printed `["workflow_dispatch"]`): `node -e "const t=require('fs').readFileSync('.github/workflows/bless.yml','utf8').split(/\r?\n/);const i=t.indexOf('on:');const keys=[];for(const l of t.slice(i+1)){if(/^\S/.test(l))break;const m=l.match(/^  ([A-Za-z_]+):/);if(m)keys.push(m[1]);}console.log(JSON.stringify(keys));process.exit(i>=0&&keys.length===1&&keys[0]==='workflow_dispatch'?0:1)"`.
+  Python (parsed; `on` is `{workflow_dispatch: {inputs: {baselines: ...}}}`, permissions
+  `{contents: read}`): `python3 -c "import yaml,json; d=yaml.safe_load(open('.github/workflows/bless.yml')); ..."`.
+- Phase 2, a dispatch is not possible from the session: `bless.yml` has never run. Phase 3 is its
+  first run.
+- Phase 2, the fixture's description is its own `scripts/fixtures/bless-report/README.md`;
+  `scripts/fixtures/README.md` is not in the phase's files and does not mention it.
 
 ### Close triggers
 
