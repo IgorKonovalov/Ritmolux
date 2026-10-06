@@ -1,8 +1,8 @@
 # ADR-0259 — The swarm projects through the shared camera, in a frustum-shaped torus
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-06 (Plan 0239)
 > **Date:** 2026-10-01
-> **Related plan(s):** [0239](../plans/0239-the-swarm-moves-into-a-real-camera.md)
+> **Related plan(s):** [0239](../plans/done/0239-the-swarm-moves-into-a-real-camera.md)
 > **Supersedes in part:** ADR-0044 (its depth model; its target-sized torus survives in a new shape)
 
 ## Context
@@ -117,3 +117,17 @@ plexus.
 - ADR-0044's rejection of a depth sort and of a depth buffer still holds: blending stays additive and
   commutative.
 - ADR-0044's Alternative B (boids) is untouched by this ADR.
+
+## Outcome (2026-10-06, Plan 0239 close)
+
+- **Three swarm presets shipped, not five**, and none was `swarm_drift.toml`, which Plan 0232 had
+  already retired. The seam comment that described the retired arithmetic was `swarm_braid.toml`'s.
+  The owner kept Braid and Maelstrom and re-tuned Murmuration's `zoom` from 0.78 to 0.85.
+- **"Zooming out below the margin"** is, under the projection, a `zoom` below about 0.82 at the rest
+  `fov`, not 1/1.25: `zoom` divides `fov` through a tangent, so the seam reaches the frame edge where
+  `1.25 * tan(0.4) = tan(0.4 / zoom)`.
+- **The fill cost on `Floor` was measured** by Plan 0239 Phase 3: the blurred frame costs 1.57 to
+  1.63 times the sharp one, inside the budget, so no swarm-only CoC ceiling below the shared cap was
+  needed. `swarm_max_coc_px` exists at the shared cap's values.
+- **The goldens' re-bless is owed** (Plan 0239 Phase 7, ADR-0249): `swarm` and `swarm_shaped` moved
+  off-WARP and are not yet re-blessed on DX12 WARP.

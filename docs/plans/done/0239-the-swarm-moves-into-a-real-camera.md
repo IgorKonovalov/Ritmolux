@@ -1,9 +1,11 @@
 # 0239 — The swarm moves into a real camera
 
-> **Status:** in-progress
+> **Status:** done - Phases 7 and 8 owed, ADR-0249. Closed 2026-10-06 at v0.167.0; phase commits
+> b70e1488, b598e6c5, d6e2299d, 65e4a600, cbb2276c, 8ece66bd. Close review round 1: no blockers, no
+> majors, four minors (three fixed in 885b7155), one nit.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0259](../adrs/0259-the-swarm-projects-through-the-shared-camera-in-a-frustum-shaped-torus.md) (proposed), [ADR-0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md), [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed), [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)
+> **Related ADRs:** [ADR-0259](../../adrs/0259-the-swarm-projects-through-the-shared-camera-in-a-frustum-shaped-torus.md) (accepted), [ADR-0044](../../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md), [ADR-0258](../../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md), [ADR-0257](../../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)
 
 ## TL;DR
 
@@ -363,6 +365,158 @@ struct Particle {
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
 - **Outstanding `human` phases:** 6 (blocks merge), 7 and 8 (`Blocks merge: no`).
 
+## Close review
+
+The conductor's round 1 review, graded at tip `4c13d2e7`, follows in full; its headings are demoted
+one level to sit under this section. No earlier round raised a finding, so no fix-round lines
+follow it.
+
+**Owed (ADR-0249).** Phase 7 has not yet re-blessed `swarm.png` and `swarm_shaped.png` on DX12 WARP,
+so the Windows CI golden job is expected red on both until it does; nothing has yet checked the
+projected swarm against a WARP baseline. Phase 8 has not yet applied the replacement `## swarm`
+section to `.claude/skills/preset-author/references/systems.md`, so the content lane's reference
+still describes the four 2.5D depth cues.
+
+**What the close did with the findings.** Minors 1, 2 and 3 were repaired in `885b7155`: backlog
+0275 is half discharged and re-probed, the two preset comments say about 0.82, and the `marks.rs`,
+`emitter.rs` and `warp_mesh/resources.rs` comments describe the swarm's own two-entry pipeline.
+Minor 4 (the Braid and Maelstrom gallery cards) is an image and stays open. Nit 5 stays open.
+
+### Plan 0239 — close review, round 1
+
+Graded at tip `4c13d2e7a70702ef1ae05bff048d17506e23cb4c`, lane `plan-0239-the-swarm-moves-into-a-real-camera`.
+
+**Verdict: Plan 0239 landed cleanly. No blockers, no majors, four minors and one nit.** Every dev
+phase matches its done-when in the tree, and the tests the plan named exist and assert what the plan
+claims. The owed human Phases 7 and 8 are correctly marked `Blocks merge: no` (ADR-0249).
+
+#### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 7fc7c21 is green in the suite ledger, run by
+  gate 0239-pre-review at 2026-10-06T16:16:20.328Z: 2014 tests run: 2014 passed (10 slow), 8 skipped`.
+  That ledger record is the full-suite evidence (ADR-0207).
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: green. d0a3c2f5 fixed the private
+  intra-doc links that held the pre-review gate red.
+- `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --all -- --check`: both green.
+- `node scripts/check-doc-links.mjs`, `node scripts/toc.mjs --check`, `node scripts/check-reader-prose.mjs`
+  and `node scripts/check-comment-hygiene.mjs` all pass. They cover Phase 5's done-when.
+- `node scripts/check-backlog-claims.mjs`: exit 1, backlog 0275 with two broken probes (finding 1).
+
+#### Lens 1: alignment
+
+Every phase carries one in-vocabulary owner tag. The phase-to-commit mapping is b70e1488, b598e6c5,
+d6e2299d, 65e4a600 and cbb2276c, then 8ece66bd for the Phase 6 re-tune. Two commits sit off the plan,
+and both are justified: a68e7c0a, a conductor roster-test case owed by cf28d425 on main, and
+d0a3c2f5, a rustdoc repair.
+
+- **Phase 1.**
+  - Frustum coordinates live in `Particle::pos`/`z`, and the flow runs in world space with a `z` current (`swarm.rs:1205-1259`).
+  - `slab_fade` handles the slab bounds.
+  - `camera.wgsl` is prepended and the sprite projects through `project()`.
+  - The camera subset is `yaw`/`pitch`, clamped per frame by `sway_bound`, plus `fov`, `focus` and `aperture`, with no `distance`.
+  - The `depth_fade` default is `1 - 0.45/1.05`.
+  - The aspect comes from `render`'s argument, never from `set_target_size` (ADR-0037).
+  - The tests match the done-when:
+    - `the_swarm_fixture_moves_between_two_frames_a_second_apart` uses the `capture_preset` path that `shot` drives.
+    - `the_wrap_seam_stays_outside_the_frame_at_every_depth` runs 600 frames at 1280x800 and 1920x1080, at rest and at all four sway corners clamped from twice the bound. It also asserts that more than 1000 particle-frames landed near the seam.
+    - `far_particles_cross_the_screen_more_slowly_than_near_ones` asserts far < 0.8 x near on projected centres.
+  - The `update` cost is logged: 0.835 ms at 10k, under the plan's ~1 ms trigger.
+- **Phase 2.**
+  - The vertex stage grows the quad by `reach = (r_px + coc) / r_px` and dims it by `1/reach^2`.
+  - The fragment stretches the SDF falloff over `reach`, so the silhouette's iso-lines keep their shape.
+  - `a_zero_aperture_renders_the_sharp_swarm_byte_for_byte` asserts exact equality and is non-vacuous.
+  - `a_defocused_sprite_spreads_wider_and_dimmer_than_a_focused_one` asserts more pixels and a lower peak in one frame.
+  - `a_polygon_at_the_focal_plane_keeps_its_edge` asserts three lobes and |diff| < 1e-3 against aperture 0, with a non-vacuity arm.
+- **Phase 3.**
+  - The probe is `mark_cost::a_blurred_swarm_is_priced_against_the_sharp_one`:
+    - It uses the same fixture pair, the same run and the same adapter, and it reports without gating (ADR-0071, ADR-0074).
+    - It asserts the two frames differ, so it cannot measure one shader twice.
+  - `Floor` ratio is 1.63/1.57, and the blurred 5.996 ms sits inside 16.67/2.7 = 6.17 ms, the headroom `docs/nfr.md:94` records. The margin is tight but it is inside.
+  - `Rich` was measured on the RTX 3080 Laptop: 1.27.
+  - The ladder stopped before rung 1. `swarm_max_coc_px` exists at the shared values, and `scenes/mod.rs` passes `min(swarm, shared)`.
+  - `the_circle_of_confusion_never_exceeds_the_swarm_cap` sweeps aperture (including inf/NaN), focus and depth on both tiers, and asserts the clamp is announced exactly when the aperture passes the cap.
+  - The goldens' movement is quoted in the log for Phase 7.
+- **Phase 4.** No binding needed removing, because the `DEPTH_*` cues were constants. Braid's seam
+  comment was rewritten. The `git grep -c "near depth layer" -- presets/swarm_braid.toml` check was
+  run as a single `git grep` and finds nothing.
+- **Phase 5.**
+  - The generated blocks are regenerated, and the suite's `preset_schema`/`preset` drift tests are green.
+  - `docs/specs/player-schema.json` is included, which the log flagged as outside the list and correctly took.
+  - The ADR-0044 index row reads `superseded in part by 0259`.
+  - The replacement text for the preset-author reference is in the log for Phase 8.
+- **Phase 6.** Braid keep, Maelstrom keep, Murmuration re-tuned (8ece66bd, `zoom` 0.78 to 0.85) and
+  judged live.
+- The implementation log is a few lines longer than the phases section (nit 5).
+
+#### Lens 2: layering and real-time safety
+
+- No platform or audio-source type enters `core/`.
+- The swarm builds its own two-uniform pipeline rather than widening `marks::InstancedQuads`, and the ADR-0058 layout guard still passes on it.
+- `update` and `render` do not allocate: `instance_data` is rebuilt in place.
+- The hot-path `deny` pragma is intact.
+- The C ABI and the control protocol are untouched. The scene's surface changes only through `ParamSpec` declarations.
+
+#### Lens 3: docs and bookkeeping
+
+- `docs/presets.md`, `docs/preset-guide.md` and `presets/README.md`'s hand-written swarm prose describe
+  the projected model, and `docs/images/gallery/swarm.png` was re-rendered.
+- The Braid and Maelstrom gallery cards are stale (finding 4).
+- `.claude/skills/preset-author/references/systems.md` is owed by Phase 8, by design.
+- The close owes:
+  - ADR-0259 `proposed -> accepted`, with its row refreshed.
+  - The plan to `done/`, with Phases 7 and 8 `owed` (`Status: done - Phases 7 and 8 owed, ADR-0249`).
+  - Backlog 0275 repaired (finding 1).
+  - A **minor** version bump: this is a feature plan.
+  - The studio's two version copies.
+  - A preset-curation verdict, since `presets/` was touched.
+
+#### Lens 4: correctness and determinism
+
+- The torus shape is the render target's at every depth, and `the_domain_takes_its_shape_from_the_target_at_every_depth` sweeps five aspects.
+- The seed scatter is in frustum coordinates, so it does not depend on the target.
+- No wall-clock reads.
+- Numeric assertions are dimensionless properties: ratios of like quantities, exact equality at `coc = 0`, and the cap bound. The probe's frame times are reported, not asserted.
+- `sway_bound` handles non-finite input and returns zero when there is no headroom.
+
+#### Lens 5: design integrity
+
+- The `Scene` trait is untouched.
+- The camera subset is matched locally in `set_param` rather than delegated, so the block's `distance`, `fog` and `solid` stay unreachable, as ADR-0259 decided.
+
+#### Findings
+
+##### minor
+
+1. **Backlog 0275's probes are both broken, and its question changed shape** (`docs/design-backlog.md:1671`, `:1673`).
+   - 8ece66bd set Murmuration's `zoom` to `0.85`, and the seam test's `SHIPPED_ZOOMS` was deleted by b70e1488.
+   - The entry's first question ("does Murmuration show the seam?") is answered: the owner saw it live and the zoom moved.
+   - Its second question survives in a new form. `the_wrap_seam_stays_outside_the_frame_at_every_depth` now runs at `zoom = 1` only, so nothing gates the shipped minimum zoom against the seam.
+   - Fix at the close (step 1c): close the first half to the archive citing 8ece66bd, and leave the second half live with a fresh probe. One option is `absent: SHIPPED_ZOOMS in: core/src/render/scenes/swarm/tests.rs`, or re-word it as "the seam test measures zoom 1 only".
+2. **Two preset comments state the seam threshold as 0.8, but it is about 0.82** (`presets/swarm_murmuration.toml:61`, `presets/swarm_braid.toml:123`).
+   - `zoom` divides `fov` through a tangent, so at the rest `fov = 0.8` the seam reaches the frame edge at `zoom ≈ 0.822`. That is where `1.25 * tan(0.4) = tan(0.4 / zoom)`, and `presets/README.md:1513` says "about 0.82".
+   - Murmuration's "At least 0.8 ... below 1/1.25" would let a re-tune to 0.81 show the seam. Its 0.85 is safe, with about 0.04 NDC of headroom.
+   - Fix: say "at least about 0.82" in Murmuration and "a zoom below about 0.82" in Braid.
+3. **Doc comments elsewhere still describe the swarm's old pipeline.**
+   - `core/src/render/scenes/marks.rs:221-222` says the swarm resolves "depth parallax" into `QuadInstance::attr`.
+   - `core/src/render/scenes/marks.rs:266-282` says `InstancedQuads` is what "`swarm` and `emitter`" draw through.
+   - `core/src/render/scenes/emitter.rs:1089-1112` describes the swarm's layout as "one `[Uniform]` entry".
+   - `core/src/render/scenes/warp_mesh/resources.rs:564-567` does the same: the log noted this one.
+   - Since b70e1488 the swarm builds its own two-entry pipeline (`swarm.rs:355-471`), and only the emitter uses `InstancedQuads`.
+   - Fix: comment-only edits saying the emitter is the shared draw's one user and the swarm's layout has two entries. Keep the ADR-0058 warning, which still applies to the emitter's layout.
+4. **The Braid and Maelstrom gallery cards still show the 2.5D look** (`docs/images/gallery/presets/swarm_braid.png`, `swarm_maelstrom.png`).
+   - Only `gallery/swarm.png` and Murmuration's card were re-rendered.
+   - Fix: `node scripts/docs-shots.mjs` on the two cards. This is an image, not prose, so it stays open for a dev or owner session.
+
+##### nit
+
+5. **The implementation log runs slightly longer than the phases section** (`docs/plans/0239-the-swarm-moves-into-a-real-camera.md:233`).
+   - The log is about 133 lines and the phases section about 129, which is the shape lens 1 flags.
+   - The excess is the 34-line `systems.md` replacement block that Phase 5 told the log to carry, so this is noted rather than graded.
+
 ## Followups (after this lands)
 
-- Accept ADR-0259 at the close, and mark ADR-0044 superseded in part in the ADR index.
+- ~~Accept ADR-0259 at the close, and mark ADR-0044 superseded in part in the ADR index.~~ Done at
+  the close.
+- Phase 7 (the WARP re-bless) and Phase 8 (the preset-author reference) are owed (ADR-0249).
+- Re-render the Braid and Maelstrom gallery cards (close review finding 4).
