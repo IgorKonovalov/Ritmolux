@@ -146,12 +146,14 @@ flowchart LR
 - **What:**
   - The generated params block, `presets/schema/` and `.taplo.toml` are regenerated.
   - `docs/presets.md` and `docs/preset-guide.md` describe the swarm as projected, with a new picture.
-  - The preset-author reference's `## swarm` section replaces the four cues with the camera subset,
-    `depth_fade`, the bounded sway, and the note that `zoom` and `pan` no longer parallax.
+  - The log carries the replacement text for the preset-author reference's `## swarm` section, for
+    the owner to apply in Phase 8: the camera subset in place of the four cues, `depth_fade`, the
+    bounded sway, and the note that `zoom` and `pan` no longer parallax. A headless session cannot
+    edit `.claude/` (ADR-0210).
   - ADR-0044's Notes cannot be edited once accepted, so `docs/adrs/README.md` marks it
     `superseded in part by 0259`.
 - **Files touched:** `presets/README.md`, `presets/schema/`, `.taplo.toml`, `docs/presets.md`,
-  `docs/preset-guide.md`, `docs/images/`, `.claude/skills/preset-author/references/systems.md`.
+  `docs/preset-guide.md`, `docs/images/`, `docs/specs/player-schema.json`, `docs/adrs/README.md`.
 - **Done when:** the schema and param-reference tests pass on the regenerated files.
   `node scripts/toc.mjs --check`, `node scripts/check-doc-links.mjs` and
   `node scripts/check-reader-prose.mjs` pass.
@@ -173,6 +175,14 @@ flowchart LR
   and nothing else. If Plan 0218 has moved blessing to lavapipe by then, bless there instead.
 - **Files touched:** `core/tests/golden/swarm.png`, `core/tests/golden/swarm_shaped.png`.
 - **Done when:** the Windows CI golden job is green on `main`.
+
+### Phase 8 — The preset-author reference
+- **Owner skill:** human
+- **Blocks merge:** no
+- **What:** the owner applies, in an interactive session, the text Phase 5 left in the log to
+  `.claude/skills/preset-author/references/systems.md`'s `## swarm` section.
+- **Files touched:** `.claude/skills/preset-author/references/systems.md`.
+- **Done when:** the edit is committed on `main` and `node scripts/check-doc-links.mjs` exits 0.
 
 ## Data shapes
 
@@ -233,6 +243,7 @@ struct Particle {
 | 5 — Documentation and the references | dev | not started | |
 | 6 — The three presets, judged and re-tuned | human | not started | |
 | 7 — The moved baselines are blessed | human | not started | |
+| 8 — The preset-author reference | human | not started | |
 
 ### Notes
 

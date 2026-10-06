@@ -13,23 +13,33 @@
 preset's bindings. **Any param you don't bind keeps its default** — you only write what you drive.
 
 **Colour:** **every** scene colours through the shared **palette LUT** — `[palette]`,
-`[palette_b]`, `palette_mix`, `saturation`, plus either `color_span`/`color_center` (fragment,
-reaction-diffusion) or `hue_spread` (+ `hue_center` on swarm/attractor). The shader scenes sample
-it per pixel or per particle; the four **line** scenes sample it on the CPU per segment. Since
+`[palette_b]`, `palette_mix`, `saturation`, plus either `color_span` (with `color_center` on all
+but the collage) on the field-like scenes — `fragment_field`, `reaction_diffusion`,
+`analytic_field`, `shape_field`, `warp_mesh`, `shape_collage` — or `hue_spread` (+ `hue_center` on
+swarm, attractor, emitter and plexus). The schema per system is the check. The shader scenes sample
+it per pixel or per particle; the five **line** scenes (`waterfall` lives with them) sample it on
+the CPU per segment. Since
 Plan 0054 / ADR-0059 each line scene walks `hue_spread` along **its own generator's axis** — path
 position (`parametric_curve`), generation depth (`lsystem`), radius (`star_pattern` — flat on a
 bare interlace, live once `rings` is declared; see below), band index (`spectrum`). `hue_spread = 0` everywhere is one flat `hue`, which is
 what these scenes drew before. See `docs/preset-palettes.md` and `presets/README.md`'s axis table.
 
 **Almost every scene takes** the shared view transform (`zoom`, `pan_x`, `pan_y`) — the exceptions
-are `shape_field` and `shape_collage` (no `zoom`) and `warp_mesh` (no `pan_x`/`pan_y`). **Every scene
+are `shape_field` and `shape_collage` (no `zoom`) and `warp_mesh` (no `pan_x`/`pan_y`, and its
+`zoom` is the per-vertex resample scale of the past frame, not a view zoom). **Every scene
 takes** the engine stages `bg_hue`/`bg_bright`/`bg_vignette` + the ramp
-(`bg_angle`/`bg_hue_span`/`bg_shade`/`bg_shade_end`/`bg_ramp_gamma`) + the band
+(`bg_angle`/`bg_hue_span`/`bg_shade`/`bg_shade_end`/`bg_ramp_gamma`, and `bg_coord_mode` /
+`bg_center_x`/`bg_center_y` to fan it around a point) + the band
 (`bg_band_amount`/`bg_band_angle`/`bg_band_pos`/`bg_band_width`/`bg_band_curve`/`bg_band_hue`/`bg_band_hue_span`),
-`trails`,
-`kaleido_order`/`kaleido_angle`/`kaleido_center_x`/`kaleido_center_y`,
-`bloom_amount`/`bloom_threshold`/`bloom_radius`, `exposure`, `ink_amount`/`paper_*`/`ink_*`.
-Line scenes additionally take `mirror_order`/`mirror_reflect`.
+`trails` and its transform `fb_zoom`/`fb_rotate`/`fb_dx`/`fb_dy`/`fb_center_x`/`fb_center_y`/`fb_warp`,
+`kaleido_order`/`kaleido_angle`/`kaleido_center_x`/`kaleido_center_y` and the symmetry siblings
+`kaleido_tile`/`kaleido_spiral`/`kaleido_radial`/`kaleido_zoom`/`kaleido_edge`/`kaleido_inner`,
+`bloom_amount`/`bloom_threshold`/`bloom_radius`, `occlude`, `exposure`,
+`ink_amount`/`ink_gamma`/`paper_hue`/`paper_sat`/`paper_bright`/`ink_hue`/`ink_sat`/`ink_bright`.
+`parametric_curve`, `lsystem`, `star_pattern` and `spectrum` additionally take
+`mirror_order`/`mirror_reflect` (`waterfall` does not), and share the stroke params `glow`,
+`softness` and `stroke_blend` (additive light at `0`, opaque paint at `1`; `waterfall` takes only
+`glow`) — see each scene's table in `presets/README.md`.
 
 ---
 
@@ -48,6 +58,9 @@ life comes through the bindings. Draws **opaquely**, so `bg_*` has no visible ef
 | `color_center` | `0.0` | `0 – 1` | where that window sits. Slide on treble. |
 | `saturation` | `1.0` | `0.6 – 1.4` | chroma. |
 
+Also declared: `field_speed` and `fold_speed`, the field's own animation rates (`presets/README.md`,
+"`fragment_field` animation rates").
+
 ## `swarm` — ~10k-particle CPU flow swarm
 *Kinetic, dancey, physical.* Additive sprites, so density reads as glow.
 
@@ -61,6 +74,11 @@ life comes through the bindings. Draws **opaquely**, so `bg_*` has no visible ef
 | `hue` | `0.0` | `0 – 1` | gradient offset. |
 | `hue_spread` | `1.0` | `0.1 – 1.0` | width of the per-particle hue band. **`1.0` is full rainbow; drop it for a coherent cloud.** |
 | `hue_center` | `0.5` | `0 – 1` | centre of that band — two presets differing only here read as different colours. |
+
+Also declared: `field_freq` (the flow field's spatial frequency — higher is smaller, busier
+eddies), `twinkle`, `size_spread`, `reseed` (re-scatters on a crossing), and the shaped-mark params
+(`shape`, `points`, `star_*`) shared with the emitter — `presets/README.md`, "Swarm flow-field
+structure" and "Shaped marks".
 
 ## `parametric_curve` — line curves
 *Precise, geometric, hypnotic.* `[curve]` is optional; inside it `family` is required and names
@@ -95,8 +113,19 @@ from a copy here, which is how this section went stale in the first place. The r
 camera (ADR-0258), the same block and the same 0-nearest `focus` scale as `plexus` below. **No
 preset ships yet**: the ranges come from `docs/examples/curves/torus_knot.toml` and the golden
 fixtures, so treat them as a starting point and sweep. `mirror_order`, `mirror_reflect`, `spin` and
-`stroke_blend` are inert on both, so a slow clock on `yaw` is what turns the figure; the six camera
-params are inert on the flat families.
+`stroke_blend` are inert on both, so a slow clock on `yaw` is what turns the figure. The nine 3D
+params — `yaw pitch distance fov focus aperture fog solid hue_axis` — are inert on the flat
+families. On a space family, `fog` fades strokes toward black with depth, `solid = 1` paints near
+strokes over far ones (crossings stop brightening), and `hue_axis` moves the palette walk from the
+path (`0`) to depth (`1`).
+
+**A torus knot faces the camera at `pitch = 0`**, not from above: the torus's axis points down
+the view there, so a low pitch (`0.1`–`0.4`) shows the knot's `d`-fold star and a high one
+(`≥ 1`) collapses it into a side-on coil of stacked ellipses. On `torus_knot`, `n` is the number
+of turns around the axis and `d` the number through the hole, so `d` sets how many lobes the star
+shows (`n = 2, d = 5` is a cinquefoil). A strand that ends on screen under `solid = 1` is
+usually passing behind a nearer one, not a broken path. Measured on Cinquefoil's drafts,
+2026-10-05.
 
 | Param | Typical | Controls / natural driver |
 |-------|---------|---------------------------|
@@ -216,6 +245,13 @@ neighbouring `a`/`rho` values are neighbouring *figures*. Do **not** put `morph`
 easing an already-slow curve only lags it. Full table and the per-roster notes:
 [`presets/README.md`](../../../../presets/README.md).
 
+**Also declared, and worth knowing exist:** the depth set `perspective`, `focus`, `aperture`,
+`depth_fade`, `depth_hue` and `spin` (README, "Attractor depth"); the map shapers `curl`, `vigor`
+and `lean`; and `emergence`, the seconds the figure takes to settle out of its starting cloud. In
+`[particles]`, `density` sets how much of the tier's particle budget is drawn (ADR-0069 /
+ADR-0195; absent is the whole budget), and `morph_to` names a second **IFS** figure for `morph` to
+travel towards (ADR-0075). All in `presets/README.md`.
+
 ---
 
 ## `shape_field` — one silhouette at frame scale
@@ -275,7 +311,7 @@ honours the view transform, the geometry mirror (transformative on `bars`/
 **Per-element bindings.** A binding whose text names `index` is evaluated once per element, with
 `index` at that element's `0..1` position — so `thickness = "0.01 + bin(index) * 0.05"` thickens each
 element by its own band, and `base = "0.16 + index * 0.12"` gives the quiet top end a longer rest.
-Five params genuinely vary per element (`base` `scale` `thickness` `brightness` `hue`); the
+Six params genuinely vary per element (`base` `scale` `curve` `thickness` `brightness` `hue`); the
 whole-figure ones take the `index = 0` value rather than being dropped. `[smoothing]` cannot ease a
 per-element binding (a surfaced warning) — use `[spectrum] smoothing`, where an asymmetric
 `{ attack, release }` earns its keep more than almost anywhere else: the bands are the rawest signal
@@ -430,7 +466,8 @@ It has two modes, split by `color_source`, and they want opposite settings for a
   passed. When a band column reads dead, give that band a source lever.
 - **Every world starts with an empty field.** A two-second still shows the warm-up (Smoke's single
   finger, Sirocco's plume), not what runs on stage. The first horizon row is the fill, so read the
-  rows after it. All seven headers carry a horizon verdict; copy the shape.
+  rows after it. Most shipped `warp_*` headers carry a horizon verdict (`warp_sirocco.toml` is
+  one); copy the shape, and give every new world one.
 - **Write sharp features with `smoothstep`, not a comparison.** Interpolation between vertices is
   linear, so `rad > 0.5` renders as a polygon of the mesh. Shipped grids run 32x24 to 48x48, inside
   the Floor tier's 64x48 ceiling, so they render the same on every machine. A boil needs no more than
@@ -453,14 +490,14 @@ replaces it is the palette's:
 
 **Keep every element colour under the tonemap's knee: linear 0.6, which is sRGB byte `0xcb` in the
 hex you write.** ADR-0046's curve is the identity below it, so a fill leaves the post chain unshaded.
-Bloom's threshold sits above it, so the edges stay hard. All four shipped canvases obey it; reach
+Bloom's threshold sits above it, so the edges stay hard. Every shipped canvas obeys it; reach
 past it and the flat fill and the hard edge go together, silently. The paper is the one plateau
 allowed above the knee, and pure white is unreachable anyway (`f(1.0) = 0.800`), so it is always
 off-white or a dark ground (Nocturne's `#272930`).
 
 **The palette is eight plateaus, not a gradient.** A layout grammar gives each element one of eight
 band centres (`k/8 + 1/16`) and reserves the last for the ground. Stop pairs about 0.0002 apart are
-the hard transitions, and a smooth ramp would shade every element. All four shipped files pin
+the hard transitions, and a smooth ramp would shade every element. Every shipped canvas pins
 `paper = "0.9375"`, the eighth centre, as a raw coordinate that `color_span` and `palette_shift`
 cannot move. Weight the colours by repeating plateaus: Collage Mono gives five black slots to two
 red, so the red arrives as an event.
@@ -468,18 +505,18 @@ red, so the red arrives as an event.
 | Param | Typical | Controls / natural driver |
 |-------|---------|---------------------------|
 | `layout` | `0`, `1`, `2` | `0` is the authored fourteen-element canvas (Suprematist) and ignores the four rows below. `1` is anchor-and-satellites, where the picture has a subject (Nocturne). `2` is diagonal-axis, where it has a direction (On White, Collage Mono). **`3` (size-hierarchy) ships in no preset**, so there is no working range for it. |
-| `roster` | `0` or `1` | `1` is the Kandinsky vocabulary (bar, ring, segment, arc, checker, about one in four translucent) on top of the suprematist three. The two roster-1 canvases run 40 elements, and the two roster-0 ones run 14 and 17. |
-| `count` | `14 – 40` | **40 is the Floor tier's element cap** (`TierConfig::collage_elements`). A 41st element is dropped silently. Nocturne needed 40 because anchor-and-satellites leaves paper showing: at 26 it covered 0.169 of the frame, too little for any lever to register. |
+| `roster` | `0` or `1` | `1` is the Kandinsky vocabulary (bar, ring, segment, arc, checker, about one in four translucent) on top of the suprematist three. Roster 0 canvases run a fixed 14 – 17; On White (roster 1) runs only `5 + clamp(mid * 8, 0, 2)`, a few large forms that gain one or two on the mids. |
+| `count` | `5 – 40` | **40 is the Floor tier's element cap** (`TierConfig::collage_elements`). A 41st element is dropped silently. Nocturne needed 40 because anchor-and-satellites leaves paper showing: at 26 it covered 0.169 of the frame, too little for any lever to register. |
 | `size_hierarchy` | `0.62 – 0.82` | Higher makes the leading forms dominate. It is what makes an anchor an anchor (Nocturne 0.82). Forty elements need at least ~0.6, or the canvas reads as gravel. |
 | `angle_bias` | `-24`, or `-18 ± 6`, on diagonal; `14 ± 9` on anchor | Degrees. It wraps, so `sin(time * 0.04 – 0.05) * 6 – 9` gives a slow lean that never snaps. |
 | `density` | `0.72 – 0.78` base, +mid `0.15 – 0.28` | Elements fade in and out over about half a second, in stable birth order, so a rise only ever adds. Mid is the natural driver; Nocturne adds onset `+0.3`. Smoothed 0.3 – 0.35 s. A denser canvas should start higher and travel less. |
 | `scale` | `1.0` ± a `0.04 – 0.045` breath, +bass `0.08 – 0.2` | The whole canvas leans in. **Smooth it about 0.5 s**: at 0.15 the bass term reads as a zoom. |
 | `pan_x` / `pan_y` | amplitude `0.06 – 0.15` / `0.04 – 0.10` | Rate chooses the character. `0.07 – 0.11` rad/s is a print not quite square to the wall (Mono, Suprematist). `0.52 – 0.77` is where Nocturne and On White get their idle motion. Use incommensurate x and y rates so the path does not repeat. |
 | `drift` / `spin` | `0.55 – 1.3` +bass `0.4 – 0.8` / `0.3 – 0.7` +mid `0.3 – 0.5` | Multipliers on each element's own seeded travel and turn, so elements move against each other. They do not move the canvas as a whole; that is `pan_*`. Smoothed 0.6 s, or they stutter on each hit. Slower for a denser canvas. |
-| `recompose` / `recompose_blend` | a `[latch]` / `0.45 – 0.9` | Edge-triggered on the rise past 0.5, so a latch with `hold = 0` is the right source. Three of four ship one armed in a window of a clock cycle and fired by an onset: 24 s on a dark ground, 100 – 130 s on paper, onset threshold 0.6 – 0.75. On White's older `hash(beat_index) > 0.93` gate has no period at all (ADR-0109), which is why the other three moved off it. A composition must stay still long enough to be read, so a slow cycle calls for a long blend. |
+| `recompose` / `recompose_blend` | a `[latch]` / `0.45 – 0.9` | Edge-triggered on the rise past 0.5, so a latch with `hold = 0` is the right source. The latched canvases arm it in a window of a clock cycle and fire it on an onset: 24 s on a dark ground, 100 – 130 s on paper, onset threshold 0.6 – 0.75. On White's older `hash(beat_index) > 0.93` gate has no period at all (ADR-0109), which is why the others moved off it. A composition must stay still long enough to be read, so a slow cycle calls for a long blend. |
 | `pump_size` / `pump_alpha` | bass `0.12 – 0.15` or onset `0.3` / bass `0.2` or onset `0.35` | Per-element swells with a per-element phase, so the canvas never pulses as one sheet. Only the depth is authorable. `pump_alpha` pays off on roster 1, whose translucent elements' crossings breathe. Use attack 0.03 and release 0.45 when an onset drives it. |
 | `saturation` | `0.9 – 0.95` +treb `0.07 – 0.1` (Mono pins `1.0`) | **The treble goes on chroma, because there is no `brightness` param and nothing to blow out.** Rest the base under 1 so there is room to come up. |
-| `opacity` / `edge_softness` | `1` / `0` | All four sit there, and two pin it explicitly. The hard analytic edge is the look, not a quality knob. |
+| `opacity` / `edge_softness` | `1` / `0` | Every shipped canvas sits there, and Collage Mono pins it explicitly. The hard analytic edge is the look, not a quality knob. |
 
 **The family is onset-deaf by construction, and Nocturne is the fix.** A recompose that fires twice
 a set cannot show in a measurement, so Plan 0104 read onset at 0.000 on the first three canvases. To
@@ -511,7 +548,7 @@ or with `trap` by the orbit's closest approach to a circle, line, point or cross
 | `escape_radius` | `24 – 64` | Larger smooths the band spacing. The shipped files that set it use 24 – 64; the rest leave the default 16. |
 | `zoom` | `0.72 – 0.9` whole set; `1.85`; `3.6`; `~220` | Most frame the whole Julia set just under 1. Stained Glass sits at 1.85 and Parabolic Dust about 3.7x in on one spiral arm (with `pan_*` aimed at it). Seahorse is ~220x into the Mandelbrot map with pan at the valley and `pow(2.2, noise - 0.5)` breathing; f32 holds there. A mid nudge of ≤ `0.07 – 0.2` on zoom, eased 0.3 – 1.2 s. |
 | `color_span` | `0.46 – 0.55` glow; `0.9 – 1.8` trap; `4` panes | Low for a continuous boundary glow (Julia Circuit, Parabolic Dust, Two-Band Julia). Higher for trap distances. 4 on Stained Glass only because its useful distances all sit under 0.1. |
-| `brightness` | `1.0 – 1.4` | Constant in every escape-time preset: the music goes into `c`, the trap, or `iterations`, not into light (only `interior` takes a small onset lift). Five of the nine bloom at `0.3 – 0.4`, threshold `0.8 – 0.9`. |
+| `brightness` | `1.0 – 1.4` | Constant in every escape-time preset: the music goes into `c`, the trap, or `iterations`, not into light (only `interior` takes a small onset lift). About half of them bloom at `0.3 – 0.4`, threshold `0.8 – 0.9`. |
 
 **Palettes do the lighting.** A trap palette is bright only near distance 0 and near-black by
 0.3 – 0.6, so only the filaments light (Ring Orbit, Pearl String). The palette repeats
@@ -581,9 +618,13 @@ working range for that lever yet.
 ## `plexus` — a 3D proximity network through a camera with depth of field
 *Networks, meshes, constellations, data-viz plexus.* Family `plexus` (`plexus_*.toml`). Points in
 3D, joined by a line wherever two are closer than `link_distance`, seen through the shared
-perspective camera (ADR-0257). **No preset ships yet**: the ranges below come from the teaching
-presets in `docs/examples/plexus/` and the plan's renders, not from a curated set, so treat them as
-a starting point and sweep. The `[plexus]` table chooses `layout` (`cloud` — points drifting in a
+perspective camera (ADR-0257). Several presets ship (`ls presets/plexus_*.toml`), alongside the
+teaching presets in `docs/examples/plexus/`; the ranges below came from those teaching files and
+the plan's renders, so read the shipped headers for what was judged in motion. The shipped set
+leans hard on three levers the table below omits: `node_glow` (the dots' brightness relative to
+the lines, `0 – 4`), `distance` (camera range — nearer exaggerates perspective) and `fov` (the
+vertical field of view, which `zoom` divides); the camera's `fog` and `solid` work here as on the
+space curves. The `[plexus]` table chooses `layout` (`cloud` — points drifting in a
 cube two units across — or `sheet` — a rippled jittered grid), `points` and `seed`; it is in
 `docs/presets.md`.
 
@@ -608,10 +649,13 @@ same 0-nearest scale, and does nothing on the flat maps.
 (`waterfall_*.toml`). The band array `spectrum` draws, kept as history: every `row_period` seconds
 the current levels become a new row at the front, and older rows recede until the oldest leaves.
 Seen through the shared camera (ADR-0257), so `yaw`, `pitch`, `distance`, `fov`, `focus` and
-`aperture` behave as on `plexus`. **No preset ships yet**: the ranges come from
-`docs/examples/waterfall/landscape.toml`, the golden fixture and the plan's cost probes, so treat
-them as a starting point and sweep. The `[waterfall]` table (`elements`, `rows`, `row_period`,
-`smoothing`) is in `docs/presets.md`.
+`aperture` behave as on `plexus`. `waterfall_ridgeline` is the shipped reference: solid white
+rows seen front-on and low (`pitch` about `0.2`, `yaw` `0`) read as terrain, and `curve` a little
+above 1 keeps the quiet bands flat so the peaks stand up. The other ranges come from
+`docs/examples/waterfall/landscape.toml` and the golden fixture, so sweep from there. The `[waterfall]` table (`elements`, `rows`, `row_period`,
+`smoothing`) is in `docs/presets.md`. Also declared: `curve` (an exponent on each band's level —
+below 1 lifts quiet detail), `glow`, `hue_spread` (lowest band to highest), and the camera's `fog`
+and `solid`; `docs/examples/waterfall/landscape_solid.toml` shows the latter.
 
 | Param | Typical | Controls / natural driver |
 |-------|---------|---------------------------|
@@ -637,18 +681,22 @@ them as a starting point and sweep. The `[waterfall]` table (`elements`, `rows`,
 | `bg_angle` / `bg_hue_span` | `0` / `0` | **the directional ramp** (Plan 0080/ADR-0094): the backdrop paints a *segment* of your `[palette]` along one axis instead of one point of it. `bg_angle` is **radians**, `0` = bottom-to-top; `bg_hue_span` is how far the coordinate travels, `bg_hue` being the coordinate at the ramp's **start**. Placement is your stops' own `at` positions — there is no `bg_ramp_center`. The segment **wraps** if it leaves `[0, 1]`. |
 | `bg_shade` / `bg_shade_end` | `0.72` / `1.0` | the brightness ramp's two ends, on that same axis. These two numbers **are** the fixed `0.72 -> 1.0` upward tilt the pass used to hardcode, so leaving them alone changes nothing — but a backdrop can now be brighter at the **bottom**, which it never could be. |
 | `bg_ramp_gamma` | `1.0` | the ramp's **response exponent**, applied to the *position* ahead of both channels so colour and brightness reach their midpoints at the same height. `> 1` holds the ramp near its start then falls away (a hot horizon band, then a long fade); `< 1` drops fast into a dim tail. Clamped `0.05 .. 20`. It is the only shape control the brightness ramp has, and the only one that shapes the sky *without* re-mapping the figure — the `[palette]` is shared. |
+| `bg_coord_mode` / `bg_center_x` / `bg_center_y` | `0` / `0` / `0` | how the ramp is measured: `0` straight across the frame, `1` around a point, turning its bands into a fan converging on (`bg_center_x`, `bg_center_y`). The centre does nothing at mode `0`. |
 | `bg_band_amount` | `0.0` | **the curved band** (Plan 0081/ADR-0095): one soft gaussian swell of light drawn *additively over the ground and under the scene*, for a Milky Way arc over a horizon. `0` draws no band and leaves the six below inert. **This alone lights the pass** — a band over a `bg_bright = 0` sky paints, which is the near-black sky the look actually wants. Hidden by an opaque scene exactly as the ramp is; **absent** behind `fragment_field`. |
 | `bg_band_angle` / `bg_band_pos` | `0` / `0.5` | `bg_band_angle` is **radians** naming the direction **across** the band — same convention as `bg_angle`, so `0` runs the band *horizontally* and the band itself is perpendicular to the number you write. `bg_band_pos` is the centreline's position along that across-axis, in the same normalized `0..1` the ramp uses. |
 | `bg_band_width` | `0.15` | the **`1/e` half-width**, not a full width and not an edge: the envelope has fallen to ~37 % exactly this far either side of the centreline and is still faintly visible for two or three times that, so the **visible band is several times wider than the number**. Clamped `0.001 .. 100`. |
 | `bg_band_curve` | `0.0` | the **arc** — how far the centreline bows, in across-axis units, at the middle of the band. `0` is exactly straight. This is the silhouette that reads as a galaxy rather than a streak; move `bg_band_pos` to ride the arc up or down the frame and raise this to bow it further. |
 | `bg_band_hue` / `bg_band_hue_span` | `0` / `0` | the band's **own** segment of the same `[palette]`, swept **along** the band so one end can brighten toward a core. `bg_band_hue` is an **absolute** coordinate, not an offset from the ground's, so the arc keeps its colour whatever the ramp underneath is doing. Repeat-addressed, so a span leaving `[0, 1]` wraps. **One palette now serves the ground, the band, the figure and the `[layer]`** — a dusk gradient fully spent on a horizon has no stops left for a pale arc, and that is the one real authoring constraint here. |
 | `trails` | `0` | per-frame decay; `0` off, higher = longer. Needs real motion to read. |
-| `kaleido_order` / `kaleido_angle` | `1` / `0` | `< 2` is passthrough. **The order is rounded to a whole number** (a fractional wedge count tears the frame), so it snaps at each half-integer even when smoothed — ride `kaleido_angle` on `time` for continuous motion. |
+| `fb_zoom` / `fb_rotate` / `fb_dx` / `fb_dy` / `fb_center_x` / `fb_center_y` / `fb_warp` | `1` / `0` / `0` / `0` / `0.5` / `0.5` / `0` | the **feedback transform**: per second, the accumulation is scaled, turned, drifted and swirled about the feedback centre, so a trail tunnels or curls instead of fading in place. Inert at `trails = 0`. |
+| `kaleido_order` / `kaleido_angle` | `1` / `0` | `< 2` is passthrough. **The order is rounded to a whole number** (a fractional wedge count tears the frame), so it snaps at each half-integer even when smoothed. **Never rotate `kaleido_angle`** (a standing owner rule): set it once and put the motion in what the fold reflects. |
+| `kaleido_tile` / `kaleido_spiral` / `kaleido_radial` / `kaleido_zoom` / `kaleido_edge` / `kaleido_inner` | `1` / `0` / `1` / `0` / `1` / `0.06` | the rest of the symmetry stage: repeat the source before folding, twist the wedges into a spiral, scale and shift the sampled radius, soften the seams, and keep an untouched centre disc. Semantics in `presets/README.md`'s `kaleidoscope` table. |
 | `kaleido_center_x` / `kaleido_center_y` | `0.5` / `0.5` | the fold axis, in uv; clamped into the frame. The fold shows the largest disc around that axis and fades out past it onto the backdrop. |
 | `bloom_amount` / `bloom_threshold` / `bloom_radius` | `0` / `1.0` / `1.0` | `0` amount is off and free. The threshold is in **linear light**, so the default blooms exactly what the display could not have shown. The radius spreads the same energy wider rather than adding more (`0..4`). |
+| `occlude` | `1` | how much of the backdrop the scene's own coverage hides; `0` lets the `bg_*` sky through everywhere. |
 | `exposure` | `1.0` | linear multiplier on the whole frame before the engine tonemap. Crossfades across a preset switch like `ink_*` does. |
-| `mirror_order` / `mirror_reflect` | `1` / `0` | **line scenes only**; folds geometry (before the segment cap), not pixels. |
-| `ink_amount` | `0` | `1` = black-on-white; `paper_*`/`ink_*` make it any duotone. Collapses the palette to two colours. **Not a contrast control** — a partial value is a transition, not a resting place. |
+| `mirror_order` / `mirror_reflect` | `1` / `0` | `parametric_curve` (flat families), `lsystem`, `star_pattern` and `spectrum` only; folds geometry (before the segment cap), not pixels. |
+| `ink_amount` | `0` | `1` = black-on-white; `paper_hue`/`_sat`/`_bright` and `ink_hue`/`_sat`/`_bright` make it any duotone. Collapses the palette to two colours. **Not a contrast control** — a partial value is a transition, not a resting place. |
 | `ink_gamma` | `1` | the **response** between the two poles (Plan 0078). Above `1` thins the mids toward paper so only the strong strokes keep full ink; below `1` inks them for a heavier print. Neither pole moves at any value. This is the lever for "the ink should bite harder" — `exposure` (upstream) and `ink_amount` (how much remap) are the other two, and they are not interchangeable. |
 
 Details and the exact semantics: `presets/README.md`.

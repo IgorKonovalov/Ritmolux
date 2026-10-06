@@ -1,8 +1,8 @@
 # ADR-0263 — A 3D stroke may be solid by a back-to-front sort, and the depth cues ride the shared camera
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-05, at Plan 0248's close
 > **Date:** 2026-10-05
-> **Related plan(s):** [0248](../plans/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md)
+> **Related plan(s):** [0248](../plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md)
 > **Relates to:** [ADR-0257](0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md)
 > (the camera and the `seg3d` stroke this extends),
 > [ADR-0258](0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md)

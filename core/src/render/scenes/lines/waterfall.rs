@@ -34,6 +34,16 @@
 //! `hue` places the lowest band and `hue_spread` says how far the palette
 //! travels to the highest. Age dims a row by `fade`: the farthest row keeps
 //! `1 - fade` of the front edge's light.
+//!
+//! # Solid
+//!
+//! When the camera block's `solid` is on, every row segment also lays a
+//! **skirt** under itself: a black band down to the ground plane, drawn through
+//! the same `seg3d` pipeline and sorted with its row by where the row stands,
+//! so a near row hides what lies behind it — hidden-line removal for a
+//! ridgeline (ADR-0263). A skirted row costs twice the segments, and the rows
+//! drawn are held to that cost each solid frame, announced as the load-time
+//! row clamp is.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; `render/` scan set).
 // `update` and `render` run every displayed frame.
@@ -45,7 +55,7 @@
     clippy::unreachable
 )]
 
-use super::renderer::{LineRenderer, Segment3dInstance};
+use super::renderer::{LineRenderer, Segment3dInstance, joined_chord};
 use super::spectrum::{CURVE_MAX, CURVE_MIN, downsample, shape_and_ease};
 use super::{CapOverflow, ColorRamp, GeneratorConfig, OverflowContext};
 use crate::dsp::AnalysisFrame;
@@ -95,6 +105,10 @@ const FRONT_Z: f32 = 1.0;
 
 /// The world half-width of a row: the frequency axis spans `x` in `[-1, 1]`.
 const HALF_WIDTH: f32 = 1.0;
+
+/// The world y of the ground the rows stand on: a band at level `0` lies on
+/// it, and a solid row's skirts reach down to it (ADR-0263).
+const GROUND_Y: f32 = 0.0;
 
 /// The stroke profile every row is drawn with: a solid core over the inner half
 /// and a ramp across the outer (ADR-0124), as on the plexus.
@@ -211,6 +225,8 @@ pub const PARAMS: &[ParamSpec] = &[
     camera::FOV,
     camera::FOCUS,
     camera::APERTURE,
+    camera::FOG,
+    camera::SOLID,
     crate::render::scenes::common::zoom(1.0),
     crate::render::scenes::common::PAN_X,
     crate::render::scenes::common::PAN_Y,
@@ -343,6 +359,11 @@ impl Landscape {
     pub(crate) fn capacity(&self) -> usize {
         self.capacity
     }
+
+    /// Bands across a row.
+    pub(crate) fn elements(&self) -> usize {
+        self.elements
+    }
 }
 
 /// The waterfall scene: the landscape's rows and the `seg3d` renderer they are
@@ -421,7 +442,7 @@ impl WaterfallScene {
     /// `seg3d` buffer can draw, and return that clamp when it bit. Off the hot
     /// path: preset load only.
     fn resize(&mut self, config: &WaterfallConfig) -> Option<CapOverflow> {
-        let (rows, overflow) = rows_clamp(config.rows, config.elements, self.seg3d_cap);
+        let (rows, overflow) = rows_clamp(config.rows, config.elements, self.seg3d_cap, false);
         self.landscape
             .resize(config.elements, rows, config.row_period, config.easing);
         overflow
@@ -441,10 +462,17 @@ impl WaterfallScene {
 }
 
 /// `rows` held to the most whole rows of `elements` bands a buffer of `cap`
-/// segments draws — a row is `elements - 1` segments — and the overflow to
-/// announce when the cap bit (ADR-0045), its `dropped` counted in segments.
-pub(crate) fn rows_clamp(rows: u32, elements: usize, cap: usize) -> (usize, Option<CapOverflow>) {
-    let per_row = elements.saturating_sub(1).max(1);
+/// segments draws — a row is `elements - 1` segments, and twice that when
+/// `skirted`, since a solid row lays a skirt under each segment (ADR-0263) —
+/// and the overflow to announce when the cap bit (ADR-0045), its `dropped`
+/// counted in segments.
+pub(crate) fn rows_clamp(
+    rows: u32,
+    elements: usize,
+    cap: usize,
+    skirted: bool,
+) -> (usize, Option<CapOverflow>) {
+    let per_row = elements.saturating_sub(1).max(1) * if skirted { 2 } else { 1 };
     let fits = cap / per_row;
     let asked = rows as usize;
     if asked <= fits {
@@ -556,7 +584,21 @@ impl Scene for WaterfallScene {
             geometry.radius(),
             self.max_coc,
         );
-        self.clamp = frame.blur;
+        // A solid row costs its skirts too, so the rows the ring holds are held
+        // again to what the buffer draws at twice the cost, nearest first, and
+        // that clamp is announced ahead of the blur's (ADR-0263).
+        let held = self.landscape.capacity() + 1;
+        let (row_budget, row_clamp) = if frame.solid {
+            rows_clamp(
+                u32::try_from(held).unwrap_or(u32::MAX),
+                self.landscape.elements(),
+                self.seg3d_cap,
+                true,
+            )
+        } else {
+            (held, None)
+        };
+        self.clamp = row_clamp.or(frame.blur);
         let width = if self.line_width.is_finite() {
             self.line_width.max(0.0)
         } else {
@@ -584,7 +626,7 @@ impl Scene for WaterfallScene {
                 Some((k as f32 + frac, alpha, row))
             }),
         );
-        for (depth, alpha, row) in rows {
+        for (depth, alpha, row) in rows.take(row_budget) {
             if alpha <= 0.0 {
                 continue;
             }
@@ -592,29 +634,62 @@ impl Scene for WaterfallScene {
             let z = geometry.z(depth);
             let n = row.len();
             let span = n.saturating_sub(1).max(1) as f32;
+            // A row is one open polyline (ADR-0263): each segment joins its
+            // neighbours across the row, and the two outer bands are free.
+            let point = |j: usize| row.get(j).map(|&l| [geometry.x(j, n), geometry.y(l), z]);
+            let foot = |p: [f32; 3]| [p[0], GROUND_Y, p[2]];
             for (i, pair) in row.windows(2).enumerate() {
                 let (Some(&l0), Some(&l1)) = (pair.first(), pair.get(1)) else {
                     continue;
                 };
                 let pa = [geometry.x(i, n), geometry.y(l0), z];
                 let pb = [geometry.x(i + 1, n), geometry.y(l1), z];
-                let Some((a, b)) = frame.view.clip_near(pa, pb) else {
+                let before = i.checked_sub(1).and_then(point);
+                let Some([prev, a, b, next]) =
+                    joined_chord(&frame.view, before, pa, pb, point(i + 2))
+                else {
                     continue;
                 };
-                if frame.view.outside(a, b, frame.margin) {
+                let line_in = !frame.view.outside(a, b, frame.margin);
+                // A skirt reaches the ground, so it can be on screen while
+                // its line is above the frame; a foot behind the near plane
+                // is kept rather than projected.
+                let skirt_in = frame.solid && {
+                    let (fa, fb) = (foot(a), foot(b));
+                    let in_front = frame.view.depth(fa).min(frame.view.depth(fb)) >= camera::NEAR;
+                    line_in || !in_front || !frame.view.outside(fa, fb, frame.margin)
+                };
+                if !line_in && !skirt_in {
                     continue;
                 }
-                if instances.len() >= self.seg3d_cap {
+                if instances.len() + usize::from(line_in) + usize::from(skirt_in) > self.seg3d_cap {
                     break;
                 }
-                let [r, g, bl] = ramp.at(&self.palette, (i as f32 + 0.5) / span);
-                instances.push(Segment3dInstance {
-                    a,
-                    b,
-                    color: [r * light, g * light, bl * light],
-                    width,
-                    alpha,
-                });
+                if skirt_in {
+                    instances.push(Segment3dInstance {
+                        a,
+                        b,
+                        color: [0.0; 3],
+                        width,
+                        alpha,
+                        prev: a,
+                        next: b,
+                        skirt: 1.0,
+                    });
+                }
+                if line_in {
+                    let [r, g, bl] = ramp.at(&self.palette, (i as f32 + 0.5) / span);
+                    instances.push(Segment3dInstance {
+                        a,
+                        b,
+                        color: [r * light, g * light, bl * light],
+                        width,
+                        alpha,
+                        prev,
+                        next,
+                        skirt: 0.0,
+                    });
+                }
             }
         }
         let glow = if self.glow.is_finite() {
@@ -622,14 +697,10 @@ impl Scene for WaterfallScene {
         } else {
             DEFAULT_GLOW
         };
-        self.lines.draw_3d(
-            queue,
-            encoder,
-            view,
-            &frame.uniform,
-            glow,
-            SOFTNESS,
-            &instances,
+        // The rows stand on the ground plane: a solid frame orders them by
+        // their feet and fills each skirt down to it.
+        self.lines.draw_3d_terrain(
+            queue, encoder, view, &frame, glow, SOFTNESS, GROUND_Y, &instances,
         );
         self.instances = instances;
     }
@@ -801,8 +872,12 @@ mod tests {
     /// announced with what was asked, in the buffer's own unit.
     #[test]
     fn rows_are_held_to_whole_rows_of_the_buffer() {
-        assert_eq!(rows_clamp(126, 64, 8000), (126, None), "exactly at the cap");
-        let (rows, overflow) = rows_clamp(200, 64, 8000);
+        assert_eq!(
+            rows_clamp(126, 64, 8000, false),
+            (126, None),
+            "exactly at the cap"
+        );
+        let (rows, overflow) = rows_clamp(200, 64, 8000, false);
         assert_eq!(rows, 126, "8000 segments hold 126 rows of 63");
         let overflow = overflow.unwrap_or_else(|| panic!("a clamp that bit is announced"));
         assert_eq!(overflow.context, OverflowContext::Rows(200, 63));
@@ -813,6 +888,26 @@ mod tests {
             text.contains("rows 200") && text.contains("keeps 126 rows"),
             "{text}"
         );
+    }
+
+    /// **A solid row costs its skirts** (ADR-0263): the same rows that fit a
+    /// buffer as lines alone are held to half as many once each segment
+    /// carries a skirt, and the clamp says so in the same words, counting
+    /// a row at its skirted cost.
+    #[test]
+    fn a_skirted_row_costs_twice_its_segments() {
+        assert_eq!(
+            rows_clamp(63, 64, 8000, true),
+            (63, None),
+            "63 skirted rows of 126 fit"
+        );
+        let (rows, overflow) = rows_clamp(126, 64, 8000, true);
+        assert_eq!(rows, 63, "8000 segments hold 63 skirted rows of 63 bands");
+        let overflow = overflow.unwrap_or_else(|| panic!("a clamp that bit is announced"));
+        assert_eq!(overflow.context, OverflowContext::Rows(126, 126));
+        assert_eq!(overflow.dropped, 63 * 126);
+        let text = overflow.to_string();
+        assert!(text.contains("keeps 63 rows"), "{text}");
     }
 
     /// **The same seed and analysis frames give the same ring after 600

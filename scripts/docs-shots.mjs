@@ -333,6 +333,9 @@ const CARDS = [
   "warp_sirocco",
   "warp_smoke",
   "warp_tracery",
+  // waterfall (2)
+  "waterfall_ridgeline",
+  "waterfall_tidepool",
 ];
 
 const IMAGES = [
@@ -407,6 +410,16 @@ const IMAGES = [
   {
     out: "docs/images/curves/torus_knot.png",
     presetFile: "docs/examples/curves/torus_knot.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  // The same trefoil drawn solid and fogged, coloured by depth: the guide's
+  // one picture of the camera block's depth cues.
+  {
+    out: "docs/images/curves/torus_knot_solid.png",
+    presetFile: "docs/examples/curves/torus_knot_solid.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",

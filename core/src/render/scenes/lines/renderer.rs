@@ -242,7 +242,7 @@ pub struct ArcInstance {
 /// and an alpha.
 ///
 /// Drawn by the `seg3d` pipeline, which [`LineRenderer::new_3d`] builds and
-/// [`LineRenderer::draw_3d`] selects — a separate pipeline and instance buffer
+/// `LineRenderer::draw_3d` selects — a separate pipeline and instance buffer
 /// rather than a branch in the 2D one, so every 2D line scene keeps its bytes.
 ///
 /// **Field order is shader-location order**, for the reason
@@ -264,6 +264,57 @@ pub struct Segment3dInstance {
     /// multiplied by this, so a fading edge fades out of the frame rather than
     /// into a dark line.
     pub alpha: f32,
+    /// The polyline's point before [`a`](Self::a), or `a` itself where `a` is
+    /// a free end. A joined end is mitred in screen space against the
+    /// direction it arrives from, so two neighbours meet on one line instead
+    /// of overlapping (ADR-0263); a free end draws flat, as an unjoined stroke
+    /// always did.
+    ///
+    /// **Bit-equal to the neighbour's own `a`**, or the two quads compute the
+    /// shared corner from different numbers and leave a seam:
+    /// `joined_chord` is what makes it so, near-plane clip included.
+    pub prev: [f32; 3],
+    /// The polyline's point after [`b`](Self::b), or `b` itself where `b` is a
+    /// free end. The `b`-end counterpart of [`prev`](Self::prev).
+    pub next: [f32; 3],
+    /// `1.0` on a **skirt**: not a stroke but a filled band from `a -> b` down
+    /// to the ground plane the draw names
+    /// (`LineRenderer::draw_3d_terrain`), at full coverage times
+    /// [`alpha`](Self::alpha) in [`color`](Self::color). A solid waterfall
+    /// row lays one under each of its segments, so a near row hides what lies
+    /// behind it (ADR-0263). `0.0` on every stroke.
+    pub skirt: f32,
+}
+
+/// The chord `pa -> pb` of a polyline, clipped against `view`'s near plane, as
+/// `[prev, a, b, next]` for a [`Segment3dInstance`] — or `None` when the whole
+/// chord lies behind the plane.
+///
+/// `before` is the point ahead of `pa` and `after` the point past `pb`, `None`
+/// at an open polyline's ends. A neighbour that reaches behind the plane is
+/// taken where its own chord meets the plane, which is **exactly the point**
+/// that chord's own [`CameraView::clip_near`] cuts to — the same arguments in
+/// the same order — so the two quads still share their corner bit for bit. An
+/// end that was itself cut has no neighbour on screen and is left free.
+///
+/// [`CameraView::clip_near`]: crate::render::camera::CameraView::clip_near
+pub(crate) fn joined_chord(
+    view: &crate::render::camera::CameraView,
+    before: Option<[f32; 3]>,
+    pa: [f32; 3],
+    pb: [f32; 3],
+    after: Option<[f32; 3]>,
+) -> Option<[[f32; 3]; 4]> {
+    let (a, b) = view.clip_near(pa, pb)?;
+    let prev = match before {
+        Some(p) if a == pa => view.clip_near(p, pa).map_or(a, |(cut, _)| cut),
+        _ => a,
+    };
+    let next = match after {
+        Some(n) if b == pb => view.clip_near(pb, n).map_or(b, |(_, cut)| cut),
+        _ => b,
+    };
+    Some([prev, a, b, next])
 }
 
 /// **Which space the stroke is measured in** (ADR-0160) — the half-width, the
@@ -693,12 +744,20 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// The profile is prepended here for the reason [`arc_shader_source`] gives: a
 /// 3D stroke and a 2D one fall off across their width by one definition.
 ///
+/// [`MITER_LIMIT`] is written into it from the one Rust constant, so a 3D
+/// joint and a 2D one fall back to the bevel at the same corner, and
+/// [`NEAR`](crate::render::camera::NEAR) likewise, so a skirt's foot is held to
+/// the plane the CPU clips at.
+///
 /// Runs once per [`LineRenderer::new_3d`] (pipeline build, not the hot path).
 pub(crate) fn seg3d_shader_source() -> String {
     format!(
         "{PROFILE_WGSL}
+const MITER_LIMIT: f32 = {MITER_LIMIT:?};
+const NEAR_DEPTH: f32 = {:?};
 {}
 {SEG3D_SHADER}",
+        crate::render::camera::NEAR,
         crate::render::camera::CAMERA_WGSL
     )
 }
@@ -750,13 +809,29 @@ pub(crate) fn seg3d_shader_source() -> String {
 /// A sharp stroke skips both the factor and the exact coordinate on a flat
 /// flag, so an aperture of `0` draws the bytes a pinhole camera drew.
 ///
+/// # Joins (ADR-0263)
+///
+/// An end whose [`Segment3dInstance::prev`] or [`next`](Segment3dInstance::next)
+/// names a neighbour is mitred in pixel space: its two corners move onto the
+/// line bisecting the turn, where the neighbour's corners also lie, so two
+/// blurred neighbours abut instead of summing their overlap into a ridge. A
+/// corner sharper than [`MITER_LIMIT`] stays flat, as in 2D.
+///
+/// # Fog (ADR-0263)
+///
+/// Each end's light is scaled by `fog_light()` at its own depth, `1 - fog * d`
+/// with `d` its place across the volume, and the factor is interpolated along
+/// the quad. Coverage is untouched, so a fogged stroke darkens rather than
+/// thins.
+///
 /// The position leaves the vertex shader already divided (`w = 1`). The quad is
 /// a screen-space shape, and interpolating its varyings perspective-correctly
 /// against the endpoints' depths would bend the across-the-stroke coordinate.
 const SEG3D_SHADER: &str = r#"
 struct Stroke {
-    // x: glow multiplier, y: softness (ADR-0124), zw: unused. The vertex
-    // stage reads the softness too, to widen it toward a blurred end.
+    // x: glow multiplier, y: softness (ADR-0124), z: fog (ADR-0263), w: the
+    // world y of the ground plane a skirt reaches down to. The vertex stage
+    // reads the softness too, to widen it toward a blurred end.
     v: vec4<f32>,
 }
 
@@ -779,6 +854,8 @@ struct Seg3dOut {
     // 1 when either end is blurred, 0 otherwise. Flat, so a sharp stroke reads
     // the uniform softness itself rather than an interpolation of copies of it.
     @location(4) @interpolate(flat) blurred: f32,
+    // 1 on a skirt, which fills at full coverage rather than stroking.
+    @location(8) @interpolate(flat) skirt: f32,
 }
 
 // The profile's integral across a unit half-width at softness `s`.
@@ -789,6 +866,40 @@ fn profile_mass(s: f32) -> f32 {
 // Half a pixel: the narrowest half-width a stroke is rasterized at.
 const MIN_HALF_PX: f32 = 0.5;
 
+// The mitred corner offset at `v`, where the polyline arrives from `p0` and
+// leaves for `p1`, for a half-width `hw` - all in pixels. `xy` is the offset of
+// the corner on the left side (`side = +1`), and `z` is 1 when the end is
+// joined, 0 when it is free: a neighbour that coincides with `v` on screen,
+// or a corner sharper than MITER_LIMIT, which draws flat as the bevel
+// fallback does in 2D (ADR-0158).
+//
+// Both quads that share `v` call this with the same three points, in the same
+// roles, so they compute the same corner bit for bit and abut on the mitre
+// line with no pixel covered twice and none missed.
+//
+// The left normal of each arm, summed, is the mitre direction; its corner
+// lies `hw / cos(turn / 2)` along it, and `cos(turn / 2)` is
+// `sqrt((1 + d_in . d_out) / 2)` - the expression `miter_extension_between`
+// takes, with no trigonometry.
+fn mitre_offset(p0: vec2<f32>, v: vec2<f32>, p1: vec2<f32>, hw: f32) -> vec3<f32> {
+    let arm_in = v - p0;
+    let arm_out = p1 - v;
+    let len_in = length(arm_in);
+    let len_out = length(arm_out);
+    if (len_in <= 1e-6 || len_out <= 1e-6) {
+        return vec3<f32>(0.0, 0.0, 0.0);
+    }
+    let d_in = arm_in / len_in;
+    let d_out = arm_out / len_out;
+    let cos_half = sqrt(max((1.0 + dot(d_in, d_out)) * 0.5, 0.0));
+    if (cos_half <= 1.0 / MITER_LIMIT) {
+        return vec3<f32>(0.0, 0.0, 0.0);
+    }
+    let bisector = vec2<f32>(-d_in.y, d_in.x) + vec2<f32>(-d_out.y, d_out.x);
+    let m = bisector / length(bisector);
+    return vec3<f32>(m * (hw / cos_half), 1.0);
+}
+
 @vertex
 fn vs_main(
     @builtin(vertex_index) vi: u32,
@@ -797,6 +908,9 @@ fn vs_main(
     @location(2) color: vec3<f32>,
     @location(3) width: f32,
     @location(4) alpha: f32,
+    @location(5) prev: vec3<f32>,
+    @location(6) next: vec3<f32>,
+    @location(7) skirt: f32,
 ) -> Seg3dOut {
     // (along, side): along runs a->b, side spans -1..1 across the width.
     var corners = array<vec2<f32>, 6>(
@@ -836,17 +950,54 @@ fn vs_main(
         dir = vec2<f32>(1.0, 0.0);
     }
     let nrm = vec2<f32>(-dir.y, dir.x);
-    let p = mix(sa, sb, c.x) + nrm * c.y * hw;
+    var p = mix(sa, sb, c.x) + nrm * c.y * hw;
+
+    // The join (ADR-0263). This corner's end, its neighbour on the far side
+    // and the half-width there are picked with `select` rather than `mix`:
+    // `mix(x, y, 1.0)` need not be `y` to the bit, and the neighbouring quad
+    // reads the same end as its `a`, where it is. A free end keeps the flat
+    // corner above untouched, so a stroke with no neighbours draws the bytes
+    // it drew before joins existed.
+    let at_b = c.x > 0.5;
+    let joint = select(sa, sb, at_b);
+    let before = select(clip_to_px(cam, project(cam, prev)), sa, at_b);
+    let after = select(sb, clip_to_px(cam, project(cam, next)), at_b);
+    let hw_joint = max(select(wide_a, wide_b, at_b), MIN_HALF_PX);
+    let mitre = mitre_offset(before, joint, after, hw_joint);
+    let joined = mitre.z > 0.5;
+    if (joined) {
+        p = joint + mitre.xy * c.y;
+    }
+
+    // Fog (ADR-0263), per end and interpolated along the quad. It scales the
+    // light and never the coverage, and at fog 0 it is exactly 1.
+    let fogged = fog_light(cam, stroke.v.z, select(ca.w, cb.w, at_b));
+
+    // A skirt (ADR-0263) is the band under this end: its `side = +1` corners
+    // on the segment, its `side = -1` corners straight below on the ground
+    // plane, each projected on its own. No width, no join and no blur reach
+    // it; the fragment fills it.
+    let is_skirt = skirt > 0.5;
+    if (is_skirt) {
+        let top = select(a, b, at_b);
+        let foot = vec3<f32>(top.x, stroke.v.w, top.z);
+        let corner = project(cam, select(foot, top, c.y > 0.0));
+        p = clip_to_px(cam, vec4<f32>(corner.xyz, max(corner.w, NEAR_DEPTH)));
+    }
 
     var out: Seg3dOut;
     out.pos = vec4<f32>(px_to_ndc(cam, p), 0.0, 1.0);
+    out.skirt = select(0.0, 1.0, is_skirt);
     out.side = c.y;
-    out.color = color * (hw_true / hw);
+    out.color = color * (hw_true / hw) * fogged;
     out.alpha = alpha;
     out.soft = mix(soft_a, soft_b, c.x);
     out.sharp_hw = mix(hw_a, hw_b, c.x);
     out.wide_hw = hw_true;
-    out.offset = c.y * hw;
+    // A mitred corner lies `hw_joint` from the centreline across the stroke,
+    // wherever the mitre has slid it along, so the offset stays the true
+    // across-the-stroke distance.
+    out.offset = c.y * select(hw, hw_joint, joined);
     out.blurred = select(0.0, 1.0, max(coc_a, coc_b) > 0.0);
     return out;
 }
@@ -868,11 +1019,16 @@ fn fs_main(in: Seg3dOut) -> @location(0) vec4<f32> {
         blurred && spread > 0.0,
     );
     // Premultiplied (ADR-0056): the glow scales the light, not the coverage.
-    return vec4<f32>(in.color * g * stroke.v.x * keep, g);
+    // A skirt covers its whole band at its alpha; it is chosen after the
+    // stroke is computed rather than branched to, because `fwidth` above must
+    // stay in uniform control flow.
+    let lit = vec4<f32>(in.color * g * stroke.v.x * keep, g);
+    let fill = vec4<f32>(in.color * stroke.v.x * in.alpha, in.alpha);
+    return select(lit, fill, in.skirt > 0.5);
 }
 "#;
 
-/// The `seg3d` stroke uniform: `[glow, softness, unused, unused]`.
+/// The `seg3d` stroke uniform: `[glow, softness, fog, ground y]`.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Stroke3dUniform {
@@ -883,11 +1039,85 @@ struct Stroke3dUniform {
 /// [`LineRenderer::new_3d`].
 struct Seg3d {
     pipeline: wgpu::RenderPipeline,
+    /// The same pipeline composited **over** rather than added, for a solid
+    /// frame (ADR-0263). Built with the additive one rather than on the first
+    /// solid frame: a resource created mid-run moves what later passes
+    /// resolve to on the WARP software adapter the goldens capture on.
+    over_pipeline: wgpu::RenderPipeline,
     instances: wgpu::Buffer,
     camera: wgpu::Buffer,
     stroke: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     capacity: usize,
+    /// A solid frame's sort keys, `(depth, index)`, preallocated to
+    /// `capacity` so the sort allocates nothing.
+    keys: Vec<(f32, u32)>,
+    /// A solid frame's segments in draw order, far to near, preallocated to
+    /// `capacity`.
+    sorted: Vec<Segment3dInstance>,
+}
+
+/// `segments` in **far-to-near** order into `out`, by the camera depth of each
+/// segment's midpoint under `view` — the painter's order a solid frame draws
+/// in (ADR-0263), so a nearer stroke composites over a farther one.
+///
+/// **The order is a function of the set, not of the order it arrived in.**
+/// Two segments at one depth are ordered by their own bytes, which is a total
+/// order on the instance, so a system that emits the same segments in another
+/// order draws the same frame.
+///
+/// **Allocation-free** while `segments` fits the capacity `keys` and `out`
+/// were reserved to: both are cleared and refilled, and `sort_unstable_by`
+/// sorts in place.
+pub(crate) fn sort_far_to_near(
+    view: &crate::render::camera::CameraView,
+    segments: &[Segment3dInstance],
+    keys: &mut Vec<(f32, u32)>,
+    out: &mut Vec<Segment3dInstance>,
+) {
+    sort_painter(view, segments, None, keys, out);
+}
+
+/// [`sort_far_to_near`], with the depth each segment sorts by taken at its
+/// midpoint's **foot** on the plane `y = ground` when one is named.
+///
+/// A heightfield's rows are what occlude one another, not its peaks: keyed at
+/// the midpoint itself, a tall peak several rows back sorts nearer than a low
+/// row in front of it, because raising a point toward a camera that looks down
+/// shortens its depth. Keyed at the foot, every segment of one row sorts by
+/// where the row stands.
+///
+/// At one key, a skirt sorts **before** the stroke it lies under, so the
+/// stroke is drawn over its own band; past that the instance bytes break the
+/// tie.
+pub(crate) fn sort_painter(
+    view: &crate::render::camera::CameraView,
+    segments: &[Segment3dInstance],
+    ground: Option<f32>,
+    keys: &mut Vec<(f32, u32)>,
+    out: &mut Vec<Segment3dInstance>,
+) {
+    keys.clear();
+    out.clear();
+    for (i, s) in segments.iter().enumerate() {
+        let mid = [
+            0.5 * (s.a[0] + s.b[0]),
+            ground.unwrap_or(0.5 * (s.a[1] + s.b[1])),
+            0.5 * (s.a[2] + s.b[2]),
+        ];
+        keys.push((view.depth(mid), i as u32));
+    }
+    let skirt = |i: u32| segments.get(i as usize).map_or(0.0, |s| s.skirt);
+    let content = |i: u32| segments.get(i as usize).map(bytemuck::bytes_of);
+    keys.sort_unstable_by(|x, y| {
+        y.0.total_cmp(&x.0)
+            .then_with(|| skirt(y.1).total_cmp(&skirt(x.1)))
+            .then_with(|| content(x.1).cmp(&content(y.1)))
+    });
+    out.extend(
+        keys.iter()
+            .filter_map(|&(_, i)| segments.get(i as usize).copied()),
+    );
 }
 
 impl Seg3d {
@@ -970,49 +1200,63 @@ impl Seg3d {
             bind_group_layouts: &[Some(&bind_layout)],
             immediate_size: 0,
         });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some(&format!("{label}-seg3d-pipeline")),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[Some(wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Segment3dInstance>() as u64,
-                    step_mode: wgpu::VertexStepMode::Instance,
-                    attributes: &wgpu::vertex_attr_array![
-                        0 => Float32x3,
-                        1 => Float32x3,
-                        2 => Float32x3,
-                        3 => Float32,
-                        4 => Float32,
-                    ],
-                })],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    // The seam every additive line draws through (ADR-0056).
-                    blend: Some(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        // The two pipelines differ in the blend state and nothing else, so they
+        // are built from one closure, as the 2D pair is.
+        let make = |blend: wgpu::BlendState, suffix: &str| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(&format!("{label}-seg3d-pipeline{suffix}")),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<Segment3dInstance>() as u64,
+                        step_mode: wgpu::VertexStepMode::Instance,
+                        attributes: &wgpu::vertex_attr_array![
+                            0 => Float32x3,
+                            1 => Float32x3,
+                            2 => Float32x3,
+                            3 => Float32,
+                            4 => Float32,
+                            5 => Float32x3,
+                            6 => Float32x3,
+                            7 => Float32,
+                        ],
+                    })],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: surface_format,
+                        blend: Some(blend),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+        // The seam every additive line draws through (ADR-0056), then the
+        // premultiplied OVER a solid frame takes. The fragment is premultiplied
+        // either way, which is why one shader serves both.
+        let pipeline = make(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE, "");
+        let over_pipeline = make(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING, "-over");
         Self {
             pipeline,
+            over_pipeline,
             instances,
             camera,
             stroke,
             bind_group,
             capacity,
+            keys: Vec::with_capacity(capacity),
+            sorted: Vec::with_capacity(capacity),
         }
     }
 }
@@ -1287,7 +1531,7 @@ impl LineRenderer {
     }
 
     /// A renderer for **3D segments only** (ADR-0257): the `seg3d` pipeline and
-    /// a `capacity`-instance buffer for it, drawn with [`draw_3d`](Self::draw_3d).
+    /// a `capacity`-instance buffer for it, drawn with `draw_3d`.
     ///
     /// Its 2D half is built empty — no segment capacity, no arcs, no OVER
     /// pipelines — so a 3D scene owns its renderer outright and the roster's
@@ -1697,30 +1941,90 @@ impl LineRenderer {
     }
 
     /// Draw `segments` through the shared camera (ADR-0257), **loading** over
-    /// the backdrop, in one additive pass of their own. Segments beyond
+    /// the backdrop, in one pass of their own. Segments beyond
     /// [`capacity_3d`](Self::capacity_3d) are dropped defensively; a renderer
     /// without the pipeline draws none.
     ///
     /// Every endpoint must already be in front of the near plane: the scene
     /// clips on the CPU against the same view the uniform carries
     /// ([`CameraView::clip_near`](crate::render::camera::CameraView::clip_near)).
+    ///
+    /// `frame` is the camera block's whole frame, not only its uniform: the
+    /// depth cues it carries (`fog`, `solid`) are the block's, so every system
+    /// that splices the block draws them without naming them.
+    ///
+    /// **A solid frame** (ADR-0263) is drawn far to near and composited over:
+    /// the segments are sorted by [`sort_far_to_near`] into scratch reserved
+    /// at the buffer's capacity, so the sort allocates nothing, and the over
+    /// pipeline paints each nearer stroke over what it covers. A glow frame
+    /// uploads `segments` as they came, through the additive pipeline.
     #[allow(
         clippy::too_many_arguments,
         reason = "distinct GPU handles plus the per-frame camera and stroke values; bundling \
                   them would only shuffle the same values behind a one-use struct"
     )]
-    pub fn draw_3d(
+    pub(crate) fn draw_3d(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
-        camera: &crate::render::camera::CameraUniform,
+        frame: &crate::render::camera::CameraFrame,
         glow: f32,
         softness: f32,
         segments: &[Segment3dInstance],
     ) {
+        self.draw_3d_on(queue, encoder, view, frame, glow, softness, None, segments);
+    }
+
+    /// [`draw_3d`](Self::draw_3d) for a **heightfield** standing on the plane
+    /// `y = ground`: a [`skirt`](Segment3dInstance::skirt) instance fills down
+    /// to that plane, and a solid frame orders its segments by their feet on
+    /// it ([`sort_painter`]), so a near row hides a far one whatever either's
+    /// height (ADR-0263).
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "see `draw_3d` — this is that signature plus the ground plane"
+    )]
+    pub(crate) fn draw_3d_terrain(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        frame: &crate::render::camera::CameraFrame,
+        glow: f32,
+        softness: f32,
+        ground: f32,
+        segments: &[Segment3dInstance],
+    ) {
+        self.draw_3d_on(
+            queue,
+            encoder,
+            view,
+            frame,
+            glow,
+            softness,
+            Some(ground),
+            segments,
+        );
+    }
+
+    /// The one body behind [`draw_3d`](Self::draw_3d) and
+    /// [`draw_3d_terrain`](Self::draw_3d_terrain). `ground: None` keys the
+    /// solid sort at each midpoint and puts a stray skirt's foot at `y = 0`.
+    #[allow(clippy::too_many_arguments, reason = "see `draw_3d_terrain`")]
+    fn draw_3d_on(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        frame: &crate::render::camera::CameraFrame,
+        glow: f32,
+        softness: f32,
+        ground: Option<f32>,
+        segments: &[Segment3dInstance],
+    ) {
         let mut pass = gpu::color_pass(encoder, "seg3d-pass", view, wgpu::LoadOp::Load);
-        let Some(seg3d) = self.seg3d.as_ref() else {
+        let Some(seg3d) = self.seg3d.as_mut() else {
             return;
         };
         let count = segments.len().min(seg3d.capacity);
@@ -1728,16 +2032,29 @@ impl LineRenderer {
         if drawn.is_empty() {
             return; // nothing to stroke; the backdrop shows through
         }
-        queue.write_buffer(&seg3d.instances, 0, bytemuck::cast_slice(drawn));
-        queue.write_buffer(&seg3d.camera, 0, bytemuck::bytes_of(camera));
+        if frame.solid {
+            let (keys, sorted) = (&mut seg3d.keys, &mut seg3d.sorted);
+            match ground {
+                None => sort_far_to_near(&frame.view, drawn, keys, sorted),
+                Some(_) => sort_painter(&frame.view, drawn, ground, keys, sorted),
+            }
+            queue.write_buffer(&seg3d.instances, 0, bytemuck::cast_slice(&seg3d.sorted));
+        } else {
+            queue.write_buffer(&seg3d.instances, 0, bytemuck::cast_slice(drawn));
+        }
+        queue.write_buffer(&seg3d.camera, 0, bytemuck::bytes_of(&frame.uniform));
         queue.write_buffer(
             &seg3d.stroke,
             0,
             bytemuck::bytes_of(&Stroke3dUniform {
-                v: [glow, softness, 0.0, 0.0],
+                v: [glow, softness, frame.fog, ground.unwrap_or(0.0)],
             }),
         );
-        pass.set_pipeline(&seg3d.pipeline);
+        pass.set_pipeline(if frame.solid {
+            &seg3d.over_pipeline
+        } else {
+            &seg3d.pipeline
+        });
         pass.set_bind_group(0, &seg3d.bind_group, &[]);
         pass.set_vertex_buffer(0, seg3d.instances.slice(..));
         pass.draw(0..6, 0..count as u32);

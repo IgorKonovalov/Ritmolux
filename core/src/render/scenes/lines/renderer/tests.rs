@@ -2189,7 +2189,7 @@ fn the_stroke_is_as_thick_across_as_it_is_along_whatever_the_orientation() {
 mod seg3d {
     use super::super::{LineRenderer, Segment3dInstance};
     use crate::render::RenderError;
-    use crate::render::camera::{Camera3d, CameraUniform, CameraView, Lens};
+    use crate::render::camera::{Camera3d, CameraFrame, CameraUniform, CameraView, Lens};
     use crate::render::context::RenderContext;
     use crate::render::gpu;
 
@@ -2227,8 +2227,45 @@ mod seg3d {
     /// (depth 8), `width` pixels wide at the focal plane and drawn grey at
     /// `aperture`, as the red channel of the target.
     fn render(ctx: &RenderContext, aperture: f32, width: f32) -> Vec<f32> {
+        let (a, b) = ([-1.5, 0.0, 0.0], [1.5, 0.0, -FOCAL]);
+        let segment = Segment3dInstance {
+            a,
+            b,
+            color: [0.25, 0.25, 0.25],
+            width,
+            alpha: 1.0,
+            prev: a,
+            next: b,
+            skirt: 0.0,
+        };
+        render_segments(ctx, aperture, 0.0, &[segment])
+    }
+
+    /// `segments` drawn through [`view`] at `aperture` and `fog`, as the red
+    /// channel of the target. The volume runs from the focal plane (depth 4)
+    /// to twice its depth, the span [`render`]'s segment crosses.
+    fn render_segments(
+        ctx: &RenderContext,
+        aperture: f32,
+        fog: f32,
+        segments: &[Segment3dInstance],
+    ) -> Vec<f32> {
+        render_rgba(ctx, aperture, fog, false, segments)
+            .into_iter()
+            .map(|[r, _, _, _]| r)
+            .collect()
+    }
+
+    /// [`render_segments`] with `solid` chosen, as every channel of the target.
+    fn render_rgba(
+        ctx: &RenderContext,
+        aperture: f32,
+        fog: f32,
+        solid: bool,
+        segments: &[Segment3dInstance],
+    ) -> Vec<[f32; 4]> {
         let device = &ctx.device;
-        let mut lines = LineRenderer::new_3d(device, FORMAT, 4, "seg3d-probe");
+        let mut lines = LineRenderer::new_3d(device, FORMAT, 16, "seg3d-probe");
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("seg3d-probe-target"),
             size: wgpu::Extent3d {
@@ -2251,14 +2288,17 @@ mod seg3d {
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let segment = Segment3dInstance {
-            a: [-1.5, 0.0, 0.0],
-            b: [1.5, 0.0, -FOCAL],
-            color: [0.25, 0.25, 0.25],
-            width,
-            alpha: 1.0,
+        let frame = CameraFrame {
+            view: view(),
+            uniform: CameraUniform::new(&view(), W, H, Lens::new(aperture, FOCAL, CAP))
+                .with_volume(FOCAL, FOCAL),
+            margin: 0.0,
+            near_extent: FOCAL,
+            span: FOCAL,
+            blur: None,
+            fog,
+            solid,
         };
-        let uniform = CameraUniform::new(&view(), W, H, Lens::new(aperture, FOCAL, CAP));
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("seg3d-probe-encoder"),
         });
@@ -2272,10 +2312,10 @@ mod seg3d {
             &ctx.queue,
             &mut encoder,
             &target,
-            &uniform,
+            &frame,
             1.0,
             0.5,
-            &[segment],
+            segments,
         );
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo {
@@ -2314,7 +2354,10 @@ mod seg3d {
         let data = slice.get_mapped_range().expect("mapped").to_vec();
         readback.unmap();
         data.chunks_exact(8)
-            .map(|px| f16_to_f32(u16::from_le_bytes([px[0], px[1]])))
+            .map(|px| {
+                let channel = |k: usize| f16_to_f32(u16::from_le_bytes([px[2 * k], px[2 * k + 1]]));
+                [channel(0), channel(1), channel(2), channel(3)]
+            })
             .collect()
     }
 
@@ -2362,6 +2405,293 @@ mod seg3d {
             }
             Err(e) => panic!("headless context build failed: {e}"),
         }
+    }
+
+    /// The depth every join probe is drawn at: half the focal depth again
+    /// behind it, so the aperture blurs it and the blur is the same along it.
+    const JOIN_Z: f32 = -0.5 * FOCAL;
+
+    /// A world point in pixels of the target, `x` right and `y` down the rows.
+    fn px(p: [f32; 3]) -> [f32; 2] {
+        let c = view().clip(p);
+        [
+            (c[0] / c[3] * 0.5 + 0.5) * W as f32,
+            (0.5 - c[1] / c[3] * 0.5) * H as f32,
+        ]
+    }
+
+    /// `image` at a pixel-space point, bilinear between the four pixel centres
+    /// around it.
+    fn sample(image: &[f32], p: [f32; 2]) -> f32 {
+        let (x, y) = (p[0] - 0.5, p[1] - 0.5);
+        let (x0, y0) = (x.floor(), y.floor());
+        let (fx, fy) = (x - x0, y - y0);
+        let at = |dx: f32, dy: f32| {
+            let (xi, yi) = ((x0 + dx) as usize, (y0 + dy) as usize);
+            image[yi * W as usize + xi]
+        };
+        let top = at(0.0, 0.0) * (1.0 - fx) + at(1.0, 0.0) * fx;
+        let bottom = at(0.0, 1.0) * (1.0 - fx) + at(1.0, 1.0) * fx;
+        top * (1.0 - fy) + bottom * fy
+    }
+
+    /// `points` as one polyline of joined segments, its two outer ends free,
+    /// or as unjoined segments when `joined` is false.
+    fn polyline(points: &[[f32; 3]], width: f32, joined: bool) -> Vec<Segment3dInstance> {
+        (0..points.len() - 1)
+            .map(|k| {
+                let (a, b) = (points[k], points[k + 1]);
+                let prev = if joined && k > 0 { points[k - 1] } else { a };
+                let next = if joined && k + 2 < points.len() {
+                    points[k + 2]
+                } else {
+                    b
+                };
+                Segment3dInstance {
+                    a,
+                    b,
+                    color: [0.25, 0.25, 0.25],
+                    width,
+                    alpha: 1.0,
+                    prev,
+                    next,
+                    skirt: 0.0,
+                }
+            })
+            .collect()
+    }
+
+    /// **A straight line split into joined pieces is the same line** (ADR-0263):
+    /// eight collinear joined segments, blurred, render as one segment does, on
+    /// the same adapter in the same run — the property the comb broke.
+    #[test]
+    fn eight_collinear_joined_segments_render_as_one() {
+        let Some(ctx) = context() else {
+            return;
+        };
+        let (a, b) = ([-1.5, 0.1, JOIN_Z], [1.5, 0.1, JOIN_Z]);
+        let points: Vec<[f32; 3]> = (0..=8)
+            .map(|k| {
+                let t = k as f32 / 8.0;
+                [a[0] + (b[0] - a[0]) * t, a[1], a[2]]
+            })
+            .collect();
+        let one = render_segments(&ctx, 12.0, 0.0, &polyline(&[a, b], NARROW, true));
+        let eight = render_segments(&ctx, 12.0, 0.0, &polyline(&points, NARROW, true));
+        let peak = one.iter().copied().fold(0.0, f32::max);
+        let worst = one
+            .iter()
+            .zip(&eight)
+            .map(|(x, y)| (x - y).abs())
+            .fold(0.0, f32::max);
+        println!("collinear: peak {peak}, worst pixel difference {worst}");
+        assert!(peak > 0.0, "the line reached the target");
+        assert!(
+            worst == 0.0,
+            "eight joined pieces differ from one segment by up to {worst} against a \
+             peak of {peak}"
+        );
+    }
+
+    /// **A joined right-angle bend has no ridge at its joint** (ADR-0263), the
+    /// 3D counterpart of the 2D `line_joints` property with ridges for holes.
+    ///
+    /// Along the centre line and along two paths half the blurred half-width
+    /// either side of it, the light within one blurred half-width of the joint
+    /// stays at or below the light the two arms carry away from it. The same
+    /// bend drawn **unjoined** is the control: the inside of its corner sums two
+    /// overlapping strokes into a ridge, which is what makes the probe see one.
+    #[test]
+    fn a_joined_right_angle_has_no_ridge_at_its_joint() {
+        let Some(ctx) = context() else {
+            return;
+        };
+        let aperture = 12.0;
+        let p0 = [-1.5, 0.6, JOIN_Z];
+        let v = [0.4, 0.6, JOIN_Z];
+        let p2 = [0.4, -1.4, JOIN_Z];
+        let depth = FOCAL - JOIN_Z;
+        // The blurred half-width at that depth: perspective on the half-width,
+        // plus the circle of confusion.
+        let reach = 0.5 * NARROW * FOCAL / depth + aperture * (depth - FOCAL) / depth;
+        let [sv, s0, s2] = [px(v), px(p0), px(p2)];
+        let unit = |from: [f32; 2], to: [f32; 2]| {
+            let (dx, dy) = (to[0] - from[0], to[1] - from[1]);
+            let len = dx.hypot(dy);
+            [dx / len, dy / len]
+        };
+        let (d1, d2) = (unit(s0, sv), unit(sv, s2));
+        let (n1, n2) = ([-d1[1], d1[0]], [-d2[1], d2[0]]);
+        let dot = |p: [f32; 2], q: [f32; 2]| p[0] * q[0] + p[1] * q[1];
+        assert!(dot(d1, d2).abs() < 1e-3, "the probe bends at a right angle");
+
+        // One path `o` pixels off the centre line: arm one up to the mitre
+        // corner, then arm two from it, sampled each pixel, with the signed
+        // distance from the joint along the path.
+        let path = |image: &[f32], o: f32| -> Vec<(f32, f32)> {
+            let mut out = Vec::new();
+            let end1 = o * dot(n2, d1);
+            let mut s = -3.0 * reach;
+            while s <= end1 {
+                let p = [sv[0] + s * d1[0] + o * n1[0], sv[1] + s * d1[1] + o * n1[1]];
+                out.push((s - end1, sample(image, p)));
+                s += 1.0;
+            }
+            let start2 = o * dot(n1, d2);
+            let mut s = start2;
+            while s <= 3.0 * reach {
+                let p = [sv[0] + s * d2[0] + o * n2[0], sv[1] + s * d2[1] + o * n2[1]];
+                out.push((s - start2, sample(image, p)));
+                s += 1.0;
+            }
+            out
+        };
+        // The highest light within `reach` of the joint, and the highest
+        // between two and three reaches from it on either arm.
+        let ridge = |image: &[f32], o: f32| {
+            let samples = path(image, o);
+            let at_joint = samples
+                .iter()
+                .filter(|(s, _)| s.abs() <= reach)
+                .map(|(_, v)| *v)
+                .fold(0.0, f32::max);
+            let away = samples
+                .iter()
+                .filter(|(s, _)| s.abs() >= 2.0 * reach)
+                .map(|(_, v)| *v)
+                .fold(0.0, f32::max);
+            (at_joint, away)
+        };
+
+        let joined = render_segments(&ctx, aperture, 0.0, &polyline(&[p0, v, p2], NARROW, true));
+        let unjoined = render_segments(&ctx, aperture, 0.0, &polyline(&[p0, v, p2], NARROW, false));
+        // How fast the light falls across the stroke at offset `o`, per pixel,
+        // read on arm one well clear of the joint.
+        let slope = |image: &[f32], o: f32| {
+            let at = |q: f32| {
+                let s = -2.5 * reach;
+                sample(
+                    image,
+                    [sv[0] + s * d1[0] + q * n1[0], sv[1] + s * d1[1] + q * n1[1]],
+                )
+            };
+            0.5 * (at(o + 1.0) - at(o - 1.0)).abs()
+        };
+        let offsets = [-0.5 * reach, 0.0, 0.5 * reach];
+        let mut control = 0.0f32;
+        for o in offsets {
+            let (at_joint, away) = ridge(&joined, o);
+            let (bare_joint, bare_away) = ridge(&unjoined, o);
+            // The allowance is the pixel grid's, not the join's: the bilinear
+            // sample at the inside corner of a level set mixes in pixels from
+            // the brighter side, by up to half a pixel of the profile's own
+            // slope there. A half-float target adds its 2^-10 relative step.
+            let allowance = 0.5 * slope(&joined, o) + away / 1024.0;
+            println!(
+                "offset {o:+.2} px: joined {at_joint:.4} at the joint against {away:.4} \
+                 away (allowance {allowance:.4}); unjoined {bare_joint:.4} against \
+                 {bare_away:.4}"
+            );
+            assert!(away > 0.0, "offset {o}: the arms carry light");
+            assert!(
+                at_joint <= away + allowance,
+                "offset {o}: the joined bend peaks at {at_joint} at its joint against \
+                 {away} along its arms, past the sampling allowance {allowance}"
+            );
+            control = control.max((bare_joint - bare_away) / allowance.max(1e-6));
+        }
+        assert!(
+            control > 4.0,
+            "the unjoined control rises only {control} allowances at its joint, so \
+             the probe cannot see a ridge"
+        );
+    }
+
+    /// **A solid frame paints the near stroke over the far one** (ADR-0263):
+    /// two sharp strokes crossing at the frame's centre at different depths,
+    /// one red and one green. Solid, the crossing pixel is the near stroke's
+    /// colour whichever order the two arrive in; glow, it is the sum of both,
+    /// as it always was.
+    #[test]
+    fn a_solid_crossing_takes_the_near_colour_and_a_glow_one_the_sum() {
+        let Some(ctx) = context() else {
+            return;
+        };
+        let stroke = |a: [f32; 3], b: [f32; 3], color: [f32; 3]| Segment3dInstance {
+            a,
+            b,
+            color,
+            width: NARROW,
+            alpha: 1.0,
+            prev: a,
+            next: b,
+            skirt: 0.0,
+        };
+        let near = stroke([-1.5, 0.0, -1.0], [1.5, 0.0, -1.0], [0.5, 0.0, 0.0]);
+        let far = stroke([0.0, -1.5, -3.0], [0.0, 1.5, -3.0], [0.0, 0.5, 0.0]);
+        let centre = |image: &[[f32; 4]]| image[(H / 2 * W + W / 2) as usize];
+        let solid_near_first = centre(&render_rgba(&ctx, 0.0, 0.0, true, &[near, far]));
+        let solid_far_first = centre(&render_rgba(&ctx, 0.0, 0.0, true, &[far, near]));
+        let glow = centre(&render_rgba(&ctx, 0.0, 0.0, false, &[near, far]));
+        println!("crossing: solid {solid_near_first:?} / {solid_far_first:?}, glow {glow:?}");
+        for solid in [solid_near_first, solid_far_first] {
+            assert!(
+                (solid[0] - 0.5).abs() < 0.01 && solid[1] < 0.01,
+                "solid, the crossing is the near stroke's red alone: {solid:?}"
+            );
+        }
+        assert!(
+            (glow[0] - 0.5).abs() < 0.01 && (glow[1] - 0.5).abs() < 0.01,
+            "glow, the crossing is the sum of red and green: {glow:?}"
+        );
+    }
+
+    /// **Full fog blacks out the far end and leaves the near one alone**
+    /// (ADR-0263). A segment spanning the volume's whole depth, from its
+    /// nearest extent to its farthest, is drawn at `fog = 1` and at `fog = 0`;
+    /// column by column the fogged light is the unfogged light times
+    /// `1 - t`, with `t` the column's place along the quad — `1` at the near
+    /// end, `0` at the far one. A ratio of two renders of one geometry, so
+    /// coverage cancels and the property holds on any adapter.
+    #[test]
+    fn full_fog_blacks_out_the_far_end_and_keeps_the_near_one() {
+        let Some(ctx) = context() else {
+            return;
+        };
+        let (a, b) = ([-1.5, 0.0, 0.0], [1.5, 0.0, -FOCAL]);
+        let segment = Segment3dInstance {
+            a,
+            b,
+            color: [0.25, 0.25, 0.25],
+            width: WIDE,
+            alpha: 1.0,
+            prev: a,
+            next: b,
+            skirt: 0.0,
+        };
+        let clear = render_segments(&ctx, 0.0, 0.0, &[segment]);
+        let fogged = render_segments(&ctx, 0.0, 1.0, &[segment]);
+        let (xa, xb) = (px(a)[0], px(b)[0]);
+        let mut ratios = Vec::new();
+        for col in (xa.ceil() as u32)..(xb.floor() as u32) {
+            let t = (col as f32 + 0.5 - xa) / (xb - xa);
+            let (_, lit, _) = cross_section(&clear, col);
+            let (_, dim, _) = cross_section(&fogged, col);
+            assert!(lit > 0.0, "column {col} carries the stroke");
+            let ratio = dim / lit;
+            assert!(
+                (ratio - (1.0 - t)).abs() < 0.005,
+                "column {col} at t = {t}: fog keeps {ratio} of the light, not {}",
+                1.0 - t
+            );
+            ratios.push(ratio);
+        }
+        let (Some(&near), Some(&far)) = (ratios.first(), ratios.last()) else {
+            panic!("the stroke spans columns");
+        };
+        println!("fog 1: the near column keeps {near}, the far column {far}");
+        assert!(near > 0.98, "the nearest end keeps its light: {near}");
+        assert!(far < 0.02, "the farthest end is black: {far}");
     }
 
     /// **The width varies along one line**: a segment running from the focal
@@ -2454,5 +2784,108 @@ mod seg3d {
             "the summed light moves by {spread:.4} while the peak falls {peak_fall:.4}, \
              so the energy is not kept: {blurred:?}"
         );
+    }
+}
+
+// -----------------------------------------------------------------------
+// The solid frame's painter's order (ADR-0263)
+// -----------------------------------------------------------------------
+
+mod solid_order {
+    use super::super::{Segment3dInstance, sort_far_to_near};
+    use crate::render::camera::{Camera3d, CameraView};
+
+    fn view() -> CameraView {
+        Camera3d {
+            yaw: 0.3,
+            pitch: 0.4,
+            distance: 4.0,
+            fov: 0.8,
+            focus: 0.5,
+            aperture: 0.0,
+        }
+        .view(16.0 / 9.0, 1.0, [0.0, 0.0])
+    }
+
+    /// Sixty-four segments from a fixed linear congruential walk, every eighth
+    /// one followed by an exact duplicate of itself — a depth tie.
+    fn segments() -> Vec<Segment3dInstance> {
+        let mut state = 0x2545_f491_u32;
+        let mut next = || {
+            state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (state >> 8) as f32 / (1u32 << 24) as f32 * 2.0 - 1.0
+        };
+        let mut out = Vec::new();
+        for k in 0..64 {
+            let a = [next(), next(), next()];
+            let b = [next(), next(), next()];
+            let color = [next().abs(), next().abs(), next().abs()];
+            out.push(Segment3dInstance {
+                a,
+                b,
+                color,
+                width: 2.0,
+                alpha: 1.0,
+                prev: a,
+                next: b,
+                skirt: 0.0,
+            });
+            if k % 8 == 0 {
+                // An exact duplicate: the tie the content order has to break
+                // the same way whichever copy arrives first.
+                out.push(*out.last().unwrap_or_else(|| panic!("just pushed")));
+            }
+        }
+        out
+    }
+
+    /// **The order a solid frame is drawn in is a function of the set**: the
+    /// same segments emitted forwards, backwards and rotated sort to the same
+    /// sequence, far to near, and the sort reuses the scratch it was handed
+    /// rather than growing it.
+    #[test]
+    fn the_draw_order_does_not_depend_on_the_emission_order() {
+        let view = view();
+        let forward = segments();
+        let mut backward = forward.clone();
+        backward.reverse();
+        let mut rotated = forward.clone();
+        rotated.rotate_left(23);
+
+        let cap = forward.len();
+        let mut keys = Vec::with_capacity(cap);
+        let mut out = Vec::with_capacity(cap);
+        let (keys_at, out_at) = (keys.as_ptr(), out.as_ptr());
+        let mut sorted = |input: &[Segment3dInstance]| {
+            sort_far_to_near(&view, input, &mut keys, &mut out);
+            assert_eq!(keys.as_ptr(), keys_at, "the key scratch was reallocated");
+            assert_eq!(out.as_ptr(), out_at, "the output scratch was reallocated");
+            out.clone()
+        };
+        let a = sorted(&forward);
+        let b = sorted(&backward);
+        let c = sorted(&rotated);
+        assert_eq!(a.len(), cap);
+        assert_eq!(a, b, "a reversed emission draws in another order");
+        assert_eq!(a, c, "a rotated emission draws in another order");
+
+        let depth = |s: &Segment3dInstance| {
+            view.depth([
+                0.5 * (s.a[0] + s.b[0]),
+                0.5 * (s.a[1] + s.b[1]),
+                0.5 * (s.a[2] + s.b[2]),
+            ])
+        };
+        for pair in a.windows(2) {
+            assert!(
+                depth(&pair[0]) >= depth(&pair[1]),
+                "far to near: {} then {}",
+                depth(&pair[0]),
+                depth(&pair[1])
+            );
+        }
+        // Non-vacuity: the emission order was not already far to near.
+        let emitted: Vec<f32> = forward.iter().map(depth).collect();
+        assert!(emitted.windows(2).any(|w| w[0] < w[1]));
     }
 }

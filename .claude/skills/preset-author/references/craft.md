@@ -7,8 +7,11 @@ quiet, or between beats. None of it is enforced by the engine; it's judgment, ve
 
 ## First: the additive ceiling — spend peak energy on structure, not luminance
 
-**Every scene draws additively.** Particles, line segments, field samples and the feedback buffer all
-*add* light into the frame. Luminance terms therefore stack: `brightness` + `glow`/`flash` + stroke
+**The scenes draw additively by default.** Particles, line segments, field samples and the feedback
+buffer all *add* light into the frame unless you opt out — line strokes through `stroke_blend`, the
+space curves, `plexus` and `waterfall` through `solid`, a `[layer]` through `blend = "multiply"`
+(ADR-0106) — and `shape_collage` is the one scene that paints opaque on its own paper instead
+(ADR-0123). This section is about the default, which is where most presets live. Luminance terms therefore stack: `brightness` + `glow`/`flash` + stroke
 `thickness` + whatever `trails` has accumulated + `bg_bright`. Push past the point where the picture
 can absorb them and it stops getting brighter and starts getting **flatter** — the structure that made
 the look washes out at exactly the moment the music is most exciting.
@@ -63,7 +66,9 @@ A preset that only responds to `bass` pumps like a subwoofer meter. Beautiful pr
 so something is evolving at every rhythm:
 
 - **Slow evolution (`time`).** A gentle unending drift so the look never sits still even in
-  silence — almost always on `hue` (`+ time * 0.02..0.06`), sometimes rotation or `kaleido_angle`.
+  silence — almost always on `hue` (`+ time * 0.02..0.06`), sometimes a figure's own rotation or a
+  slow `noise` wander on a shape param. **Never `kaleido_angle`** — the owner's standing rule is
+  that the fold does not turn; give it a static angle and move what it folds.
 - **Per-beat breathing (`bar`).** `bar` ramps `0→1` between beats: `zoom = "1.0 + bar * 0.25"`, or
   `draw_progress` riding `bar` to redraw a figure each beat. Musical pulse, not spasm.
 - **Beat accents (`beat`).** The `0/1` gate for a discrete snap — a size bump, a `burst`, a
@@ -105,7 +110,9 @@ Every scene samples the shared **palette LUT** (line scenes included, since ADR-
   line scenes' axis walk) are the
   cohesion knobs: **low = one colour family**, high = a rainbow. This is the single biggest lever
   between "designed" and "novelty screensaver". Watch the RD exception — its field only reaches
-  ~`0..0.4`, so a full custom gradient there needs `color_span` around `2.0–2.5`.
+  ~`0..0.4`, so a full custom gradient there needs `color_span` around `2.0–2.5`. That is past the
+  `0 – 1` range `presets/README.md` prints for it, deliberately: the generated range is advisory
+  guidance, not a clamp, and this is one place to step outside it.
 - **Move the centre, not the whole wheel.** `color_center` / `hue_center` sliding gently on treble
   keeps colour alive without losing the base tone.
 - **Crossfade for section change.** `[palette_b]` + `palette_mix` bound to `bar`, a `tempo`
@@ -150,8 +157,25 @@ These are engine-wide and bindable, so treat them as instruments, not decoration
   does — see the ceiling note above, which the tonemap softened but did not remove). It also
   restarts from empty on a preset switch, so a look that *is* the accumulation takes a second to
   arrive after a dissolve — judge it a few beats in, not on the opening frames.
-- **`kaleido_*`** — instant symmetry on any scene; ride `kaleido_angle` on `time` so the fold turns
-  rather than sits.
+- **`trails`' transform, `fb_*`** — `fb_zoom`, `fb_rotate`, `fb_dx`/`fb_dy`, `fb_center_*` and
+  `fb_warp` move the accumulation itself each frame, so a trail tunnels, turns, drifts or curls
+  instead of only fading in place. Inert at `trails = 0`. Ranges in `presets/README.md`'s `trails`
+  stage table.
+- **`kaleido_*`** — instant symmetry on any scene. Pick a static `kaleido_angle` and leave it:
+  **never rotate the fold** (a standing owner rule). The symmetry stage has more than the wedge
+  count — `kaleido_tile` repeats the source before folding, `kaleido_spiral`/`_radial`/`_zoom`
+  reshape the sampling, `kaleido_edge` softens seams and `kaleido_inner` keeps a clean centre disc;
+  `presets/README.md`'s `kaleidoscope` table has them. For crisp thick lines through a fold, the
+  owner's recipe is `softness = 0` with `stroke_blend = 1`.
+- **`occlude`** — how much of the backdrop the scene's own coverage hides (default `1`); lower it to
+  let a `bg_*` sky show through the figure.
+- **`stroke_blend` / `solid` / `fog`** — the opt-outs from additive light. `stroke_blend` (line
+  scenes) moves a stroke toward opaque paint so crossings stop brightening; `solid` (space curves,
+  `plexus`, `waterfall`) paints near strokes over far ones; `fog` on the same camera scenes fades
+  strokes toward black with depth. Each scene's table says which it declares.
+- **`[layer]`** — one second scene composed with the first (ADR-0090), sharing the `[palette]`;
+  `blend = "multiply"` on an over join is the dark-on-light route (ADR-0106). Schema in
+  `docs/presets.md`.
 - **`bloom_*`** (Plan 0045) — the reason to *have* an over-range peak instead of suppressing it.
   `bloom_amount = 0` is off and free; the default `bloom_threshold = 1.0` means it finds exactly the
   light the display could not have shown, so switching it on halos the hot spots and leaves the rest
@@ -180,14 +204,15 @@ These are engine-wide and bindable, so treat them as instruments, not decoration
   is occasionally what you want and usually not.
 - **`mirror_*`** (line scenes) — folds the *geometry*, so it builds true fractal structure rather
   than a pixel mirror. Costs segments: high order on a dense curve hits the cap.
-- **`ink_amount`** — the only route to a *dark-on-light* look, because the scenes draw additively.
-  `"1"` alone is black-on-white; `paper_*`/`ink_*` make any duotone. It collapses colour to two
+- **`ink_amount`** — the general route to a *dark-on-light* look on an additive scene (the others:
+  a `multiply` `[layer]`, and `shape_collage`'s own paper). `"1"` alone is black-on-white; `paper_*`/`ink_*` make any duotone. It collapses colour to two
   tones, so in ink mode use the palette and `saturation` to sculpt **contrast**, not hue. Rest at
   `0` or `1` — a partial amount greys the paper. There is one ink pass for the whole blended frame, so
   its params **crossfade with a preset switch**: an ink preset landing after a glowing one travels
-  through that greyed state for about a second (fine — it's a transition), and two ink presets sitting
-  next to each other in the `presets/` filename order will walk between their two duotones, so pick
-  neighbouring poles that look intentional on the way across.
+  through that greyed state for about a second (fine — it's a transition), and two ink presets that
+  meet in rotation walk between their two duotones. Rotation is shuffled by default (sequential walks
+  display names, ADR-0239), so any ink preset may meet any other: pick poles that look intentional
+  on the way across.
 
 ## Make it survive a real track, not just the loud frame
 

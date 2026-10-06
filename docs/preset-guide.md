@@ -173,6 +173,18 @@ A strand wound round a doughnut, drawn in three dimensions and seen through a ca
 the Lissajous figure. `mirror_order`, `mirror_reflect`, `spin` and `stroke_blend` belong to the flat
 families and do nothing on these two.
 
+![The same trefoil knot drawn as a solid tube: a thick strand that passes over and under itself, each
+near loop hiding the loop behind it where they cross, coloured by depth from pale green at the front
+through yellow to a darkened orange and rust at the back, on black](images/curves/torus_knot_solid.png)
+
+*`solid`, `fog` and `hue_axis` — [`docs/examples/curves/torus_knot_solid.toml`](examples/curves/torus_knot_solid.toml)*
+
+By default the strand is light, and where it crosses itself the crossing glows. `solid = "1"` paints
+the near loops over the far ones instead, so the knot reads as an object, and `fog` darkens the far
+side. `hue_axis = "1"` colours the strand by depth rather than along its length. The same `solid`
+and `fog` work on `plexus` and `waterfall`; what each costs is in
+[the `[plexus]` table](presets.md#the-plexus-table).
+
 ### `lsystem`
 
 ![A pale ice-blue Koch snowflake outline on a dark slate ground: one closed crystalline edge, its
@@ -407,7 +419,7 @@ by thin straight lines to its nearest neighbours, the network densest at the cen
 single strands toward the edges](images/gallery/plexus.png)
 
 *`layout = "cloud"` — the teaching preset
-[`docs/examples/plexus/cloud.toml`](examples/plexus/cloud.toml); the system ships no preset yet*
+[`docs/examples/plexus/cloud.toml`](examples/plexus/cloud.toml); the shipped set has `plexus_*.toml`*
 
 A **network in three dimensions**: a few hundred points, each joined by a line to every other point
 closer than `link_distance`, seen through a camera that orbits the network's centre. A line fades in
@@ -444,7 +456,7 @@ peaks in the middle and settling into low magenta ridges on the right, the rows 
 horizon on black](images/gallery/waterfall.png)
 
 *The teaching preset [`docs/examples/waterfall/landscape.toml`](examples/waterfall/landscape.toml);
-the system ships no preset yet*
+the shipped set has `waterfall_*.toml`*
 
 The **spectrum's recent past as terrain**. Every fraction of a second the current band levels become
 a new row at the front, and the rows before it step back into the distance, so a sustained note

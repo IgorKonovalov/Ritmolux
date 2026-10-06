@@ -562,6 +562,9 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `fov` | `0.8` | `torus_knot` `0.2` – `2`; `lissajous_3d` `0.2` – `2`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | The camera's vertical field of view onto a space curve, in radians; zoom divides it. | motion |
 | `focus` | `0.5` | `torus_knot` `0` – `1`; `lissajous_3d` `0` – `1`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | Where the focal plane sits in a space curve's depth: 0 at its nearest point, 1 at its farthest. | light, main |
 | `aperture` | `0` | `torus_knot` `0` – `24`; `lissajous_3d` `0` – `24`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | The blur of a space curve's far side, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill. | light, main |
+| `fog` | `0` | `torus_knot` `0` – `1`; `lissajous_3d` `0` – `1`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | Fades a space curve toward black with depth: at 1 its farthest point is black and its nearest keeps its light. 0 is off. | light |
+| `solid` | `0` | `torus_knot` `0` – `1`; `lissajous_3d` `0` – `1`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | 1 paints a space curve's near strands over its far ones, so it reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every chord by depth each frame. | light |
+| `hue_axis` | `0` | `torus_knot` `0` – `1`; `lissajous_3d` `0` – `1`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | Moves a space curve's colour from running along its path (0) to running with depth (1), nearest first; between mixes the two. | colour |
 
 ### System: `lsystem`
 
@@ -1020,6 +1023,8 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `fov` | `0.8` | `0.2` – `2` | The camera's vertical field of view in radians; zoom divides it. | motion |
 | `focus` | `0.5` | `0` – `1` | Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest. | light, main |
 | `aperture` | `0` | `0` – `24` | The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill. | light, main |
+| `fog` | `0` | `0` – `1` | Fades strokes toward black with depth: at 1 the farthest point of the scene's volume is black and the nearest keeps its light. 0 is off. | light |
+| `solid` | `0` | `0` – `1` | 1 paints near strokes over far ones, so the scene reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every stroke by depth each frame. | light |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
 | `hue_center` | `0.5` | `0` – `1` | Where along the palette the middle of the volume's depth is coloured. | colour |
 | `hue_spread` | `0.5` | `0` – `1` | How far along the palette the colour travels from the nearest part of the volume to the farthest. | colour |
@@ -1058,6 +1063,8 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `fov` | `0.8` | `0.2` – `2` | The camera's vertical field of view in radians; zoom divides it. | motion |
 | `focus` | `0.5` | `0` – `1` | Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest. | light, main |
 | `aperture` | `0` | `0` – `24` | The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill. | light, main |
+| `fog` | `0` | `0` – `1` | Fades strokes toward black with depth: at 1 the farthest point of the scene's volume is black and the nearest keeps its light. 0 is off. | light |
+| `solid` | `0` | `0` – `1` | 1 paints near strokes over far ones, so the scene reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every stroke by depth each frame. | light |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. | shape |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
