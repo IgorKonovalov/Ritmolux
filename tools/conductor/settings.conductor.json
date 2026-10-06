@@ -45,6 +45,7 @@
       "Bash(grep *)",
       "Bash(sed -n *)",
       "Bash(RUSTDOCFLAGS=* cargo doc *)",
+      "Bash(RLX_BLESS=* cargo *)",
       "Bash(RLX_UPDATE_PRESET_SCHEMA=1 cargo *)",
       "Bash(RLX_UPDATE_PRESET_SCHEMA=1 node *)",
       "Bash(RLX_UPDATE_PARAM_REFERENCE=1 cargo *)",

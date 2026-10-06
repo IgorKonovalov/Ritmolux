@@ -1,6 +1,6 @@
 # 0249 — A dispatched CI job blesses the named WARP baselines
 
-> **Status:** draft
+> **Status:** approved (2026-10-06, user). Queued on lane a; Plan 0218 runs after it.
 > **Created:** 2026-10-06
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0264](../adrs/0264-a-warp-baseline-is-blessed-by-a-dispatched-ci-job-until-the-reference-moves-to-lavapipe.md)
