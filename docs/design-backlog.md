@@ -49,6 +49,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated](#0278--plexus-lays-its-points-in-a-cube-or-on-a-plane-so-a-turning-wire-sphere-is-only-approximated)
 - [0282 — a misspelled top-level table is silently ignored, so `[smothing]` passes `--check --strict` and its easing never runs](#0282--a-misspelled-top-level-table-is-silently-ignored-so-smothing-passes---check---strict-and-its-easing-never-runs)
 - [0283 — the shared `zoom` declaration says "above 1 fills more of the frame", which is backwards on `fragment_field` and `reaction_diffusion`](#0283--the-shared-zoom-declaration-says-above-1-fills-more-of-the-frame-which-is-backwards-on-fragment_field-and-reaction_diffusion)
+- [0284 — the show window reports an empty Wayland app class, so a Hyprland window rule cannot target it](#0284--the-show-window-reports-an-empty-wayland-app-class-so-a-hyprland-window-rule-cannot-target-it)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1787,3 +1788,24 @@ scenes, and the generated files regenerated. Unifying the direction would retune
   `present: above 1 fills more of the frame in: core/src/render/scenes/common.rs`
 - **Verified 2026-10-05** — the field scene multiplies:
   `present: var p = uv \* zoom \+ pan; in: core/src/render/scenes/fragment_field.rs`
+
+## 0284 — the show window reports an empty Wayland app class, so a Hyprland window rule cannot target it
+
+Plan 0218 Phase 1 read the compositor with `hyprctl clients -j` on the Arch box on 2026-09-29 and
+found the show's window reporting `class: ""`, where every other client names itself (`code`,
+`firefox`). On Wayland the class is the `xdg_toplevel` app id, and winit sends one only when the
+window attributes carry it (`WindowAttributesExtWayland::with_name`). The standalone builds both of
+its windows with a title and nothing else: `run.rs` sets `APP_TITLE` and `app_state.rs` sets
+`CONSOLE_TITLE`. A user therefore cannot pin the show to a workspace or a monitor, or turn off blur
+for it, by class. A rule can match only the title, and the show's title changes with every preset.
+The cheap shape is one app id for both windows, `ritmolux`, set on Linux, and a line in
+`docs/running.md` naming it. Whether the console gets a separate id, so a rule can place the two
+windows apart, is the one question this leaves. It matters once Phase 1's second-display readings
+exist.
+
+- **Raised:** 2026-09-29 by the owner and `architect` at Plan 0218 Phase 1, filed by `architect` at
+  Plan 0218's close on 2026-10-06. **Owner if taken:** `dev` (a window attribute and a doc line; no
+  ADR unless the console takes its own id).
+- **Verified 2026-10-06** — neither window builder sets a name or app id:
+  `absent: with_name|app_id in: standalone/src/run.rs`
+- **Verified 2026-10-06** — `absent: with_name|app_id in: standalone/src/app_state.rs`
