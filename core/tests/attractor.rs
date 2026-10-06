@@ -833,6 +833,78 @@ fn a_perspective_binding_is_a_load_error_naming_the_camera() {
     );
 }
 
+/// The shipped presets whose 3D figure moved off `perspective` onto the shared
+/// camera (ADR-0260), each with its family's coverage floor in `sanity.rs`'s
+/// `coverage_floor` — `attractor` 0.11, `fragment_field` 0.21 for `Sumi`, whose
+/// Thomas trace is a layer.
+const MIGRATED_3D: &[(&str, f32)] = &[
+    ("Ink on Paper", 0.11),
+    ("Lorenz Knot", 0.11),
+    ("Thomas Gallery", 0.11),
+    ("Thomas on Red", 0.11),
+    ("Thomas Walk", 0.11),
+    ("Sumi", 0.21),
+];
+
+/// **Every migrated 3D preset still frames a picture** (ADR-0260): rendered the
+/// way `sanity.rs` renders the library — backdrops stripped, against the frame's
+/// own modal ground, at 96 px after 30 frames — each clears its family's
+/// coverage floor and spreads over at least two quadrants, at a moderate drive
+/// and at the full one. The full drive is where Lorenz Knot's bass brings the
+/// camera nearest the figure, so a migrated `distance` that let a lobe reach the
+/// near plane, or blew the figure past the frame, shows here by name.
+#[test]
+fn every_migrated_3d_preset_clears_the_sanity_floor() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let presets: Vec<Preset> = rlx_core::preset::default_presets()
+        .into_iter()
+        .map(|mut preset| {
+            preset.params.retain(|b| !b.name.starts_with("bg_"));
+            preset
+        })
+        .collect();
+    for (name, _) in MIGRATED_3D {
+        assert!(
+            presets.iter().any(|p| p.name == *name),
+            "{name} no longer ships; take it off MIGRATED_3D"
+        );
+    }
+    renderer.set_presets(presets);
+    let excited = |level: f32| AnalysisFrame {
+        bass: level,
+        mid: level,
+        treb: level,
+        onset: level,
+        beat: true,
+        bar: 0.5,
+        spectrum: [level; rlx_core::dsp::SPECTRUM_BINS],
+        ..Default::default()
+    };
+    let mut failures = Vec::new();
+    for (name, floor) in MIGRATED_3D {
+        for level in [0.4f32, 1.0] {
+            let img = renderer
+                .capture_preset(name, &excited(level), 30)
+                .expect("capture a migrated preset");
+            let ground = rlx_core::render::metrics::modal_ground(&img);
+            let cov = coverage(&img, ground, EPS);
+            let spread = quadrant_spread(&img, ground, EPS);
+            println!("{name:<16} at {level}: coverage {cov:.4} (floor {floor}) quadrants {spread}");
+            if cov < *floor || spread < 2 {
+                failures.push(format!(
+                    "{name} at drive {level}: coverage {cov:.4} against {floor}, {spread} quadrant(s)"
+                ));
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "migrated 3D presets that no longer frame a picture: {failures:#?}"
+    );
+}
+
 /// Mean `(R − G, G − B)` over the pixels `mask` selects — the figure's **colour**,
 /// separated from how bright it is the way [`mean_luma_over`] separates level.
 fn mean_chroma_over(img: &CaptureImage, mask: &[bool]) -> (f32, f32) {

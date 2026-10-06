@@ -56,7 +56,14 @@ morph = "time * 0.1 - floor(time * 0.1)"
 # rather than a flat hatch. Bass speeds the turn; mid dims the far strands
 # further, which on a two-pole remap is the only depth cue there is.
 spin = "0.6 + clamp(bass * 0.5, 0, 0.4)"
-perspective = "0.2"
+# THE CAMERA, mapped from the retired `perspective = 0.2` at `zoom = 1.12`
+# (ADR-0260): `distance = 1 / 0.2` on the roster's unit depth, and the `fov` whose
+# tangent is `0.2 / (0.572 * 1.12)`, which carries the crop the zoom was. Level.
+# Two of the thirteen entries are shallower than unit depth and read a little
+# flatter than they did; re-curation is owed.
+distance = "5.0"
+fov = "0.6055"
+pitch = "0"
 depth_fade = "0.4 + clamp(mid * 0.4, 0, 0.3)"
 
 # THE NIB. Fine and constant - the trail grid is surface-sized (Plan 0027 Phase
@@ -78,10 +85,10 @@ hue_spread = "0.05"
 hue_center = "0.5"
 
 # VIEW - a slow drift so the composition reframes over a track rather than
-# sitting dead centre, and a fixed crop: a zoom on the music was the pump the
-# sitting removed.
-zoom  = "1.12"
-pan_x = "sin(time * 0.0230) * 0.07"
+# sitting dead centre, and a fixed crop (the `fov` above): a zoom on the music was
+# the pump the sitting removed. The camera divides `pan_x` by the aspect, so its
+# swing is the old 0.07 times 16/9 - the same drift on a 16:9 screen.
+pan_x = "sin(time * 0.0230) * 0.1244"
 pan_y = "cos(time * 0.0170) * 0.055"
 
 # THE REMAP - full, and held at the pole. A partial amount lets the near-black

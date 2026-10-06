@@ -198,8 +198,8 @@ struct ModelTransform {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Walking skeleton: Lorenz through the camera | dev | done | 19386418 |
-| 2 — The real lens, and `perspective` retires | dev | done | committed with this row |
-| 3 — The shipped presets migrate by the mapping | dev | not started | |
+| 2 — The real lens, and `perspective` retires | dev | done | 80566e42 |
+| 3 — The shipped presets migrate by the mapping | dev | done | committed with this row |
 | 4 — Documentation and the references | dev | not started | |
 | 5 — The 3D presets, re-curated in motion | human | not started | |
 | 6 — The moved baseline is blessed | human | not started | |
@@ -249,6 +249,38 @@ struct ModelTransform {
 - Between Phase 2 and Phase 3, the shipped presets that still bind `perspective` fail to load. In
   this phase that reddened `attractor_contract` and `attractor_projects_at_the_target_aspect`,
   which load `attractor_walkdejong`.
+- Phase 3: the shipped set no longer matches the plan's counts. 12 presets draw the attractor, not
+  22, and 6 draw a 3D family, not 10: Ink on Paper, Lorenz Knot, Thomas Gallery, Thomas on Red and
+  Thomas Walk, plus the `fragment_sumi` layer. Each was migrated onto `distance`, `fov` and
+  `pitch = 0`, with `E` and the footprint measured per roster entry. `attractor_fernmono` (fern)
+  and `attractor_walkdejong` (De Jong) also bound `perspective`, which was inert on their flat
+  families, so their bindings were deleted with no replacement. `fragment_nebula`'s layer is De
+  Jong and binds nothing the camera replaced, so it is unchanged.
+- Phase 3: mapping approximations.
+  - Ink on Paper and Thomas Gallery step a 13-entry roster. They use `E = 1` and footprint 0.572,
+    which 11 entries share. Entry 0's footprint is 0.63, and entries 1 and 4 have `E` of 0.72 and
+    0.84.
+  - Lorenz Knot's `perspective` was bass-driven. `distance = 1 / p` follows it exactly. Expressions
+    have no `atan`, so `fov` is a quadratic fit in the bass term, within 0.0008 rad.
+  - Thomas Walk's `zoom = 1.0 + bar * 0.04` stays on the camera's `zoom`, which divides the angle
+    and not its tangent, so the pulse is near the old one but not equal.
+  - Sumi's layer takes `distance = 20` and `fov = 0.1299`. That is a 1.1:1 near-to-far ratio, and
+    both values are outside the declared ranges, which document and do not clamp.
+- The camera divides `pan_x` by the aspect, which the attractor's in-plane path did not. This
+  landed in Phase 1 and was not noted there. In Phase 3, Ink on Paper's `pan_x` swing was scaled by
+  16/9, which reproduces the old drift on a 16:9 target only.
+- Phase 3: the `attractor_depth` capture moved. The golden run on llvmpipe (off WARP, so the
+  comparison is reported and not asserted) printed `attractor_depth    mean 0.0022 (tol 0.02)
+  max_outlier 62 (tol 48)`. The unchanged flat `attractor` fixture printed mean 0.0018 /
+  max_outlier 114 on the same adapter. A `shot` capture of the fixture differs byte-wise from the
+  pre-plan capture. Not re-blessed (Phase 6).
+- Phase 3: `every_migrated_3d_preset_clears_the_sanity_floor` (`core/tests/attractor.rs`) is the
+  coverage test. Coverage at drive 0.4 and 1.0 ran 0.258 (Thomas on Red) to 0.535 (Lorenz Knot)
+  against the attractor floor of 0.11, and Sumi read 0.92 against 0.21. Every preset spread over
+  four quadrants.
+- Phase 3: `sanity` (32 run, 2 `#[ignore]` instruments skipped) and `animation`, `reactivity`,
+  `distinctness` (46 run, 1 `#[ignore]` skipped) pass on llvmpipe. `-P fast` is 1881 of 1884,
+  and the three red tests are the generated-file checks named under Phase 1.
 - Followup noticed: `core/src/render/scenes/particles/ifs.rs` (the `SIGMA_CEILING` doc) still cites
   `perspective` as a silently clamped param. The file is outside every phase of this plan.
 

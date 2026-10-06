@@ -205,10 +205,10 @@ saturation = "0.15"
 # route. The onset arm rides on top so a hit stirs it early.
 reseed = "max(mod(time, 4.0) < 0.06, onset > 0.62)"
 
-# Depth, without a camera move. `perspective` gives the knot its near/far
-# without turning it, and `depth_fade` lets the far strands sit back into the
-# page - which on a duotone is the only depth cue available, since the remap
-# will not give a far strand a different colour.
+# Depth, without a camera move. The camera's `distance` gives the knot its
+# near/far without turning it, and `depth_fade` lets the far strands sit back
+# into the page - which on a duotone is the only depth cue available, since the
+# remap will not give a far strand a different colour.
 # THE HALO. Bloom is a mixer and this world is already outside the limited-ink
 # class, so it costs nothing here that was not already spent - which is exactly
 # why the glow lives on this preset and not on one of the three-ink worlds.
@@ -226,16 +226,19 @@ bloom_radius    = "1.2"
 
 spin        = "0"
 
-# A CONSTANT, AND ON THIS FAMILY IT MOVES THE CAMERA IN. `zoom` is inverted
-# between families - on the fields a higher value shows MORE - so this is a crop.
-# 1.50 rather than the 2.1 an earlier draft used: at the tighter crop the knot
-# ran to every edge, and a figure that touches all four sides reads as LARGE
-# whatever its strokes are doing. Backing the crop off leaves red around it,
-# which is what makes the glow legible as light rather than as fill. It is
-# deliberately not bound to anything: a zoom that answers the music is the camera
-# move this project does not want.
-zoom        = "1.50"
-perspective = "0.26"
+# A CONSTANT CROP, CARRIED BY THE LENS. It was `zoom = 1.50` with
+# `perspective = 0.26`, and the camera block replaced both (ADR-0260):
+# `distance = 1 / 0.26` on the walk's unit depth, and the `fov` whose tangent is
+# `0.26 / (0.572 * 1.50)`. 1.50 rather than the 2.1 an earlier draft used: at
+# the tighter crop the knot ran to every edge, and a figure that touches all four
+# sides reads as LARGE whatever its strokes are doing. Backing the crop off
+# leaves red around it, which is what makes the glow legible as light rather
+# than as fill. It is deliberately not bound to anything: a lens that answers the
+# music is the camera move this project does not want. Level; re-curation is
+# owed.
+distance    = "3.8462"
+fov         = "0.5887"
+pitch       = "0"
 depth_fade  = "0.42 + clamp(mid * 0.176, 0, 0.15)"
 
 # DELIBERATELY ABSENT: every `bg_*` (a lit backdrop greys the page - see the
