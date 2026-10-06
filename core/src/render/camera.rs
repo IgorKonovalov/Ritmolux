@@ -64,11 +64,11 @@ pub const NEAR: f32 = 0.05;
 /// The widest field of view the lens opens to, in radians, after `zoom` has
 /// divided it. Past about 170 degrees the tangent grows without bound and the
 /// picture is all edge.
-const MAX_FOV: f32 = 3.0;
+pub(crate) const MAX_FOV: f32 = 3.0;
 
 /// The narrowest, in radians. `zoom` divides the field of view, so a large
 /// `zoom` would otherwise reach a lens that magnifies without limit.
-const MIN_FOV: f32 = 0.01;
+pub(crate) const MIN_FOV: f32 = 0.01;
 
 /// The steepest `pitch` the orbit reaches, in radians, just short of straight
 /// up or down. At a quarter turn the view axis is parallel to world `+y` and

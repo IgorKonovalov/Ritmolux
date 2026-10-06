@@ -1,0 +1,522 @@
+# 0239 — The swarm moves into a real camera
+
+> **Status:** done - Phases 7 and 8 owed, ADR-0249. Closed 2026-10-06 at v0.167.0; phase commits
+> b70e1488, b598e6c5, d6e2299d, 65e4a600, cbb2276c, 8ece66bd. Close review round 1: no blockers, no
+> majors, four minors (three fixed in 885b7155), one nit.
+> **Created:** 2026-10-01
+> **Owner skill(s):** dev, human
+> **Related ADRs:** [ADR-0259](../../adrs/0259-the-swarm-projects-through-the-shared-camera-in-a-frustum-shaped-torus.md) (accepted), [ADR-0044](../../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md), [ADR-0258](../../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md), [ADR-0257](../../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)
+
+## TL;DR
+
+The swarm's 2.5D model is replaced (ADR-0259). Particles live in a **frustum-shaped torus**, move in
+depth as well as across the screen, and project through the shared camera. A focal layer of the swarm
+can be sharp while the layers in front and behind soften, and far particles cross the screen more
+slowly than near ones because they are farther away, not because a scale factor says so. Silhouettes,
+ink mode and the speed cue keep working. Every swarm preset changes look, so its re-tune is part of
+this plan's merge rather than a followup.
+
+## Context & problem
+
+ADR-0044 gave each particle a fixed `z` that drives four hand-made cues: sprite scale, brightness,
+parallax against `zoom` and `pan`, and a flow-phase offset. The simulation is CPU-side
+(`swarm.rs` `update`), 10,000 particles on `Floor` and 30,000 on `Rich`, uploaded each frame through
+the swarm's own `marks::InstancedQuads` pipeline and WGSL. The world is a 2D torus sized from the
+target's aspect times a margin of 1.25, so the wrap seam sits off-screen.
+
+The owner chose to replace that model with a real camera rather than add a mode beside it. ADR-0259
+records the design and its alternatives. The two goldens are `swarm` and `swarm_shaped`. The swarm
+also backs `swarm_lit_backdrop`, `backdrop_band` and `backdrop_ramp`, and `mark_cost` measures 10,000
+sprites. Three presets ship: `braid`, `maelstrom` and `murmuration`.
+
+## Decision
+
+Each particle holds `(u, v, z)` in frustum coordinates. The flow is evaluated in world space and
+converted back by the frustum half-extent at the particle's depth. `z` moves on a slow flow component
+and fades near the slab bounds. The swarm's sprite WGSL prepends `camera.wgsl` and uses `project()`
+and `coc()`. The swarm splices a **subset** of the camera block: `yaw` and `pitch` bounded to a sway
+the margin covers, plus `fov`, `focus` and `aperture`, with no `distance`. `depth_fade` replaces the
+brightness ramp, with a default that reproduces it. All of this is ADR-0259's Decision. We rejected
+an opt-in mode, a world-space box, `quad3d` sprites and proximity links (ADR-0259, Alternatives A
+to D).
+
+## Architecture diagram
+
+```mermaid
+flowchart LR
+    subgraph sim[swarm.rs update, CPU]
+        P["particle (u, v, z)<br/>frustum coords"]
+        W["to world: u,v * half_extent(z) at rest fov"]
+        F["flow field in world space<br/>+ slow z component"]
+        B["back to (u, v): / half_extent(z)<br/>wrap u, v; fade near z bounds"]
+    end
+    subgraph gpu[swarm's own sprite pipeline]
+        VS["camera.wgsl project(), coc()<br/>+ SDF silhouette, ink, speed cue"]
+    end
+    P --> W --> F --> B --> P
+    B --> VS
+```
+
+## Implementation phases
+
+### Phase 1 — Walking skeleton: the swarm in a camera
+- **Owner skill:** dev
+- **What:** the frustum-coordinate particle state, the world-space flow with its `z` component, the
+  wrap in `u` and `v`, and the fade at the slab bounds. Prepend `camera.wgsl` to the swarm's WGSL,
+  project each sprite through `project()`, and size it by perspective. Splice the camera-block subset,
+  and retire the `DEPTH_*` scale and parallax cues. Keep `depth_fade` at a default that reproduces the
+  0.45 to 1.05 ramp. The aspect comes from the render target (ADR-0037), not from the torus.
+- **Files touched:** `core/src/render/scenes/swarm.rs`, `core/src/render/scenes/swarm/tests.rs`,
+  `core/src/render/camera.rs`, `core/tests/`.
+- **Done when:** a swarm fixture renders through `shot` and two frames a second apart differ. Over
+  600 frames of the default flow, no particle's projected centre falls inside the frame within one
+  sprite radius of the wrap seam, at 1280x800 and at 1920x1080 (ADR-0037's disagreeing pair). The
+  mean screen speed of particles in the far third of the slab is lower than in the near third, under
+  the same flow.
+
+### Phase 2 — Depth of field on the swarm's sprites
+- **Owner skill:** dev
+- **What:** the sprite vertex stage takes `coc()` at its depth, grows the sprite by `(r + coc) / r`
+  and dims it by the area factor, as on `quad3d` (ADR-0257). The SDF silhouette is sampled at the
+  grown radius with its edge softness widened by the CoC, so a blurred polygon reads as a soft polygon.
+  Ink mode and the speed cue multiply as before.
+- **Files touched:** `core/src/render/scenes/swarm.rs`, `core/src/render/scenes/swarm/tests.rs`,
+  `core/tests/`.
+- **Done when:** `aperture = 0` renders identically to Phase 1. With `aperture > 0`, sprites far from
+  the focal depth cover more pixels and have a lower peak than sprites at it, in one rendered frame. A
+  `shape = "2"` sprite at the focal plane keeps its polygon edge.
+
+### Phase 3 — Caps, cost and the goldens
+- **Owner skill:** dev
+- **What:** blur grows a sprite's **area**, so a 3 px sprite at a 12 px CoC fills 25 times its sharp
+  pixels. At 10,000 sprites that is the one cost in Plans 0236 to 0240 that may not fit `Floor`.
+  Plexus's blur added 45 to 65 percent (Plan 0235 Phase 6), but on 600 nodes. This phase measures
+  the cost against a stated budget and walks a fixed fallback ladder until the budget holds.
+  - **The probe.** A worst-case fixture: `Floor`'s 10,000 sprites, `aperture` past the cap, `focus`
+    at the near slab bound so most of the population is defocused, the `trails` post stage on as
+    every shipped preset has it, 1920x1080, release profile. It runs at `aperture = 0` and at the
+    worst case, in the same run on the same adapter. Extend `mark_cost` with that pair, in the
+    measurement shape `mark_cost` already uses (ADR-0071: it names its machine and skips elsewhere).
+  - **The budget.** The blurred frame costs at most **twice** the sharp one, and the blurred frame
+    sits inside NFR section 1's 16.67 ms with the headroom NFR section 1 already records for the
+    shipped set. The two terms of the ratio are the same quantity, from one fixture, one run and one
+    adapter (ADR-0074).
+  - **The fallback ladder**, in this order, stopping at the first rung that meets the budget, with
+    each rung's measurement in the log:
+    1. A swarm-only CoC ceiling, `swarm_max_coc_px` in `TierConfig`, below `max_coc_px`. Start
+       `Floor` at 6 px. The clamp is announced through `OverflowContext::Blur`, as the shared cap is.
+    2. A cheap fragment path for heavily blurred sprites. Past a CoC of about twice the sprite's
+       radius, a polygon or star silhouette is visually a disc. The fragment then evaluates an
+       analytic radial falloff instead of the SDF. The two paths are cross-faded over a band of
+       `coc / r`, so no sprite pops as it crosses the threshold, and a test sweeps `coc` through the
+       band and finds no step in a sprite's summed light.
+    3. Lower `swarm_particles` on `Floor`, announced. This rung changes the look, so taking it is
+       written in the log for Phase 6's judgement, never taken silently.
+  - **`Rich`.** Measure `Rich`'s 30,000 sprites the same way on the reference machine's discrete GPU
+    (Plan 0218 Phase 2), and give `Rich` its own `swarm_max_coc_px`. If no discrete GPU is reachable
+    from the session, the log says `Rich` is unmeasured, as Plan 0235's did, rather than inventing a
+    value.
+  - Then re-run the `swarm` and `swarm_shaped` goldens and the backdrop fixtures' tests on whatever
+    the ladder settled. Do not re-bless: baselines are blessed on DX12 WARP only, and that is Phase 7.
+- **Files touched:** `core/src/render/tier.rs`, `core/src/render/scenes/swarm.rs`,
+  `core/src/render/scenes/swarm/tests.rs`, `core/tests/mark_cost.rs`, `core/tests/golden/`,
+  `core/tests/fixtures/`, `core/src/render/post/tests.rs`, `core/tests/`.
+- **Done when:**
+  - The log carries the probe's sharp and blurred frame times on `Floor`, the rung the ladder stopped
+    at, and the ratio. The ratio is at most 2, and the blurred time is inside NFR section 1.
+  - `Rich` carries a measured value, or the log says it is unmeasured.
+  - The CoC never exceeds `swarm_max_coc_px` at any `aperture`.
+  - If rung 2 was built, its cross-fade test shows no step.
+  - The golden suite passes on the session's adapter, and the log says whether `swarm` and
+    `swarm_shaped` moved, quoting the off-WARP drift report. The backdrop tests pass, or each one
+    that changed is named in the log with the reason.
+
+### Phase 4 — The shipped presets keep rendering
+- **Owner skill:** dev
+- **What:** bring the three shipped swarm presets onto the new surface mechanically. Remove bindings to
+  params that no longer exist, and replace the seam-clearance comment in `swarm_braid.toml` with one
+  that describes the frustum torus. Do not judge or re-tune the look; that is Phase 6's and the
+  content lane's.
+- **Files touched:** `presets/swarm_braid.toml`, `presets/swarm_maelstrom.toml`,
+  `presets/swarm_murmuration.toml`.
+- **Done when:** the `sanity`, `animation`, `reactivity` and `distinctness` suites pass on all three.
+  `git grep -c "near depth layer" -- presets/swarm_braid.toml` finds no description of the retired
+  arithmetic.
+
+### Phase 5 — Documentation and the references
+- **Owner skill:** dev
+- **What:**
+  - The generated params block, `presets/schema/` and `.taplo.toml` are regenerated.
+  - `docs/presets.md` and `docs/preset-guide.md` describe the swarm as projected, with a new picture.
+  - The log carries the replacement text for the preset-author reference's `## swarm` section, for
+    the owner to apply in Phase 8: the camera subset in place of the four cues, `depth_fade`, the
+    bounded sway, and the note that `zoom` and `pan` no longer parallax. A headless session cannot
+    edit `.claude/` (ADR-0210).
+  - ADR-0044's Notes cannot be edited once accepted, so `docs/adrs/README.md` marks it
+    `superseded in part by 0259`.
+- **Files touched:** `presets/README.md`, `presets/schema/`, `.taplo.toml`, `docs/presets.md`,
+  `docs/preset-guide.md`, `docs/images/`, `docs/specs/player-schema.json`, `docs/adrs/README.md`.
+- **Done when:** the schema and param-reference tests pass on the regenerated files.
+  `node scripts/toc.mjs --check`, `node scripts/check-doc-links.mjs` and
+  `node scripts/check-reader-prose.mjs` pass.
+
+### Phase 6 — The three presets, judged and re-tuned
+- **Owner skill:** human
+- **What:** the owner runs each of the three shipped swarm presets live, with the music track, and
+  marks each keep, re-tune or cut, writing what is off. The re-tunes go to `preset-author` before the
+  merge. This phase blocks the merge because, unlike the attractor's migration, nothing here starts
+  near the old picture.
+- **Files touched:** none (the re-tunes are `preset-author`'s commits).
+- **Done when:** each of the three presets is marked in this plan's log, and every one marked re-tune
+  has a `preset-author` commit on the lane.
+
+### Phase 7 — The moved baselines are blessed
+- **Owner skill:** human
+- **Blocks merge:** no
+- **What:** re-bless on DX12 WARP whichever of `swarm` and `swarm_shaped` Phase 3's log says moved,
+  and nothing else. If Plan 0218 has moved blessing to lavapipe by then, bless there instead.
+- **Files touched:** `core/tests/golden/swarm.png`, `core/tests/golden/swarm_shaped.png`.
+- **Done when:** the Windows CI golden job is green on `main`.
+
+### Phase 8 — The preset-author reference
+- **Owner skill:** human
+- **Blocks merge:** no
+- **What:** the owner applies, in an interactive session, the text Phase 5 left in the log to
+  `.claude/skills/preset-author/references/systems.md`'s `## swarm` section.
+- **Files touched:** `.claude/skills/preset-author/references/systems.md`.
+- **Done when:** the edit is committed on `main` and `node scripts/check-doc-links.mjs` exits 0.
+
+## Data shapes
+
+```rust
+// illustrative, not the final interface
+struct Particle {
+    uv: [f32; 2],   // [-1, 1) across the frustum at this particle's depth, times MARGIN
+    z: f32,         // view depth between Z_NEAR and Z_FAR, camera units
+    vel: [f32; 3],  // world units
+}
+// world = (uv * half_extent(z, rest_fov, aspect), z)
+// half_extent(z, fov, aspect) = z * tan(fov / 2) * (aspect, 1)
+```
+
+## Risks & open questions
+
+- **The look changes, and the three presets were judged in motion.** Phase 6 is blocking for that
+  reason. A preset the owner marks cut, under Plan 0232's two-per-family floor, may leave the swarm
+  short. Then the refill is `preset-author`'s, and the merge waits.
+- **Fill cost, the plan's main hazard.** 10,000 blurred sprites is the largest blurred population in
+  the engine, and blur grows each one by area, not by width. A rough estimate, not a measurement:
+  - `mark_cost` reads about 0.88 ms for 10,000 sharp discs.
+  - With a third of the population fully defocused at 25 times the area, fill lands around 5 to
+    10 ms, before the `trails` stage.
+
+  Phase 3's ladder is the answer, and its order is deliberate. Shallower blur first, because that is a
+  content limit (ADR-0045). The cheap path second, because it changes pixels only where the eye cannot
+  tell a polygon from a disc. Fewer particles last, because that changes what the swarm is.
+- **The CPU loop gets heavier too.** Per particle, the flow gains a third axis, and the position is
+  converted to and from world space by the frustum half-extent. That is arithmetic per particle, not
+  per pixel, at 10,000 to 30,000 particles, single-threaded. Phase 1 times `update` before and after
+  and puts both numbers in the log. If it grows past about 1 ms on `Floor`, the conversion can be
+  cached per depth band, since `half_extent(z)` is linear in `z`.
+- **The sway bound** is derived from the margin. With a larger `fov`, the frustum is wider and the same
+  angle shows less of the margin. The bound should be computed from both, not fixed. Phase 1 decides
+  and the test covers both target sizes.
+- **`zoom` below the margin shows the seam**, as today. Not re-derived here (ADR-0259, Negative).
+- **The backdrop fixtures** use the swarm as a carrier for backdrop tests. Their assertions are about
+  the backdrop, so they should pass. A failure there is a test reading swarm pixels it should not.
+
+## What this plan does NOT do
+
+- Links between particles (ADR-0259, Alternative D).
+- Boids (ADR-0044, Alternative B, untouched).
+- Move the swarm onto `quad3d`.
+- Re-derive the margin or the seam behaviour under `zoom < 1`.
+
+## Implementation log
+
+**Lane:** branch `plan-0239-the-swarm-moves-into-a-real-camera`, worktree `/home/igor/Work/rlx-plan-0239`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — Walking skeleton: the swarm in a camera | dev | done | b70e1488 |
+| 2 — Depth of field on the swarm's sprites | dev | done | b598e6c5 |
+| 3 — Caps, cost and the goldens | dev | done | d6e2299d |
+| 4 — The shipped presets keep rendering | dev | done | 65e4a600 |
+| 5 — Documentation and the references | dev | done | cbb2276c |
+| 6 — The three presets, judged and re-tuned | human | done - Braid keep, Maelstrom keep, Murmuration re-tune | 8ece66bd |
+| 7 — The moved baselines are blessed | human | owed | |
+| 8 — The preset-author reference | human | owed | |
+
+### Notes
+
+- Phase 1, `update` cost (release, software adapter, best of five 120-frame runs): 10,000 particles
+  0.677 ms before, 0.835 ms after; 30,000 particles 2.062 ms before, 2.517 ms after. The probe was
+  a scratch test, not committed.
+- Phase 1: the swarm no longer draws through `marks::InstancedQuads`. It builds its own pipeline in
+  `swarm.rs` (a two-uniform layout, the camera at binding 1), because the shared quad pipeline
+  binds one uniform and `marks.rs` is outside the phase's files. Its instance carries a `presence`
+  (the slab fade) that scales coverage as well as light; without it a particle faded at a slab bound
+  held the backdrop out (`a_lit_backdrop_survives_where_the_swarm_drew_nothing` failed, 4 channels).
+- Phase 1: a sprite's `size` is stated at a reference depth and carried by perspective only. `zoom`
+  magnifies positions (it divides `fov`), not sprite sizes, as on `quad3d`.
+- Phase 1: `fov` is spliced with its range narrowed to `0.2`-`0.9`; `yaw` and `pitch` with rest `0`
+  and range `±0.2`, clamped per frame to the computed sway bound.
+- Phase 1: `camera.rs`'s `MIN_FOV` and `MAX_FOV` became `pub(crate)` for the sway bound.
+- From Phase 1 on, three `-P fast` tests fail on generated artifacts the new params made stale:
+  `preset::the_parameter_reference_block_is_current`,
+  `preset_schema::the_generated_editor_files_are_current` and
+  `preset_schema::the_player_schema_snapshot_is_current`. Phase 5 regenerates the first two; the third
+  is `docs/specs/player-schema.json`, which Phase 5's file list does not name.
+- Phase 2 edits `core/src/render/scenes/mod.rs`, outside its files: one constructor argument passing
+  the tier's `max_coc_px` to `SwarmScene::new`. The swarm announces its blur clamp through
+  `mirror_overflow`.
+- Phase 2, "aperture = 0 renders identically to Phase 1": checked once by hashing the 60-frame
+  captures of the `swarm`, `swarm_shaped` and `swarm_lit_backdrop` fixtures at 160x100 on the
+  session's software adapter at b70e1488 and after Phase 2 — identical. The committed test compares
+  `aperture = "0"` (with `focus` moved) against unbound, byte for byte.
+- Phase 3 probe (`mark_cost::a_blurred_swarm_is_priced_against_the_sharp_one`, release, 1920x1080,
+  `trails = 0.8`, `focus = 0`, `aperture = 40`, best of 3 over 240 frames of slope, two runs):
+  - `Floor`, 10,000 sprites, AMD Radeon RADV RENOIR (integrated), Mesa 26.2.2: sharp 3.681 / 3.741 ms,
+    blurred 5.996 / 5.868 ms, ratio 1.63 / 1.57.
+  - `Rich`, 30,000 sprites, NVIDIA GeForce RTX 3080 Laptop GPU (discrete), driver 610.57.04: sharp
+    3.308 ms, blurred 4.186 ms, ratio 1.27. A `Rich` run on the integrated GPU read 6.998 / 18.364 ms,
+    ratio 2.62.
+  - The ladder stopped before rung 1: the shared cap met the budget on both tiers. `swarm_max_coc_px`
+    exists in `TierConfig` at the shared cap's values, `Floor` 12 and `Rich` 24, and the scene takes
+    the lower of it and `max_coc_px`. Rung 2 was not built; rung 3 was not taken.
+- Phase 3, budget terms as read: NFR section 1's 16.67 ms, and its recorded ~2.7x headroom, which is
+  16.67 / 2.7 = 6.17 ms.
+- Phase 3 edits `core/src/render/scenes/mod.rs` again (the constructor argument becomes
+  `swarm_max_coc_px.min(max_coc_px)`).
+- Phase 3 goldens, on llvmpipe (the session's adapter; the baselines are DX12 WARP, so the suite
+  reports and skips): `swarm` moved, mean 0.1480 (tol 0.02), max outlier 171 (tol 48);
+  `swarm_shaped` moved, mean 0.0208, max outlier 125. `backdrop_ramp` (mean 0.0014, outlier 20) and
+  `backdrop_band` (0.0013, 21) stayed inside tolerance. The `post::tests`, `backdrop` and swarm
+  lit-backdrop tests pass.
+- Phase 4: no binding was removed. Phase 1 retired no param (the `DEPTH_*` cues were constants), so
+  every binding in the three presets still resolves; only Braid's seam comment changed. The
+  `sanity`, `animation`, `reactivity` and `distinctness` binaries were run whole (79 passed, 3
+  skipped), since their batches do not separate presets by file.
+- Phase 1 left stale: `warp_mesh/resources.rs`'s comment describing `swarm-bind-layout` as a single
+  unsized vertex uniform (outside the phase's files).
+- Phase 5: `.taplo.toml` did not change on regeneration. `presets/README.md`'s hand-written swarm
+  prose ("Two things the swarm does on its own", and one phrase in the `bg_bright` section) was
+  rewritten for the projected model, beside the regenerated params block.
+- Phase 5: only `docs/images/gallery/swarm.png` was re-rendered (`node scripts/docs-shots.mjs
+  docs/images/gallery/swarm.png`, on the session's adapter). The three per-preset
+  cards under `docs/images/gallery/presets/swarm_*.png` were not, and still show the 2.5D look.
+- Phase 5: `rlx-core` builds with one `dead_code` warning, `PreviewService::target` in
+  `core/src/render/preview.rs`, which arrived with the merge of `main` (bbd1e961), not from this plan.
+- Phase 5, the replacement for `.claude/skills/preset-author/references/systems.md`'s `## swarm`
+  section (lines 64-81 at bbd1e961), for Phase 8:
+
+  ````markdown
+  ## `swarm` — ~10k-particle CPU flow swarm in a camera
+  *Kinetic, dancey, physical.* Additive sprites, so density reads as glow. The particles live in a
+  volume and project through the shared perspective camera (ADR-0259): a near mark draws larger and
+  crosses the screen faster than a far one, out of the projection itself, and the layers ride
+  different currents.
+
+  | Param | Default | Typical | Controls / natural driver |
+  |-------|---------|---------|---------------------------|
+  | `force` | `1.4` | `1.4 – 7` | steering toward the flow field. Bass. |
+  | `spin` | `0.3` | `0.3 – 2.3` | how fast the field evolves. Mid. |
+  | `burst` | `0.0` | `0 – 12` | radial kick from centre. `beat * 9..11`. |
+  | `brightness` | `0.8` | `0.8 – 1.8` | global multiplier. |
+  | `size` | `1.0` | `1.0 – 2.5` | mark size at the middle of the slab; perspective carries it about 2.7x from front to back. Watch overdraw on the iGPU floor. |
+  | `hue` | `0.0` | `0 – 1` | gradient offset. |
+  | `hue_spread` | `1.0` | `0.1 – 1.0` | width of the per-particle hue band. **`1.0` is full rainbow; drop it for a coherent cloud.** |
+  | `hue_center` | `0.5` | `0 – 1` | centre of that band — two presets differing only here read as different colours. |
+  | `depth_fade` | `0.571` | `0 – 1` | light lost from the front of the slab to the back. The default is the old 0.45-to-1.05 ramp; `0` lights every depth alike. |
+  | `focus` | `0.5` | `0 – 1` | the focal plane's place in the slab, 0 nearest, 1 farthest. A slow wave racks focus through the layers. |
+  | `aperture` | `0` | `0 – 24` | blur of the far background in pixels; the layers away from `focus` soften and dim by area. Clamped to the tier's swarm cap, and it costs fill. |
+  | `fov` | `0.8` | `0.2 – 0.9` | field of view; `zoom` divides it. Wider spends the margin, much wider shows the seam. |
+  | `yaw`, `pitch` | `0` | `±0.2` | turn the camera about the slab's centre, so near and far layers slide past each other in opposite directions. Held per frame to the sway the margin covers: bind a slow wave, never a clock. |
+
+  No `distance`: the slab is placed relative to the camera, and an orbit would show the edge of the
+  world. **`zoom` and `pan_*` no longer parallax** — `zoom` divides `fov` and `pan_*` shift the
+  projected picture, so both move every layer together; `zoom` below about `0.82` shows the seam.
+  The four hand-made depth cues (sprite scale, brightness ramp, parallax, flow-phase offset) are
+  gone: the camera, `depth_fade` and the depth-varying flow replace them.
+
+  Also declared: `field_freq` (the flow field's spatial frequency — higher is smaller, busier
+  eddies), `twinkle`, `size_spread`, `reseed` (re-scatters on a crossing), and the shaped-mark params
+  (`shape`, `points`, `star_*`) shared with the emitter — `presets/README.md`, "Swarm flow-field
+  structure" and "Shaped marks".
+  ````
+
+- **Phase 6, 2026-10-06 (owner, live on the Arch box, sequential walk of the three).** Braid:
+  keep. Maelstrom: keep. Murmuration: re-tune, then keep. At `zoom = 0.78` it showed empty borders,
+  the torus seam that any zoom below 1/1.25 exposes at every depth at once. 8ece66bd sets `0.85`
+  and re-renders its gallery card; the owner judged that live as good and reading in depth.
+
+### Close triggers
+
+- **`presets/` touched:** yes — `presets/swarm_braid.toml` (Phase 4), `presets/README.md`,
+  `presets/preset.schema.json` and `presets/schema/{attractor,plexus,swarm,waterfall}.schema.json`
+  (Phase 5).
+- **Plan header `Closes:`** none
+- **What shipped:** feature
+- **Operator docs touched:** `presets/README.md`, `docs/presets.md`, `docs/preset-guide.md`,
+  `docs/images/gallery/swarm.png`, `docs/specs/player-schema.json`, `docs/adrs/README.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 1, one broken: backlog 0275's
+  `present: SHIPPED_ZOOMS: \[f32; 5\] = \[0\.99` in `core/src/render/scenes/swarm/tests.rs`
+  (docs/design-backlog.md:1673); the constant was removed by b70e1488.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** 6 (blocks merge), 7 and 8 (`Blocks merge: no`).
+
+## Close review
+
+The conductor's round 1 review, graded at tip `4c13d2e7`, follows in full; its headings are demoted
+one level to sit under this section. No earlier round raised a finding, so no fix-round lines
+follow it.
+
+**Owed (ADR-0249).** Phase 7 has not yet re-blessed `swarm.png` and `swarm_shaped.png` on DX12 WARP,
+so the Windows CI golden job is expected red on both until it does; nothing has yet checked the
+projected swarm against a WARP baseline. Phase 8 has not yet applied the replacement `## swarm`
+section to `.claude/skills/preset-author/references/systems.md`, so the content lane's reference
+still describes the four 2.5D depth cues.
+
+**What the close did with the findings.** Minors 1, 2 and 3 were repaired in `885b7155`: backlog
+0275 is half discharged and re-probed, the two preset comments say about 0.82, and the `marks.rs`,
+`emitter.rs` and `warp_mesh/resources.rs` comments describe the swarm's own two-entry pipeline.
+Minor 4 (the Braid and Maelstrom gallery cards) is an image and stays open. Nit 5 stays open.
+
+### Plan 0239 — close review, round 1
+
+Graded at tip `4c13d2e7a70702ef1ae05bff048d17506e23cb4c`, lane `plan-0239-the-swarm-moves-into-a-real-camera`.
+
+**Verdict: Plan 0239 landed cleanly. No blockers, no majors, four minors and one nit.** Every dev
+phase matches its done-when in the tree, and the tests the plan named exist and assert what the plan
+claims. The owed human Phases 7 and 8 are correctly marked `Blocks merge: no` (ADR-0249).
+
+#### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 7fc7c21 is green in the suite ledger, run by
+  gate 0239-pre-review at 2026-10-06T16:16:20.328Z: 2014 tests run: 2014 passed (10 slow), 8 skipped`.
+  That ledger record is the full-suite evidence (ADR-0207).
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: green. d0a3c2f5 fixed the private
+  intra-doc links that held the pre-review gate red.
+- `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --all -- --check`: both green.
+- `node scripts/check-doc-links.mjs`, `node scripts/toc.mjs --check`, `node scripts/check-reader-prose.mjs`
+  and `node scripts/check-comment-hygiene.mjs` all pass. They cover Phase 5's done-when.
+- `node scripts/check-backlog-claims.mjs`: exit 1, backlog 0275 with two broken probes (finding 1).
+
+#### Lens 1: alignment
+
+Every phase carries one in-vocabulary owner tag. The phase-to-commit mapping is b70e1488, b598e6c5,
+d6e2299d, 65e4a600 and cbb2276c, then 8ece66bd for the Phase 6 re-tune. Two commits sit off the plan,
+and both are justified: a68e7c0a, a conductor roster-test case owed by cf28d425 on main, and
+d0a3c2f5, a rustdoc repair.
+
+- **Phase 1.**
+  - Frustum coordinates live in `Particle::pos`/`z`, and the flow runs in world space with a `z` current (`swarm.rs:1205-1259`).
+  - `slab_fade` handles the slab bounds.
+  - `camera.wgsl` is prepended and the sprite projects through `project()`.
+  - The camera subset is `yaw`/`pitch`, clamped per frame by `sway_bound`, plus `fov`, `focus` and `aperture`, with no `distance`.
+  - The `depth_fade` default is `1 - 0.45/1.05`.
+  - The aspect comes from `render`'s argument, never from `set_target_size` (ADR-0037).
+  - The tests match the done-when:
+    - `the_swarm_fixture_moves_between_two_frames_a_second_apart` uses the `capture_preset` path that `shot` drives.
+    - `the_wrap_seam_stays_outside_the_frame_at_every_depth` runs 600 frames at 1280x800 and 1920x1080, at rest and at all four sway corners clamped from twice the bound. It also asserts that more than 1000 particle-frames landed near the seam.
+    - `far_particles_cross_the_screen_more_slowly_than_near_ones` asserts far < 0.8 x near on projected centres.
+  - The `update` cost is logged: 0.835 ms at 10k, under the plan's ~1 ms trigger.
+- **Phase 2.**
+  - The vertex stage grows the quad by `reach = (r_px + coc) / r_px` and dims it by `1/reach^2`.
+  - The fragment stretches the SDF falloff over `reach`, so the silhouette's iso-lines keep their shape.
+  - `a_zero_aperture_renders_the_sharp_swarm_byte_for_byte` asserts exact equality and is non-vacuous.
+  - `a_defocused_sprite_spreads_wider_and_dimmer_than_a_focused_one` asserts more pixels and a lower peak in one frame.
+  - `a_polygon_at_the_focal_plane_keeps_its_edge` asserts three lobes and |diff| < 1e-3 against aperture 0, with a non-vacuity arm.
+- **Phase 3.**
+  - The probe is `mark_cost::a_blurred_swarm_is_priced_against_the_sharp_one`:
+    - It uses the same fixture pair, the same run and the same adapter, and it reports without gating (ADR-0071, ADR-0074).
+    - It asserts the two frames differ, so it cannot measure one shader twice.
+  - `Floor` ratio is 1.63/1.57, and the blurred 5.996 ms sits inside 16.67/2.7 = 6.17 ms, the headroom `docs/nfr.md:94` records. The margin is tight but it is inside.
+  - `Rich` was measured on the RTX 3080 Laptop: 1.27.
+  - The ladder stopped before rung 1. `swarm_max_coc_px` exists at the shared values, and `scenes/mod.rs` passes `min(swarm, shared)`.
+  - `the_circle_of_confusion_never_exceeds_the_swarm_cap` sweeps aperture (including inf/NaN), focus and depth on both tiers, and asserts the clamp is announced exactly when the aperture passes the cap.
+  - The goldens' movement is quoted in the log for Phase 7.
+- **Phase 4.** No binding needed removing, because the `DEPTH_*` cues were constants. Braid's seam
+  comment was rewritten. The `git grep -c "near depth layer" -- presets/swarm_braid.toml` check was
+  run as a single `git grep` and finds nothing.
+- **Phase 5.**
+  - The generated blocks are regenerated, and the suite's `preset_schema`/`preset` drift tests are green.
+  - `docs/specs/player-schema.json` is included, which the log flagged as outside the list and correctly took.
+  - The ADR-0044 index row reads `superseded in part by 0259`.
+  - The replacement text for the preset-author reference is in the log for Phase 8.
+- **Phase 6.** Braid keep, Maelstrom keep, Murmuration re-tuned (8ece66bd, `zoom` 0.78 to 0.85) and
+  judged live.
+- The implementation log is a few lines longer than the phases section (nit 5).
+
+#### Lens 2: layering and real-time safety
+
+- No platform or audio-source type enters `core/`.
+- The swarm builds its own two-uniform pipeline rather than widening `marks::InstancedQuads`, and the ADR-0058 layout guard still passes on it.
+- `update` and `render` do not allocate: `instance_data` is rebuilt in place.
+- The hot-path `deny` pragma is intact.
+- The C ABI and the control protocol are untouched. The scene's surface changes only through `ParamSpec` declarations.
+
+#### Lens 3: docs and bookkeeping
+
+- `docs/presets.md`, `docs/preset-guide.md` and `presets/README.md`'s hand-written swarm prose describe
+  the projected model, and `docs/images/gallery/swarm.png` was re-rendered.
+- The Braid and Maelstrom gallery cards are stale (finding 4).
+- `.claude/skills/preset-author/references/systems.md` is owed by Phase 8, by design.
+- The close owes:
+  - ADR-0259 `proposed -> accepted`, with its row refreshed.
+  - The plan to `done/`, with Phases 7 and 8 `owed` (`Status: done - Phases 7 and 8 owed, ADR-0249`).
+  - Backlog 0275 repaired (finding 1).
+  - A **minor** version bump: this is a feature plan.
+  - The studio's two version copies.
+  - A preset-curation verdict, since `presets/` was touched.
+
+#### Lens 4: correctness and determinism
+
+- The torus shape is the render target's at every depth, and `the_domain_takes_its_shape_from_the_target_at_every_depth` sweeps five aspects.
+- The seed scatter is in frustum coordinates, so it does not depend on the target.
+- No wall-clock reads.
+- Numeric assertions are dimensionless properties: ratios of like quantities, exact equality at `coc = 0`, and the cap bound. The probe's frame times are reported, not asserted.
+- `sway_bound` handles non-finite input and returns zero when there is no headroom.
+
+#### Lens 5: design integrity
+
+- The `Scene` trait is untouched.
+- The camera subset is matched locally in `set_param` rather than delegated, so the block's `distance`, `fog` and `solid` stay unreachable, as ADR-0259 decided.
+
+#### Findings
+
+##### minor
+
+1. **Backlog 0275's probes are both broken, and its question changed shape** (`docs/design-backlog.md:1671`, `:1673`).
+   - 8ece66bd set Murmuration's `zoom` to `0.85`, and the seam test's `SHIPPED_ZOOMS` was deleted by b70e1488.
+   - The entry's first question ("does Murmuration show the seam?") is answered: the owner saw it live and the zoom moved.
+   - Its second question survives in a new form. `the_wrap_seam_stays_outside_the_frame_at_every_depth` now runs at `zoom = 1` only, so nothing gates the shipped minimum zoom against the seam.
+   - Fix at the close (step 1c): close the first half to the archive citing 8ece66bd, and leave the second half live with a fresh probe. One option is `absent: SHIPPED_ZOOMS in: core/src/render/scenes/swarm/tests.rs`, or re-word it as "the seam test measures zoom 1 only".
+2. **Two preset comments state the seam threshold as 0.8, but it is about 0.82** (`presets/swarm_murmuration.toml:61`, `presets/swarm_braid.toml:123`).
+   - `zoom` divides `fov` through a tangent, so at the rest `fov = 0.8` the seam reaches the frame edge at `zoom ≈ 0.822`. That is where `1.25 * tan(0.4) = tan(0.4 / zoom)`, and `presets/README.md:1513` says "about 0.82".
+   - Murmuration's "At least 0.8 ... below 1/1.25" would let a re-tune to 0.81 show the seam. Its 0.85 is safe, with about 0.04 NDC of headroom.
+   - Fix: say "at least about 0.82" in Murmuration and "a zoom below about 0.82" in Braid.
+3. **Doc comments elsewhere still describe the swarm's old pipeline.**
+   - `core/src/render/scenes/marks.rs:221-222` says the swarm resolves "depth parallax" into `QuadInstance::attr`.
+   - `core/src/render/scenes/marks.rs:266-282` says `InstancedQuads` is what "`swarm` and `emitter`" draw through.
+   - `core/src/render/scenes/emitter.rs:1089-1112` describes the swarm's layout as "one `[Uniform]` entry".
+   - `core/src/render/scenes/warp_mesh/resources.rs:564-567` does the same: the log noted this one.
+   - Since b70e1488 the swarm builds its own two-entry pipeline (`swarm.rs:355-471`), and only the emitter uses `InstancedQuads`.
+   - Fix: comment-only edits saying the emitter is the shared draw's one user and the swarm's layout has two entries. Keep the ADR-0058 warning, which still applies to the emitter's layout.
+4. **The Braid and Maelstrom gallery cards still show the 2.5D look** (`docs/images/gallery/presets/swarm_braid.png`, `swarm_maelstrom.png`).
+   - Only `gallery/swarm.png` and Murmuration's card were re-rendered.
+   - Fix: `node scripts/docs-shots.mjs` on the two cards. This is an image, not prose, so it stays open for a dev or owner session.
+
+##### nit
+
+5. **The implementation log runs slightly longer than the phases section** (`docs/plans/0239-the-swarm-moves-into-a-real-camera.md:233`).
+   - The log is about 133 lines and the phases section about 129, which is the shape lens 1 flags.
+   - The excess is the 34-line `systems.md` replacement block that Phase 5 told the log to carry, so this is noted rather than graded.
+
+## Followups (after this lands)
+
+- ~~Accept ADR-0259 at the close, and mark ADR-0044 superseded in part in the ADR index.~~ Done at
+  the close.
+- Phase 7 (the WARP re-bless) and Phase 8 (the preset-author reference) are owed (ADR-0249).
+- Re-render the Braid and Maelstrom gallery cards (close review finding 4).

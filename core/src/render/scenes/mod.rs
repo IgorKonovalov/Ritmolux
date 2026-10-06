@@ -1377,6 +1377,7 @@ fn create(
             device,
             surface_format,
             tier.swarm_particles,
+            tier.swarm_max_coc_px.min(tier.max_coc_px) as f32,
         )),
         SystemKind::ParametricCurve => Box::new(lines::ParametricCurveScene::new(
             line_renderer(),

@@ -435,7 +435,9 @@ describe('what the family on screen decides', () => {
       const input = screen.getByLabelText(name) as HTMLInputElement
       expect([name, input.type, input.min, input.max]).toEqual([name, 'range', '-3', '3'])
     }
-    expect(screen.queryByRole('heading', { name: /^not read on / })).toBeNull()
+    // The group itself still renders: the camera block is inert on a flat map.
+    for (const name of ['a', 'b', 'c', 'd']) expect(notRead('de_jong')).not.toContain(name)
+    expect(notRead('de_jong')).toEqual(expect.arrayContaining(['yaw', 'fog']))
   })
 
   it('falls back to the single range when the player reports no family', () => {

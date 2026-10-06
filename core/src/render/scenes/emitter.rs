@@ -1110,7 +1110,10 @@ impl EmitterScene {
         // zero outlier. The two changes are cheap and honest on their own terms
         // (the size *is* known; the mask is a superset, so it forbids nothing),
         // but the reason they are here is the collision. **Do not "tidy" this
-        // back into the swarm's shape.**
+        // back into a one-entry, unsized, `VERTEX`-only shape.** The swarm's
+        // layout has two entries (its uniform, unsized, and the camera, sized),
+        // so the hazard is any descriptor this one matches byte for byte, not
+        // the swarm's in particular.
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("emitter-bind-layout"),
             entries: &[wgpu::BindGroupLayoutEntry {

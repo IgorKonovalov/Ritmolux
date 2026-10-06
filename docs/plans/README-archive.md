@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0239 - The swarm moves into a real camera](#0239---the-swarm-moves-into-a-real-camera)
   - [0249 - A dispatched CI job blesses the named WARP baselines](#0249---a-dispatched-ci-job-blesses-the-named-warp-baselines)
   - [0240 - The attractor projects through the shared camera](#0240---the-attractor-projects-through-the-shared-camera)
   - [0237 - The L-system turtle turns in space, and can grow without end](#0237---the-l-system-turtle-turns-in-space-and-can-grow-without-end)
@@ -290,6 +291,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0235 - The plexus system, and a shared camera with depth of field](done/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md) - closed 2026-10-01. Review: **three rounds; 3 majors, 3 minors (all fixed), two nits.** Version: **0.156.0**. ADR-0257 accepted. [Write-up](README-archive.md).
 - [0230 - The Russian slice becomes findable](done/0230-the-russian-slice-becomes-findable.md) - closed 2026-09-30, Phase 4 read 2026-10-01. Review: **no blockers, no majors, no minors, two nits.** Version: **0.155.0**. ADR-0213 accepted, Outcome. [Write-up](README-archive.md).
 - [0231 - The interface is audited, then learns one look](done/0231-the-interface-is-audited-then-learns-one-look.md) - closed 2026-09-30. Review: **no blockers, no majors, two minors (fixed), two nits (one fixed).** Version: **0.154.0**. ADR-0252 + 0256 accepted. [Write-up](README-archive.md).
 - [0233 - The close reviews' small findings are repaired](done/0233-the-close-reviews-small-findings-are-repaired.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.153.0**. Closes 0263-0272 bar 0267. [Write-up](README-archive.md).
@@ -498,6 +500,32 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0239 - The swarm moves into a real camera](done/0239-the-swarm-moves-into-a-real-camera.md)
+
+- closed 2026-10-06 by a conductor close on the lane
+`plan-0239-the-swarm-moves-into-a-real-camera`. The phases landed in `b70e1488` (Phase 1),
+`b598e6c5` (2), `d6e2299d` (3), `65e4a600` (4) and `cbb2276c` (5); Phase 6 was the owner's live
+judgement, with Murmuration re-tuned in `8ece66bd`. **Phases 7 and 8 are owed** (`Blocks merge: no`,
+ADR-0249): the WARP re-bless of `swarm.png` and `swarm_shaped.png`, and applying the preset-author
+reference text the log carries. The round 1 review found **no blockers, no majors, four minors and a
+nit**. The close repaired backlog 0275 (half discharged, re-probed), the two preset seam comments
+(about 0.82, not 0.8) and the stale swarm-pipeline comments in `marks.rs`, `emitter.rs` and
+`warp_mesh/resources.rs` in `885b7155`. The Braid and Maelstrom gallery cards still show the 2.5D
+look and stay open; the log's length is a nit. Version: **0.167.0** (minor: a feature). ADR-0259
+accepted, Outcome. Upstream CI read green at the close. The full review is the plan's own
+`## Close review`.
+- **What landed.** The swarm's particles live in a frustum-shaped torus and project through the
+  shared camera (`yaw`, `pitch` bounded to the margin's sway, `fov`, `focus`, `aperture`; no
+  `distance`). The flow moves in depth; `depth_fade` replaces the brightness ramp at a default that
+  reproduces it. Depth of field grows each sprite by its CoC, capped by `swarm_max_coc_px`.
+- **Open.** `zoom` and `pan` no longer parallax, so a user preset relying on that motion changes look.
+  The seam test measures `zoom = 1` only (backlog 0275). The Windows CI golden job is expected red on
+  `swarm` and `swarm_shaped` until Phase 7.
+- **Curation.** `presets/` touched: Braid's and Murmuration's comments, Murmuration's `zoom`. All
+  three swarm presets were walked live and kept; the set holds its two-per-family floor. The
+  `ADR-00NN|Plan 00NN|backlog 00NN` header grep over `presets/swarm_*.toml` names nothing this plan
+  made stale.
 
 ### [0249 - A dispatched CI job blesses the named WARP baselines](done/0249-a-dispatched-ci-job-blesses-the-named-warp-baselines.md)
 

@@ -13,7 +13,7 @@
 > [0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)
 > **Closes:** design-backlog 0279, 0280, 0281
 > **Runs before:** Plans [0237](0237-the-l-system-turtle-turns-in-space.md),
-> [0239](../0239-the-swarm-moves-into-a-real-camera.md) and
+> [0239](0239-the-swarm-moves-into-a-real-camera.md) and
 > [0240](0240-the-attractor-projects-through-the-shared-camera.md), which splice the camera block this
 > plan extends.
 

@@ -43,7 +43,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0262 — the diffusion filter's cost page reads 2.5x what `quality` measured on Linux, and nothing says which profile a reader should start from](#0262--the-diffusion-filters-cost-page-reads-25x-what-quality-measured-on-linux-and-nothing-says-which-profile-a-reader-should-start-from)
 - [0267 — the conductor's `Remove-Item` deletion bound was never asked of the real CLI](#0267--the-conductors-remove-item-deletion-bound-was-never-asked-of-the-real-cli)
 - [0274 — the cellular scene cannot trace a route through the maze it grows, so a labyrinth never shows its longest path](#0274--the-cellular-scene-cannot-trace-a-route-through-the-maze-it-grows-so-a-labyrinth-never-shows-its-longest-path)
-- [0275 — Murmuration sits at zoom 0.78, under the swarm's measured seam-safe 0.84 and under the range the seam test says the shipped presets reach](#0275--murmuration-sits-at-zoom-078-under-the-swarms-measured-seam-safe-084-and-under-the-range-the-seam-test-says-the-shipped-presets-reach)
+- [0275 — the swarm's seam test measures zoom 1 only, so nothing gates the shipped minimum zoom against the seam](#0275--the-swarms-seam-test-measures-zoom-1-only-so-nothing-gates-the-shipped-minimum-zoom-against-the-seam)
 - [0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen](#0276--a-collage-elements-own-drift-and-spin-are-too-slow-for-the-animation-gate-to-see-so-a-sparse-canvas-reads-as-frozen)
 - [0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`](#0277--the-owners-hotkey-walk-and-the-live-retune-loop-exist-only-as-scratch-scripts-under-target)
 - [0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated](#0278--plexus-lays-its-points-in-a-cube-or-on-a-plane-so-a-turning-wire-sphere-is-only-approximated)
@@ -1654,7 +1654,16 @@ changes. The drawn route could be one new overlay colour, or a distance a palett
 - **Verified 2026-09-30** — the scene has no route search:
   `absent: [Bb]readth|\bbfs\b|\bBFS\b|[Ll]ongest path in: core/src/render/scenes/cellular`
 
-## 0275 — Murmuration sits at zoom 0.78, under the swarm's measured seam-safe 0.84 and under the range the seam test says the shipped presets reach
+## 0275 — the swarm's seam test measures zoom 1 only, so nothing gates the shipped minimum zoom against the seam
+
+**Half discharged 2026-10-06 (Plan 0239 close).** The first question below is answered: the owner
+saw Murmuration's seam live at Plan 0239 Phase 6, and 8ece66bd moved its `zoom` from `0.78` to
+`0.85`. Plan 0239 also replaced the swarm's model (ADR-0259) and deleted `SHIPPED_ZOOMS`. The seam
+now reaches the frame edge at `zoom` of about `0.82` at the rest `fov` (`presets/README.md`), and
+`the_wrap_seam_stays_outside_the_frame_at_every_depth` in `core/src/render/scenes/swarm/tests.rs`
+runs at `zoom = 1` only. The second question survives in that form: should the seam test measure
+the lowest `zoom` the shipped set reaches, derived from the set? The original text follows as the
+record.
 
 `presets/README.md` measures the swarm's wrap seam as usable down to about **`0.84`**. Below it, the
 near depth layer reaches the frame edge first. `swarm_murmuration.toml` binds `zoom = "0.78"`, a
@@ -1668,10 +1677,10 @@ should `SHIPPED_ZOOMS` be derived from the shipped set rather than written down?
 - **Raised:** 2026-09-30 by `preset-author`, found while re-pointing the seam test's comment off the
   retired `swarm_drift` at Plan 0232 Phase 4. **Owner if taken:** the owner (a look at Murmuration
   in the running app), then `dev` (widen `SHIPPED_ZOOMS`, or derive it).
-- **Verified 2026-09-30** — Murmuration binds the constant:
-  `present: ^zoom = "0\.78" in: presets/swarm_murmuration.toml`
-- **Verified 2026-09-30** — the test's shipped range starts above it:
-  `present: SHIPPED_ZOOMS: \[f32; 5\] = \[0\.99 in: core/src/render/scenes/swarm/tests.rs`
+- **Verified 2026-10-06** — Murmuration binds a constant above the seam:
+  `present: ^zoom = "0\.85" in: presets/swarm_murmuration.toml`
+- **Verified 2026-10-06** — the seam test takes no shipped zoom range:
+  `absent: SHIPPED_ZOOMS in: core/src/render/scenes/swarm/tests.rs`
 
 ## 0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen
 

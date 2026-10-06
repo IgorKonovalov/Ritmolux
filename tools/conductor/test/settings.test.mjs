@@ -179,7 +179,7 @@ const CASES = [
     allowed: true,
   },
   // RLX_BLESS takes a list of baseline names as its value, so its rule leaves the value open.
-  { tool: "Bash", command: "RLX_BLESS=1 cargo nextest run -p rlx-core --test golden", allowed: true },
+  { tool: "Bash", command: "RLX_BLESS=1 cargo nextest run -p rlx-core --test golden", allowed: true, why: "the bless form the dev skill documents" },
   {
     tool: "Bash",
     command: "RLX_BLESS=waterfall_ramp node tools/conductor/with-lock.mjs suite -- cargo nextest run -p rlx-core --test golden",

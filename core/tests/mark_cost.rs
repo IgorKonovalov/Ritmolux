@@ -64,8 +64,21 @@
 //! both; and a swarm frame at this size is bandwidth-bound through 10 000
 //! overdrawing quads long before it is ALU-bound.
 //!
-//! One `#[test]` per file (its own binary → its own process), so the hardware
-//! device never coexists with the other suites' software ones.
+//! # The depth-of-field probe
+//!
+//! The second test prices the swarm's blur (ADR-0259, Plan 0239 Phase 3): blur
+//! grows a sprite's **area**, so the swarm's whole tier of sprites defocused is
+//! the largest blurred population in the engine. It renders one worst-case
+//! fixture twice in the same run on the same adapter — `aperture = 0`, and
+//! `aperture` past every tier's cap with `focus` at the slab's near bound so
+//! most of the population is defocused — with `trails` on as every shipped swarm
+//! preset has it, at 1920x1080, at the tier it names. The two terms of the
+//! ratio it prints are the same quantity, from one fixture, one run and one
+//! adapter (ADR-0074). It reports and does not gate, for the reasons above.
+//!
+//! This binary holds its tests in one process only under `cargo test`; nextest
+//! runs each in its own, so the hardware device never coexists with another
+//! suite's software one.
 
 // The determinism gate bans wall-clock reads because analysis must be a pure
 // function of its input (clippy.toml, NFR §6). This file is the deliberate
@@ -85,7 +98,7 @@ use std::time::Instant;
 
 use rlx_core::dsp::AnalysisFrame;
 use rlx_core::preset::Preset;
-use rlx_core::render::{CaptureImage, Renderer};
+use rlx_core::render::{AdapterChoice, CaptureImage, HeadlessOptions, Renderer, Tier};
 
 /// A realistic frame for this scene, not a stress test: the size the standalone
 /// opens at, where the swarm is one of the heavier families.
@@ -144,7 +157,11 @@ fn hardware() -> Option<Renderer> {
 /// which is ADR-0071's "control taken in the same run" applied to time instead of
 /// to pixels.
 fn per_frame_ms(renderer: &mut Renderer) -> (Vec<f64>, Vec<CaptureImage>) {
-    let presets: Vec<Preset> = (0..CASES.len()).map(probe).collect();
+    per_frame_ms_of(renderer, (0..CASES.len()).map(probe).collect())
+}
+
+/// [`per_frame_ms`] over any set of presets, in their order.
+fn per_frame_ms_of(renderer: &mut Renderer, presets: Vec<Preset>) -> (Vec<f64>, Vec<CaptureImage>) {
     let names: Vec<String> = presets.iter().map(|p| p.name.clone()).collect();
     renderer.set_presets(presets);
     let frame = AnalysisFrame {
@@ -185,6 +202,99 @@ fn per_frame_ms(renderer: &mut Renderer) -> (Vec<f64>, Vec<CaptureImage>) {
         .map(|(long, short)| (long - short) / f64::from(FRAMES_LONG - FRAMES_SHORT))
         .collect();
     (best, images)
+}
+
+/// The depth-of-field probe's frame: the size a shipped show runs at.
+const DOF_WIDTH: u32 = 1920;
+const DOF_HEIGHT: u32 = 1080;
+
+/// The depth-of-field probe's pair, in report order: `(label, aperture)`. The
+/// blurred case's aperture is past the highest tier's cap, so every tier draws
+/// at its own cap.
+const DOF_CASES: [(&str, &str); 2] = [("sharp  ", "0"), ("blurred", "40")];
+
+/// A swarm preset differing from its sibling **only** in its aperture: the
+/// default flow and mark, `focus` at the slab's near bound, and `trails` on.
+fn dof_probe(index: usize) -> Preset {
+    let (_, aperture) = DOF_CASES[index];
+    let toml = format!(
+        "system = \"swarm\"\nname = \"dof_{index}\"\n[params]\n\
+         brightness = \"0.9\"\nsize = \"1.0\"\nfocus = \"0\"\naperture = \"{aperture}\"\n\
+         trails = \"0.8\"\n"
+    );
+    Preset::from_toml_str(&toml).expect("the depth-of-field probe preset parses")
+}
+
+/// **The swarm's depth of field, priced against the sharp swarm**, at each tier.
+///
+/// Reports; does not gate. See the module docs for the probe's shape.
+///
+/// `Floor` runs on the adapter a headless capture picks by default, which on a
+/// hybrid machine is the integrated one the floor is stated against; `Rich` on
+/// the high-performance adapter, the discrete GPU it is calibrated against
+/// (`docs/nfr.md`). The report names each.
+#[test]
+fn a_blurred_swarm_is_priced_against_the_sharp_one() {
+    for tier in [Tier::Floor, Tier::Rich] {
+        let built = match tier {
+            Tier::Rich => Renderer::new_headless_on(
+                HeadlessOptions {
+                    width: DOF_WIDTH,
+                    height: DOF_HEIGHT,
+                    prefer_software: false,
+                },
+                tier,
+                &AdapterChoice::HighPerformance,
+            )
+            .ok()
+            .filter(|renderer| !renderer.adapter_is_software()),
+            Tier::Floor => common::headless_hardware_for(
+                DOF_WIDTH,
+                DOF_HEIGHT,
+                Some(tier),
+                common::NEEDS_HARDWARE_FOR_TIMING,
+            ),
+        };
+        let Some(mut renderer) = built else {
+            eprintln!(
+                "skipped: tier {tier:?} has no hardware adapter here — {}",
+                common::NEEDS_HARDWARE_FOR_TIMING
+            );
+            continue;
+        };
+        let presets = (0..DOF_CASES.len()).map(dof_probe).collect();
+        let (times, frames) = per_frame_ms_of(&mut renderer, presets);
+        let (sharp, blurred) = (times[0], times[1]);
+        eprintln!(
+            "swarm depth of field at {DOF_WIDTH}x{DOF_HEIGHT}, tier {tier:?}, {} frames of \
+             slope, best of {REPEATS}, interleaved, on {} (ADR-0071 report):\n  \
+             {} {sharp:.3} ms/frame\n  {} {blurred:.3} ms/frame\n  ratio {:.2}",
+            FRAMES_LONG - FRAMES_SHORT,
+            renderer.adapter_description(),
+            DOF_CASES[0].0,
+            DOF_CASES[1].0,
+            blurred / sharp
+        );
+
+        // Non-vacuity: both readings are times, and the blurred case drew a
+        // different picture, so the pair measured two configurations.
+        for ms in [sharp, blurred] {
+            assert!(ms.is_finite() && ms > 0.0, "a reading is not a time: {ms}");
+        }
+        let total = (DOF_WIDTH * DOF_HEIGHT) as usize;
+        let differing = frames[0]
+            .rgba
+            .chunks_exact(4)
+            .zip(frames[1].rgba.chunks_exact(4))
+            .filter(|(a, b)| a[..3] != b[..3])
+            .count();
+        eprintln!("  blurred differs from sharp in {differing} of {total} pixels");
+        assert!(
+            differing * 10 > total,
+            "the blurred probe drew the sharp picture, so this measured one shader twice: \
+             {differing} of {total} pixels differ"
+        );
+    }
 }
 
 /// **The shaped-mark branch, priced against the disc case it replaces.**
