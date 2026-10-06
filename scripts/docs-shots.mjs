@@ -426,6 +426,20 @@ const IMAGES = [
     tier: "rich",
   },
 
+  // --- the lsystem's space turtle and endless growth -----------------------
+  //
+  // UNJUDGED: no shipped preset walks in space or grows without end yet, so
+  // each renders a teaching preset from docs/examples/lsystem/. Filed outside
+  // the gallery for the curves' reason.
+  ...["space_tree", "endless_vine"].map((name) => ({
+    out: `docs/images/lsystem/${name}.png`,
+    presetFile: `docs/examples/lsystem/${name}.toml`,
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  })),
+
   // --- the analytic field's families beyond the plate ----------------------
   //
   // The gallery entry below pictures `chladni`; this pictures `escape_time`,

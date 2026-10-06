@@ -4474,12 +4474,40 @@ expressions. Validated at load; a bad value is a surfaced error.
 | `axiom`     | string          | Starting string. Required, non-empty.                       |
 | `rules`     | table `k = "v"` | Each key a single character (the predecessor). Required.    |
 | `angle_deg` | number          | Turn angle for `+`/`-`. Default 25.                         |
-| `max_depth` | integer         | Iterations to precompute; clamped to `1..=7`. Default 4.    |
+| `max_depth` | integer         | Iterations to precompute; clamped to `1..=7`. Default 4. Inert under `growth = "endless"`. |
+| `turtle`    | `flat` / `space` | Which turtle walks the string. Default `flat`, the plane walk. `space` walks in depth, seen through the camera block. An unknown name is a load error naming both. |
+| `growth`    | `fixed` / `endless` | Default `fixed`: one cached depth, picked by `visible_depth`. `endless` grows a vine that never ends, at the rate `grow` sets. An unknown name is a load error naming both. |
+| `trail`     | integer         | Endless only: how many segments the vine keeps behind its tip. Default 2000. Held to the tier's cap (`seg3d_segments` in `space`, `max_segments` in `flat`), and the clamp is announced. A grammar whose whole stream is shorter than `trail` is a load error. |
+| `follow_window` | integer     | Endless only: how many of the newest segments the view follows the centre of. Default 32. Wider smooths the jump a `]` makes. |
 | `seed`      | integer or `"random"` | The salt for `hash()`/`noise()` — see [Seeded randomness](#seeded-randomness--hash-noise-and-generator-seed). **Not** an L-system key: the expansion is deterministic and ignores it, and any system's preset may declare one. Default 0. |
 
 Turtle vocabulary in the expanded string: `F`/`G` draw forward, `f` moves without
 drawing, `+`/`-` turn by `angle_deg`, `[`/`]` push/pop the branch state, any other
 character is an inert grammar variable.
+
+Under `turtle = "space"` the turtle carries a heading, a left and an up direction,
+and five more symbols turn it, each by `angle_deg`: `&`/`^` pitch down and up,
+`\`/`/` roll, and `|` turns it around. `+`/`-` still turn it left and right. Under
+`flat` those five stay inert variables, so a grammar that names them as variables
+walks what it always did. The space figure is drawn through the camera block
+(`yaw`, `pitch`, `distance`, `fov`, `focus`, `aperture`, `fog`, `solid`), and
+`thickness` is in pixels at the focal plane. A segment is a straight stroke with no
+join, so a sharp turn shows a facet at any width above a hairline.
+
+Under `growth = "endless"` nothing is cached. The turtle walks the grammar's
+derivation one symbol at a time at a fixed internal depth, `grow` draw steps a
+second, and keeps the newest `trail` segments; the oldest `tail` fraction of them
+fades out. The view follows the centre of the newest `follow_window` segments on a
+spring with time constant `follow`. In `space` the camera orbits that point; in
+`flat` the figure pans by it, on top of `pan_x`/`pan_y`. The walk is depth-first,
+so a `]` sends the tip back to its branch point: vines and short-branched coral
+suit `endless`, and a deep tree, whose `]` jumps a long way back, does not.
+
+What each mode makes inert is in the generated table under
+[System: `lsystem`](#system-lsystem): `rotation`, `scale`, `stroke_blend`,
+`mirror_order` and `mirror_reflect` are flat-only; the camera block is space-only;
+`visible_depth`, `draw_progress` and the mirror pair are inert under `endless`, and
+`grow`, `tail` and `follow` under `fixed`.
 
 ### `[generator]` — for `star_pattern`
 

@@ -1,0 +1,27 @@
+# A branching tree walked by the space turtle, for the illustrated guide's
+# picture of `turtle = "space"`. Teaching material, not a shipped preset.
+# Each branch pitches off its trunk with `&`, and the three are rolled a third
+# of a turn apart with `/`, so the tree stands in depth. The camera turns
+# slowly round it with the focal plane near the front, so the far branches
+# take the open aperture's blur.
+system = "lsystem"
+name = "Tree in space"
+
+[generator]
+axiom     = "X"
+rules     = { X = "F[&X]////[&X]////[&X]", F = "FF" }
+angle_deg = 28
+max_depth = 6
+turtle    = "space"
+
+[params]
+visible_depth = "6"
+hue           = "0.3"
+hue_spread    = "0.5"
+thickness     = "3"
+yaw           = "time * 0.1"
+pitch         = "0.2"
+distance      = "2.6"
+fov           = "0.9"
+focus         = "0.25"
+aperture      = "8 + clamp(bass * 2, 0, 2)"

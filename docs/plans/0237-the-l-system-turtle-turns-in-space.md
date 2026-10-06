@@ -330,8 +330,8 @@ and `follow_window`.
 | 3 — Caps and the space golden | dev | done | 927564c3 |
 | 4 — Endless: the lazy stream and the ring | dev | done | 263296bd |
 | 5 — The camera follows the growth | dev | done | 6222ae74 |
-| 6 — Endless cost and the endless golden | dev | done | committed with this row |
-| 7 — Documentation and the references | dev | not started | |
+| 6 — Endless cost and the endless golden | dev | done | d50a77fb |
+| 7 — Documentation and the references | dev | done | committed with this row |
 | 8 — The look, judged | human | not started | |
 | 9 — The preset-author reference | human | not started | |
 
@@ -437,6 +437,44 @@ and `follow_window`.
   Their fixtures overrun `trail 48` within the harness's 60 frames (`grow 72`). The 600-frame
   determinism check is `lsystem_endless::the_same_frames_grow_the_same_ring`, which compares two
   captures of each fixture byte for byte.
+- Phase 7's regeneration changed nothing: `presets/schema/`, `.taplo.toml`,
+  `docs/specs/player-schema.json` and the params block were already current from Phases 1, 2
+  and 4. The schema tests and `the_parameter_reference_block_is_current` pass on them.
+- Phase 7's two guide pictures render teaching presets, `docs/examples/lsystem/space_tree.toml`
+  and `docs/examples/lsystem/endless_vine.toml`, through two new entries in
+  `scripts/docs-shots.mjs`, which is every committed image's provenance record. Both paths are
+  outside the phase list. The images were rendered on llvmpipe; the `docs/images/lsystem/` stems
+  are outside `docs/images/gallery/`, so the gallery hygiene tests do not read them.
+- The lane's tip builds `rlx-core` with a `dead_code` warning on `PreviewService::target` in
+  `core/src/render/preview.rs`, which arrived with the merge of `main` (fdac6e6e, a8eab67d), not
+  from this plan. Not touched.
+- Phase 7's text for the preset-author reference's `## lsystem` section in
+  `.claude/skills/preset-author/references/systems.md`, for the owner to apply in Phase 9:
+
+  > **Two structural modes on `[generator]`, both defaulting to the shipped behaviour.**
+  >
+  > - **`turtle = "space"`** walks the grammar in depth. Beside `+`/`-` (yaw), `&`/`^` pitch,
+  >   `\`/`/` roll and `|` turns around, all by `angle_deg`; under `flat` those five are inert
+  >   variables. The figure is drawn through the camera block (`yaw`, `pitch`, `distance`, `fov`,
+  >   `focus`, `aperture`, `fog`, `solid`), and `thickness` is pixels at the focal plane. Inert in
+  >   `space`: `rotation`, `scale`, `stroke_blend`, `mirror_order`, `mirror_reflect`. The fit is
+  >   a bounding sphere, so a small tree reads small: `distance` is the lever, not `scale`.
+  > - **`growth = "endless"`** grows a vine that never ends, in either turtle mode. `grow` is draw
+  >   steps a second (bind it to `onset` to surge), `trail` (a `[generator]` key, default 2000,
+  >   held to the tier's cap) is how many segments stay, `tail` is the fading oldest fraction, and
+  >   the view follows the newest `follow_window` segments on a spring of `follow` seconds. Inert
+  >   in `endless`: `max_depth`, `visible_depth`, `draw_progress`, `mirror_order`,
+  >   `mirror_reflect`. In `flat endless`, `scale` sets the step's size and `rotation` still turns
+  >   the figure. `grow`, `tail` and `follow` are inert under `fixed`. A grammar whose stream is
+  >   shorter than `trail` is a load error.
+  > - **The facet at a turn.** A segment is a straight stroke with no join, so every turn of
+  >   `angle_deg` shows a facet at any width above a hairline, more at 60 to 90 degrees than at
+  >   20. Keep `thickness` low on a sharp-angled grammar, or accept the faceted look.
+  > - **Which grammars suit `endless`.** The walk is depth-first, so a `]` sends the tip back to
+  >   its branch point and the camera glides after it. Vines and short-branched coral
+  >   (`F=F[&+F]F[^-F]/F`, `F=F+F-F&F^F`) read as growth. A deep tree (`X=F[+X][-X]FX`,
+  >   `F=FF`) jumps a long way back at every coarse `]` and reads as a pen tracing a tree; draw
+  >   it `fixed` instead. A wider `follow_window` or a longer `follow` softens a jump.
 
 ### Close triggers
 

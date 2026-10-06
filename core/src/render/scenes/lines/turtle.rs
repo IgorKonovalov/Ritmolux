@@ -11,6 +11,16 @@
 //! - `[`      — push position + heading
 //! - `]`      — pop position + heading
 //! - anything else — no-op (grammar variables such as `X` that only expand)
+//!
+//! The space turtle ([`TurtleMode::Space`]) reads the same commands, with `+`
+//! and `-` yawing about its up vector, and five more, each turning by the
+//! configured angle:
+//! - `&`, `^` — pitch down, up (about the left vector)
+//! - `\`, `/` — roll left, right (about the heading)
+//! - `|`      — turn around (yaw by 180 degrees)
+//!
+//! `[` and `]` push and pop the whole frame. The flat turtle leaves those five
+//! symbols inert.
 
 // Under render/, so it carries the panic pragma even though it runs only at
 // preset load. Written panic-free (no unwrap/index/panic).
