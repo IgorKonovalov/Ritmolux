@@ -1,6 +1,6 @@
 # 0250 — The close findings and five small asks are paid
 
-> **Status:** approved (2026-10-06)
+> **Status:** in-progress
 > **Created:** 2026-10-06
 > **Owner skill(s):** dev, studio-builder
 > **Closes:** design-backlog 0260, 0275, 0282, 0283, 0284
@@ -196,17 +196,25 @@ had already judged the length warranted.
 
 ## Implementation log
 
-**Lane:**
+**Lane:** `plan-0250-the-close-findings-and-five-small-asks-are-paid`, worktree `/home/igor/Work/rlx-plan-0250`, run by hand after the conductor's implement session died (plan parked in the conductor)
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The loader and the reference stop misleading an author | dev | not started | |
+| 1 — The loader and the reference stop misleading an author | dev | done | committed with this row |
 | 2 — The 3D findings | dev | not started | |
 | 3 — The two gates that cannot see what shipped | dev | not started | |
 | 4 — Window names, thumbnail dates, tooling | dev | not started | |
 | 5 — The render service stops leaking | studio-builder | not started | |
 
 ### Notes
+
+- Phase 1, deviation: no `#[serde(flatten)]` catch-all. Flatten makes the derived `Deserialize` call
+  `deserialize_map`, which hides the field roster `every_serde_field_has_a_descriptor_row_and_the_reverse`
+  probes, and routes type errors through buffered content. The loader instead parses the source as a
+  `toml::Table` and warns on any top-level or `[layer]` key that is no row of `raw::PRESET` / `raw::LAYER`
+  (`warn_unknown_keys` in `load.rs`). Chosen by the owner in-session.
+- Phase 1: the done-when's `--check --strict presets` spelling exits 2 (`--check` takes the path); the
+  run was `--strict --check presets`, 93 files, 0 warnings. `.taplo.toml` did not change on regeneration.
 
 ### Close triggers
 

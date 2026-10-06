@@ -462,7 +462,7 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `field_speed` | `1` | `0` – `4` | How fast the field itself drifts, as a multiple of its base rate. | motion, main |
 | `fold_speed` | `1` | `0` – `4` | How fast the fold turns, independently of the field's own drift. | motion |
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. | colour, main |
-| `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. | shape |
+| `zoom` | `1` | `0.25` – `4` | Scales the sampled window of the field; above 1 shows more of the field, each feature smaller. | shape |
 | `glow` | `0.7` | `0` – `2` | Overall light the field emits, before the composite sees it. | light, main |
 | `flash` | `0` | `0` – `1` | Lifts the whole field toward white, for a beat-driven blink. | light |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
@@ -677,7 +677,7 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. | colour |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. | colour |
 | `palette_contour_ink` | `0` | `0` – `1` | Where along the palette an ink contour takes its colour; unread by the two black styles. | colour |
-| `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. | shape |
+| `zoom` | `1` | `0.25` – `4` | Scales the sampled window of the field; above 1 shows more of the field, each feature smaller. | shape |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
 

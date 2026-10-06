@@ -39,7 +39,7 @@
         "color_center": { "$ref": "#/definitions/param.color_center.analytic_field" },
         "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
         "hue": { "$ref": "#/definitions/param.hue.fragment_field" },
-        "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
+        "zoom": { "$ref": "#/definitions/param.zoom.swarm" },
         "pan_x": { "$ref": "#/definitions/param.pan_x" },
         "pan_y": { "$ref": "#/definitions/param.pan_y" },
         "saturation": { "$ref": "#/definitions/param.saturation" },
@@ -802,11 +802,6 @@
       "description": "Where this scene reads from the palette, as a coordinate along it rather than a colour.",
       "markdownDescription": "Where this scene reads from the palette, as a coordinate along it rather than a colour.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.zoom.fragment_field": {
-      "type": "string",
-      "description": "Scales the whole scene about its centre; above 1 fills more of the frame.",
-      "markdownDescription": "Scales the whole scene about its centre; above 1 fills more of the frame.\n\n- default `1.0`\n- typical range `0.25` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
     "param.pan_x": {
       "type": "string",
       "description": "Slides the whole scene sideways, in the scene's own units rather than pixels.",
@@ -846,6 +841,11 @@
       "type": "string",
       "description": "Where along the palette an ink contour takes its colour; unread by the two black styles.",
       "markdownDescription": "Where along the palette an ink contour takes its colour; unread by the two black styles.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.zoom.swarm": {
+      "type": "string",
+      "description": "Scales the whole scene about its centre; above 1 fills more of the frame.",
+      "markdownDescription": "Scales the whole scene about its centre; above 1 fills more of the frame.\n\n- default `1.0`\n- typical range `0.25` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.brightness.parametric_curve": {
       "type": "string",

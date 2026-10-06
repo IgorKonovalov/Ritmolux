@@ -937,7 +937,7 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::common::PALETTE_CONTOUR,
     crate::render::scenes::common::PALETTE_CONTOUR_STYLE,
     crate::render::scenes::common::PALETTE_CONTOUR_INK,
-    crate::render::scenes::common::zoom(DEFAULT_ZOOM),
+    crate::render::scenes::common::field_zoom(DEFAULT_ZOOM),
     crate::render::scenes::common::PAN_X,
     crate::render::scenes::common::PAN_Y,
 ];

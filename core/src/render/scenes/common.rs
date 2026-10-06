@@ -183,13 +183,31 @@ pub(crate) const fn brightness(default: f32) -> ParamSpec {
     }
 }
 
-/// `zoom`, the shared view transform. One meaning across every scene that has it.
+/// `zoom`, the shared view transform, for a scene that scales what it draws.
+/// A scene that scales the window it samples a field through declares
+/// [`field_zoom`] instead: the same key, the opposite direction on screen.
 pub(crate) const fn zoom(default: f32) -> ParamSpec {
     ParamSpec {
         name: "zoom",
         default,
         range: Some([0.25, 4.0]),
         doc: "Scales the whole scene about its centre; above 1 fills more of the frame.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
+    }
+}
+
+/// `zoom` on a sampled field (ADR-0018): it scales the window the shader reads
+/// the field through, so a larger value shows more of the field and draws each
+/// feature smaller -- the inverse of [`zoom`]'s on-screen sense.
+pub(crate) const fn field_zoom(default: f32) -> ParamSpec {
+    ParamSpec {
+        name: "zoom",
+        default,
+        range: Some([0.25, 4.0]),
+        doc: "Scales the sampled window of the field; above 1 shows more of the field, each \
+              feature smaller.",
         kind: ParamKind::Modal,
         group: ParamGroup::Shape,
         main: false,

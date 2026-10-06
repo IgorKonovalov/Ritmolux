@@ -412,7 +412,7 @@ pub const PARAMS: &[ParamSpec] = &[
         main: false,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),
-    crate::render::scenes::common::zoom(DEFAULT_ZOOM),
+    crate::render::scenes::common::field_zoom(DEFAULT_ZOOM),
     ParamSpec {
         name: "glow",
         default: 0.7,

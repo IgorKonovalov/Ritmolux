@@ -143,8 +143,10 @@ files`, so a run over nothing reports itself rather than passing silently.
 **Exit codes: `0` clean, `1` a preset failed, `2` the command was wrong.** A path naming nothing is
 `2`, because a missing file is the spelling rather than the content. `--strict` moves a warning into
 the failing class, which is what a gate wants and what an author mid-edit does not: the class the
-loader forgives on purpose is a parameter name it does not recognise, where the binding is kept and
-nothing reads it — a silent typo, and the one `--strict` exists for.
+loader forgives on purpose is a name it does not recognise — a parameter, where the binding is kept
+and nothing reads it, or a top-level table or key (`[smothing]`, and the same inside `[layer]`),
+which the warning names with the nearest known spelling when one is within two edits. Each is a
+silent typo, and the one `--strict` exists for.
 
 Like `--help` and `--schema` it creates no window, no GPU device and no capture client, so an
 author's "does this compile" loop costs one process start. **Nothing about it writes**: there is no

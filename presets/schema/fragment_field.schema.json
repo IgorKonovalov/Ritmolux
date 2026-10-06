@@ -811,8 +811,8 @@
     },
     "param.zoom.fragment_field": {
       "type": "string",
-      "description": "Scales the whole scene about its centre; above 1 fills more of the frame.",
-      "markdownDescription": "Scales the whole scene about its centre; above 1 fills more of the frame.\n\n- default `1.0`\n- typical range `0.25` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Scales the sampled window of the field; above 1 shows more of the field, each feature smaller.",
+      "markdownDescription": "Scales the sampled window of the field; above 1 shows more of the field, each feature smaller.\n\n- default `1.0`\n- typical range `0.25` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.glow.fragment_field": {
       "type": "string",

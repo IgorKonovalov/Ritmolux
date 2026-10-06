@@ -4798,3 +4798,62 @@ fn the_grammar_is_hashed_and_the_schema_version_did_not_move() {
          cannot tell a studio its expression editor is stale"
     );
 }
+
+/// A table or key the loader does not know is a **warning** that names it and,
+/// when a known name is within two edits, the one the author meant — the
+/// preset still loads, and `--strict` is what turns the warning into a failure.
+#[test]
+fn an_unknown_top_level_table_or_key_warns_and_names_the_nearest_known_one() {
+    let misspelled = Preset::from_toml_str(
+        "system = \"fragment_field\"\n[params]\nhue = \"bass\"\n[smothing]\nhue = 1\n",
+    )
+    .expect("an unknown table is a warning, not an error");
+    assert_eq!(
+        misspelled.warnings.len(),
+        1,
+        "exactly one warning: {:?}",
+        misspelled.warnings
+    );
+    let warning = misspelled.warnings.first().expect("the warning");
+    assert!(
+        warning.contains("'[smothing]'") && warning.contains("'[smoothing]'"),
+        "the warning names the table and suggests the known one: {warning}"
+    );
+
+    let spelled = Preset::from_toml_str(
+        "system = \"fragment_field\"\n[params]\nhue = \"bass\"\n[smoothing]\nhue = 1\n",
+    )
+    .expect("valid preset");
+    assert!(
+        spelled.warnings.is_empty(),
+        "a known table does not warn: {:?}",
+        spelled.warnings
+    );
+
+    let scalar = Preset::from_toml_str("system = \"fragment_field\"\nsytem = \"x\"\n")
+        .expect("an unknown scalar is a warning, not an error");
+    assert_eq!(scalar.warnings.len(), 1, "{:?}", scalar.warnings);
+    let warning = scalar.warnings.first().expect("the warning");
+    assert!(
+        warning.contains("'sytem'") && warning.contains("'system'"),
+        "a stray scalar warns and suggests the known key: {warning}"
+    );
+}
+
+/// The `[layer]` sub-preset gets the same check against its own roster: a
+/// table the layer does not take warns with the `layer.` path it was written
+/// under.
+#[test]
+fn an_unknown_layer_table_warns_with_its_dotted_name() {
+    let preset = Preset::from_toml_str(
+        "system = \"fragment_field\"\n[layer]\nsystem = \"fragment_field\"\n\
+         [layer.smothing]\nhue = 1\n",
+    )
+    .expect("an unknown layer table is a warning, not an error");
+    assert_eq!(preset.warnings.len(), 1, "{:?}", preset.warnings);
+    let warning = preset.warnings.first().expect("the warning");
+    assert!(
+        warning.contains("'[layer.smothing]'") && warning.contains("'[layer.smoothing]'"),
+        "the warning names the layer table and the known one: {warning}"
+    );
+}

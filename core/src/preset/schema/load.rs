@@ -27,6 +27,7 @@ impl Preset {
         let latch_names: Vec<String> = latches.iter().map(|l| l.name.clone()).collect();
 
         let mut warnings = Vec::new();
+        warn_unknown_keys(src, &mut warnings);
         let mut params = compile_bindings(
             system,
             raw.params,
@@ -365,6 +366,74 @@ impl Preset {
             representative: raw.representative,
         })
     }
+}
+
+/// Warn on every key the document carries that no descriptor row names, at the
+/// top level and inside `[layer]` -- a warning, not an error (ADR-0020), so a
+/// misspelled `[smothing]` still loads and `--strict` is what fails on it.
+///
+/// The check reads the [`raw::PRESET`] and [`raw::LAYER`] descriptors rather
+/// than a `#[serde(flatten)]` catch-all on the raw structs: `schema::tests`
+/// already holds those descriptors equal to the fields serde derives, and a
+/// flattened struct would hide that roster from the probe that reads it and
+/// route every type error through serde's buffered content, losing its span.
+/// The source is parsed a second time for it, once per load, off the hot path.
+fn warn_unknown_keys(src: &str, warnings: &mut Vec<PresetWarning>) {
+    let Ok(doc) = src.parse::<toml::Table>() else {
+        return;
+    };
+    warn_unknown_in(&doc, &raw::PRESET, "", "top-level ", warnings);
+    if let Some(toml::Value::Table(layer)) = doc.get("layer") {
+        warn_unknown_in(layer, &raw::LAYER, "layer.", "[layer] ", warnings);
+    }
+}
+
+/// One table's half of [`warn_unknown_keys`]. `prefix` is the dotted path a
+/// sub-table's name is written under, `place` the words naming where it sits.
+fn warn_unknown_in(
+    table: &toml::Table,
+    desc: &TableDesc,
+    prefix: &str,
+    place: &str,
+    warnings: &mut Vec<PresetWarning>,
+) {
+    let spell = |name: &str, value: &toml::Value| match value {
+        toml::Value::Table(_) => format!("table '[{prefix}{name}]'"),
+        _ => format!("key '{name}'"),
+    };
+    for (name, value) in table {
+        if desc.keys.iter().any(|key| key.name == name) {
+            continue;
+        }
+        let hint = desc
+            .keys
+            .iter()
+            .map(|key| (edit_distance(name, key.name), key.name))
+            .filter(|&(distance, _)| distance <= 2)
+            .min_by_key(|&(distance, _)| distance)
+            .map(|(_, known)| format!("; did you mean {}?", spell(known, value)))
+            .unwrap_or_default();
+        warnings.push(PresetWarning::unanchored(format!(
+            "unknown {place}{}: nothing reads it{hint}",
+            spell(name, value)
+        )));
+    }
+}
+
+/// The Levenshtein distance between two names, by character.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut diagonal = row[0];
+        row[0] = i + 1;
+        for (j, &cb) in b.iter().enumerate() {
+            let substitute = diagonal + usize::from(ca != cb);
+            diagonal = row[j + 1];
+            row[j + 1] = substitute.min(row[j] + 1).min(diagonal + 1);
+        }
+    }
+    row[b.len()]
 }
 
 /// Compile and validate the `[latch]` table (ADR-0137).
