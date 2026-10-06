@@ -226,8 +226,8 @@ struct Particle {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: the swarm in a camera | dev | done | committed with this row |
-| 2 — Depth of field on the swarm's sprites | dev | not started | |
+| 1 — Walking skeleton: the swarm in a camera | dev | done | b70e1488 |
+| 2 — Depth of field on the swarm's sprites | dev | done | committed with this row |
 | 3 — Caps, cost and the goldens | dev | not started | |
 | 4 — The shipped presets keep rendering | dev | not started | |
 | 5 — Documentation and the references | dev | not started | |
@@ -254,6 +254,13 @@ struct Particle {
   `preset_schema::the_generated_editor_files_are_current` and
   `preset_schema::the_player_schema_snapshot_is_current`. Phase 5 regenerates the first two; the third
   is `docs/specs/player-schema.json`, which Phase 5's file list does not name.
+- Phase 2 edits `core/src/render/scenes/mod.rs`, outside its files: one constructor argument passing
+  the tier's `max_coc_px` to `SwarmScene::new`. The swarm announces its blur clamp through
+  `mirror_overflow`.
+- Phase 2, "aperture = 0 renders identically to Phase 1": checked once by hashing the 60-frame
+  captures of the `swarm`, `swarm_shaped` and `swarm_lit_backdrop` fixtures at 160x100 on the
+  session's software adapter at b70e1488 and after Phase 2 — identical. The committed test compares
+  `aperture = "0"` (with `focus` moved) against unbound, byte for byte.
 - Phase 1 left stale: `warp_mesh/resources.rs`'s comment describing `swarm-bind-layout` as a single
   unsized vertex uniform (outside the phase's files).
 

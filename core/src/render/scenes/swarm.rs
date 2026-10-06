@@ -242,6 +242,9 @@ struct VsOut {
     @location(4) @interpolate(flat) star: vec3<f32>,
     @location(5) @interpolate(flat) rough: vec3<f32>,
     @location(6) @interpolate(flat) presence: f32,
+    // How far the drawn quad reaches past the sharp sprite: `(r + coc) / r`,
+    // exactly 1 where the sprite is in focus.
+    @location(7) @interpolate(flat) reach: f32,
 }
 
 @vertex
@@ -265,11 +268,23 @@ fn vs_main(
     // reference depth; perspective carries it to this one. The x half-extent
     // is divided by the target's aspect so the sprite is round on screen.
     let r = radius * misc.v.y / depth;
-    let ndc = clip.xy / depth + c * r * vec2<f32>(1.0 / misc.v.x, 1.0);
+    // Depth of field (ADR-0257): the circle of confusion at this depth, in
+    // pixels of the texture drawn into, grows the sprite by `(r + coc) / r` and
+    // dims its light by the area factor, so a blurred sprite spreads its light
+    // over the larger disc rather than adding to it. At `coc = 0` both factors
+    // are exactly 1 and the sprite is the sharp one, bit for bit.
+    let r_px = r * 0.5 * cam.viewport.y;
+    let blur = coc(cam, depth);
+    let reach = select(1.0, (r_px + blur) / r_px, r_px > 0.0);
+    let keep = 1.0 / (reach * reach);
+    let ndc = clip.xy / depth + c * (r * reach) * vec2<f32>(1.0 / misc.v.x, 1.0);
     var out: VsOut;
     out.pos = vec4<f32>(ndc, 0.0, 1.0);
-    out.local = c;
-    out.color = color;
+    // The silhouette is sampled out to the grown radius, in the sharp sprite's
+    // own units, so its shape is unchanged and only its edge widens.
+    out.local = c * reach;
+    out.reach = reach;
+    out.color = color * keep;
     out.shape = misc.m.x;
     out.points = misc.m.y;
     out.star = misc.s.xyz;
@@ -284,7 +299,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // and nothing else; the falloff below is untouched either way, so a visual
     // change is attributable to the shape alone.
     let d = mark_distance(in.local, in.shape, in.points, in.star, in.rough);
-    let falloff = max(0.0, 1.0 - d);
+    // The falloff stretched to reach zero at the grown radius rather than the
+    // sharp one: `d` scales with radius on every arm, so its iso-lines keep the
+    // silhouette's shape and a blurred polygon reads as a soft polygon. At
+    // `reach = 1` this is `1 - d`.
+    let falloff = max(0.0, 1.0 - d / in.reach);
     let g = falloff * falloff;
     // Premultiplied: colour AND alpha carry the same coverage `g`, so the four
     // corners outside the inscribed disc write nothing at all rather than
@@ -604,6 +623,11 @@ pub struct SwarmScene {
     /// How many reseeds have fired. Salts the per-particle kick draw so
     /// successive reseeds scatter differently (the attractor's convention).
     reseed_count: u32,
+    /// The tier's cap on a sprite's circle of confusion, in pixels.
+    max_coc: f32,
+    /// This frame's blur clamp, when `aperture` is past `max_coc`, for the
+    /// renderer to announce (ADR-0007: a cap is never silent).
+    clamp: Option<super::CapOverflow>,
 }
 
 impl SwarmScene {
@@ -612,11 +636,13 @@ impl SwarmScene {
     /// [`swarm_particles`](crate::render::TierConfig::swarm_particles). The count
     /// is fixed for the life of the scene — the instance buffer and the CPU
     /// mirror are both sized to it here, so the per-frame path never allocates —
-    /// and a tier change rebuilds the scene rather than resizing it.
+    /// and a tier change rebuilds the scene rather than resizing it. Blur is
+    /// held to `max_coc` pixels, the tier's cap.
     pub fn new(
         device: &wgpu::Device,
         surface_format: wgpu::TextureFormat,
         particles: usize,
+        max_coc: f32,
     ) -> Self {
         let sprites = Sprites::new(device, particles, surface_format);
 
@@ -679,6 +705,8 @@ impl SwarmScene {
             reseed: 0.0,
             prev_reseed: 0.0,
             reseed_count: 0,
+            max_coc,
+            clamp: None,
         }
     }
 
@@ -1042,6 +1070,10 @@ impl Scene for SwarmScene {
         self.target = (width, height);
     }
 
+    fn mirror_overflow(&self) -> Option<&super::CapOverflow> {
+        self.clamp.as_ref()
+    }
+
     fn set_palette(&mut self, palette: &Palette) {
         // CPU-sampled per particle in `update`; a cheap array copy, off the hot
         // path (once per preset switch).
@@ -1278,7 +1310,8 @@ impl Scene for SwarmScene {
         // correct source for a shape (ADR-0037); see the field's docs for why
         // `set_target_size` is not.
         self.aspect = aspect.max(0.1);
-        let frame = self.camera_frame(self.aspect, 0.0);
+        let frame = self.camera_frame(self.aspect, self.max_coc);
+        self.clamp = frame.blur;
         let misc = SwarmUniform {
             v: [self.aspect, SIZE_DEPTH, 0.0, 0.0],
             // Quantized here, on the way into the uniform, so the shader's

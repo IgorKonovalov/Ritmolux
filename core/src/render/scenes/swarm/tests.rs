@@ -16,6 +16,9 @@ use crate::render::scenes::SeededRng;
 /// every golden capture draws (Plan 0044).
 const FLOOR_PARTICLES: usize = crate::render::TierConfig::FLOOR.swarm_particles;
 
+/// The floor tier's blur cap, which every scene these tests build is held to.
+const MAX_COC: f32 = crate::render::TierConfig::FLOOR.max_coc_px as f32;
+
 /// Target aspects worth checking a domain against: 16:9, 16:10, 4:3, an
 /// ultrawide, and a portrait.
 const ASPECTS: [f32; 5] = [16.0 / 9.0, 16.0 / 10.0, 4.0 / 3.0, 21.0 / 9.0, 9.0 / 16.0];
@@ -43,7 +46,7 @@ fn scene(particles: usize) -> Option<(crate::render::Renderer, SwarmScene)> {
         }
         Err(e) => panic!("headless renderer build failed: {e}"),
     };
-    let scene = SwarmScene::new(&renderer.ctx.device, COMPOSITE_FORMAT, particles);
+    let scene = SwarmScene::new(&renderer.ctx.device, COMPOSITE_FORMAT, particles, MAX_COC);
     Some((renderer, scene))
 }
 
@@ -833,6 +836,23 @@ const MARK_HALF: f32 = 0.9;
 /// grey, so the profile below thresholds on luminance with no palette sample
 /// putting notches in it that have nothing to do with the shape.
 fn capture_one_mark(shape: f32, points: f32) -> Option<Vec<f32>> {
+    capture_sprites(
+        &[("shape", shape), ("points", points)],
+        &[SwarmInstance {
+            center: [0.0, 0.0, PIVOT - SIZE_DEPTH],
+            radius: MARK_HALF,
+            color: [0.5; 3],
+            presence: 1.0,
+        }],
+    )
+}
+
+/// `sprites`, drawn through the real swarm pipeline under `params` onto a clear
+/// [`MARK_CAPTURE`]-square target — the linear composite, RGBA, row-major.
+///
+/// The scene is built with a pool of exactly `sprites.len()`, updated once so
+/// its uniforms are the bound ones, and its sprites then replaced by these.
+fn capture_sprites(params: &[(&str, f32)], sprites: &[SwarmInstance]) -> Option<Vec<f32>> {
     use crate::dsp::AnalysisFrame;
     use crate::render::context::RenderError;
     use crate::render::{COMPOSITE_FORMAT, HeadlessOptions, Renderer, capture};
@@ -852,19 +872,14 @@ fn capture_one_mark(shape: f32, points: f32) -> Option<Vec<f32>> {
     let device = renderer.ctx.device.clone();
     let queue = renderer.ctx.queue.clone();
 
-    let mut scene = SwarmScene::new(&device, COMPOSITE_FORMAT, 1);
-    for (name, value) in [("shape", shape), ("points", points)] {
+    let mut scene = SwarmScene::new(&device, COMPOSITE_FORMAT, sprites.len(), MAX_COC);
+    for &(name, value) in params {
         scene.set_param(name, value);
     }
     scene.set_time(0.0);
     scene.update(&AnalysisFrame::default());
     scene.set_target_size(MARK_CAPTURE, MARK_CAPTURE);
-    scene.instance_data[0] = SwarmInstance {
-        center: [0.0, 0.0, PIVOT - SIZE_DEPTH],
-        radius: MARK_HALF,
-        color: [0.5; 3],
-        presence: 1.0,
-    };
+    scene.instance_data.copy_from_slice(sprites);
 
     let (texture, view) =
         capture::create_target(&device, COMPOSITE_FORMAT, MARK_CAPTURE, MARK_CAPTURE);
@@ -1204,6 +1219,194 @@ fn a_disc_shaped_swarm_is_byte_identical_to_the_unshaped_one() {
         differing * 50 > (SIZE * SIZE) as usize,
         "a star must genuinely move the frame, or the equality above is a \
          statement about a binding that reached nothing: {differing} pixels"
+    );
+}
+
+// -----------------------------------------------------------------------
+// Depth of field on the sprites (Plan 0239 Phase 2, ADR-0257)
+// -----------------------------------------------------------------------
+
+/// A sprite at view depth `depth`, `x` normalized-device units across a square
+/// target, whose **sharp** size on screen is `half` normalized-device units at
+/// any depth: its radius is scaled up by the depth so perspective cancels, and
+/// the only thing left to differ between two of them is their blur.
+fn sprite_at(depth: f32, x: f32, half: f32) -> SwarmInstance {
+    SwarmInstance {
+        center: [x * depth * (0.5 * REST_FOV).tan(), 0.0, PIVOT - depth],
+        radius: half * depth / SIZE_DEPTH,
+        color: [0.5; 3],
+        presence: 1.0,
+    }
+}
+
+/// The lit-pixel count and the peak luminance of one half of a square linear
+/// capture: the left half when `left`, else the right.
+fn half_stats(pixels: &[f32], left: bool) -> (usize, f32) {
+    let size = MARK_CAPTURE as usize;
+    let (mut lit, mut peak) = (0usize, 0.0f32);
+    for (i, px) in pixels.chunks_exact(4).enumerate() {
+        if (i % size < size / 2) != left {
+            continue;
+        }
+        let lum = px[0] + px[1] + px[2];
+        peak = peak.max(lum);
+        if lum > 1e-3 {
+            lit += 1;
+        }
+    }
+    (lit, peak)
+}
+
+/// **`aperture = 0` draws exactly the sharp sprites**: binding it, and moving
+/// `focus` while it is 0, renders the same bytes as leaving both unbound. At
+/// `coc = 0` the shader's growth and area factors are exactly 1, so this is
+/// equality, not a tolerance.
+#[test]
+fn a_zero_aperture_renders_the_sharp_swarm_byte_for_byte() {
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::Preset;
+    use crate::render::context::RenderError;
+    use crate::render::{HeadlessOptions, Renderer};
+
+    const FIXTURE: &str = include_str!("../../../../tests/fixtures/swarm.toml");
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: 160,
+        height: 100,
+        prefer_software: true,
+    }) {
+        Ok(renderer) => renderer,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    let frame = AnalysisFrame::default();
+    let mut capture = |extra: &str| {
+        let preset = Preset::from_toml_str(&format!("{FIXTURE}{extra}"))
+            .expect("the swarm fixture parses with overrides");
+        let name = preset.name.clone();
+        renderer.set_presets(vec![preset]);
+        renderer
+            .capture_preset(&name, &frame, 60)
+            .expect("capture the swarm fixture")
+    };
+    let unbound = capture("");
+    let zero = capture("aperture = \"0\"\nfocus = \"0.1\"\n");
+    let blurred = capture("aperture = \"10\"\nfocus = \"0.1\"\n");
+    assert_eq!(
+        unbound.rgba, zero.rgba,
+        "aperture 0 must draw the sharp swarm whatever the focus"
+    );
+    let differing = blurred
+        .rgba
+        .chunks_exact(4)
+        .zip(unbound.rgba.chunks_exact(4))
+        .filter(|(a, b)| a[..3] != b[..3])
+        .count();
+    eprintln!("aperture 10: {differing} pixels differ from the sharp swarm");
+    assert!(
+        differing * 10 > unbound.rgba.len() / 4,
+        "a bound aperture must reach the sprites: {differing} pixels differ"
+    );
+}
+
+/// **A sprite far from the focal depth covers more pixels and has a lower
+/// peak than one at it, in one rendered frame** (Plan 0239 Phase 2): two
+/// sprites of the same sharp size on screen and the same light, one at the far
+/// slab bound with the focal plane on it, one at the near bound.
+#[test]
+fn a_defocused_sprite_spreads_wider_and_dimmer_than_a_focused_one() {
+    const HALF: f32 = 0.05;
+    let Some(pixels) = capture_sprites(
+        &[("aperture", 24.0), ("focus", 1.0)],
+        &[
+            // Left: at the focal plane.
+            sprite_at(Z_FAR, -0.5, HALF),
+            // Right: at the near bound, as far from focus as the slab allows.
+            sprite_at(Z_NEAR, 0.5, HALF),
+        ],
+    ) else {
+        return;
+    };
+    let (sharp_lit, sharp_peak) = half_stats(&pixels, true);
+    let (soft_lit, soft_peak) = half_stats(&pixels, false);
+    eprintln!(
+        "focused: {sharp_lit} px, peak {sharp_peak:.4}; defocused: {soft_lit} px, peak {soft_peak:.4}"
+    );
+    assert!(
+        sharp_lit > 20,
+        "the focused sprite must draw: {sharp_lit} px"
+    );
+    assert!(
+        soft_lit > sharp_lit * 2,
+        "the defocused sprite must cover more pixels: {soft_lit} vs {sharp_lit}"
+    );
+    assert!(
+        soft_peak < sharp_peak * 0.7,
+        "the defocused sprite must peak lower: {soft_peak:.4} vs {sharp_peak:.4}"
+    );
+}
+
+/// **A `shape = "2"` sprite at the focal plane keeps its polygon edge**
+/// (Plan 0239 Phase 2): with a wide aperture bound, a triangle drawn at the
+/// focal depth still shows three angular maxima and matches the aperture-0
+/// frame to within rounding, while the same triangle at the near bound softens.
+#[test]
+fn a_polygon_at_the_focal_plane_keeps_its_edge() {
+    const BINS: usize = 360;
+    let triangle = |aperture: f32, depth: f32| {
+        capture_sprites(
+            &[
+                ("shape", 2.0),
+                ("points", 3.0),
+                ("aperture", aperture),
+                ("focus", (depth - Z_NEAR) / Z_SPAN),
+            ],
+            &[sprite_at(depth, 0.0, 0.6)],
+        )
+    };
+    let Some(sharp) = triangle(0.0, PIVOT) else {
+        return;
+    };
+    let Some(focused) = triangle(24.0, PIVOT) else {
+        return;
+    };
+    let worst = sharp
+        .iter()
+        .zip(&focused)
+        .map(|(a, b)| (a - b).abs())
+        .fold(0.0f32, f32::max);
+    let lobes = angular_lobes(&lit_radius_profile(&focused, BINS));
+    eprintln!(
+        "triangle at the focal plane: {lobes} angular maxima, worst |diff| vs aperture 0 {worst:.5}"
+    );
+    assert_eq!(lobes, 3, "a triangle in focus must keep its three corners");
+    assert!(
+        worst < 1e-3,
+        "a sprite at the focal plane must draw as the sharp one: worst {worst:.5}"
+    );
+
+    // Non-vacuity: the same aperture does blur a triangle away from focus.
+    let Some(soft) = capture_sprites(
+        &[
+            ("shape", 2.0),
+            ("points", 3.0),
+            ("aperture", 24.0),
+            ("focus", 1.0),
+        ],
+        &[sprite_at(PIVOT, 0.0, 0.6)],
+    ) else {
+        return;
+    };
+    let moved = soft
+        .iter()
+        .zip(&sharp)
+        .map(|(a, b)| (a - b).abs())
+        .fold(0.0f32, f32::max);
+    assert!(
+        moved > 0.01,
+        "the triangle away from focus must soften: worst |diff| {moved:.5}"
     );
 }
 
