@@ -227,12 +227,13 @@ flowchart LR
   - The generated params block and schemas are regenerated.
   - `turtle.rs`'s module doc lists the space vocabulary.
   - `docs/preset-guide.md` gets one picture of a tree in space and one of an endless vine.
-  - The preset-author reference's `## lsystem` section names both modes, their inert params, the facet
-    at a right-angle turn, and which grammars suit `endless` (vines and short-branched coral, not
-    deep trees, whose `]` sends the tip back a long way).
+  - The log carries the text for the preset-author reference's `## lsystem` section, for the owner
+    to apply in Phase 9: both modes, their inert params, the facet at a right-angle turn, and which
+    grammars suit `endless` (vines and short-branched coral, not deep trees, whose `]` sends the tip
+    back a long way). A headless session cannot edit `.claude/` (ADR-0210).
 - **Files touched:** `presets/README.md`, `presets/schema/`, `.taplo.toml`,
   `core/src/render/scenes/lines/turtle.rs`, `docs/preset-guide.md`, `docs/images/`,
-  `.claude/skills/preset-author/references/systems.md`.
+  `docs/specs/player-schema.json`.
 - **Done when:** the schema and param-reference tests pass on the regenerated files.
   `node scripts/toc.mjs --check`, `node scripts/check-doc-links.mjs` and
   `node scripts/check-reader-prose.mjs` pass.
@@ -251,6 +252,14 @@ flowchart LR
 - **Files touched:** none.
 - **Done when:** the owner records a keep, or a list of what is off, and a yes or no on the dive, in
   this plan's log.
+
+### Phase 9 — The preset-author reference
+- **Owner skill:** human
+- **Blocks merge:** no
+- **What:** the owner applies, in an interactive session, the text Phase 7 left in the log to
+  `.claude/skills/preset-author/references/systems.md`'s `## lsystem` section.
+- **Files touched:** `.claude/skills/preset-author/references/systems.md`.
+- **Done when:** the edit is committed on `main` and `node scripts/check-doc-links.mjs` exits 0.
 
 ## Data shapes
 
@@ -324,6 +333,7 @@ and `follow_window`.
 | 6 — Endless cost and the endless golden | dev | done | committed with this row |
 | 7 — Documentation and the references | dev | not started | |
 | 8 — The look, judged | human | not started | |
+| 9 — The preset-author reference | human | not started | |
 
 ### Notes
 

@@ -33,8 +33,10 @@ audio one of two ways:
    and the counters `beat_index beat_in_bar bar_index` (truncated to whole numbers). An unknown key is
    an error. `=1` is already at the top of the useful band range. Vary it to probe moments —
    `beat=0` for the off-beat, `onset=1` for a hit, `bass=0.1,mid=0.1,treb=0.05` for the quiet frame,
-   `tempo=140` for a preset that branches on `select(tempo > 128, …)`. `time` and the spectrum are
-   not keys: `time` follows `--frames`, and `bin()` reads `0` in every `--set` still.
+   `tempo=140` for a preset that branches on `select(tempo > 128, …)`. `time`, the spectrum and the
+   stereo field are not keys: `time` follows `--frames`, `bin()` reads `0` in every `--set` still,
+   and `balance spread bass_balance mid_balance treb_balance` read `0` too — reach them with the
+   stereo `--signal` kinds below or a stereo `--audio` clip.
 
 2. **`--signal` / `--audio`** → synthesizes PCM, runs the **real DSP analyzer**, and renders a
    **filmstrip** (frames tiled across time) so you see motion and beat response:
@@ -42,10 +44,20 @@ audio one of two ways:
    cargo run -p standalone --example shot -- --preset-file presets/my_draft.toml \
      --signal click:120 --strip 8 --out strip.png
    ```
-   `--signal` kinds: `click:<bpm>`, `bass:<hz>`, `treble:<hz>`/`treb:<hz>`, `noise:<seed>`,
-   `chord`, and `dynamic:<bpm>` — the one kind with dynamics (a groove that gets louder and quieter),
-   so the one to judge a threshold or a bloom on. `--audio <clip.wav>` drives from a 16-bit PCM WAV
-   (uncompressed only).
+   `--signal` kinds: `click:<bpm>`, `bass:<hz>`, `treble:<hz>`/`treb:<hz>`, `noise[:<seed>]`
+   (seed defaults to 1), `chord` (a fixed 220 / 277 / 330 Hz triad; any parameter is ignored), and
+   `dynamic:<bpm>` — the one kind with dynamics (a groove that gets louder and quieter), so the one
+   to judge a threshold or a bloom on. Those are all mono, so the stereo variables read `0` under
+   them; the three **stereo** kinds are `pan:<pos>` (one waveform panned to `pos` in `-1..1`:
+   `balance = pos`, `spread = 0`), `wide[:<seed>]` (decorrelated channels: `spread ≈ 0.5`, centred)
+   and `split:<pos>` (centred bass under treble panned to `pos`) — `docs/capturing.md`, "The stereo
+   kinds". `--signal-secs <s>` sets the synthesized length (default 4 s), which bounds which hops
+   exist. `--audio <clip.wav>` drives from a 16-bit PCM WAV (uncompressed only).
+
+   Every filmstrip also prints an **audio-level table** to stdout — min / mean / max over the clip
+   for each band and each stereo variable, then the hop where `onset` peaks. That is what tells you
+   whether a threshold can fire on this stimulus (calibrate gains against it, not against `--set`
+   magnitudes), and which hop to aim `--at` at.
 
 **Rule of thumb: `--set` for composition and colour; `--signal` for motion and beat response.**
 
@@ -92,6 +104,10 @@ The app **never seeds** into an override folder — it is yours.
 | `--frames <N>` | frames advanced before capture (default 120). More frames = later in any `time`-driven animation. |
 | `--size <WxH>` | render size (default 1280x720). Render near 1080p when judging the real look — the attractor's detail in particular follows the target size. |
 | `--strip <N>` | frames tiled along the audio (default 8). |
+| `--at <hop>,...` | explicit filmstrip hops instead of `--strip`'s even spacing — the only way to aim a capture at a transient (take the hop from the level table). Duplicates and hops past the clip's end are errors. |
+| `--frame-at <hop>` | **one** real-audio frame at that hop, written at the full `--size` with no tile scaling and no border. Needs `--signal` or `--audio`; not combinable with `--at`. |
+| `--tier floor\|rich` | quality tier to capture at, default `floor`; deliberately ignores `RLX_TIER`. A `rich` capture is an instrument, never a baseline. |
+| `--render <clip.wav>` | offline video: walks the clip at `--fps` (default 60) and streams Y4M to stdout, or with `--ffmpeg <path> --out <file>` (and `--crf`) encodes directly; `--bar-grid <path>` also writes the bar starts. For showing a look over a whole track — `docs/capturing.md`, "`--render`". |
 | `--out <path>` | output PNG (parent dirs auto-created). For `--all`, a `.png` path is used verbatim; any other path is treated as a dir and the sheet lands at `<out>/contact-sheet.png`. |
 | `--horizon <minutes>` | the **long-run drift check** — N *simulated* minutes at capture cadence, one statistics row per interval, no image. Only for worlds that accumulate; see below. |
 | `--interval <secs>` | simulated seconds between horizon rows (default 30). |
@@ -170,8 +186,10 @@ cargo run -p standalone --example shot -- --presets presets --report --json > re
 
 A real header and one real row, so the widths are the real widths: the `Rose Window` row of
 `--presets presets --report family=star_pattern`, 2026-09-15, printed beside the family's other three
-presets. The line families add a separate `geom` table under the rows, one line per preset. Under
-the rows, a `NEAR-DUP: <a> ~ <b>` line per flagged pair:
+presets. Each family block then carries further tables under the rows (the line families' `geom`,
+then the cost, lit-footprint, realistic-level and branch-reach blocks), and it **ends** with a
+`NEAR-DUP: <a> ~ <b>` line per flagged pair — or `near-duplicate geometry: none below shape 0.08`
+when there is none, so look at the bottom of each block:
 
 ```
 === star_pattern (4 presets) ===
@@ -217,8 +235,10 @@ What the pair exposes that neither sheet alone does:
 - **Dead presets** — identical loud and quiet thumbnails means nothing is reaching the picture.
 - **Family sameness** — a grid makes near-duplicates and one-note families obvious in a way a
   sequence of single stills never does, and it confirms what `--report` flagged as `NEAR-DUP`.
-- **Neighbour clashes** — the sheet is laid out in the same filename order the engine's rotation
-  walks, so adjacent cells are the presets that will dissolve into each other.
+- **Clashes across the set** — the sheet is laid out in filename order, which is **not** the
+  rotation order (shuffled by default; `sequential` walks display names, ADR-0239), so adjacent
+  cells are not the presets that will dissolve into each other. Read the grid for any pair that
+  would clash if they met, since in a shuffle any pair can.
 
 Pair it with `--report`: the table gives the numbers, the sheets say which failure produced them.
 

@@ -333,6 +333,9 @@ const CARDS = [
   "warp_sirocco",
   "warp_smoke",
   "warp_tracery",
+  // waterfall (2)
+  "waterfall_ridgeline",
+  "waterfall_tidepool",
 ];
 
 const IMAGES = [

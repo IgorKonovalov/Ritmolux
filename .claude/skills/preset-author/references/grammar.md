@@ -25,8 +25,9 @@ name = "ice"
 [palette_b]                 # optional crossfade target for a bindable `palette_mix`
 name = "ember"
 
-[smoothing]                 # per-param easing: SECONDS, a bare number, NOT an expression
-zoom = 0.12
+[smoothing]                 # per-param easing: SECONDS, NOT an expression
+zoom  = 0.12                # a bare number eases both ways
+burst = { attack = 0.02, release = 0.7 }   # or an asymmetric pair
 
 [params]                    # every value is a quoted STRING, even a bare number
 zoom        = "1 + clamp(bass * 3, 0, 0.6)"
@@ -34,15 +35,20 @@ palette_mix = "bar"
 ```
 
 `[params]` values are strings — `warp = 0.4` is a TOML type error, `warp = "0.4"` is right.
-`[smoothing]` values are the opposite: bare numbers, and an expression there is an error.
+`[smoothing]` values are the opposite: numbers (a bare one, or an `{ attack, release }` pair of
+them), and an expression there is an error.
 Bindings apply name-sorted, so file order is irrelevant (group them for a human reader anyway).
 
-The full set of top-level tables beyond the ones above: the structural tables `[curve]`,
+The full set of top-level keys and tables beyond the ones above: the `representative` boolean
+(ADR-0157, a family sample for the narrowed test tier); the structural tables `[curve]`,
 `[generator]`, `[particles]`, `[path]`, `[spectrum]`, `[mesh]`, `[field]`, `[cellular]`,
-`[feedback]` and `[milk]` (each read by the system it belongs to); `[per_vertex]` (bindings evaluated
-once per mesh vertex); `[hold]` and `[latch]` (held values and armed events); and `[layer]` (one
-optional second scene, ADR-0090). Every per-system schema under `presets/schema/` lists them all,
-unscoped — which ones a system actually reads is in `presets/README.md` and `docs/presets.md`.
+`[plexus]`, `[waterfall]` and `[milk]` (each read by the system it belongs to); `[feedback]`, which
+the loader reads for **every** system rather than one; `[per_vertex]` (bindings evaluated once per
+mesh vertex); `[hold]` and `[latch]` (held values and armed events); `[occupancy]` (params whose
+clamp is meant to pin, exempted from the saturation gate, ADR-0062); and `[layer]` (one optional
+second scene, ADR-0090). Every per-system schema under `presets/schema/` lists them all, unscoped —
+which ones a system actually reads is in `presets/README.md` and `docs/presets.md`. `RawPreset` is
+the authority, and **a table name it does not know is ignored silently** (see below).
 
 ## Reaching for the right tool
 
@@ -59,7 +65,7 @@ unscoped — which ones a system actually reads is in `presets/README.md` and `d
 | "loud AND fast" / "beat OR strong hit" | `min(bass > 0.3, tempo > 120)` / `max(beat, onset > 0.6)` — no booleans exist; comparisons give clean `1`/`0` |
 | behaviour that changes with tempo | `select(tempo > 128, fast, calm)` — never use `tempo` raw, it's BPM |
 | a driver that stops jittering | move it to `[smoothing]`, don't fake it with arithmetic |
-| a value held until the next beat | a `[hold]` entry — re-samples the binding on a musical edge and holds it in between (`docs/presets.md`, "The `[hold]` table"). The expression itself stays pure |
+| a value held until the next beat | a `[hold]` entry — re-samples the binding on `"beat"` or `"bar"`, or every N seconds when given a positive number, and holds it in between (`docs/presets.md`, "The `[hold]` table"). The expression itself stays pure |
 | an event armed by one thing and fired by another | a `[latch]` entry (ADR-0137) — its name becomes a variable reading `1` for its hold window (`docs/presets.md`, "The `[latch]` table") |
 
 Chained comparisons (`a > b > c`) parse left-associatively and compare a `0`/`1` against `c` —
@@ -72,8 +78,14 @@ malformed TOML; unknown `system`; an expression that fails to compile (unknown i
 arity, unbalanced parens, stray character, `1 2` trailing tokens); an invalid value in any
 structural, `[palette]`, `[smoothing]`, `[hold]` or `[latch]` table.
 
-**Warning — the preset loads and everything else applies:** a binding whose param name no system or
-engine stage consumes. The message names the param and the system.
+**Warning — the preset loads and everything else applies.** The commonest is a binding whose param
+name no system or engine stage consumes (the message names the param and the system), but the
+loader warns about more than typos: an inert `[latch]` (nothing names it), an inert `[smoothing]`,
+`[hold]` or `[occupancy]` entry (names a param the preset does not bind), `[per_vertex]` on a
+system other than `warp_mesh`, a `[smoothing]` entry on a `[per_vertex]` or per-element (`index`)
+binding, a compositing param bound inside `[layer]`, a `[layer] blend` that its join ignores, a
+vertex variable used outside `[per_vertex]`, and a few params *resting* at a value known to look
+dead. `build_config` and its helpers in `core/src/preset/schema/load.rs` are the full list.
 
 > **The warning is where this lane gets bitten.** The binding is kept and nothing reads it, so the
 > render looks "fine, just not doing what I asked". The standalone prints warnings on load and on
@@ -81,17 +93,22 @@ engine stage consumes. The message names the param and the system.
 > `ritmolux --check <file> --strict` turns one into a failure, so run it before trusting a render.
 > An editor with the generated schemas underlines the same key live (SKILL.md step 4).
 
+**Silent — no error, no warning:** a misspelled **top-level table name**. `[smothing]` is an unknown
+table that nothing reads, and `ritmolux --check --strict` passes it clean. Eyeball every table
+header; this is a known engine gap (`api-feedback.md`).
+
 **Not validated at all:** the numeric *range* an expression produces. Output is written straight
 into the scene param — no clamping, no NaN check. `NaN`/`inf` (a zero denominator, `sqrt` of a
 negative outside a `select`) becomes broken geometry, not an error. You clamp; the engine won't.
 
 ## Structural tables — the parts with rules
 
-- **`[curve]`** — `parametric_curve` only. `family` is one of `maurer_rose`, `lissajous`,
-  `hypotrochoid`, `superformula`, `harmonograph`, and is **required inside the table**; the table
-  itself is optional and absent means `maurer_rose`. An unknown name is a surfaced error, not a
-  fallback. `n` and `d` are read per family — ranges in `presets/README.md`. A sixth family is
-  engine work.
+- **`[curve]`** — `parametric_curve` only. `family` is one of seven: the flat `maurer_rose`,
+  `lissajous`, `hypotrochoid`, `superformula`, `harmonograph`, and the space families `torus_knot`
+  and `lissajous_3d`, drawn in 3D through the shared camera (ADR-0258). It is **required inside the
+  table**; the table itself is optional and absent means `maurer_rose`. An unknown name is a
+  surfaced error, not a fallback. `n` and `d` are read per family — ranges in `presets/README.md`.
+  A new family is engine work.
 - **`[generator]` as L-system** — required for `lsystem`. Non-empty `axiom`; ≥1 `rules` entry with a
   **single-character** key; `angle_deg` finite (default 25); `max_depth` in `1..=7` (default 4).
   Turtle vocabulary: `F`/`G` draw, `f` moves without drawing, `+`/`-` turn, `[`/`]` push/pop, any
@@ -115,7 +132,8 @@ negative outside a `select`) becomes broken geometry, not an error. You clamp; t
   custom `stops` (≥2, each `at` in `0..=1` and ascending, colour `#rrggbb` or `[r,g,b]` floats).
   Setting both, or neither, is a load error. Reaches **every** scene since Plan 0054 / ADR-0059 —
   it used to be silently inert on the three generator line scenes.
-- **`[smoothing]`** — `param = seconds`, non-negative and finite; `0` means instant. Runs on real
+- **`[smoothing]`** — `param = seconds`, or `param = { attack = s, release = s }` for a different
+  rise and fall; each non-negative and finite, `0` meaning instant. Runs on real
   elapsed time (identical at any refresh rate) and resets on a preset switch.
 
 **Geometry cap:** the line scenes share a per-tier segment cap, `TierConfig::max_segments` in

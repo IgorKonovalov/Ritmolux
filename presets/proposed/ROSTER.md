@@ -8,6 +8,15 @@ going for, so a verdict is a comparison rather than a general impression.
 | preset | system / family | pass | what to look at |
 |--------|-----------------|------|-----------------|
 
+## Owner verdicts (2026-10-06)
+
+Three drafts, judged in the running app. **Ridgeline** shipped to `presets/` as the first
+`waterfall` preset ("looks awesome, like terrain"). **Tidepool**, retuned once to much brighter
+and blooming, shipped beside it: the owner had first said to delete it, then chose to ship it
+when the distinctness gate turned out to need a second waterfall to compare Ridgeline against.
+**Cinquefoil**, a solid (2,5) torus knot racking focus per bar, was deleted for now, not
+rejected by name ("the rest can be deleted for now"); `git show f9a94932` has it.
+
 ## Owner verdicts (2026-10-01, Plan 0232 Phase 6)
 
 The first pass for gaps 5-7 (Tilework, Red Lattice, Drop Band, Sprout) was judged in the running

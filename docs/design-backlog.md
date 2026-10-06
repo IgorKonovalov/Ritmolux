@@ -47,6 +47,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen](#0276--a-collage-elements-own-drift-and-spin-are-too-slow-for-the-animation-gate-to-see-so-a-sparse-canvas-reads-as-frozen)
 - [0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`](#0277--the-owners-hotkey-walk-and-the-live-retune-loop-exist-only-as-scratch-scripts-under-target)
 - [0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated](#0278--plexus-lays-its-points-in-a-cube-or-on-a-plane-so-a-turning-wire-sphere-is-only-approximated)
+- [0282 — a misspelled top-level table is silently ignored, so `[smothing]` passes `--check --strict` and its easing never runs](#0282--a-misspelled-top-level-table-is-silently-ignored-so-smothing-passes---check---strict-and-its-easing-never-runs)
+- [0283 — the shared `zoom` declaration says "above 1 fills more of the frame", which is backwards on `fragment_field` and `reaction_diffusion`](#0283--the-shared-zoom-declaration-says-above-1-fills-more-of-the-frame-which-is-backwards-on-fragment_field-and-reaction_diffusion)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1728,3 +1730,51 @@ entry up then, or when a second look asks for a closed 3-D surface.
 - **Verified 2026-10-01** — the two layouts, and no third:
   `present: ALL: \[PlexusLayout; 2\] in: core/src/render/scenes/plexus/mod.rs`
 - **Verified 2026-10-01** — `absent: Sphere|Shell in: core/src/render/scenes/plexus/mod.rs`
+
+## 0282 — a misspelled top-level table is silently ignored, so `[smothing]` passes `--check --strict` and its easing never runs
+
+ADR-0020 made an unknown parameter name a surfaced warning, and `--check --strict` turns that
+warning into a failure. One level up nothing equivalent exists. `RawPreset` derives `Deserialize`
+with no `deny_unknown_fields` and no catch-all field, so serde drops any top-level key it does not
+know. A preset with `[smothing]` where `[smoothing]` was meant loads clean: on 2026-10-05 a fresh
+build gave `checked 1 file: 0 errors, 0 warnings` on a `fragment_field` file holding
+`[smothing] hue = 1`, and the easing silently never ran. The same goes for `[pallete]`,
+`[genrator]`, and a stray top-level key such as `sytem`. A smoothing table or palette that never
+applies leaves the preset looking almost right, which is the failure ADR-0020 exists to surface.
+The child tables are already strict where it was asked for: `[path]` and `[latch]` reject unknown
+keys. The obvious shape is a warning, not an error, to keep ADR-0020's severity: collect unknown
+top-level keys, for example with a `#[serde(flatten)]` catch-all map, and warn
+`unknown top-level table '[smothing]'`, with a nearest-name hint if one is cheap. An error would
+break forward compatibility. A file written for a newer table would stop loading on an older build,
+and ADR-0020 chose a warning for exactly that reason.
+
+- **Raised:** 2026-10-05 by `preset-author` while validating its own skill references, filed by
+  `architect` the same day. **Owner if taken:** `dev` (a loader change under ADR-0020's existing
+  rule; no new ADR unless the severity is changed to an error).
+- **Verified 2026-10-05** — the loader has no unknown-table message:
+  `absent: [Uu]nknown (top-level )?(table|key) in: core/src/preset/schema/load.rs`
+- **Verified 2026-10-05** — `unprobeable: the silent pass is a runtime outcome of ritmolux --check on a scratch file, which the probe grammar cannot run; the absent probe above is the reduction`
+
+## 0283 — the shared `zoom` declaration says "above 1 fills more of the frame", which is backwards on `fragment_field` and `reaction_diffusion`
+
+`common::zoom` is the one `ParamSpec` every scene with a view zoom declares. Its doc, "Scales the
+whole scene about its centre; above 1 fills more of the frame", and the comment above it, "One
+meaning across every scene that has it", flow into the generated `presets/README.md`, every
+`presets/schema/*.schema.json` hover, and the studio's parameter panel. Two field scenes scale the
+sample coordinate the other way. `fragment_field` computes `uv * zoom + pan`, and
+`reaction_diffusion` says it uses the same shape, so a higher `zoom` samples a wider window and
+shows *more* of the field, each feature smaller. `analytic_field` and `cellular` divide
+(`uv / zoom`) and agree with the doc. The preset-author skill has documented the inversion by hand
+since ADR-0018, and the generated reference now contradicts it. The behaviour is not the defect,
+since every shipped `fragment_*` and `reaction_*` preset is tuned against it. The defect is one
+declaration claiming one meaning. The cheap fix is a second constructor in `common.rs` with the
+field-space wording ("above 1 shows more of the field, each feature smaller"), used by those two
+scenes, and the generated files regenerated. Unifying the direction would retune every
+`fragment_*` and `reaction_*` preset, and it is not worth that.
+
+- **Raised:** 2026-10-05 by `preset-author`, filed by `architect` the same day. **Owner if taken:**
+  `dev` (a doc-string split and a regeneration; no behaviour change, no ADR).
+- **Verified 2026-10-05** — the shared doc line:
+  `present: above 1 fills more of the frame in: core/src/render/scenes/common.rs`
+- **Verified 2026-10-05** — the field scene multiplies:
+  `present: var p = uv \* zoom \+ pan; in: core/src/render/scenes/fragment_field.rs`
