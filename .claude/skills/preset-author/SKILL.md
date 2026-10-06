@@ -43,7 +43,7 @@ each surface:
 | Expression variables | `VAR_NAMES` — `core/src/preset/expr.rs` |
 | Expression functions + arity | `Func::from_name` / `Func::arity` — `core/src/preset/expr.rs` |
 | A scene's exact param set | that scene's `PARAMS` const (`ParamSpec` declarations) beside its `set_param` — `core/src/render/scenes/**` |
-| Engine-stage params (`bg_*`, `trails`, `kaleido_*`, `bloom_*`, `occlude`, `exposure`, `ink_*`/`paper_*`) | `GLOBAL_PARAMS` in `core/src/preset/schema/system.rs`, which gathers the `PARAMS` of `core/src/render/{background,trails,kaleidoscope,bloom,tonemap,ink}.rs` and `post.rs`'s `CHAIN_PARAMS` |
+| Engine-stage params (`bg_*`, `trails` + `fb_*`, `kaleido_*`, `bloom_*`, `occlude`, `exposure`, `ink_*`/`paper_*`) | `GLOBAL_PARAMS` in `core/src/preset/schema/system.rs`, which gathers the `PARAMS` of `core/src/render/{background,trails,kaleidoscope,bloom,tonemap,ink}.rs` and `post.rs`'s `CHAIN_PARAMS` |
 | Structural tables + validation | `RawPreset` (`schema/raw/preset.rs`), `into_lsystem` / `into_star` (`schema/raw/generator.rs`), `build_config` (`schema/load.rs`) — all under `core/src/preset/schema/` |
 | Palette names + stop rules | `NamedPalette::from_name` — `core/src/render/palette.rs`; `validate_stops` — `core/src/preset/schema/raw/palette.rs` |
 | `shot` CLI flags | the arg parser in `standalone/examples/shot.rs`; `--set` keys and `--signal` kinds in `standalone/src/shot/args.rs` |
@@ -94,20 +94,30 @@ copy here does:
 `ls presets/*.toml` is the third answer and the cheapest: the shipped set is named
 `<family>_<look>.toml`, where the family is one `_`-separated segment of the system name
 (`curve_*` is `parametric_curve`, `collage_*` is `shape_collage`, `analytic_*` is
-`analytic_field` — `SystemKind::family` is the map), so the roster is in the filenames.
+`analytic_field` — `SystemKind::family` is the map), so the *shipped* roster is in the filenames.
+It under-reports the systems, though: a system can exist with no shipped preset yet (`waterfall`
+has only `docs/examples/waterfall/` today), so for "which systems exist" `SystemKind::ALL` and
+`docs/preset-guide.md` are the answer, not `ls`.
 
 **Every** preset, whatever its system, may additionally bind the engine-wide composite: the
-background pre-pass (`bg_*`), feedback `trails`, the screen-space kaleidoscope (`kaleido_*`),
-`bloom_*`, the frame `exposure`, and the terminal ink-on-paper remap (`ink_amount`, `paper_*`,
-`ink_*`). The shared view transform (`zoom`, `pan_x`, `pan_y`) is declared by **almost** every
-system — `shape_field` and `shape_collage` take no `zoom`, and `warp_mesh` no `pan_x`/`pan_y`; the
-system's schema or `presets/README.md` table is the check. Line systems also take the geometry
-mirror (`mirror_*`).
+background pre-pass (`bg_*`, including the ramp's `bg_coord_mode` / `bg_center_*` fan), feedback
+`trails` and its transform (`fb_zoom`, `fb_rotate`, `fb_dx`, `fb_dy`, `fb_center_*`, `fb_warp`),
+the screen-space kaleidoscope (`kaleido_order`/`_angle`/`_center_*` plus the symmetry siblings
+`kaleido_tile`, `_spiral`, `_radial`, `_zoom`, `_edge`, `_inner`), `bloom_*`, the composite's
+`occlude`, the frame `exposure`, and the terminal ink-on-paper remap (`ink_amount`, `ink_gamma`,
+`paper_hue`/`_sat`/`_bright`, `ink_hue`/`_sat`/`_bright`). The "Engine stage" tables in
+`presets/README.md` are the roster. The shared view transform (`zoom`, `pan_x`, `pan_y`) is
+declared by **almost** every system — `shape_field` and `shape_collage` take no `zoom`, and
+`warp_mesh`'s `zoom` is its per-vertex resample scale rather than a view zoom (and it takes no
+`pan_x`/`pan_y`); the system's schema or `presets/README.md` table is the check. The geometry
+mirror (`mirror_*`) is taken by `parametric_curve`, `lsystem`, `star_pattern` and `spectrum` only
+(not `waterfall`, and inert on the space curve families).
 
 **The expression grammar** (every `[params]` value is a quoted string, even a bare number):
 
 - **Variables:** `bass mid treb onset beat bar time tempo novelty bass_raw mid_raw treb_raw
-  onset_raw beat_index time_since_beat beat_in_bar bar_index bar_phase index`, plus `x y rad ang`
+  onset_raw beat_index time_since_beat beat_in_bar bar_index bar_phase balance spread bass_balance
+  mid_balance treb_balance index`, plus `x y rad ang`
   — the vertex's own position, live only inside a `[per_vertex]` binding and `0` elsewhere — and the
   names you declare in a `[latch]` table (ADR-0137), which resolve onto reserved slots at load.
   **Since ADR-0049 (Plan 0048) `bass`/`mid`/`treb`/`onset` really are `0..1`** — each is a fraction
@@ -136,6 +146,15 @@ mirror (`mirror_*`).
   and never claim a wrong beat 1), but do not author a look whose whole point is landing on the
   real bar line. **`index` is not audio** — it is the per-element position (Plan
   0034), see below.
+- **The stereo field — `balance spread bass_balance mid_balance treb_balance` — is absolute, not
+  levelled** (ADR-0215; `docs/presets.md`, "The stereo field is absolute"). `balance` and the three
+  per-band balances run `-1` left to `+1` right; real music sits well inside `±0.3` of centre, so
+  multiply for the excursions (`clamp(balance * 2.5, -1, 1)`). `spread` is decorrelation: `0`
+  identical channels, **`0.5` fully decorrelated** (not "half wide"), `1` polarity-inverted; wide
+  material averages well under `0.5`, so the useful gate is `spread > 0.25`. **All five read `0`
+  forever on a mono source** (a mono file or device, and every `--signal` kind except the stereo
+  ones), so a look leaning on them must still work centred. `--set` has no key for any of them —
+  drive them with `--signal pan:<pos>`, `wide[:<seed>]`, `split:<pos>`, or a stereo `--audio` clip.
 - **Constants:** `pi`, `tau`.
 - **Functions (17):** `sin cos abs floor sqrt log min max pow mod clamp lerp smoothstep select bin
   hash noise`. `mod` is floored (`mod(-0.2, 1.0)` is `0.8` — cyclic hue never jumps); `select`
@@ -176,16 +195,17 @@ mirror (`mirror_*`).
     mean in a comment beside the position** so the next axis change has something to check against.
 - **`index` makes one binding per-element.** On `spectrum`, a binding whose text names `index` is
   evaluated once per element with `index` at that element's `0..1` position, so
-  `thickness = "0.01 + bin(index) * 0.05"` thickens each element by its own band. Five params vary
-  per element (`base` `scale` `thickness` `brightness` `hue`); the whole-figure ones take the
+  `thickness = "0.01 + bin(index) * 0.05"` thickens each element by its own band. Six params vary
+  per element (`base` `scale` `curve` `thickness` `brightness` `hue`); the whole-figure ones take the
   `index = 0` value. `index` reads `0` everywhere else, and `[smoothing]` on a per-element binding is
   a surfaced **warning** — ease with `[spectrum] smoothing` instead.
-- **Operators:** `+ - * /`, unary `-`, parentheses, and six comparisons `> < >= <= == !=` at the
+- **Operators:** `+ - * /`, unary `-` and `+`, parentheses, and six comparisons `> < >= <= == !=` at the
   **lowest** precedence, each yielding a clean `1`/`0`. No booleans — `min` is and, `max` is or,
   `1 - c` is not.
 
-**Beyond expressions:** `[smoothing]` low-passes a param (a time constant in seconds, a bare number —
-not an expression) so band/beat motion eases instead of snapping; `[palette]` / `[palette_b]` +
+**Beyond expressions:** `[smoothing]` low-passes a param (a time constant in seconds — a bare
+number, or an asymmetric `{ attack = …, release = … }` pair, never an expression) so band/beat
+motion eases instead of snapping; `[palette]` / `[palette_b]` +
 bindable `palette_mix` set colour on every scene (ADR-0059). `[hold]` re-samples a value on a musical
 edge and holds it in between; `[latch]` arms on one condition and fires on another — the two
 answers to "hold this until the next beat" (`docs/presets.md` has a section on each).
@@ -198,7 +218,7 @@ and `C / 0.60` for `treb`/`onset`, which puts a typical passage near half the ca
 **A gain can be dead the same way a threshold can** — if `C / G` sits below the typical level the
 term is a constant no matter how reactive it reads, and **nothing in the harness checks this yet**
 (Plan 0048 found 263 of 332 clamped band terms in that state at once). Do the division by hand.
-And the bound matters most on **luminance**: the scenes draw additively, so a big reactive term on
+And the bound matters most on **luminance**: most scenes draw additively by default, so a big reactive term on
 `brightness`/`glow`/`flash`/`thickness` clips the peak to white and erases the look. Peak energy
 belongs on structure — see the additive ceiling in the footguns.
 
@@ -431,8 +451,8 @@ could not express (`references/api-feedback.md`).
 
 ## The footguns that ruin presets
 
-- **The additive ceiling is the single biggest one.** Every scene draws *additively*, so luminance
-  terms stack (`brightness` + `glow`/`flash` + `thickness` + what `trails` has accumulated +
+- **The additive ceiling is the single biggest one.** The scenes draw *additively* by default, so
+  luminance terms stack (`brightness` + `glow`/`flash` + `thickness` + what `trails` has accumulated +
   `bg_bright`) and a hard peak renders as a **wash** with the structure gone. Since Plan 0045 the
   composite is linear light with an engine tonemap, so a peak *rolls off* with its colour intact
   rather than clipping to flat white — softer, and still the wrong place to spend the music's
@@ -441,11 +461,17 @@ could not express (`references/api-feedback.md`).
   structure — the full principle, with what changed at Plan 0045 and the numbers that worked, is the
   first section of `references/craft.md`. This one binding habit is worth more than every other
   footgun here. (What over-range light *is* now good for: `bloom_amount` finds it — see
-  `references/craft.md`'s composite section.)
+  `references/craft.md`'s composite section.) Not everything is additive any more, and the
+  exceptions are opt-in: the line scenes' `stroke_blend`, `solid` on the space curves, `plexus` and
+  `waterfall` (near strokes paint over far ones), `shape_collage` compositing opaque elements on its
+  own paper (ADR-0123), and a `[layer]` with `blend = "multiply"` for dark-on-light (ADR-0106). The
+  ceiling applies wherever the additive default is in force.
 - **Presets now dissolve into each other (Plan 0023 / ADR-0024) — a preset is no longer judged
   alone.** Every switch is a ~1 s blend whose kind rotates deterministically through crossfade,
-  **add/burn**, luma-dissolve and wipe, and rotation walks the `presets/` **filename sort**, so your
-  file's neighbours are its alphabetical ones. Three consequences reach your `.toml`:
+  **add/burn**, luma-dissolve and wipe. Your neighbours are not predictable from filenames: the
+  default rotation order is **shuffled**, and `order = "sequential"` walks ascending **display
+  name** (`name = "…"`), not the filename (ADR-0239; `docs/configuration.md`). Any preset may
+  follow yours. Three consequences reach your `.toml`:
   - the add/burn kind *sums* two frames, so a preset already sitting at its brightness ceiling has no
     headroom left mid-dissolve — one more reason peak energy belongs on structure;
   - `ink_*`/`paper_*` **crossfade across the switch** (one engine-wide ink pass over the blended
@@ -461,13 +487,21 @@ could not express (`references/api-feedback.md`).
   the warning to stderr (`shot: preset …: warning: …`), where it scrolls past a build log easily;
   **`ritmolux --check <file> --strict` is what makes it fail** (step 4) — run it before every render
   rather than trusting a clean-looking one.
+- **A misspelled top-level TABLE is silently ignored — not even a warning.** `[smothing]`,
+  `[pallete]` or `[latches]` parses as an unknown table that nothing reads, and
+  `ritmolux --check --strict` passes it with zero warnings (the loader's `RawPreset` does not refuse
+  unknown fields). The easing, palette or latch you meant simply never happens. Until the engine
+  closes this, eyeball every table header against `docs/presets.md` / `RawPreset`, and suspect it
+  first when a whole table seems to do nothing.
 - **A bare still is silent.** Always `--set` a loud frame or use `--signal`.
 - **`--set` cannot drive the spectrum — only `--signal` / `--audio` can.** `apply_set` writes the
   frame *scalars* and there is deliberately no key for the 64-band array, so **every `bin()` term
   reads `0`** in a `--set` still and a `spectrum` preset renders flat there (a polyline spectrum comes
   out as two straight lines — that is the stimulus, not the preset). `--report` and the contact
   sheets are **fine** since `ff2c4d9`: their frames now light the log-band slice each named band
-  summarises, mirroring `reactivity.rs`. **Verify anything spectral with `--signal`.**
+  summarises, mirroring `reactivity.rs`. **Verify anything spectral with `--signal`.** The same
+  holds for the five stereo variables: no `--set` key reaches them, and only the stereo signal kinds
+  (`pan:`, `wide`, `split:`) or a stereo `--audio` clip move them off `0`.
 - **The band scale inverted at ADR-0049.** Bands are now `0..1` with real-music means around
   `0.42 / 0.41 / 0.22 / 0.20`, so the old failure (a threshold above anything music produces, never
   firing) has been replaced by its mirror: a threshold *below* the typical level, firing always.

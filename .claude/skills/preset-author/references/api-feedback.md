@@ -36,7 +36,10 @@ Route it: "This is engine work, not a preset. Handing architect a feedback note;
 
 **Check `docs/design-backlog.md` first** — captured-but-not-yet-promoted feedback lives there, and
 re-raising an entry is still useful signal (it says the demand is real), but say so rather than
-filing it as new.
+filing it as new. A promoted or closed entry has moved to `docs/design-backlog-archive.md`
+(ADR-0206), so look there before calling something unreported. And a backlog entry making a claim
+about the repo carries an executable probe that re-checks it (ADR-0108) — when your note asserts
+"X is absent", give `architect` the command that shows it.
 
 ## Gaps that are still real (verify before reporting — the surface keeps moving)
 
@@ -49,8 +52,10 @@ filing it as new.
 - ~~**No per-bin spectrum access**~~ — **delivered by Plan 0034.** `bin(x)` samples the 64-band
   log-spaced array at a normalized position; a `spectrum` system draws N elements off it; and a
   binding naming `index` is evaluated once per element. Note `bin()` is a **narrow probe** (~2 of
-  the 64 bands, a window ~0.032 wide in `x`), not a region average — see backlog 0016. Still
-  absent: `bin_range(lo, hi)`.
+  the 64 bands, a window ~0.032 wide in `x`), not a region average — see `docs/presets.md`,
+  "`bin(x)` — reaching the spectrum". Still absent: `bin_range(lo, hi)`, and **`bin_hz`** —
+  addressing the spectrum by frequency rather than position (ADR-0063 is accepted but only its
+  immediate half is built), so a probe's Hz still lives in a comment.
 - ~~**No randomness / noise function**~~ — **delivered by ADR-0051.** `hash(x)` scatters and
   `noise(x)` wanders, both seeded by `[generator] seed`, so determinism holds (`docs/presets.md`,
   "`hash(x)` and `noise(x)` — seeded randomness").
@@ -70,9 +75,13 @@ filing it as new.
   `[generator] rings` fills it with concentric rings of motifs, moved by `ring_phase`,
   `ring_spread` and `ring_scale` (design-backlog 0007 is closed). The motif roster is closed, so a
   motif outside it is still feedback.
-- **No author-supplied shader/WGSL pass** — you cannot write a look the built-in scenes can't draw.
-- **Particle/segment counts are not preset-settable**: the attractor's particle count is fixed
-  (`samples` on the curve is, but the swarm's and attractor's populations are not).
+- **No author-supplied shader/WGSL pass** — you cannot hand-write a look the built-in scenes can't
+  draw. The one place shaders arrive with a preset is a **converted MilkDrop** preset: `milkconv`
+  emits its `[milk]` / `[per_vertex]` tables and the engine generates the shaders from them
+  (ADR-0113, ADR-0212). That is the converter's output, never something this lane writes.
+- **The swarm's population is not preset-settable.** The attractor's is, through `[particles]
+  density` (ADR-0069 / ADR-0195), and `samples` sets a curve's; the swarm's particle count is still
+  fixed.
 - **No tempo-varying structural morph on the rose** beyond `n`/`d`/`phase`/`radial_offset`.
 
 **Composite / colour**
@@ -86,12 +95,19 @@ filing it as new.
   depth / radius / band index) — the table is in `presets/README.md`. Two live limits: a
   bracket-free grammar (a Koch-style `F = "F+F--F+F"`, as in `lsystem_rime`) has one generation, and
   a bare `star_pattern` interlace has a flat radial ramp — declaring `rings` makes it live.
-- Palette interpolation is plain RGB (no OKLab / perceptual blending yet).
+- Palette stops are authored in sRGB and converted to linear at load, so the gradient blends in
+  linear RGB (ADR-0151) — still no OKLab / perceptual blending.
 
 **Transitions**
 - Cross-preset dissolves are engine-configured policy (kind, duration) — a preset **cannot declare
   its own** `[transition]`, and dissolves are not beat-quantised. Both are named follow-ups, so
   align feedback with them rather than re-proposing.
+
+**Loader**
+- **A misspelled top-level table is silently ignored.** `RawPreset` does not refuse unknown fields,
+  so `[smothing]` (or any other mistyped table name) loads with no error and no warning, and
+  `ritmolux --check --strict` passes it clean. A misspelled *param* warns (ADR-0020); a misspelled
+  *table* does not. Until that closes, eyeball every table header.
 
 **Determinism caveat:** feedback sims and chaotic attractors are not bit-identical across GPU
 vendors — "identical on every device" holds *visually*, not pixel-exactly. Don't author a preset
