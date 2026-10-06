@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0249** (ADRs are a separate sequence — next free there is **0264**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0250** (ADRs are a separate sequence — next free there is **0265**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -44,9 +44,10 @@ place. The plan file carries the real link.
 | [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | approved | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four are `human`. Unblocked: 0120 closed 2026-09-22. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) | The rig session measures the wave modes and judges the fourth gate | approved | human, dev | 0202's Phases 4-7. Not queued until the owner has the Windows rig; commit Phase 1's eight rows on main, then queue. |
-| [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Approved 2026-09-24, NOT queued: Phase 1 is a `human` probe and 0214 is open. ADR-0241 + 0242 + 0243: goldens re-bless on lavapipe, hardware tests move to the dGPU (Phase 2). |
+| [0218](0218-the-reference-machine-becomes-arch.md) | The reference machine becomes Arch | approved | dev, human | Queueable 2026-10-06 once `RLX_BLESS` is allowlisted. ADR-0242: goldens move to lavapipe (Phase 2, retiring 0249). |
 | [0239](0239-the-swarm-moves-into-a-real-camera.md) | The swarm moves into a real camera | approved | dev, human | ADR-0259 (proposed) supersedes 0044's depth model. After 0236. Every swarm preset changes look; Phase 6 (owner's judgement) blocks the merge. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
+| [0249](0249-a-dispatched-ci-job-blesses-the-named-warp-baselines.md) | A dispatched CI job blesses the named WARP baselines | draft | dev, human | ADR-0264 (proposed). The bridge until 0218 Phase 2: `bless.yml` on `windows-latest`, `RLX_BLESS` takes names. Its Phase 3 blesses 0248's four. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
