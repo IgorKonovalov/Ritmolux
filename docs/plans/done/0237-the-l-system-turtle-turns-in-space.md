@@ -1,9 +1,11 @@
 # 0237 — The L-system turtle turns in space, and can grow without end
 
-> **Status:** in-progress (2026-10-05). Runs after Plan 0236 closes.
+> **Status:** done - Phases 8, 9 owed, ADR-0249 (closed 2026-10-06). Phases 1-7 landed in
+> `aaf32332`, `6d5c4129`, `927564c3`, `263296bd`, `6222ae74`, `d50a77fb` and `b8d2cd95`. Round 1
+> review: no blockers, no majors, five minors (three fixed at the close). Version 0.165.0.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed), [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md), [ADR-0019](../adrs/0019-eased-parameters.md)
+> **Related ADRs:** [ADR-0258](../../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (accepted, Plan 0236), [ADR-0257](../../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0059](../../adrs/0059-line-scenes-colour-along-their-generator-axis.md), [ADR-0019](../../adrs/0019-eased-parameters.md)
 
 ## TL;DR
 
@@ -494,6 +496,105 @@ Phase 7's text for the preset-author reference's `## lsystem` section in
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
 - **Outstanding `human` phases:** Phase 8 (the look, judged) and Phase 9 (the preset-author
   reference), both `Blocks merge: no`.
+
+## Close review
+
+Closed 2026-10-06 by a conductor close on the lane, round 1, against the review that graded
+`cdd8c7af`. **Phases 8 and 9 are owed** (ADR-0249): nobody has yet judged whether depth reads,
+whether the endless vine reads as growth rather than a scroll, or whether `grow` on onset surges
+well, and the preset-author reference's `## lsystem` section does not yet carry the space and
+endless text under `### Phase 9 hand-off` above.
+
+Close notes:
+
+- **Repairs at the close.** Findings 1 and 2 (the `lsystem.rs` and `grammar.rs` module docs) in
+  `363848de`; finding 5 (the hand-off text under its own heading) in `108ae312`. Findings 3 and 4
+  are code and stay open.
+- **Upstream CI:** red at the close, run 37444996175 on `main` at `c703beb`: the `coverage` job.
+- **Watch item (finding 4):** the Windows CI golden job is the first WARP reading of the three new
+  baselines (`lsystem_space`, `lsystem_endless_flat`, `lsystem_endless_space`) and of
+  `waterfall`, `parametric_torus_knot` and `parametric_lissajous_3d`, which Plan 0248 Phase 7
+  already owes a re-bless. If it goes red past those, build the `seg3d` renderer lazily on the
+  first space or endless `configure`.
+- **Preset curation:** no preset `.toml` was added, changed or removed, and the plan fixed no
+  engine defect a shipped preset works around. Nothing to curate.
+- **Backlog probes:** green, 58 reductions across 29 live entries, 4 unprobeable. No entry closed.
+- **Translations:** no translated source moved.
+- **ADR-0258** was already accepted by Plan 0236.
+- **Version:** 0.165.0 (minor: a feature).
+
+### Round 1 review, in full
+
+**Verdict:** Plan 0237 landed cleanly at `cdd8c7af`. There are no blockers and no majors, and there are five minors. Phases 1–7 are built as the plan describes, and every done-when named in the plan has a test whose assertion body checks the claim it is named for. Phases 8 and 9 are `human` phases marked `Blocks merge: no`, and their rows correctly read `owed`.
+
+#### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 046b8c6 is green in the suite ledger, run by gate 0237-pre-review-after-repair-1 at 2026-10-06T11:14:48.895Z: 1998 tests run: 1998 passed (16 slow), 8 skipped`.
+  `git rev-parse HEAD^{tree}` is `046b8c6ba698…`, so that record covers the graded tip (ADR-0207).
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: green.
+- `cargo fmt --all -- --check`: clean. `cargo clippy --workspace --all-targets -- -D warnings`: clean.
+- `node scripts/toc.mjs --check`, `check-doc-links.mjs`, `check-reader-prose.mjs` and
+  `check-comment-hygiene.mjs` all pass. Phase 7's done-when is met.
+- The tree was clean before and after this review.
+
+#### Lens 1: alignment
+
+Every phase carries a single owner tag from the vocabulary. The log maps each phase to its commit. I checked each done-when against the assertion bodies:
+
+- **P1:** `turtle.rs` `a_pitched_square_stands_up_in_space_and_lies_straight_on_the_plane` checks the exact corners in the `yz` plane, and the flat walk as four steps up one line. `lsystem_space.rs` `a_space_tree_reaches_the_frame_and_turns_with_yaw` asserts more than 300 lit pixels and a yaw diff above 0.002. The fixture is asserted to contain `&`, `/` and `"space"`. The byte-identity claim rests on the log's `shot`+`cmp` record on llvmpipe, and the four shipped presets (not six) are noted.
+- **P2:** `the_frame_stays_orthonormal_over_a_hundred_thousand_turns` uses a seeded LCG, a `1e-4` bound on length and on the dot products, and a handedness check. The generated reference names each mode against each inert param: `presets/README.md` shows `inert on space, …`. `the_turtle_table_is_the_roster_and_names_every_inert_parameter` holds the table to the roster. `each_turtle_ignores_what_it_declares_inert` also proves inertness on pixels, with positive controls.
+- **P3:** `a_space_depth_past_the_seg3d_cap_is_reported` asserts `Depth(7)`, the cap, and `dropped = 4^7 - cap` exactly. A depth inside the cap reports nothing. The golden `lsystem_space` is appended at the end of `EXTRA_FIXTURES`.
+- **P4:** The stream-equals-`expand` test covers every shipped grammar plus the golden fixture. It requires at least 5 grammars and at least one compared over the full 10,000 symbols. `the_ring_fills_to_its_trail_and_nothing_grows` checks exactly `trail` segments and unchanged capacities. `an_endless_scene_grows_no_buffer_it_owns` does the same at the scene level, through real renders. The 60/144 Hz rate test is within 1, and also within 1 of `grow*10`. The refusal message names `1 draw step` and `trail is 2000`.
+- **P5:** The no-jump test bounds each frame's move by `dt/follow` times the farthest error seen, and guards against a vacuous run (a jump of at least 10 steps). The in-frame test projects through the flat mapping at 1280x800 and the default camera at 1920x1080. The million-step test asserts that a re-base actually happened (origin past 999,000). The re-base pixel claim is asserted on the bytes handed to the GPU, which is at least as strong as a capture comparison.
+- **P6:** The goldens are appended. `the_same_frames_grow_the_same_ring` compares two 600-frame captures byte for byte. The log carries the sharp and blurred frame times (1.218 ms and 1.523 ms), the ratio (1.25), NFR §1, and the `update` CPU times.
+- **P7:** The docs, the guide images and the provenance in `docs-shots.mjs` are present. The Phase 9 text is in the log.
+
+The deviations are all disclosed in the log: `f64` grid positions, `ENDLESS_STEP = 0.025`, a symbol budget beside the emit ceiling, files touched outside the lists, and `OverflowContext::Trail`. None of them reverses an ADR.
+
+#### Lens 2: layering and real-time safety
+
+No platform or audio-source type appears in `core/`. No C ABI or control-protocol surface changed. `OverflowContext` grew a variant, but it is a core-internal notice. `lsystem.rs`, `turtle.rs` and `grammar.rs` keep the panic-deny pragma. The per-frame endless path (`advance`, `step`, `follow_step`, `lay_endless`, `lay_endless_space`) works only in buffers reserved at configure: the stream frames at `depth+1`, the pen stack at `bracket_bound`, and the ring at `trail`, which is at most the tier cap and so at most the capacity of `draw_buf`/`instances3d`.
+
+#### Lens 3: docs and bookkeeping
+
+`presets/README.md`, the generated params block and schemas, `docs/preset-guide.md` and `player-schema.json` are swept. There is no new `config.toml` key. **The close owes:** ADR-0258 `proposed → accepted`; a **minor** version bump (feature); `Status: done - Phases 8, 9 owed, ADR-0249`; and the watch item on Windows CI goldens (finding 4).
+
+#### Lens 4: correctness and determinism
+
+There is no wall clock and no unseeded randomness. The rate is integrated (ADR-0019). Aspect comes from the render target in both `render_space` and `render_endless_space`. The numeric assertions are properties or exact values, not frozen machine measurements. The cost figures are in the log with their machine named, and they are not asserted.
+
+#### Lens 5: design integrity
+
+The `Scene` trait is unwidened, and the new renderer stays inside the scene. Finding 4 is the one open question about that choice.
+
+#### Findings
+
+##### Minor
+
+1. **`core/src/render/scenes/lines/lsystem.rs:1`**: the module doc is stale for endless mode.
+   - **What:** It says the grammar "is expanded and turtle-walked into one cached segment buffer *per depth*" at load, and that "per frame the scene only picks the visible depth … no expansion". Under `growth = "endless"`, nothing is cached, and the grammar is streamed and walked every frame.
+   - **Fix:** Add a sentence saying that this describes `growth = "fixed"`, and that `endless` streams the derivation through `Endless` into a ring with no per-frame allocation. Close-repairable (doc comment).
+2. **`core/src/render/scenes/lines/grammar.rs:3`**: the module doc says the module is "a build-time step (runs inside `Scene::configure`, off the hot path), not per-frame work".
+   - **What:** `Stream::next_symbol` in this module now runs every frame of an endless figure.
+   - **Fix:** Say that `expand` is build-time and that `Stream` is the allocation-free per-frame walk. Close-repairable (doc comment).
+3. **`core/src/render/scenes/lines/lsystem.rs:313`**: in endless mode, `hue_spread` no longer spans the palette.
+   - **What:** The endless colour divisor is `bracket_bound`, which is `STREAM_DEPTH (32)` times the successor nesting. So `hue_spread = 1` reaches only a fraction of the palette on an endless vine. On `F=F[+F]F[-F]F`, the generation after ~10^5 steps is at most about 7 of 32. This breaks the property the module doc states from ADR-0059: "`hue_spread = 1` spans the palette exactly once on any grammar". The `hue_spread` doc row does not say so either. The log notes the effect but no doc does, so the preset-author lane will find `hue_spread` nearly inert on a vine.
+   - **Fix:** Pick a divisor that reflects the generations a ring actually shows, or state the endless scaling in the `lsystem` reference text and in the Phase 9 hand-off. The divisor is code and stays open for a fix round or a followup.
+4. **`core/src/render/scenes/lines/lsystem.rs:604`**: a possible effect of the new renderer on later WARP goldens is still open.
+   - **What:** `LSystemScene::new` now builds a `seg3d` renderer at construction for every `lsystem` scene, including flat ones. The lane's own Phase 3 run read `waterfall` (0.0017/213), `parametric_torus_knot` and `parametric_lissajous_3d` past WARP's outlier tolerance on llvmpipe, where they were blessed at 0/0. The log says it "did not establish whether its own `seg3d` renderer contributes". `golden.rs` itself documents that building GPU resources mid-run moves later WARP captures.
+   - **Fix:** The close notes must name the Windows CI golden job as the first reading of all three new baselines and of these three. If that job goes red, build `lines3d` lazily on the first space or endless `configure`, which is off the hot path.
+5. **`docs/plans/0237-the-l-system-turtle-turns-in-space.md:322`**: the `## Implementation log` (~173 lines) is longer than `## Implementation phases` (~161 lines). Lens 1 rates that a minor.
+   - **Context:** Most of the excess is the 27-line Phase 9 hand-off text, which the plan itself requires in the log. Without it the log is shorter than the contract.
+   - **Fix:** Optionally move the hand-off text under its own `### Phase 9 hand-off` heading. No other change is needed.
+
+##### Nit
+
+None.
+
+### Earlier rounds
+
+None: round 1 was the first review.
 
 ## Followups (after this lands)
 
