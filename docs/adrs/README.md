@@ -96,7 +96,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0073](0073-the-windows-ci-critical-path.md) | The Windows CI critical path: the sweep gets one owner, and a shape claim stops sweeping | accepted (Outcome) |
 | [0074](0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) | A ratio against an in-run control is not automatically portable | accepted (Outcome) |
 | [0075](0075-ifs-family-morphs-in-singular-value-space.md) | The IFS family is parameterized by its singular values, and morphs there | accepted (Plan 0062; Outcome) |
-| [0076](0076-the-attractor-keeps-the-depth-it-already-computes.md) | The attractor keeps the depth it already computes | accepted (Outcome) |
+| [0076](0076-the-attractor-keeps-the-depth-it-already-computes.md) | The attractor keeps the depth it already computes | accepted (Outcome); amended by 0260 |
 | [0077](0077-the-symmetry-stage-owns-one-coordinate-map.md) | The symmetry stage owns one coordinate map, applied at one sample | accepted 2026-08-09 (Plan 0064; Outcome) |
 | [0078](0078-banding-is-a-palette-coordinate-operation.md) | Banding is an operation on the palette coordinate, not on the baked LUT | accepted 2026-08-09 (Plan 0064) |
 | [0079](0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md) | The mandala interior is rings of motifs, and it lives inside `star_pattern` | accepted (Outcome) |
@@ -278,10 +278,10 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0254](0254-the-release-artifact-count-runs-on-every-release-run-and-proves-it-refuses.md) | The release artifact count runs on every release run, and proves it refuses | proposed 2026-09-28, Plan 0214 |
 | [0255](0255-a-conductor-session-writes-inside-its-lane-and-the-os-temp-directory.md) | A conductor session writes inside its lane and the OS temp directory | accepted 2026-09-29, Plan 0234, Outcome |
 | [0256](0256-a-parameter-declares-its-group-and-whether-it-is-main.md) | A parameter declares its group and whether it is main | accepted 2026-09-30, Plan 0231 |
-| [0257](0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md) | A shared camera projects 3D primitives, and depth of field is a per-endpoint circle of confusion | accepted 2026-10-01, Plan 0235 |
+| [0257](0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md) | A shared camera projects 3D primitives, and depth of field is a per-endpoint circle of confusion | accepted 2026-10-01, Plan 0235; amended by 0260 |
 | [0258](0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) | A system takes depth through one shared camera block, and its 3D mode forgoes what `seg3d` does not draw | accepted 2026-10-02, Plan 0236; Plans 0237-0240 |
 | [0259](0259-the-swarm-projects-through-the-shared-camera-in-a-frustum-shaped-torus.md) | The swarm projects through the shared camera, in a frustum-shaped torus | proposed 2026-10-01, Plan 0239; supersedes 0044 in part |
-| [0260](0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md) | The attractor's 3D families project through the shared camera, and `perspective` retires | proposed 2026-10-01, Plan 0240; amends 0076, 0257 |
+| [0260](0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md) | The attractor's 3D families project through the shared camera, and `perspective` retires | accepted 2026-10-06, Plan 0240, Outcome; amends 0076, 0257 |
 | [0261](0261-the-conductor-parks-only-on-what-the-owner-must-settle.md) | The conductor parks only on what the owner must settle | accepted 2026-10-01, Plan 0241; amends 0207, 0209, 0248 |
 | [0262](0262-the-studio-renders-a-clip-by-piping-three-children-and-transcodes-what-the-player-cannot-read.md) | The studio renders a clip by piping three children, and transcodes what the player cannot read | accepted 2026-10-02, Plan 0247; amends 0175 |
 | [0263](0263-a-3d-stroke-may-be-solid-by-a-back-to-front-sort-and-depth-cues-ride-the-shared-camera.md) | A 3D stroke may be solid by a back-to-front sort, and the depth cues ride the shared camera | accepted 2026-10-05, Plan 0248 |

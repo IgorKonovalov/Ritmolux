@@ -1,9 +1,11 @@
 # 0240 — The attractor projects through the shared camera
 
-> **Status:** in-progress (2026-10-06). Runs after Plan 0236 closes.
+> **Status:** done - Phases 6-8 owed, ADR-0249 (closed 2026-10-06). Phases 1-5 in `19386418`,
+> `80566e42`, `7a43c794`, `a430d6fa`, `1ed3c786`; round 1 review clean (five minors, four fixed at
+> the close); full suite green on the tagged tree; v0.166.0.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0260](../adrs/0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md) (proposed), [ADR-0076](../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md), [ADR-0093](../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md), [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed)
+> **Related ADRs:** [ADR-0260](../../adrs/0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md) (accepted, Outcome), [ADR-0076](../../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md), [ADR-0093](../../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md), [ADR-0257](../../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0258](../../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (accepted)
 
 ## TL;DR
 
@@ -354,6 +356,199 @@ much of the tier's particle budget is drawn (ADR-0069 / ADR-0195; absent is the 
 - **Outstanding `human` phases:** 6 (re-curation brief), 7 (re-bless `attractor_depth`, which
   Phase 3 recorded as moved) and 8 (apply the text above to the preset-author reference). All three
   are `Blocks merge: no`.
+
+## Close review
+
+Phases 6, 7 and 8 are **owed** (`Blocks merge: no`, ADR-0249) and nothing below checks them: no
+owner has yet judged the migrated 3D presets in motion (Phase 6), `attractor_depth.png` is not
+re-blessed on WARP, so the Windows CI golden job is expected red on it (Phase 7), and the
+preset-author reference still describes `perspective` (Phase 8).
+
+Close repairs: minors 1 and 2 in `4a36d122`; minors 3 and 5 in `0015dc53`. Minor 4 stays open:
+`0015dc53` corrected the README sentence that overstated the near-plane proof, but the test gap
+itself is test code. Upstream CI on `origin/main` read red (`coverage`) at the close. No earlier
+round raised a finding.
+
+Close notes: the preset set is kept as migrated; the six 3D presets carry mapping headers citing
+ADR-0260, and judging them is Phase 6. Backlog probes exit 0 (58 reductions, 29 entries). No
+translated source moved. Release note owed: a user preset binding `perspective` on the attractor
+no longer loads.
+
+### Round 1 review, in full
+
+Graded at `c5f8d9ce28b3585216a0294e13e3c567e355fd52` (tree `07260b42`), lane
+`plan-0240-the-attractor-projects-through-the-shared-camera`.
+
+**Verdict: Plan 0240 landed cleanly. There are no blockers and no majors, and five minors, all of them
+comment or prose text that the close can repair except one test gap.** Phases 1 to 5 are built as
+the plan describes. Phases 6, 7 and 8 are `human` with `**Blocks merge:** no` and are correctly logged
+`owed` (ADR-0249).
+
+#### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 07260b4 is green in the suite ledger, run by
+  gate 0240-pre-review at 2026-10-06T12:39:22.325Z: 2005 tests run: 2005 passed (15 slow), 8 skipped`.
+  `git rev-parse HEAD^{tree}` is `07260b42…`, so that record grades this exact tree. It stands as the
+  full-suite evidence (ADR-0207).
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: clean.
+- `cargo fmt --all -- --check`: clean. `cargo clippy --workspace --all-targets -- -D warnings`: clean.
+- `node scripts/check-comment-hygiene.mjs`, `check-doc-links.mjs`, `toc.mjs --check` and
+  `check-reader-prose.mjs` all exit 0.
+- `node scripts/check-backlog-claims.mjs`: exit 0, 58 reductions across 29 live entries, 4
+  unprobeable. The advisory lists 0259 (attractor sprite cost) and 0282 (misspelled top-level table)
+  as touched paths. Neither entry is changed by this plan: 0259 is a performance question, and 0282
+  is about tables, not `RETIRED_PARAMS`.
+- The tree was left clean (`git status --porcelain` is empty).
+
+#### Lens 1: alignment
+
+- Every phase has one in-vocabulary `**Owner skill:**`.
+- **Phase 1.** `CameraParams` rides `DrawUniform` as `cam` plus a `mdl` row. The flat path takes zeros
+  and never reads them.
+  - `Framing::model` derives the model transform from the stored framing, so nothing is measured
+    twice. It returns `None` exactly when `inv_depth_extent` is 0, because `framed_half >=` the depth
+    half-extent. This keeps the shader's `draw.d.w != 0` branch and the CPU `model()` in agreement.
+  - `the_mapped_camera_reproduces_the_retired_magnification` pins the mapping against the old
+    projection to 1e-4 inside the clamp, at four spins. That is a strong test.
+  - `a_yaw_sweep_barely_moves_the_lorenz_centroid` asserts `swing < 0.9 * p` at p 0.25 and 0.5, as the
+    done-when says.
+  - `every_roster_entry_fills_the_frame_like_its_canonical_figure` reads 3D entries through the
+    default camera.
+  - `a_lorenz_figure_pitches_through_the_camera` asserts that pitch moves Lorenz and leaves De Jong
+    byte-equal.
+- **Phase 2.**
+  - `MAX_PERSPECTIVE`, `magnify`, `depth_norm` and `figure_coc` are gone, and
+    `git grep MAX_PERSPECTIVE -- core/src` finds nothing.
+  - The loader was a warning, not silent. `RETIRED_PARAMS` in `core/src/preset/schema/load.rs` makes
+    the binding a `PresetError::Config` naming `distance` and `fov`.
+    `a_perspective_binding_is_a_load_error_naming_the_camera` asserts this at the top level and in a
+    layer.
+  - The aperture done-when is held by three tests:
+    - `a_sprite_away_from_the_focal_depth_grows_and_dims` asserts that growth is monotone behind
+      focus and that `keep < 1`.
+    - `an_aperture_blurs_a_3d_figure_and_leaves_a_flat_map_alone` asserts that a flat map renders
+      byte-equal at aperture 30.
+    - `the_blur_is_in_target_pixels_whatever_the_grid_scale` holds ADR-0037.
+- **Phase 3.**
+  - The plan's counts (22 / 10) were wrong against the tree, and the log says so: 12 / 6.
+  - `every_migrated_3d_preset_clears_the_sanity_floor` asserts coverage and quadrant spread at two
+    drives, by name.
+  - `git grep perspective -- presets` finds no binding, only migration comments and generated
+    `distance` docs.
+  - `attractor_depth` was recorded as moved, with the drift-report line quoted. It was not re-blessed,
+    as the plan requires.
+- **Phase 4.** The params block and schemas are regenerated, `docs/presets.md` gained its section, and
+  the Phase 8 replacement text is in the log. The extra `presets/preset.schema.json` regeneration is
+  noted.
+- **Phase 5.**
+  - `fog` rides `mdl.w` and multiplies light only.
+  - `set_param` matches the seven declared names itself, so `solid` stays undeclared.
+    `declared_params_match_set_param` covers it.
+  - `fog_dims_the_far_half_of_a_3d_figure_more_than_the_near_half` splits a GPU-converged cloud at the
+    median view depth: far 0.281 / near 0.721 on Thomas.
+  - The engine test holds `fog = 0` byte-equal to unset and De Jong byte-equal at `fog = 1`.
+- **Recorded deviations, all reasoned in the log:**
+  - Spin composes as `yaw - spin_phase`, not `+`.
+  - `pan_x` is in frame heights on the 3D path.
+  - Ink on Paper's pan was rescaled for 16:9.
+  - `projection_mirror.rs` and `family.rs` were touched outside their phase's file lists.
+
+#### Lens 2: layering and real-time
+
+There are no platform types in `core/`, and there is no C ABI or control-protocol change. `camera_rows`
+allocates nothing and does not unwrap. The attractor reuses the shared `camera.wgsl` block without
+widening the `Scene` trait.
+
+#### Lens 3: docs and bookkeeping
+
+- The camera block is documented in `presets/README.md` ("Attractor depth: the camera, …") and
+  `docs/presets.md`.
+- `docs/specs/player-schema.json` is regenerated.
+- `.claude/skills/preset-author/references/systems.md` is Phase 8, owed, and its replacement text is
+  in the log.
+- **The close owes:**
+  - Accept ADR-0260, with an Outcome (minor 3).
+  - Mark ADR-0076 and ADR-0257 amended in the ADR index, per the plan's Followups.
+  - Bump the version by a **minor** (feature: a new param surface on the attractor, and a retired
+    param).
+  - Set `Status: done - Phases 6-8 owed, ADR-0249`, and add the matching recently-closed bullet.
+- **Release note owed:** a user preset binding `perspective` on the attractor now fails to load. ADR-0260's Negative
+  says "the release notes say so".
+- **Known after merge:** the Windows CI golden job is expected to fail on `attractor_depth` until Phase 7 re-blesses it.
+  On llvmpipe its max outlier was 62 against a tolerance of 48.
+
+#### Lens 4: correctness
+
+- **Aspect.** The 3D path takes `aspect` from `Scene::render` and pixels from `set_target_size`, both
+  the target's. Sprite and CoC sizes are in target pixels and go back through `px_to_ndc` on the same
+  viewport, so the trail grid's size cancels out.
+- **Near plane.** A particle with `w < NEAR` collapses to an off-screen point. The bound is held at the
+  declared minimum `distance` by `every_3d_entry_stays_clear_of_the_near_plane`. See minor 4 for a
+  shipped preset below that minimum.
+- **Numeric assertions.** All are properties: ratios of like quantities, byte equality, or a
+  monotonicity. None is a frozen adapter measurement.
+
+#### Lens 5: design integrity
+
+The shared camera is re-declared per system only for its doc lines (`..camera::YAW`), so the defaults
+and ranges stay single-sourced. `RETIRED_PARAMS` is a small, general table, not an attractor special
+case in the loader. Nothing here is a concern.
+
+#### Findings
+
+##### minor 1: `resources.rs` documents the retired uniform layout
+`core/src/render/scenes/particles/resources.rs:117` and `:141`. The `DrawUniform` doc still says
+"`d`: x `perspective`", and it says `mdl` "w unused". The shader's own layout comment (`shaders.rs`
+`struct Draw`) correctly says `d.x` is unused and `mdl.w` is the camera's `fog`. Two layout
+descriptions of one uniform now disagree.
+
+**Fix (comment text):** change `` `d`: x `perspective`, `` to `` `d`: x unused, ``. Change
+`` that is one unit of normalized depth, inverted, w unused. `` to
+`` that is one unit of normalized depth, inverted, w the camera's `fog` (ADR-0263). ``
+
+##### minor 2: two doc comments still cite `perspective` as live
+- `core/src/render/scenes/particles/ifs.rs:577` says `presets/README.md` "already documents" a silent
+  ceiling "for `bloom_threshold` and `perspective`". That README section no longer exists for
+  `perspective`, and the log flagged this as a followup.
+- `core/src/render/scenes/particles/family.rs:499` says "the perspective magnification is `1`", but
+  `magnify` is gone. The zero now selects the in-plane path.
+
+**Fix (comment text):** ifs.rs: `documents for \`bloom_threshold\`.` family.rs: replace "so the
+perspective magnification is `1`, the haze multiplier" with "so the draw shader keeps them on the
+in-plane path, the haze multiplier".
+
+##### minor 3: ADR-0260's Decision is falsified in two details
+`docs/adrs/0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md:40`
+says the spin "adds to `yaw`". The implementation subtracts it (`encode::spun`), because the camera's
+yaw turns the eye, and subtracting is what keeps a positive `spin` turning the figure the same way. At
+`:24` and `:74` the ADR says "10 of the 22 attractor presets" and "Ten presets owe a fresh look". The
+tree has 12 attractor presets and 6 3D ones (five presets plus Sumi's layer).
+
+**Fix (prose, at the close):** accept the ADR with a dated `## Outcome` recording the sign of the
+spin composition and the real counts. Also record that `pan_x` on the 3D path is in frame heights. Do
+not edit the body.
+
+##### minor 4: a shipped preset runs the camera nearer than the near-plane test proves safe
+`presets/attractor_lorenzknot.toml:69` drives `distance = 1 / (0.42 + clamp(bass * 0.33, 0, 0.28))`,
+which reaches about 1.43 at full bass. `every_3d_entry_stays_clear_of_the_near_plane`
+(`core/src/render/scenes/particles/tests.rs:592`) proves the entries clear only at the declared minimum
+of 1.5. `presets/README.md` says `1.5` "keeps Lorenz's far lobes clear" and that shipped presets run
+"from about `1.4`". The plan's risk section leaned on the Phase 3 coverage test to catch a violation,
+but a coverage floor cannot see a few dropped or hugely magnified near-plane sprites.
+
+**Fix:** either extend the near-plane test to also assert entry 1's reach against the nearest
+`distance` a shipped preset binds, or have the Phase 6 re-curation keep Lorenz Knot at or above 1.5.
+Until one of those lands, the README sentence overstates what is proven.
+
+##### minor 5: the implementation log outweighs the phases it reports
+The plan's `## Implementation log` (about 188 lines) is longer than its `## Implementation phases`
+section (about 128 lines). Mode 4 holds the report to be no larger than the contract. Most of the
+weight is Phase 3's mapping notes and the Phase 8 replacement text, which is a deliverable and must
+stay.
+
+**Fix (prose, at the close):** tighten the Phase 1 to Phase 3 notes that restate test names already
+cited by the test bodies. Keep the deviations and the Phase 8 text verbatim.
 
 ## Followups (after this lands)
 

@@ -1,8 +1,8 @@
 # ADR-0260 — The attractor's 3D families project through the shared camera, and `perspective` retires
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-06 (Outcome below)
 > **Date:** 2026-10-01
-> **Related plan(s):** [0240](../plans/0240-the-attractor-projects-through-the-shared-camera.md)
+> **Related plan(s):** [0240](../plans/done/0240-the-attractor-projects-through-the-shared-camera.md)
 > **Amends:** ADR-0076 (its projection), ADR-0257 (its "the attractor's projection stays")
 
 ## Context
