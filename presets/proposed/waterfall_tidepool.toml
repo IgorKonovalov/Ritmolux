@@ -1,0 +1,46 @@
+# Tidepool - the spectrum's history seen from high above, like looking down
+# into shallow water: glowing contour lines in teal and coral, sharp at the
+# newest row and blurring away into the past. The opposite of a terrain read:
+# no `solid`, so crossings glow, and the depth cue is focus, not occlusion.
+#
+# The focal plane sits on the front rows and `aperture` softens everything
+# behind them, so the present is crisp and the last few seconds go out of
+# focus as they recede. The camera turns very slowly around the pool on
+# `yaw`, and MID opens the aperture a little on dense passages. The palette
+# runs deep teal through seafoam to coral across the bands, so bass rows are
+# cold and treble rows warm. Luminance stays flat; peaks show as height.
+system = "waterfall"
+name = "Tidepool"
+
+[waterfall]
+elements   = 48
+rows       = 60
+row_period = 0.05
+smoothing  = 0.06
+
+[palette]
+stops = [
+  { at = 0.0, color = "#06343c" },
+  { at = 0.45, color = "#2fb7a4" },
+  { at = 0.75, color = "#bff0dc" },
+  { at = 1.0, color = "#ff7a5c" },
+]
+
+[params]
+height      = "0.75"
+row_spacing = "0.055"
+curve       = "0.9"
+fade        = "0.6"
+line_width  = "1.8"
+glow        = "1.1"
+brightness  = "0.9"
+hue         = "0.15"
+hue_spread  = "0.85"
+yaw         = "time * 0.02"
+pitch       = "0.55"
+distance    = "3.0"
+focus       = "0.08"
+aperture    = "7 + clamp(mid * 4.7, 0, 4)"
+
+[smoothing]
+aperture = 0.4

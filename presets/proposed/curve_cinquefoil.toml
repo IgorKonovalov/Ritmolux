@@ -1,0 +1,51 @@
+# Cinquefoil - a (2,5) torus knot as a solid object in ember and gold,
+# turning slowly in the dark while the lens racks focus through it once per
+# bar. `solid` paints its near loops over its far ones so it reads as a knot
+# rather than as glowing wire, `fog` darkens the far side, and `hue_axis`
+# colours the strand by depth: the near loops are gold, the far ones ember.
+#
+# The camera sits low (`pitch` near 0.35): a torus knot's axis points at a
+# camera at `pitch` 0, so a low pitch shows the five-fold star and a high one
+# collapses it into a side-on coil.
+#
+# Motion on three time-scales: the camera orbits on a slow clock, the focal
+# plane sweeps front to back on `bar_phase` (a sine of it, so the wrap at the
+# bar line is seamless), and BASS swells the tube outward so the knot breathes
+# on the kick. ONSET opens the aperture for a moment. Brightness is held flat;
+# the music spends itself on shape and focus.
+system = "parametric_curve"
+name = "Cinquefoil"
+
+[curve]
+family = "torus_knot"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#3a0a05" },
+  { at = 0.4, color = "#b8320f" },
+  { at = 0.75, color = "#f08a1c" },
+  { at = 1.0, color = "#ffe08a" },
+]
+
+[params]
+n          = "2"
+d          = "5"
+tube       = "0.42 + clamp(bass * 0.14, 0, 0.12)"
+samples    = "600"
+thickness  = "14"
+brightness = "1.0"
+hue        = "0.3"
+hue_spread = "0.75"
+hue_axis   = "1"
+solid      = "1"
+fog        = "0.45"
+yaw        = "time * 0.06"
+pitch      = "0.35 + 0.12 * noise(time * 0.03)"
+distance   = "3.1"
+fov        = "0.85"
+focus      = "0.5 + 0.4 * sin(bar_phase * tau)"
+aperture   = "5 + clamp(onset * 10, 0, 6)"
+
+[smoothing]
+tube = 0.15
+aperture = 0.2

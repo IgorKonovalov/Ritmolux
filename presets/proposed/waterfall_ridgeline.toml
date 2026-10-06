@@ -1,0 +1,43 @@
+# Ridgeline - the spectrum's last four seconds as a pulsar plot: white
+# ridges on black, seen almost edge-on, each row hiding the rows behind it.
+# The landscape IS the music, so almost nothing else is bound: the rows carry
+# every band, `solid` turns them into terrain, and `curve` above 1 presses the
+# quiet bands flat so the peaks stand out of a calm plain.
+#
+# Front-on and low: `yaw` stays at 0 so the rows run straight across the
+# frame, and `pitch` only wanders a little on a slow noise, so the camera
+# never visibly moves. Colour is the mono palette read near its top with no
+# spread, so every row is the same near-white and depth comes from `fade` and
+# `fog`, not hue. BASS lifts the whole landscape a little; nothing on
+# luminance reacts.
+system = "waterfall"
+name = "Ridgeline"
+
+[waterfall]
+elements   = 48
+rows       = 56
+row_period = 0.07
+smoothing  = 0.04
+
+[palette]
+name = "mono"
+
+[params]
+height      = "0.5 + clamp(bass * 0.18, 0, 0.15)"
+row_spacing = "0.045"
+curve       = "1.15"
+fade        = "0.55"
+fog         = "0.45"
+line_width  = "1.8"
+glow        = "0.5"
+brightness  = "2.0"
+hue         = "1.0"
+hue_spread  = "0"
+saturation  = "0"
+yaw         = "0"
+pitch       = "0.2 + 0.08 * noise(time * 0.05)"
+distance    = "2.3"
+solid       = "1"
+
+[smoothing]
+height = 0.25
