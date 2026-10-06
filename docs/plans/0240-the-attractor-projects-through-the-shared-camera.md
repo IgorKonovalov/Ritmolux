@@ -128,12 +128,15 @@ flowchart LR
 - **Owner skill:** dev
 - **What:**
   - The generated params block, `presets/schema/` and `.taplo.toml` are regenerated.
-  - `docs/presets.md` and the preset-author reference's `## attractor` section replace `perspective`
-    with the camera block, and say which families it reads on.
-  - The reference states the migration rule, so the content lane can re-curate from it.
+  - `docs/presets.md` replaces `perspective` with the camera block, and says which families it
+    reads on.
+  - The log carries the replacement text for the preset-author reference's `## attractor` section,
+    for the owner to apply in Phase 7: the camera block in place of `perspective`, the families it
+    reads on, and the migration rule, so the content lane can re-curate from it. A headless session
+    cannot edit `.claude/` (ADR-0210).
   - `scripts/tuple-sheets.mjs` still renders 3D roster entries at the default camera.
 - **Files touched:** `presets/README.md`, `presets/schema/`, `.taplo.toml`, `docs/presets.md`,
-  `.claude/skills/preset-author/references/systems.md`, `scripts/tuple-sheets.mjs`.
+  `docs/specs/player-schema.json`, `scripts/tuple-sheets.mjs`.
 - **Done when:** the schema and param-reference tests pass on the regenerated files.
   `node scripts/toc.mjs --check`, `node scripts/check-doc-links.mjs` and
   `node scripts/check-reader-prose.mjs` pass.
@@ -154,6 +157,14 @@ flowchart LR
   If Plan 0218 has moved blessing to lavapipe by then, bless there instead.
 - **Files touched:** `core/tests/golden/attractor_depth.png`.
 - **Done when:** the Windows CI golden job is green on `main`.
+
+### Phase 7 — The preset-author reference
+- **Owner skill:** human
+- **Blocks merge:** no
+- **What:** the owner applies, in an interactive session, the text Phase 4 left in the log to
+  `.claude/skills/preset-author/references/systems.md`'s `## attractor` section.
+- **Files touched:** `.claude/skills/preset-author/references/systems.md`.
+- **Done when:** the edit is committed on `main` and `node scripts/check-doc-links.mjs` exits 0.
 
 ## Data shapes
 
@@ -202,6 +213,7 @@ struct ModelTransform {
 | 4 — Documentation and the references | dev | not started | |
 | 5 — The 3D presets, re-curated in motion | human | not started | |
 | 6 — The moved baseline is blessed | human | not started | |
+| 7 — The preset-author reference | human | not started | |
 
 ### Notes
 
