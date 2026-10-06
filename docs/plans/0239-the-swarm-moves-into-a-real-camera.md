@@ -242,8 +242,8 @@ struct Particle {
 | 4 — The shipped presets keep rendering | dev | done | 65e4a600 |
 | 5 — Documentation and the references | dev | done | cbb2276c |
 | 6 — The three presets, judged and re-tuned | human | done - Braid keep, Maelstrom keep, Murmuration re-tune | 8ece66bd |
-| 7 — The moved baselines are blessed | human | not started | |
-| 8 — The preset-author reference | human | not started | |
+| 7 — The moved baselines are blessed | human | owed | |
+| 8 — The preset-author reference | human | owed | |
 
 ### Notes
 
