@@ -754,6 +754,50 @@ fn the_depth_cues_are_exact_no_ops_on_a_flat_family() {
     );
 }
 
+/// **A 3D figure pitches through the shared camera, and a flat one does not**
+/// (ADR-0260): the same Lorenz preset at `pitch = 0.6` and at `pitch = 0`
+/// renders two different frames, and the same pair on De Jong, which keeps its
+/// in-plane path, renders one.
+#[test]
+fn a_lorenz_figure_pitches_through_the_camera() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let lively = AnalysisFrame {
+        bass: 0.5,
+        mid: 0.4,
+        treb: 0.5,
+        ..Default::default()
+    };
+    renderer.set_presets(vec![
+        attractor_bare_preset("lz_level", "lorenz", "pitch = \"0\"\n"),
+        attractor_bare_preset("lz_pitched", "lorenz", "pitch = \"0.6\"\n"),
+        attractor_bare_preset("dj_level", "de_jong", "pitch = \"0\"\n"),
+        attractor_bare_preset("dj_pitched", "de_jong", "pitch = \"0.6\"\n"),
+    ]);
+    let mut capture = |name: &str| {
+        renderer
+            .capture_preset(name, &lively, 60)
+            .expect("capture a pitch probe")
+    };
+    let (level, pitched) = (capture("lz_level"), capture("lz_pitched"));
+    assert!(
+        lit_mask(&level).iter().filter(|&&l| l).count() > 500,
+        "the level Lorenz lit almost nothing"
+    );
+    let moved = frame_diff(&level, &pitched);
+    println!("lorenz pitch 0 -> 0.6: frame_diff {moved:.4}");
+    assert!(
+        moved > 0.001,
+        "`pitch = 0.6` moved nothing on Lorenz ({moved:.5})"
+    );
+    let (flat, flat_pitched) = (capture("dj_level"), capture("dj_pitched"));
+    assert_eq!(
+        flat.rgba, flat_pitched.rgba,
+        "`pitch` must be inert on a flat family"
+    );
+}
+
 /// Mean `(R − G, G − B)` over the pixels `mask` selects — the figure's **colour**,
 /// separated from how bright it is the way [`mean_luma_over`] separates level.
 fn mean_chroma_over(img: &CaptureImage, mask: &[bool]) -> (f32, f32) {

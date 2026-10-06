@@ -10,6 +10,7 @@ use super::{
     deposit_scale, family, ifs, projection_mirror, spin_phase, streak_flag,
 };
 use crate::dsp::AnalysisFrame;
+use crate::render::camera::{self, CameraParams, CameraView};
 use crate::render::context::RenderContext;
 use crate::render::scenes::declares;
 use crate::render::{Tier, TierConfig, attractor_budget};
@@ -399,68 +400,226 @@ fn depth_samples(family: AttractorFamily) -> [[f32; 3]; 4] {
     }
 }
 
-/// **ADR-0076's diagnosis and its fix, as one dimensionless property.**
+/// A 3D family's canonical model transform (ADR-0260).
+fn canonical_model(family: AttractorFamily) -> family::ModelTransform {
+    canonical(family)
+        .model(family)
+        .expect("a family with depth has a model transform")
+}
+
+/// The orbit camera at `yaw`, `pitch`, `distance` and `fov`, on a square
+/// target with no zoom or pan.
+fn orbit(yaw: f32, pitch: f32, distance: f32, fov: f32) -> CameraView {
+    CameraParams {
+        yaw,
+        pitch,
+        distance,
+        fov,
+        ..CameraParams::default()
+    }
+    .camera()
+    .view(1.0, 1.0, [0.0, 0.0])
+}
+
+/// A model point's normalized device position through `view`.
+fn ndc_of(view: &CameraView, p: [f32; 3]) -> [f32; 2] {
+    let [x, y, _, w] = view.clip(p);
+    [x / w, y / w]
+}
+
+/// The camera ADR-0260's mapping gives a retired `perspective` of `p` on this
+/// model, at zoom 1: `distance = E / p` in model units and
+/// `tan(fov / 2) = p / (E * footprint)`, where `E` is the depth half-extent in
+/// model units and `footprint` the half-extent the figure drew at.
+fn migrated_lens(model: &family::ModelTransform, p: f32) -> (f32, f32) {
+    let e = 1.0 / model.inv_unit_depth;
+    (e / p, 2.0 * (p / (e * model.footprint)).atan())
+}
+
+/// **ADR-0076's diagnosis, through the shared camera** (ADR-0260).
 ///
-/// Under orthography the projection at rotation `π` is the exact `x`-mirror
-/// of the projection at `0` — at `cs = -1, sn = 0` the horizontal term
-/// becomes `-p.x` and the vertical term is untouched. That is why a rotating
-/// transparent structure carries no information about *which way* it is
-/// turning, and with additive blending there is no occlusion to break the
-/// tie either: the percept flips and settles on "flat".
+/// Under orthography the projection at a half turn is the `x`-mirror of the
+/// projection at rest. That is why a rotating transparent structure carries
+/// no information about *which way* it is turning, and with additive blending
+/// there is no occlusion to break the tie either: the percept flips and
+/// settles on "flat". A camera far away through a narrow lens is that
+/// orthography; at a working distance the half turn is no mirror, because
+/// the near side projects larger than the far.
 ///
-/// Under perspective it is not a mirror, because `m(h) != m(-h)` for any
-/// `h != 0`. Both halves are asserted here, exactly, on the formula — a
-/// capture could only report that the picture changed.
+/// Read off [`CameraView::clip`], the CPU half the camera's own test pins to
+/// the GPU, applied to the model the draw shader's `to_model` builds.
 #[test]
-fn perspective_breaks_the_orthographic_mirror() {
+fn the_camera_breaks_the_orthographic_mirror() {
+    use std::f32::consts::PI;
     for family in [AttractorFamily::Lorenz, AttractorFamily::Thomas] {
+        let model = canonical_model(family);
         for q in depth_samples(family) {
+            let p = model.apply(q);
             // The premise: this sample must actually have depth, or every
-            // assertion below is about `m(0) = m(0)`.
-            let rest = projection_mirror::project(q, family, REST.0, REST.1);
-            let dn = projection_mirror::depth_norm(rest.depth, canonical_depth(family));
+            // assertion below compares two points at the orbit target.
             assert!(
-                dn.abs() > 0.05,
-                "{family:?} sample {q:?} sits at depth {dn} — too near the view plane to \
-                 distinguish a perspective divide from an orthographic one"
+                p[2].abs() > 0.05,
+                "{family:?} sample {q:?} sits at model depth {} — too near the view plane \
+                 to distinguish a perspective divide from an orthographic one",
+                p[2]
             );
 
-            // --- the flatness, pinned ---
-            let flat_rest = projection_mirror::world(q, family, REST.0, REST.1, 0.0);
-            let flat_half = projection_mirror::world(q, family, HALF_TURN.0, HALF_TURN.1, 0.0);
-            let ([rx, ry], [hx, hy]) = (flat_rest, flat_half);
-            assert_eq!(
-                hx, -rx,
-                "{family:?} sample {q:?}: at perspective 0 the half turn must be the exact \
-                 x-mirror of the rest pose"
-            );
-            assert_eq!(
-                hy, ry,
-                "{family:?} sample {q:?}: the vertical must not move"
+            // --- the flatness, at a distance a perspective cannot be seen from ---
+            let far = 1.0e4f32;
+            let fov = 2.0 * (1.0 / far).atan();
+            let [rx, ry] = ndc_of(&orbit(0.0, 0.0, far, fov), p);
+            let [hx, hy] = ndc_of(&orbit(PI, 0.0, far, fov), p);
+            assert!(
+                (hx + rx).abs() < 1e-3 && (hy - ry).abs() < 1e-3,
+                "{family:?} sample {q:?}: from {far} away the half turn must be the \
+                 x-mirror of the rest pose: ({rx}, {ry}) against ({hx}, {hy})"
             );
 
-            // --- and the fix, pinned ---
-            const P: f32 = 0.5;
-            let deep_rest = projection_mirror::world(q, family, REST.0, REST.1, P);
-            let deep_half = projection_mirror::world(q, family, HALF_TURN.0, HALF_TURN.1, P);
-            let ([drx, dry], [dhx, dhy]) = (deep_rest, deep_half);
-            assert_ne!(
-                dhx, -drx,
-                "{family:?} sample {q:?}: at perspective {P} the half turn is STILL the \
-                 x-mirror of the rest pose — the depth is not reaching the magnification, so \
-                 the rotation is as ambiguous as it was"
+            // --- and the depth, at the default distance ---
+            let rest = CameraParams::default();
+            let near = |yaw: f32| ndc_of(&orbit(yaw, 0.0, rest.distance, rest.fov), p);
+            let ([drx, dry], [dhx, dhy]) = (near(0.0), near(PI));
+            assert!(
+                (dhx + drx).abs() > 1e-3,
+                "{family:?} sample {q:?}: at distance {} the half turn is STILL the \
+                 x-mirror of the rest pose — the depth is not reaching the divide",
+                rest.distance
             );
-            // The vertical breaks too, and that is worth stating separately:
-            // the magnification scales the whole projected position, so a
-            // half turn moves the figure toward or away from the camera
-            // rather than merely flipping it.
-            assert_ne!(
-                dhy, dry,
-                "{family:?} sample {q:?}: the vertical is unchanged by the half turn under \
-                 perspective — the magnification is not being applied to it"
+            // The vertical breaks too: the divide scales the whole projected
+            // position, so a half turn moves the point toward or away from the
+            // eye rather than merely flipping it.
+            assert!(
+                (dhy - dry).abs() > 1e-3,
+                "{family:?} sample {q:?}: the vertical is unchanged by the half turn \
+                 under perspective"
             );
         }
     }
+}
+
+/// **The mapping is the retired projection** (ADR-0260): a camera at
+/// `distance = E / p` through the matching `fov` projects every point the
+/// pseudo-perspective `magnify` drew inside its depth clamp to where that drew
+/// it, at every spin — `spun` turning the eye so the figure turns the way it
+/// did. Points past the clamp are where the two part, by design.
+#[test]
+fn the_mapped_camera_reproduces_the_retired_magnification() {
+    for family in [AttractorFamily::Lorenz, AttractorFamily::Thomas] {
+        let model = canonical_model(family);
+        for p in [0.18f32, 0.3, 0.5] {
+            let (distance, fov) = migrated_lens(&model, p);
+            let bound = CameraParams {
+                distance,
+                fov,
+                pitch: 0.0,
+                yaw: 0.0,
+                ..CameraParams::default()
+            };
+            for turn in [0.0f32, 0.7, 2.1, 4.0] {
+                let view = super::encode::spun(bound, turn / SPIN_RATE).camera().view(
+                    1.0,
+                    1.0,
+                    [0.0, 0.0],
+                );
+                let (cs, sn) = (turn.cos(), turn.sin());
+                for q in depth_samples(family) {
+                    let rest = projection_mirror::project(q, family, cs, sn);
+                    let dn = rest.depth * canonical_depth(family);
+                    if dn.abs() > 1.0 {
+                        continue;
+                    }
+                    let [ox, oy] = projection_mirror::world(q, family, cs, sn, p);
+                    let [nx, ny] = ndc_of(&view, model.apply(q));
+                    assert!(
+                        (ox - nx).abs() < 1e-4 && (oy - ny).abs() < 1e-4,
+                        "{family:?} at perspective {p}, turn {turn}, sample {q:?}: the \
+                         camera draws ({nx}, {ny}) where the magnification drew ({ox}, {oy})"
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// **A full turn of `yaw` barely moves a Lorenz figure's centroid** — ADR-0076's
+/// Outcome measured a centre-x swing of about `0.9 * p` NDC peak to peak under
+/// the retired projection, and the figure orbited the frame instead of turning
+/// in place. Here the bank of on-attractor points is projected through the
+/// camera the mapping gives at `p` and its mean is tracked across the turn.
+#[test]
+fn a_yaw_sweep_barely_moves_the_lorenz_centroid() {
+    const FAMILY: AttractorFamily = AttractorFamily::Lorenz;
+    const STEPS: usize = 72;
+    let model = canonical_model(FAMILY);
+    let bank = family::measure_figure(FAMILY, FAMILY.default_coeffs())
+        .expect("the canonical butterfly measures")
+        .fill;
+    let points: Vec<[f32; 3]> = bank.iter().map(|q| model.apply(*q)).collect();
+    for p in [0.25f32, 0.5] {
+        let (distance, fov) = migrated_lens(&model, p);
+        let centres: Vec<f32> = (0..STEPS)
+            .map(|i| {
+                let yaw = i as f32 / STEPS as f32 * std::f32::consts::TAU;
+                let view = orbit(yaw, 0.0, distance, fov);
+                points.iter().map(|q| ndc_of(&view, *q)[0]).sum::<f32>() / points.len() as f32
+            })
+            .collect();
+        let lo = centres.iter().copied().fold(f32::INFINITY, f32::min);
+        let hi = centres.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let swing = hi - lo;
+        println!("perspective {p}: centroid swing {swing:.4} NDC over a full yaw turn");
+        assert!(
+            swing < 0.9 * p,
+            "at the camera matched to perspective {p} the centroid swings {swing:.4} NDC, \
+             not under ADR-0076's {:.3}",
+            0.9 * p
+        );
+    }
+}
+
+/// **No 3D roster entry reaches the near plane at the nearest declared
+/// `distance`** (ADR-0260). The model transform puts each entry at unit
+/// framed radius, but a figure's points reach past it along a diagonal; every
+/// banked point of every entry, in model space, stays nearer the orbit target
+/// than the lowest `distance` the camera block declares, less the near plane.
+#[test]
+fn every_3d_entry_stays_clear_of_the_near_plane() {
+    let Some([nearest, _]) = super::DISTANCE.range else {
+        panic!("distance declares a range")
+    };
+    for family in [AttractorFamily::Thomas, AttractorFamily::Lorenz] {
+        for (index, entry) in family::resolve_roster(family).iter().enumerate() {
+            let model = entry
+                .tuple
+                .framing
+                .model(family)
+                .expect("a 3D entry has a model transform");
+            let bank = if entry.fill.is_empty() {
+                family::measure_figure(family, entry.tuple.coeffs)
+                    .expect("a shipped entry measures")
+                    .fill
+            } else {
+                entry.fill.clone()
+            };
+            let reach = bank
+                .iter()
+                .map(|q| {
+                    let [x, y, z] = model.apply(*q);
+                    (x * x + y * y + z * z).sqrt()
+                })
+                .fold(0.0f32, f32::max);
+            assert!(
+                reach + camera::NEAR < nearest,
+                "{family:?} entry {index} reaches {reach:.3} model units from its centre, \
+                 into the near plane at distance {nearest}"
+            );
+        }
+    }
+    // The draw shader drops a particle at the camera's own near plane.
+    assert!(
+        super::DRAW_SHADER.contains(&format!("const NEAR_DEPTH: f32 = {:?};", camera::NEAR)),
+        "the draw shader's NEAR_DEPTH is not camera::NEAR"
+    );
 }
 
 /// **The flat families are untouched at every `perspective`.**
@@ -3147,6 +3306,11 @@ fn a_divergent_tuple_falls_back_instead_of_reaching_the_gpu() {
 /// of the frame** as the figure that family shipped with. That is the property
 /// worth pinning — a candidate sheet is only a judgement of figures if no cell
 /// is bigger or smaller than the others for framing reasons.
+///
+/// **A family with depth is read through the shared camera at its defaults**
+/// (ADR-0260): the model transform brings each entry to unit framed radius, so
+/// the reach is where the entry's box extremes project across a full turn of
+/// the orbit, and the canonical figure's is the reference.
 #[test]
 fn every_roster_entry_fills_the_frame_like_its_canonical_figure() {
     for family in [
@@ -3160,11 +3324,13 @@ fn every_roster_entry_fills_the_frame_like_its_canonical_figure() {
             roster.len() > 1,
             "{family:?} has no candidates to sheet — Phase 2 needs a menu"
         );
-        let reference = family::framed_half(family, canonical(family).seed_box.0)
-            * canonical(family).projection.0;
+        let reach_of = |framing: &Framing| match framing.model(family) {
+            Some(model) => camera_reach(&model, framing.seed_box.0),
+            None => family::framed_half(family, framing.seed_box.0) * framing.projection.0,
+        };
+        let reference = reach_of(&canonical(family));
         for (index, entry) in roster.iter().enumerate() {
-            let (scale, _, _) = entry.tuple.framing.projection;
-            let reach = family::framed_half(family, entry.tuple.framing.seed_box.0) * scale;
+            let reach = reach_of(&entry.tuple.framing);
             assert!(
                 reach <= 1.0,
                 "{family:?} entry {index} reaches {reach:.2} of the frame — out of frame"
@@ -3179,6 +3345,38 @@ fn every_roster_entry_fills_the_frame_like_its_canonical_figure() {
             );
         }
     }
+}
+
+/// How far from the centre of a square frame a 3D entry reaches through the
+/// default camera, in normalized device units: the six extremes of its box
+/// `half`, through the model transform, at every yaw of a full turn.
+fn camera_reach(model: &family::ModelTransform, half: [f32; 3]) -> f32 {
+    let [hx, hy, hz] = half;
+    // The box's extremes along each axis, laid on the model's axes the way
+    // `apply` lays a point: `x` across, the vertical up, the partner in depth.
+    let extremes = [[hx, 0.0, 0.0], [0.0, hy, 0.0], [0.0, 0.0, hz]]
+        .into_iter()
+        .flat_map(|axis| [axis, axis.map(|v| -v)])
+        .map(|offset| {
+            let [cx, cy, cz] = model.centre;
+            let [ox, oy, oz] = offset;
+            model.apply([cx + ox, cy + oy, cz + oz])
+        })
+        .collect::<Vec<_>>();
+    let rest = CameraParams::default();
+    (0..48)
+        .flat_map(|i| {
+            let yaw = i as f32 / 48.0 * std::f32::consts::TAU;
+            let view = orbit(yaw, rest.pitch, rest.distance, rest.fov);
+            extremes
+                .iter()
+                .map(|p| {
+                    let [x, y] = ndc_of(&view, *p);
+                    x.abs().max(y.abs())
+                })
+                .collect::<Vec<_>>()
+        })
+        .fold(0.0f32, f32::max)
 }
 
 /// **The framing travels with the tuple, so `reseed` does too** — the Plan 0062
@@ -3456,6 +3654,9 @@ fn mentions(code: &str, name: &str) -> bool {
 /// evidence.
 #[test]
 fn the_family_table_is_the_roster_and_its_inert_cells_are_inert() {
+    // The four coefficient rows, in `default_coeffs` order; the rest of the
+    // table is the camera block.
+    const COEFFICIENTS: [&str; 4] = ["a", "b", "c", "d"];
     let families = attractor_family_names();
     let mut seen = Vec::new();
     for row in family::FAMILY_PARAMS {
@@ -3465,14 +3666,39 @@ fn the_family_table_is_the_roster_and_its_inert_cells_are_inert() {
             .iter()
             .find(|spec| spec.name == row.name)
             .unwrap_or_else(|| panic!("`{}` is not a declared parameter", row.name));
-        assert_eq!(
-            spec.range, None,
-            "`{}` must keep `range: None` — one pair for four maps at different \
-             scales is a claim nothing holds",
-            row.name
-        );
         let listed: Vec<&str> = row.ranges.iter().map(|r| r.family).collect();
         assert_eq!(listed, families, "`{}` must list every family", row.name);
+        if COEFFICIENTS.contains(&row.name) {
+            assert_eq!(
+                spec.range, None,
+                "`{}` must keep `range: None` — one pair for four maps at different \
+                 scales is a claim nothing holds",
+                row.name
+            );
+            continue;
+        }
+        // The camera block (ADR-0260): its own range on every family with
+        // depth, inert on every flat one — the families the model transform
+        // exists for, asked of the framing itself.
+        assert!(
+            CameraParams::SPECS.iter().any(|s| s.name == row.name),
+            "`{}` is neither a coefficient nor a camera param",
+            row.name
+        );
+        for (cell, family) in row.ranges.iter().zip(
+            AttractorFamily::MAPS
+                .into_iter()
+                .chain(IfsFigure::ALL.map(AttractorFamily::Ifs)),
+        ) {
+            let deep = canonical(family).model(family).is_some();
+            assert_eq!(
+                cell.range,
+                if deep { spec.range } else { None },
+                "`{}` on {}: the camera reads exactly on the families with depth",
+                row.name,
+                cell.family
+            );
+        }
     }
     assert_eq!(
         crate::render::scenes::family_params("attractor"),
@@ -3509,7 +3735,10 @@ fn the_family_table_is_the_roster_and_its_inert_cells_are_inert() {
     ];
 
     let mut inert_checked = 0;
-    for (index, row) in family::FAMILY_PARAMS.iter().enumerate() {
+    let coefficient_rows = family::FAMILY_PARAMS
+        .iter()
+        .filter(|row| COEFFICIENTS.contains(&row.name));
+    for (index, row) in coefficient_rows.enumerate() {
         for (cell, family) in row.ranges.iter().zip(AttractorFamily::MAPS) {
             let reads = cell.range.is_some();
             // The shader, which is the source.

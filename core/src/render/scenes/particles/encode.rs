@@ -22,6 +22,7 @@
 // A continuation of one module split across four files, so it needs the names
 // `particles/mod.rs` has in scope.
 use super::*;
+use crate::render::camera::{CameraUniform, CameraView};
 
 /// One frame's uniform inputs, gathered so [`upload_uniforms`] takes one argument
 /// rather than fourteen. Plain values read off the scene's params.
@@ -78,16 +79,17 @@ pub(super) struct UniformInputs {
     pub(super) zoom: f32,
     pub(super) pan: [f32; 2],
     pub(super) perspective: f32,
-    /// The lens (ADR-0257): `aperture` in pixels and `focus` normalized to the
-    /// figure's depth, both raw and sanitized where they are packed, and the
-    /// tier's cap on the circle of confusion.
-    pub(super) aperture: f32,
-    pub(super) focus: f32,
+    /// The shared camera block (ADR-0258), raw as bound: the orbit and lens a
+    /// family with depth projects through (ADR-0260), and its `focus` and
+    /// `aperture`, sanitized where they are packed.
+    pub(super) camera: CameraParams,
+    /// The tier's cap on the circle of confusion, in pixels.
     pub(super) max_coc: f32,
-    /// The render target's height in pixels — never the trail grid's, which
-    /// the grid scale and the tier cap shrink — so a circle of confusion stated
-    /// in pixels is a width on screen (ADR-0257, ADR-0037).
-    pub(super) target_height: u32,
+    /// The render target's width and height in pixels — never the trail
+    /// grid's, which the grid scale and the tier cap shrink — so a circle of
+    /// confusion or a sprite stated in pixels is a width on screen (ADR-0257,
+    /// ADR-0037).
+    pub(super) target: (u32, u32),
     pub(super) depth_fade: f32,
     pub(super) depth_hue: f32,
     /// ADR-0087's last-map channel, at its two routes. Both reach the draw
@@ -199,6 +201,7 @@ pub(super) fn upload_uniforms(
     // from "how bright the figure is". At the default the factor is exactly
     // `1.0`, so this line is the identity and no existing capture moves.
     let deposit = deposit_scale(active) * brightness_factor(inputs.brightness);
+    let (cam, mdl) = camera_rows(inputs);
     queue.write_buffer(
         &pipelines.draw_uniform,
         0,
@@ -238,8 +241,13 @@ pub(super) fn upload_uniforms(
             ],
             // The lens rides the three padding lanes the basis and the centre
             // rows already had, so the uniform keeps its size (ADR-0257).
-            bh: [hx, hy, hz, finite_or(inputs.aperture, 0.0).max(0.0)],
-            bv: [vx, vy, vz, finite_or(inputs.focus, 0.5).clamp(0.0, 1.0)],
+            bh: [hx, hy, hz, finite_or(inputs.camera.aperture, 0.0).max(0.0)],
+            bv: [
+                vx,
+                vy,
+                vz,
+                finite_or(inputs.camera.focus, 0.5).clamp(0.0, 1.0),
+            ],
             d: [
                 // Clamped here, silently, and not in the shader: this is the one
                 // place the value crosses into the GPU, so a preset asking for
@@ -302,16 +310,18 @@ pub(super) fn upload_uniforms(
                     emergence_rate(inputs.emergence),
                     0.0,
                     palette::band_steps(inputs.palette_steps),
-                    inputs.target_height as f32,
+                    inputs.target.1 as f32,
                 ]
             } else {
                 [
                     0.0,
                     1.0,
                     palette::band_steps(inputs.palette_steps),
-                    inputs.target_height as f32,
+                    inputs.target.1 as f32,
                 ]
             },
+            cam,
+            mdl,
         }),
     );
     // Frame-rate-independent trail decay: retain `fade` per 1/60 s, raised to
@@ -479,6 +489,70 @@ pub(super) fn encode_present(
     pass.set_pipeline(&pipelines.present_pipeline);
     pass.set_bind_group(0, present_bg, &[]);
     pass.draw(0..3, 0..1);
+}
+
+/// The bounding radius the camera's lens is laid across: the model transform
+/// brings every 3D roster entry to unit radius (ADR-0260).
+pub(super) const MODEL_RADIUS: f32 = 1.0;
+
+/// The orbit camera a family with depth projects through at `spin_time`: the
+/// bound block with the spin's phase taken off its yaw. The camera's yaw turns
+/// the eye about the figure, so turning the eye backwards turns the figure the
+/// way a positive `spin` always has.
+pub(super) fn spun(camera: CameraParams, spin_time: f32) -> CameraParams {
+    CameraParams {
+        yaw: camera.yaw - spin_phase(spin_time),
+        ..camera
+    }
+}
+
+/// The draw uniform's `cam` and `mdl` rows: the shared camera and the active
+/// entry's model transform on a family with depth, zeros on a flat one.
+fn camera_rows(inputs: &UniformInputs) -> (CameraUniform, [f32; 4]) {
+    let Some(model) = inputs.framing.model(inputs.family) else {
+        return (bytemuck::Zeroable::zeroed(), [0.0; 4]);
+    };
+    let frame = spun(inputs.camera, inputs.spin_time).frame(
+        inputs.aspect,
+        inputs.zoom,
+        inputs.pan,
+        inputs.target,
+        MODEL_RADIUS,
+        inputs.max_coc,
+    );
+    let mut cam = frame.uniform;
+    // Sprite sizes are stated at the orbit target, the figure's centre, rather
+    // than at the focal plane, so moving the focus never resizes a sprite.
+    let [w, h, _, unused] = cam.viewport;
+    cam.viewport = [w, h, frame.view.distance, unused];
+    let sprite_px = sprite_radius_px(
+        POINT_BASE * inputs.size / model.footprint,
+        &frame.view,
+        inputs.target.1,
+    );
+    (
+        cam,
+        [model.inv_framed_half, sprite_px, model.inv_unit_depth, 0.0],
+    )
+}
+
+/// The on-screen radius, in pixels of a target `height` high, of a sprite
+/// `radius` model units across at the orbit target: `radius * s / distance`
+/// in normalized device units, where `s = 1 / tan(fov / 2)` is the lens's
+/// focal scale, times half the height.
+pub(super) fn sprite_radius_px(radius: f32, view: &CameraView, height: u32) -> f32 {
+    radius * focal_scale(view) / view.distance * height.max(1) as f32 * 0.5
+}
+
+/// The lens's focal scale `1 / tan(fov / 2)`, read back off the view matrix,
+/// so the field of view `Camera3d::view` sanitized is the one used. Row 1 of
+/// the matrix is `up * s + forward * pan_y` and row 3 is `forward`, both unit
+/// and orthogonal, so `s` is row 1's length once its `forward` part is removed.
+fn focal_scale(view: &CameraView) -> f32 {
+    let [[_, u0, _, f0], [_, u1, _, f1], [_, u2, _, f2], _] = view.view_proj;
+    let along = u0 * f0 + u1 * f1 + u2 * f2;
+    let (a, b, c) = (u0 - along * f0, u1 - along * f1, u2 - along * f2);
+    (a * a + b * b + c * c).sqrt()
 }
 
 /// `v` when it is finite, `fallback` when a binding evaluated to NaN or an

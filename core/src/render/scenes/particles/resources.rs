@@ -133,6 +133,13 @@ impl StepUniform {
 /// would black them out rather than leave them alone. **z and w are free** since
 /// the retirement: z carried `1/churn_max_lifetime()`, which only the age colour
 /// channel read.
+///
+/// `cam`: the shared camera (ADR-0260) a family with depth projects through,
+/// its `viewport.z` the orbit target's view depth, which sprite sizes are
+/// stated at. `mdl`: x the model transform's `1 / framed half-extent`, y the
+/// sprite radius in target pixels at that reference depth, z the model depth
+/// that is one unit of normalized depth, inverted, w unused. Both are zero on a
+/// flat family, whose path never reads them.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct DrawUniform {
@@ -146,6 +153,8 @@ pub(super) struct DrawUniform {
     pub(super) ctr: [f32; 4],
     pub(super) ch: [f32; 4],
     pub(super) em: [f32; 4],
+    pub(super) cam: crate::render::camera::CameraUniform,
+    pub(super) mdl: [f32; 4],
 }
 
 /// Decay uniform (per frame): x is the per-frame trail retention factor.

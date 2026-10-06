@@ -1,6 +1,6 @@
 # 0240 — The attractor projects through the shared camera
 
-> **Status:** approved (2026-10-01). Runs after Plan 0236 closes.
+> **Status:** in-progress (2026-10-06). Runs after Plan 0236 closes.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0260](../adrs/0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md) (proposed), [ADR-0076](../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md), [ADR-0093](../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md), [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed)
@@ -192,11 +192,12 @@ struct ModelTransform {
 
 ## Implementation log
 
-**Lane:**
+**Lane:** branch `plan-0240-the-attractor-projects-through-the-shared-camera`, worktree
+`/home/igor/Work/rlx-plan-0240`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: Lorenz through the camera | dev | not started | |
+| 1 — Walking skeleton: Lorenz through the camera | dev | done | committed with this row |
 | 2 — The real lens, and `perspective` retires | dev | not started | |
 | 3 — The shipped presets migrate by the mapping | dev | not started | |
 | 4 — Documentation and the references | dev | not started | |
@@ -204,6 +205,32 @@ struct ModelTransform {
 | 6 — The moved baseline is blessed | human | not started | |
 
 ### Notes
+
+- Phase 1: the spin composes with the camera as `yaw - spin_phase` (`encode::spun`), not `+`:
+  the camera's yaw turns the eye, so subtracting turns the figure the way a positive `spin`
+  turned it. `the_mapped_camera_reproduces_the_retired_magnification` pins the direction against
+  the old mirror.
+- Phase 1: a sprite's size is stated at the orbit target (`viewport.z = distance`), not at the
+  focal plane as on the plexus, so `focus` never resizes a sprite. Its radius is the old world
+  size divided by the entry's footprint (`scale * framed half`), which makes the mapping exact
+  for sprites too.
+- Phase 1: from this phase until Phase 2, `perspective` is inert on the 3D path, and every shipped
+  3D preset renders through the default camera until Phase 3.
+- Phase 1: "flat goldens byte-identical" was checked on this session's adapter, not on WARP:
+  `shot` captures of `attractor`, `attractor_trails`, `attractor_ifs` and `attractor_fb_rotate`
+  compared with `cmp` before and after the phase, all identical. `attractor_depth` differs.
+- Phase 1: the pitch done-when was run through `shot` on scratch fixtures under `target/`, and is
+  also held by `a_lorenz_figure_pitches_through_the_camera` in `core/tests/attractor.rs`.
+- Phase 1: the centroid swing over a full yaw turn measured 0.116 NDC at the camera matched to
+  `p = 0.25` and 0.141 at `p = 0.5` (`a_yaw_sweep_barely_moves_the_lorenz_centroid`).
+- Phase 1: the near-plane bound is held by `every_3d_entry_stays_clear_of_the_near_plane`: every
+  banked point of every 3D entry, in model units, is nearer its centre than `distance`'s declared
+  minimum (1.5) less `camera::NEAR`. The shader also drops a particle nearer than `NEAR`.
+- From Phase 1 until Phase 4 regenerates them, three generated-file checks are red in `-P fast`:
+  `the_parameter_reference_block_is_current`, `the_player_schema_snapshot_is_current` and
+  `the_generated_editor_files_are_current`. The second compares `docs/specs/player-schema.json`,
+  which Phase 4's file list does not name; `RLX_UPDATE_PRESET_SCHEMA=1` rewrites it with the rest.
+  The other 1882 tests pass.
 
 ### Close triggers
 
