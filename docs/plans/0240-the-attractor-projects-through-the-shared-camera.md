@@ -252,41 +252,19 @@ struct ModelTransform {
   focal plane as on the plexus, so `focus` never resizes a sprite. Its radius is the old world
   size divided by the entry's footprint (`scale * framed half`), which makes the mapping exact
   for sprites too.
-- Phase 1: from this phase until Phase 2, `perspective` is inert on the 3D path, and every shipped
-  3D preset renders through the default camera until Phase 3.
-- Phase 1: "flat goldens byte-identical" was checked on this session's adapter, not on WARP:
-  `shot` captures of `attractor`, `attractor_trails`, `attractor_ifs` and `attractor_fb_rotate`
-  compared with `cmp` before and after the phase, all identical. `attractor_depth` differs.
-- Phase 1: the pitch done-when was run through `shot` on scratch fixtures under `target/`, and is
-  also held by `a_lorenz_figure_pitches_through_the_camera` in `core/tests/attractor.rs`.
-- Phase 1: the centroid swing over a full yaw turn measured 0.116 NDC at the camera matched to
-  `p = 0.25` and 0.141 at `p = 0.5` (`a_yaw_sweep_barely_moves_the_lorenz_centroid`).
-- Phase 1: the near-plane bound is held by `every_3d_entry_stays_clear_of_the_near_plane`: every
-  banked point of every 3D entry, in model units, is nearer its centre than `distance`'s declared
-  minimum (1.5) less `camera::NEAR`. The shader also drops a particle nearer than `NEAR`.
-- From Phase 1 until Phase 4 regenerates them, three generated-file checks are red in `-P fast`:
-  `the_parameter_reference_block_is_current`, `the_player_schema_snapshot_is_current` and
-  `the_generated_editor_files_are_current`. The second compares `docs/specs/player-schema.json`,
-  which Phase 4's file list does not name; `RLX_UPDATE_PRESET_SCHEMA=1` rewrites it with the rest.
-  The other 1882 tests pass.
-- Phase 2: the loader was not silent before this phase. An undeclared param was a load warning
-  (`unknown parameter ... binding kept, but nothing reads it`), not an error. The done-when names a
-  load error, so `load.rs` gained `RETIRED_PARAMS`: a binding to `perspective` on the attractor, at
-  the top level or in a layer, fails with `PresetError::Config` naming `distance` and `fov`.
-- Phase 2: the `dn` clamp left `depth_norm`, which is gone, and became a saturation in `depth01`,
-  because the haze goes negative past the far extent. The flat path's `dn` is now a literal 0.
-- Phase 2: `core/tests/fixtures/attractor_depth.toml` moved off `perspective = 0.5`,
-  `zoom = 1.30` onto the mapping (`distance = 2.0`, `fov = 1.1839`, `pitch = 0`, zoom 1),
-  because the retired binding no longer loads. Its baseline was not re-blessed.
-- Phase 2 touched `core/src/render/scenes/particles/projection_mirror.rs`, which only Phase 1
-  lists. Its transcriptions of `depth_norm`, `magnify` and `figure_coc` went with the shader
-  functions they mirror, `world` lost its `perspective` argument, and `depth01` gained the
-  saturation.
-- Phase 2: the flat fixtures stayed byte-identical on this adapter (the same `shot` and `cmp`
-  check as Phase 1).
-- Between Phase 2 and Phase 3, the shipped presets that still bind `perspective` fail to load. In
-  this phase that reddened `attractor_contract` and `attractor_projects_at_the_target_aspect`,
-  which load `attractor_walkdejong`.
+- Phase 1: the flat captures (`attractor`, `attractor_trails`, `attractor_ifs`,
+  `attractor_fb_rotate`) were byte-identical before and after, by `shot` and `cmp` on this
+  session's adapter, not WARP. The yaw sweep's centroid swing was 0.116 NDC at `p = 0.25` and
+  0.141 at `p = 0.5`. The near-plane bound holds at `distance`'s declared minimum, 1.5.
+- Phases 1 to 3 left three generated-file checks red until Phase 4 regenerated them, among them
+  `docs/specs/player-schema.json`, which Phase 4's file list does not name.
+- Phase 2: the loader warned on an undeclared param rather than erroring, so `load.rs` gained
+  `RETIRED_PARAMS`: a `perspective` binding on the attractor fails, naming `distance` and `fov`.
+- Phase 2: the `dn` clamp became a saturation in `depth01`, because the haze goes negative past
+  the far extent. `core/tests/fixtures/attractor_depth.toml` moved onto the mapping
+  (`distance = 2.0`, `fov = 1.1839`, `pitch = 0`), unblessed. Phase 2 also touched
+  `projection_mirror.rs`, listed only under Phase 1, removing the mirrors of the retired shader
+  functions. The flat fixtures stayed byte-identical.
 - Phase 3: the shipped set no longer matches the plan's counts. 12 presets draw the attractor, not
   22, and 6 draw a 3D family, not 10: Ink on Paper, Lorenz Knot, Thomas Gallery, Thomas on Red and
   Thomas Walk, plus the `fragment_sumi` layer. Each was migrated onto `distance`, `fov` and
@@ -307,63 +285,25 @@ struct ModelTransform {
 - The camera divides `pan_x` by the aspect, which the attractor's in-plane path did not. This
   landed in Phase 1 and was not noted there. In Phase 3, Ink on Paper's `pan_x` swing was scaled by
   16/9, which reproduces the old drift on a 16:9 target only.
-- Phase 3: the `attractor_depth` capture moved. The golden run on llvmpipe (off WARP, so the
-  comparison is reported and not asserted) printed `attractor_depth    mean 0.0022 (tol 0.02)
-  max_outlier 62 (tol 48)`. The unchanged flat `attractor` fixture printed mean 0.0018 /
-  max_outlier 114 on the same adapter. A `shot` capture of the fixture differs byte-wise from the
-  pre-plan capture. Not re-blessed (Phase 7).
-- Phase 3: `every_migrated_3d_preset_clears_the_sanity_floor` (`core/tests/attractor.rs`) is the
-  coverage test. Coverage at drive 0.4 and 1.0 ran 0.258 (Thomas on Red) to 0.535 (Lorenz Knot)
-  against the attractor floor of 0.11, and Sumi read 0.92 against 0.21. Every preset spread over
-  four quadrants.
-- Phase 3: `sanity` (32 run, 2 `#[ignore]` instruments skipped) and `animation`, `reactivity`,
-  `distinctness` (46 run, 1 `#[ignore]` skipped) pass on llvmpipe. `-P fast` is 1881 of 1884,
-  and the three red tests are the generated-file checks named under Phase 1.
-- Followup noticed: `core/src/render/scenes/particles/ifs.rs` (the `SIGMA_CEILING` doc) still cites
-  `perspective` as a silently clamped param. The file is outside every phase of this plan.
-- Phase 4: `docs/presets.md` never named `perspective`. It gained a section, "The attractor's 3D
-  families are seen through the camera", and the `attractor` row of its systems table links to it.
-  The `perspective` essay was in `presets/README.md` ("Attractor depth"), which was rewritten
-  around the camera block with the migration rule. Its two measured `perspective` bullets (the
-  silent 0.8 clamp, and the centroid-orbit table) were removed, and two bullets replace them:
-  the magnification ratio `(D + 1) / (D - 1)` and how `spin` composes with `yaw`.
-- Phase 4: the regeneration also rewrote `presets/preset.schema.json`, which the file list does
-  not name. `.taplo.toml` did not change. `docs/specs/player-schema.json` was rewritten by
-  `RLX_UPDATE_PRESET_SCHEMA=1`, as the Phase 1 note says.
-- Phase 4: `scripts/tuple-sheets.mjs` was not changed. It was run once
-  (`node scripts/tuple-sheets.mjs target/tuple-sheets`), and it rendered all four sheets, Thomas
-  and Lorenz at the default camera (`pitch` 0.25, `distance` 3.5). On the Lorenz sheet, entry 0
-  draws as a near-solid filled blob at the script's `size = 0.4`. Every other entry shows its
-  strands.
-- Phase 4: the done-when's generated-file tests (`preset_schema::` and
-  `the_parameter_reference_block_is_current`, 14 tests) pass without the regenerate switches.
-  `toc.mjs --check` was stale after the README heading rename. `node scripts/toc.mjs` rewrote
-  the block, and the check, `check-doc-links.mjs` and `check-reader-prose.mjs` all exit 0.
-- Phase 5: the attractor's `set_param` no longer delegates to `CameraParams::set`. It matches the
-  seven camera names it declares itself, because the delegation also answers `solid`. With that
-  change, `declared_params_match_set_param` scans those seven names like the rest of the
-  attractor's arms.
-- Phase 5 touched `core/src/render/scenes/particles/family.rs`, which its file list does not name:
-  `FAMILY_PARAMS` gained a `fog` row, live on `thomas` and `lorenz` and inert on the flat families,
-  as the other six camera rows are. The generated reference's `fog` row comes from it.
-- Phase 5: fog is applied at the head's view depth, on the scale of the unit model volume
-  (`MODEL_RADIUS`), and it multiplies the light only. It rides `mdl.w`, which was unused. The
-  uniform did not grow.
-- Phase 5: the near/far test is `fog_dims_the_far_half_of_a_3d_figure_more_than_the_near_half`
-  (`particles/tests.rs`). It reads a converged GPU cloud back, splits it at the median view depth,
-  and sums `CameraFrame::fog_light`, the CPU mirror. It also checks the shader's 3D path for the
-  `fog_light` call. At `fog = 1` Thomas's near half keeps 0.721 of its light and its far half
-  0.281. Lorenz's keep 0.639 and 0.356. The engine-level test,
-  `fog_darkens_a_3d_figure_and_leaves_a_flat_one_alone` (`core/tests/attractor.rs`), measured
-  the figure's mean luma at 78.27 -> 66.83 on Thomas and 103.57 -> 97.62 on Lorenz. It also holds
-  `fog = 0` byte-equal to an unset `fog`, and holds De Jong byte-equal at `fog = 1`.
-- Phase 5: the byte-identity done-when was checked on this session's adapter with `shot` captures
-  (320x180, 60 frames) before and after the phase, compared with `cmp`. The 3D captures were
-  `attractor_depth` and `presets/attractor_thomasgallery.toml`, both at `fog` unset. The flat
-  captures were `attractor`, `attractor_trails` and `attractor_ifs`. All five were identical.
-- Phase 5: `.taplo.toml` did not change on regeneration. `presets/preset.schema.json` did, and the
-  file list does not name it. `-P fast`: 1920 run, 1920 passed. The deferred `attractor` suite
-  passed, 11 of 11.
+- Phase 3: the `attractor_depth` capture moved. The golden run on llvmpipe (off WARP, reported
+  and not asserted) printed `attractor_depth    mean 0.0022 (tol 0.02) max_outlier 62 (tol 48)`.
+  Not re-blessed (Phase 7).
+- Phase 3: coverage ran 0.258 (Thomas on Red) to 0.535 (Lorenz Knot) against the attractor floor
+  of 0.11, Sumi 0.92 against 0.21. `sanity`, `animation`, `reactivity` and `distinctness` pass on
+  llvmpipe.
+- Phase 4: `docs/presets.md` never named `perspective`; it gained a camera section. The essay in
+  `presets/README.md` ("Attractor depth") was rewritten around the camera block. The regeneration
+  also rewrote `presets/preset.schema.json`, outside the file list. `scripts/tuple-sheets.mjs`,
+  unchanged, rendered all four sheets once; Lorenz entry 0 draws as a near-solid blob at its
+  `size = 0.4`.
+- Phase 5: the attractor's `set_param` matches its seven camera names itself rather than
+  delegating to `CameraParams::set`, which also answers `solid`. Phase 5 also touched
+  `family.rs`, outside its file list: `FAMILY_PARAMS` gained the `fog` row. Fog rides `mdl.w`,
+  which was unused, so the uniform did not grow. At `fog = 1` Thomas's near half keeps 0.721 of
+  its light and its far half 0.281, Lorenz 0.639 and 0.356. The 3D captures at `fog` unset
+  (`attractor_depth`, `attractor_thomasgallery`) and the three flat captures were byte-identical
+  before and after, by `shot` and `cmp` on this session's adapter. `presets/preset.schema.json`
+  was regenerated again, outside the file list.
 
 #### Replacement text for Phase 8 (`.claude/skills/preset-author/references/systems.md`, `## attractor`)
 

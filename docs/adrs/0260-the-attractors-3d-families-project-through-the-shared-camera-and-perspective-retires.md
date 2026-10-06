@@ -97,3 +97,22 @@ and moving them would re-bless the goldens that need not move.
 
 - ADR-0093's rosters are append-only and preset-visible. Nothing here changes an entry's index,
   coefficients or measured framing.
+
+## Outcome (2026-10-06, Plan 0240 close)
+
+Plan 0240 built the Decision as written, and the tree differs from the body in these details:
+
+- **The spin is subtracted from `yaw`, not added.** The camera's `yaw` turns the eye round the
+  figure, so the composition is `yaw - spin_phase` (`encode::spun`). That is what keeps a positive
+  `spin` turning the figure the way it turned under the retired projection, which is the meaning the
+  Decision meant to keep.
+- **The counts were wrong against the tree.** 12 presets draw the attractor, not 22, and 6 draw a
+  3D family, not 10: Ink on Paper, Lorenz Knot, Thomas Gallery, Thomas on Red and Thomas Walk, plus
+  the `fragment_sumi` layer. Six presets, not ten, owe the fresh look.
+- **On the 3D path `pan_x` is in frame heights.** The camera divides it by the aspect, which the
+  in-plane path did not, so a pan written for a flat family drifts `16/9` as far on a 16:9 target.
+- **A binding to `perspective` is a load error** naming `distance` and `fov`, not a lost binding:
+  the loader's `RETIRED_PARAMS` table answers the Negative's "depending on how the loader treats an
+  undeclared param".
+- The camera block grew `fog` (ADR-0263) during the plan, and the attractor's 3D families take it;
+  `solid` is not an attractor param.

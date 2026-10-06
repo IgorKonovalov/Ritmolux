@@ -1281,9 +1281,10 @@ camera** that `plexus`, `waterfall` and the space curves use
 `yaw` turns it round the figure, `pitch` raises it, `distance` moves it in and
 out and `fov` is its field of view; `focus` and `aperture` are its lens. Each
 roster entry is first brought to unit radius by its own measured framing, so
-`distance` is in **figure radii** and means the same on every entry: `1.5`, the
-bottom of its range, keeps Lorenz's far lobes clear of the camera, and a
-particle nearer the camera than its near plane is dropped. The engine-wide
+`distance` is in **figure radii** and means the same on every entry: at `1.5`,
+the bottom of its range, a test holds every 3-D entry clear of the camera's
+near plane. Lorenz Knot's bass hit reaches about `1.43`, below what that test
+covers. A particle nearer the camera than the near plane is dropped. The engine-wide
 `zoom` divides the field of view (the angle, not its tangent), and `pan_x` /
 `pan_y` slide the picture; on these two families `pan_x` is measured in frame
 heights, so a value written for a flat family drifts `16/9` as far on a 16:9
