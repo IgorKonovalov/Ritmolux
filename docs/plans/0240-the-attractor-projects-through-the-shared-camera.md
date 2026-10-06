@@ -238,9 +238,9 @@ struct ModelTransform {
 | 3 — The shipped presets migrate by the mapping | dev | done | 7a43c794 |
 | 4 — Documentation and the references | dev | done | a430d6fa |
 | 5 — Fog on the attractor's sprites | dev | done | 1ed3c786 |
-| 6 — The 3D presets, re-curated in motion | human | not started | |
-| 7 — The moved baseline is blessed | human | not started | |
-| 8 — The preset-author reference | human | not started | |
+| 6 — The 3D presets, re-curated in motion | human | owed | |
+| 7 — The moved baseline is blessed | human | owed | |
+| 8 — The preset-author reference | human | owed | |
 
 ### Notes
 
