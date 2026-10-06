@@ -337,7 +337,8 @@ flowchart TB
   - **Found, not asked:** the show's window reports an **empty app class** to Hyprland (`class: ""`),
     where every other client names itself (`code`, `firefox`). A user cannot target the show with a
     window rule (a workspace, a monitor, "no blur") by class, only by title, and the title changes
-    with every preset. This is a reading for the architect, not a defect repaired here.
+    with every preset. This is a reading for the architect, not a defect repaired here. Routed at
+    the close as [backlog 0284](../design-backlog.md).
 - **Phase 2: 53 baselines, not 44.** `core/tests/golden/` holds 53 PNGs: 37 in `golden.rs` (the
   16-system roster, 20 `EXTRA_FIXTURES`, `waterfall_ramp`), 10 `composite_*`, 3 `layer_*`, and
   `line_joint_zigzag`, `attractor_trails` and `warp_mesh_wide`. All 53 were recaptured with
