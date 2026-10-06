@@ -255,7 +255,7 @@ pub struct Pen {
 /// bits — so adding or subtracting a whole number of steps is exact.
 const GRID: f64 = 1_073_741_824.0;
 
-/// `p` rounded to the nearest point of the [`GRID`].
+/// `p` rounded to the nearest point of the `GRID`.
 pub fn on_grid(p: [f64; 3]) -> [f64; 3] {
     [
         (p[0] * GRID).round() / GRID,
