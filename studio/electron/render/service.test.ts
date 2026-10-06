@@ -36,18 +36,36 @@ function silentWav(): Buffer {
   return bytes
 }
 
-function harness() {
+/** A transcode the test holds open: what it was handed, and how to finish it. */
+interface HeldTranscode {
+  signal: AbortSignal | undefined
+  finish: () => void
+}
+
+function harness(hold?: (held: HeldTranscode) => void) {
   const dir = mkdtempSync(join(tmpdir(), 'rlx-service-'))
   const source = join(dir, 'track.flac')
   writeFileSync(source, 'flac')
   const script = join(dir, 'sd_filter.py')
   writeFileSync(script, '# the sidecar')
   let cuda = 'True'
-  const run: RunTool = vi.fn((_command: string, args: string[]) => {
+  const run: RunTool = vi.fn((_command: string, args: string[], signal?: AbortSignal) => {
     if (args[0] === '-c') return Promise.resolve(`${cuda}\n`)
     // ffmpeg's transcode writes its last argument; --bars writes after --out.
     const out = args.includes('--out') ? args[args.indexOf('--out') + 1] : (args.at(-1) as string)
-    writeFileSync(out, args.includes('--bars') ? GRID : silentWav())
+    const write = (): void => writeFileSync(out, args.includes('--bars') ? GRID : silentWav())
+    if (hold !== undefined && !args.includes('--bars')) {
+      return new Promise<string>((resolve) =>
+        hold({
+          signal,
+          finish: () => {
+            write()
+            resolve('')
+          },
+        }),
+      )
+    }
+    write()
     return Promise.resolve('')
   })
   const spawned: { command: string; args: readonly string[] }[] = []
@@ -136,6 +154,37 @@ describe('the render service', () => {
   })
 })
 
+describe('quitting while a job is still being prepared', () => {
+  it('tells the transcode to stop and launches nothing afterwards', async () => {
+    let held: HeldTranscode | undefined
+    const { service, source, spawned, events } = harness((h) => (held = h))
+    service.grant(source)
+    const output = service.suggestOutput(source, 'Gyre')
+    if (!output.ok) throw new Error(output.reason)
+    const started = service.start({
+      source,
+      preset: 'Gyre',
+      fps: '30',
+      size: '1920x1080',
+      tier: 'rich',
+      output: output.value,
+      neural: null,
+    })
+    await vi.waitFor(() => expect(held).toBeDefined())
+    expect(service.busy).toBe(true)
+    expect(held?.signal?.aborted).toBe(false)
+
+    service.abandon()
+    expect(held?.signal?.aborted).toBe(true)
+    // A transcode that finishes anyway still launches nothing.
+    held?.finish()
+    expect(await started).toEqual({ ok: false, reason: 'the studio is quitting' })
+    expect(spawned).toEqual([])
+    expect(events).toEqual([])
+    expect(service.busy).toBe(false)
+  })
+})
+
 describe('a neural job', () => {
   function neuralRequest(source: string, output: string, timeline: { at_bar: number; prompt: string }[]) {
     return {
@@ -202,7 +251,7 @@ describe('a neural job', () => {
     ])
   })
 
-  it('refuses a prompt past the grid the player counted', async () => {
+  it('refuses a prompt past the grid the player counted, and leaves no grid beside the output', async () => {
     const { service, source, spawned } = harness()
     service.grant(source)
     const output = service.suggestOutput(source, 'Gyre')
@@ -210,6 +259,8 @@ describe('a neural job', () => {
     const result = await service.start(neuralRequest(source, output.value, [{ at_bar: 3, prompt: 'late' }]))
     expect(result).toMatchObject({ ok: false, reason: expect.stringContaining('past the track') })
     expect(spawned).toEqual([])
+    expect(existsSync(`${output.value}.bars.json`)).toBe(false)
+    expect(existsSync(`${output.value}.timeline.json`)).toBe(false)
   })
 })
 

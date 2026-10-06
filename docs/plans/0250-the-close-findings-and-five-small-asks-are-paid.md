@@ -203,8 +203,8 @@ had already judged the length warranted.
 | 1 — The loader and the reference stop misleading an author | dev | done | `5c53d893` |
 | 2 — The 3D findings | dev | done | `449a9b17` |
 | 3 — The two gates that cannot see what shipped | dev | done | `f595d155` |
-| 4 — Window names, thumbnail dates, tooling | dev | done | committed with this row |
-| 5 — The render service stops leaking | studio-builder | not started | |
+| 4 — Window names, thumbnail dates, tooling | dev | done | `b25cd8cf` |
+| 5 — The render service stops leaking | studio-builder | done | committed with this row |
 
 ### Notes
 
@@ -238,6 +238,13 @@ had already judged the length warranted.
 - Phase 4: the thumbnail layout went to `FORMAT = 2` (a length-prefixed build string after the name),
   so a version-less entry fails to decode and re-renders. Outside the file list,
   `standalone/tests/suite/thumb_cli.rs` decodes that layout itself and was updated to read it.
+- Phase 5, deviation: `studio/electron/render/transcode.ts` was also touched, with the owner's approval
+  in-session. `RunTool` takes an optional `AbortSignal` (passed to `execFile`), and `wavFor` threads it
+  into the transcode it starts. A transcode already in flight from `prepare` is shared and not stopped
+  by a start's abort.
+- Phase 5: the `render.diffusion is not set` refusal moved ahead of the transcode, so no refusal after
+  the grid is read leaves the timeline file either. The grid is removed on any start that does not
+  launch, not only the `timelineProblem` refusal.
 
 ### Close triggers
 

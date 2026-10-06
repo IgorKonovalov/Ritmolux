@@ -50,18 +50,21 @@ export function transcodeArgs(source: string, out: string): string[] {
   ]
 }
 
-/** Run one short command, resolving with its stdout or rejecting with its last words. */
-export type RunTool = (command: string, args: string[]) => Promise<string>
+/**
+ * Run one short command, resolving with its stdout or rejecting with its last
+ * words. An aborted `signal` kills the command and rejects.
+ */
+export type RunTool = (command: string, args: string[], signal?: AbortSignal) => Promise<string>
 
 /** Lines of a failed tool's stderr quoted in its refusal. */
 const QUOTED_LINES = 4
 
-export const runTool: RunTool = (command, args) =>
+export const runTool: RunTool = (command, args, signal) =>
   new Promise((resolve, reject) => {
     execFile(
       command,
       args,
-      { windowsHide: true, maxBuffer: 16 * 1024 * 1024 },
+      { windowsHide: true, maxBuffer: 16 * 1024 * 1024, signal },
       (error, stdout, stderr) => {
         if (error) {
           const said = String(stderr)
@@ -93,8 +96,11 @@ export class TranscodeCache {
     return this.dir
   }
 
-  /** The cached WAV for `source`, transcoding it the first time. */
-  wavFor(source: string): Promise<string> {
+  /**
+   * The cached WAV for `source`, transcoding it the first time. `signal` stops
+   * a transcode this call starts; one already in flight is shared as it is.
+   */
+  wavFor(source: string, signal?: AbortSignal): Promise<string> {
     let stat
     try {
       stat = statSync(source)
@@ -104,7 +110,7 @@ export class TranscodeCache {
     const key = cacheKey(source, stat.size, stat.mtimeMs)
     let entry = this.entries.get(key)
     if (entry === undefined) {
-      entry = this.transcode(source, key)
+      entry = this.transcode(source, key, signal)
       // A failed transcode is not kept: the user may install ffmpeg or fix the
       // path in settings and try the same track again.
       entry.catch(() => this.entries.delete(key))
@@ -119,14 +125,14 @@ export class TranscodeCache {
     rmSync(this.dir, { recursive: true, force: true })
   }
 
-  private async transcode(source: string, key: string): Promise<string> {
+  private async transcode(source: string, key: string, signal?: AbortSignal): Promise<string> {
     mkdirSync(this.dir, { recursive: true })
     const out = join(this.dir, `${key}.wav`)
     // Written under another name and renamed, so a transcode cut short is never
     // the file a later render reads.
     const partial = join(this.dir, `${key}.partial.wav`)
     try {
-      await this.run(this.ffmpeg(), transcodeArgs(source, partial))
+      await this.run(this.ffmpeg(), transcodeArgs(source, partial), signal)
     } catch (error) {
       rmSync(partial, { force: true })
       throw new Error(`ffmpeg could not transcode the track: ${(error as Error).message}`)

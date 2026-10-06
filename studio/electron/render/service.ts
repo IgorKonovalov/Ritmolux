@@ -12,7 +12,7 @@
  * answered and what this service suggested, the same rule the preset channels
  * hold with the player's own answers.
  */
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 
@@ -77,6 +77,12 @@ export class RenderService {
   private readonly peaks = new Map<string, Promise<Peaks>>()
   private job: RenderJob | undefined
   private starting = false
+  /**
+   * Aborts the start in its preparation window — the transcode and the
+   * `--bars` read — from the moment `start` passes its checks until it
+   * launches the job or refuses.
+   */
+  private preparing: AbortController | undefined
   private probed: Promise<ProbeResult> | undefined
 
   constructor(private readonly env: RenderEnvironment) {}
@@ -143,37 +149,57 @@ export class RenderService {
     }
 
     this.starting = true
+    const abort = new AbortController()
+    this.preparing = abort
+    const run: RunTool = (command, args) => this.run(command, args, abort.signal)
+    // A grid written beside the output for a job that never launched is
+    // removed: nothing would read it, and it would sit beside a clip that was
+    // never rendered.
+    let bars: string | undefined
+    let launched = false
     try {
       let sidecar: StageCommand | undefined
+      let diffusion: { python: string; script: string } | undefined
       if (neural !== null) {
         const probe = await this.probe(false)
         if (!probe.ready) return refuse(`the neural render cannot start: ${probe.reason}`)
-      }
-      mkdirSync(dirname(request.output), { recursive: true })
-      const wav = await this.env.cache.wavFor(request.source)
-      let grid
-      if (neural === null) {
-        grid = await readBars(this.run, player, wav, request.fps, this.barsFile(wav, request.fps))
-      } else {
-        // The grid is written beside the output by the player itself, so the
-        // sidecar reads the bars the strip showed, byte for byte.
-        const files = neuralFiles(request.output)
-        grid = await readBars(this.run, player, wav, request.fps, files.bars)
-        const problem = timelineProblem(neural.timeline, grid.bar_starts.length)
-        if (problem !== undefined) return refuse(`the neural render cannot start: ${problem}`)
-        writeTimeline(files.timeline, neural.timeline)
         const { python, script } = this.env.diffusion() ?? {}
         if (python === undefined || script === undefined) {
           return refuse('the neural render cannot start: render.diffusion is not set')
         }
-        sidecar = { stage: 'sidecar', command: python, args: sidecarArgs(script, neural, files) }
+        diffusion = { python, script }
       }
+      mkdirSync(dirname(request.output), { recursive: true })
+      const wav = await this.env.cache.wavFor(request.source, abort.signal)
+      let grid
+      if (neural === null || diffusion === undefined) {
+        grid = await readBars(run, player, wav, request.fps, this.barsFile(wav, request.fps))
+      } else {
+        // The grid is written beside the output by the player itself, so the
+        // sidecar reads the bars the strip showed, byte for byte.
+        const files = neuralFiles(request.output)
+        bars = files.bars
+        grid = await readBars(run, player, wav, request.fps, files.bars)
+        const problem = timelineProblem(neural.timeline, grid.bar_starts.length)
+        if (problem !== undefined) return refuse(`the neural render cannot start: ${problem}`)
+        writeTimeline(files.timeline, neural.timeline)
+        sidecar = {
+          stage: 'sidecar',
+          command: diffusion.python,
+          args: sidecarArgs(diffusion.script, neural, files),
+        }
+      }
+      // A tool that finished despite the abort still launches nothing.
+      if (abort.signal.aborted) return refuse('the studio is quitting')
       writeJob(request)
       this.launch(player, wav, request, grid.frames, sidecar)
+      launched = true
       return { ok: true, value: null }
     } catch (error) {
-      return refuse((error as Error).message)
+      return refuse(abort.signal.aborted ? 'the studio is quitting' : (error as Error).message)
     } finally {
+      if (!launched && bars !== undefined) rmSync(bars, { force: true })
+      this.preparing = undefined
       this.starting = false
     }
   }
@@ -215,8 +241,13 @@ export class RenderService {
     this.job?.cancel()
   }
 
-  /** Stop a running job and remove its partial file before the studio exits. */
+  /**
+   * Stop whatever the studio is doing before it exits: a start still
+   * transcoding or counting bars, and a running job, whose partial file is
+   * removed.
+   */
   abandon(): void {
+    this.preparing?.abort()
     this.job?.abandon()
   }
 
