@@ -7,6 +7,43 @@ use rlx_core::preset::{Preset, default_presets};
 use rlx_core::render::scenes::GeneratorConfig;
 use rlx_core::render::scenes::lines::grammar::{Stream, expand};
 
+use crate::common;
+
+/// Plan 0237 Phase 6's done-when: the same analysis frames give the same
+/// ring after 600 frames. Two captures of each endless golden fixture, from a
+/// fresh preset load each time, are the same bytes.
+#[test]
+fn the_same_frames_grow_the_same_ring() {
+    let Some(mut renderer) = common::headless(96, 96) else {
+        return;
+    };
+    let frame = common::fixed_frame_spectrum();
+    for toml in [
+        include_str!("../fixtures/lsystem_endless_flat.toml"),
+        include_str!("../fixtures/lsystem_endless_space.toml"),
+    ] {
+        let mut capture = || {
+            let preset = Preset::from_toml_str(toml).expect("the fixture loads");
+            let name = preset.name.clone();
+            renderer.set_presets(vec![preset]);
+            renderer
+                .capture_preset(&name, &frame, 600)
+                .expect("capture")
+        };
+        let (first, second) = (capture(), capture());
+        let lit = first
+            .rgba
+            .chunks_exact(4)
+            .filter(|p| p[..3].iter().any(|&c| c > 32))
+            .count();
+        assert!(lit > 50, "the vine lit only {lit} pixels after 600 frames");
+        assert!(
+            first.rgba == second.rgba,
+            "two runs of the same frames grew different rings"
+        );
+    }
+}
+
 /// The flat fixture the `lsystem` golden is rendered from.
 const FLAT_FIXTURE: &str = include_str!("../fixtures/lsystem.toml");
 

@@ -320,8 +320,8 @@ and `follow_window`.
 | 2 — What is inert in space, and the frame's drift | dev | done | 6d5c4129 |
 | 3 — Caps and the space golden | dev | done | 927564c3 |
 | 4 — Endless: the lazy stream and the ring | dev | done | 263296bd |
-| 5 — The camera follows the growth | dev | done | committed with this row |
-| 6 — Endless cost and the endless golden | dev | not started | |
+| 5 — The camera follows the growth | dev | done | 6222ae74 |
+| 6 — Endless cost and the endless golden | dev | done | committed with this row |
 | 7 — Documentation and the references | dev | not started | |
 | 8 — The look, judged | human | not started | |
 
@@ -407,6 +407,26 @@ and `follow_window`.
   to `GeneratorConfig::LSystem` in `core/src/render/scenes/mod.rs`.
 - Phase 5 dropped Phase 4's sanitizing of `dt`: `hygiene::a_frame_delta_is_checked_for_finiteness_in_exactly_one_place`
   allows only the renderer's (ADR-0191). `grow` and `follow` are still sanitized.
+- Phase 6 frame cost: `shot --report family=lsystem --tier floor`, release profile, 1920x1080, on
+  AMD Radeon Graphics (RADV RENOIR) iGPU with Mesa 26.2.2, one run. The presets were scratch
+  files under `target/0237/cost/`: `growth = "endless"`, `turtle = "space"`,
+  `F=F[&+F]F[^-F]/F` at 25 degrees, `trail 8000` (Floor's `seg3d_segments`), `thickness 12`,
+  `distance 1.5`, `fov 1.2`, `focus 0`. `grow 60000` fills the ring inside the report's 8-frame
+  short leg, so each timed frame emits about 1,000 steps, near the 1,024 ceiling, over a full
+  ring. `follow 0.001` keeps that ring in view; at the default 0.3 s the spring lags hundreds of
+  units at that rate and the frame is black. Sharp (`aperture 0`): 1.218 ms. Blurred
+  (`aperture 40`, past Floor's 12 px cap): 1.523 ms. Ratio 1.25. NFR section 1's budget is
+  16.67 ms. `trail`'s cap was not lowered, and `core/src/render/tier.rs` is untouched.
+- Phase 6 `update` cost: a scratch release-profile test, not committed, drove `LSystemScene`
+  with `grow 1e6` (the 1,024 ceiling every frame), `trail 8000` and the same grammar, for 600
+  frames after 60 to warm. It timed `reset_params`, `set_param`, `advance` and `update`, plus
+  `lay_endless_space` on the space turtle (the CPU half of `render`). Flat: 104.5 us a frame.
+  Space: 326.0 us a frame. Neither reading includes the GPU upload.
+- Phase 6's goldens `lsystem_endless_flat.png` and `lsystem_endless_space.png` were written on
+  llvmpipe through the reverted missing-baseline-only change, as in Phase 3; both read 0.0000 / 0.
+  Their fixtures overrun `trail 48` within the harness's 60 frames (`grow 72`). The 600-frame
+  determinism check is `lsystem_endless::the_same_frames_grow_the_same_ring`, which compares two
+  captures of each fixture byte for byte.
 
 ### Close triggers
 
