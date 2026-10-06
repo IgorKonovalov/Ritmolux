@@ -241,7 +241,7 @@ struct Particle {
 | 3 — Caps, cost and the goldens | dev | done | d6e2299d |
 | 4 — The shipped presets keep rendering | dev | done | 65e4a600 |
 | 5 — Documentation and the references | dev | done | cbb2276c |
-| 6 — The three presets, judged and re-tuned | human | not started | |
+| 6 — The three presets, judged and re-tuned | human | done - Braid keep, Maelstrom keep, Murmuration re-tune | 8ece66bd |
 | 7 — The moved baselines are blessed | human | not started | |
 | 8 — The preset-author reference | human | not started | |
 
@@ -342,6 +342,11 @@ struct Particle {
   (`shape`, `points`, `star_*`) shared with the emitter — `presets/README.md`, "Swarm flow-field
   structure" and "Shaped marks".
   ````
+
+- **Phase 6, 2026-10-06 (owner, live on the Arch box, sequential walk of the three).** Braid:
+  keep. Maelstrom: keep. Murmuration: re-tune, then keep. At `zoom = 0.78` it showed empty borders,
+  the torus seam that any zoom below 1/1.25 exposes at every depth at once. 8ece66bd sets `0.85`
+  and re-renders its gallery card; the owner judged that live as good and reading in depth.
 
 ### Close triggers
 
