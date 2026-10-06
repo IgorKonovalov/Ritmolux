@@ -237,7 +237,7 @@ struct ModelTransform {
 | 2 — The real lens, and `perspective` retires | dev | done | 80566e42 |
 | 3 — The shipped presets migrate by the mapping | dev | done | 7a43c794 |
 | 4 — Documentation and the references | dev | done | a430d6fa |
-| 5 — Fog on the attractor's sprites | dev | done | committed with this row |
+| 5 — Fog on the attractor's sprites | dev | done | 1ed3c786 |
 | 6 — The 3D presets, re-curated in motion | human | not started | |
 | 7 — The moved baseline is blessed | human | not started | |
 | 8 — The preset-author reference | human | not started | |
