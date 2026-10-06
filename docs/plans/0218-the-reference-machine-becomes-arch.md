@@ -561,6 +561,10 @@ flowchart TB
   pre-0239 recapture, so `scenes_match_golden_baselines` failed on those two alone. Re-blessed with
   `RLX_BLESS=swarm,swarm_shaped` on llvmpipe; old and new opened side by side show the same field
   re-projected through the camera. This settles Plan 0239 Phase 7.
+  The second pre-review run then failed on `layer_under`, `layer_over` and `layer_multiply`, whose
+  fixtures layer a swarm; re-blessed the same way (`RLX_BLESS=layer_under,layer_over,layer_multiply`),
+  judged the same composition with the swarm layer re-projected. No other fixture with a baseline draws
+  the swarm (`backdrop_ramp` / `backdrop_band` carry one and passed).
 
 ### Close triggers
 
