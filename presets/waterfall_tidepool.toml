@@ -13,6 +13,7 @@
 # for a moment, so a hit reads as a flare of light on the water.
 system = "waterfall"
 name = "Tidepool"
+representative = true
 
 [waterfall]
 elements   = 48

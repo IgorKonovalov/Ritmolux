@@ -12,6 +12,7 @@
 # luminance reacts.
 system = "waterfall"
 name = "Ridgeline"
+representative = true
 
 [waterfall]
 elements   = 48

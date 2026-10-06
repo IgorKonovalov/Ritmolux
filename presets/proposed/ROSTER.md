@@ -7,9 +7,15 @@ going for, so a verdict is a comparison rather than a general impression.
 
 | preset | system / family | pass | what to look at |
 |--------|-----------------|------|-----------------|
-| `waterfall_ridgeline` | waterfall | 2026-10-05, first waterfall pass | A pulsar-plot read: white solid ridges, front-on and low. Does the terrain read, and is the bass end too dominant? |
-| `waterfall_tidepool` | waterfall | 2026-10-05, first waterfall pass | Looking down into the history: teal-to-coral contours, crisp front row, the past blurred by `aperture`. Is it legible in motion? |
-| `curve_cinquefoil` | parametric_curve (`torus_knot`) | 2026-10-05, first space-curve pass | A solid five-lobed knot in ember and gold, focus racking through it once per bar. Does the rack read, or is it too subtle? |
+
+## Owner verdicts (2026-10-06)
+
+Three drafts, judged in the running app. **Ridgeline** shipped to `presets/` as the first
+`waterfall` preset ("looks awesome, like terrain"). **Tidepool**, retuned once to much brighter
+and blooming, shipped beside it: the owner had first said to delete it, then chose to ship it
+when the distinctness gate turned out to need a second waterfall to compare Ridgeline against.
+**Cinquefoil**, a solid (2,5) torus knot racking focus per bar, was deleted for now, not
+rejected by name ("the rest can be deleted for now"); `git show f9a94932` has it.
 
 ## Owner verdicts (2026-10-01, Plan 0232 Phase 6)
 
