@@ -202,8 +202,8 @@ had already judged the length warranted.
 |---|---|---|---|
 | 1 — The loader and the reference stop misleading an author | dev | done | `5c53d893` |
 | 2 — The 3D findings | dev | done | `449a9b17` |
-| 3 — The two gates that cannot see what shipped | dev | done | committed with this row |
-| 4 — Window names, thumbnail dates, tooling | dev | not started | |
+| 3 — The two gates that cannot see what shipped | dev | done | `f595d155` |
+| 4 — Window names, thumbnail dates, tooling | dev | done | committed with this row |
 | 5 — The render service stops leaking | studio-builder | not started | |
 
 ### Notes
@@ -232,6 +232,12 @@ had already judged the length warranted.
   first-order model over-allows at small headroom. No shipped swarm preset binds `yaw`/`pitch`. Chosen
   by the owner in-session; the `sway_bound` overshoot is a followup. `zoom = "0.78"` and an expression
   `zoom` each turned the test red and were reverted.
+- Phase 4: one `with_name` call, the Wayland trait's. In winit 0.30.13 it and the X11 trait's setter
+  write the same `platform_specific.name`, which both backends read. The app id was not checked
+  against a running window (`hyprctl clients`).
+- Phase 4: the thumbnail layout went to `FORMAT = 2` (a length-prefixed build string after the name),
+  so a version-less entry fails to decode and re-renders. Outside the file list,
+  `standalone/tests/suite/thumb_cli.rs` decodes that layout itself and was updated to read it.
 
 ### Close triggers
 

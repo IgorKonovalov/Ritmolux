@@ -128,16 +128,24 @@ fn one_invocation_writes_one_image_and_the_next_is_a_reported_no_op() {
     );
 
     // The bytes are an entry of the size this build renders, read the way the
-    // browser reads them: magic, version, then the two dimensions.
+    // browser reads them: magic, version, then the two dimensions; and after
+    // the 40-byte header and the name, the build that rendered it.
     let bytes = std::fs::read(image).expect("read the cache entry");
     assert_eq!(&bytes[..4], b"RLXT", "the entry has no magic");
     let at = |i: usize| u32::from_le_bytes(bytes[i..i + 4].try_into().unwrap());
     assert_eq!(
         at(4),
-        1,
+        2,
         "the entry declares a version this test cannot read"
     );
     assert_eq!((at(8), at(12)), (160, 90), "the still is not 160x90");
+    let (name_len, build_len) = (at(32) as usize, at(36) as usize);
+    let build_at = 40 + name_len;
+    assert_eq!(
+        &bytes[build_at..build_at + build_len],
+        env!("CARGO_PKG_VERSION").as_bytes(),
+        "the entry does not carry the build that rendered it"
+    );
 
     let written = std::fs::metadata(image)
         .and_then(|m| m.modified())

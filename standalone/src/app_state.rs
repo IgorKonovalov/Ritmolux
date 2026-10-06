@@ -22,7 +22,7 @@ use standalone::osc::{OscSink, Telemetry, rms_of};
 use standalone::rss;
 use winit::event_loop::ActiveEventLoop;
 use winit::monitor::MonitorHandle;
-use winit::window::{Fullscreen, Window};
+use winit::window::{Fullscreen, Window, WindowAttributes};
 
 #[cfg(windows)]
 use crate::capture_start::capture_mode;
@@ -64,6 +64,30 @@ pub(crate) const TITLE_UPDATE_FRAMES: u32 = 30;
 /// The operator console's window title, so it is tellable from the show's in a
 /// taskbar and by a window manager.
 pub(crate) const CONSOLE_TITLE: &str = concat!("Ritmolux console ", env!("CARGO_PKG_VERSION"));
+/// The show window's app id on Linux: the Wayland `app_id` and the X11
+/// `WM_CLASS` a window-manager rule matches on.
+pub(crate) const APP_ID: &str = "ritmolux";
+/// The console's app id, distinct from the show's so one rule can place the
+/// two windows on different monitors.
+pub(crate) const CONSOLE_APP_ID: &str = "ritmolux-console";
+
+/// `attrs` carrying `id` as the window's app id on Linux; unchanged elsewhere.
+///
+/// winit keeps one application name for both Linux backends, so the Wayland
+/// setter is also what X11 reads for `WM_CLASS` (class and instance both `id`).
+pub(crate) fn with_app_id(attrs: WindowAttributes, id: &str) -> WindowAttributes {
+    #[cfg(target_os = "linux")]
+    {
+        use winit::platform::wayland::WindowAttributesExtWayland;
+        attrs.with_name(id, id)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = id;
+        attrs
+    }
+}
+
 /// The console's default size. Wide enough for the browser's multi-column list
 /// at its current column width, short enough to sit beside other desk windows.
 pub(crate) const CONSOLE_WIDTH: u32 = 900;
@@ -746,9 +770,12 @@ impl AppState {
             None => None,
         };
 
-        let mut attrs = Window::default_attributes()
-            .with_title(CONSOLE_TITLE)
-            .with_inner_size(winit::dpi::PhysicalSize::new(CONSOLE_WIDTH, CONSOLE_HEIGHT));
+        let mut attrs = with_app_id(
+            Window::default_attributes()
+                .with_title(CONSOLE_TITLE)
+                .with_inner_size(winit::dpi::PhysicalSize::new(CONSOLE_WIDTH, CONSOLE_HEIGHT)),
+            CONSOLE_APP_ID,
+        );
         if let Some(monitor) = target {
             // Position rather than fullscreen: the console is a desk-side
             // window an operator drags and resizes, not a second show surface.

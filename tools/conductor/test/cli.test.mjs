@@ -950,6 +950,33 @@ test("readiness NNNN on a committed plan records one ready line with the plan's 
   assert.equal(sh(["status", "--porcelain"], repo), "", "the main checkout is untouched");
 });
 
+test("readiness NNNN prints each advisory a ready verdict carries and still exits 0", async () => {
+  const { p, cli } = setup([{ number: "0999", phases: [dev("1")] }], { a: [] });
+  // A session that reads `ready` with one advisory, which the fake scenario never emits.
+  const scenario = join(p.toolDir, "advisory-scenario.mjs");
+  writeFileSync(
+    scenario,
+    [
+      "export default async ({ vars }) => ({",
+      '  text: "Session finished.\\n\\n```rlx-outcome\\n" +',
+      '    JSON.stringify({ kind: "ready", plan: vars.plan, advisories: ["Phase 1 names no test file"] }) +',
+      '    "\\n```\\n",',
+      "  costUsd: 0.3,",
+      "});",
+      "",
+    ].join("\n"),
+  );
+  process.env.FAKE_CLAUDE_SCENARIO = scenario;
+  const r = await cli("readiness", "0999");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  assert.match(r.out.join("\n"), /plan 0999 is ready/);
+  assert.ok(
+    r.out.includes("conductor: advisory (never parks): Phase 1 names no test file"),
+    `the advisory is printed: ${r.out.join("\n")}`,
+  );
+  assert.equal(readinessRecords(p.stateDir, "0999").length, 1, "an advisory does not stop the record");
+});
+
 test("readiness NNNN refuses a plan file with uncommitted changes and records nothing", async () => {
   const { repo, p, cli } = setup([{ number: "0999", phases: [dev("1")] }], { a: [] });
   const planPath = join(repo, "docs", "plans", "0999-fixture.md");

@@ -330,6 +330,21 @@ the application, decides where a window goes, so `D` may do nothing there — us
 move-to-monitor shortcut. Both write themselves to `config.toml` under
 `[output]`, so a rig set up once opens the same way tomorrow.
 
+What a Linux window manager can do instead is match the windows by **app id**: the show is
+`ritmolux` and the console is `ritmolux-console` (the Wayland `app_id`, and the X11 `WM_CLASS` for
+both class and instance). They differ, so one rule can send the console to the desk monitor while
+the show stays on the projector. In Hyprland's Lua config (0.56 and later):
+
+```lua
+hl.window_rule({
+    name    = "ritmolux-console-on-desk",
+    match   = { class = "^ritmolux-console$" },
+    monitor = "DP-2",
+})
+```
+
+The older `hyprland.conf` form is `windowrule = monitor DP-2, class:^(ritmolux-console)$`.
+
 A monitor is remembered **by name before index** — `[output] display_name` first, then
 `[output] display` — because the window system's monitor ordering is not stable across a reboot or
 a hotplug, so a stored index alone can point at the wrong screen.

@@ -22,7 +22,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::monitor::MonitorHandle;
 use winit::window::{Fullscreen, Window, WindowId};
 
-use crate::app_state::{APP_TITLE, AppState, HIDDEN_TICK};
+use crate::app_state::{APP_ID, APP_TITLE, AppState, HIDDEN_TICK, with_app_id};
 use crate::capture_start::list_devices_and_exit;
 use crate::cli::{
     InputSource, missing_companion, parse_check_arg, parse_console_flag, parse_control_arg,
@@ -108,7 +108,7 @@ impl ApplicationHandler for App {
                 .as_ref()
                 .map_or(self.config.output.display, |(i, _)| *i);
 
-            let mut attrs = Window::default_attributes().with_title(APP_TITLE);
+            let mut attrs = with_app_id(Window::default_attributes().with_title(APP_TITLE), APP_ID);
             attrs = match (self.config.output.fullscreen, target) {
                 (true, Some((_, monitor))) => {
                     attrs.with_fullscreen(Some(Fullscreen::Borderless(Some(monitor))))

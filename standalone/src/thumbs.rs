@@ -65,11 +65,17 @@ const MAGIC: [u8; 4] = *b"RLXT";
 /// The layout version. An entry written by another version is discarded and
 /// re-rendered: there is nothing here worth migrating, and reading a header one
 /// field wider than expected would hand the browser someone else's pixels.
-const FORMAT: u32 = 1;
+const FORMAT: u32 = 2;
 
-/// Bytes before the name: magic, version, width, height, source length, source
-/// mtime, name length.
-const HEADER_LEN: usize = 4 + 4 + 4 + 4 + 8 + 8 + 4;
+/// The build that renders this binary's stills, written into every entry. An
+/// entry written by any other build, or by one that wrote no version at all, is
+/// stale: a new build may draw a preset differently from the one that cached it.
+pub(crate) const BUILD_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Bytes before the name: magic, layout version, width, height, source length,
+/// source mtime, name length, build version length. The build version follows
+/// the name.
+const HEADER_LEN: usize = 4 + 4 + 4 + 4 + 8 + 8 + 4 + 4;
 
 /// What makes a cache entry stale: the source file's modification time and its
 /// length, together.
@@ -90,9 +96,9 @@ impl Stamp {
     /// which a launch holds when no directory yielded anything.
     ///
     /// A distinguished value rather than an `Option`, so the cache entry's
-    /// layout is one shape. The stamp carries no build identity, so an embedded
-    /// preset's picture is never judged stale, even after a new build changes
-    /// the preset or the engine's rendering of it: the cache outlives the build.
+    /// layout is one shape. The stamp carries no build identity; the entry's
+    /// [`build`](Entry::build) is what makes an embedded preset's picture stale
+    /// once a new build may draw it differently.
     pub(crate) const EMBEDDED: Stamp = Stamp {
         mtime_nanos: 0,
         len: 0,
@@ -133,6 +139,8 @@ pub(crate) struct Entry {
     /// a miss rather than the wrong picture.
     pub(crate) name: String,
     pub(crate) stamp: Stamp,
+    /// The `CARGO_PKG_VERSION` of the build that rendered it.
+    pub(crate) build: String,
     pub(crate) width: u32,
     pub(crate) height: u32,
     /// `width * height * 4` bytes, RGBA8, no row padding — a
@@ -141,13 +149,15 @@ pub(crate) struct Entry {
 }
 
 impl Entry {
-    /// The file's bytes: the fixed header, the name, then the rows.
+    /// The file's bytes: the fixed header, the name, the build version, then
+    /// the rows.
     ///
     /// Little-endian throughout. The cache is per-machine and never shipped, so
     /// this is a choice of one order rather than a portability claim.
     pub(crate) fn encode(&self) -> Vec<u8> {
         let name = self.name.as_bytes();
-        let mut out = Vec::with_capacity(HEADER_LEN + name.len() + self.rgba.len());
+        let build = self.build.as_bytes();
+        let mut out = Vec::with_capacity(HEADER_LEN + name.len() + build.len() + self.rgba.len());
         out.extend_from_slice(&MAGIC);
         out.extend_from_slice(&FORMAT.to_le_bytes());
         out.extend_from_slice(&self.width.to_le_bytes());
@@ -155,7 +165,9 @@ impl Entry {
         out.extend_from_slice(&self.stamp.len.to_le_bytes());
         out.extend_from_slice(&self.stamp.mtime_nanos.to_le_bytes());
         out.extend_from_slice(&(name.len() as u32).to_le_bytes());
+        out.extend_from_slice(&(build.len() as u32).to_le_bytes());
         out.extend_from_slice(name);
+        out.extend_from_slice(build);
         out.extend_from_slice(&self.rgba);
         out
     }
@@ -187,21 +199,25 @@ impl Entry {
         let len = u64_at(16)?;
         let mtime_nanos = u64_at(24)?;
         let name_len = u32_at(32)? as usize;
+        let build_len = u32_at(36)? as usize;
 
         let name_end = HEADER_LEN.checked_add(name_len)?;
         let name = String::from_utf8(bytes.get(HEADER_LEN..name_end)?.to_vec()).ok()?;
+        let build_end = name_end.checked_add(build_len)?;
+        let build = String::from_utf8(bytes.get(name_end..build_end)?.to_vec()).ok()?;
         let pixels = (width as usize)
             .checked_mul(height as usize)?
             .checked_mul(4)?;
-        let rgba = bytes.get(name_end..name_end.checked_add(pixels)?)?;
+        let rgba = bytes.get(build_end..build_end.checked_add(pixels)?)?;
         // Exactly the pixels, with nothing after them: trailing bytes mean this
         // file is not what its header says it is.
-        if name_end + pixels != bytes.len() {
+        if build_end + pixels != bytes.len() {
             return None;
         }
         Some(Entry {
             name,
             stamp: Stamp { mtime_nanos, len },
+            build,
             width,
             height,
             rgba: rgba.to_vec(),
@@ -325,10 +341,14 @@ pub(crate) fn write_entry(dir: &Path, entry: &Entry) -> Result<(), String> {
 ///
 /// The size is part of it: a cache written before [`THUMB_W`] moved holds a
 /// picture of the right preset at the wrong size, and drawing it would be the
-/// browser quietly changing shape.
+/// browser quietly changing shape. So is the build: another build may render
+/// the same source differently, so its picture re-renders.
 pub(crate) fn is_current(dir: &Path, name: &str, stamp: Stamp) -> bool {
     read_entry(dir, name).is_some_and(|entry| {
-        entry.stamp == stamp && entry.width == THUMB_W && entry.height == THUMB_H
+        entry.stamp == stamp
+            && entry.build == BUILD_VERSION
+            && entry.width == THUMB_W
+            && entry.height == THUMB_H
     })
 }
 
@@ -888,6 +908,7 @@ fn render_one(name: &str) -> i32 {
     let entry = Entry {
         name: name.to_owned(),
         stamp,
+        build: BUILD_VERSION.to_owned(),
         width: image.width,
         height: image.height,
         rgba: image.rgba,
@@ -975,6 +996,7 @@ mod tests {
         Entry {
             name: name.to_owned(),
             stamp,
+            build: BUILD_VERSION.to_owned(),
             width: 2,
             height: 2,
             rgba: (0..16).map(|b| b as u8).collect(),
@@ -1067,6 +1089,42 @@ mod tests {
         assert!(
             !is_current(&dir, "Gyre", stamp),
             "an entry at the wrong size must not count as current"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// **The build is part of what makes an entry current**: the same stamp
+    /// and size written by another build reads as stale, so a new release
+    /// re-renders every picture, and one written by this build reads as fresh.
+    #[test]
+    fn an_entry_from_another_build_is_stale() {
+        let dir = scratch("build");
+        let stamp = Stamp {
+            mtime_nanos: 7,
+            len: 300,
+        };
+        let mut entry = sample("Lattice", stamp);
+        entry.width = THUMB_W;
+        entry.height = THUMB_H;
+        entry.rgba = vec![3; (THUMB_W * THUMB_H * 4) as usize];
+
+        entry.build = format!("{BUILD_VERSION}-older");
+        write_entry(&dir, &entry).expect("write the other build's entry");
+        assert_eq!(
+            read_entry(&dir, "Lattice").map(|e| e.build),
+            Some(format!("{BUILD_VERSION}-older")),
+            "the entry reads back with the build it was written by"
+        );
+        assert!(
+            !is_current(&dir, "Lattice", stamp),
+            "an entry written by another build must not count as current"
+        );
+
+        entry.build = BUILD_VERSION.to_owned();
+        write_entry(&dir, &entry).expect("write this build's entry");
+        assert!(
+            is_current(&dir, "Lattice", stamp),
+            "this build's entry at the same stamp is current"
         );
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1488,6 +1546,7 @@ mod tests {
         Entry {
             name: name.to_owned(),
             stamp: Stamp::EMBEDDED,
+            build: BUILD_VERSION.to_owned(),
             width: THUMB_W,
             height: THUMB_H,
             rgba: vec![9; (THUMB_W * THUMB_H * 4) as usize],
