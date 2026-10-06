@@ -316,6 +316,11 @@ accepted cost" are different documents and only one of them is honest.
 - [0279 — a 3-D stroke is additive light with no depth test, so a near strand never hides a far one](#0279--a-3-d-stroke-is-additive-light-with-no-depth-test-so-a-near-strand-never-hides-a-far-one)
 - [0280 — a space curve does not fade or shift with distance, so nothing atmospheric says "far"](#0280--a-space-curve-does-not-fade-or-shift-with-distance-so-nothing-atmospheric-says-far)
 - [0281 — a heavily blurred 3-D stroke breaks into a comb of segment streaks](#0281--a-heavily-blurred-3-d-stroke-breaks-into-a-comb-of-segment-streaks)
+- [0260 — a thumbnail's stamp carries no build identity, so an upgrade never re-renders a picture the engine now draws differently](#0260--a-thumbnails-stamp-carries-no-build-identity-so-an-upgrade-never-re-renders-a-picture-the-engine-now-draws-differently)
+- [0275 — the swarm's seam test measures zoom 1 only, so nothing gates the shipped minimum zoom against the seam](#0275--the-swarms-seam-test-measures-zoom-1-only-so-nothing-gates-the-shipped-minimum-zoom-against-the-seam)
+- [0282 — a misspelled top-level table is silently ignored, so `[smothing]` passes `--check --strict` and its easing never runs](#0282--a-misspelled-top-level-table-is-silently-ignored-so-smothing-passes---check---strict-and-its-easing-never-runs)
+- [0283 — the shared `zoom` declaration says "above 1 fills more of the frame", which is backwards on `fragment_field` and `reaction_diffusion`](#0283--the-shared-zoom-declaration-says-above-1-fills-more-of-the-frame-which-is-backwards-on-fragment_field-and-reaction_diffusion)
+- [0284 — the show window reports an empty Wayland app class, so a Hyprland window rule cannot target it](#0284--the-show-window-reports-an-empty-wayland-app-class-so-a-hyprland-window-rule-cannot-target-it)
 <!-- toc:end -->
 
 ## The ledger
@@ -344,6 +349,11 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
+| 0260 | A thumbnail stamp carries no build identity, so an upgrade never re-renders | [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 4. **Promoted** |
+| 0275 | The swarm seam test measures zoom 1 only, not the shipped minimum | [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 3. **Promoted** |
+| 0282 | A misspelled top-level table is silently ignored, even under --strict | [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 1. **Promoted** |
+| 0283 | The shared zoom doc is backwards on fragment_field and reaction_diffusion | [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 1. **Promoted** |
+| 0284 | The show window reports an empty Wayland app class | [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 4. **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -16833,3 +16843,126 @@ one is contained to the line renderer, and it is the cheapest of the three to ta
 Phase 1. The joint overlap was the mechanism: `Segment3dInstance` carries its neighbours and the
 `seg3d` shader mitres each joined end in screen space. Eight collinear joined segments now render
 identically to one at an open aperture, and a joined right angle has no ridge at its joint.
+
+## 0260 — a thumbnail's stamp carries no build identity, so an upgrade never re-renders a picture the engine now draws differently
+
+The browser's thumbnail cache (`standalone/src/thumbs.rs`) judges an entry stale by the preset
+file's modification time and length, and an embedded preset carries the fixed `Stamp::EMBEDDED`.
+Nothing in the stamp names the build that rendered the picture. A new release is exactly how a user
+receives a changed preset or a changed rendering of its family, and the cache outlives the release,
+so after an upgrade every embedded preset, and every seeded preset whose `.toml` did not change,
+keeps its pre-upgrade picture for good. Nothing prunes the cache and nothing re-stamps it.
+
+**The candidate repair:** write the package version, or a render-affecting build id, into the entry
+header and treat a mismatch as stale, at the cost of one re-render of the library per release.
+[Plan 0206](plans/done/0206-the-browser-shows-the-look.md) defined the stamp as mtime plus length and
+the implementation follows it, which is why this is an entry and not a finding against that plan.
+
+- **Raised:** 2026-09-26 by `architect`, from Plan 0206's close review (round 1, minor 3).
+  **Owner if taken:** `architect` for the stamp's definition; `dev` for the header change.
+- **Verified 2026-09-26** — the embedded stamp is a fixed value:
+  `present: const EMBEDDED: Stamp in: standalone/src/thumbs.rs`
+- **Verified 2026-09-26** — the cache names no build:
+  `absent: CARGO_PKG_VERSION in: standalone/src/thumbs.rs`
+- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+
+## 0275 — the swarm's seam test measures zoom 1 only, so nothing gates the shipped minimum zoom against the seam
+
+**Half discharged 2026-10-06 (Plan 0239 close).** The first question below is answered: the owner
+saw Murmuration's seam live at Plan 0239 Phase 6, and 8ece66bd moved its `zoom` from `0.78` to
+`0.85`. Plan 0239 also replaced the swarm's model (ADR-0259) and deleted `SHIPPED_ZOOMS`. The seam
+now reaches the frame edge at `zoom` of about `0.82` at the rest `fov` (`presets/README.md`), and
+`the_wrap_seam_stays_outside_the_frame_at_every_depth` in `core/src/render/scenes/swarm/tests.rs`
+runs at `zoom = 1` only. The second question survives in that form: should the seam test measure
+the lowest `zoom` the shipped set reaches, derived from the set? The original text follows as the
+record.
+
+`presets/README.md` measures the swarm's wrap seam as usable down to about **`0.84`**. Below it, the
+near depth layer reaches the frame edge first. `swarm_murmuration.toml` binds `zoom = "0.78"`, a
+constant, so it sits under that bound for its whole run. The seam test in
+`core/src/render/scenes/swarm/tests.rs` takes its concrete zooms from `SHIPPED_ZOOMS`, which starts
+at `0.99` and whose doc says it is "the range the shipped presets actually reach". The test therefore
+never measures the shipped minimum, and nothing gates it. Two questions follow. Does Murmuration
+show the seam on screen? The walk kept it, and the seam was not what anyone was looking for. And
+should `SHIPPED_ZOOMS` be derived from the shipped set rather than written down?
+
+- **Raised:** 2026-09-30 by `preset-author`, found while re-pointing the seam test's comment off the
+  retired `swarm_drift` at Plan 0232 Phase 4. **Owner if taken:** the owner (a look at Murmuration
+  in the running app), then `dev` (widen `SHIPPED_ZOOMS`, or derive it).
+- **Verified 2026-10-06** — Murmuration binds a constant above the seam:
+  `present: ^zoom = "0\.85" in: presets/swarm_murmuration.toml`
+- **Verified 2026-10-06** — the seam test takes no shipped zoom range:
+  `absent: SHIPPED_ZOOMS in: core/src/render/scenes/swarm/tests.rs`
+- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+
+## 0282 — a misspelled top-level table is silently ignored, so `[smothing]` passes `--check --strict` and its easing never runs
+
+ADR-0020 made an unknown parameter name a surfaced warning, and `--check --strict` turns that
+warning into a failure. One level up nothing equivalent exists. `RawPreset` derives `Deserialize`
+with no `deny_unknown_fields` and no catch-all field, so serde drops any top-level key it does not
+know. A preset with `[smothing]` where `[smoothing]` was meant loads clean: on 2026-10-05 a fresh
+build gave `checked 1 file: 0 errors, 0 warnings` on a `fragment_field` file holding
+`[smothing] hue = 1`, and the easing silently never ran. The same goes for `[pallete]`,
+`[genrator]`, and a stray top-level key such as `sytem`. A smoothing table or palette that never
+applies leaves the preset looking almost right, which is the failure ADR-0020 exists to surface.
+The child tables are already strict where it was asked for: `[path]` and `[latch]` reject unknown
+keys. The obvious shape is a warning, not an error, to keep ADR-0020's severity: collect unknown
+top-level keys, for example with a `#[serde(flatten)]` catch-all map, and warn
+`unknown top-level table '[smothing]'`, with a nearest-name hint if one is cheap. An error would
+break forward compatibility. A file written for a newer table would stop loading on an older build,
+and ADR-0020 chose a warning for exactly that reason.
+
+- **Raised:** 2026-10-05 by `preset-author` while validating its own skill references, filed by
+  `architect` the same day. **Owner if taken:** `dev` (a loader change under ADR-0020's existing
+  rule; no new ADR unless the severity is changed to an error).
+- **Verified 2026-10-05** — the loader has no unknown-table message:
+  `absent: [Uu]nknown (top-level )?(table|key) in: core/src/preset/schema/load.rs`
+- **Verified 2026-10-05** — `unprobeable: the silent pass is a runtime outcome of ritmolux --check on a scratch file, which the probe grammar cannot run; the absent probe above is the reduction`
+- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+
+## 0283 — the shared `zoom` declaration says "above 1 fills more of the frame", which is backwards on `fragment_field` and `reaction_diffusion`
+
+`common::zoom` is the one `ParamSpec` every scene with a view zoom declares. Its doc, "Scales the
+whole scene about its centre; above 1 fills more of the frame", and the comment above it, "One
+meaning across every scene that has it", flow into the generated `presets/README.md`, every
+`presets/schema/*.schema.json` hover, and the studio's parameter panel. Two field scenes scale the
+sample coordinate the other way. `fragment_field` computes `uv * zoom + pan`, and
+`reaction_diffusion` says it uses the same shape, so a higher `zoom` samples a wider window and
+shows *more* of the field, each feature smaller. `analytic_field` and `cellular` divide
+(`uv / zoom`) and agree with the doc. The preset-author skill has documented the inversion by hand
+since ADR-0018, and the generated reference now contradicts it. The behaviour is not the defect,
+since every shipped `fragment_*` and `reaction_*` preset is tuned against it. The defect is one
+declaration claiming one meaning. The cheap fix is a second constructor in `common.rs` with the
+field-space wording ("above 1 shows more of the field, each feature smaller"), used by those two
+scenes, and the generated files regenerated. Unifying the direction would retune every
+`fragment_*` and `reaction_*` preset, and it is not worth that.
+
+- **Raised:** 2026-10-05 by `preset-author`, filed by `architect` the same day. **Owner if taken:**
+  `dev` (a doc-string split and a regeneration; no behaviour change, no ADR).
+- **Verified 2026-10-05** — the shared doc line:
+  `present: above 1 fills more of the frame in: core/src/render/scenes/common.rs`
+- **Verified 2026-10-05** — the field scene multiplies:
+  `present: var p = uv \* zoom \+ pan; in: core/src/render/scenes/fragment_field.rs`
+- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+
+## 0284 — the show window reports an empty Wayland app class, so a Hyprland window rule cannot target it
+
+Plan 0218 Phase 1 read the compositor with `hyprctl clients -j` on the Arch box on 2026-09-29 and
+found the show's window reporting `class: ""`, where every other client names itself (`code`,
+`firefox`). On Wayland the class is the `xdg_toplevel` app id, and winit sends one only when the
+window attributes carry it (`WindowAttributesExtWayland::with_name`). The standalone builds both of
+its windows with a title and nothing else: `run.rs` sets `APP_TITLE` and `app_state.rs` sets
+`CONSOLE_TITLE`. A user therefore cannot pin the show to a workspace or a monitor, or turn off blur
+for it, by class. A rule can match only the title, and the show's title changes with every preset.
+The cheap shape is one app id for both windows, `ritmolux`, set on Linux, and a line in
+`docs/running.md` naming it. Whether the console gets a separate id, so a rule can place the two
+windows apart, is the one question this leaves. It matters once Phase 1's second-display readings
+exist.
+
+- **Raised:** 2026-09-29 by the owner and `architect` at Plan 0218 Phase 1, filed by `architect` at
+  Plan 0218's close on 2026-10-06. **Owner if taken:** `dev` (a window attribute and a doc line; no
+  ADR unless the console takes its own id).
+- **Verified 2026-10-06** — neither window builder sets a name or app id:
+  `absent: with_name|app_id in: standalone/src/run.rs`
+- **Verified 2026-10-06** — `absent: with_name|app_id in: standalone/src/app_state.rs`
+- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.

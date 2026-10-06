@@ -1,6 +1,6 @@
 # 0250 — The close findings and five small asks are paid
 
-> **Status:** draft
+> **Status:** approved (2026-10-06)
 > **Created:** 2026-10-06
 > **Owner skill(s):** dev, studio-builder
 > **Closes:** design-backlog 0260, 0275, 0282, 0283, 0284
