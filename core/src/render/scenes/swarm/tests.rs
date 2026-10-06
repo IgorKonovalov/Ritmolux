@@ -3,10 +3,10 @@
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
 use super::{
-    DEFAULT_HUE, DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, DEFAULT_SPIN, DEPTH_PARALLAX_FAR,
-    DEPTH_PARALLAX_NEAR, DEPTH_SCALE_FAR, DEPTH_SCALE_NEAR, FALLBACK_DT, MARGIN, Phase, SEED,
-    Scene, SwarmScene, TWINKLE_FREQ_HI, TWINKLE_FREQ_LO, bounds, channel, hue_coord, size_factor,
-    twinkle_factor, unit,
+    DEFAULT_DEPTH_FADE, DEFAULT_HUE, DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, DEFAULT_SPIN,
+    FALLBACK_DT, MARGIN, PIVOT, Phase, REST_FOV, SEED, SIZE_DEPTH, Scene, SwarmInstance,
+    SwarmScene, TWINKLE_FREQ_HI, TWINKLE_FREQ_LO, Z_FAR, Z_NEAR, Z_SPAN, channel, depth_light,
+    half_extent, hue_coord, size_factor, slab_fade, sway_bound, twinkle_factor, unit,
 };
 use crate::render::palette::Palette;
 use crate::render::scenes::SeededRng;
@@ -16,186 +16,325 @@ use crate::render::scenes::SeededRng;
 /// every golden capture draws (Plan 0044).
 const FLOOR_PARTICLES: usize = crate::render::TierConfig::FLOOR.swarm_particles;
 
-/// Target aspects worth checking a domain against: 16:9, the 16:10 the fixed
-/// constants disagreed with, 4:3, an ultrawide, and a portrait.
+/// Target aspects worth checking a domain against: 16:9, 16:10, 4:3, an
+/// ultrawide, and a portrait.
 const ASPECTS: [f32; 5] = [16.0 / 9.0, 16.0 / 10.0, 4.0 / 3.0, 21.0 / 9.0, 9.0 / 16.0];
 
-/// The domain has the **render target's** shape, not the baked 16:9 the
-/// replaced constants encoded (ADR-0037, ADR-0044).
-///
-/// The visible frame is `|world.y| <= 1` by `|world.x| <= aspect`, so a domain
-/// that fills it without over-filling has exactly that ratio. The old
-/// `BOUND_X = 1.8` / `BOUND_Y = 1.0` pair is 1.80 at every target size — right
-/// only at 16:9, and the reason no existing test could tell: at 16:10 it
-/// over-fills horizontally by 12 %.
+/// ADR-0037's disagreeing pair: two targets whose aspects differ, so a shape
+/// taken from anything but the target is wrong on at least one of them.
+const TARGETS: [(u32, u32); 2] = [(1280, 800), (1920, 1080)];
+
+/// A scene of `particles` on a software device, or `None` (a logged skip) when
+/// the runner has none (ADR-0016). The renderer is returned beside it so the
+/// device outlives the scene.
+fn scene(particles: usize) -> Option<(crate::render::Renderer, SwarmScene)> {
+    use crate::render::context::RenderError;
+    use crate::render::{COMPOSITE_FORMAT, HeadlessOptions, Renderer};
+
+    let renderer = match Renderer::new_headless(HeadlessOptions {
+        width: 64,
+        height: 64,
+        prefer_software: true,
+    }) {
+        Ok(renderer) => renderer,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    let scene = SwarmScene::new(&renderer.ctx.device, COMPOSITE_FORMAT, particles);
+    Some((renderer, scene))
+}
+
+/// A world point's normalized-device position through `view`: the CPU mirror
+/// of the shader's `project()` and divide.
+fn ndc(view: &crate::render::camera::CameraView, p: [f32; 3]) -> [f32; 2] {
+    let c = view.clip(p);
+    [c[0] / c[3], c[1] / c[3]]
+}
+
+/// The torus has the **render target's** shape at every depth (ADR-0037,
+/// ADR-0259): its cross-section is the rest frustum's times the margin, so its
+/// aspect is the target's whatever the depth, and it grows linearly with depth.
 #[test]
-fn the_domain_takes_its_shape_from_the_target() {
+fn the_domain_takes_its_shape_from_the_target_at_every_depth() {
     for aspect in ASPECTS {
-        let (bx, by) = bounds(aspect);
+        for z in [Z_NEAR, PIVOT, Z_FAR] {
+            let (hx, hy) = half_extent(z, aspect);
+            assert!(
+                (hx / hy - aspect).abs() < 1e-5,
+                "cross-section shape {:.4} at depth {z} must equal the target's {aspect:.4}",
+                hx / hy
+            );
+            // At rest the frame's half-height at `z` is `z * tan(fov / 2)`, so
+            // the seam sits `MARGIN` times past it.
+            let frame = z * (0.5 * REST_FOV).tan();
+            assert!(
+                (hy / frame - MARGIN).abs() < 1e-5,
+                "the seam must sit MARGIN past the frame at depth {z}: {:.4}",
+                hy / frame
+            );
+        }
+    }
+}
+
+/// **Over 600 frames of the default flow, no particle within one sprite radius
+/// of the wrap seam projects inside the frame**, at 1280x800 and at 1920x1080
+/// (Plan 0239 Phase 1, ADR-0037's disagreeing pair) — at rest and with the
+/// camera swayed to [`sway_bound`] in each of the four diagonal directions.
+///
+/// The projection is the camera's own CPU mirror of `project()`, through the
+/// frame `render` would build, so this asserts on what the GPU draws.
+#[test]
+fn the_wrap_seam_stays_outside_the_frame_at_every_depth() {
+    use crate::dsp::AnalysisFrame;
+
+    for (width, height) in TARGETS {
+        let Some((_renderer, mut scene)) = scene(FLOOR_PARTICLES) else {
+            return;
+        };
+        let aspect = width as f32 / height as f32;
+        scene.aspect = aspect;
+        scene.target = (width, height);
+
+        let [yaw, pitch] = sway_bound(REST_FOV, 1.0, aspect, [0.0, 0.0]);
         assert!(
-            (bx / by - aspect).abs() < 1e-5,
-            "domain shape {:.4} must equal the target's {aspect:.4}",
-            bx / by
+            yaw > 0.02 && pitch > 0.02,
+            "the margin must leave a usable sway at {width}x{height}: yaw {yaw:.4}, pitch {pitch:.4}"
+        );
+        let views: Vec<_> = [
+            (0.0, 0.0),
+            (yaw, pitch),
+            (-yaw, pitch),
+            (yaw, -pitch),
+            (-yaw, -pitch),
+        ]
+        .into_iter()
+        .map(|(y, p)| {
+            // Bound past the limit, so the clamp is what is measured.
+            scene.camera.yaw = y * 2.0;
+            scene.camera.pitch = p * 2.0;
+            scene.camera_frame(aspect, 0.0).view
+        })
+        .collect();
+
+        let frame = AnalysisFrame::default();
+        let (mut near_seam, mut inside, mut worst) = (0usize, 0usize, f32::INFINITY);
+        for _ in 0..600 {
+            scene.update(&frame);
+            for (p, inst) in scene.particles.iter().zip(&scene.instance_data) {
+                // The sprite's radius in frustum coordinates: its
+                // normalized-device height at this depth over the margin, and
+                // the width over the aspect too, because it is round on screen.
+                let r_ndc = inst.radius * SIZE_DEPTH / p.z;
+                let (ru, rv) = (r_ndc / (aspect * MARGIN), r_ndc / MARGIN);
+                if p.pos[0].abs() < 1.0 - ru && p.pos[1].abs() < 1.0 - rv {
+                    continue;
+                }
+                near_seam += 1;
+                for view in &views {
+                    let [x, y] = ndc(view, inst.center);
+                    let past = x.abs().max(y.abs());
+                    worst = worst.min(past);
+                    if past < 1.0 {
+                        inside += 1;
+                    }
+                }
+            }
+        }
+        eprintln!(
+            "{width}x{height}: {near_seam} particle-frames within a sprite radius of the seam, \
+             {inside} projected inside the frame; nearest {worst:.4} ndc (sway bound \
+             yaw {yaw:.4}, pitch {pitch:.4})"
+        );
+        assert!(
+            near_seam > 1000,
+            "too few particles reached the seam for this to measure anything: {near_seam}"
+        );
+        assert_eq!(
+            inside, 0,
+            "{inside} particle-frames within one sprite radius of the wrap seam projected \
+             inside the frame at {width}x{height}"
         );
     }
-
-    // The pair it replaced, for the record: correct at 16:9 and wrong the
-    // moment the target is anything else.
-    let (old_x, old_y) = (1.8f32, 1.0f32);
-    let sixteen_ten = 16.0 / 10.0;
-    assert!(
-        (old_x / old_y - sixteen_ten).abs() > 0.1,
-        "the fixed constants must genuinely disagree with 16:10, or this guards nothing"
-    );
 }
 
-/// **The artifact fix, as arithmetic** (backlog 0029): the toroidal wrap seam
-/// projects outside the visible frame across the whole `zoom`/`pan_*` range the
-/// swarm family works in, so no particle is guaranteed to paint on a fixed
-/// on-screen line and the feedback stage has no bar to integrate.
-///
-/// The shader projects a particle at world `p` to
-/// `ndc = ((p.x * zoom + pan_x) / aspect, p.y * zoom + pan_y)`, so a seam at
-/// `+bound` clears the frame when `bound * zoom - |pan| > extent`. Non-vacuous
-/// by construction: at the old `MARGIN = 1` equivalent the y seam lands exactly
-/// on `ndc.y = 1` at `zoom = 1`, which is the reported defect.
-///
-/// Asserted twice, because the margin is **proportional** and `pan_*` is in
-/// world units: the general clearance scales with each axis' half-extent, so
-/// the literal `0.16` the presets pan by buys different headroom on a wide
-/// target than on a tall one. The second block pins the family's own number
-/// against the landscape targets it will actually meet. On a portrait target
-/// the x axis is the tight one — `9:16` leaves 0.14 of pan headroom against
-/// that 0.16 — which is a property of `pan_x` being world-space, not something
-/// the domain should distort its shape to paper over.
+/// **Far particles cross the screen more slowly than near ones under the same
+/// flow** (Plan 0239 Phase 1): the mean screen speed of the far third of the
+/// slab is lower than the near third's, measured on the projected centres over
+/// the default flow. Perspective alone predicts the far third at about half the
+/// near third's speed; the bound below is that with room for the field's own
+/// depth dependence.
 #[test]
-fn the_wrap_seam_projects_outside_the_visible_frame() {
-    // The family's working range (Plan 0043 Phase 1).
-    const ZOOMS: [f32; 4] = [1.0, 1.1, 1.2, 1.3];
-    /// The range the **shipped** presets actually reach, which starts *below* 1:
-    /// a since-retired swarm bound `zoom = "1.04 + sin(...) * 0.05 + ..."`, so it
-    /// bottomed out just under 1 and a guard starting at 1.0 leaves the shipped
-    /// minimum unmeasured (Plan 0043 close review). Used for the concrete block
-    /// below, not the general one — "clears by at least `headroom`" is a
-    /// `zoom >= 1` property by construction, while "clears at all" is the claim
-    /// that has to hold everywhere the family goes.
-    const SHIPPED_ZOOMS: [f32; 5] = [0.99, 1.0, 1.1, 1.2, 1.3];
-    /// The largest `pan_*` amplitude any surviving preset binds (a since-retired swarm's `pan_x`).
-    /// A future preset that pans further or zooms lower has to widen these two —
-    /// which is why they say where they come from.
-    const PAN: f32 = 0.16;
-    let headroom = MARGIN - 1.0;
+fn far_particles_cross_the_screen_more_slowly_than_near_ones() {
+    use crate::dsp::AnalysisFrame;
 
-    // General: on any target and anywhere in the working zoom range, each seam
-    // clears its frame edge by at least `headroom` of that axis' half-extent.
-    for aspect in ASPECTS {
-        let (bx, by) = bounds(aspect);
-        for zoom in ZOOMS {
-            assert!(
-                by * zoom - 1.0 >= headroom - 1e-5,
-                "y seam clears by {:.4}, want >= {headroom:.4} (aspect {aspect:.3}, \
-                 zoom {zoom:.2})",
-                by * zoom - 1.0
-            );
-            assert!(
-                bx * zoom - aspect >= aspect * headroom - 1e-5,
-                "x seam clears by {:.4}, want >= {:.4} (aspect {aspect:.3}, zoom {zoom:.2})",
-                bx * zoom - aspect,
-                aspect * headroom
-            );
-        }
-    }
-
-    // Concrete: the pan the swarm presets reach, against every landscape
-    // target, **at the near depth layer**. Parallax scales both the pan offset
-    // and the zoom deflection, and the near layer takes the most pan — so it is
-    // the one whose seam sits closest to the frame and the only one worth
-    // asserting. Checking a depth-agnostic 1.0 here would pass while the layer
-    // that actually binds went unmeasured.
-    for aspect in [16.0 / 9.0, 16.0 / 10.0, 4.0 / 3.0, 21.0 / 9.0] {
-        let (bx, by) = bounds(aspect);
-        for zoom in SHIPPED_ZOOMS {
-            let par = DEPTH_PARALLAX_NEAR;
-            let seam_y = by * (1.0 + (zoom - 1.0) * par) - PAN * par;
-            let seam_x = bx * (1.0 + (zoom - 1.0) * par) - PAN * par;
-            assert!(
-                seam_y > 1.0,
-                "near-layer y seam projects to {seam_y:.3} at zoom {zoom:.2}, pan {PAN} \
-                 — inside the frame"
-            );
-            assert!(
-                seam_x > aspect,
-                "near-layer x seam projects to {seam_x:.3} at zoom {zoom:.2}, pan {PAN} \
-                 — inside the half-width {aspect:.3}"
-            );
-        }
-    }
-
-    // What the margin costs, stated so a change to it is deliberate: the
-    // visible fraction of the domain is 1 / MARGIN^2.
-    let visible = 1.0 / (MARGIN * MARGIN);
-    assert!(
-        (0.5..0.85).contains(&visible),
-        "a margin keeping under half the particles on screen is too expensive: {visible:.3}"
-    );
-}
-
-/// **Parallax is present, not merely a scale change** (Plan 0043 Phase 3's
-/// done-when): under the same `pan_*`, a near particle traverses the frame
-/// measurably faster than a far one.
-///
-/// Replicates the vertex shader's projection exactly — that one expression is
-/// the whole depth transform, so asserting on it is asserting on what the GPU
-/// does. Two claims, and the second is what stops this from being a tautology
-/// about a constant: the layers separate under a pan, and they do **not**
-/// separate at the identity transform, so an unbound preset gets no parallax
-/// distortion at all.
-#[test]
-fn near_particles_traverse_the_frame_faster_than_far_ones() {
-    // `misc.v`: ndc.x = (center.x * (1 + (zoom - 1) * par) + pan.x * par) / aspect
-    let project = |center_x: f32, zoom: f32, pan_x: f32, par: f32, aspect: f32| {
-        (center_x * (1.0 + (zoom - 1.0) * par) + pan_x * par) / aspect
+    let Some((_renderer, mut scene)) = scene(FLOOR_PARTICLES) else {
+        return;
     };
     let aspect = 16.0 / 9.0;
-    let (near, far) = (DEPTH_PARALLAX_NEAR, DEPTH_PARALLAX_FAR);
+    scene.aspect = aspect;
+    let view = scene.camera_frame(aspect, 0.0).view;
+    let frame = AnalysisFrame::default();
+    for _ in 0..60 {
+        scene.update(&frame);
+    }
 
-    // Two particles at the same place, at opposite depths, under a pan sweep.
-    let center_x = 0.4;
-    let (pan_a, pan_b) = (0.0, 0.3);
-    let travel = |par: f32| {
-        (project(center_x, 1.0, pan_b, par, aspect) - project(center_x, 1.0, pan_a, par, aspect))
-            .abs()
-    };
-    let (near_travel, far_travel) = (travel(near), travel(far));
-    assert!(
-        near_travel > far_travel * 1.5,
-        "the near layer must outrun the far one: {near_travel:.4} vs {far_travel:.4} \
-         (ratio {:.2})",
-        near_travel / far_travel
+    let third = Z_SPAN / 3.0;
+    let (mut near, mut far) = ((0.0f64, 0usize), (0.0f64, 0usize));
+    let mut previous: Vec<([f32; 2], [f32; 2], f32)> = scene
+        .particles
+        .iter()
+        .zip(&scene.instance_data)
+        .map(|(p, inst)| (p.pos, ndc(&view, inst.center), p.z))
+        .collect();
+    for _ in 0..240 {
+        scene.update(&frame);
+        for ((p, inst), before) in scene
+            .particles
+            .iter()
+            .zip(&scene.instance_data)
+            .zip(previous.iter_mut())
+        {
+            let now = ndc(&view, inst.center);
+            let wrapped = (p.pos[0] - before.0[0]).abs() > 1.0
+                || (p.pos[1] - before.0[1]).abs() > 1.0
+                || (p.z - before.2).abs() > 0.5 * Z_SPAN;
+            if !wrapped {
+                // Isotropic: an x step in normalized-device units is `aspect`
+                // times as many pixels as a y step.
+                let step = (((now[0] - before.1[0]) * aspect).powi(2)
+                    + (now[1] - before.1[1]).powi(2))
+                .sqrt() as f64;
+                if p.z < Z_NEAR + third {
+                    near.0 += step;
+                    near.1 += 1;
+                } else if p.z > Z_FAR - third {
+                    far.0 += step;
+                    far.1 += 1;
+                }
+            }
+            *before = (p.pos, now, p.z);
+        }
+    }
+    let near_speed = near.0 / near.1.max(1) as f64;
+    let far_speed = far.0 / far.1.max(1) as f64;
+    eprintln!(
+        "screen speed: near third {near_speed:.6} over {} samples, far third {far_speed:.6} \
+         over {} samples (ratio {:.3})",
+        near.1,
+        far.1,
+        far_speed / near_speed
     );
-
-    // A zoom deflection separates them too — depth is not pan-only.
-    let zoomed = |par: f32| (project(center_x, 1.3, 0.0, par, aspect)).abs();
     assert!(
-        zoomed(near) > zoomed(far) * 1.05,
-        "zoom must deflect the near layer further: {:.4} vs {:.4}",
-        zoomed(near),
-        zoomed(far)
+        near.1 > 10_000 && far.1 > 10_000,
+        "both thirds must be populated"
     );
+    assert!(
+        far_speed < near_speed * 0.8,
+        "the far third must cross the screen more slowly: {far_speed:.6} vs {near_speed:.6}"
+    );
+}
 
-    // ...and at the identity transform every depth projects to the same place,
-    // so an unbound preset is untouched by the depth axis' parallax term.
-    for par in [far, 1.0, near] {
+/// The sway bound comes from the margin **and** the field of view: a wider
+/// `fov` shows more of the margin and leaves less to sway into, a `zoom` that
+/// narrows it leaves more, and a pan eats into it. Past the point where the
+/// seam already shows, the bound is zero rather than negative.
+#[test]
+fn the_sway_bound_follows_the_lens_and_the_pan() {
+    let aspect = 16.0 / 9.0;
+    let [rest_yaw, rest_pitch] = sway_bound(REST_FOV, 1.0, aspect, [0.0, 0.0]);
+    let [wide_yaw, wide_pitch] = sway_bound(0.9, 1.0, aspect, [0.0, 0.0]);
+    let [zoomed_yaw, zoomed_pitch] = sway_bound(REST_FOV, 1.3, aspect, [0.0, 0.0]);
+    let [panned_yaw, panned_pitch] = sway_bound(REST_FOV, 1.0, aspect, [0.1, 0.1]);
+    let [open_yaw, open_pitch] = sway_bound(1.2, 1.0, aspect, [0.0, 0.0]);
+    eprintln!(
+        "sway bound (yaw, pitch): rest {rest_yaw:.4} {rest_pitch:.4}, fov 0.9 {wide_yaw:.4} \
+         {wide_pitch:.4}, zoom 1.3 {zoomed_yaw:.4} {zoomed_pitch:.4}, pan 0.1 {panned_yaw:.4} \
+         {panned_pitch:.4}"
+    );
+    assert!(wide_yaw < rest_yaw && wide_pitch < rest_pitch);
+    assert!(zoomed_yaw > rest_yaw && zoomed_pitch > rest_pitch);
+    assert!(panned_yaw < rest_yaw && panned_pitch < rest_pitch);
+    assert_eq!([open_yaw, open_pitch], [0.0, 0.0]);
+    for value in sway_bound(f32::NAN, f32::INFINITY, f32::NAN, [f32::NAN; 2]) {
         assert!(
-            (project(center_x, 1.0, 0.0, par, aspect) - center_x / aspect).abs() < 1e-6,
-            "identity zoom/pan must be depth-independent"
+            value.is_finite() && value >= 0.0,
+            "a non-finite input must give a usable bound"
         );
     }
+}
+
+/// `depth_fade`'s default reproduces ADR-0044's ramp — 1.05 at the near bound,
+/// 0.45 at the far — and `0` lights every depth alike. The slab fade is 1 in
+/// the interior and 0 at both bounds, where a particle wraps.
+#[test]
+fn the_depth_light_reproduces_the_ramp_and_the_slab_bounds_are_dark() {
+    assert!((depth_light(Z_NEAR, DEFAULT_DEPTH_FADE) - 1.05).abs() < 1e-5);
+    assert!((depth_light(Z_FAR, DEFAULT_DEPTH_FADE) - 0.45).abs() < 1e-5);
+    assert_eq!(depth_light(Z_NEAR, 0.0), depth_light(Z_FAR, 0.0));
+    assert!(depth_light(Z_FAR, 3.0) >= 0.0);
+    assert_eq!(slab_fade(Z_NEAR), 0.0);
+    assert_eq!(slab_fade(Z_FAR), 0.0);
+    assert_eq!(slab_fade(PIVOT), 1.0);
+}
+
+/// **Two frames a second apart differ** (Plan 0239 Phase 1): the swarm golden
+/// fixture rendered through the headless capture path `shot` drives, at frames
+/// 60 and 120.
+#[test]
+fn the_swarm_fixture_moves_between_two_frames_a_second_apart() {
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::Preset;
+    use crate::render::context::RenderError;
+    use crate::render::{HeadlessOptions, Renderer};
+
+    const FIXTURE: &str = include_str!("../../../../tests/fixtures/swarm.toml");
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: 160,
+        height: 100,
+        prefer_software: true,
+    }) {
+        Ok(renderer) => renderer,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    let preset = Preset::from_toml_str(FIXTURE).expect("the swarm fixture parses");
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+    let frame = AnalysisFrame::default();
+    let a = renderer
+        .capture_preset(&name, &frame, 60)
+        .expect("capture frame 60");
+    let b = renderer
+        .capture_preset(&name, &frame, 120)
+        .expect("capture frame 120");
+    let lit = a
+        .rgba
+        .chunks_exact(4)
+        .filter(|px| px[..3] != [0, 0, 0])
+        .count();
+    let differing = a
+        .rgba
+        .chunks_exact(4)
+        .zip(b.rgba.chunks_exact(4))
+        .filter(|(x, y)| x[..3] != y[..3])
+        .count();
+    eprintln!("swarm fixture: {lit} lit pixels at frame 60, {differing} differ at frame 120");
+    assert!(lit > 100, "the fixture must draw: {lit} lit pixels");
+    assert!(
+        differing > 100,
+        "two frames a second apart must differ: {differing} pixels"
+    );
 }
 
 /// The depth axis is **seeded**, so a capture is reproducible run-to-run
-/// (NFR §6) — and it genuinely spans the range, which is what makes the scale,
-/// fade and parallax lerps do anything.
+/// (NFR §6) — and it genuinely spans the slab, which is what makes perspective,
+/// the depth light and motion parallax do anything.
 #[test]
 fn the_seeded_scatter_reproduces_the_same_depth_sequence() {
     let depths = || {
@@ -207,16 +346,16 @@ fn the_seeded_scatter_reproduces_the_same_depth_sequence() {
     let (a, b) = (depths(), depths());
     assert_eq!(a, b, "the same seed must give the same depth sequence");
 
-    let lo = a.iter().copied().fold(f32::INFINITY, f32::min);
-    let hi = a.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    let mean = a.iter().sum::<f32>() / a.len() as f32;
+    let lo = (a.iter().copied().fold(f32::INFINITY, f32::min) - Z_NEAR) / Z_SPAN;
+    let hi = (a.iter().copied().fold(f32::NEG_INFINITY, f32::max) - Z_NEAR) / Z_SPAN;
+    let mean = (a.iter().sum::<f32>() / a.len() as f32 - Z_NEAR) / Z_SPAN;
     assert!(
         (0.0..0.02).contains(&lo) && (0.98..=1.0).contains(&hi),
-        "depth must span the full 0..1 range, got {lo:.4}..{hi:.4}"
+        "depth must span the whole slab, got {lo:.4}..{hi:.4} of it"
     );
     assert!(
         (0.45..0.55).contains(&mean),
-        "depth must populate the range evenly, mean was {mean:.4}"
+        "depth must populate the slab evenly, mean was {mean:.4} of it"
     );
 }
 
@@ -224,15 +363,17 @@ fn the_seeded_scatter_reproduces_the_same_depth_sequence() {
 /// consequence: "the wrap must stay stable across one rather than teleporting
 /// every particle at once").
 ///
-/// Normalized storage is what buys this, and the test says so by measuring the
-/// alternative alongside: with world-space positions, shrinking the domain
-/// re-wraps everything outside the new bounds, and those particles jump by a
-/// full domain width. Normalized positions move continuously with the change.
+/// Frustum-coordinate storage is what buys this, and the test says so by
+/// measuring the alternative alongside: with world-space positions, shrinking
+/// the domain re-wraps everything outside the new bounds, and those particles
+/// jump by a full domain width. Frustum coordinates move continuously with the
+/// change. Measured at the slab's centre; the half-extents are linear in depth,
+/// so every depth scales the same way.
 #[test]
 fn a_resize_rescales_the_field_rather_than_wrapping_it() {
     let (before, after) = (16.0 / 9.0, 16.0 / 10.0);
-    let (bx0, by0) = bounds(before);
-    let (bx1, by1) = bounds(after);
+    let (bx0, by0) = half_extent(SIZE_DEPTH, before);
+    let (bx1, by1) = half_extent(SIZE_DEPTH, after);
 
     // A fan of normalized positions spanning the torus, including both seams.
     let samples: Vec<[f32; 2]> = (0..64)
@@ -676,30 +817,21 @@ fn a_reseed_pulse_disperses_the_population_and_it_reconverges() {
 /// `golden.rs`'s 128 there is not enough of it to bin cleanly.
 const MARK_CAPTURE: u32 = 256;
 
-/// The mark's half-size in world units. The frame is `|ndc| <= 1` on a square
-/// target, so this leaves a tenth of the frame outside the sprite quad.
+/// The mark's half-size in normalized-device units. The frame is `|ndc| <= 1`
+/// on a square target, so this leaves a tenth of the frame outside the sprite
+/// quad.
 const MARK_HALF: f32 = 0.9;
 
 /// **One mark, drawn large and centred, through the real swarm pipeline** —
 /// the linear composite it wrote, RGBA, row-major.
 ///
 /// A swarm normally draws thousands of sprites and no single silhouette is
-/// legible in the sum, so this builds the scene with a pool of **one**. Two
-/// tricks make that one mark measurable, and both are arithmetic rather than
-/// tuning:
-///
-/// - **It is centred exactly**, whatever the seeded scatter put the particle
-///   at. The vertex shader computes
-///   `center * (1 + (zoom - 1) * parallax) + pan * parallax`, so
-///   `zoom = 1 - 1/parallax` with `pan = 0` collapses the position term to
-///   zero identically. The particle's own `parallax` comes off its depth,
-///   which the seeded draw is replayed here to read.
-/// - **It is scaled to a known size** by dividing [`MARK_HALF`] through the
-///   per-particle size and depth scale the same replay gives.
-///
-/// `saturation = 0` so every lit pixel is grey: the profile below thresholds
-/// on luminance, and a palette sample that happened to be dark in one channel
-/// would put notches in it that have nothing to do with the shape.
+/// legible in the sum, so this builds the scene with a pool of **one**, runs
+/// its `update` so the silhouette uniform is the bound one, and then replaces
+/// that one sprite with a known one: on the view axis at [`SIZE_DEPTH`], where
+/// the shader draws `radius` unscaled, at a half-size of [`MARK_HALF`], and
+/// grey, so the profile below thresholds on luminance with no palette sample
+/// putting notches in it that have nothing to do with the shape.
 fn capture_one_mark(shape: f32, points: f32) -> Option<Vec<f32>> {
     use crate::dsp::AnalysisFrame;
     use crate::render::context::RenderError;
@@ -720,31 +852,19 @@ fn capture_one_mark(shape: f32, points: f32) -> Option<Vec<f32>> {
     let device = renderer.ctx.device.clone();
     let queue = renderer.ctx.queue.clone();
 
-    // Replay the seeded draw the scene's own pool will make, so the depth
-    // terms below are the particle's and not an assumption about it.
-    let mut rng = SeededRng::new(SEED);
-    let particle = SwarmScene::spawn(&mut rng);
-    let parallax = DEPTH_PARALLAX_FAR + (DEPTH_PARALLAX_NEAR - DEPTH_PARALLAX_FAR) * particle.z;
-    let depth_scale = DEPTH_SCALE_FAR + (DEPTH_SCALE_NEAR - DEPTH_SCALE_FAR) * particle.z;
-
     let mut scene = SwarmScene::new(&device, COMPOSITE_FORMAT, 1);
-    for (name, value) in [
-        ("force", 0.0),
-        ("spin", 0.0),
-        ("burst", 0.0),
-        ("brightness", 1.0),
-        ("saturation", 0.0),
-        ("size", MARK_HALF / (particle.size * depth_scale)),
-        ("zoom", 1.0 - 1.0 / parallax),
-        ("pan_x", 0.0),
-        ("pan_y", 0.0),
-        ("shape", shape),
-        ("points", points),
-    ] {
+    for (name, value) in [("shape", shape), ("points", points)] {
         scene.set_param(name, value);
     }
     scene.set_time(0.0);
     scene.update(&AnalysisFrame::default());
+    scene.set_target_size(MARK_CAPTURE, MARK_CAPTURE);
+    scene.instance_data[0] = SwarmInstance {
+        center: [0.0, 0.0, PIVOT - SIZE_DEPTH],
+        radius: MARK_HALF,
+        color: [0.5; 3],
+        presence: 1.0,
+    };
 
     let (texture, view) =
         capture::create_target(&device, COMPOSITE_FORMAT, MARK_CAPTURE, MARK_CAPTURE);

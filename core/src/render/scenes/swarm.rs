@@ -1,12 +1,40 @@
 //! Particle-swarm scene: ~10k CPU-simulated particles drifting through a flow
-//! field, drawn as instanced additive sprites (the starfield's approach,
-//! scaled up). One of the two preset-driven systems (ADR-0002 layers 1-2).
+//! field in a perspective volume, drawn as instanced additive sprites projected
+//! through the shared camera (ADR-0259). One of the two preset-driven systems
+//! (ADR-0002 layers 1-2).
 //!
 //! Its behavior is a set of named parameters — `force`, `spin`, `burst`, `hue`,
 //! `brightness`, `size` — that a preset binds to expressions over the audio
-//! analysis (Plan 0003 Phase 5). All per-particle math is CPU-side; no compute
-//! shader. Motion is deterministic; the only randomness is the seeded initial
-//! scatter (NFR 6).
+//! analysis (Plan 0003 Phase 5), plus a subset of the shared camera block. All
+//! per-particle math is CPU-side; no compute shader. Motion is deterministic;
+//! the only randomness is the seeded initial scatter (NFR 6).
+//!
+//! # The world is a torus in frustum coordinates
+//!
+//! A particle holds `(u, v, z)`: `z` is a view depth inside the slab
+//! [`Z_NEAR`]`..`[`Z_FAR`], and `u`, `v` in `[-1, 1)` are its place across the
+//! frustum's cross-section **at its own depth**, times [`MARGIN`]. Its world
+//! position is `(u * hx(z), v * hy(z))` with `hx`, `hy` the rest frustum's
+//! half-extents at `z` scaled by the margin ([`half_extent`]). The torus wraps
+//! in `u` and `v`, so the seam sits the same margin outside the frame at every
+//! depth — a box of fixed world bounds would show its seam at one end of the
+//! slab or waste its population at the other (ADR-0259).
+//!
+//! The flow is evaluated in world space and a world velocity is converted back
+//! by the half-extent at the particle's depth, so a far particle crosses the
+//! screen more slowly than a near one under the same current: motion parallax
+//! out of the simulation itself. `z` rides a slow component of the same field,
+//! wraps across the slab, and a particle's light fades to zero in a band at
+//! either slab bound, so the depth wrap never pops.
+//!
+//! # The camera is a subset of the shared block
+//!
+//! The eye orbits the slab's centre at [`PIVOT`] and looks down `-z`. `yaw` and
+//! `pitch` are held to a sway the margin covers ([`sway_bound`]), and there is
+//! no `distance`: the slab is defined relative to the camera, so an orbit would
+//! show the edge of the world. `zoom` divides the field of view and `pan_*`
+//! shift after the projection (ADR-0257); neither re-maps the simulation, and a
+//! `zoom` below the margin shows the seam.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). Runs every displayed frame.
@@ -22,6 +50,8 @@ use super::common;
 use super::marks;
 use super::{FALLBACK_DT, Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
+use crate::render::camera::{self, CameraFrame, CameraParams, CameraUniform};
+use crate::render::gpu;
 use crate::render::palette::{self, Palette};
 use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
@@ -30,78 +60,74 @@ use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 // this scene's goldens, so the value is opaque and stays as it is.
 const SEED: u64 = 0x4C4D_565F_5357_524D;
 
-/// How far the toroidal domain extends past the visible frame (Plan 0043 Phase 1,
-/// ADR-0044).
+/// How far the torus extends past the visible frame, as a multiple of the rest
+/// frustum's half-extent at every depth (ADR-0044, ADR-0259).
 ///
-/// Half-extents of `BOUND_X = 1.8` / `BOUND_Y = 1.0` put the wrap seam
-/// on the NDC frame edge, which `1.0` **is**. The wrap is toroidal, so
-/// that line is the one place on screen every wrapping particle is
-/// guaranteed to paint, and the feedback stage integrates it into a
-/// saturated bar across the top and bottom of every swarm preset within
-/// a few hundred frames.
+/// At `1.0` the wrap seam would sit on the frame edge, the one line on screen
+/// every wrapping particle is guaranteed to paint, and the feedback stage
+/// integrates that into a saturated bar within a few hundred frames. At 1.25 the
+/// seam projects to normalized-device `±1.25` at rest, which leaves a quarter of
+/// the frame's half-extent for `pan_*` and the camera sway to share
+/// ([`sway_bound`]).
 ///
-/// The bounds now follow the render target (below) and carry this margin so the
-/// seam sits *outside* the frame. Chosen by measurement, not by rounding: the
-/// family works at `zoom` 1.0–1.3 with `pan_*` to about 0.16, and a particle at
-/// world `y = BOUND_Y` lands on the frame edge when `BOUND_Y * zoom - |pan_y| ==
-/// 1`. At the worst case in that range (`zoom = 1.0`) the seam clears the frame
-/// for `|pan| <= MARGIN - 1`, so 1.25 buys 0.25 of pan headroom on both axes —
-/// comfortably past what the family uses, and it also puts the *domain rectangle*
-/// off-screen down to `zoom = 0.8`, which is the inset-edge wall that pinned the
-/// family at or above 1.0.
-///
-/// The cost is visible density: the visible fraction of the domain is `1 /
-/// MARGIN^2`, so a quarter of the 10 000 particles are off-screen at any moment.
-/// That is the tradeoff Phase 4's re-authoring absorbs.
+/// The cost is visible density: the visible fraction of the cross-section is
+/// `1 / MARGIN^2`, so a third of the population is off-screen at any moment.
 const MARGIN: f32 = 1.25;
 /// Domain aspect before the first [`Scene::render`] hands one over. Only reached
-/// on the very first `update` of a fresh scene; because positions are stored
-/// normalized (see [`Particle::pos`]) an aspect change rescales the field rather
-/// than teleporting it, so this fallback is continuous with whatever follows.
+/// on the very first `update` of a fresh scene; because positions are stored in
+/// frustum coordinates an aspect change rescales the field rather than
+/// teleporting it, so this fallback is continuous with whatever follows.
 const FALLBACK_ASPECT: f32 = 16.0 / 9.0;
 
 /// Velocity retained per frame (the rest is re-steered by the flow field).
 const DAMPING: f32 = 0.86;
 
-// --- The depth axis (Plan 0043 Phase 3, ADR-0044) -------------------------------
+// --- The slab ----------------------------------------------------------------
 //
-// Each particle carries a `z` in `0..1` — 0 far, 1 near — seeded with the rest of
-// the scatter. It drives four things and **never** a sort: the scene blends
-// additively, and addition is commutative, so draw order is irrelevant. That one
-// fact is what makes a depth axis nearly free here; the per-frame sort a 3D
-// particle system normally pays buys occlusion an additive scene does not have.
-//
-// It is an honest fake. There is no occlusion and no perspective divide — two
-// particles at different depths that overlap simply sum — so the illusion flattens
-// as density rises. That is the known limit of the 2.5D choice, not a defect.
-/// Sprite scale at `z = 0` and `z = 1`. The mean is ~1, so the family's `size`
-/// bindings keep roughly their old meaning.
-const DEPTH_SCALE_FAR: f32 = 0.55;
-const DEPTH_SCALE_NEAR: f32 = 1.50;
-/// Atmospheric fade: brightness multiplier at `z = 0` and `z = 1`. Distance
-/// washing out contrast is the oldest depth cue there is, and it is what keeps a
-/// far particle from reading as merely a small near one.
-const DEPTH_FADE_FAR: f32 = 0.45;
-const DEPTH_FADE_NEAR: f32 = 1.05;
-/// Parallax strength against the shared view transform at `z = 0` and `z = 1`.
-///
-/// A near particle traverses the frame ~1.9x faster than a far one under the same
-/// `pan_*`, which is the difference between a depth axis and a sprite sheet at two
-/// scales. Both ends are deliberately kept near 1 rather than spread wide: the
-/// near layer is the binding case for the [`MARGIN`] seam clearance (it is the one
-/// pan pushes furthest toward the frame), and at `zoom = 1` with the family's
-/// `pan` of 0.16 this still leaves the seam off-screen.
-const DEPTH_PARALLAX_FAR: f32 = 0.65;
-const DEPTH_PARALLAX_NEAR: f32 = 1.25;
-/// Phase offset, in radians, applied to the flow-field sample per unit of `z`.
-///
-/// **This is the term that makes it read as volume.** Without it every depth layer
-/// rides identical streamlines and the result is one flock drawn at several sizes;
-/// with it the near and far layers follow genuinely different currents, so they
-/// cross and separate the way real depth does. Sized as a large fraction of the
-/// field's `TAU` period — enough to decorrelate the layers, short of wrapping them
-/// back onto each other.
-const DEPTH_FIELD_OFFSET: f32 = 2.6;
+// Depth is a view depth in camera units, and never a sort: the scene blends
+// additively, and addition is commutative, so draw order is irrelevant and no
+// depth buffer is needed (ADR-0044, ADR-0259).
+
+/// The nearest view depth a particle reaches.
+const Z_NEAR: f32 = 1.4;
+/// The farthest. `Z_FAR / Z_NEAR` is the near-to-far ratio of on-screen sprite
+/// size and of screen speed under the same world current.
+const Z_FAR: f32 = 3.8;
+/// The slab's depth.
+const Z_SPAN: f32 = Z_FAR - Z_NEAR;
+/// The eye's distance from the orbit target, which is the slab's centre: a sway
+/// turns about the middle of the volume, so the near and far layers slide past
+/// each other in opposite directions.
+const PIVOT: f32 = 0.5 * (Z_NEAR + Z_FAR);
+/// The view depth at which a sprite's `size` is stated: nearer draws larger and
+/// farther smaller, by `SIZE_DEPTH / depth`. It is where `ln(Z_FAR / Z_NEAR) /
+/// Z_SPAN`, the slab's mean of `1 / depth`, puts the mean sprite at its stated
+/// size, and where the rest frame's half-height is one world unit to within
+/// 2 %, so `field_freq` keeps the scale it is documented at.
+const SIZE_DEPTH: f32 = 2.4;
+/// The field of view the torus is sized against: the shared camera's resting
+/// `fov`. A wider bound `fov` shows more of the margin, and past
+/// `2 * atan(MARGIN * tan(REST_FOV / 2))` the seam.
+const REST_FOV: f32 = camera::FOV.default;
+/// The share of a slab bound's depth over which a particle's light fades to
+/// zero before it wraps to the other bound.
+const FADE_BAND: f32 = 0.12;
+/// The flow's phase per unit of world depth, in radians. **This is the term
+/// that makes it read as volume**: layers at different depths ride genuinely
+/// different currents, so they cross and separate the way real depth does.
+/// Sized so the whole slab spans 2.6 radians, a large fraction of the field's
+/// `TAU` period — enough to decorrelate the layers, short of wrapping them back
+/// onto each other.
+const DEPTH_FIELD_FREQ: f32 = 2.6 / Z_SPAN;
+/// The depth current's share of `force`. Small, so a particle takes tens of
+/// seconds to cross the slab and depth reads as layering, not as rushing.
+const Z_FLOW: f32 = 0.3;
+/// The share of [`sway_bound`]'s first-order bound the sway may take: the rest
+/// absorbs the second-order terms that model leaves out.
+const SWAY_SHARE: f32 = 0.8;
+/// The light of a particle at the near slab bound, under `depth_fade`. With the
+/// default fade it falls to 0.45 at the far bound: the ramp ADR-0044 tuned.
+const DEPTH_LIGHT_NEAR: f32 = 1.05;
 
 /// Parameter defaults — a calm idle drift when nothing is bound.
 const DEFAULT_FORCE: f32 = default_of(PARAMS, "force");
@@ -110,12 +136,8 @@ const DEFAULT_BURST: f32 = default_of(PARAMS, "burst");
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_BRIGHTNESS: f32 = 0.8;
 const DEFAULT_SIZE: f32 = default_of(PARAMS, "size");
-/// Spatial frequency of the flow field — how many vortices fit across the world,
-/// and so how many distinct streams a frame can hold (Plan 0043 Phase 2).
-///
-/// Was a bare `const FIELD_FREQ`; it is now the bindable `field_freq`, and this
-/// default is **exactly** the constant it replaced, so a preset that does not bind
-/// it renders unchanged.
+/// Spatial frequency of the flow field — how many vortices fit across a world
+/// unit, and so how many distinct streams a frame can hold (Plan 0043 Phase 2).
 ///
 /// It is this scene's first structural lever. Low values give a few broad
 /// currents that many particles share — which is where the family's apparent
@@ -126,10 +148,12 @@ const DEFAULT_FIELD_FREQ: f32 = default_of(PARAMS, "field_freq");
 // Per-mark individuation (Plan 0077 Phase 2, backlog 0068). Both default OFF —
 // unlike the emitter's spreads, which default non-zero, the swarm's scatter
 // already ships a seeded per-particle size and brightness, so these *widen*
-// what is there and their defaults must leave every shipped capture
-// byte-identical.
+// what is there and their defaults leave every capture byte-identical.
 const DEFAULT_TWINKLE: f32 = default_of(PARAMS, "twinkle");
 const DEFAULT_SIZE_SPREAD: f32 = default_of(PARAMS, "size_spread");
+/// `depth_fade` at rest: the share of [`DEPTH_LIGHT_NEAR`] a particle loses
+/// from the near slab bound to the far one, chosen so the far bound keeps 0.45.
+const DEFAULT_DEPTH_FADE: f32 = default_of(PARAMS, "depth_fade");
 /// The per-particle twinkle rate band, Hz — the emitter's values
 /// (`emitter.rs`), kept equal so `twinkle` means one thing across the two
 /// particle scenes. The spread across particles is the point, not the values:
@@ -143,13 +167,14 @@ const TWINKLE_FREQ_HI: f32 = 1.6;
 /// the attractor's constant and its reason (`particles/mod.rs`): a sustained
 /// beat flag must not disturb every frame.
 const RESEED_THRESHOLD: f32 = 0.5;
-/// Fraction of the domain's normalized half-extent one `reseed` kick spans per
-/// axis (Plan 0077 Phase 3, ADR-0066 semantics): the kick disturbs the
+/// Fraction of the cross-section's normalized half-extent one `reseed` kick
+/// spans per axis (Plan 0077 Phase 3, ADR-0066 semantics): the kick disturbs the
 /// population **where it is**, sized from the swarm's own domain the way
 /// `AttractorFamily::jitter_extent` derives from `seed_box` — *not* a respawn
 /// into a uniform box, which is the artifact class ADR-0066 removed and
-/// backlog 0064 caught returning once already. Positions are normalized, so a
-/// fraction here is domain-relative on any target and any aspect.
+/// backlog 0064 caught returning once already. Positions are frustum
+/// coordinates, so a fraction here is domain-relative on any target, at any
+/// depth.
 ///
 /// The value is the attractor's measured `JITTER_FRACTION`, adopted as the
 /// starting magnitude for the same figure-relative kick. ADR-0066 records the
@@ -158,13 +183,12 @@ const RESEED_THRESHOLD: f32 = 0.5;
 const RESEED_KICK: f32 = 0.06;
 // Shared palette color knobs (ADR-0021). Each particle's hue occupies the band
 // `hue_center + (particle_hue - 0.5) * hue_spread`; the defaults (`center = 0.5`,
-// `spread = 1`) reproduce the prior full-wheel look (`particle_hue`), and
+// `spread = 1`) reproduce the full-wheel look (`particle_hue`), and
 // `saturation = 1` leaves color untouched — so an unbound swarm is unchanged.
 const DEFAULT_HUE_SPREAD: f32 = default_of(PARAMS, "hue_spread");
 const DEFAULT_HUE_CENTER: f32 = default_of(PARAMS, "hue_center");
-// Shared view transform (ADR-0018): identity by default, so an unbound preset is
-// unchanged. `zoom` multiplies particle positions about the frame centre; `pan_*`
-// offset them — matching the line scenes' semantics (zoom > 1 = zoomed in).
+// Shared view transform (ADR-0018): identity by default. `zoom` divides the
+// camera's field of view and `pan_*` shift after the projection (ADR-0257).
 const DEFAULT_ZOOM: f32 = 1.0;
 // The mark silhouette (ADR-0084). `disc` is exactly the arithmetic the sprite
 // drew before the roster existed, so an unbound swarm is unchanged.
@@ -179,39 +203,35 @@ const DEFAULT_STAR_SEED: f32 = marks::DEFAULT_STAR_SEED;
 const DEFAULT_STAR_WOBBLE: f32 = marks::DEFAULT_STAR_WOBBLE;
 const DEFAULT_STAR_WOBBLE_FREQ: f32 = marks::DEFAULT_STAR_WOBBLE_FREQ;
 
-/// The scene's own WGSL. The shared mark-silhouette chunk
-/// ([`marks::sdf_wgsl`]) is prepended at module creation, so `mark_distance` here
-/// is the same function the emitter evaluates.
+/// The scene's own WGSL. The shared camera ([`camera::CAMERA_WGSL`]) and the
+/// shared mark-silhouette chunk ([`marks::sdf_wgsl`]) are prepended at module
+/// creation, so `project()` here is the function every 3D pipeline projects
+/// through and `mark_distance` is the same function the emitter evaluates.
 ///
 /// **`shape` and `points` travel vertex -> fragment as flat varyings rather than
-/// being read from `misc` in the fragment stage**, and that is deliberate. The
-/// fragment stage cannot see this scene's uniform without widening the bind
-/// layout's visibility to `VERTEX_FRAGMENT` — which would make this descriptor
-/// byte-identical to the line renderer's (`{uniform, VERTEX_FRAGMENT,
-/// min_binding_size: None}`), the exact collision shape ADR-0058 records and the
-/// one the emitter's layout comment says not to tidy back in. A flat varying
-/// carries a per-draw value with no descriptor change at all.
+/// being read from `misc` in the fragment stage.** The fragment stage cannot see
+/// this scene's uniforms without widening the bind layout's visibility, and a
+/// flat varying carries a per-draw value with no descriptor change at all
+/// (ADR-0058).
 const SHADER: &str = r#"
 struct Misc {
-    // x: aspect, y: zoom, zw: pan (the shared ViewTransform, ADR-0018)
+    // x: the render target's aspect, y: the view depth a sprite's size is
+    // stated at, zw: unused.
     v: vec4<f32>,
     // x: mark shape position, y: quantized point count (ADR-0084), z: the star
     // arm's arrangement seed, w: its edge-wobble amplitude. Per draw, not per
-    // instance: the branch stays uniform across a warp and `Instance` does not
-    // grow.
+    // instance: the branch stays uniform across a warp and the instance does
+    // not grow.
     m: vec4<f32>,
     // xyz: the star arm's shape params (valley, curve, jitter), w: the edge
     // wobble's frequency — all conditioned CPU-side (Plan 0091 Phase 5). Per
     // draw, like `m`. Inert on every other shape, and at their defaults the arm
     // takes its original closed form.
-    //
-    // The three hand-drawn controls sit in the padding these two rows already
-    // carried, which is what keeps this uniform and the bind layout over it the
-    // shapes they were (ADR-0058).
     s: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> misc: Misc;
+@group(0) @binding(1) var<uniform> cam: Camera;
 
 struct VsOut {
     @builtin(position) pos: vec4<f32>,
@@ -221,78 +241,260 @@ struct VsOut {
     @location(3) @interpolate(flat) points: f32,
     @location(4) @interpolate(flat) star: vec3<f32>,
     @location(5) @interpolate(flat) rough: vec3<f32>,
+    @location(6) @interpolate(flat) presence: f32,
 }
 
 @vertex
 fn vs_main(
     @builtin(vertex_index) vi: u32,
-    @location(0) center: vec2<f32>,
-    @location(1) size: f32,
+    @location(0) center: vec3<f32>,
+    @location(1) radius: f32,
     @location(2) color: vec3<f32>,
-    @location(3) parallax: f32,
+    @location(3) presence: f32,
 ) -> VsOut {
     var corners = array<vec2<f32>, 6>(
         vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0), vec2<f32>(0.0, 1.0),
         vec2<f32>(0.0, 1.0), vec2<f32>(1.0, 0.0), vec2<f32>(1.0, 1.0),
     );
     let c = corners[vi] * 2.0 - vec2<f32>(1.0, 1.0);
-    // Shared ViewTransform (ADR-0018): zoom about the frame centre, then pan the
-    // particle position; the sprite quad (c * size) keeps its on-screen size.
-    //
-    // Depth parallax (Plan 0043 Phase 3): `parallax` is the per-particle strength
-    // the CPU derived from `z`, so a near particle takes more of the pan and more
-    // of the zoom deflection than a far one and the layers slide across each other
-    // as the camera moves. At the identity transform (zoom 1, pan 0) this reduces
-    // to `center` for every depth, so an unbound preset is untouched.
-    let zoom = misc.v.y;
-    let pan = misc.v.zw;
-    let center_v = center * (1.0 + (zoom - 1.0) * parallax) + pan * parallax;
-    let world = center_v + c * size;
+    // Every particle sits inside the slab, far in front of the near plane, so
+    // the divide by `w` is safe without a CPU clip.
+    let clip = project(cam, center);
+    let depth = clip.w;
+    // `radius` is the sprite's half-extent in normalized-device height at the
+    // reference depth; perspective carries it to this one. The x half-extent
+    // is divided by the target's aspect so the sprite is round on screen.
+    let r = radius * misc.v.y / depth;
+    let ndc = clip.xy / depth + c * r * vec2<f32>(1.0 / misc.v.x, 1.0);
     var out: VsOut;
-    out.pos = vec4<f32>(world.x / misc.v.x, world.y, 0.0, 1.0);
+    out.pos = vec4<f32>(ndc, 0.0, 1.0);
     out.local = c;
     out.color = color;
     out.shape = misc.m.x;
     out.points = misc.m.y;
     out.star = misc.s.xyz;
     out.rough = vec3<f32>(misc.m.z, misc.m.w, misc.s.w);
+    out.presence = presence;
     return out;
 }
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // The silhouette (ADR-0084). At the default `disc` this is `length(in.local)`
-    // and nothing else, so an unshaped swarm is the arithmetic it always was; the
-    // falloff below is untouched either way, so a visual change is attributable
-    // to the shape alone.
+    // and nothing else; the falloff below is untouched either way, so a visual
+    // change is attributable to the shape alone.
     let d = mark_distance(in.local, in.shape, in.points, in.star, in.rough);
     let falloff = max(0.0, 1.0 - d);
     let g = falloff * falloff;
     // Premultiplied: colour AND alpha carry the same coverage `g`, so the four
     // corners outside the inscribed disc write nothing at all rather than
     // opaque black (ADR-0056). See `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`.
-    return vec4<f32>(in.color * g, g);
+    // The colour already carries `presence`; the coverage takes it here.
+    return vec4<f32>(in.color * g, g * in.presence);
 }
 "#;
 
+/// One sprite as the GPU reads it.
+///
+/// **Field order is shader-location order**: `vertex_attr_array!` assigns
+/// locations by declaration order and offsets by field order, so a field
+/// inserted anywhere but the end re-points every attribute after it.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+struct SwarmInstance {
+    /// Centre, world space.
+    center: [f32; 3],
+    /// Half-extent in normalized-device height at [`SIZE_DEPTH`].
+    radius: f32,
+    /// Premultiplied light (ADR-0056): the colour already scaled by brightness
+    /// and by `presence`.
+    color: [f32; 3],
+    /// How present the particle is, `0..1`: its [`slab_fade`]. It scales the
+    /// sprite's coverage as the CPU scaled its light, so a particle fading out
+    /// at a slab bound stops holding the backdrop out as it stops lighting it.
+    presence: f32,
+}
+
+/// The per-draw uniform at binding 0: `v` is `[aspect, SIZE_DEPTH, 0, 0]`, `m`
+/// is `[shape, points, star_seed, star_wobble]` (ADR-0084) and `s` is
+/// `[star_valley, star_curve, star_jitter, star_wobble_freq]`, quantized and
+/// conditioned on the way in.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct SwarmUniform {
+    v: [f32; 4],
+    m: [f32; 4],
+    s: [f32; 4],
+}
+
+/// The swarm's sprite pipeline: its instance buffer, its two uniforms and the
+/// draw.
+///
+/// **The layout is this scene's own shape** — the silhouette uniform with no
+/// declared size, then the camera with its size — which no other layout in
+/// `core/src` shares (ADR-0058).
+struct Sprites {
+    pipeline: wgpu::RenderPipeline,
+    instances: wgpu::Buffer,
+    misc: wgpu::Buffer,
+    camera: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
+}
+
+impl Sprites {
+    fn new(device: &wgpu::Device, capacity: usize, target_format: wgpu::TextureFormat) -> Self {
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("swarm-shader"),
+            // The shared camera, then the shared silhouette chunk, then this
+            // scene's own source — one `project()` for every 3D pipeline, one
+            // `mark_distance` for both mark scenes (ADR-0257, ADR-0084).
+            source: wgpu::ShaderSource::Wgsl(
+                format!("{}\n{}{SHADER}", camera::CAMERA_WGSL, marks::sdf_wgsl()).into(),
+            ),
+        });
+        let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("swarm-bind-layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(
+                            std::mem::size_of::<CameraUniform>() as u64,
+                        ),
+                    },
+                    count: None,
+                },
+            ],
+        });
+        let instances = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("swarm-instances"),
+            size: (capacity.max(1) * std::mem::size_of::<SwarmInstance>()) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let misc = gpu::uniform_buffer(device, "swarm-misc", std::mem::size_of::<SwarmUniform>());
+        let camera =
+            gpu::uniform_buffer(device, "swarm-camera", std::mem::size_of::<CameraUniform>());
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("swarm-bind-group"),
+            layout: &bind_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: misc.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: camera.as_entire_binding(),
+                },
+            ],
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("swarm-pipeline-layout"),
+            bind_group_layouts: &[Some(&bind_layout)],
+            immediate_size: 0,
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("swarm-pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[Some(wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<SwarmInstance>() as u64,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &wgpu::vertex_attr_array![
+                        0 => Float32x3,
+                        1 => Float32,
+                        2 => Float32x3,
+                        3 => Float32,
+                    ],
+                })],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: target_format,
+                    // The seam every additive mark draws through (ADR-0056).
+                    blend: Some(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+        Self {
+            pipeline,
+            instances,
+            misc,
+            camera,
+            bind_group,
+        }
+    }
+
+    /// Write this frame's uniforms and sprites and encode the draw, **loading**
+    /// over what is already in `view`. The pass is begun even when there is
+    /// nothing to draw, so an idle frame encodes the same load/store pair.
+    fn draw(
+        &self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        misc: &SwarmUniform,
+        camera: &CameraUniform,
+        sprites: &[SwarmInstance],
+    ) {
+        let mut pass = gpu::color_pass(encoder, "swarm-pass", view, wgpu::LoadOp::Load);
+        if sprites.is_empty() {
+            return;
+        }
+        queue.write_buffer(&self.instances, 0, bytemuck::cast_slice(sprites));
+        queue.write_buffer(&self.misc, 0, bytemuck::bytes_of(misc));
+        queue.write_buffer(&self.camera, 0, bytemuck::bytes_of(camera));
+        pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(0, &self.bind_group, &[]);
+        pass.set_vertex_buffer(0, self.instances.slice(..));
+        pass.draw(0..6, 0..sprites.len() as u32);
+    }
+}
+
 struct Particle {
-    /// Position on the torus in **normalized** domain coordinates, each axis in
-    /// `[-1, 1)`; world position is this times the current half-extents (Plan 0043
-    /// Phase 1).
+    /// Position across the frustum's cross-section **at the particle's own
+    /// depth**, each axis in `[-1, 1)`; world position is this times
+    /// [`half_extent`] at `z`.
     ///
-    /// Normalized rather than world-space for one reason: the half-extents now
-    /// follow the render target, so they change on a resize, and a world-space
-    /// store would have to either re-wrap (teleporting every particle that fell
-    /// outside the new domain, all in one frame) or rescale every position by
-    /// hand. Here the resize *is* the rescale — each particle keeps its place on
-    /// the torus and the field stretches with the frame, which is the
-    /// discontinuity-free resize ADR-0044 requires. It also keeps the seeded
-    /// scatter aspect-independent, so the same seed gives the same field at any
-    /// target size (NFR §6).
+    /// Frustum coordinates rather than world space for two reasons. The
+    /// half-extents follow the render target, so a resize rescales the field
+    /// continuously instead of re-wrapping it (ADR-0044); and the torus wraps
+    /// at `±1` here whatever the depth, which is what keeps the seam outside
+    /// the frame at every depth (ADR-0259). It also keeps the seeded scatter
+    /// aspect-independent, so the same seed gives the same field at any target
+    /// size (NFR §6).
     pos: [f32; 2],
+    /// View depth at rest, in `Z_NEAR..Z_FAR`.
+    z: f32,
     /// Velocity in **world** units per second — the flow field and the burst are
-    /// screen-space forces, so they must not change magnitude with the domain.
-    vel: [f32; 2],
+    /// world-space forces, so they must not change magnitude with the domain.
+    vel: [f32; 3],
     /// Per-particle twinkle oscillator (Plan 0077 Phase 2): rate in Hz from
     /// the `TWINKLE_FREQ_LO..HI` band and phase in cycles, both off the
     /// particle's stable identity through [`unit`]. Fixed for the particle's
@@ -304,15 +506,6 @@ struct Particle {
     /// eased spread moves the whole population continuously (the emitter's
     /// reasoning for draw-time resolution, verbatim).
     size_unit: f32,
-    /// Depth: 0 = far, 1 = near (Plan 0043 Phase 3). Drives sprite scale, an
-    /// atmospheric brightness fade, a parallax offset against the shared view
-    /// transform, and which current the particle rides — **never** sorting, since
-    /// the scene blends additively (ADR-0044).
-    ///
-    /// Fixed for the particle's life, like `hue` and `bright`: it comes off the
-    /// seeded scatter, so the same seed gives the same depth sequence every run
-    /// (NFR §6).
-    z: f32,
     /// Per-particle palette offset and brightness, from the seeded scatter.
     hue: f32,
     bright: f32,
@@ -321,18 +514,15 @@ struct Particle {
 
 /// ~10k-particle CPU flow-field swarm, driven by named preset parameters.
 pub struct SwarmScene {
-    /// The instance buffer, the view/silhouette uniform, the bind group over the
-    /// layout declared below, and the instanced-quad pipeline (ADR-0007).
-    quads: marks::InstancedQuads,
+    sprites: Sprites,
     particles: Vec<Particle>,
-    /// This frame's marks, rebuilt in place every `update` — the fourth attribute
-    /// is this scene's **depth parallax**, resolved from the particle's `z` on the
-    /// CPU so the shader needs no depth constants (Plan 0043 Phase 3).
-    instance_data: Vec<marks::QuadInstance>,
+    /// This frame's sprites, rebuilt in place every `update`, so the per-frame
+    /// path never allocates.
+    instance_data: Vec<SwarmInstance>,
     /// Shared scene clock (seconds), set by the renderer each frame.
     time: f32,
     /// The **render target's** aspect, recorded by `render` for the next `update`
-    /// to size the toroidal domain from (Plan 0043 Phase 1).
+    /// to size the frustum torus from.
     ///
     /// Read off `render`'s argument and deliberately **not** off
     /// [`Scene::set_target_size`](super::Scene::set_target_size), which carries the
@@ -343,8 +533,12 @@ pub struct SwarmScene {
     ///
     /// One frame behind by construction: `update` runs before `render` in a frame,
     /// so the domain follows the target with a single frame of lag. Harmless —
-    /// positions are normalized, so a change rescales the field continuously.
+    /// positions are frustum coordinates, so a change rescales the field
+    /// continuously.
     aspect: f32,
+    /// The pixel size of the texture this scene draws into, for the camera
+    /// uniform's viewport. A resolution only: no shape is taken from it.
+    target: (u32, u32),
     /// Real elapsed seconds for this frame's integration (Plan 0014 Phase 2),
     /// injected via `advance` so the swarm moves at the same wall-clock rate on
     /// any refresh. Seeded to the fallback step for the first frame before any
@@ -354,24 +548,27 @@ pub struct SwarmScene {
     spin: f32,
     /// The curl-noise field's own clock, integrated at `spin` ([`Phase`]).
     ///
-    /// **Not `time * spin`** (ADR-0135). `spin` is the one rate here two shipped
-    /// worlds bind to a band, and under the multiply a binding that moved
-    /// rescaled every second already elapsed: at t = 100 s a 0.04 swing advanced
-    /// this clock by 4 s in a single frame against a nominal 0.019 s, and the
-    /// field re-rolled rather than flowing on. The particles steer by the field,
-    /// so it reads as the flow changing its mind, not as a teleport.
+    /// **Not `time * spin`** (ADR-0135). `spin` is a rate shipped worlds bind to
+    /// a band, and under the multiply a binding that moved rescaled every second
+    /// already elapsed: at t = 100 s a 0.04 swing advanced this clock by 4 s in a
+    /// single frame against a nominal 0.019 s, and the field re-rolled rather
+    /// than flowing on.
     field_phase: Phase,
     burst: f32,
     /// The shared palette knobs (ADR-0021).
     colour: common::PaletteParams,
     /// The shared view transform (ADR-0018).
     pan: common::PanParams,
+    /// The camera subset this scene splices: `yaw`, `pitch`, `fov`, `focus`
+    /// and `aperture`, raw as bound. `distance`, `fog` and `solid` stay at
+    /// their resting values and are replaced when the frame is built.
+    camera: CameraParams,
     size: f32,
     field_freq: f32,
     zoom: f32,
+    depth_fade: f32,
     /// The active baked palette (ADR-0021), sampled per particle on the CPU. Set
-    /// by `set_palette` on a preset switch; default `spectrum` reproduces the
-    /// prior cosine.
+    /// by `set_palette` on a preset switch; default `spectrum`.
     palette: Palette,
     /// Per-particle hue band + shared desaturation (ADR-0021).
     hue_spread: f32,
@@ -421,40 +618,12 @@ impl SwarmScene {
         surface_format: wgpu::TextureFormat,
         particles: usize,
     ) -> Self {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("swarm-shader"),
-            // The shared silhouette chunk first, then this scene's own source —
-            // one `mark_distance`, two scenes (ADR-0084).
-            source: wgpu::ShaderSource::Wgsl(format!("{}{SHADER}", marks::sdf_wgsl()).into()),
-        });
-        let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("swarm-bind-layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
-        let quads = marks::InstancedQuads::new(
-            device,
-            "swarm",
-            particles,
-            &shader,
-            &bind_layout,
-            surface_format,
-        );
+        let sprites = Sprites::new(device, particles, surface_format);
 
         let mut rng = SeededRng::new(SEED);
         // The individuation draws come off the particle's index through `unit`,
         // NOT off `rng`: an extra `SeededRng` draw per particle would shift the
-        // stream for every draw after it and re-scatter the whole field, and
-        // the defaults' byte-identity claim (Plan 0077 Phase 2) rests on the
-        // existing scatter being untouched.
+        // stream for every draw after it and re-scatter the whole field.
         let particle_state: Vec<Particle> = (0..particles)
             .map(|i| {
                 let mut p = Self::spawn(&mut rng);
@@ -468,19 +637,20 @@ impl SwarmScene {
             .collect();
 
         Self {
-            quads,
+            sprites,
             particles: particle_state,
             instance_data: vec![
-                marks::QuadInstance {
-                    center: [0.0, 0.0],
-                    size: 0.0,
+                SwarmInstance {
+                    center: [0.0, 0.0, 0.0],
+                    radius: 0.0,
                     color: [0.0, 0.0, 0.0],
-                    attr: 1.0,
+                    presence: 0.0,
                 };
                 particles
             ],
             time: 0.0,
             aspect: FALLBACK_ASPECT,
+            target: (1, 1),
             dt: FALLBACK_DT,
             force: DEFAULT_FORCE,
             spin: DEFAULT_SPIN,
@@ -488,9 +658,11 @@ impl SwarmScene {
             burst: DEFAULT_BURST,
             colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
             pan: common::PanParams::default(),
+            camera: rest_camera(),
             size: DEFAULT_SIZE,
             field_freq: DEFAULT_FIELD_FREQ,
             zoom: DEFAULT_ZOOM,
+            depth_fade: DEFAULT_DEPTH_FADE,
             palette: Palette::default_spectrum(),
             hue_spread: DEFAULT_HUE_SPREAD,
             hue_center: DEFAULT_HUE_CENTER,
@@ -510,21 +682,16 @@ impl SwarmScene {
         }
     }
 
-    /// A particle scattered across the field with a random heading and tint.
+    /// A particle scattered across the slab with a random heading and tint.
     ///
-    /// The scatter is in **normalized** domain coordinates, so it does not depend
-    /// on the render target — the same seed gives the same field at any size
-    /// (NFR §6).
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "pos/vel index a fixed [f32; 2] at constant 0/1, always in-bounds"
-    )]
+    /// The scatter is in **frustum** coordinates, so it does not depend on the
+    /// render target — the same seed gives the same field at any size (NFR §6).
     fn spawn(rng: &mut SeededRng) -> Particle {
         let angle = rng.range(0.0, std::f32::consts::TAU);
         Particle {
             pos: [rng.range(-1.0, 1.0), rng.range(-1.0, 1.0)],
-            vel: [angle.cos() * 0.2, angle.sin() * 0.2],
-            z: rng.next_f32(),
+            vel: [angle.cos() * 0.2, angle.sin() * 0.2, 0.0],
+            z: Z_NEAR + rng.next_f32() * Z_SPAN,
             hue: rng.next_f32(),
             bright: rng.range(0.5, 1.0),
             size: rng.range(0.004, 0.011),
@@ -535,23 +702,139 @@ impl SwarmScene {
             size_unit: 0.5,
         }
     }
+
+    /// This frame's camera onto a render target of `aspect`: the bound subset
+    /// with `yaw` and `pitch` held to [`sway_bound`], the eye at [`PIVOT`], and
+    /// the slab as the volume `focus` is stated across.
+    fn camera_frame(&self, aspect: f32, max_coc: f32) -> CameraFrame {
+        let pan = [self.pan.x, self.pan.y];
+        let [yaw_max, pitch_max] = sway_bound(self.camera.fov, self.zoom, aspect, pan);
+        let finite = |v: f32| if v.is_finite() { v } else { 0.0 };
+        let params = CameraParams {
+            yaw: finite(self.camera.yaw).clamp(-yaw_max, yaw_max),
+            pitch: finite(self.camera.pitch).clamp(-pitch_max, pitch_max),
+            ..rest_camera_with(self.camera)
+        };
+        params.frame(aspect, self.zoom, pan, self.target, 0.5 * Z_SPAN, max_coc)
+    }
 }
 
-/// The toroidal world half-extents for a render target of this aspect (Plan 0043
-/// Phase 1).
+/// The shared camera block at this scene's rest: eye on the slab's axis with no
+/// sway, at [`PIVOT`], every other value at the shared default.
+fn rest_camera() -> CameraParams {
+    CameraParams {
+        yaw: 0.0,
+        pitch: 0.0,
+        ..rest_camera_with(CameraParams::default())
+    }
+}
+
+/// `bound` with the values this scene does not offer put back: `distance` at
+/// [`PIVOT`], and neither `fog` nor `solid`.
+fn rest_camera_with(bound: CameraParams) -> CameraParams {
+    CameraParams {
+        distance: PIVOT,
+        fog: 0.0,
+        solid: 0.0,
+        ..bound
+    }
+}
+
+/// The torus's half-extents at view depth `z` for a render target of `aspect`:
+/// the rest frustum's cross-section at that depth, times [`MARGIN`].
 ///
-/// The visible frame is `|world.y| <= 1` and `|world.x| <= aspect` — the shader
-/// divides x by the aspect on its way to NDC — so this is the visible rectangle
-/// scaled by [`MARGIN`], which is what puts the wrap seam off-screen. At
-/// `MARGIN = 1` and 16:9 it returns `(1.78, 1.0)`, i.e. the constants it replaces.
-fn bounds(aspect: f32) -> (f32, f32) {
-    (aspect * MARGIN, MARGIN)
+/// The visible frame at rest is exactly `[MARGIN; 2]` smaller on each axis, so
+/// the seam sits outside it by the same share at every depth.
+fn half_extent(z: f32, aspect: f32) -> (f32, f32) {
+    let h = MARGIN * z * (0.5 * REST_FOV).tan();
+    (h * aspect, h)
+}
+
+/// The largest `|yaw|` and `|pitch|`, in radians, that keep the wrap seam
+/// outside the frame under a bound `fov`, `zoom`, target `aspect` and `pan`.
+///
+/// At rest the seam projects to normalized-device `MARGIN * tan(REST_FOV / 2)
+/// / tan(fov / 2)` on both axes; what is left past the frame edge and the pan
+/// is that axis's headroom `h`. Turning the eye by `θ` about [`PIVOT`] moves a
+/// seam point at depth `z` along the turn's own axis by `θ * (1 + s^2 - PIVOT /
+/// z)` in tangent units, to first order, where `s` is the seam's rest tangent
+/// on that axis — the turn itself, its foreshortening, and the eye's own
+/// displacement. Alone, an axis may turn by `h` over the worst of that drift
+/// across the slab.
+///
+/// The two turns also couple: a yaw `θ` pushes one side of the frame deeper,
+/// which divides the other axis's tangents by up to `1 + θ * s_x` at the seam's
+/// corner, and a pitch likewise. So both alone-bounds are scaled by one shared
+/// `c`, the largest for which `seam / (1 + c * a) >= 1 + pan + c * h` holds on
+/// both axes, with `a` the other turn's coupling at its alone-bound; and then by
+/// [`SWAY_SHARE`] for the terms this first-order model leaves out. Zero where
+/// either axis has no headroom, so a pan or a `fov` that already shows the seam
+/// is not made worse by a sway.
+fn sway_bound(fov: f32, zoom: f32, aspect: f32, pan: [f32; 2]) -> [f32; 2] {
+    let finite = |v: f32, fallback: f32| if v.is_finite() { v } else { fallback };
+    let zoom = finite(zoom, 1.0).max(1e-3);
+    let fov = (finite(fov, REST_FOV) / zoom).clamp(camera::MIN_FOV, camera::MAX_FOV);
+    let aspect = finite(aspect, 1.0).max(0.1);
+    let rest = (0.5 * REST_FOV).tan();
+    let open = (0.5 * fov).tan();
+    let seam = MARGIN * rest / open;
+    // Each axis's pan in normalized-device units, the frame edge's tangent and
+    // the seam's rest tangent.
+    let (pan_x, pan_y) = (
+        finite(pan[0], 0.0).abs() / aspect,
+        finite(pan[1], 0.0).abs(),
+    );
+    let (frame_x, frame_y) = (open * aspect, open);
+    let (slope_x, slope_y) = (MARGIN * rest * aspect, MARGIN * rest);
+    let (h_x, h_y) = (seam - 1.0 - pan_x, seam - 1.0 - pan_y);
+    if h_x <= 0.0 || h_y <= 0.0 {
+        return [0.0, 0.0];
+    }
+    let drift = |slope: f32| {
+        [Z_NEAR, Z_FAR]
+            .into_iter()
+            .map(|z| (1.0 + slope * slope - PIVOT / z).abs())
+            .fold(f32::EPSILON, f32::max)
+    };
+    let (alone_yaw, alone_pitch) = (
+        h_x * frame_x / drift(slope_x),
+        h_y * frame_y / drift(slope_y),
+    );
+    // The largest `c` in `[0, 1]` with `c^2 h a + c (h + a (1 + pan)) - h <= 0`:
+    // the coupled condition above, rearranged.
+    let share = |h: f32, a: f32, pan: f32| {
+        if a <= f32::EPSILON {
+            return 1.0;
+        }
+        let b = h + a * (1.0 + pan);
+        ((-b + (b * b + 4.0 * h * h * a).sqrt()) / (2.0 * h * a)).clamp(0.0, 1.0)
+    };
+    let c = share(h_x, alone_pitch * slope_y, pan_x).min(share(h_y, alone_yaw * slope_x, pan_y));
+    [SWAY_SHARE * c * alone_yaw, SWAY_SHARE * c * alone_pitch]
+}
+
+/// The light a particle keeps at view depth `z` under `depth_fade`:
+/// [`DEPTH_LIGHT_NEAR`] at the near slab bound, falling linearly by the
+/// `depth_fade` share of it to the far bound. Clamped at zero, since a bound
+/// fade past 1 would otherwise subtract light.
+fn depth_light(z: f32, depth_fade: f32) -> f32 {
+    let across = ((z - Z_NEAR) / Z_SPAN).clamp(0.0, 1.0);
+    (DEPTH_LIGHT_NEAR * (1.0 - depth_fade * across)).max(0.0)
+}
+
+/// How much of its light a particle at view depth `z` shows as it nears a slab
+/// bound: 1 in the slab's interior, easing to 0 across [`FADE_BAND`] of the
+/// slab at either bound, so a particle is dark at the moment it wraps in depth.
+fn slab_fade(z: f32) -> f32 {
+    let band = FADE_BAND * Z_SPAN;
+    let e = ((z - Z_NEAR).min(Z_FAR - z) / band).clamp(0.0, 1.0);
+    e * e * (3.0 - 2.0 * e)
 }
 
 /// The LUT sample coordinate for one particle (ADR-0021): its per-particle hue
 /// occupies the band `hue_center + (particle_hue - 0.5) * hue_spread`, plus the
 /// shared `hue` rotation. Defaults (`center = 0.5`, `spread = 1`, `hue = 0`)
-/// reduce to `particle_hue`, reproducing the prior full-wheel look.
+/// reduce to `particle_hue`, the full-wheel look.
 fn hue_coord(hue_center: f32, hue_spread: f32, particle_hue: f32, hue: f32) -> f32 {
     hue_center + (particle_hue - 0.5) * hue_spread + hue
 }
@@ -636,7 +919,7 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "size",
         default: 1.0,
         range: Some([0.0, 4.0]),
-        doc: "Size of each particle's mark.",
+        doc: "Size of each particle's mark at the middle of the swarm's depth; nearer marks draw larger and farther ones smaller.",
         kind: ParamKind::Modal,
         group: ParamGroup::Shape,
         main: true,
@@ -702,6 +985,36 @@ pub const PARAMS: &[ParamSpec] = &[
         group: ParamGroup::Motion,
         main: false,
     },
+    ParamSpec {
+        name: "depth_fade",
+        default: 1.0 - 0.45 / DEPTH_LIGHT_NEAR,
+        range: Some([0.0, 1.0]),
+        doc: "How much light a particle loses from the front of the swarm to the back; 0 lights every depth alike.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
+    },
+    ParamSpec {
+        name: "yaw",
+        default: 0.0,
+        range: Some([-0.2, 0.2]),
+        doc: "Turns the camera sideways within the swarm, in radians; held to the sway the margin past the frame covers, so bind it to a slow wave.",
+        ..camera::YAW
+    },
+    ParamSpec {
+        name: "pitch",
+        default: 0.0,
+        range: Some([-0.2, 0.2]),
+        doc: "Tilts the camera up or down within the swarm, in radians; held to the sway the margin past the frame covers.",
+        ..camera::PITCH
+    },
+    ParamSpec {
+        range: Some([0.2, 0.9]),
+        doc: "The camera's vertical field of view in radians; zoom divides it. Wider than the resting 0.8 uses up the margin past the frame, and much wider shows the wrap seam.",
+        ..camera::FOV
+    },
+    camera::FOCUS,
+    camera::APERTURE,
     crate::render::scenes::marks::SHAPE,
     crate::render::scenes::marks::POINTS,
     crate::render::scenes::marks::STAR_VALLEY,
@@ -725,6 +1038,10 @@ impl Scene for SwarmScene {
         self.time = time;
     }
 
+    fn set_target_size(&mut self, width: u32, height: u32) {
+        self.target = (width, height);
+    }
+
     fn set_palette(&mut self, palette: &Palette) {
         // CPU-sampled per particle in `update`; a cheap array copy, off the hot
         // path (once per preset switch).
@@ -737,9 +1054,11 @@ impl Scene for SwarmScene {
         self.burst = DEFAULT_BURST;
         self.colour.reset();
         self.pan.reset();
+        self.camera = rest_camera();
         self.size = DEFAULT_SIZE;
         self.field_freq = DEFAULT_FIELD_FREQ;
         self.zoom = DEFAULT_ZOOM;
+        self.depth_fade = DEFAULT_DEPTH_FADE;
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.hue_center = DEFAULT_HUE_CENTER;
         self.shape = DEFAULT_SHAPE;
@@ -755,25 +1074,32 @@ impl Scene for SwarmScene {
         // `prev_reseed` is deliberately NOT reset: this runs every frame
         // before the bindings are routed, and resetting the previous level
         // would turn a held gate into an edge per frame — a continuous
-        // disturbance in place of a percussive one (measured while building
-        // this: the population never re-gathered at all). The attractor's
+        // disturbance in place of a percussive one. The attractor's
         // reset_params makes the same omission for the same reason.
         self.reseed = 0.0;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
         // The shared param blocks first, this scene's own names after
-        // (`scenes::common`).
+        // (`scenes::common`). The camera is a subset of the shared block, so
+        // its five names are matched here rather than delegated: the block's
+        // `distance`, `fog` and `solid` are not this scene's.
         if self.colour.set(name, value) || self.pan.set(name, value) {
             return;
         }
         match name {
+            "yaw" => self.camera.yaw = value,
+            "pitch" => self.camera.pitch = value,
+            "fov" => self.camera.fov = value,
+            "focus" => self.camera.focus = value,
+            "aperture" => self.camera.aperture = value,
             "force" => self.force = value,
             "spin" => self.spin = value,
             "burst" => self.burst = value,
             "size" => self.size = value,
             "field_freq" => self.field_freq = value,
             "zoom" => self.zoom = value,
+            "depth_fade" => self.depth_fade = value,
             "hue_spread" => self.hue_spread = value,
             "hue_center" => self.hue_center = value,
             "shape" => self.shape = value,
@@ -793,7 +1119,7 @@ impl Scene for SwarmScene {
 
     #[allow(
         clippy::indexing_slicing,
-        reason = "pos/vel index fixed [f32; 2] and base indexes a fixed [f32; 3], all at constant offsets, always in-bounds"
+        reason = "pos/vel/base index fixed-size arrays at constant offsets, always in-bounds"
     )]
     fn update(&mut self, _frame: &AnalysisFrame) {
         // Rising-edge detect on `reseed` (Plan 0077 Phase 3): **disturb** the
@@ -823,62 +1149,65 @@ impl Scene for SwarmScene {
         let field_t = self.field_phase.get();
         let force = self.force;
         let burst_kick = self.burst;
-        // Hoisted out of the loop: one read, 10 000 uses (Plan 0043 Phase 2).
         let field_freq = self.field_freq;
         // The individuation pair, resolved at draw like the emitter's: an
         // eased width moves the whole population continuously instead of only
         // particles spawned since the change (Plan 0077 Phase 2).
         let twinkle = self.twinkle;
         let size_spread = self.size_spread;
+        let depth_fade = self.depth_fade;
         let time = self.time;
 
         // Frame-rate-independent integration (Plan 0014 Phase 2): scale the
         // acceleration/advection by real `dt`, and raise the per-frame damping to
         // the `dt`-relative power so the velocity decays at the same wall-clock
         // rate regardless of refresh (one `powf` per frame, not per particle).
-        // At `dt == FALLBACK_DT` (1/60) this reduces to the former fixed step, so
-        // the look is unchanged live and byte-identical under fixed-`dt` capture.
         let dt = self.dt;
         let damp = DAMPING.powf(dt * 60.0);
 
-        // The domain follows the render target (Plan 0043 Phase 1). Computed once
-        // per frame, outside the loop; positions are normalized, so a change in
-        // these rescales the whole field at once instead of wrapping particles
-        // individually — no resize teleport (ADR-0044).
-        let (bound_x, bound_y) = bounds(self.aspect);
+        // The cross-section follows the render target. Its half-extents are
+        // linear in depth, so the per-depth scale is one multiply per particle
+        // off these two per-frame constants.
+        let (unit_x, unit_y) = half_extent(1.0, self.aspect);
 
         for (p, inst) in self.particles.iter_mut().zip(self.instance_data.iter_mut()) {
-            // Normalized torus position -> world, which is what the field, the
-            // burst and the sprite all work in.
-            let world = [p.pos[0] * bound_x, p.pos[1] * bound_y];
+            let (hx, hy) = (unit_x * p.z, unit_y * p.z);
+            // Frustum coordinates -> world, which is what the field, the burst
+            // and the sprite all work in.
+            let world = [p.pos[0] * hx, p.pos[1] * hy];
 
-            // Scalar potential -> flow direction (cheap curl-ish field), sampled at
-            // a depth-dependent phase so each layer rides its own currents rather
-            // than the same streamlines at several sizes (Plan 0043 Phase 3). The
-            // two axes take different offsets, so layers decorrelate in both.
-            let zo = p.z * DEPTH_FIELD_OFFSET;
+            // Scalar potential -> flow direction (cheap curl-ish field), with
+            // depth in its phase so each layer rides its own currents; the two
+            // axes take different offsets, so layers decorrelate in both.
+            let zo = p.z * DEPTH_FIELD_FREQ;
             let a = (world[0] * field_freq + field_t + zo).sin()
                 + (world[1] * field_freq - field_t * 0.8 - zo * 0.7).cos();
             let dir = [a.cos(), a.sin()];
+            // The slow depth current, off the same field at half its
+            // frequency, so neighbours on a streamline drift in depth together.
+            let lift = ((world[0] - world[1]) * field_freq * 0.5 + field_t * 0.6 + zo * 1.3).sin();
 
             p.vel[0] = p.vel[0] * damp + dir[0] * force * dt;
             p.vel[1] = p.vel[1] * damp + dir[1] * force * dt;
+            p.vel[2] = p.vel[2] * damp + lift * force * Z_FLOW * dt;
 
-            // Beat burst pushes particles radially outward from center.
+            // Beat burst pushes particles radially outward from the view axis.
             if burst_kick > 0.0 {
                 let r = (world[0] * world[0] + world[1] * world[1]).sqrt().max(1e-3);
                 p.vel[0] += world[0] / r * burst_kick * dt;
                 p.vel[1] += world[1] / r * burst_kick * dt;
             }
 
-            // Integrate a world-space velocity into a normalized position.
-            p.pos[0] += p.vel[0] * dt / bound_x;
-            p.pos[1] += p.vel[1] * dt / bound_y;
+            // A world velocity becomes a frustum-coordinate one through the
+            // half-extent at this depth: the same current moves a far particle
+            // across less of the frame.
+            p.pos[0] += p.vel[0] * dt / hx;
+            p.pos[1] += p.vel[1] * dt / hy;
+            p.z += p.vel[2] * dt;
 
-            // Toroidal wrap keeps the field populated (no respawns/hitches). In
-            // normalized space the seam is at +/-1 whatever the target is, and it
-            // is `MARGIN` past the visible frame — which is what stopped it from
-            // burning a bright bar into the feedback stage (ADR-0044).
+            // Toroidal wrap keeps the field populated (no respawns/hitches). The
+            // seam is at ±1 whatever the target and the depth, `MARGIN` past
+            // the visible frame (ADR-0044, ADR-0259).
             if p.pos[0] > 1.0 {
                 p.pos[0] -= 2.0;
             } else if p.pos[0] < -1.0 {
@@ -889,15 +1218,22 @@ impl Scene for SwarmScene {
             } else if p.pos[1] < -1.0 {
                 p.pos[1] += 2.0;
             }
+            // The depth wrap jumps a particle across the slab; `slab_fade` has
+            // it dark on both sides of the jump.
+            if p.z > Z_FAR {
+                p.z -= Z_SPAN;
+            } else if p.z < Z_NEAR {
+                p.z += Z_SPAN;
+            }
 
             let speed = (p.vel[0] * p.vel[0] + p.vel[1] * p.vel[1]).sqrt();
             // Colour through the shared LUT (ADR-0021): the per-particle hue is
             // mapped into the `hue_spread`/`hue_center` band, then desaturated by
-            // the shared `saturation`. Defaults reproduce the prior full-wheel look.
+            // the shared `saturation`.
             let coord = hue_coord(self.hue_center, self.hue_spread, p.hue, self.colour.hue);
             // Hard bands on the palette coordinate (ADR-0078), the canonical
             // `palette::band_coord` called rather than copied. `palette_steps <= 1`
-            // returns it untouched, so an unbound preset is byte-unchanged.
+            // returns it untouched.
             let base = palette::desaturate(
                 self.palette.sample(
                     palette::band_coord(coord, self.colour.steps),
@@ -905,30 +1241,27 @@ impl Scene for SwarmScene {
                 ),
                 self.colour.saturation,
             );
-            // Depth, resolved into the three visual terms it drives (Plan 0043
-            // Phase 3). Three `mul_add`-shaped lerps on a value that never changes
-            // — the whole per-particle cost of the depth axis.
-            let depth_scale = DEPTH_SCALE_FAR + (DEPTH_SCALE_NEAR - DEPTH_SCALE_FAR) * p.z;
-            let depth_fade = DEPTH_FADE_FAR + (DEPTH_FADE_NEAR - DEPTH_FADE_FAR) * p.z;
-            let parallax = DEPTH_PARALLAX_FAR + (DEPTH_PARALLAX_NEAR - DEPTH_PARALLAX_FAR) * p.z;
 
-            // The speed cue predates depth and still earns its place: on a coherent
-            // field the fast channels read brighter than slack water. The
-            // atmospheric fade multiplies it rather than replacing it. The
-            // twinkle factor is exactly 1.0 when `twinkle` is unbound, and the
-            // size factor exactly 1.0 at zero spread — multiplying by either is
-            // bit-exact, which is what keeps the shipped captures byte-identical
-            // (Plan 0077 Phase 2).
+            // The speed cue: on a coherent field the fast channels read brighter
+            // than slack water. Depth multiplies it rather than replacing it.
+            // The twinkle factor is exactly 1.0 when `twinkle` is unbound, and
+            // the size factor exactly 1.0 at zero spread, so multiplying by
+            // either is bit-exact.
+            let presence = slab_fade(p.z);
             let bright = ((0.25 + speed * 0.7) * p.bright).min(1.6)
                 * self.colour.brightness
-                * depth_fade
+                * depth_light(p.z, depth_fade)
+                * presence
                 * twinkle_factor(p.twinkle_freq, p.twinkle_phase, time, twinkle);
 
-            *inst = marks::QuadInstance {
-                center: [p.pos[0] * bound_x, p.pos[1] * bound_y],
-                size: p.size * self.size * depth_scale * size_factor(p.size_unit, size_spread),
+            let (hx, hy) = (unit_x * p.z, unit_y * p.z);
+            *inst = SwarmInstance {
+                // The eye sits at `+PIVOT` on world z looking down `-z`, so a
+                // view depth `z` at rest is world `PIVOT - z`.
+                center: [p.pos[0] * hx, p.pos[1] * hy, PIVOT - p.z],
+                radius: p.size * self.size * size_factor(p.size_unit, size_spread),
                 color: [base[0] * bright, base[1] * bright, base[2] * bright],
-                attr: parallax,
+                presence,
             };
         }
     }
@@ -940,43 +1273,42 @@ impl Scene for SwarmScene {
         view: &wgpu::TextureView,
         aspect: f32,
     ) {
-        // The domain the *next* `update` wraps against (Plan 0043 Phase 1). This
-        // argument is the render target's aspect — the only correct source for a
-        // shape (ADR-0037); see the field's docs for why `set_target_size` is not.
+        // The domain the *next* `update` wraps against, and this frame's
+        // projection. This argument is the render target's aspect — the only
+        // correct source for a shape (ADR-0037); see the field's docs for why
+        // `set_target_size` is not.
         self.aspect = aspect.max(0.1);
-        self.quads.write_instances(queue, &self.instance_data);
-        self.quads.write_uniform(
-            queue,
-            &marks::QuadUniform {
-                v: [self.aspect, self.zoom, self.pan.x, self.pan.y],
-                // Quantized here, on the way into the uniform, so the shader's
-                // precondition stays visible on the CPU side: the roster's
-                // bounds and the integer point count live in `marks`, and no
-                // fractional value ever reaches an angular fold (ADR-0084).
-                m: [
-                    marks::mark_shape(self.shape),
-                    marks::mark_points(self.points),
-                    marks::star_seed(self.star_seed),
-                    marks::star_wobble(self.star_wobble),
-                ],
-                s: [
-                    marks::star_valley(self.star_valley),
-                    marks::star_curve(self.star_curve),
-                    marks::star_jitter(self.star_jitter),
-                    marks::star_wobble_freq(self.star_wobble_freq),
-                ],
-            },
-        );
+        let frame = self.camera_frame(self.aspect, 0.0);
+        let misc = SwarmUniform {
+            v: [self.aspect, SIZE_DEPTH, 0.0, 0.0],
+            // Quantized here, on the way into the uniform, so the shader's
+            // precondition stays visible on the CPU side: the roster's
+            // bounds and the integer point count live in `marks`, and no
+            // fractional value ever reaches an angular fold (ADR-0084).
+            m: [
+                marks::mark_shape(self.shape),
+                marks::mark_points(self.points),
+                marks::star_seed(self.star_seed),
+                marks::star_wobble(self.star_wobble),
+            ],
+            s: [
+                marks::star_valley(self.star_valley),
+                marks::star_curve(self.star_curve),
+                marks::star_jitter(self.star_jitter),
+                marks::star_wobble_freq(self.star_wobble_freq),
+            ],
+        };
 
         // Load over the engine backdrop (ADR-0018): the additive particles
         // bloom over whatever the background pass painted, so the sparse gaps
         // between them reveal it.
-        self.quads.draw(
+        self.sprites.draw(
+            queue,
             encoder,
-            "swarm-pass",
             view,
-            wgpu::LoadOp::Load,
-            self.particles.len() as u32,
+            &misc,
+            &frame.uniform,
+            &self.instance_data,
         );
     }
 }

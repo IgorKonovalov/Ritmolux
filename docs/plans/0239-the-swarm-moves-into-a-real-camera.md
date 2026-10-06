@@ -1,6 +1,6 @@
 # 0239 — The swarm moves into a real camera
 
-> **Status:** approved (2026-10-01). Runs after Plan 0236 closes.
+> **Status:** in-progress
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0259](../adrs/0259-the-swarm-projects-through-the-shared-camera-in-a-frustum-shaped-torus.md) (proposed), [ADR-0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md), [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed), [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)
@@ -222,11 +222,11 @@ struct Particle {
 
 ## Implementation log
 
-**Lane:**
+**Lane:** branch `plan-0239-the-swarm-moves-into-a-real-camera`, worktree `/home/igor/Work/rlx-plan-0239`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: the swarm in a camera | dev | not started | |
+| 1 — Walking skeleton: the swarm in a camera | dev | done | committed with this row |
 | 2 — Depth of field on the swarm's sprites | dev | not started | |
 | 3 — Caps, cost and the goldens | dev | not started | |
 | 4 — The shipped presets keep rendering | dev | not started | |
@@ -235,6 +235,27 @@ struct Particle {
 | 7 — The moved baselines are blessed | human | not started | |
 
 ### Notes
+
+- Phase 1, `update` cost (release, software adapter, best of five 120-frame runs): 10,000 particles
+  0.677 ms before, 0.835 ms after; 30,000 particles 2.062 ms before, 2.517 ms after. The probe was
+  a scratch test, not committed.
+- Phase 1: the swarm no longer draws through `marks::InstancedQuads`. It builds its own pipeline in
+  `swarm.rs` (a two-uniform layout, the camera at binding 1), because the shared quad pipeline
+  binds one uniform and `marks.rs` is outside the phase's files. Its instance carries a `presence`
+  (the slab fade) that scales coverage as well as light; without it a particle faded at a slab bound
+  held the backdrop out (`a_lit_backdrop_survives_where_the_swarm_drew_nothing` failed, 4 channels).
+- Phase 1: a sprite's `size` is stated at a reference depth and carried by perspective only. `zoom`
+  magnifies positions (it divides `fov`), not sprite sizes, as on `quad3d`.
+- Phase 1: `fov` is spliced with its range narrowed to `0.2`-`0.9`; `yaw` and `pitch` with rest `0`
+  and range `±0.2`, clamped per frame to the computed sway bound.
+- Phase 1: `camera.rs`'s `MIN_FOV` and `MAX_FOV` became `pub(crate)` for the sway bound.
+- From Phase 1 on, three `-P fast` tests fail on generated artifacts the new params made stale:
+  `preset::the_parameter_reference_block_is_current`,
+  `preset_schema::the_generated_editor_files_are_current` and
+  `preset_schema::the_player_schema_snapshot_is_current`. Phase 5 regenerates the first two; the third
+  is `docs/specs/player-schema.json`, which Phase 5's file list does not name.
+- Phase 1 left stale: `warp_mesh/resources.rs`'s comment describing `swarm-bind-layout` as a single
+  unsized vertex uniform (outside the phase's files).
 
 ### Close triggers
 
