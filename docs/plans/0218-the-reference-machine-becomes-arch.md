@@ -245,6 +245,7 @@ flowchart TB
 
 ### Phase 6 — A rehearsal on the box
 - **Owner skill:** `human`
+- **Blocks merge:** no
 - **What:** the thing none of the above proves — that the app is good to run a show from on this
   machine.
 - **Files touched:** `docs/on-device-validation.md` (the record), this plan's log.
@@ -301,7 +302,7 @@ flowchart TB
 | 3 — Judge the 44 | human | done - all 53 drift, no finding | committed with this row |
 | 4 — Every WARP claim takes one of three exits | dev | not started | |
 | 5 — The documents take the stance | dev | not started | |
-| 6 — A rehearsal on the box | human | not started | |
+| 6 — A rehearsal on the box | human | owed | |
 
 ### Notes
 
