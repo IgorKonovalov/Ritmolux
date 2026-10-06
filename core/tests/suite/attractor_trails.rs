@@ -131,7 +131,7 @@ fn the_attractor_over_the_trails_stage_matches_its_baseline() {
          nothing, so this capture pins neither the scene nor the stage over it"
     );
 
-    if common::bless_requested(&renderer) {
+    if common::bless_requested(&renderer, STEM) {
         common::encode(&fresh, &path);
         println!("blessed {}", path.display());
         return;

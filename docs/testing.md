@@ -311,6 +311,47 @@ local-minimum claim is failing, so a reopened notch cannot be baselined in.
 baseline at all — see
 [Asserting that something *moved*](#asserting-that-something-moved--the-feedback-fixtures-plan-0046).
 
+**`RLX_BLESS` also takes a list of baseline names.** `RLX_BLESS=1` still means
+every baseline the run reaches. Any other value is a comma-separated list of
+stems — the file names under `core/tests/golden/` without `.png`, whitespace
+around each ignored — and blesses exactly those, comparing every other baseline
+as an ordinary run would:
+
+```bash
+RLX_BLESS=waterfall,waterfall_ramp cargo test -p rlx-core --test golden
+```
+
+A name with no PNG under `core/tests/golden/` fails the run and lists the
+unknown names, so a typo is an error rather than a bless of nothing. The check
+reads the directory, not the tests that ran, so a name is checked whatever the
+test filter selected. The cost is that a baseline that does not exist yet cannot
+be named: bless it first with `RLX_BLESS=1` under a filter that reaches only it.
+A value that names nothing, such as an empty one, also fails. Off DX12 WARP any
+value at all is refused, as it always was.
+
+**Without a Windows machine, a dispatched CI job blesses by name**
+([ADR-0264](adrs/0264-a-warp-baseline-is-blessed-by-a-dispatched-ci-job-until-the-reference-moves-to-lavapipe.md)).
+`.github/workflows/bless.yml` runs on `windows-latest`, whose software adapter
+is WARP. It compares the golden and pinned roster against what is committed,
+then blesses only the names it was given, and uploads those PNGs at their
+repository paths with a `report.md` as the artifact `blessed-<run id>`. The
+report lists each named baseline's mean and max outlier against the committed
+one, and every baseline nobody named that is over tolerance, marked "not
+blessed, still failing". The same report is the run's job summary. The job
+cannot commit anything. You look at the pictures and commit them:
+
+```bash
+gh workflow run bless.yml -f baselines=waterfall,waterfall_ramp   # dispatch on main; add --ref <branch> for another
+gh run download <run id> -n blessed-<run id> -D target/blessed      # once the run is done
+cp target/blessed/core/tests/golden/*.png core/tests/golden/        # after reading report.md
+```
+
+`gh run list --workflow bless.yml` gives the run id. The job only accepts
+names: `1` is refused, as is a name with no committed PNG. The job is retired
+when [Plan 0218](plans/0218-the-reference-machine-becomes-arch.md) Phase 2
+lands. Then delete `bless.yml` and `scripts/bless-report.mjs`, because the
+baselines then live on lavapipe and Windows skips them.
+
 **Eyeball the regenerated PNGs before committing** — the first baseline is easy
 to enshrine wrong. The compare tolerates minor cross-GPU rasterization drift; a
 genuine change exceeds it.
@@ -549,8 +590,9 @@ gate cannot see a hairline. That is the argument for asserting the property
 directly rather than trusting a baseline to notice.
 
 > **`RLX_BLESS=1` is not scoped to the scene you changed** — it rewrites **every**
-> baseline the run touches. `git status` after blessing and `git checkout` the
-> baselines your change had no business moving; committing an incidental re-bless
+> baseline the run touches. Naming the baselines instead (`RLX_BLESS=a,b`)
+> scopes it. `git status` after blessing and `git checkout` the baselines your
+> change had no business moving; committing an incidental re-bless
 > silently retires the drift guard for that scene. (Learned the hard way in Plan
 > 0027, where an over-broad bless moved `fragment_field` and `swarm`.)
 

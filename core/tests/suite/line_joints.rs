@@ -343,7 +343,7 @@ fn compare_against_baseline(img: &CaptureImage, renderer: &Renderer) {
     std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
     let path = common::golden_dir().join(format!("{BASELINE_STEM}.png"));
 
-    if common::bless_requested(renderer) {
+    if common::bless_requested(renderer, BASELINE_STEM) {
         common::encode(img, &path);
         println!("blessed {}", path.display());
         return;

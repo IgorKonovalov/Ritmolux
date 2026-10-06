@@ -249,7 +249,6 @@ fn scenes_match_golden_baselines() {
         return;
     };
     let frame = common::fixed_frame_spectrum();
-    let bless = common::bless_requested(&renderer);
     let home = common::baseline_adapter(&renderer);
     std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
 
@@ -265,7 +264,7 @@ fn scenes_match_golden_baselines() {
             .expect("capture fixture");
         let path = common::golden_dir().join(format!("{stem}.png"));
 
-        if bless {
+        if common::bless_requested(renderer, stem) {
             common::encode(&fresh, &path);
             println!("blessed {}", path.display());
             return;
@@ -324,7 +323,7 @@ fn the_waterfall_holds_a_ramped_ring() {
     let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
-    let bless = common::bless_requested(&renderer);
+    let bless = common::bless_requested(&renderer, "waterfall_ramp");
     let home = common::baseline_adapter(&renderer);
     let preset = Preset::from_toml_str(FIXTURES_WATERFALL).expect("waterfall.toml is valid");
     let name = preset.name.clone();
@@ -531,4 +530,43 @@ fn systems_rosters_every_variant() {
         Preset::from_toml_str(toml)
             .unwrap_or_else(|e| panic!("extra fixture {stem}.toml is invalid: {e}"));
     }
+}
+
+/// `RLX_BLESS`'s value names every baseline (`1`) or exactly a list of stems,
+/// and a value naming none is refused rather than read as an empty list. No
+/// GPU, so it runs everywhere.
+#[test]
+fn rlx_bless_parses_all_or_a_list_of_stems() {
+    use common::{BlessList, parse_bless};
+
+    assert_eq!(parse_bless("1"), Ok(BlessList::All));
+    assert_eq!(parse_bless(" 1 "), Ok(BlessList::All));
+    assert!(parse_bless("1").unwrap().covers("waterfall"));
+
+    let list = parse_bless("waterfall,waterfall_ramp").unwrap();
+    assert_eq!(
+        list,
+        BlessList::Stems(vec!["waterfall".into(), "waterfall_ramp".into()])
+    );
+    assert!(list.covers("waterfall_ramp"));
+    assert!(!list.covers("parametric_torus_knot"));
+    // A stem is matched whole, never as a prefix of another.
+    assert!(!parse_bless("waterfall").unwrap().covers("waterfall_ramp"));
+
+    assert_eq!(
+        parse_bless("  waterfall ,\tparametric_torus_knot , ,"),
+        Ok(BlessList::Stems(vec![
+            "waterfall".into(),
+            "parametric_torus_knot".into()
+        ]))
+    );
+    // `1` means all only as the whole value; inside a list it is a stem.
+    assert_eq!(
+        parse_bless("1,waterfall"),
+        Ok(BlessList::Stems(vec!["1".into(), "waterfall".into()]))
+    );
+
+    assert!(parse_bless("").is_err());
+    assert!(parse_bless("  ").is_err());
+    assert!(parse_bless(" , ,").is_err());
 }

@@ -733,7 +733,6 @@ fn layered_fixtures_match_golden_baselines() {
         return;
     };
     let frame = fixed_frame();
-    let bless = common::bless_requested(&renderer);
     let home = common::baseline_adapter(&renderer);
     std::fs::create_dir_all(&golden_dir).expect("create tests/golden");
 
@@ -779,7 +778,7 @@ fn layered_fixtures_match_golden_baselines() {
             .expect("capture layered golden fixture");
         let path = golden_dir.join(format!("{stem}.png"));
 
-        if bless {
+        if common::bless_requested(&renderer, stem) {
             let buf = image::RgbaImage::from_raw(fresh.width, fresh.height, fresh.rgba.clone())
                 .expect("capture buffer matches its declared dimensions");
             buf.save(&path)

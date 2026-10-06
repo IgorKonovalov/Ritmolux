@@ -1,8 +1,8 @@
 # ADR-0264 — A WARP baseline is blessed by a dispatched CI job, by name, until the reference moves to lavapipe
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-06, Plan 0249
 > **Date:** 2026-10-06
-> **Related plan(s):** [0249](../plans/0249-a-dispatched-ci-job-blesses-the-named-warp-baselines.md),
+> **Related plan(s):** [0249](../plans/done/0249-a-dispatched-ci-job-blesses-the-named-warp-baselines.md),
 > [0218](../plans/0218-the-reference-machine-becomes-arch.md)
 > **Relates to:** [ADR-0242](0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)
 > (the move this bridges to, and which retires it),

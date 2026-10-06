@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0249 - A dispatched CI job blesses the named WARP baselines](#0249---a-dispatched-ci-job-blesses-the-named-warp-baselines)
   - [0240 - The attractor projects through the shared camera](#0240---the-attractor-projects-through-the-shared-camera)
   - [0237 - The L-system turtle turns in space, and can grow without end](#0237---the-l-system-turtle-turns-in-space-and-can-grow-without-end)
   - [0248 - 3D strokes gain joins, depth cues and a solid mode](#0248---3d-strokes-gain-joins-depth-cues-and-a-solid-mode)
@@ -289,6 +290,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0230 - The Russian slice becomes findable](done/0230-the-russian-slice-becomes-findable.md) - closed 2026-09-30, Phase 4 read 2026-10-01. Review: **no blockers, no majors, no minors, two nits.** Version: **0.155.0**. ADR-0213 accepted, Outcome. [Write-up](README-archive.md).
 - [0231 - The interface is audited, then learns one look](done/0231-the-interface-is-audited-then-learns-one-look.md) - closed 2026-09-30. Review: **no blockers, no majors, two minors (fixed), two nits (one fixed).** Version: **0.154.0**. ADR-0252 + 0256 accepted. [Write-up](README-archive.md).
 - [0233 - The close reviews' small findings are repaired](done/0233-the-close-reviews-small-findings-are-repaired.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.153.0**. Closes 0263-0272 bar 0267. [Write-up](README-archive.md).
 - [0234 - A conductor session writes only where it works](done/0234-a-conductor-session-writes-only-where-it-works.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (fixed), two nits.** Version: none. ADR-0255 accepted, Outcome. Closes 0273. [Write-up](README-archive.md).
@@ -496,6 +498,25 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0249 - A dispatched CI job blesses the named WARP baselines](done/0249-a-dispatched-ci-job-blesses-the-named-warp-baselines.md)
+
+- closed 2026-10-06 by a conductor close on the lane
+`plan-0249-a-dispatched-ci-job-blesses-the-named-warp-baselines`. The phases landed in `b88d3fc2`
+(Phase 1) and `74fc0b4f` (2), with `7a3aebf0` exercising the `RLX_BLESS` allow rule the merge
+brought in. **Phase 3 is owed** (`Blocks merge: no`, ADR-0249): the first dispatch of `bless.yml`
+for 0248's four baselines, which also settles 0248 Phase 7. The round 1 review found **no blockers,
+no majors, two minors and a nit**. The close repaired the `gh workflow run` comment and the
+blockquote wrap in `c3d62809`. The unfiltered compare run in `bless.yml` is workflow code and stays
+open. Version: none (test harness, CI, a script and docs). ADR-0264 accepted. The close closes no
+backlog entry. Upstream CI read green at the close. The full review is the plan's own
+`## Close review`.
+- **What landed.** `RLX_BLESS` takes a comma list of stems, and `1` still means all; a named stem
+  with no committed PNG is an error. `bless.yml`, dispatch-only on `windows-latest`, compares, blesses
+  the named baselines, and uploads the PNGs with `bless-report.mjs`'s `report.md`.
+- **Open.** The compare run lacks the `-E "$PINNED"` filter, so each dispatch runs the whole golden
+  and suite binaries serially. `main`'s `coverage` job stays red until Phase 3. Plan 0218 Phase 2
+  retires the job.
 
 ### [0240 - The attractor projects through the shared camera](done/0240-the-attractor-projects-through-the-shared-camera.md)
 

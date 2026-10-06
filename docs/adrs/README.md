@@ -285,5 +285,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0261](0261-the-conductor-parks-only-on-what-the-owner-must-settle.md) | The conductor parks only on what the owner must settle | accepted 2026-10-01, Plan 0241; amends 0207, 0209, 0248 |
 | [0262](0262-the-studio-renders-a-clip-by-piping-three-children-and-transcodes-what-the-player-cannot-read.md) | The studio renders a clip by piping three children, and transcodes what the player cannot read | accepted 2026-10-02, Plan 0247; amends 0175 |
 | [0263](0263-a-3d-stroke-may-be-solid-by-a-back-to-front-sort-and-depth-cues-ride-the-shared-camera.md) | A 3D stroke may be solid by a back-to-front sort, and the depth cues ride the shared camera | accepted 2026-10-05, Plan 0248 |
-| [0264](0264-a-warp-baseline-is-blessed-by-a-dispatched-ci-job-until-the-reference-moves-to-lavapipe.md) | A WARP baseline is blessed by a dispatched CI job, by name, until the reference moves to lavapipe | proposed, Plan 0249 |
+| [0264](0264-a-warp-baseline-is-blessed-by-a-dispatched-ci-job-until-the-reference-moves-to-lavapipe.md) | A WARP baseline is blessed by a dispatched CI job, by name, until the reference moves to lavapipe | accepted 2026-10-06, Plan 0249 |
 <!-- roster:end -->

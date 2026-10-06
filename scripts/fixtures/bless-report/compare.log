@@ -1,0 +1,137 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+────────────
+ Nextest run ID a5e14102-5ac1-490f-8ef0-fcf56d63fb8a with nextest profile: default
+    Starting 7 tests across 2 binaries (316 tests skipped)
+       START [         ] (1/7) rlx-core::golden scenes_match_golden_baselines
+
+running 1 test
+fragment_field     mean 0.0006 (tol 0.02) max_outlier 2 (tol 48)
+swarm              mean 0.0005 (tol 0.02) max_outlier 1 (tol 48)
+parametric_curve   mean 0.0003 (tol 0.02) max_outlier 2 (tol 48)
+lsystem            mean 0.0001 (tol 0.02) max_outlier 2 (tol 48)
+star_pattern       mean 0.0000 (tol 0.02) max_outlier 1 (tol 48)
+reaction_diffusion mean 0.0110 (tol 0.02) max_outlier 190 (tol 48)
+attractor          mean 0.0018 (tol 0.02) max_outlier 114 (tol 48)
+spectrum           mean 0.0000 (tol 0.02) max_outlier 1 (tol 48)
+emitter            mean 0.0000 (tol 0.02) max_outlier 1 (tol 48)
+shape_field        mean 0.0012 (tol 0.02) max_outlier 8 (tol 48)
+warp_mesh          mean 0.0005 (tol 0.02) max_outlier 2 (tol 48)
+shape_collage      mean 0.0007 (tol 0.02) max_outlier 1 (tol 48)
+analytic_field     mean 0.0007 (tol 0.02) max_outlier 5 (tol 48)
+cellular           mean 0.0002 (tol 0.02) max_outlier 1 (tol 48)
+plexus             mean 0.0000 (tol 0.02) max_outlier 0 (tol 48)
+waterfall          mean 0.0017 (tol 0.02) max_outlier 213 (tol 48)
+attractor_depth    mean 0.0022 (tol 0.02) max_outlier 62 (tol 48)
+attractor_ifs      mean 0.0001 (tol 0.02) max_outlier 3 (tol 48)
+swarm_shaped       mean 0.0001 (tol 0.02) max_outlier 1 (tol 48)
+backdrop_ramp      mean 0.0009 (tol 0.02) max_outlier 2 (tol 48)
+backdrop_band      mean 0.0008 (tol 0.02) max_outlier 2 (tol 48)
+warp_mesh_milk     mean 0.0006 (tol 0.02) max_outlier 3 (tol 48)
+warp_mesh_shader   mean 0.0002 (tol 0.02) max_outlier 1 (tol 48)
+shape_collage_roster mean 0.0014 (tol 0.02) max_outlier 1 (tol 48)
+warp_mesh_stroke   mean 0.0002 (tol 0.02) max_outlier 2 (tol 48)
+shape_field_path   mean 0.0009 (tol 0.02) max_outlier 4 (tol 48)
+analytic_field_escape mean 0.0007 (tol 0.02) max_outlier 6 (tol 48)
+cellular_trail     mean 0.0006 (tol 0.02) max_outlier 2 (tol 48)
+cellular_ltl       mean 0.0001 (tol 0.02) max_outlier 1 (tol 48)
+cellular_cyclic    mean 0.0009 (tol 0.02) max_outlier 1 (tol 48)
+plexus_sheet       mean 0.0000 (tol 0.02) max_outlier 0 (tol 48)
+parametric_torus_knot mean 0.0010 (tol 0.02) max_outlier 208 (tol 48)
+parametric_lissajous_3d mean 0.0010 (tol 0.02) max_outlier 224 (tol 48)
+lsystem_space      mean 0.0000 (tol 0.02) max_outlier 0 (tol 48)
+lsystem_endless_flat mean 0.0000 (tol 0.02) max_outlier 0 (tol 48)
+lsystem_endless_space mean 0.0000 (tol 0.02) max_outlier 0 (tol 48)
+skipped: the baselines are a measurement taken on DX12 WARP, and this run is on llvmpipe (LLVM 22.1.8, 256 bits) (Vulkan, Cpu), driver llvmpipe Mesa 26.2.2-arch1.1 (LLVM 22.1.8) (ADR-0071). 6 comparison(s) past WARP's tolerance here: [
+    "reaction_diffusion: mean 0.0110 / outlier 190 exceeds tolerance",
+    "attractor: mean 0.0018 / outlier 114 exceeds tolerance",
+    "waterfall: mean 0.0017 / outlier 213 exceeds tolerance",
+    "attractor_depth: mean 0.0022 / outlier 62 exceeds tolerance",
+    "parametric_torus_knot: mean 0.0010 / outlier 208 exceeds tolerance",
+    "parametric_lissajous_3d: mean 0.0010 / outlier 224 exceeds tolerance",
+]
+test scenes_match_golden_baselines ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 21.74s
+
+        PASS [  21.765s] (1/7) rlx-core::golden scenes_match_golden_baselines
+       START [         ] (2/7) rlx-core::golden the_waterfall_holds_a_ramped_ring
+
+running 1 test
+waterfall_ramp     mean 0.0011 (tol 0.02) max_outlier 159 (tol 48)
+skipped: the baselines are a measurement taken on DX12 WARP, and this run is on llvmpipe (LLVM 22.1.8, 256 bits) (Vulkan, Cpu), driver llvmpipe Mesa 26.2.2-arch1.1 (LLVM 22.1.8) (ADR-0071). 1 comparison(s) past WARP's tolerance here: [
+    "waterfall_ramp: mean 0.0011 / outlier 159 exceeds tolerance",
+]
+test the_waterfall_holds_a_ramped_ring ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.98s
+
+        PASS [   1.005s] (2/7) rlx-core::golden the_waterfall_holds_a_ramped_ring
+       START [         ] (3/7) rlx-core::suite attractor_trails::the_attractor_over_the_trails_stage_matches_its_baseline
+
+running 1 test
+attractor_trails   mean 0.0009 (tol 0.02) max_outlier 89 (tol 48), 3823 of 16000 lit
+skipped: the baselines are a measurement taken on DX12 WARP, and this run is on llvmpipe (LLVM 22.1.8, 256 bits) (Vulkan, Cpu), driver llvmpipe Mesa 26.2.2-arch1.1 (LLVM 22.1.8) (ADR-0071). 1 comparison(s) past WARP's tolerance here: [
+    "attractor_trails: mean 0.0009 / outlier 89",
+]
+test attractor_trails::the_attractor_over_the_trails_stage_matches_its_baseline ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 317 filtered out; finished in 2.47s
+
+        PASS [   2.493s] (3/7) rlx-core::suite attractor_trails::the_attractor_over_the_trails_stage_matches_its_baseline
+       START [         ] (4/7) rlx-core::suite composite::composite_stages_match_golden_baselines
+
+running 1 test
+composite_trails   mean 0.0001 (tol 0.02) max_outlier 2 (tol 48)
+composite_kaleido  mean 0.0005 (tol 0.02) max_outlier 1 (tol 48)
+composite_kaleido_squash mean 0.0005 (tol 0.02) max_outlier 1 (tol 48)
+composite_overlap  mean 0.0001 (tol 0.02) max_outlier 2 (tol 48)
+composite_bloom    mean 0.0001 (tol 0.02) max_outlier 1 (tol 48)
+composite_bloom_exposed mean 0.0000 (tol 0.02) max_outlier 1 (tol 48)
+composite_symmetry mean 0.0005 (tol 0.02) max_outlier 1 (tol 48)
+composite_warp_swirl mean 0.0001 (tol 0.02) max_outlier 1 (tol 48)
+composite_warp_ripple mean 0.0001 (tol 0.02) max_outlier 2 (tol 48)
+composite_warp_fisheye mean 0.0004 (tol 0.02) max_outlier 4 (tol 48)
+skipped: the baselines are a measurement taken on DX12 WARP, and this run is on llvmpipe (LLVM 22.1.8, 256 bits) (Vulkan, Cpu), driver llvmpipe Mesa 26.2.2-arch1.1 (LLVM 22.1.8) (ADR-0071). 0 comparison(s) past WARP's tolerance here: []
+test composite::composite_stages_match_golden_baselines ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 317 filtered out; finished in 4.75s
+
+        PASS [   4.788s] (4/7) rlx-core::suite composite::composite_stages_match_golden_baselines
+       START [         ] (5/7) rlx-core::suite layer::layered_fixtures_match_golden_baselines
+
+running 1 test
+layer_under  mean 0.0006 (tol 0.02) max_outlier 4 (tol 48)
+layer_over   mean 0.0004 (tol 0.02) max_outlier 3 (tol 48)
+layer_multiply mean 0.0006 (tol 0.02) max_outlier 2 (tol 48)
+skipped: the baselines are a measurement taken on DX12 WARP, and this run is on llvmpipe (LLVM 22.1.8, 256 bits) (Vulkan, Cpu), driver llvmpipe Mesa 26.2.2-arch1.1 (LLVM 22.1.8) (ADR-0071). 0 comparison(s) past WARP's tolerance here: []
+test layer::layered_fixtures_match_golden_baselines ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 317 filtered out; finished in 3.57s
+
+        PASS [   3.602s] (5/7) rlx-core::suite layer::layered_fixtures_match_golden_baselines
+       START [         ] (6/7) rlx-core::suite line_joints::the_joined_polyline_holds_its_shape_and_its_pixels
+
+running 1 test
+element 1: interior 0.5120 | joint 0.7011 | interior 0.5120 (offset 0.0165 NDC above the path)
+element 3: interior 0.5124 | joint 0.7015 | interior 0.5120 (offset 0.0165 NDC above the path)
+first end: beyond 0.0000 (background 0.0000, dimmest stroke interior 0.5120, unlit below 0.2560; probe 0.0360 NDC past the endpoint)
+last end: beyond 0.0000 (background 0.0000, dimmest stroke interior 0.5120, unlit below 0.2560; probe 0.0360 NDC past the endpoint)
+line_joint_zigzag  mean 0.0000 (tol 0.02) max_outlier 1 (tol 48)
+skipped: the baselines are a measurement taken on DX12 WARP, and this run is on llvmpipe (LLVM 22.1.8, 256 bits) (Vulkan, Cpu), driver llvmpipe Mesa 26.2.2-arch1.1 (LLVM 22.1.8) (ADR-0071). 0 comparison(s) past WARP's tolerance here: []
+test line_joints::the_joined_polyline_holds_its_shape_and_its_pixels ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 317 filtered out; finished in 0.97s
+
+        PASS [   0.997s] (6/7) rlx-core::suite line_joints::the_joined_polyline_holds_its_shape_and_its_pixels
+       START [         ] (7/7) rlx-core::suite warp_mesh_wide::the_converted_chain_matches_its_wide_baseline
+
+running 1 test
+warp_mesh_wide     mean 0.0006 (tol 0.02) max_outlier 2 (tol 48) at 160x120
+skipped: the baselines are a measurement taken on DX12 WARP, and this run is on llvmpipe (LLVM 22.1.8, 256 bits) (Vulkan, Cpu), driver llvmpipe Mesa 26.2.2-arch1.1 (LLVM 22.1.8) (ADR-0071). 0 comparison(s) past WARP's tolerance here: []
+test warp_mesh_wide::the_converted_chain_matches_its_wide_baseline ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 317 filtered out; finished in 1.18s
+
+        PASS [   1.202s] (7/7) rlx-core::suite warp_mesh_wide::the_converted_chain_matches_its_wide_baseline
+────────────
+     Summary [  35.853s] 7 tests run: 7 passed, 316 skipped
