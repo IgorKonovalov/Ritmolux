@@ -81,6 +81,23 @@
 > Nothing else about the plan changes: the phases, their owners and their done-whens stand as
 > written. It joins a lane once Phase 1's readings are in the log and 0214 has closed.
 
+> **Amended 2026-10-06 (architect) — both holds are gone, and the plan is queueable.** Phase 1's
+> readings are in the log (2026-09-29). 0214's two `dev` phases, 2 and 4, are done. The only phase
+> left there is Phase 6, a run on the Ubuntu box that edits no harness code, so the adapter path
+> Phase 2 reads is no longer moving. The `Runs after` line keeps 0214 only for that on-device
+> reading, and it no longer gates this plan. Three things change with this:
+> - **Phase 2 needs `RLX_BLESS` in the conductor allowlist before its session starts.** No entry in
+>   `tools/conductor/settings.conductor.json` allows it today, which is half of why 0240 parked on
+>   2026-10-02. The owner adds the entry when queueing the plan. A session cannot grant itself one.
+> - **Phase 2 retires Plan 0249's bridge** (ADR-0264). Once the golden roster skips off lavapipe,
+>   the WARP bless job blesses baselines nothing compares. Phase 2 deletes
+>   `.github/workflows/bless.yml` and `scripts/bless-report.mjs`, and takes the row out of
+>   `scripts/README.md` and `docs/testing.md`. If 0249 has not landed by then, there is nothing to
+>   delete.
+> - **The WARP blesses owed by other plans become moot.** 0248 Phase 7, 0240 Phase 7 and 0239 Phase 7
+>   bless WARP baselines. Phase 2 recaptures all of them on lavapipe, and Phase 3 judges them. At
+>   this plan's close, each such row still open is marked `done` with a pointer here, not run.
+
 ## TL;DR
 
 Linux stops being a target this project ships to and becomes the machine it is judged on
@@ -178,7 +195,9 @@ flowchart TB
   it, and produce the per-fixture diff report Phase 3 judges from.
 - **Files touched:** `core/tests/golden/*.png`, `core/tests/suite/golden.rs` and the sibling
   pinned-baseline modules (`line_joints`, `attractor_trails`, `warp_mesh_wide`),
-  `docs/testing.md`.
+  `docs/testing.md`; and, if Plan 0249 has landed, `.github/workflows/bless.yml`,
+  `scripts/bless-report.mjs`, `scripts/fixtures/bless-report/` and `scripts/README.md`, which
+  this phase deletes (the 2026-10-06 amendment).
 - **Done when:** the golden roster runs on lavapipe and **skips elsewhere with a printed notice**
   in [ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md)'s shape, so the Windows and macOS arms
   neither run nor fail it; the suite is green on the Arch box against the new baselines; and the
