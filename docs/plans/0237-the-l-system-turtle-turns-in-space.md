@@ -317,8 +317,8 @@ and `follow_window`.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Walking skeleton: a tree in depth | dev | done | aaf32332 |
-| 2 — What is inert in space, and the frame's drift | dev | done | committed with this row |
-| 3 — Caps and the space golden | dev | not started | |
+| 2 — What is inert in space, and the frame's drift | dev | done | 6d5c4129 |
+| 3 — Caps and the space golden | dev | done | committed with this row |
 | 4 — Endless: the lazy stream and the ring | dev | not started | |
 | 5 — The camera follows the growth | dev | not started | |
 | 6 — Endless cost and the endless golden | dev | not started | |
@@ -352,6 +352,19 @@ and `follow_window`.
 - Phase 2's inert claim is also asserted on pixels, in `core/tests/suite/lsystem_space.rs`: the
   flat-only params leave the space fixture byte-identical, and the camera block leaves the flat
   fixture byte-identical.
+- Phase 3 adds no code to `lsystem.rs`: Phase 1's `configure` already reports a space depth's
+  drop through `OverflowContext::Depth` with `seg3d_segments` as the cap. Phase 3's test of it is
+  in `core/tests/suite/lsystem_space.rs`, outside the phase list. `top_tier_lifts` still reads
+  `max_segments` for `Depth`; `Depth`'s notice prints no tier remedy, so nothing reads it there.
+- Phase 3's golden `lsystem_space.png` was written on llvmpipe through a reverted local
+  missing-baseline-only change to `golden.rs`, as Plans 0235, 0236 and 0238 did. It reads mean
+  0.0000, outlier 0 on llvmpipe; Windows CI's golden job is its first WARP reading. The same run
+  reads `waterfall` (0.0017 / 213), `parametric_torus_knot` (0.0010 / 208) and
+  `parametric_lissajous_3d` (0.0010 / 224) past WARP's outlier tolerance on llvmpipe; those were
+  0.0000 / 0 on llvmpipe when blessed. This lane did not establish whether its own `seg3d`
+  renderer contributes.
+- Phase 3 ran `-P fast` over `rlx-core` only (1268 passed): the phase changes core tests and a
+  baseline and nothing another crate builds.
 
 ### Close triggers
 

@@ -7,7 +7,8 @@
 //! on.
 
 use rlx_core::preset::Preset;
-use rlx_core::render::{CaptureImage, Renderer, metrics::frame_diff};
+use rlx_core::render::scenes::OverflowContext;
+use rlx_core::render::{CaptureImage, Renderer, TierConfig, metrics::frame_diff};
 
 use crate::common;
 
@@ -30,6 +31,48 @@ fn capture(renderer: &mut Renderer, toml: &str) -> CaptureImage {
     renderer
         .capture_preset(&name, &common::fixed_frame(), FRAMES)
         .expect("capture")
+}
+
+/// Plan 0237 Phase 3's done-when: a space depth whose walk passes the tier's
+/// `seg3d_segments` is reported through [`OverflowContext::Depth`], naming the
+/// depth, the segments dropped and the cap that bit, rather than drawing a
+/// truncated tree without notice; a grammar inside the cap reports nothing.
+#[test]
+fn a_space_depth_past_the_seg3d_cap_is_reported() {
+    let Some(mut renderer) = common::headless(64, 64) else {
+        return;
+    };
+    let cap = TierConfig::FLOOR.seg3d_segments as usize;
+    // Every `F` rewrites to four, so depth `d` walks `4^d` segments: depth 6
+    // is 4,096, inside Floor's cap, and depth 7 is 16,384, past it.
+    let preset = |max_depth: u32| {
+        format!(
+            "system = \"lsystem\"\nname = \"dense_space_{max_depth}\"\n\
+             [generator]\naxiom = \"F\"\nrules = {{ F = \"F[&F][^F]/F\" }}\n\
+             angle_deg = 30\nmax_depth = {max_depth}\nturtle = \"space\"\n\
+             [params]\nvisible_depth = \"{max_depth}\"\n"
+        )
+    };
+    assert!(
+        4usize.pow(6) <= cap && 4usize.pow(7) > cap,
+        "the probe straddles the cap"
+    );
+
+    capture(&mut renderer, &preset(7));
+    let notice = renderer
+        .cap_overflow()
+        .copied()
+        .expect("the truncated depth must reach the renderer");
+    assert_eq!(notice.context, OverflowContext::Depth(7));
+    assert_eq!(notice.cap, cap, "the cap that bit is seg3d_segments");
+    assert_eq!(notice.dropped, 4usize.pow(7) - cap);
+
+    capture(&mut renderer, &preset(6));
+    assert_eq!(
+        renderer.cap_overflow(),
+        None,
+        "a tree inside the cap is not an overflow"
+    );
 }
 
 /// The flat fixture the `lsystem` golden is rendered from.
