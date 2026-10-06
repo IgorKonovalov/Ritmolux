@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-09-20
-> **Related plan(s):** [0218](../plans/0218-the-reference-machine-becomes-arch.md)
+> **Related plan(s):** [0218](../plans/done/0218-the-reference-machine-becomes-arch.md)
 > **Related ADRs:** [0241](0241-linux-leads-and-windows-is-a-peer.md) (the stance this serves),
 > [0023](0023-golden-drift-guard-uses-frozen-fixtures.md) (the drift guard),
 > [0016](0016-gpu-tests-opt-in-ci-scope.md) (the skip shape),

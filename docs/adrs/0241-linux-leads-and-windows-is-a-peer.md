@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-09-20
-> **Related plan(s):** [0218](../plans/0218-the-reference-machine-becomes-arch.md),
+> **Related plan(s):** [0218](../plans/done/0218-the-reference-machine-becomes-arch.md),
 > [0120](../plans/done/0120-the-standalone-ships-on-ubuntu.md),
 > [0214](../plans/0214-the-linux-arm-reports-back.md)
 > **Related ADRs:** [0131](0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md)

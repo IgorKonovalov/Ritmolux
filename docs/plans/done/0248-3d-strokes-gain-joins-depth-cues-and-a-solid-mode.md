@@ -250,7 +250,7 @@ Field order is shader-location order, so new fields go at the end.
 | 4 — The waterfall's rows hide what is behind them | dev | done | 19575ade |
 | 5 — Documentation | dev | done | fd1c12ab |
 | 6 — The preset-author reference | human | owed | |
-| 7 — The moved baselines are blessed | human | owed | |
+| 7 — The moved baselines are blessed | human | done - recaptured on lavapipe and judged, see [Plan 0218](0218-the-reference-machine-becomes-arch.md) | 8c2ec152 |
 | 8 — The looks, judged | human | owed | |
 
 ### Notes

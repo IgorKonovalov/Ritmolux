@@ -9,7 +9,7 @@
 > **Related ADRs:** [ADR-0264](../../adrs/0264-a-warp-baseline-is-blessed-by-a-dispatched-ci-job-until-the-reference-moves-to-lavapipe.md)
 > (accepted), [ADR-0242](../../adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md),
 > [ADR-0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)
-> **Retired by:** [Plan 0218](../0218-the-reference-machine-becomes-arch.md) Phase 2, which moves the
+> **Retired by:** [Plan 0218](0218-the-reference-machine-becomes-arch.md) Phase 2, which moves the
 > reference to lavapipe. Phase 2 of this plan says how the job is removed then.
 
 ## TL;DR
@@ -159,7 +159,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — `RLX_BLESS` takes a list of names | dev | done | b88d3fc2 |
 | 2 — `bless.yml` and its report | dev | done | 74fc0b4f |
-| 3 — First bless: 0248's four | human | owed | |
+| 3 — First bless: 0248's four | human | done - moot, `bless.yml` retired by [Plan 0218](0218-the-reference-machine-becomes-arch.md) Phase 2 | 8c2ec152 |
 
 ### Notes
 

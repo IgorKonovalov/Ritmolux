@@ -1,17 +1,20 @@
 # 0218 — The reference machine becomes Arch
 
-> **Status:** in-progress
+> **Status:** done - Phase 6 owed, ADR-0249. Closed 2026-10-06 by a conductor close: phases in
+> `b1543a29` (1), `8c2ec152` (2), `effc6503` (3), `d2ebef49` (4) and `69347332` (5); two review
+> rounds, the second clean (no blockers, no majors, two minors). Phase 1's second-display readings
+> are owed too. Version: none (test harness, baselines, CI and docs). ADR-0243 accepted.
 > **Created:** 2026-09-20
 > **Approved:** 2026-09-24 (user) — approved and deliberately NOT in
 > `tools/conductor/queue.json`. See the 2026-09-24 amendment below for what it waits on.
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0241](../adrs/0241-linux-leads-and-windows-is-a-peer.md),
-> [0242](../adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md),
-> [0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md),
-> [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
-> **Runs after:** [0120](done/0120-the-standalone-ships-on-ubuntu.md) and
-> [0214](0214-the-linux-arm-reports-back.md) — this plan assumes a Linux build that captures audio
+> **Related ADRs:** [0241](../../adrs/0241-linux-leads-and-windows-is-a-peer.md),
+> [0242](../../adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md),
+> [0023](../../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md),
+> [0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md),
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+> **Runs after:** [0120](0120-the-standalone-ships-on-ubuntu.md) and
+> [0214](../0214-the-linux-arm-reports-back.md) — this plan assumes a Linux build that captures audio
 > and a green `ubuntu-latest` arm. It does not repeat any of that work.
 > **BLOCKED, and the block is the machine.** Every phase needs the migrated Arch box, so nothing
 > here starts from the Windows checkout - not even the phases that only edit documents, because
@@ -21,7 +24,7 @@
 > **Unblocks** when there is an Arch box with the tree checked out and 0120 + 0214 landed.
 
 > **Amended 2026-09-22 (architect) — the machine exists; the block moves to
-> [Plan 0219](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md).** This plan now runs after 0219
+> [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md).** This plan now runs after 0219
 > closes, not after "the migration". 0219 provisions the box, repairs the lane contracts, runs 0120
 > there and proves the gate green. Three things carry over:
 > - **Phase 2's gate may already exist.** If 0219 Phase 3 had to gate the pinned-baseline modules to
@@ -33,10 +36,10 @@
 > - **Phase 3 can cross-check on the Windows box**, which the owner confirmed stays reachable. A
 >   fixture whose drift is in doubt can be rendered on WARP again, rather than judged only against
 >   the committed predecessor. Every hardware reading names the NVIDIA dGPU
->   ([ADR-0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)).
+>   ([ADR-0243](../../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)).
 
 > **Amended 2026-09-22 (architect, Plan 0120's close) — the gate exists, and it was 0120's, not
-> 0219's.** [Plan 0120](done/0120-the-standalone-ships-on-ubuntu.md) Phase 7 put it in one helper,
+> 0219's.** [Plan 0120](0120-the-standalone-ships-on-ubuntu.md) Phase 7 put it in one helper,
 > `baseline_adapter` in `core/tests/common/mod.rs` (`cfg!(windows) && adapter_is_software()`).
 > Phase 2 changes that predicate to lavapipe and rewrites its doc comment. Three things follow:
 > - **Six modules call it, not four.** They are `golden.rs`, `attractor_trails`, `composite`,
@@ -51,11 +54,11 @@
 >   ordinary run. It is also what keeps the Windows arm's readings visible after the move.
 
 > **Amended 2026-09-22 (architect, Plan 0219's close) — the hardware tests do not reach the dGPU,
-> and Phase 2 makes them.** [Plan 0219](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)
+> and Phase 2 makes them.** [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md)
 > Phase 3 found every `headless_hardware*` site resolving the AMD iGPU (RADV RENOIR), not the RTX
 > 3080 Laptop. The cause is the test harness, not the engine: `core/tests/common/mod.rs` `build`
 > passes `prefer_software: false`, which maps to `AdapterChoice::Default`, while
-> [ADR-0243](../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)'s
+> [ADR-0243](../../adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)'s
 > Decision rests on the `HighPerformance` preference the live path already uses. The owner routed
 > the repair here at 0219's close. Phase 2 therefore also:
 > - **moves the harness's hardware path to `AdapterChoice::HighPerformance`**, which changes which
@@ -68,14 +71,14 @@
 >   plan's close accepts it.
 
 > **Amended 2026-09-24 (architect) — approved, and the header's BLOCKED paragraph above is
-> superseded.** Both machine blocks are gone: [Plan 0219](done/0219-the-arch-box-builds-tests-and-runs-every-lane.md)
-> closed and [Plan 0120](done/0120-the-standalone-ships-on-ubuntu.md) closed, so the Arch box exists
+> superseded.** Both machine blocks are gone: [Plan 0219](0219-the-arch-box-builds-tests-and-runs-every-lane.md)
+> closed and [Plan 0120](0120-the-standalone-ships-on-ubuntu.md) closed, so the Arch box exists
 > with the tree checked out and a green gate on it. Two things still hold this plan out of the
 > conductor's queue, and neither is a design question:
 > - **Phase 1 is a `human` probe, and it is first.** A lane opening on this plan parks on it at
 >   once. The readings are owed by the owner, into this plan's `## Implementation log`, before the
 >   plan is queued — which is the order the Decision argues for, not an accident of sequencing.
-> - **[Plan 0214](0214-the-linux-arm-reports-back.md) has not closed.** The `Runs after` line above
+> - **[Plan 0214](../0214-the-linux-arm-reports-back.md) has not closed.** The `Runs after` line above
 >   names it, and Phase 2 reads the harness adapter path 0214 is still moving.
 >
 > Nothing else about the plan changes: the phases, their owners and their done-whens stand as
@@ -101,7 +104,7 @@
 ## TL;DR
 
 Linux stops being a target this project ships to and becomes the machine it is judged on
-([ADR-0241](../adrs/0241-linux-leads-and-windows-is-a-peer.md)). The visible change is that the
+([ADR-0241](../../adrs/0241-linux-leads-and-windows-is-a-peer.md)). The visible change is that the
 golden drift guard — 44 committed pictures — is recaptured on lavapipe and gated there, so a
 baseline can be inspected on the machine the owner is looking at instead of downloaded from a CI
 job. The first phase writes no code: it asks Hyprland what a client is allowed to do with its own
@@ -124,7 +127,7 @@ Three concrete things stand between the current tree and that change.
   development machine.
 - **274 mentions of WARP across 73 `.rs` files are claims, not spellings.** They say what WARP
   mis-renders and what a blessing on it is worth.
-  [ADR-0242](../adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)
+  [ADR-0242](../../adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)
   gives each of them three exits and forbids the fourth, which is translating a measurement nobody
   re-took.
 - **Wayland permits less than Win32.** `C` opens the operator console on another display and `D`
@@ -199,7 +202,7 @@ flowchart TB
   `scripts/bless-report.mjs`, `scripts/fixtures/bless-report/` and `scripts/README.md`, which
   this phase deletes (the 2026-10-06 amendment).
 - **Done when:** the golden roster runs on lavapipe and **skips elsewhere with a printed notice**
-  in [ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md)'s shape, so the Windows and macOS arms
+  in [ADR-0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md)'s shape, so the Windows and macOS arms
   neither run nor fail it; the suite is green on the Arch box against the new baselines; and the
   log carries one row per fixture with its mean and max-outlier difference **against its WARP
   predecessor** — which is the evidence Phase 3 reads, and is not itself a pass criterion. A
@@ -231,7 +234,7 @@ flowchart TB
 
 ### Phase 5 — The documents take the stance
 - **Owner skill:** `dev`
-- **What:** the four bindings [ADR-0241](../adrs/0241-linux-leads-and-windows-is-a-peer.md) names.
+- **What:** the four bindings [ADR-0241](../../adrs/0241-linux-leads-and-windows-is-a-peer.md) names.
 - **Files touched:** `docs/nfr.md` (§2's baseline gains a Linux row; §9's hardware matrix names the
   Arch box primary and the Windows box the peer), `docs/on-device-validation.md` (a Linux column,
   and the live checks expected there first), `docs/developing.md` (the Arch dev loop, the system
@@ -268,7 +271,7 @@ flowchart TB
   regression would ship. Whether that wants an instrument is a question for after this lands, not a
   phase here.
 - **lavapipe may be slow enough to matter.** The preset sweeps already pay a fixed per-process
-  adapter cost ([ADR-0222](../adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md));
+  adapter cost ([ADR-0222](../../adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md));
   if lavapipe is materially slower than WARP the gate's cost moves, and Phase 2's log should say
   what the suite took.
 
@@ -338,7 +341,7 @@ flowchart TB
     where every other client names itself (`code`, `firefox`). A user cannot target the show with a
     window rule (a workspace, a monitor, "no blur") by class, only by title, and the title changes
     with every preset. This is a reading for the architect, not a defect repaired here. Routed at
-    the close as [backlog 0284](../design-backlog.md).
+    the close as [backlog 0284](../../design-backlog.md).
 - **Phase 2: 53 baselines, not 44.** `core/tests/golden/` holds 53 PNGs: 37 in `golden.rs` (the
   16-system roster, 20 `EXTRA_FIXTURES`, `waterfall_ramp`), 10 `composite_*`, 3 `layer_*`, and
   `line_joint_zigzag`, `attractor_trails` and `warp_mesh_wide`. All 53 were recaptured with
@@ -591,6 +594,121 @@ flowchart TB
 - **Outstanding `human` phases:** Phase 6 (a rehearsal on the box). Phase 1's second-display
   readings (`D` and the console on another display) are also owed, per its row.
 
+## Close review
+
+Closed 2026-10-06 by a conductor close after two review rounds. **Phase 6 is owed** (ADR-0249): no
+show has been run from this box against real music, fullscreen on an external display, so the
+frame-time reading and the list of differences from the Windows box do not exist yet. Phase 1's
+second-display readings, the `D` cycle and the console on another display, are owed with it.
+Version: none. The plan changed the test harness, the baselines, CI and docs, and no shipped
+behaviour. Upstream CI read red at the close: run 37500479346 on `ffd0b34`, failing
+`check (windows-latest)` and `coverage`. Translation advisory: no translated source has moved.
+
+### Plan 0218 — close review, round 2
+
+**Verdict: the round-1 major is repaired as asked. The golden roster now asserts on CI's
+`ubuntu-latest` arm, and every comment and document that described the carrier says so. No
+blockers, no majors, two minors carried forward for the close.**
+
+Graded at tip `3687b1db051e7d15499ae81b50f7f1ed1567f789` (tree `bd84c207`), lane
+`/home/igor/Work/rlx-plan-0218` on `plan-0218-the-reference-machine-becomes-arch`. No `main` commit
+has landed since round 1's merge `8bd43bb7`, so the lane still carries `main`. Round 1 graded
+`4e56051c`. This round reads the three fix commits `89b8854c`, `858fe882` and `3687b1db`
+(`git diff 4e56051c..3687b1db`: five files), and checks the round-1 verdict on everything else
+against them.
+
+#### Evidence
+
+- **Full suite.** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree bd84c20 is green in the suite ledger, run
+  by gate 0218-fix-1 at 2026-10-06T18:11:50.499Z: 2014 tests run: 2014 passed (12 slow), 8 skipped`.
+  `git rev-parse HEAD^{tree}` is `bd84c207c1b2…`, so that record covers this exact tree. It is the
+  full-suite evidence (ADR-0207).
+- **`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`:** green.
+- **Node gates run here:** `check-comment-hygiene` OK (0 escapes), `check-doc-links` OK (602
+  files), `toc.mjs --check` OK, `check-reader-prose` OK (16 documents, 0 bare; `docs/nfr.md` is
+  one of them and was edited).
+
+#### Round-1 findings, re-graded
+
+- **Finding 1 (major), golden roster asserted in no CI job: resolved in `89b8854c`.**
+  `.github/workflows/ci.yml:139-141` adds `Assert the golden roster on lavapipe`,
+  `if: runner.os == 'Linux'`, `cargo nextest run -p rlx-core --test golden`, after the `-P fast`
+  step. The binary exists (`core/tests/golden.rs`). The default nextest profile has no
+  `default-filter`, so the step runs the whole roster. The arm already installs
+  `mesa-vulkan-drivers` (line 78), so lavapipe is the adapter `baseline_adapter` accepts. The
+  step's comment says what round 1 asked for: the baselines come from a different Mesa build, so a
+  red result is first a reading to take and never a reason to rebless from CI. The plan's diagram
+  claim (`ubuntu-latest — lavapipe, goldens run`) and ADR-0242's Positive are now true of the tree.
+- **Finding 2 (minor), `ci.yml` comments naming WARP as the carrier: resolved in `89b8854c`.**
+  The header (lines 10-13), the nine-suites block (93-104, which now names `golden` as the
+  exception `coverage` does not carry) and the per-arm note (127-130, the `suite`-binary
+  comparisons ASSERT on Linux) all state the lavapipe facts.
+- **Finding 3 (minor), `docs/developing.md:74` "nowhere else does": resolved in `89b8854c`.**
+  Lines 74-81 now say the comparisons assert on the Arch box and on CI's `ubuntu-latest` arm, add
+  the cross-Mesa caveat, and say a rebless is refused off lavapipe. Lines 441-450 drop "No CI job
+  runs them on Linux" and name the new step. `docs/nfr.md:359-367` agrees.
+- **Finding 6 (nit), unmarked WARP claim in an assertion message: resolved in `858fe882`.**
+  `core/src/render/tonemap/tests.rs:1122` carries `(a WARP reading, unverified on lavapipe as of
+  2026-10-06)`, like its sibling messages. This is message text only, and the suite stays green.
+- **Findings 4 and 5 (minors) were left to the close.** The log says so (plan line 573). Both are
+  still open and are restated below.
+
+The remaining `WARP` phrases in the touched files are true where they stand.
+`docs/nfr.md:352` ("render the shipped preset library on WARP") describes the Windows `check` and
+`coverage` jobs, which do run WARP. `ci.yml:24-37` is the coverage ratchet, which is measured on
+Windows.
+
+#### Findings
+
+##### minor
+
+1. **Phase 1's "found, not asked" reading is still not routed** —
+   `docs/plans/0218-the-reference-machine-becomes-arch.md:337`. The show window reports an empty
+   Wayland app class (`class: ""`) to Hyprland, so no window rule can target it. Nothing in
+   `docs/design-backlog.md` carries this (`git grep -n -i -E "app class|app.id|empty class" --
+   docs/design-backlog.md` finds nothing). Fix at the close, as Markdown under `docs/`: add one
+   backlog entry that records the reading, with either an `unprobeable:` line or a probe on
+   `standalone/src`'s window builder.
+2. **The implementation log outweighs the plan's `## Implementation phases`** —
+   `docs/plans/0218-the-reference-machine-becomes-arch.md:291`. The phases run 177-290; the log runs
+   from 291 to past 573. The two 53-row tables that Phases 2 and 3 required account for most of the
+   excess, so the content is warranted. No action beyond noting it in the `## Close review`.
+
+#### Lenses 2, 4 and 5
+
+The fix round touched no `core/src` behaviour: one assertion-message string, one CI step, and
+prose. The new step widens no seam (C ABI, `Scene`, control protocol). It adds wall time to the
+ubuntu arm of `check`, which is not the Windows critical path ADR-0073 guards. That cost and the
+step's first cross-Mesa reading are unmeasured, and the log says so: "The first `ubuntu-latest`
+run after the push is unread". That reading is the owner's after the push, not a tree defect.
+
+#### Bookkeeping the close owes (unchanged from round 1)
+
+- ADR-0243 `proposed → accepted`. The gating adapter line, the RTX 3080 Laptop GPU on NVIDIA
+  610.57.04, is in the log.
+- Phase 6 stays `owed`. `Status:` reads `done - Phase 6 owed, ADR-0249`, and the recently-closed
+  bullet names it. Phase 1's second-display readings are owed too.
+- Per the 2026-10-06 amendment, mark 0248 Phase 7, 0240 Phase 7 and 0239 Phase 7 `done` with a
+  pointer here. 0249 Phase 3's dispatch is moot because `bless.yml` is deleted.
+- `## Close review` names `89b8854c` for round-1 findings 1-3 and `858fe882` for finding 6.
+- **Version bump:** the plan now also changes CI (a new gating step) alongside its harness,
+  baselines and docs. Choose none or patch under ADR-0005, and choose it deliberately.
+- Step 1e: `README.md` was touched, so read the translation advisory. Step 0: read upstream CI. The
+  new golden step's first `ubuntu-latest` run is the reading to watch after the push.
+
+### Earlier rounds, and what resolved them
+
+- Round 1, finding 1 (major), the golden roster asserted in no CI job: resolved in `89b8854c`.
+- Round 1, finding 2 (minor), `ci.yml`'s comments naming WARP as the golden carrier: resolved in
+  `89b8854c`.
+- Round 1, finding 3 (minor), `docs/developing.md` "nowhere else does": resolved in `89b8854c`.
+- Round 1, finding 6 (nit), the unmarked WARP claim in a tonemap assertion message: resolved in
+  `858fe882`.
+- Round 1, finding 4 (minor), the empty app class not routed: round 2's minor 1, repaired at the
+  close as backlog 0284 in `4321d506`, with the pointer in this plan in `ca71de99`.
+- Round 1, finding 5 (minor), the log outweighs the phases: round 2's minor 2, open and noted here.
+
 ## Followups (after this lands)
 
 Each is an interview, an ADR and a plan of its own; none is scoped here.
@@ -605,5 +723,5 @@ Each is an interview, an ADR and a plan of its own; none is scoped here.
   VJ chain wants a PipeWire video node or NDI.
 - **A second player host over the C ABI** — DeaDBeeF or Audacious, the Arch-native counterpart to
   the foobar2000 component. The C ABI exists precisely so this is a shim rather than a port
-  ([ADR-0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)); which host, and whether the ABI
+  ([ADR-0001](../../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)); which host, and whether the ABI
   needs widening at all, is the decision.

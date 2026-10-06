@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0218 - The reference machine becomes Arch](#0218---the-reference-machine-becomes-arch)
   - [0239 - The swarm moves into a real camera](#0239---the-swarm-moves-into-a-real-camera)
   - [0249 - A dispatched CI job blesses the named WARP baselines](#0249---a-dispatched-ci-job-blesses-the-named-warp-baselines)
   - [0240 - The attractor projects through the shared camera](#0240---the-attractor-projects-through-the-shared-camera)
@@ -291,6 +292,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0241 - The conductor parks only on what the owner must settle](done/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (two fixed), one nit (fixed).** Version: **0.157.0**. ADR-0261 accepted. [Write-up](README-archive.md).
 - [0235 - The plexus system, and a shared camera with depth of field](done/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md) - closed 2026-10-01. Review: **three rounds; 3 majors, 3 minors (all fixed), two nits.** Version: **0.156.0**. ADR-0257 accepted. [Write-up](README-archive.md).
 - [0230 - The Russian slice becomes findable](done/0230-the-russian-slice-becomes-findable.md) - closed 2026-09-30, Phase 4 read 2026-10-01. Review: **no blockers, no majors, no minors, two nits.** Version: **0.155.0**. ADR-0213 accepted, Outcome. [Write-up](README-archive.md).
 - [0231 - The interface is audited, then learns one look](done/0231-the-interface-is-audited-then-learns-one-look.md) - closed 2026-09-30. Review: **no blockers, no majors, two minors (fixed), two nits (one fixed).** Version: **0.154.0**. ADR-0252 + 0256 accepted. [Write-up](README-archive.md).
@@ -500,6 +502,32 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0218 - The reference machine becomes Arch](done/0218-the-reference-machine-becomes-arch.md)
+
+- closed 2026-10-06 by a conductor close on the lane
+`plan-0218-the-reference-machine-becomes-arch`. The phases landed in `b1543a29` (Phase 1, the
+owner's Hyprland readings), `8c2ec152` (2), `effc6503` (3, the owner's verdict: all 53 drift),
+`d2ebef49` (4) and `69347332` (5). **Phase 6 is owed** (`Blocks merge: no`, ADR-0249): the
+rehearsal on the box. Phase 1's second-display readings (`D`, and the console on another display)
+are owed too. Round 1 found **one major, four minors and a nit**: the golden roster asserted in no
+CI job. The fix round added a Linux-only golden step to `check (ubuntu-latest)` and corrected the
+comments and docs that described WARP as the carrier, in `89b8854c`, and marked the tonemap message
+in `858fe882`. Round 2 was clean (two minors). The close routed the empty Wayland app class as
+backlog 0284; the log outweighing the phases stays open as a note. Version: none (test harness,
+baselines, CI and docs; no shipped behaviour). ADR-0243 accepted, Outcome. Upstream CI read **red**
+at the close: run 37500479346 on `ffd0b34`, failing `check (windows-latest)` and `coverage`. The
+full review is the plan's own `## Close review`.
+- **What landed.** 53 golden baselines recaptured on lavapipe (`llvmpipe`, Mesa 26.2.2) and gated
+  there by `baseline_adapter`; every other adapter skips with a printed reading. The harness's
+  hardware path asks for `HighPerformance` and prints the adapter. `bless.yml` and
+  `bless-report.mjs` are deleted. The WARP claims in 73 `.rs` files and five documents took
+  ADR-0242's three exits. `nfr.md`, `on-device-validation.md`, `developing.md`, `CLAUDE.md` and
+  `README.md` name Linux as the lead.
+- **Open.** The first `ubuntu-latest` run of the golden step compares against baselines from a
+  different Mesa build, and nobody has read it yet. The WARP blesses owed by 0239, 0240 and 0248
+  Phase 7 are marked done with a pointer here; 0249 Phase 3 is moot.
+- **Curation.** `presets/` not touched.
 
 ### [0239 - The swarm moves into a real camera](done/0239-the-swarm-moves-into-a-real-camera.md)
 
@@ -11043,7 +11071,7 @@ names its adapter (AMD RADV RENOIR) in full. Kept verbatim, except that the link
 this file's depth:
 
 **Added 2026-09-22, from the heavy-preset analysis: [0223](done/0223-the-heavy-presets-fit-the-integrated-gpu.md)
-runs after [0214](0214-the-linux-arm-reports-back.md) and beside [0218](0218-the-reference-machine-becomes-arch.md),
+runs after [0214](0214-the-linux-arm-reports-back.md) and beside [0218](done/0218-the-reference-machine-becomes-arch.md),
 not before them.** Its Phase 6 is a reading on the laptop's integrated adapter and 0218 Phase 2 is
 what moves the hardware tests onto the discrete one, so the two readings should name their adapters
 in the same vocabulary. Phases 1-2 (per-pass timings, the pipelined stream readback) change what

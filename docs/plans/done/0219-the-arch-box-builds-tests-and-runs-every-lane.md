@@ -13,7 +13,7 @@
 > [0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md)
 > **Interleaves with:** [0120](0120-the-standalone-ships-on-ubuntu.md) — its Phases 2-5 run on this
 > box **between this plan's Phase 2 and Phase 3**. See "Sequencing" below.
-> **Unblocks:** [0218](../0218-the-reference-machine-becomes-arch.md), whose "the machine does not
+> **Unblocks:** [0218](0218-the-reference-machine-becomes-arch.md), whose "the machine does not
 > exist yet" block this plan clears.
 
 ## TL;DR

@@ -1,9 +1,9 @@
 # ADR-0243 — The reference box's hardware adapter is its discrete GPU, and a reading names it
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-06 (Plan 0218), Outcome
 > **Date:** 2026-09-22
 > **Related plan(s):** [0219](../plans/done/0219-the-arch-box-builds-tests-and-runs-every-lane.md),
-> [0218](../plans/0218-the-reference-machine-becomes-arch.md)
+> [0218](../plans/done/0218-the-reference-machine-becomes-arch.md)
 > **Related ADRs:** [0241](0241-linux-leads-and-windows-is-a-peer.md) (Linux leads),
 > [0242](0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)
 > (the software reference), [0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
@@ -106,5 +106,14 @@ resolved the AMD iGPU (`AMD Radeon Graphics (RADV RENOIR)`), not the dGPU. The D
 holds for the live path and not for the test harness: `core/tests/common/mod.rs` asks for
 `AdapterChoice::Default`, which is wgpu's default options with no power preference, rather than
 `HighPerformance`. The repair moves the harness's hardware path to `HighPerformance`. It was routed
-to [Plan 0218](../plans/0218-the-reference-machine-becomes-arch.md) Phase 2, and this ADR stays
+to [Plan 0218](../plans/done/0218-the-reference-machine-becomes-arch.md) Phase 2, and this ADR stays
 `proposed` until that phase's log names the dGPU from a hardware test.
+
+## Outcome, 2026-10-06 (Plan 0218's close)
+
+The section above is now true. Plan 0218 Phase 2 moved `common::build` to
+`AdapterChoice::HighPerformance` for every non-software build, and the build prints the adapter it
+resolved once, centrally, rather than at each site. On the Arch box a `headless_hardware` site
+(`layer::a_multiply_layer_meets_a_lit_backdrop`) printed `NVIDIA GeForce RTX 3080 Laptop GPU
+(Vulkan, DiscreteGpu), driver NVIDIA 610.57.04`. The change applies to every hybrid machine; the
+Windows box has one GPU, and no reading of it after the change has been taken.

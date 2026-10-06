@@ -241,7 +241,7 @@ struct ModelTransform {
 | 4 — Documentation and the references | dev | done | a430d6fa |
 | 5 — Fog on the attractor's sprites | dev | done | 1ed3c786 |
 | 6 — The 3D presets, re-curated in motion | human | owed | |
-| 7 — The moved baseline is blessed | human | owed | |
+| 7 — The moved baseline is blessed | human | done - recaptured on lavapipe and judged, see [Plan 0218](0218-the-reference-machine-becomes-arch.md) | 8c2ec152 |
 | 8 — The preset-author reference | human | owed | |
 
 ### Notes
