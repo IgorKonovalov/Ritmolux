@@ -298,7 +298,7 @@ flowchart TB
 |---|---|---|---|
 | 1 — Ask Hyprland what a client may do | human | done - one display, so D and a second-display console were not answerable | b1543a29 |
 | 2 — The baselines move to lavapipe | dev | done | committed with this row |
-| 3 — Judge the 44 | human | not started | |
+| 3 — Judge the 44 | human | done - all 53 drift, no finding | committed with this row |
 | 4 — Every WARP claim takes one of three exits | dev | not started | |
 | 5 — The documents take the stance | dev | not started | |
 | 6 — A rehearsal on the box | human | not started | |
@@ -434,6 +434,65 @@ flowchart TB
   | line_joint_zigzag | 0.0000 | 1 | |
   | attractor_trails | 0.0009 | 89 | **over** |
   | warp_mesh_wide | 0.0006 | 2 | |
+
+- **Phase 3, 2026-10-06 (owner).** All 53 recaptures judged against their WARP predecessors on a
+  side-by-side page (old, new, an x8 diff and a flicker toggle per fixture), over-tolerance ones first.
+  Verdict: **all drift, no finding.** Five of the eight over tolerance carry an owed WARP bless's
+  intended change on top of the drift: 0248 Phase 7's four and 0240 Phase 7's `attractor_depth`. At
+  the close those rows are marked done with a pointer here, and 0249 Phase 3's dispatch is moot.
+  - `analytic_field` (mean 0.0007 / outlier 5): drift.
+  - `analytic_field_escape` (mean 0.0007 / outlier 6): drift.
+  - `attractor` (mean 0.0018 / outlier 114, over): drift; same figure, the difference is scattered pixels.
+  - `attractor_depth` (mean 0.0022 / outlier 62, over): drift, plus the intended change 0240 Phase 7 owed on WARP; same figure.
+  - `attractor_ifs` (mean 0.0001 / outlier 3): drift.
+  - `attractor_trails` (mean 0.0009 / outlier 89, over): drift; same figure, the difference is scattered pixels.
+  - `backdrop_band` (mean 0.0008 / outlier 2): drift.
+  - `backdrop_ramp` (mean 0.0009 / outlier 2): drift.
+  - `cellular` (mean 0.0002 / outlier 1): drift.
+  - `cellular_cyclic` (mean 0.0009 / outlier 1): drift.
+  - `cellular_ltl` (mean 0.0001 / outlier 1): drift.
+  - `cellular_trail` (mean 0.0006 / outlier 2): drift.
+  - `composite_bloom` (mean 0.0001 / outlier 1): drift.
+  - `composite_bloom_exposed` (mean 0.0000 / outlier 1): drift.
+  - `composite_kaleido` (mean 0.0005 / outlier 1): drift.
+  - `composite_kaleido_squash` (mean 0.0005 / outlier 1): drift.
+  - `composite_overlap` (mean 0.0001 / outlier 2): drift.
+  - `composite_symmetry` (mean 0.0005 / outlier 1): drift.
+  - `composite_trails` (mean 0.0001 / outlier 2): drift.
+  - `composite_warp_fisheye` (mean 0.0004 / outlier 4): drift.
+  - `composite_warp_ripple` (mean 0.0001 / outlier 2): drift.
+  - `composite_warp_swirl` (mean 0.0001 / outlier 1): drift.
+  - `emitter` (mean 0.0000 / outlier 1): drift.
+  - `fragment_field` (mean 0.0006 / outlier 2): drift.
+  - `layer_multiply` (mean 0.0006 / outlier 2): drift.
+  - `layer_over` (mean 0.0004 / outlier 3): drift.
+  - `layer_under` (mean 0.0006 / outlier 4): drift.
+  - `line_joint_zigzag` (mean 0.0000 / outlier 1): drift.
+  - `lsystem` (mean 0.0001 / outlier 2): drift.
+  - `lsystem_endless_flat` (mean 0.0000 / outlier 0): drift (re-encoded byte-identical).
+  - `lsystem_endless_space` (mean 0.0000 / outlier 0): drift (re-encoded byte-identical).
+  - `lsystem_space` (mean 0.0000 / outlier 0): drift (re-encoded byte-identical).
+  - `parametric_curve` (mean 0.0003 / outlier 2): drift.
+  - `parametric_lissajous_3d` (mean 0.0010 / outlier 224, over): drift, plus the intended change 0248 Phase 7 owed on WARP; same figure.
+  - `parametric_torus_knot` (mean 0.0010 / outlier 208, over): drift, plus the intended change 0248 Phase 7 owed on WARP; same figure.
+  - `plexus` (mean 0.0000 / outlier 0): drift (re-encoded byte-identical).
+  - `plexus_sheet` (mean 0.0000 / outlier 0): drift (re-encoded byte-identical).
+  - `reaction_diffusion` (mean 0.0110 / outlier 190, over): drift; same figure, the difference is scattered pixels.
+  - `shape_collage` (mean 0.0007 / outlier 1): drift.
+  - `shape_collage_roster` (mean 0.0014 / outlier 1): drift.
+  - `shape_field` (mean 0.0012 / outlier 8): drift.
+  - `shape_field_path` (mean 0.0009 / outlier 4): drift.
+  - `spectrum` (mean 0.0000 / outlier 1): drift.
+  - `star_pattern` (mean 0.0000 / outlier 1): drift.
+  - `swarm` (mean 0.0005 / outlier 1): drift.
+  - `swarm_shaped` (mean 0.0001 / outlier 1): drift.
+  - `warp_mesh` (mean 0.0005 / outlier 2): drift.
+  - `warp_mesh_milk` (mean 0.0006 / outlier 3): drift.
+  - `warp_mesh_shader` (mean 0.0002 / outlier 1): drift.
+  - `warp_mesh_stroke` (mean 0.0002 / outlier 2): drift.
+  - `warp_mesh_wide` (mean 0.0006 / outlier 2): drift.
+  - `waterfall` (mean 0.0017 / outlier 213, over): drift, plus the intended change 0248 Phase 7 owed on WARP; same figure.
+  - `waterfall_ramp` (mean 0.0011 / outlier 159, over): drift, plus the intended change 0248 Phase 7 owed on WARP; same figure.
 
 ### Close triggers
 
