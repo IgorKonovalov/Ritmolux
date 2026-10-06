@@ -496,8 +496,8 @@ impl Framing {
     ///
     /// That zero is the whole mechanism by which the flat families opt out: it
     /// makes `d_n` identically zero for every one of their particles, so the
-    /// perspective magnification is `1`, the haze multiplier is `1` and the hue
-    /// offset is `0`, with **no shader branch, no division and no way to reach a
+    /// draw shader keeps them on the in-plane path, the haze multiplier is `1`
+    /// and the hue offset is `0`, with **no division and no way to reach a
     /// `NaN`**. De Jong, Clifford and every IFS figure have no third coordinate
     /// to project, and ADR-0076 Alternative B records why inventing one for them
     /// is worse than leaving them alone.

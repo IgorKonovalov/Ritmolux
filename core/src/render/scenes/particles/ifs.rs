@@ -574,7 +574,7 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
 ///
 /// A preset asking for more `vigor` than this allows gets silence rather than an
 /// error — the same undiscoverable-ceiling shape `presets/README.md` already
-/// documents for `bloom_threshold` and `perspective`.
+/// documents for `bloom_threshold`.
 pub const SIGMA_CEILING: f32 = 0.97;
 
 /// How far [`Levers::bias`] may shift the sampling weight, as a fraction.
