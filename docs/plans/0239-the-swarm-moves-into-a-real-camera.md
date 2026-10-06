@@ -240,7 +240,7 @@ struct Particle {
 | 2 — Depth of field on the swarm's sprites | dev | done | b598e6c5 |
 | 3 — Caps, cost and the goldens | dev | done | d6e2299d |
 | 4 — The shipped presets keep rendering | dev | done | 65e4a600 |
-| 5 — Documentation and the references | dev | done | committed with this row |
+| 5 — Documentation and the references | dev | done | cbb2276c |
 | 6 — The three presets, judged and re-tuned | human | not started | |
 | 7 — The moved baselines are blessed | human | not started | |
 | 8 — The preset-author reference | human | not started | |
