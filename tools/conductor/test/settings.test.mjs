@@ -178,6 +178,7 @@ const CASES = [
     command: "RLX_UPDATE_PARAM_REFERENCE=1 node tools/conductor/with-lock.mjs suite -- cargo test -p rlx-core --test suite the_parameter_reference_block_is_current",
     allowed: true,
   },
+  { tool: "Bash", command: "RLX_BLESS=1 cargo nextest run -p rlx-core --test golden", allowed: true, why: "the bless form the dev skill documents" },
   { tool: "Bash", command: "RLX_ANYTHING_ELSE=1 cargo nextest run --workspace", allowed: false, why: "the rule names variables, it is not a shape" },
   { tool: "Bash", command: "CARGO_TARGET_DIR=target/p9 cargo build", allowed: false, why: "same: a variable that changes what a build does" },
   { tool: "Bash", command: "RLX_UPDATE_PRESET_SCHEMA=0 cargo nextest run --workspace", allowed: false, why: "the documented value is part of the rule" },
