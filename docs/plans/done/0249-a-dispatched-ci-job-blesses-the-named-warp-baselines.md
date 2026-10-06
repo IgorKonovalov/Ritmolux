@@ -1,12 +1,15 @@
 # 0249 — A dispatched CI job blesses the named WARP baselines
 
-> **Status:** in-progress
+> **Status:** done - Phase 3 owed, ADR-0249. Closed 2026-10-06 by a conductor close: Phases 1-2
+> landed in `b88d3fc2` and `74fc0b4f`; the round 1 review found no blockers, no majors, two minors
+> and a nit (the docs minor and the nit repaired in `c3d62809`). Version: none (test harness, a
+> dispatch-only workflow, a script and docs; nothing a release archive carries).
 > **Created:** 2026-10-06
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0264](../adrs/0264-a-warp-baseline-is-blessed-by-a-dispatched-ci-job-until-the-reference-moves-to-lavapipe.md)
-> (proposed), [ADR-0242](../adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md),
-> [ADR-0249](../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)
-> **Retired by:** [Plan 0218](0218-the-reference-machine-becomes-arch.md) Phase 2, which moves the
+> **Related ADRs:** [ADR-0264](../../adrs/0264-a-warp-baseline-is-blessed-by-a-dispatched-ci-job-until-the-reference-moves-to-lavapipe.md)
+> (accepted), [ADR-0242](../../adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md),
+> [ADR-0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)
+> **Retired by:** [Plan 0218](../0218-the-reference-machine-becomes-arch.md) Phase 2, which moves the
 > reference to lavapipe. Phase 2 of this plan says how the job is removed then.
 
 ## TL;DR
@@ -205,3 +208,151 @@ flowchart LR
   1920 passed, 94 skipped.
 - **Outstanding `human` phases:** Phase 3 (`Blocks merge: no`) — the first dispatch, after the merge
   and a push.
+
+## Close review
+
+Phase 3 is **owed** (`Blocks merge: no`, ADR-0249) and nothing below checks it: `bless.yml` has never
+run, so neither the job nor `bless-report.mjs` has met real WARP output, the four baselines 0248
+moved are not re-blessed, and `main`'s `coverage` job stays red on them until the owner dispatches,
+reads the report and commits the PNGs.
+
+Close repairs: the `gh workflow run` comment (minor 2) and the blockquote wrap (the nit) in
+`c3d62809`. Minor 1 stays open: it is the workflow's command, not prose. No earlier round raised a
+finding. Upstream CI on `origin/main` read green at the close (run 36297464014).
+
+Close notes: `presets/` untouched, so no curation verdict is owed. Backlog probes exit 0 (58
+reductions, 29 entries). No translated source moved. Version: none, as the review allowed: the
+plan changed test harness, a dispatch-only workflow, a script and docs, and nothing a release
+archive carries.
+
+### Round 1 review, in full
+
+Graded at tip `7a3aebf08a3ed13b623d871a610b87f0013d787a` (tree `f9c31af9`), lane
+`plan-0249-a-dispatched-ci-job-blesses-the-named-warp-baselines`.
+
+**Verdict: Plan 0249 landed cleanly. No blockers, no majors, two minors and one nit.** Phases 1 and 2
+are built as the plan says. Phase 3 is a `human` phase with `Blocks merge: no` and stays `owed`.
+
+#### Evidence
+
+- **Full suite.** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed the ledger
+  record instead of running: `with-lock: skipped cargo nextest run --workspace: tree f9c31af is green
+  in the suite ledger, run by gate 0249-pre-review-after-repair-1 at 2026-10-06T14:06:18.688Z: 2006
+  tests run: 2006 passed (17 slow), 8 skipped`. `git rev-parse HEAD^{tree}` is `f9c31af9...`, so the
+  record covers this tip.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: clean.
+- `cargo fmt --all --check`: clean. `cargo clippy --workspace --all-targets -- -D warnings`: clean.
+- `node scripts/bless-report.mjs --self-test`: `33 of 33`.
+- `node scripts/check-doc-links.mjs`: OK. `node scripts/check-reader-prose.mjs`: OK.
+  `node scripts/check-comment-hygiene.mjs`: OK.
+- `node --test tools/conductor/test/settings.test.mjs`: 153 pass. That includes the two new
+  `RLX_BLESS` cases and "every rule in settings.conductor.json is exercised".
+- `node scripts/bless-report.mjs --check-names parametric_lissajous_3d,parametric_torus_knot,waterfall_ramp,waterfall`:
+  accepts all four of Phase 3's names. Each has a committed PNG.
+
+#### Lens 1 — alignment
+
+- **Owner tags.** One per phase, all in the vocabulary (`dev`, `dev`, `human`). Phase 3 carries
+  `Blocks merge: no`, no later phase reads its output, and its log row reads `owed`. That is correct
+  under ADR-0249.
+- **Phase 1.** `bless_requested(renderer, stem)` in `core/tests/common/mod.rs` answers per baseline.
+  The parse is the pure `parse_bless`, returning `BlessList::{All, Stems}`. Unset blesses nothing,
+  `1` blesses all, and any other value is a trimmed comma list. A value naming nothing is an `Err`,
+  and the log records that choice. The adapter panic still comes first, word for word as before.
+  The unknown-name check reads `core/tests/golden/<stem>.png`, so a filtered-out test cannot hide a
+  stem; the log states that choice and its cost.
+  - Every caller passes its stem: both tests in `golden.rs` and all five pinned modules. In
+    `golden.rs`, `composite.rs` and `layer.rs` the call moved inside the roster loop.
+    `layer.rs`'s local `golden_dir` is the same `CARGO_MANIFEST_DIR/tests/golden` that
+    `common::golden_dir()` reads, so the directory check holds for its stems.
+  - Unnamed baselines are still compared and still fail the run, which is what lets the compare run
+    and the bless run share one roster.
+  - `rlx_bless_parses_all_or_a_list_of_stems` asserts what the done-when asks: `1` and ` 1 `, a
+    list, whitespace and empty entries, the empty value, whole-stem matching (`waterfall` does not
+    cover `waterfall_ramp`), and `1` inside a list read as a stem. No assertion is tautological.
+    It ran inside the green full suite.
+  - The non-WARP refusal is quoted in the log from a llvmpipe run.
+  - `docs/testing.md` states the list form and that `1` still means all.
+- **Phase 2.**
+  - `bless.yml` has `workflow_dispatch` only, `permissions: contents: read`, and one required
+    string input. It runs on `windows-latest` with `coverage`'s setup (rust-cache and nextest, no
+    pinned toolchain). The steps are: name check, compare run (failure tolerated), bless run with
+    `-E "$PINNED"` naming all seven callers, report, upload `blessed-${{ github.run_id }}`.
+  - The input reaches the shell through `env:` and is never spliced into the script, so it cannot
+    inject a command.
+  - `bless-report.mjs` writes one row per named baseline, one row per unnamed baseline over
+    tolerance marked "not blessed, still failing", and one line per named baseline with no
+    comparison. It also appends to `$GITHUB_STEP_SUMMARY`.
+  - The log records what the script adds beyond the phase text: it reads the bless log and fails
+    on a named baseline that was not blessed, and `--check-names` runs before the build.
+  - The fixture holds named baselines over tolerance (`waterfall`, `parametric_torus_knot`) and
+    unnamed ones over tolerance (six of them), as the done-when requires.
+  - `scripts/README.md` lists the script as a fifth kind of exception. `docs/testing.md` carries
+    the three owner commands and the retirement once Plan 0218 Phase 2 lands.
+  - The YAML done-when is met with the `node` one-liner quoted in the log.
+- **Outside the plan's files.** `7a3aebf0` adds two cases to `tools/conductor/test/settings.test.mjs`.
+  The `RLX_BLESS=* cargo *` allow rule reached the lane from `main` with the merge. Without a case
+  that exercises it, the file's "every rule is exercised" test fails. The change is a repair the
+  merge made necessary, not scope creep. Noted, not a finding.
+- **Log.** The log is present, shorter than the phases section, and its claims match the tree.
+
+#### Lens 2 — layering and real-time safety
+
+The plan touches no `core/src`, no C ABI, no control protocol and no audio path. Everything is test
+harness, CI and scripts, so this lens has nothing to grade.
+
+#### Lens 3 — docs and bookkeeping (owed by the close)
+
+- ADR-0264 is `proposed`; the close accepts it and refreshes `docs/adrs/README.md`.
+- The plan moves to `done/` with `Status: done - Phase 3 owed, ADR-0249`, and the plans index
+  bullet names Phase 3 as owed.
+- **Version.** The close trigger says docs-chore-only for the shipped artifacts. Nothing a release
+  archive carries changed (test harness, a dispatch-only workflow, a script, docs), so a `none`
+  bump is defensible. The close makes that call.
+- `presets/` was not touched. No `Closes:` header.
+
+#### Lens 4 — correctness
+
+- `readCompare`'s regex is `^(\S+)\s+mean`, anchored to the line start. That keeps
+  `batch_independence.rs`'s `name primitive mean ... max_outlier` line from being read as a
+  baseline in the unfiltered compare run, because a second token sits before `mean`.
+- Both test steps rely on `|| true` under the runner's default `bash -eo pipefail`, and the report
+  step's exit is the job's one signal. The upload runs `if: always()`, so `report.md` ships even
+  when a named baseline was not blessed.
+
+#### Lens 5 — design integrity
+
+Nothing to flag. The parse and the stem check sit in the shared test helper, every caller is
+uniform, and the workflow is the bridge ADR-0264 describes, with its retirement written down.
+
+#### Findings
+
+##### minor — the compare run reaches the whole `suite` binary, serially
+`.github/workflows/bless.yml:65`.
+
+- **What.** The compare step runs `cargo nextest run -p rlx-core --test golden --test suite
+  --no-fail-fast --no-capture` with no filter. Under `--no-capture`, nextest runs tests one at a
+  time. So every dispatch runs all ~320 `rlx-core` golden and suite tests serially on WARP, yet the
+  report reads only the seven baseline tests.
+- **Why it matters.** It is a cost with no reading behind it. The plan's own risk assumes "the
+  golden and pinned roster is small". The fixture README says `compare.log` was "captured ... with
+  the bless job's test filter", so what the self-test feeds the script is not what the job runs.
+- **Plan provenance.** The plan's Phase 2 text gives the unfiltered command word for word, so this
+  is the plan's slip, faithfully built.
+- **Fix.** Add `-E "$PINNED"` to the compare run, as the bless run already does.
+
+##### minor — "dispatch on the pushed branch" is wrong for `gh workflow run` without `--ref`
+`docs/testing.md:344`.
+
+- **What.** Without `--ref`, `gh workflow run` dispatches on the repository's default branch, not
+  on the branch just pushed. The workflow file also has to exist on the default branch before it
+  can be dispatched at all.
+- **Fix.** Change the comment to `# dispatch on main; add --ref <branch> for another`. This is
+  Markdown prose, so the close can repair it.
+
+##### nit — an unwrapped line in the blockquote
+`docs/testing.md:593`.
+
+- **What.** The inserted sentence `Naming the baselines instead (RLX_BLESS=a,b) scopes it.` leaves
+  that blockquote line about 130 columns wide, against roughly 80 in the rest of the paragraph.
+- **Fix.** Rewrap the blockquote.
