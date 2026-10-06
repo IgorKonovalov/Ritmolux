@@ -5,6 +5,12 @@
 //! a rotation / scale / colour / draw-on transform into the draw buffer — no
 //! expansion, no allocation.
 //!
+//! That is `growth = "fixed"`. Under `growth = "endless"` nothing is cached:
+//! the derivation is streamed through `Endless` (a lazy depth-first walk of the
+//! grammar, see `grammar::Stream`) and turtle-walked a few draw steps every frame
+//! into a fixed ring of `trail` segments. Every buffer it touches is reserved at
+//! `configure`, so the per-frame walk still allocates nothing.
+//!
 //! Beat accents advance `visible_depth` (grow one iteration); continuous motion
 //! drives `rotation`, `hue`, `draw_progress`, etc.
 //!

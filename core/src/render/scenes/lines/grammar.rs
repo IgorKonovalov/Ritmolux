@@ -1,7 +1,10 @@
 //! L-system grammar expansion: pure, deterministic string rewriting. Applies a
 //! production rule set to an axiom `depth` times — each character is replaced by
-//! its successor (or kept if no rule matches). This is a build-time step (runs
-//! inside `Scene::configure`, off the hot path), not per-frame work.
+//! its successor (or kept if no rule matches). [`expand`] is a build-time step
+//! (runs inside `Scene::configure`, off the hot path), not per-frame work.
+//! [`Stream`] is the per-frame half: an allocation-free lazy depth-first walk of
+//! the same derivation, one symbol per [`Stream::next_symbol`], over stacks
+//! preallocated at load, which an endless figure advances every frame.
 //!
 //! Deterministic by construction: a fixed `(axiom, rules, depth)` always yields
 //! the exact same string (NFR 6), which is what makes it directly unit-testable.
