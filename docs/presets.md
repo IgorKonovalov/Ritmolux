@@ -205,7 +205,7 @@ that table is maintained alongside the presets and is the authoritative list.
 | `lsystem` | An L-system turtle figure, precomputed per depth. |
 | `star_pattern` | A Hankin star pattern over a regular tiling. |
 | `reaction_diffusion` | A Gray-Scott reaction-diffusion field. |
-| `attractor` | GPU compute particles iterating a strange attractor. |
+| `attractor` | GPU compute particles iterating a strange attractor. Its two 3D families, `thomas` and `lorenz`, are seen through the same perspective camera as `plexus` ([below](#the-attractors-3d-families-are-seen-through-the-camera)). |
 | `spectrum` | The log-spaced band array as N elements — bars, a contour, or a ring. |
 | `emitter` | Objects that spawn, ride their own parabola, and die — the only system whose population varies. |
 | `shape_field` | One mark silhouette drawn at frame scale as a signed-distance field, so banding the palette draws concentric offset contours. |
@@ -285,6 +285,21 @@ Two things still follow from a stage being a *resample*:
   is deliberately fixed and independent of the window, but the field is
   **toroidal**, so `pan_*` is a seamless infinite scroll and `zoom > 1` tiles rather
   than running out of field.
+
+### The attractor's 3D families are seen through the camera
+
+The `attractor`'s `thomas` and `lorenz` families are drawn through the shared camera
+([ADR-0260](adrs/0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md)).
+`yaw`, `pitch`, `distance` and `fov` place it, and `focus` with `aperture` blur a particle away from
+the focal plane, wider and dimmer. `distance` is in figure radii, because every roster entry is
+brought to the same size first, and `spin` turns the figure on top of `yaw`. All six do nothing on
+the flat families (`de_jong`, `clifford` and the five IFS figures), which keep their in-plane view.
+`fog`, `solid` and `hue_axis` are not attractor parameters.
+
+**`perspective` is gone, and a preset that binds it on the attractor fails to load**, with a message
+naming `distance` and `fov`. The exact rewrite of an old value onto the camera, and what each camera
+parameter does to the figure, are in
+[`presets/README.md`](../presets/README.md#attractor-depth-the-camera-depth_fade-depth_hue-spin).
 
 ### The `[curve]` table
 

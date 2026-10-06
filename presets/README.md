@@ -100,7 +100,7 @@ such flag and always draws at the full scale).
   - [Engine stage: `tonemap`](#engine-stage-tonemap)
   - [Engine stage: `ink`](#engine-stage-ink)
   - [`fragment_field` animation rates — `field_speed` and `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed)
-  - [Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin`](#attractor-depth-perspective-depth_fade-depth_hue-spin)
+  - [Attractor depth: the camera, `depth_fade`, `depth_hue`, `spin`](#attractor-depth-the-camera-depth_fade-depth_hue-spin)
   - [Attractor detail sharpness](#attractor-detail-sharpness)
   - [Swarm flow-field structure](#swarm-flow-field-structure)
   - [`emitter` — objects that spawn, fall, and die](#emitter--objects-that-spawn-fall-and-die)
@@ -694,9 +694,12 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
 | `reseed` | `0` | `0` – `1` | Crossing zero throws every particle back onto a fresh start position. | motion |
-| `perspective` | `0` | `0` – `1` | How strongly depth shrinks a particle, turning a flat figure into a solid one. | shape |
-| `focus` | `0.5` | `0` – `1` | Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest. | light |
-| `aperture` | `0` | `0` – `24` | The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps. | light |
+| `yaw` | `0` | `thomas` `-3.1415927` – `3.1415927`; `lorenz` `-3.1415927` – `3.1415927`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Turns the camera around a 3D figure, in radians, on top of its spin; inert on the flat maps. | motion |
+| `pitch` | `0.25` | `thomas` `-1.55` – `1.55`; `lorenz` `-1.55` – `1.55`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Raises the camera above a 3D figure, in radians; negative looks up from below. | motion |
+| `distance` | `3.5` | `thomas` `1.5` – `8`; `lorenz` `1.5` – `8`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | How far the camera sits from a 3D figure's centre, in figure radii; nearer exaggerates the perspective. | motion |
+| `fov` | `0.8` | `thomas` `0.2` – `2`; `lorenz` `0.2` – `2`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | The camera's vertical field of view onto a 3D figure, in radians; zoom divides it. | motion |
+| `focus` | `0.5` | `thomas` `0` – `1`; `lorenz` `0` – `1`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest. | light, main |
+| `aperture` | `0` | `thomas` `0` – `24`; `lorenz` `0` – `24`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps. | light, main |
 | `depth_fade` | `0` | `0` – `1` | How much depth dims a particle, which is what reads as air between the layers. | light |
 | `depth_hue` | `0` | `-1` – `1` | Shifts colour with depth, so far parts of the figure sit elsewhere on the palette. | colour |
 | `spin` | `0` | `-2` – `2` | Turns per second the figure rotates by about its vertical axis. | motion, main |
@@ -1199,13 +1202,14 @@ remap documented there.
 > family.** `a b c d` mean different things per family and mean *nothing* on the
 > five IFS figures; `morph` `curl` `vigor` `lean` `bias` **and** `map_tint`
 > `map_hue` `root_tint` `root_hue` `emergence` are **IFS-only** and are inert on the four map
-> families; `perspective` `depth_fade` `depth_hue` reach only the two 3-D flows.
+> families; the camera block (`yaw` `pitch` `distance` `fov` `focus` `aperture`)
+> and `depth_fade` `depth_hue` reach only the two 3-D flows.
 > Binding an inert one is not an error and produces no warning — it produces
 > nothing at all. See
 > [The five IFS figures](#the-five-ifs-figures--a-different-kind-of-family),
 > [What made this point, and how far into the figure it is](#what-made-this-point-and-how-far-into-the-figure-it-is)
 > and
-> [Attractor depth](#attractor-depth-perspective-depth_fade-depth_hue-spin).
+> [Attractor depth](#attractor-depth-the-camera-depth_fade-depth_hue-spin).
 
 **My attractor is too bright / too dim — which knob?** `brightness`. It is a
 plain multiplier on the light each particle deposits (default `1.0`), so it
@@ -1257,25 +1261,59 @@ same shape for the same reason.)
 under one `fold_speed`; they are a sine/cosine pair chosen not to beat against
 each other, and nothing has asked for them to diverge.
 
-### Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin`
+### Attractor depth: the camera, `depth_fade`, `depth_hue`, `spin`
 
-**Three of these four are exact no-ops on every flat family**, the same way
-`a b c d` already carry family-specific meanings. `perspective`, `depth_fade`
-and `depth_hue` do something only on the **3-D families — `thomas` and
-`lorenz`.** On `de_jong`, `clifford` and the five IFS figures they are
-*exactly* the identity: those maps have no third coordinate, so the engine
-hands the shader a depth extent of zero and every cue collapses to a no-op.
-Binding them there is not an error and produces no warning — it produces
-nothing at all. (Verified by capture: at any setting, **zero pixels** differ —
-asserted for all three in `core/tests/attractor.rs`.)
+**The 3-D families — `thomas` and `lorenz` — are seen through the shared
+camera** that `plexus`, `waterfall` and the space curves use
+([ADR-0260](../docs/adrs/0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md)).
+`yaw` turns it round the figure, `pitch` raises it, `distance` moves it in and
+out and `fov` is its field of view; `focus` and `aperture` are its lens. Each
+roster entry is first brought to unit radius by its own measured framing, so
+`distance` is in **figure radii** and means the same on every entry: `1.5`, the
+bottom of its range, keeps Lorenz's far lobes clear of the camera, and a
+particle nearer the camera than its near plane is dropped. The engine-wide
+`zoom` divides the field of view (the angle, not its tangent), and `pan_x` /
+`pan_y` slide the picture; on these two families `pan_x` is measured in frame
+heights, so a value written for a flat family drifts `16/9` as far on a 16:9
+target. The default `pitch` is `0.25`, so an unbound 3-D preset is seen slightly
+from above.
+
+**The camera turns the figure in place.** It orbits the figure's centre, so a
+yaw sweep or a `spin` no longer slides the figure round the frame: over a full
+turn a Lorenz figure's projected centroid moves about 0.12 NDC at a camera
+matched to the old `perspective = 0.25`, where that setting swung it 0.20.
+
+**`perspective` is retired, and binding it is a load error** that names
+`distance` and `fov`. An old preset moves onto the camera by an exact mapping,
+with `E` the entry's depth half-extent in figure radii and `p` the old value:
+`distance = E / p`, `tan(fov / 2) = p / (scale * E * zoom)` with the camera's
+`zoom` left at `1`, and `pitch = 0`. A preset that sat at `perspective = 0`
+takes a long `distance` and a matching narrow `fov` — the shipped `fragment_sumi`
+layer uses `distance = 20`, `fov = 0.13` — which is as near to orthographic as
+the camera goes.
+
+**`focus` and `aperture` act on the camera's real lens.** `focus` places the
+focal plane in the figure's depth, `0` at its nearest point and `1` at its
+farthest; `aperture` is the blur of the far side in pixels, and a sprite off the
+focal plane draws wider and dimmer, so its light stays the same. A sprite's size
+is stated at the figure's centre, so moving `focus` never resizes one; nearer
+sprites draw larger and farther ones smaller, as nearer material should.
+
+**The camera, `depth_fade` and `depth_hue` are exact no-ops on every flat
+family**, the same way `a b c d` already carry family-specific meanings. On
+`de_jong`, `clifford` and the five IFS figures they are *exactly* the identity:
+those maps have no third coordinate, so they keep their in-plane path and every
+depth cue collapses to a no-op. Binding them there is not an error and produces
+no warning — it produces nothing at all. (Verified by capture: at any setting,
+**zero pixels** differ — asserted in `core/tests/attractor.rs`.)
 
 > **`depth_fade` is a no-op on a flat family too, and the arithmetic is why it once
 > was not** ([design-backlog 0067](../docs/design-backlog.md)). The haze is
 > `1 − depth_fade · (1 − depth01(dn))`, and a flat family's `dn ≡ 0` would put the
 > multiplier at `1 − depth_fade/2`, so `depth_fade = 0.9` would dim a flat figure
 > **45 %** everywhere with no depth gradient (measured on `attractor_dissolve`:
-> 20.1 % of pixels moved, max channel delta 97, while `perspective` and
-> `depth_hue` moved **zero**). The fade term is now multiplied by the family's
+> 20.1 % of pixels moved, max channel delta 97, while `depth_hue` moved
+> **zero**). The fade term is now multiplied by the family's
 > has-depth flag, so all three cues are the identity together. If an old draft
 > leaned on the dimming as an undocumented brightness trim on a flat family, it
 > silently brightened back — `exposure` is the parameter that means "dimmer"
@@ -1288,54 +1326,28 @@ reads as wind. That asymmetry is deliberate; do not read it as an oversight.
 
 | Param | What it does | Range that means something |
 |---|---|---|
-| `perspective` | Near material grows and far material shrinks, position and point size together. Segments foreshorten, because both endpoints project independently. | `0` (orthographic, the default) .. **~`0.3` in practice**; the clamp is at `0.8` and the reason to stop short of it is below |
+| `distance` | How far the camera sits from the figure's centre, in figure radii. Nearer exaggerates the perspective: near material grows and far material shrinks, position and sprite size together. | `1.5` .. `8`; the shipped 3-D presets run from about `1.4` (Lorenz Knot on a bass hit) to `5`. The range documents and does not clamp |
+| `fov` | The vertical field of view, in radians. A narrow `fov` at a long `distance` flattens the figure toward orthographic. | `0.2` .. `2` |
 | `depth_fade`  | Attenuates brightness with distance — the substitute for occlusion, which this scene does not do. `1` takes the far end to black. | `0` (off) .. `1` |
 | `depth_hue`   | Shifts the palette coordinate by `±depth_hue/2` across the depth range, so distance moves *colour* as well as contrast — **on a ramp that travels in hue at roughly constant lightness.** On a dark-to-light ramp (which is what the 3-D presets have shipped) it duplicates `depth_fade` instead, and under `ink_amount = 1` it is structurally dead, like `saturation`. [design-backlog 0062](../docs/design-backlog.md) | `0` (off) .. **`2 * min(hue_center, 1 - hue_center)`**, past which the offset wraps on the LUT's repeat sampler and far material lands on the near colour |
 | `spin`        | Rate multiplier on the display rotation. `1` is unchanged, `0` holds the figure still, negative reverses it. | any |
 
 Four things you cannot discover by binding them:
 
-- **`perspective` is clamped at `0.8`, silently.** A preset asking for more gets
-  the ceiling, not a warning — the same undiscoverable-ceiling shape
-  `bloom_threshold` and `vigor` already carry. The number means the figure's
-  depth half-extent as a fraction of the camera distance, so the near-to-far
-  magnification ratio is `(1 + p) / (1 - p)`: `0.5` gives 3:1, `0.8` gives 9:1,
-  and the singularity would be at `1`.
-- **`perspective` mostly MOVES the figure, and a `zoom` edit cannot recover
-  that.** The magnification is applied *before* the view transform, so raising it
-  does make the figure bigger — but that is the small half. **Measured**
-  peak-to-peak over four spin phases on a bare Lorenz, 600 px square:
-
-  | `perspective` | centre-x swing | widest span |
-  |---|---|---|
-  | 0.00 | 0.04 NDC | 522 px |
-  | 0.15 | 0.11 NDC | 525 px |
-  | 0.25 | 0.20 NDC | 529 px |
-  | 0.40 | 0.37 NDC | 542 px |
-  | 0.60 | 0.55 NDC | 555 px |
-
-  The near side is magnified, so the projected centroid shifts toward whichever
-  side is currently near — and as the figure turns, that shift **orbits**. The
-  swing is about **0.9 x `perspective`** in NDC; the size growth across that
-  whole sweep is **6 %**. A `zoom` is a static scale, so it cannot recover a
-  phase-varying translation: all it can do is shrink the figure until the orbit
-  fits inside the frame, which is what the 3-D presets paid for
-  (`attractor_lorenz` went 1.32 -> 1.16 and Thomas 1.14 -> 1.02, both since
-  retired).
-  **So the real ceiling is ~`0.3`, not the `0.8` clamp** — past that the figure
-  visibly slides around the frame instead of turning in place, which is a worse
-  artifact than the flatness `perspective` was bought to fix. The clamp is not
-  where the projection breaks; at `0.8` it is still a true perspective divide and
-  reads as a strong wide angle, not a fisheye. This ceiling note is
-  [design-backlog 0061](../docs/design-backlog.md)'s documented resolution; the
-  deeper fix — re-centring the projection on the figure's projected centroid —
-  remains unowned.
+- **The near-to-far magnification is set by `distance` alone.** A figure of
+  radius 1 seen from `distance` `D` magnifies its near side over its far side by
+  `(D + 1) / (D - 1)`: `3` gives 2:1, `2` gives 3:1, and `1.5` gives 5:1. `fov`
+  and `zoom` change how large the whole figure is, not that ratio, so to keep a
+  figure's size while deepening it, shorten `distance` and widen `fov` together.
+- **`spin` turns the figure, `yaw` places the camera, and they add.** The spin
+  phase is subtracted from `yaw`, so a positive `spin` turns the figure the same
+  way it always has, and a fixed `yaw` offsets where the turn starts.
 - **`spin` is a multiplier on 0.18 rad/s** (`spin = 1` is one revolution per
   **34.9 seconds**), and **its usable ceiling is set by `fade`, not by taste —
   `spin` and `fade` are one look.** A frame of trail drawn while the figure
   turns is a frame of *rotational smear*: push the pair too far and the
   accumulation stops being a trace of the trajectory and becomes concentric
-  arcs, which destroys exactly the volume `perspective` was bought to buy.
+  arcs, which destroys exactly the volume the camera is there to show.
   **Measured**: at `fade = 0.932` (~15 frames of trail)
   the rendered ladder `1 / 2 / 3 / 5 / 8` reads *crisp, crisp, softening,
   smeared, scribble* — usable peak about **1.9**; at `fade = 0.955` (~22
@@ -1354,8 +1366,8 @@ Four things you cannot discover by binding them:
 - **The illusion has a density limit and haze does not remove it.** Nothing
   occludes anything here — two strands crossing simply sum — so as
   `[particles] density` rises the figure reads more and more as X-ray whatever
-  these are set to. If depth stops reading, lower `density` before raising
-  `perspective`.
+  these are set to. If depth stops reading, lower `density` before shortening
+  `distance`, and try a `pitch` that separates the strands.
 
 ### Attractor detail sharpness
 
@@ -4906,8 +4918,7 @@ including every intermediate `morph` and every combination of the four levers �
 is a converging system. Drive them as hard as you like; unlike `a`..`d` on a
 chaotic map, there is no cliff to fall off.
 
-**`vigor`'s ceiling is silent**, the same shape as `bloom_threshold` and
-`perspective`. Every map's contraction is held under **0.97**, and the fern's
+**`vigor`'s ceiling is silent**, the same shape as `bloom_threshold`. Every map's contraction is held under **0.97**, and the fern's
 largest is already `0.851` — so about 17 % of headroom, and asking for more than
 that gets *silence* rather than an error or a warning. Past the ceiling every
 value renders identically. If `vigor` seems to stop responding, that is where it

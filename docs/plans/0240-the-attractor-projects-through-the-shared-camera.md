@@ -210,8 +210,8 @@ struct ModelTransform {
 |---|---|---|---|
 | 1 — Walking skeleton: Lorenz through the camera | dev | done | 19386418 |
 | 2 — The real lens, and `perspective` retires | dev | done | 80566e42 |
-| 3 — The shipped presets migrate by the mapping | dev | done | committed with this row |
-| 4 — Documentation and the references | dev | not started | |
+| 3 — The shipped presets migrate by the mapping | dev | done | 7a43c794 |
+| 4 — Documentation and the references | dev | done | committed with this row |
 | 5 — The 3D presets, re-curated in motion | human | not started | |
 | 6 — The moved baseline is blessed | human | not started | |
 | 7 — The preset-author reference | human | not started | |
@@ -295,6 +295,52 @@ struct ModelTransform {
   and the three red tests are the generated-file checks named under Phase 1.
 - Followup noticed: `core/src/render/scenes/particles/ifs.rs` (the `SIGMA_CEILING` doc) still cites
   `perspective` as a silently clamped param. The file is outside every phase of this plan.
+- Phase 4: `docs/presets.md` never named `perspective`. It gained a section, "The attractor's 3D
+  families are seen through the camera", and the `attractor` row of its systems table links to it.
+  The `perspective` essay was in `presets/README.md` ("Attractor depth"), which was rewritten
+  around the camera block with the migration rule. Its two measured `perspective` bullets (the
+  silent 0.8 clamp, and the centroid-orbit table) were removed, and two bullets replace them:
+  the magnification ratio `(D + 1) / (D - 1)` and how `spin` composes with `yaw`.
+- Phase 4: the regeneration also rewrote `presets/preset.schema.json`, which the file list does
+  not name. `.taplo.toml` did not change. `docs/specs/player-schema.json` was rewritten by
+  `RLX_UPDATE_PRESET_SCHEMA=1`, as the Phase 1 note says.
+- Phase 4: `scripts/tuple-sheets.mjs` was not changed. It was run once
+  (`node scripts/tuple-sheets.mjs target/tuple-sheets`), and it rendered all four sheets, Thomas
+  and Lorenz at the default camera (`pitch` 0.25, `distance` 3.5). On the Lorenz sheet, entry 0
+  draws as a near-solid filled blob at the script's `size = 0.4`. Every other entry shows its
+  strands.
+- Phase 4: the done-when's generated-file tests (`preset_schema::` and
+  `the_parameter_reference_block_is_current`, 14 tests) pass without the regenerate switches.
+  `toc.mjs --check` was stale after the README heading rename. `node scripts/toc.mjs` rewrote
+  the block, and the check, `check-doc-links.mjs` and `check-reader-prose.mjs` all exit 0.
+
+#### Replacement text for Phase 7 (`.claude/skills/preset-author/references/systems.md`, `## attractor`)
+
+Replace the paragraph that begins `**Also declared, and worth knowing exist:**` with the two
+paragraphs below, and leave the rest of the section as it is:
+
+```markdown
+**The 3D families — `thomas` and `lorenz` — are seen through the shared camera** (ADR-0260), the
+same block as `plexus`: `yaw` (on top of `spin`), `pitch` (default `0.25`, slightly from above),
+`distance` (in **figure radii**, `1.5 – 8`; nearer exaggerates the perspective, near-to-far
+magnification `(D + 1) / (D - 1)`), `fov` (`0.2 – 2` rad; the engine `zoom` divides it), and the
+real lens `focus` / `aperture` (off-focus sprites draw wider and dimmer). All six are **inert on
+`de_jong`, `clifford` and the five IFS figures**, which keep their in-plane view. **`perspective` is
+retired, and binding it is a load error** naming `distance` and `fov`. To migrate an old value `p`
+on an entry of depth half-extent `E`: `distance = E / p`, `tan(fov / 2) = p / (scale * E * zoom)`,
+camera `zoom = 1`, `pitch = 0`. A `perspective = 0` look takes a long `distance` with a matching
+narrow `fov` (Sumi's layer: `20`, `0.13`). The shipped 3D presets were migrated by that rule, so
+they sit at `pitch = 0`. Re-curating one means reaching for `pitch` and a nearer `distance`, which
+the old projection could not do without sliding the figure round the frame. On these two families
+`pan_x` is in frame heights, not NDC.
+
+**Also declared, and worth knowing exist:** `depth_fade`, `depth_hue` and `spin` (README,
+"Attractor depth: the camera"); the map shapers `curl`, `vigor` and `lean`; and `emergence`, the
+seconds the figure takes to settle out of its starting cloud. In `[particles]`, `density` sets how
+much of the tier's particle budget is drawn (ADR-0069 / ADR-0195; absent is the whole budget), and
+`morph_to` names a second **IFS** figure for `morph` to travel towards (ADR-0075). All in
+`presets/README.md`.
+```
 
 ### Close triggers
 
