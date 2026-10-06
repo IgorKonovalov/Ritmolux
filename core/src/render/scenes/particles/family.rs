@@ -429,6 +429,15 @@ pub const FAMILY_PARAMS: &[FamilyParam] = &[
     per_family!("c":
         Some([-3.0, 3.0]), Some([-2.0, 2.0]), None, Some([0.5, 4.5])),
     per_family!("d": Some([-3.0, 3.0]), Some([-2.0, 2.0]), None, None),
+    // The shared camera block (ADR-0260): read by the families with depth and
+    // inert on the flat ones, which keep their in-plane path.
+    per_family!("yaw": None, None, super::YAW.range, super::YAW.range),
+    per_family!("pitch": None, None, super::PITCH.range, super::PITCH.range),
+    per_family!("distance": None, None, super::DISTANCE.range, super::DISTANCE.range),
+    per_family!("fov": None, None, super::FOV.range, super::FOV.range),
+    per_family!("focus": None, None, super::FOCUS.range, super::FOCUS.range),
+    per_family!("aperture": None, None, super::APERTURE.range, super::APERTURE.range),
+    per_family!("fog": None, None, super::FOG.range, super::FOG.range),
 ];
 
 /// One roster entry's framing (ADR-0093): where the figure is and how big, as
@@ -487,8 +496,8 @@ impl Framing {
     ///
     /// That zero is the whole mechanism by which the flat families opt out: it
     /// makes `d_n` identically zero for every one of their particles, so the
-    /// perspective magnification is `1`, the haze multiplier is `1` and the hue
-    /// offset is `0`, with **no shader branch, no division and no way to reach a
+    /// draw shader keeps them on the in-plane path, the haze multiplier is `1`
+    /// and the hue offset is `0`, with **no division and no way to reach a
     /// `NaN`**. De Jong, Clifford and every IFS figure have no third coordinate
     /// to project, and ADR-0076 Alternative B records why inventing one for them
     /// is worse than leaving them alone.
@@ -533,6 +542,68 @@ impl Framing {
         // live possibility rather than a theoretical one, and it costs one
         // compare either way.
         if half > 0.0 { 1.0 / half } else { 0.0 }
+    }
+
+    /// The model transform that brings this entry to the shared camera at unit
+    /// radius (ADR-0260), or `None` on a family without depth, which keeps its
+    /// in-plane path.
+    ///
+    /// Read off the framing ADR-0093 already stores — the projection's centre,
+    /// the family's [`Basis`] and [`framed_half`] of the seed box — so nothing
+    /// about an entry is measured twice.
+    pub(super) fn model(&self, family: AttractorFamily) -> Option<ModelTransform> {
+        let inv_depth = self.inv_depth_extent(family);
+        let framed = framed_half(family, self.seed_box.0);
+        if inv_depth == 0.0 || framed.is_nan() || framed <= 0.0 {
+            return None;
+        }
+        let (scale, _, centre) = self.projection;
+        Some(ModelTransform {
+            centre,
+            basis: family.basis().masks(),
+            inv_framed_half: 1.0 / framed,
+            inv_unit_depth: framed * inv_depth,
+            footprint: scale * framed,
+        })
+    }
+}
+
+/// A 3D roster entry's model transform (ADR-0260): what the draw shader's
+/// `to_model` applies before the shared camera projects.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) struct ModelTransform {
+    /// The entry's measured centre, subtracted first.
+    pub(super) centre: [f32; 3],
+    /// [`Basis::masks`]: the spin's partner axis and the vertical, as the
+    /// model's `z` and `y`.
+    pub(super) basis: ([f32; 3], [f32; 3]),
+    /// `1 / framed half-extent`, which puts the entry at unit radius.
+    pub(super) inv_framed_half: f32,
+    /// `1 / E`, where `E` is the entry's depth half-extent in model units —
+    /// what turns a model depth into the normalized depth the haze and the
+    /// depth tint read, `1` at the near extent.
+    pub(super) inv_unit_depth: f32,
+    /// The half-extent the entry's figure drew at on the in-plane path,
+    /// `scale * framed half-extent`: the unit sprite sizes are stated against,
+    /// so a sprite keeps its size relative to the figure.
+    pub(super) footprint: f32,
+}
+
+impl ModelTransform {
+    /// `q` in model space. **The CPU mirror of `to_model()` in
+    /// [`DRAW_SHADER`](super::DRAW_SHADER)**: `x` across, the vertical up, the
+    /// partner axis toward the eye.
+    #[cfg(test)]
+    pub(super) fn apply(&self, q: [f32; 3]) -> [f32; 3] {
+        let ([qx, qy, qz], [cx, cy, cz]) = (q, self.centre);
+        let (px, py, pz) = (qx - cx, qy - cy, qz - cz);
+        let dot = |[mx, my, mz]: [f32; 3]| px * mx + py * my + pz * mz;
+        let (h, v) = self.basis;
+        [
+            px * self.inv_framed_half,
+            dot(v) * self.inv_framed_half,
+            dot(h) * self.inv_framed_half,
+        ]
     }
 }
 

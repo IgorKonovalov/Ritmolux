@@ -147,13 +147,21 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 ///   renderer, so the space families' 3D walks, the scene's own `seg3d`
 ///   renderer and the camera block are unreached by it. One per space family,
 ///   each through a fixed camera with an open aperture.
+/// - `lsystem_space` — the rostered `lsystem.toml` walks the flat turtle, so
+///   the space walk, its sphere fit and the scene's own `seg3d` renderer are
+///   unreached by it. A branching tree through a fixed camera with an open
+///   aperture.
+/// - `lsystem_endless_flat` and `lsystem_endless_space` — every other `lsystem`
+///   fixture is a fixed figure, so the stream, the ring and its fade, the
+///   follow spring and the layout relative to it are unreached. One per
+///   turtle, each captured after the ring has overrun its trail.
 ///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 17] = [
+const EXTRA_FIXTURES: [(&str, &str); 20] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -200,6 +208,15 @@ const EXTRA_FIXTURES: [(&str, &str); 17] = [
     (
         "parametric_lissajous_3d",
         include_str!("fixtures/parametric_lissajous_3d.toml"),
+    ),
+    ("lsystem_space", include_str!("fixtures/lsystem_space.toml")),
+    (
+        "lsystem_endless_flat",
+        include_str!("fixtures/lsystem_endless_flat.toml"),
+    ),
+    (
+        "lsystem_endless_space",
+        include_str!("fixtures/lsystem_endless_space.toml"),
     ),
 ];
 
@@ -253,7 +270,6 @@ fn scenes_match_golden_baselines() {
             println!("blessed {}", path.display());
             return;
         }
-
         assert!(
             path.exists(),
             "missing baseline {} — run `RLX_BLESS=1 cargo test -p rlx-core --test golden`",

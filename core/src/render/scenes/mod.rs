@@ -293,6 +293,7 @@ pub struct FamilyParam {
 pub fn family_params(label: &str) -> &'static [FamilyParam] {
     match label {
         "parametric_curve" => lines::parametric::FAMILY_PARAMS,
+        "lsystem" => lines::lsystem::FAMILY_PARAMS,
         "analytic_field" => analytic_field::FAMILY_PARAMS,
         "cellular" => cellular::FAMILY_PARAMS,
         "plexus" => plexus::FAMILY_PARAMS,
@@ -384,6 +385,20 @@ pub enum GeneratorConfig {
         max_depth: u32,
         /// Reserved seed for future stochastic rules; deterministic today.
         seed: u64,
+        /// Which turtle walks the expansion, from `[generator] turtle`
+        /// (ADR-0258). `Flat` is the default and the plane walk.
+        turtle: lines::turtle::TurtleMode,
+        /// How the figure grows, from `[generator] growth`: `Fixed`, the
+        /// default, caches every depth; `Endless` walks a stream into a ring.
+        growth: lines::lsystem::Growth,
+        /// How many segments an endless figure keeps, from `[generator]
+        /// trail`, validated at load against the stream's length and held to
+        /// the tier's cap by the scene. Inert on a fixed figure.
+        trail: u32,
+        /// How many of an endless figure's newest segments its follow point is
+        /// the centroid of, from `[generator] follow_window`. Inert on a fixed
+        /// figure.
+        follow_window: u32,
     },
     /// A Hankin star pattern: an `n`-fold star rosette built at load, with a few
     /// contact-angle variants a beat can switch between — and, since ADR-0079,
@@ -630,6 +645,17 @@ pub enum OverflowContext {
     /// the [`CapOverflow`] carries the segment cap. A clamp of content: the
     /// landscape keeps less of the music.
     Rows(u32, u32),
+    /// An endless L-system's `[generator] trail` asked for past the tier's
+    /// cap for its turtle — [`seg3d_segments`](crate::render::TierConfig::seg3d_segments)
+    /// in space, [`max_segments`](crate::render::TierConfig::max_segments) on
+    /// the plane — at preset load, since the trail is structural. A clamp of
+    /// content: the vine keeps fewer segments behind its tip.
+    Trail {
+        /// The trail asked for.
+        asked: u32,
+        /// Whether the figure walks in space, which names the cap that bit.
+        space: bool,
+    },
 }
 
 impl std::fmt::Display for OverflowContext {
@@ -648,6 +674,7 @@ impl std::fmt::Display for OverflowContext {
             OverflowContext::Blur(asked) => write!(f, "an aperture of {asked} px"),
             OverflowContext::Samples(asked) => write!(f, "samples {asked}"),
             OverflowContext::Rows(asked, _) => write!(f, "rows {asked}"),
+            OverflowContext::Trail { asked, .. } => write!(f, "trail {asked}"),
         }
     }
 }
@@ -742,6 +769,13 @@ impl std::fmt::Display for CapOverflow {
                     self.context, self.cap
                 )
             }
+            OverflowContext::Trail { .. } => write!(
+                f,
+                "{} is past this quality tier's cap of {}; the vine keeps {} segments \
+                 instead, so less of it trails behind its tip than the preset asked \
+                 (ask for {} or fewer{pin})",
+                self.context, self.cap, self.cap, self.cap
+            ),
             OverflowContext::Mirror(_) | OverflowContext::Depth(_) => write!(
                 f,
                 "geometry exceeded the {}-segment cap at {} (dropped {} segment(s)); \
@@ -771,6 +805,8 @@ impl CapOverflow {
             OverflowContext::Edges(_) => rich.plexus_edges as usize,
             OverflowContext::Blur(_) => rich.max_coc_px as usize,
             OverflowContext::Samples(_) | OverflowContext::Rows(..) => rich.seg3d_segments as usize,
+            OverflowContext::Trail { space: true, .. } => rich.seg3d_segments as usize,
+            OverflowContext::Trail { space: false, .. } => rich.max_segments,
         };
         self.cap < top
     }
@@ -836,6 +872,9 @@ impl std::fmt::Display for Recovered<'_> {
                     f,
                     "the row count is back within this tier's cap of {kept} rows"
                 )
+            }
+            OverflowContext::Trail { .. } => {
+                write!(f, "the trail is back within this tier's cap of {cap}")
             }
         }
     }
@@ -1344,9 +1383,14 @@ fn create(
             tier.seg3d_segments as usize,
             tier.max_coc_px as f32,
         )),
-        SystemKind::LSystem => {
-            Box::new(lines::LSystemScene::new(line_renderer(), tier.max_segments))
-        }
+        SystemKind::LSystem => Box::new(lines::LSystemScene::new(
+            line_renderer(),
+            tier.max_segments,
+            device,
+            surface_format,
+            tier.seg3d_segments as usize,
+            tier.max_coc_px as f32,
+        )),
         SystemKind::StarPattern => Box::new(lines::StarPatternScene::new(
             line_renderer(),
             tier.max_segments,
@@ -1492,6 +1536,20 @@ mod tests {
                 rich.seg3d_segments as usize,
             ),
             (OverflowContext::Rows(900, 63), rich.seg3d_segments as usize),
+            (
+                OverflowContext::Trail {
+                    asked: 90_000,
+                    space: true,
+                },
+                rich.seg3d_segments as usize,
+            ),
+            (
+                OverflowContext::Trail {
+                    asked: 90_000,
+                    space: false,
+                },
+                rich.max_segments,
+            ),
         ] {
             let below = CapOverflow {
                 dropped: 1,
@@ -1533,6 +1591,13 @@ mod tests {
             (OverflowContext::Samples(30_000), "sample count"),
             // One segment a row, so the rows kept are the 20000 asserted below.
             (OverflowContext::Rows(30_000, 1), "row count"),
+            (
+                OverflowContext::Trail {
+                    asked: 30_000,
+                    space: true,
+                },
+                "trail",
+            ),
         ] {
             let overflow = CapOverflow {
                 dropped: 0,
@@ -1558,6 +1623,7 @@ mod tests {
                     | OverflowContext::Blur(_)
                     | OverflowContext::Samples(_)
                     | OverflowContext::Rows(..)
+                    | OverflowContext::Trail { .. }
             );
             if structural {
                 assert!(

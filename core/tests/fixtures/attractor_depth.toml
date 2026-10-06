@@ -2,20 +2,24 @@
 #
 # The attractor's DEPTH CUES (Plan 0063, ADR-0076), which the per-SystemKind
 # roster structurally cannot reach. `attractor.toml` is De Jong, and a 2-D
-# family's inverse depth extent is exactly 0.0 by design - so `perspective`,
+# family's inverse depth extent is exactly 0.0 by design - so the camera,
 # `depth_fade` and `depth_hue` are the identity there no matter how badly they
-# are broken. This is a 3-D family with all four levers off their defaults, and
-# it is the only thing in the suite that would notice a regression in them.
+# are broken. This is a 3-D family with every lever off its default, and it is
+# the only thing in the suite that would notice a regression in them.
 #
 # WHAT EACH VALUE IS HOLDING - none of these is a look choice:
-#   family      lorenz, so the projection takes the 3-D branch at all. Its basis
+#   family      lorenz, so the figure takes the camera path at all. Its basis
 #               is x-z (ADR-0068), which puts the depth axis on y.
 #   density     0.02 -> 1000 particles at the floor tier. Sparse enough that the
 #               figure reads as separable traces rather than a fog, so a
-#               magnification or fade change moves recognisable geometry.
-#   perspective 0.5 -> a 3:1 near-to-far magnification ratio, comfortably inside
-#               the silent 0.8 clamp. At 0 the whole magnification is the exact
-#               identity and this fixture would pin nothing.
+#               perspective or fade change moves recognisable geometry.
+#   distance    2.0 and fov 1.1839, pitch 0, zoom 1: the shared camera
+#               (ADR-0260) mapped from the retired `perspective = 0.5` at
+#               `zoom = 1.30` - distance = E / p with E = 1 on the canonical
+#               butterfly, and tan(fov / 2) = p / (E * 0.572 * 1.30), 0.572 its
+#               footprint. That is a 3:1 near-to-far magnification ratio on the
+#               figure's depth half-extent. The neutralization figures below
+#               were measured against `perspective` before the mapping.
 #   depth_fade  0.95 -> the far end at 5% brightness. THIS VALUE WAS SET BY
 #               MEASUREMENT AND THE FIRST GUESS WAS WRONG. At 0.6 (the far end
 #               at 40%) neutralizing the fade moved the capture by mean 0.0091
@@ -62,9 +66,10 @@ density = 0.02
 [params]
 size        = "0.35"
 fade        = "0.90"
-zoom        = "1.30"
 exposure    = "0.30"
-perspective = "0.5"
+distance    = "2.0"
+fov         = "1.1839"
+pitch       = "0"
 depth_fade  = "0.95"
 depth_hue   = "0.35"
 spin        = "3.0"

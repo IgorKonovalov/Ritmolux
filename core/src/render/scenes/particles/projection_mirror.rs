@@ -15,10 +15,10 @@ pub(super) struct Projected {
 /// `f32` `π` is not `−1` to the last bit, and the property ADR-0076 names is
 /// about `cs = −1, sn = 0`.
 pub(super) fn project(q: [f32; 3], family: AttractorFamily, cs: f32, sn: f32) -> Projected {
-    // Entry 0's framing (ADR-0093). The mirror's claim is about the projection's
-    // *algebra* — that rotation by π is an exact x-mirror under orthography and
-    // is not under perspective — which holds for every roster entry, so the
-    // canonical one is a representative rather than a limitation.
+    // Entry 0's framing (ADR-0093). The mirror's claims are about the
+    // projection's *algebra* — a half turn of an in-plane figure is a point
+    // reflection — which holds for every roster entry, so the canonical one is
+    // a representative rather than a limitation.
     let (_, dim, [cx, cy, cz]) = family.canonical_framing().projection;
     let ([hx, hy, hz], [vx, vy, vz]) = family.basis().masks();
     let [qx, qy, qz] = q;
@@ -37,19 +37,10 @@ pub(super) fn project(q: [f32; 3], family: AttractorFamily, cs: f32, sn: f32) ->
     }
 }
 
-/// Mirrors `depth_norm()` in [`DRAW_SHADER`](super::DRAW_SHADER).
-pub(super) fn depth_norm(depth: f32, inv_extent: f32) -> f32 {
-    (depth * inv_extent).clamp(-1.0, 1.0)
-}
-
-/// Mirrors `magnify()` in [`DRAW_SHADER`](super::DRAW_SHADER).
-pub(super) fn magnify(dn: f32, perspective: f32) -> f32 {
-    1.0 / (1.0 - perspective * dn)
-}
-
-/// Mirrors `depth01()` in [`DRAW_SHADER`](super::DRAW_SHADER).
+/// Mirrors `depth01()` in [`DRAW_SHADER`](super::DRAW_SHADER), saturation
+/// included.
 pub(super) fn depth01(dn: f32) -> f32 {
-    (dn + 1.0) * 0.5
+    ((dn + 1.0) * 0.5).clamp(0.0, 1.0)
 }
 
 /// Mirrors `haze()` in [`DRAW_SHADER`](super::DRAW_SHADER) — the per-particle
@@ -152,47 +143,16 @@ pub(super) fn shift_hue(c: [f32; 3], turns: f32) -> [f32; 3] {
     hsv2rgb(hsv)
 }
 
-/// The magnified world-space position of one particle — `project` composed
-/// with the two above and the family's world scale, which is the composition
-/// the vertex shader performs before the aspect division and the view
-/// transform.
+/// The world-space position of one particle on the in-plane path — `project`
+/// times the family's world scale, which is the composition the vertex shader
+/// performs before the aspect division and the view transform.
 ///
 /// The sprite's own corner offset is left off: it is a fixed square about
 /// this point, so it cannot affect whether two projections are mirror images.
-pub(super) fn world(
-    q: [f32; 3],
-    family: AttractorFamily,
-    cs: f32,
-    sn: f32,
-    perspective: f32,
-) -> [f32; 2] {
-    let framing = family.canonical_framing();
-    let (scl, _, _) = framing.projection;
-    let p = project(q, family, cs, sn);
-    let m = magnify(
-        depth_norm(p.depth, framing.inv_depth_extent(family)),
-        perspective,
-    );
-    let [sx, sy] = p.screen;
-    [sx * scl * m, sy * scl * m]
-}
-
-// The virtual lens the figure's normalized depth is laid on (ADR-0257): the
-// scene's own CPU copy of the draw shader's constants.
-use super::{FIGURE_DISTANCE, FIGURE_RADIUS};
-
-/// Mirrors `figure_coc()` in [`DRAW_SHADER`](super::DRAW_SHADER): the circle of
-/// confusion in pixels at normalized depth `dn`, through the shared
-/// [`Lens::coc`](crate::render::camera::Lens::coc).
-pub(super) fn figure_coc(dn: f32, aperture: f32, focus: f32, max_coc: f32, inv_extent: f32) -> f32 {
-    let focal = FIGURE_DISTANCE - FIGURE_RADIUS * (1.0 - 2.0 * focus);
-    let lens = crate::render::camera::Lens {
-        aperture,
-        focal_depth: focal,
-        max_coc,
-    };
-    let has_depth = if inv_extent != 0.0 { 1.0 } else { 0.0 };
-    lens.coc(FIGURE_DISTANCE - FIGURE_RADIUS * dn) * has_depth
+pub(super) fn world(q: [f32; 3], family: AttractorFamily, cs: f32, sn: f32) -> [f32; 2] {
+    let (scl, _, _) = family.canonical_framing().projection;
+    let [sx, sy] = project(q, family, cs, sn).screen;
+    [sx * scl, sy * scl]
 }
 
 /// Mirrors `blur_growth()` in [`DRAW_SHADER`](super::DRAW_SHADER).

@@ -100,7 +100,7 @@ such flag and always draws at the full scale).
   - [Engine stage: `tonemap`](#engine-stage-tonemap)
   - [Engine stage: `ink`](#engine-stage-ink)
   - [`fragment_field` animation rates — `field_speed` and `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed)
-  - [Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin`](#attractor-depth-perspective-depth_fade-depth_hue-spin)
+  - [Attractor depth: the camera, `depth_fade`, `depth_hue`, `spin`](#attractor-depth-the-camera-depth_fade-depth_hue-spin)
   - [Attractor detail sharpness](#attractor-detail-sharpness)
   - [Swarm flow-field structure](#swarm-flow-field-structure)
   - [`emitter` — objects that spawn, fall, and die](#emitter--objects-that-spawn-fall-and-die)
@@ -579,30 +579,41 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | Parameter | Default | Range | What it does | Group |
 |---|---|---|---|---|
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. | colour |
-| `mirror_order` | `1` | `1` – `12` | Repeats the geometry this many times around the centre; 1 draws it once. | shape |
+| `mirror_order` | `1` | `flat` `1` – `12`; inert on `space`, `flat endless`, `space endless` | Repeats a flat L-system this many times around the centre; 1 draws it once. | shape |
 
 **Modal**
 
 | Parameter | Default | Range | What it does | Group |
 |---|---|---|---|---|
-| `visible_depth` | `1` | `1` – `7` | Which recursion generation is drawn, counted from 1 and capped at `max_depth`; a fraction floors to the generation below it, and anything under 2 draws the first. | shape, main |
-| `rotation` | `0` | `0` – `6.2831855` | Turns the whole figure, in radians. | motion |
+| `visible_depth` | `1` | `flat` `1` – `7`; `space` `1` – `7`; inert on `flat endless`, `space endless` | Which recursion generation is drawn, counted from 1 and capped at `max_depth`; a fraction floors to the generation below it, and anything under 2 draws the first. | shape, main |
+| `rotation` | `0` | `flat` `0` – `6.2831855`; `flat endless` `0` – `6.2831855`; inert on `space`, `space endless` | Turns a flat figure in its plane, in radians. | motion |
 | `hue` | `0.3` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. | colour, main |
 | `hue_spread` | `0` | `0` – `1` | How far along the palette the colour travels from one end of the figure to the other. | colour |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. | colour |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. | colour |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. | colour |
-| `draw_progress` | `1` | `0` – `1` | How much of the figure is drawn, from its start; below 1 the line is still arriving. | motion |
-| `thickness` | `1.8` | `0.5` – `12` | Stroke width in pixels at the render target, before softness widens the falloff. | shape, main |
-| `scale` | `1` | `0.1` – `2` | Size of the figure within the frame, before the shared zoom is applied. | shape |
+| `draw_progress` | `1` | `flat` `0` – `1`; `space` `0` – `1`; inert on `flat endless`, `space endless` | How much of a fixed L-system is drawn, from its first segment: 0 none, 1 all of it. | motion |
+| `thickness` | `1.8` | `0.5` – `12` | Stroke width: on a flat figure in the shared line units, on a space figure in pixels at the focal plane, wider nearer and narrower farther. | shape, main |
+| `scale` | `1` | `flat` `0.1` – `2`; `flat endless` `0.1` – `2`; inert on `space`, `space endless` | Scales a flat figure about its centre; a space figure is sized by the camera's distance instead. | shape |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
 | `glow` | `1` | `0` – `4` | Brightness of the halo around each stroke, on top of the stroke itself. | light, main |
 | `softness` | `0.25` | `0` – `1` | How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core. | light |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. | shape |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
-| `stroke_blend` | `0` | `0` – `1` | Moves the stroke from additive light toward opaque paint, so crossings stop brightening. | light |
-| `mirror_reflect` | `0` | `0` – `1` | Alternates the repeats into mirror images rather than plain rotations. | shape |
+| `stroke_blend` | `0` | `flat` `0` – `1`; `flat endless` `0` – `1`; inert on `space`, `space endless` | Moves a flat L-system's stroke from additive light toward opaque paint, so crossing branches stop brightening. | light |
+| `mirror_reflect` | `0` | `flat` `0` – `1`; inert on `space`, `flat endless`, `space endless` | Alternates a flat L-system's repeats into mirror images rather than plain rotations. | shape |
+| `yaw` | `0` | `space` `-3.1415927` – `3.1415927`; `space endless` `-3.1415927` – `3.1415927`; inert on `flat`, `flat endless` | Turns the camera around a space tree, in radians; bind it to a slow clock to orbit. | motion |
+| `pitch` | `0.25` | `space` `-1.55` – `1.55`; `space endless` `-1.55` – `1.55`; inert on `flat`, `flat endless` | Raises the camera above a space tree, in radians; negative looks up from below. | motion |
+| `distance` | `3.5` | `space` `1.5` – `8`; `space endless` `1.5` – `8`; inert on `flat`, `flat endless` | How far the camera sits from a space tree's centre; nearer makes the tree larger and exaggerates the perspective. | motion |
+| `fov` | `0.8` | `space` `0.2` – `2`; `space endless` `0.2` – `2`; inert on `flat`, `flat endless` | The camera's vertical field of view onto a space tree, in radians; zoom divides it. | motion |
+| `focus` | `0.5` | `space` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `flat endless` | Where the focal plane sits in a space tree's depth: 0 at its nearest point, 1 at its farthest. | light, main |
+| `aperture` | `0` | `space` `0` – `24`; `space endless` `0` – `24`; inert on `flat`, `flat endless` | The blur of a space tree's far side, in pixels; branches nearer than the focal plane blur more, up to the tier's cap. 0 keeps every branch sharp, and wider costs fill. | light, main |
+| `fog` | `0` | `space` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `flat endless` | Fades a space tree toward black with depth: at 1 its farthest point is black and its nearest keeps its light. 0 is off. | light |
+| `solid` | `0` | `space` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `flat endless` | 1 paints a space tree's near branches over its far ones, so it reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every segment by depth each frame. | light |
+| `grow` | `20` | `flat endless` `0` – `120`; `space endless` `0` – `120`; inert on `flat`, `space` | How fast an endless figure grows, in draw steps a second; bind it to onset to make it surge. | motion, main |
+| `tail` | `0.5` | `flat endless` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `space` | The oldest fraction of an endless figure's trail that fades out; 0 keeps every segment at full light until it is dropped. | light |
+| `follow` | `0.3` | `flat endless` `0.05` – `3`; `space endless` `0.05` – `3`; inert on `flat`, `space` | How slowly the view follows an endless figure's growing tip, in seconds: short keeps the tip near the centre, long lets it lead and glides after a branch's jump. | motion |
 
 ### System: `star_pattern`
 
@@ -700,9 +711,13 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
 | `reseed` | `0` | `0` – `1` | Crossing zero throws every particle back onto a fresh start position. | motion |
-| `perspective` | `0` | `0` – `1` | How strongly depth shrinks a particle, turning a flat figure into a solid one. | shape |
-| `focus` | `0.5` | `0` – `1` | Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest. | light |
-| `aperture` | `0` | `0` – `24` | The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps. | light |
+| `yaw` | `0` | `thomas` `-3.1415927` – `3.1415927`; `lorenz` `-3.1415927` – `3.1415927`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Turns the camera around a 3D figure, in radians, on top of its spin; inert on the flat maps. | motion |
+| `pitch` | `0.25` | `thomas` `-1.55` – `1.55`; `lorenz` `-1.55` – `1.55`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Raises the camera above a 3D figure, in radians; negative looks up from below. | motion |
+| `distance` | `3.5` | `thomas` `1.5` – `8`; `lorenz` `1.5` – `8`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | How far the camera sits from a 3D figure's centre, in figure radii; nearer exaggerates the perspective. | motion |
+| `fov` | `0.8` | `thomas` `0.2` – `2`; `lorenz` `0.2` – `2`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | The camera's vertical field of view onto a 3D figure, in radians; zoom divides it. | motion |
+| `focus` | `0.5` | `thomas` `0` – `1`; `lorenz` `0` – `1`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest. | light, main |
+| `aperture` | `0` | `thomas` `0` – `24`; `lorenz` `0` – `24`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps. | light, main |
+| `fog` | `0` | `thomas` `0` – `1`; `lorenz` `0` – `1`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Fades a 3D figure's sprites toward black with depth: at 1 its farthest point is black and its nearest keeps its light. 0 is off; inert on the flat maps. | light |
 | `depth_fade` | `0` | `0` – `1` | How much depth dims a particle, which is what reads as air between the layers. | light |
 | `depth_hue` | `0` | `-1` – `1` | Shifts colour with depth, so far parts of the figure sit elsewhere on the palette. | colour |
 | `spin` | `0` | `-2` – `2` | Turns per second the figure rotates by about its vertical axis. | motion, main |
@@ -1205,13 +1220,14 @@ remap documented there.
 > family.** `a b c d` mean different things per family and mean *nothing* on the
 > five IFS figures; `morph` `curl` `vigor` `lean` `bias` **and** `map_tint`
 > `map_hue` `root_tint` `root_hue` `emergence` are **IFS-only** and are inert on the four map
-> families; `perspective` `depth_fade` `depth_hue` reach only the two 3-D flows.
+> families; the camera block (`yaw` `pitch` `distance` `fov` `focus` `aperture`)
+> and `depth_fade` `depth_hue` reach only the two 3-D flows.
 > Binding an inert one is not an error and produces no warning — it produces
 > nothing at all. See
 > [The five IFS figures](#the-five-ifs-figures--a-different-kind-of-family),
 > [What made this point, and how far into the figure it is](#what-made-this-point-and-how-far-into-the-figure-it-is)
 > and
-> [Attractor depth](#attractor-depth-perspective-depth_fade-depth_hue-spin).
+> [Attractor depth](#attractor-depth-the-camera-depth_fade-depth_hue-spin).
 
 **My attractor is too bright / too dim — which knob?** `brightness`. It is a
 plain multiplier on the light each particle deposits (default `1.0`), so it
@@ -1263,25 +1279,68 @@ same shape for the same reason.)
 under one `fold_speed`; they are a sine/cosine pair chosen not to beat against
 each other, and nothing has asked for them to diverge.
 
-### Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin`
+### Attractor depth: the camera, `depth_fade`, `depth_hue`, `spin`
 
-**Three of these four are exact no-ops on every flat family**, the same way
-`a b c d` already carry family-specific meanings. `perspective`, `depth_fade`
-and `depth_hue` do something only on the **3-D families — `thomas` and
-`lorenz`.** On `de_jong`, `clifford` and the five IFS figures they are
-*exactly* the identity: those maps have no third coordinate, so the engine
-hands the shader a depth extent of zero and every cue collapses to a no-op.
-Binding them there is not an error and produces no warning — it produces
-nothing at all. (Verified by capture: at any setting, **zero pixels** differ —
-asserted for all three in `core/tests/attractor.rs`.)
+**The 3-D families — `thomas` and `lorenz` — are seen through the shared
+camera** that `plexus`, `waterfall` and the space curves use
+([ADR-0260](../docs/adrs/0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md)).
+`yaw` turns it round the figure, `pitch` raises it, `distance` moves it in and
+out and `fov` is its field of view; `focus` and `aperture` are its lens. Each
+roster entry is first brought to unit radius by its own measured framing, so
+`distance` is in **figure radii** and means the same on every entry: at `1.5`,
+the bottom of its range, a test holds every 3-D entry clear of the camera's
+near plane. Lorenz Knot's bass hit reaches about `1.43`, below what that test
+covers. A particle nearer the camera than the near plane is dropped. The engine-wide
+`zoom` divides the field of view (the angle, not its tangent), and `pan_x` /
+`pan_y` slide the picture; on these two families `pan_x` is measured in frame
+heights, so a value written for a flat family drifts `16/9` as far on a 16:9
+target. The default `pitch` is `0.25`, so an unbound 3-D preset is seen slightly
+from above.
+
+**The camera turns the figure in place.** It orbits the figure's centre, so a
+yaw sweep or a `spin` no longer slides the figure round the frame: over a full
+turn a Lorenz figure's projected centroid moves about 0.12 NDC at a camera
+matched to the old `perspective = 0.25`, where that setting swung it 0.20.
+
+**`perspective` is retired, and binding it is a load error** that names
+`distance` and `fov`. An old preset moves onto the camera by an exact mapping,
+with `E` the entry's depth half-extent in figure radii and `p` the old value:
+`distance = E / p`, `tan(fov / 2) = p / (scale * E * zoom)` with the camera's
+`zoom` left at `1`, and `pitch = 0`. A preset that sat at `perspective = 0`
+takes a long `distance` and a matching narrow `fov` — the shipped `fragment_sumi`
+layer uses `distance = 20`, `fov = 0.13` — which is as near to orthographic as
+the camera goes.
+
+**`focus` and `aperture` act on the camera's real lens.** `focus` places the
+focal plane in the figure's depth, `0` at its nearest point and `1` at its
+farthest; `aperture` is the blur of the far side in pixels, and a sprite off the
+focal plane draws wider and dimmer, so its light stays the same. A sprite's size
+is stated at the figure's centre, so moving `focus` never resizes one; nearer
+sprites draw larger and farther ones smaller, as nearer material should.
+
+**`fog` darkens a sprite with its depth**, on the scale `focus` uses: at `1` the
+figure's farthest point is black and its nearest keeps all its light, and `0`
+is off. It takes light and never size, at the particle's own depth, so the trace
+behind a particle keeps the light it had where it was. Its scale is the figure
+brought to unit radius, so it reads the same on every roster entry. `depth_fade` is the older cue on the same idea, measured on the entry's
+depth half-extent; the two multiply. `solid` is not an attractor parameter: a
+sprite has no line to paint over another.
+
+**The camera, `depth_fade` and `depth_hue` are exact no-ops on every flat
+family**, the same way `a b c d` already carry family-specific meanings. On
+`de_jong`, `clifford` and the five IFS figures they are *exactly* the identity:
+those maps have no third coordinate, so they keep their in-plane path and every
+depth cue collapses to a no-op. Binding them there is not an error and produces
+no warning — it produces nothing at all. (Verified by capture: at any setting,
+**zero pixels** differ — asserted in `core/tests/attractor.rs`.)
 
 > **`depth_fade` is a no-op on a flat family too, and the arithmetic is why it once
 > was not** ([design-backlog 0067](../docs/design-backlog.md)). The haze is
 > `1 − depth_fade · (1 − depth01(dn))`, and a flat family's `dn ≡ 0` would put the
 > multiplier at `1 − depth_fade/2`, so `depth_fade = 0.9` would dim a flat figure
 > **45 %** everywhere with no depth gradient (measured on `attractor_dissolve`:
-> 20.1 % of pixels moved, max channel delta 97, while `perspective` and
-> `depth_hue` moved **zero**). The fade term is now multiplied by the family's
+> 20.1 % of pixels moved, max channel delta 97, while `depth_hue` moved
+> **zero**). The fade term is now multiplied by the family's
 > has-depth flag, so all three cues are the identity together. If an old draft
 > leaned on the dimming as an undocumented brightness trim on a flat family, it
 > silently brightened back — `exposure` is the parameter that means "dimmer"
@@ -1294,54 +1353,28 @@ reads as wind. That asymmetry is deliberate; do not read it as an oversight.
 
 | Param | What it does | Range that means something |
 |---|---|---|
-| `perspective` | Near material grows and far material shrinks, position and point size together. Segments foreshorten, because both endpoints project independently. | `0` (orthographic, the default) .. **~`0.3` in practice**; the clamp is at `0.8` and the reason to stop short of it is below |
+| `distance` | How far the camera sits from the figure's centre, in figure radii. Nearer exaggerates the perspective: near material grows and far material shrinks, position and sprite size together. | `1.5` .. `8`; the shipped 3-D presets run from about `1.4` (Lorenz Knot on a bass hit) to `5`. The range documents and does not clamp |
+| `fov` | The vertical field of view, in radians. A narrow `fov` at a long `distance` flattens the figure toward orthographic. | `0.2` .. `2` |
 | `depth_fade`  | Attenuates brightness with distance — the substitute for occlusion, which this scene does not do. `1` takes the far end to black. | `0` (off) .. `1` |
 | `depth_hue`   | Shifts the palette coordinate by `±depth_hue/2` across the depth range, so distance moves *colour* as well as contrast — **on a ramp that travels in hue at roughly constant lightness.** On a dark-to-light ramp (which is what the 3-D presets have shipped) it duplicates `depth_fade` instead, and under `ink_amount = 1` it is structurally dead, like `saturation`. [design-backlog 0062](../docs/design-backlog.md) | `0` (off) .. **`2 * min(hue_center, 1 - hue_center)`**, past which the offset wraps on the LUT's repeat sampler and far material lands on the near colour |
 | `spin`        | Rate multiplier on the display rotation. `1` is unchanged, `0` holds the figure still, negative reverses it. | any |
 
 Four things you cannot discover by binding them:
 
-- **`perspective` is clamped at `0.8`, silently.** A preset asking for more gets
-  the ceiling, not a warning — the same undiscoverable-ceiling shape
-  `bloom_threshold` and `vigor` already carry. The number means the figure's
-  depth half-extent as a fraction of the camera distance, so the near-to-far
-  magnification ratio is `(1 + p) / (1 - p)`: `0.5` gives 3:1, `0.8` gives 9:1,
-  and the singularity would be at `1`.
-- **`perspective` mostly MOVES the figure, and a `zoom` edit cannot recover
-  that.** The magnification is applied *before* the view transform, so raising it
-  does make the figure bigger — but that is the small half. **Measured**
-  peak-to-peak over four spin phases on a bare Lorenz, 600 px square:
-
-  | `perspective` | centre-x swing | widest span |
-  |---|---|---|
-  | 0.00 | 0.04 NDC | 522 px |
-  | 0.15 | 0.11 NDC | 525 px |
-  | 0.25 | 0.20 NDC | 529 px |
-  | 0.40 | 0.37 NDC | 542 px |
-  | 0.60 | 0.55 NDC | 555 px |
-
-  The near side is magnified, so the projected centroid shifts toward whichever
-  side is currently near — and as the figure turns, that shift **orbits**. The
-  swing is about **0.9 x `perspective`** in NDC; the size growth across that
-  whole sweep is **6 %**. A `zoom` is a static scale, so it cannot recover a
-  phase-varying translation: all it can do is shrink the figure until the orbit
-  fits inside the frame, which is what the 3-D presets paid for
-  (`attractor_lorenz` went 1.32 -> 1.16 and Thomas 1.14 -> 1.02, both since
-  retired).
-  **So the real ceiling is ~`0.3`, not the `0.8` clamp** — past that the figure
-  visibly slides around the frame instead of turning in place, which is a worse
-  artifact than the flatness `perspective` was bought to fix. The clamp is not
-  where the projection breaks; at `0.8` it is still a true perspective divide and
-  reads as a strong wide angle, not a fisheye. This ceiling note is
-  [design-backlog 0061](../docs/design-backlog.md)'s documented resolution; the
-  deeper fix — re-centring the projection on the figure's projected centroid —
-  remains unowned.
+- **The near-to-far magnification is set by `distance` alone.** A figure of
+  radius 1 seen from `distance` `D` magnifies its near side over its far side by
+  `(D + 1) / (D - 1)`: `3` gives 2:1, `2` gives 3:1, and `1.5` gives 5:1. `fov`
+  and `zoom` change how large the whole figure is, not that ratio, so to keep a
+  figure's size while deepening it, shorten `distance` and widen `fov` together.
+- **`spin` turns the figure, `yaw` places the camera, and they add.** The spin
+  phase is subtracted from `yaw`, so a positive `spin` turns the figure the same
+  way it always has, and a fixed `yaw` offsets where the turn starts.
 - **`spin` is a multiplier on 0.18 rad/s** (`spin = 1` is one revolution per
   **34.9 seconds**), and **its usable ceiling is set by `fade`, not by taste —
   `spin` and `fade` are one look.** A frame of trail drawn while the figure
   turns is a frame of *rotational smear*: push the pair too far and the
   accumulation stops being a trace of the trajectory and becomes concentric
-  arcs, which destroys exactly the volume `perspective` was bought to buy.
+  arcs, which destroys exactly the volume the camera is there to show.
   **Measured**: at `fade = 0.932` (~15 frames of trail)
   the rendered ladder `1 / 2 / 3 / 5 / 8` reads *crisp, crisp, softening,
   smeared, scribble* — usable peak about **1.9**; at `fade = 0.955` (~22
@@ -1360,8 +1393,8 @@ Four things you cannot discover by binding them:
 - **The illusion has a density limit and haze does not remove it.** Nothing
   occludes anything here — two strands crossing simply sum — so as
   `[particles] density` rises the figure reads more and more as X-ray whatever
-  these are set to. If depth stops reading, lower `density` before raising
-  `perspective`.
+  these are set to. If depth stops reading, lower `density` before shortening
+  `distance`, and try a `pitch` that separates the strands.
 
 ### Attractor detail sharpness
 
@@ -4490,12 +4523,40 @@ expressions. Validated at load; a bad value is a surfaced error.
 | `axiom`     | string          | Starting string. Required, non-empty.                       |
 | `rules`     | table `k = "v"` | Each key a single character (the predecessor). Required.    |
 | `angle_deg` | number          | Turn angle for `+`/`-`. Default 25.                         |
-| `max_depth` | integer         | Iterations to precompute; clamped to `1..=7`. Default 4.    |
+| `max_depth` | integer         | Iterations to precompute; clamped to `1..=7`. Default 4. Inert under `growth = "endless"`. |
+| `turtle`    | `flat` / `space` | Which turtle walks the string. Default `flat`, the plane walk. `space` walks in depth, seen through the camera block. An unknown name is a load error naming both. |
+| `growth`    | `fixed` / `endless` | Default `fixed`: one cached depth, picked by `visible_depth`. `endless` grows a vine that never ends, at the rate `grow` sets. An unknown name is a load error naming both. |
+| `trail`     | integer         | Endless only: how many segments the vine keeps behind its tip. Default 2000. Held to the tier's cap (`seg3d_segments` in `space`, `max_segments` in `flat`), and the clamp is announced. A grammar whose whole stream is shorter than `trail` is a load error. |
+| `follow_window` | integer     | Endless only: how many of the newest segments the view follows the centre of. Default 32. Wider smooths the jump a `]` makes. |
 | `seed`      | integer or `"random"` | The salt for `hash()`/`noise()` — see [Seeded randomness](#seeded-randomness--hash-noise-and-generator-seed). **Not** an L-system key: the expansion is deterministic and ignores it, and any system's preset may declare one. Default 0. |
 
 Turtle vocabulary in the expanded string: `F`/`G` draw forward, `f` moves without
 drawing, `+`/`-` turn by `angle_deg`, `[`/`]` push/pop the branch state, any other
 character is an inert grammar variable.
+
+Under `turtle = "space"` the turtle carries a heading, a left and an up direction,
+and five more symbols turn it, each by `angle_deg`: `&`/`^` pitch down and up,
+`\`/`/` roll, and `|` turns it around. `+`/`-` still turn it left and right. Under
+`flat` those five stay inert variables, so a grammar that names them as variables
+walks what it always did. The space figure is drawn through the camera block
+(`yaw`, `pitch`, `distance`, `fov`, `focus`, `aperture`, `fog`, `solid`), and
+`thickness` is in pixels at the focal plane. A segment is a straight stroke with no
+join, so a sharp turn shows a facet at any width above a hairline.
+
+Under `growth = "endless"` nothing is cached. The turtle walks the grammar's
+derivation one symbol at a time at a fixed internal depth, `grow` draw steps a
+second, and keeps the newest `trail` segments; the oldest `tail` fraction of them
+fades out. The view follows the centre of the newest `follow_window` segments on a
+spring with time constant `follow`. In `space` the camera orbits that point; in
+`flat` the figure pans by it, on top of `pan_x`/`pan_y`. The walk is depth-first,
+so a `]` sends the tip back to its branch point: vines and short-branched coral
+suit `endless`, and a deep tree, whose `]` jumps a long way back, does not.
+
+What each mode makes inert is in the generated table under
+[System: `lsystem`](#system-lsystem): `rotation`, `scale`, `stroke_blend`,
+`mirror_order` and `mirror_reflect` are flat-only; the camera block is space-only;
+`visible_depth`, `draw_progress` and the mirror pair are inert under `endless`, and
+`grow`, `tail` and `follow` under `fixed`.
 
 ### `[generator]` — for `star_pattern`
 
@@ -4933,8 +4994,7 @@ including every intermediate `morph` and every combination of the four levers �
 is a converging system. Drive them as hard as you like; unlike `a`..`d` on a
 chaotic map, there is no cliff to fall off.
 
-**`vigor`'s ceiling is silent**, the same shape as `bloom_threshold` and
-`perspective`. Every map's contraction is held under **0.97**, and the fern's
+**`vigor`'s ceiling is silent**, the same shape as `bloom_threshold`. Every map's contraction is held under **0.97**, and the fern's
 largest is already `0.851` — so about 17 % of headroom, and asking for more than
 that gets *silence* rather than an error or a warning. Past the ceiling every
 value renders identically. If `vigor` seems to stop responding, that is where it

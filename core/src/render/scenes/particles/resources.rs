@@ -114,7 +114,7 @@ impl StepUniform {
 /// (ADR-0069) — non-zero exactly when [`AttractorFamily::is_continuous`].
 /// `bh`/`bv`: the 3D projection basis's two axis selectors (ADR-0068) — the axis
 /// the spin rotates `x` against, and the vertical. Read only on the 3D branch.
-/// `d`: x `perspective`, y `depth_fade`, z `depth_hue`, w the family's
+/// `d`: x unused, y `depth_fade`, z `depth_hue`, w the family's
 /// **inverse** depth half-extent (ADR-0076) — `0` for a 2D family, which is what
 /// makes every depth cue the identity there without a shader branch.
 /// `ctr`: xyz the world centre subtracted before projection (Plan 0062), w unused.
@@ -133,6 +133,14 @@ impl StepUniform {
 /// would black them out rather than leave them alone. **z and w are free** since
 /// the retirement: z carried `1/churn_max_lifetime()`, which only the age colour
 /// channel read.
+///
+/// `cam`: the shared camera (ADR-0260) a family with depth projects through,
+/// its `viewport.z` the orbit target's view depth, which sprite sizes are
+/// stated at. `mdl`: x the model transform's `1 / framed half-extent`, y the
+/// sprite radius in target pixels at that reference depth, z the model depth
+/// that is one unit of normalized depth, inverted, w the camera's `fog`
+/// (ADR-0263). Both are zero on a
+/// flat family, whose path never reads them.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct DrawUniform {
@@ -146,6 +154,8 @@ pub(super) struct DrawUniform {
     pub(super) ctr: [f32; 4],
     pub(super) ch: [f32; 4],
     pub(super) em: [f32; 4],
+    pub(super) cam: crate::render::camera::CameraUniform,
+    pub(super) mdl: [f32; 4],
 }
 
 /// Decay uniform (per frame): x is the per-frame trail retention factor.

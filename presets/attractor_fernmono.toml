@@ -173,7 +173,6 @@ hue_spread = "0.55"
 saturation = "0"      # neutral: this world is white light, not tinted light
 
 # Depth, without a camera move.
-perspective = "0.10"
 depth_fade  = "0.28 + clamp(mid * 0.118, 0, 0.10)"
 
 # Fresh disturbance on a hard hit only - the fern re-settles within a second or

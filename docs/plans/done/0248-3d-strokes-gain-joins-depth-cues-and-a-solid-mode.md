@@ -12,9 +12,9 @@
 > [0158](../../adrs/0158-a-joined-end-carries-its-own-miter-length.md),
 > [0249](../../adrs/0249-a-human-phase-may-be-owed-after-the-merge.md)
 > **Closes:** design-backlog 0279, 0280, 0281
-> **Runs before:** Plans [0237](../0237-the-l-system-turtle-turns-in-space.md),
+> **Runs before:** Plans [0237](0237-the-l-system-turtle-turns-in-space.md),
 > [0239](../0239-the-swarm-moves-into-a-real-camera.md) and
-> [0240](../0240-the-attractor-projects-through-the-shared-camera.md), which splice the camera block this
+> [0240](0240-the-attractor-projects-through-the-shared-camera.md), which splice the camera block this
 > plan extends.
 
 ## TL;DR
@@ -176,9 +176,14 @@ flowchart LR
 ### Phase 7 — The moved baselines are blessed
 - **Owner skill:** human
 - **Blocks merge:** no
-- **What:** Re-bless, on DX12 WARP, the baselines Phase 1's log names, and nothing else. If Plan 0218
-  has moved blessing to lavapipe by then, bless there instead.
-- **Files touched:** `core/tests/golden/`, `core/tests/suite/` baselines named in the log.
+- **What:** Re-bless, on DX12 WARP, the four baselines the merged tree moved, and nothing else:
+  `parametric_lissajous_3d`, `parametric_torus_knot`, `waterfall_ramp` and `waterfall`. Phase 1's
+  log names the first three. `waterfall` was byte-identical on the Linux Vulkan adapter Phase 1
+  captured on, but moved on WARP (outlier 213 against 48 in CI run 37444996175's `coverage` job).
+  If Plan 0218 has moved blessing to lavapipe by then, bless there instead.
+- **Files touched:** `core/tests/golden/parametric_lissajous_3d.png`,
+  `core/tests/golden/parametric_torus_knot.png`, `core/tests/golden/waterfall_ramp.png`,
+  `core/tests/golden/waterfall.png`.
 - **Done when:** the Windows CI golden job is green on `main`.
 
 ### Phase 8 — The looks, judged

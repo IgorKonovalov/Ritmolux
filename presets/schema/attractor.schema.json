@@ -42,9 +42,13 @@
         "pan_x": { "$ref": "#/definitions/param.pan_x" },
         "pan_y": { "$ref": "#/definitions/param.pan_y" },
         "reseed": { "$ref": "#/definitions/param.reseed.attractor" },
-        "perspective": { "$ref": "#/definitions/param.perspective" },
+        "yaw": { "$ref": "#/definitions/param.yaw.attractor" },
+        "pitch": { "$ref": "#/definitions/param.pitch.attractor" },
+        "distance": { "$ref": "#/definitions/param.distance.attractor" },
+        "fov": { "$ref": "#/definitions/param.fov.attractor" },
         "focus": { "$ref": "#/definitions/param.focus.attractor" },
         "aperture": { "$ref": "#/definitions/param.aperture.attractor" },
+        "fog": { "$ref": "#/definitions/param.fog.attractor" },
         "depth_fade": { "$ref": "#/definitions/param.depth_fade.attractor" },
         "depth_hue": { "$ref": "#/definitions/param.depth_hue" },
         "spin": { "$ref": "#/definitions/param.spin.attractor" },
@@ -367,8 +371,30 @@
         },
         "max_depth": {
           "type": "integer",
-          "description": "L-system: how many iterations to expand and cache.",
-          "markdownDescription": "L-system: how many iterations to expand and cache.\n\nDefault `4`."
+          "description": "L-system: how many iterations to expand and cache. Inert under growth = \"endless\", whose stream is walked to its own fixed depth.",
+          "markdownDescription": "L-system: how many iterations to expand and cache. Inert under growth = \"endless\", whose stream is walked to its own fixed depth.\n\nDefault `4`."
+        },
+        "turtle": {
+          "type": "string",
+          "enum": ["flat", "space"],
+          "description": "L-system: \"flat\" walks the plane; \"space\" walks in depth through the camera, where & and ^ pitch, \\ and / roll and | turns around.",
+          "markdownDescription": "L-system: \"flat\" walks the plane; \"space\" walks in depth through the camera, where & and ^ pitch, \\ and / roll and | turns around.\n\nDefault `flat`."
+        },
+        "growth": {
+          "type": "string",
+          "enum": ["fixed", "endless"],
+          "description": "L-system: \"fixed\" draws one cached depth; \"endless\" grows a vine that never ends at the rate grow sets, keeping the newest trail segments.",
+          "markdownDescription": "L-system: \"fixed\" draws one cached depth; \"endless\" grows a vine that never ends at the rate grow sets, keeping the newest trail segments.\n\nDefault `fixed`."
+        },
+        "trail": {
+          "type": "integer",
+          "description": "L-system, endless: how many segments the vine keeps behind its tip, held to the quality tier's cap.",
+          "markdownDescription": "L-system, endless: how many segments the vine keeps behind its tip, held to the quality tier's cap.\n\nDefault `2000`."
+        },
+        "follow_window": {
+          "type": "integer",
+          "description": "L-system, endless: how many of the newest segments the view follows the centre of; wider smooths the jump a branch's return makes.",
+          "markdownDescription": "L-system, endless: how many of the newest segments the view follows the centre of; wider smooths the jump a branch's return makes.\n\nDefault `32`."
         },
         "seed": {
           "anyOf": [
@@ -880,20 +906,40 @@
       "description": "Crossing zero throws every particle back onto a fresh start position.",
       "markdownDescription": "Crossing zero throws every particle back onto a fresh start position.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.perspective": {
+    "param.yaw.attractor": {
       "type": "string",
-      "description": "How strongly depth shrinks a particle, turning a flat figure into a solid one.",
-      "markdownDescription": "How strongly depth shrinks a particle, turning a flat figure into a solid one.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Turns the camera around a 3D figure, in radians, on top of its spin; inert on the flat maps.",
+      "markdownDescription": "Turns the camera around a 3D figure, in radians, on top of its spin; inert on the flat maps.\n\n- default `0.0`\n- typical range depends on the family: `thomas` `-3.1415927` to `3.1415927`, `lorenz` `-3.1415927` to `3.1415927` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.pitch.attractor": {
+      "type": "string",
+      "description": "Raises the camera above a 3D figure, in radians; negative looks up from below.",
+      "markdownDescription": "Raises the camera above a 3D figure, in radians; negative looks up from below.\n\n- default `0.25`\n- typical range depends on the family: `thomas` `-1.55` to `1.55`, `lorenz` `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.distance.attractor": {
+      "type": "string",
+      "description": "How far the camera sits from a 3D figure's centre, in figure radii; nearer exaggerates the perspective.",
+      "markdownDescription": "How far the camera sits from a 3D figure's centre, in figure radii; nearer exaggerates the perspective.\n\n- default `3.5`\n- typical range depends on the family: `thomas` `1.5` to `8.0`, `lorenz` `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.fov.attractor": {
+      "type": "string",
+      "description": "The camera's vertical field of view onto a 3D figure, in radians; zoom divides it.",
+      "markdownDescription": "The camera's vertical field of view onto a 3D figure, in radians; zoom divides it.\n\n- default `0.8`\n- typical range depends on the family: `thomas` `0.2` to `2.0`, `lorenz` `0.2` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.focus.attractor": {
       "type": "string",
       "description": "Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest.",
-      "markdownDescription": "Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range depends on the family: `thomas` `0.0` to `1.0`, `lorenz` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.aperture.attractor": {
       "type": "string",
       "description": "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.",
-      "markdownDescription": "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.\n\n- default `0.0`\n- typical range depends on the family: `thomas` `0.0` to `24.0`, `lorenz` `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.fog.attractor": {
+      "type": "string",
+      "description": "Fades a 3D figure's sprites toward black with depth: at 1 its farthest point is black and its nearest keeps its light. 0 is off; inert on the flat maps.",
+      "markdownDescription": "Fades a 3D figure's sprites toward black with depth: at 1 its farthest point is black and its nearest keeps its light. 0 is off; inert on the flat maps.\n\n- default `0.0`\n- typical range depends on the family: `thomas` `0.0` to `1.0`, `lorenz` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.depth_fade.attractor": {
       "type": "string",

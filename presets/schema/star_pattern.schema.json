@@ -31,18 +31,18 @@
         "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
         "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
         "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
-        "draw_progress": { "$ref": "#/definitions/param.draw_progress" },
+        "draw_progress": { "$ref": "#/definitions/param.draw_progress.parametric_curve" },
         "thickness": { "$ref": "#/definitions/param.thickness.parametric_curve" },
-        "scale": { "$ref": "#/definitions/param.scale.lsystem" },
+        "scale": { "$ref": "#/definitions/param.scale.star_pattern" },
         "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
         "glow": { "$ref": "#/definitions/param.glow.parametric_curve" },
         "softness": { "$ref": "#/definitions/param.softness" },
-        "stroke_blend": { "$ref": "#/definitions/param.stroke_blend.lsystem" },
+        "stroke_blend": { "$ref": "#/definitions/param.stroke_blend.star_pattern" },
         "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
         "pan_x": { "$ref": "#/definitions/param.pan_x" },
         "pan_y": { "$ref": "#/definitions/param.pan_y" },
-        "mirror_order": { "$ref": "#/definitions/param.mirror_order.lsystem" },
-        "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect.lsystem" },
+        "mirror_order": { "$ref": "#/definitions/param.mirror_order.star_pattern" },
+        "mirror_reflect": { "$ref": "#/definitions/param.mirror_reflect.star_pattern" },
         "ring_phase": { "$ref": "#/definitions/param.ring_phase" },
         "ring_spread": { "$ref": "#/definitions/param.ring_spread" },
         "ring_scale": { "$ref": "#/definitions/param.ring_scale" },
@@ -355,8 +355,30 @@
         },
         "max_depth": {
           "type": "integer",
-          "description": "L-system: how many iterations to expand and cache.",
-          "markdownDescription": "L-system: how many iterations to expand and cache.\n\nDefault `4`."
+          "description": "L-system: how many iterations to expand and cache. Inert under growth = \"endless\", whose stream is walked to its own fixed depth.",
+          "markdownDescription": "L-system: how many iterations to expand and cache. Inert under growth = \"endless\", whose stream is walked to its own fixed depth.\n\nDefault `4`."
+        },
+        "turtle": {
+          "type": "string",
+          "enum": ["flat", "space"],
+          "description": "L-system: \"flat\" walks the plane; \"space\" walks in depth through the camera, where & and ^ pitch, \\ and / roll and | turns around.",
+          "markdownDescription": "L-system: \"flat\" walks the plane; \"space\" walks in depth through the camera, where & and ^ pitch, \\ and / roll and | turns around.\n\nDefault `flat`."
+        },
+        "growth": {
+          "type": "string",
+          "enum": ["fixed", "endless"],
+          "description": "L-system: \"fixed\" draws one cached depth; \"endless\" grows a vine that never ends at the rate grow sets, keeping the newest trail segments.",
+          "markdownDescription": "L-system: \"fixed\" draws one cached depth; \"endless\" grows a vine that never ends at the rate grow sets, keeping the newest trail segments.\n\nDefault `fixed`."
+        },
+        "trail": {
+          "type": "integer",
+          "description": "L-system, endless: how many segments the vine keeps behind its tip, held to the quality tier's cap.",
+          "markdownDescription": "L-system, endless: how many segments the vine keeps behind its tip, held to the quality tier's cap.\n\nDefault `2000`."
+        },
+        "follow_window": {
+          "type": "integer",
+          "description": "L-system, endless: how many of the newest segments the view follows the centre of; wider smooths the jump a branch's return makes.",
+          "markdownDescription": "L-system, endless: how many of the newest segments the view follows the centre of; wider smooths the jump a branch's return makes.\n\nDefault `32`."
         },
         "seed": {
           "anyOf": [
@@ -833,30 +855,10 @@
       "description": "How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core.",
       "markdownDescription": "How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core.\n\n- default `0.25`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.draw_progress": {
+    "param.draw_progress.parametric_curve": {
       "type": "string",
       "description": "How much of the figure is drawn, from its start; below 1 the line is still arriving.",
       "markdownDescription": "How much of the figure is drawn, from its start; below 1 the line is still arriving.\n\n- default `1.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.scale.lsystem": {
-      "type": "string",
-      "description": "Size of the figure within the frame, before the shared zoom is applied.",
-      "markdownDescription": "Size of the figure within the frame, before the shared zoom is applied.\n\n- default `1.0`\n- typical range `0.1` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.stroke_blend.lsystem": {
-      "type": "string",
-      "description": "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.",
-      "markdownDescription": "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.mirror_order.lsystem": {
-      "type": "string",
-      "description": "Repeats the geometry this many times around the centre; 1 draws it once.",
-      "markdownDescription": "Repeats the geometry this many times around the centre; 1 draws it once.\n\n- default `1.0`\n- typical range `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.mirror_reflect.lsystem": {
-      "type": "string",
-      "description": "Alternates the repeats into mirror images rather than plain rotations.",
-      "markdownDescription": "Alternates the repeats into mirror images rather than plain rotations.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.variant": {
       "type": "string",
@@ -872,6 +874,26 @@
       "type": "string",
       "description": "Where this scene reads from the palette, as a coordinate along it rather than a colour.",
       "markdownDescription": "Where this scene reads from the palette, as a coordinate along it rather than a colour.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.scale.star_pattern": {
+      "type": "string",
+      "description": "Size of the figure within the frame, before the shared zoom is applied.",
+      "markdownDescription": "Size of the figure within the frame, before the shared zoom is applied.\n\n- default `1.0`\n- typical range `0.1` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.stroke_blend.star_pattern": {
+      "type": "string",
+      "description": "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.",
+      "markdownDescription": "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.mirror_order.star_pattern": {
+      "type": "string",
+      "description": "Repeats the geometry this many times around the centre; 1 draws it once.",
+      "markdownDescription": "Repeats the geometry this many times around the centre; 1 draws it once.\n\n- default `1.0`\n- typical range `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.mirror_reflect.star_pattern": {
+      "type": "string",
+      "description": "Alternates the repeats into mirror images rather than plain rotations.",
+      "markdownDescription": "Alternates the repeats into mirror images rather than plain rotations.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.ring_phase": {
       "type": "string",

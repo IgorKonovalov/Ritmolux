@@ -41,7 +41,14 @@ bg_ramp_gamma = "1.7"
 bg_vignette = "0.38"
 
 spin = "0.25"
-perspective = "0.20"
+# The camera, mapped from the retired `perspective = 0.20` (ADR-0260):
+# `distance = 1 / 0.20` on the walk's unit depth, and the `fov` whose tangent is
+# `0.20 / 0.572`. Level; re-curation is owed. The bar pulse stays on `zoom`, which
+# divides the field of view rather than its tangent, so the pulse is near the old
+# one rather than equal to it.
+distance = "5.0"
+fov = "0.6730"
+pitch = "0"
 depth_fade = "0.45 + clamp(mid * 0.15, 0, 0.15)"
 saturation = "0.9"
 hue_spread = "0.18"

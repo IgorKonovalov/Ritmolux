@@ -35,7 +35,12 @@ bloom_amount = "0.35 + beat * 0.25 + clamp(bass * 0.20, 0, 0.15)"
 bloom_threshold = "1.6"
 bloom_radius = "1.6"
 
-perspective = "0.20"
+# The camera, mapped from the retired `perspective = 0.20` (ADR-0260): `distance
+# = 1 / 0.20` on the roster's unit depth, and the `fov` whose tangent is
+# `0.20 / 0.572`. Level; re-curation is owed.
+distance = "5.0"
+fov = "0.6730"
+pitch = "0"
 depth_fade = "0.50"
 spin = "1.0"
 
@@ -46,4 +51,3 @@ hue_center = "0.55"
 [smoothing]
 size = { attack = 0.03, release = 0.30 }
 bloom_amount = { attack = 0.04, release = 0.40 }
-perspective = 0.9

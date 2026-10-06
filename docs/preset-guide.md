@@ -202,6 +202,25 @@ a visible depth and transforms it.
 **Reach for this when** you want structure that *grows*: branching, botanical, or space-filling
 figures, and a `draw_progress` that traces them on.
 
+![A branching tree on black: a pale blue trunk forks into cyan limbs that end in clusters of golden
+twigs, the farther clusters softened](images/lsystem/space_tree.png)
+
+*`turtle = "space"` — [`docs/examples/lsystem/space_tree.toml`](examples/lsystem/space_tree.toml)*
+
+`turtle = "space"` walks the grammar in depth: `&` and `^` pitch, `\` and `/` roll, and `|` turns
+the turtle around. The tree is seen through the same camera block as the space curves, so `aperture`
+softens the branches away from the focal plane.
+
+![A mint-green branching vine on black, rising from a faded dark stem, its side shoots short and
+evenly spaced](images/lsystem/endless_vine.png)
+
+*`growth = "endless"` — [`docs/examples/lsystem/endless_vine.toml`](examples/lsystem/endless_vine.toml)*
+
+`growth = "endless"` grows a vine that never ends. It grows at the rate `grow` sets and keeps the
+newest `trail` segments, fading the oldest, and the view follows the growing tip. Vines and
+short-branched grammars suit it; the keys are in
+[the `[generator]` table](../presets/README.md#generator--for-lsystem).
+
 ### `star_pattern`
 
 ![A bold gold rose window: concentric twelve-pointed star outlines nested inward on

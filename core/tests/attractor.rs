@@ -672,11 +672,11 @@ fn the_ifs_tint_channels_move_colour_without_moving_the_figure() {
     }
 }
 
-/// **All three depth cues are exact identities on a flat family** (Plan 0075
-/// Phase 2, closing design-backlog 0067) — ADR-0076's stated property, asserted
-/// at the capture with byte equality.
+/// **The depth cues and the camera are exact identities on a flat family**
+/// (Plan 0075 Phase 2, closing design-backlog 0067; ADR-0260) — ADR-0076's
+/// stated property, asserted at the capture with byte equality.
 ///
-/// The property held for `perspective` and `depth_hue` from the day they
+/// The property held for the projection and `depth_hue` from the day they
 /// landed and was **false** for `depth_fade`: `dn` is identically 0 on a flat
 /// family, `depth01(0)` is 0.5 — arithmetically "mid depth" — so the haze
 /// multiplier was a uniform `1 - depth_fade/2`. Measured on `attractor_dissolve`
@@ -710,7 +710,11 @@ fn the_depth_cues_are_exact_no_ops_on_a_flat_family() {
 
     renderer.set_presets(vec![
         attractor_bare_preset("at_flat_base", "de_jong", ""),
-        attractor_bare_preset("at_flat_persp", "de_jong", "perspective = \"0.7\"\n"),
+        attractor_bare_preset(
+            "at_flat_cam",
+            "de_jong",
+            "distance = \"2.0\"\nfov = \"1.2\"\npitch = \"0.6\"\naperture = \"30\"\n",
+        ),
         attractor_bare_preset("at_flat_hue", "de_jong", "depth_hue = \"0.6\"\n"),
         attractor_bare_preset("at_flat_fade", "de_jong", "depth_fade = \"0.9\"\n"),
         attractor_bare_preset("at_deep_base", "lorenz", ""),
@@ -724,7 +728,7 @@ fn the_depth_cues_are_exact_no_ops_on_a_flat_family() {
     assert!(lit > 500, "the bare De Jong lit only {lit} pixels");
 
     for (name, param) in [
-        ("at_flat_persp", "perspective = 0.7"),
+        ("at_flat_cam", "the camera block"),
         ("at_flat_hue", "depth_hue = 0.6"),
         ("at_flat_fade", "depth_fade = 0.9"),
     ] {
@@ -751,6 +755,235 @@ fn the_depth_cues_are_exact_no_ops_on_a_flat_family() {
         moved > 0.001,
         "`depth_fade = 0.9` moved nothing on a family with depth ({moved:.5}) — the \
          no-op assertions above would be vacuously true"
+    );
+}
+
+/// **A 3D figure pitches through the shared camera, and a flat one does not**
+/// (ADR-0260): the same Lorenz preset at `pitch = 0.6` and at `pitch = 0`
+/// renders two different frames, and the same pair on De Jong, which keeps its
+/// in-plane path, renders one.
+#[test]
+fn a_lorenz_figure_pitches_through_the_camera() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let lively = AnalysisFrame {
+        bass: 0.5,
+        mid: 0.4,
+        treb: 0.5,
+        ..Default::default()
+    };
+    renderer.set_presets(vec![
+        attractor_bare_preset("lz_level", "lorenz", "pitch = \"0\"\n"),
+        attractor_bare_preset("lz_pitched", "lorenz", "pitch = \"0.6\"\n"),
+        attractor_bare_preset("dj_level", "de_jong", "pitch = \"0\"\n"),
+        attractor_bare_preset("dj_pitched", "de_jong", "pitch = \"0.6\"\n"),
+    ]);
+    let mut capture = |name: &str| {
+        renderer
+            .capture_preset(name, &lively, 60)
+            .expect("capture a pitch probe")
+    };
+    let (level, pitched) = (capture("lz_level"), capture("lz_pitched"));
+    assert!(
+        lit_mask(&level).iter().filter(|&&l| l).count() > 500,
+        "the level Lorenz lit almost nothing"
+    );
+    let moved = frame_diff(&level, &pitched);
+    println!("lorenz pitch 0 -> 0.6: frame_diff {moved:.4}");
+    assert!(
+        moved > 0.001,
+        "`pitch = 0.6` moved nothing on Lorenz ({moved:.5})"
+    );
+    let (flat, flat_pitched) = (capture("dj_level"), capture("dj_pitched"));
+    assert_eq!(
+        flat.rgba, flat_pitched.rgba,
+        "`pitch` must be inert on a flat family"
+    );
+}
+
+/// **Fog darkens a 3D figure and nothing else** (ADR-0263): `fog = 0` renders
+/// byte for byte what an unset `fog` does, `fog = 1` darkens Thomas and Lorenz
+/// over the pixels they light, and a flat family renders identically at any
+/// `fog`. `solid` is not the attractor's: a sprite has no stroke to sort, so a
+/// binding to it loads with the undeclared-parameter warning.
+#[test]
+fn fog_darkens_a_3d_figure_and_leaves_a_flat_one_alone() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let lively = AnalysisFrame {
+        bass: 0.5,
+        mid: 0.4,
+        treb: 0.5,
+        ..Default::default()
+    };
+    let mut presets = Vec::new();
+    for family in ["thomas", "lorenz", "de_jong"] {
+        presets.push(attractor_bare_preset(
+            &format!("{family}_unset"),
+            family,
+            "",
+        ));
+        presets.push(attractor_bare_preset(
+            &format!("{family}_fog0"),
+            family,
+            "fog = \"0\"\n",
+        ));
+        presets.push(attractor_bare_preset(
+            &format!("{family}_fog1"),
+            family,
+            "fog = \"1\"\n",
+        ));
+    }
+    renderer.set_presets(presets);
+    let mut capture = |name: &str| {
+        renderer
+            .capture_preset(name, &lively, 60)
+            .expect("capture a fog probe")
+    };
+    for family in ["thomas", "lorenz"] {
+        let unset = capture(&format!("{family}_unset"));
+        let off = capture(&format!("{family}_fog0"));
+        let full = capture(&format!("{family}_fog1"));
+        assert_eq!(
+            unset.rgba, off.rgba,
+            "{family}: `fog = 0` must render exactly what an unset `fog` does"
+        );
+        let mask = lit_mask(&unset);
+        assert!(
+            mask.iter().filter(|&&l| l).count() > 500,
+            "{family}: the bare figure lit almost nothing"
+        );
+        let (clear, fogged) = (mean_luma_over(&unset, &mask), mean_luma_over(&full, &mask));
+        println!("{family}: mean luma over the figure {clear:.2} -> {fogged:.2} at fog 1");
+        assert!(
+            fogged < clear * 0.95,
+            "{family}: `fog = 1` did not darken the figure ({clear:.2} -> {fogged:.2})"
+        );
+    }
+    let flat = capture("de_jong_unset");
+    let flat_fogged = capture("de_jong_fog1");
+    assert_eq!(
+        flat.rgba, flat_fogged.rgba,
+        "`fog` must be inert on a flat family"
+    );
+
+    let solid = Preset::from_toml_str(
+        "system = \"attractor\"\nname = \"solid\"\n[particles]\nfamily = \"thomas\"\n\
+         [params]\nsolid = \"1\"\n",
+    )
+    .expect("an undeclared param is a warning, not an error");
+    assert!(
+        solid
+            .warnings
+            .iter()
+            .any(|w| w.param.as_deref() == Some("solid") || w.message.contains("solid")),
+        "a `solid` binding on the attractor must warn as undeclared: {:?}",
+        solid.warnings
+    );
+}
+
+/// **A binding to the retired `perspective` fails to load, naming what replaced
+/// it** (ADR-0260): at the top level and in a layer, on any family, so a user
+/// preset never loads without the depth it asked for. The camera block that
+/// replaced it loads.
+#[test]
+fn a_perspective_binding_is_a_load_error_naming_the_camera() {
+    let top = "system = \"attractor\"\nname = \"retired\"\n[particles]\nfamily = \"lorenz\"\n\
+               [params]\nperspective = \"0.3\"\n";
+    let layered = "system = \"fragment_field\"\nname = \"retired_layer\"\n[params]\n\
+                   [layer]\nsystem = \"attractor\"\n[layer.particles]\nfamily = \"thomas\"\n\
+                   [layer.params]\nperspective = \"0.2\"\n";
+    for (surface, toml) in [("top level", top), ("layer", layered)] {
+        let err = match Preset::from_toml_str(toml) {
+            Ok(_) => panic!("a {surface} `perspective` binding loaded"),
+            Err(err) => err.to_string(),
+        };
+        assert!(
+            err.contains("perspective") && err.contains("`distance`") && err.contains("`fov`"),
+            "the {surface} error must name the retired param and its replacement: {err}"
+        );
+    }
+    let replaced = "system = \"attractor\"\nname = \"camera\"\n[particles]\nfamily = \"lorenz\"\n\
+                    [params]\ndistance = \"2.0\"\nfov = \"1.18\"\n";
+    let loaded = Preset::from_toml_str(replaced).expect("the camera block loads");
+    assert!(
+        loaded.warnings.is_empty(),
+        "the camera block is declared on the attractor: {:?}",
+        loaded.warnings
+    );
+}
+
+/// The shipped presets whose 3D figure moved off `perspective` onto the shared
+/// camera (ADR-0260), each with its family's coverage floor in `sanity.rs`'s
+/// `coverage_floor` — `attractor` 0.11, `fragment_field` 0.21 for `Sumi`, whose
+/// Thomas trace is a layer.
+const MIGRATED_3D: &[(&str, f32)] = &[
+    ("Ink on Paper", 0.11),
+    ("Lorenz Knot", 0.11),
+    ("Thomas Gallery", 0.11),
+    ("Thomas on Red", 0.11),
+    ("Thomas Walk", 0.11),
+    ("Sumi", 0.21),
+];
+
+/// **Every migrated 3D preset still frames a picture** (ADR-0260): rendered the
+/// way `sanity.rs` renders the library — backdrops stripped, against the frame's
+/// own modal ground, at 96 px after 30 frames — each clears its family's
+/// coverage floor and spreads over at least two quadrants, at a moderate drive
+/// and at the full one. The full drive is where Lorenz Knot's bass brings the
+/// camera nearest the figure, so a migrated `distance` that let a lobe reach the
+/// near plane, or blew the figure past the frame, shows here by name.
+#[test]
+fn every_migrated_3d_preset_clears_the_sanity_floor() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let presets: Vec<Preset> = rlx_core::preset::default_presets()
+        .into_iter()
+        .map(|mut preset| {
+            preset.params.retain(|b| !b.name.starts_with("bg_"));
+            preset
+        })
+        .collect();
+    for (name, _) in MIGRATED_3D {
+        assert!(
+            presets.iter().any(|p| p.name == *name),
+            "{name} no longer ships; take it off MIGRATED_3D"
+        );
+    }
+    renderer.set_presets(presets);
+    let excited = |level: f32| AnalysisFrame {
+        bass: level,
+        mid: level,
+        treb: level,
+        onset: level,
+        beat: true,
+        bar: 0.5,
+        spectrum: [level; rlx_core::dsp::SPECTRUM_BINS],
+        ..Default::default()
+    };
+    let mut failures = Vec::new();
+    for (name, floor) in MIGRATED_3D {
+        for level in [0.4f32, 1.0] {
+            let img = renderer
+                .capture_preset(name, &excited(level), 30)
+                .expect("capture a migrated preset");
+            let ground = rlx_core::render::metrics::modal_ground(&img);
+            let cov = coverage(&img, ground, EPS);
+            let spread = quadrant_spread(&img, ground, EPS);
+            println!("{name:<16} at {level}: coverage {cov:.4} (floor {floor}) quadrants {spread}");
+            if cov < *floor || spread < 2 {
+                failures.push(format!(
+                    "{name} at drive {level}: coverage {cov:.4} against {floor}, {spread} quadrant(s)"
+                ));
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "migrated 3D presets that no longer frame a picture: {failures:#?}"
     );
 }
 

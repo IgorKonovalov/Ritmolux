@@ -361,17 +361,14 @@ struct Draw {
     // u: x hue_spread, y hue_center, z palette_mix, w saturation
     // x: x zoom, yz pan (view transform, ADR-0018), w streak (ADR-0069:
     //    non-zero on a continuous family, so the quad spans prev -> pos)
-    // bh: xyz the axis the spin rotates x against (ADR-0068), w the aperture
-    //    in pixels (ADR-0257)
-    // bv: xyz the vertical axis (ADR-0068), w the focus, 0 nearest to 1
-    //    farthest (ADR-0257)
-    // d: x perspective, y depth_fade, z depth_hue, w the family's INVERSE depth
-    //    half-extent (ADR-0076) - exactly 0 for a 2D family, which is what
-    //    collapses every depth cue below to the identity with no branch
-    // ctr: xyz the world centre subtracted before projection, w the largest
-    //    circle of confusion the tier draws, in pixels (ADR-0257). The four
-    //    map families pass [0,0,0] or [0,0,25] - exactly what they passed when
-    //    this was the scalar `w.z` - and subtracting a zero is exact.
+    // bh: xyz the axis the spin rotates x against (ADR-0068), w unused
+    // bv: xyz the vertical axis (ADR-0068), w unused
+    // d: x unused, y depth_fade, z depth_hue, w the family's INVERSE depth
+    //    half-extent (ADR-0076) - exactly 0 for a 2D family, which selects the
+    //    in-plane path and collapses every depth cue below to the identity
+    // ctr: xyz the world centre subtracted before projection, w unused. The
+    //    four map families pass [0,0,0] or [0,0,25] - exactly what they passed
+    //    when this was the scalar `w.z` - and subtracting a zero is exact.
     // ch: the two per-particle colour channels, two routes each -
     //    x map_tint, y map_hue (ADR-0087), z root_tint, w root_hue (ADR-0088).
     //    The row SWAPPED rather than grew at Plan 0074 Phase 3: `age_tint` and
@@ -393,12 +390,16 @@ struct Draw {
     //    their `age` is identically zero, so a bare `age * rate` would black them
     //    out. Two numbers rather than a branch, and the multiply by a literal 1.0
     //    is the identity in IEEE-754, so no existing capture moves.
-    //    z is `palette_steps` (ADR-0078) - it and w were FREE since Plan 0074
-    //    Phase 3, when z stopped carrying the reciprocal of the longest
-    //    reachable lifetime that only the retired age colour channel read.
-    //    w is the render target's height in pixels - not the trail field's,
-    //    which the grid scale shrinks - and turns a circle of confusion in
-    //    pixels of the screen into world units.
+    //    z is `palette_steps` (ADR-0078), w unused.
+    // cam: the shared camera a family with depth projects through (ADR-0260).
+    //    Its view matrix carries the spin in its yaw, `viewport.z` is the
+    //    orbit target's view depth, which sprite sizes are stated at, and its
+    //    lens is the depth of field (ADR-0257). Zeroed on a flat family, whose
+    //    path never reads it.
+    // mdl: x the model transform's 1 / framed half-extent, y the sprite radius
+    //    in target pixels at `cam.viewport.z`, z 1 / the model depth that is one
+    //    unit of normalized depth, w the camera's `fog` (ADR-0263), finite and
+    //    in [0, 1]. Zeroed on a flat family.
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
@@ -409,6 +410,8 @@ struct Draw {
     ctr: vec4<f32>,
     ch: vec4<f32>,
     em: vec4<f32>,
+    cam: Camera,
+    mdl: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> draw: Draw;
 // Shared gradient LUTs (ADR-0021): sampled per-particle in the vertex shader
@@ -436,22 +439,20 @@ fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
     return vec3<f32>(luma) + (c - vec3<f32>(luma)) * s;
 }
 
-// Project one attractor position to the pre-aspect "world" plane, **keeping the
-// depth** the rotation produces: `xy` is the screen position, `z` is the view
-// depth (ADR-0076). Factored out of the vertex body so a segment can project
-// **both** its endpoints through the identical path — two call sites that must
-// not be allowed to drift apart.
-//
-// The depth used to be computed and thrown away, which is exactly why the 3D
-// families rendered flat: an orthographic projection of a rotating transparent
-// structure carries no information about the direction of rotation, because the
-// image at rotation pi is the exact x-mirror of the image at 0.
+// Project one attractor position to the pre-aspect "world" plane: `xy` is the
+// screen position, `z` the depth the rotation produces. Factored out of the
+// vertex body so a segment can project **both** its endpoints through the
+// identical path — two call sites that must not be allowed to drift apart.
 //
 // Named `project_figure` because the shared camera prepended to this module
 // declares a `project` of its own, for the 3D primitives that go through it.
 //
-// **This function and the two below are the SOURCE**; `projection_mirror` in the
-// Rust body transcribes them for the property test, the same discipline
+// Only the in-plane path calls it: a family with depth projects through the
+// shared camera instead (ADR-0260), so its 3D arm is reached only by a 3D
+// family whose framing box is degenerate.
+//
+// **This function is the SOURCE**; `projection_mirror` in the Rust body
+// transcribes it for the property tests, the same discipline
 // `apply_saturation` follows against `palette.rs::desaturate`. Edit here, then
 // edit there.
 fn project_figure(q: vec3<f32>, dim: f32, ctr: vec3<f32>, cs: f32, sn: f32) -> vec3<f32> {
@@ -479,51 +480,27 @@ fn project_figure(q: vec3<f32>, dim: f32, ctr: vec3<f32>, cs: f32, sn: f32) -> v
     return vec3<f32>(p.x * cs + h * sn, dot(p, draw.bv.xyz), -p.x * sn + h * cs);
 }
 
-// Depth in units of the family's own half-extent, clamped to [-1, 1].
-//
-// `draw.d.w` is an INVERSE extent and is exactly 0 for a 2D family, so this is
-// identically 0 there - no branch, no division, no NaN.
-//
-// **The clamp is not decoration.** A family's converged figure overruns its
-// `seed_box` (Lorenz reaches y = 25.4 against a 26 half-extent while its x
-// reaches 19.2, so the rotated depth reaches ~1.22), and an unclamped value at
-// the `perspective` ceiling would magnify by ~50x rather than the 5x ADR-0076
-// documents. Clamping is what makes the stated (1 + p) / (1 - p) ratio true and
-// keeps the divisor below bounded away from zero.
-fn depth_norm(depth: f32) -> f32 {
-    return clamp(depth * draw.d.w, -1.0, 1.0);
+// `camera::NEAR`, the near plane in the camera's model units. A particle
+// nearer than it is not drawn: its projection divides by nearly zero, and
+// unlike a stroke a particle cannot be clipped on the CPU before upload.
+const NEAR_DEPTH: f32 = 0.05;
+
+// A 3D family's position in the camera's model space (ADR-0260): centred on
+// the roster entry's measured centre, laid on its basis - `x` across, the
+// vertical up, the spin's partner axis toward the eye - and scaled by
+// 1 / framed half-extent, so every entry reaches the camera at unit radius.
+// **The CPU mirror is `ModelTransform::apply`** in `family.rs`.
+fn to_model(q: vec3<f32>) -> vec3<f32> {
+    let p = q - draw.ctr.xyz;
+    return vec3<f32>(p.x, dot(p, draw.bv.xyz), dot(p, draw.bh.xyz)) * draw.mdl.x;
 }
 
-// The perspective magnification: near material grows, far material shrinks.
-// `perspective` is the figure's depth half-extent as a fraction of the camera
-// distance, clamped CPU-side to [0, 0.8], so the divisor stays in [0.2, 1.8].
-// At `perspective = 0` this is exactly 1.0 and every use of it is a no-op.
-fn magnify(dn: f32) -> f32 {
-    return 1.0 / (1.0 - draw.d.x * dn);
-}
-
-// The figure's place on a virtual lens (ADR-0257). This scene has no camera
-// distance - `perspective` is a ratio - so its normalized depth is laid on a
-// lens whose orbit target sits FIGURE_DISTANCE away with the figure
-// FIGURE_RADIUS deep either side of it: the proportions of the plexus camera at
-// its defaults. `dn = 1` is nearest.
-const FIGURE_DISTANCE: f32 = 1.0;
-const FIGURE_RADIUS: f32 = 0.5;
-
-// The circle of confusion at normalized depth `dn`, in pixels, through the
-// shared `coc()`. `focus` 0 is the figure's nearest extent and 1 its farthest,
-// the scale the plexus focus is on.
-//
-// **Exactly 0 on a 2D family**, whatever the aperture: `dn` is identically 0
-// there, which would put every particle at one depth - in focus only when
-// `focus` is 0.5 - so the result is multiplied by whether the family has depth,
-// the same `draw.d.w != 0` guard `haze` uses. And exactly 0 at aperture 0.
-fn figure_coc(dn: f32) -> f32 {
-    var cam: Camera;
-    let focal = FIGURE_DISTANCE - FIGURE_RADIUS * (1.0 - 2.0 * draw.bv.w);
-    cam.lens = vec4<f32>(draw.bh.w, focal, draw.ctr.w, 0.0);
-    let has_depth = f32(draw.d.w != 0.0);
-    return coc(cam, FIGURE_DISTANCE - FIGURE_RADIUS * dn) * has_depth;
+// Normalized depth from a view depth, 1 at the figure's near extent and -1 at
+// its far one: the model's toward-the-eye offset from the orbit target,
+// divided by the model depth that is one unit of it. Not clamped - a converged
+// figure overruns its framing box, and the cues below saturate in `depth01`.
+fn view_depth_norm(w: f32) -> f32 {
+    return (draw.cam.viewport.z - w) * draw.mdl.z;
 }
 
 // How much a sprite of radius `r_px` pixels grows to cover a circle of
@@ -535,10 +512,12 @@ fn blur_growth(r_px: f32, blur: f32) -> f32 {
 }
 
 // Depth remapped to [0, 1] with **1 nearest**, which is the sense both
-// atmospheric cues below are written in. `dn` is already clamped, so this needs
-// no clamp of its own.
+// atmospheric cues below are written in. Saturated, because a figure's points
+// reach past its framing box: past -1 the haze below would go NEGATIVE, and a
+// negative deposit in an additive accumulation subtracts light. A flat
+// family's `dn` is exactly 0, which lands on exactly 0.5.
 fn depth01(dn: f32) -> f32 {
-    return (dn + 1.0) * 0.5;
+    return clamp((dn + 1.0) * 0.5, 0.0, 1.0);
 }
 
 // Distance haze: brightness attenuated with distance, so `depth_fade = 1` takes
@@ -551,8 +530,7 @@ fn depth01(dn: f32) -> f32 {
 // family, which lands `depth01` on 0.5 - arithmetically "mid depth", so the
 // multiplier was a uniform `1 - depth_fade/2`: a 45% whole-figure dimmer at
 // `depth_fade = 0.9`, on the one cue that was NOT the identity at zero extent.
-// `f32(bool)` is 1.0 or 0.0 - one extra multiply, no branch, the same style
-// as the zero-extent trick in `depth_norm`.
+// `f32(bool)` is 1.0 or 0.0 - one extra multiply, no branch.
 fn haze(dn: f32) -> f32 {
     let has_depth = f32(draw.d.w != 0.0);
     return 1.0 - draw.d.y * (1.0 - depth01(dn)) * has_depth;
@@ -675,85 +653,117 @@ fn vs_main(
     let cs = cos(rot);
     let sn = sin(rot);
     let streak = draw.x.w;
-    let projected = project_figure(center, dim, ctr, cs, sn);
-    let screen = projected.xy;
-    // This particle's normalized depth, and the magnification it earns
-    // (ADR-0076). Both are exactly 0 and exactly 1 for a 2D family.
-    let dn = depth_norm(projected.z);
-    let mag = magnify(dn);
-    // Position AND sprite size take the same magnification, which is what makes
-    // size grading and parallax one mutually-consistent term rather than two
-    // hand-tuned constants (the swarm needed two; ADR-0076 Alternative B).
-    let sprite = psize * mag;
-
-    // Depth of field (ADR-0257): a sprite away from the focal depth grows by
-    // its circle of confusion and its light spreads over the larger disc. The
-    // render target's height turns pixels into the world units the sprite is
-    // built in: one world unit is `zoom * height / 2` pixels of the screen,
-    // whatever size the trail field is drawn at.
-    let px_per_world = draw.x.x * draw.em.w * 0.5;
-    let blur = figure_coc(dn);
-    let grow = blur_growth(sprite * px_per_world, blur);
-    // Area factor `(r / (r + coc))^2` for a disc, `r / (r + coc)` for a
-    // capsule's light per unit length; both exactly 1.0 with no blur.
-    var keep = 1.0 / (grow * grow);
-
-    // The sprite. A point is a `sprite` square about the projected position; a
-    // segment is that square swept from `prev` to `pos` — a capsule (ADR-0069).
-    //
-    // Both are built in **world** space, before the single aspect division below.
-    // That is deliberate and it is what keeps the stroke an even width: world `x`
-    // is what becomes NDC `x / aspect`, so equal world distances are equal
-    // *pixels* on both axes, and a capsule built here is round-ended on screen
-    // rather than sheared by the target's aspect (ADR-0037).
-    var world: vec2<f32>;
+    // This particle's normalized depth, 1 nearest, which the colour and the
+    // haze below read whichever path projected it.
+    var dn = 0.0;
+    var keep = 1.0;
     var local: vec2<f32>;
     var half_len = 0.0;
-    if (streak != 0.0) {
-        // **Both endpoints are magnified independently**, so a trace receding
-        // into the distance is drawn genuinely shorter - the strongest depth cue
-        // a curve has, and free, because the capsule already projects both ends.
-        let pp = project_figure(previous, dim, ctr, cs, sn);
-        let dn_prev = depth_norm(pp.z);
-        let a = pp.xy * scl * magnify(dn_prev);
-        let b = screen * scl * mag;
-        let mid = (a + b) * 0.5;
-        let axis = (b - a) * 0.5;
-        let len = length(axis);
-        // A stationary particle has no direction to orient by, and `normalize`
-        // of a zero vector is undefined — so fall back to the point's own frame,
-        // which is what a zero-length capsule is anyway.
-        var dir = vec2<f32>(1.0, 0.0);
-        if (len > 1e-9) {
-            dir = axis / len;
+    var ndc: vec2<f32>;
+    if (draw.d.w != 0.0) {
+        // A family with depth projects through the shared camera (ADR-0260),
+        // in target pixels from the centre: `clip_to_px` is isotropic, so a
+        // capsule built here is round-ended on screen at any aspect. The view
+        // matrix already holds the spin, zoom and pan.
+        let cam = draw.cam;
+        let head = project(cam, to_model(center));
+        dn = view_depth_norm(head.w);
+        var visible = head.w >= NEAR_DEPTH;
+        var px: vec2<f32>;
+        if (streak != 0.0) {
+            let tail = project(cam, to_model(previous));
+            visible = visible && tail.w >= NEAR_DEPTH;
+            // Both endpoints are projected, so a trace receding into the
+            // distance is drawn shorter; the width is the sprite's at the
+            // midpoint's depth.
+            let a = clip_to_px(cam, tail);
+            let b = clip_to_px(cam, head);
+            let mid = (a + b) * 0.5;
+            let axis = (b - a) * 0.5;
+            let len = length(axis);
+            var dir = vec2<f32>(1.0, 0.0);
+            if (len > 1e-9) {
+                dir = axis / len;
+            }
+            let nrm = vec2<f32>(-dir.y, dir.x);
+            // Depth of field (ADR-0257) through the camera's own lens: the
+            // capsule widens by the circle of confusion at its midpoint and
+            // its light spreads over the wider stroke.
+            let w_mid = (head.w + tail.w) * 0.5;
+            let wid_sharp = at_depth(cam, draw.mdl.y, w_mid);
+            let grow_mid = blur_growth(wid_sharp, coc(cam, w_mid));
+            let wid = wid_sharp * grow_mid;
+            keep = 1.0 / grow_mid;
+            half_len = len / wid;
+            px = mid + dir * (corner.x * (len + wid)) + nrm * (corner.y * wid);
+            local = vec2<f32>(corner.x * (half_len + 1.0), corner.y);
+        } else {
+            // A sprite away from the focal depth grows by its circle of
+            // confusion, and its light spreads over the larger disc: the area
+            // factor `(r / (r + coc))^2`, exactly 1.0 with no blur.
+            let r = at_depth(cam, draw.mdl.y, head.w);
+            let grow = blur_growth(r, coc(cam, head.w));
+            keep = 1.0 / (grow * grow);
+            px = clip_to_px(cam, head) + corner * (r * grow);
+            local = corner;
         }
-        let nrm = vec2<f32>(-dir.y, dir.x);
-        // The capsule's WIDTH is uniform and takes the midpoint's magnification.
-        // A tapered stroke would mean interpolating a radius in the fragment's
-        // distance function, which reworks ADR-0069's one-expression
-        // point/segment unification - deliberately out of scope (ADR-0076).
-        let dn_mid = (dn + dn_prev) * 0.5;
-        let wid_sharp = psize * magnify(dn_mid);
-        let grow_mid = blur_growth(wid_sharp * px_per_world, figure_coc(dn_mid));
-        let wid = wid_sharp * grow_mid;
-        keep = 1.0 / grow_mid;
-        half_len = len / wid;
-        // Extended by `wid` past each end so the round caps have room.
-        world = mid + dir * (corner.x * (len + wid)) + nrm * (corner.y * wid);
-        local = vec2<f32>(corner.x * (half_len + 1.0), corner.y);
+        // Fog (ADR-0263) on the light, never the size, at the head's view
+        // depth - the trail behind it keeps the light it had there. The
+        // camera's volume is the unit model, so the figure's nearest extent
+        // keeps all its light and its farthest keeps `1 - fog`. Exactly 1.0
+        // at fog 0.
+        keep = keep * fog_light(cam, draw.mdl.w, head.w);
+        // Past the near plane every corner lands on one point off screen, so
+        // the quad has no area and draws nothing.
+        ndc = select(vec2<f32>(-2.0, -2.0), px_to_ndc(cam, px), visible);
     } else {
-        let sprite_dof = sprite * grow;
-        world = screen * scl * mag + corner * sprite_dof;
-        local = corner;
-    }
+        // A flat family keeps its in-plane path (ADR-0260). It has no depth,
+        // so no perspective and no blur: `dn` stays exactly 0, and so does
+        // every depth cue below.
+        let screen = project_figure(center, dim, ctr, cs, sn).xy;
 
-    // View transform (ADR-0018): project to NDC, then scale about the screen centre
-    // by `zoom` and offset by `pan`. Default zoom = 1, pan = 0 is the identity, so an
-    // unbound preset is byte-unchanged. Applied post-projection so it moves the whole
-    // attractor (position and apparent point size) as one.
-    let zoom = draw.x.x;
-    let pan = draw.x.yz;
-    let ndc = vec2<f32>(world.x / aspect, world.y) * zoom + pan;
+        // The sprite. A point is a `psize` square about the projected position;
+        // a segment is that square swept from `prev` to `pos` - a capsule
+        // (ADR-0069).
+        //
+        // Both are built in **world** space, before the single aspect division
+        // below. That is deliberate and it is what keeps the stroke an even
+        // width: world `x` is what becomes NDC `x / aspect`, so equal world
+        // distances are equal *pixels* on both axes, and a capsule built here is
+        // round-ended on screen rather than sheared by the target's aspect
+        // (ADR-0037).
+        var world: vec2<f32>;
+        if (streak != 0.0) {
+            let a = project_figure(previous, dim, ctr, cs, sn).xy * scl;
+            let b = screen * scl;
+            let mid = (a + b) * 0.5;
+            let axis = (b - a) * 0.5;
+            let len = length(axis);
+            // A stationary particle has no direction to orient by, and `normalize`
+            // of a zero vector is undefined - so fall back to the point's own frame,
+            // which is what a zero-length capsule is anyway.
+            var dir = vec2<f32>(1.0, 0.0);
+            if (len > 1e-9) {
+                dir = axis / len;
+            }
+            let nrm = vec2<f32>(-dir.y, dir.x);
+            half_len = len / psize;
+            // Extended by `psize` past each end so the round caps have room.
+            world = mid + dir * (corner.x * (len + psize)) + nrm * (corner.y * psize);
+            local = vec2<f32>(corner.x * (half_len + 1.0), corner.y);
+        } else {
+            world = screen * scl + corner * psize;
+            local = corner;
+        }
+
+        // View transform (ADR-0018): project to NDC, then scale about the screen centre
+        // by `zoom` and offset by `pan`. Default zoom = 1, pan = 0 is the identity, so an
+        // unbound preset is byte-unchanged. Applied post-projection so it moves the whole
+        // attractor (position and apparent point size) as one.
+        let zoom = draw.x.x;
+        let pan = draw.x.yz;
+        ndc = vec2<f32>(world.x / aspect, world.y) * zoom + pan;
+    }
 
     // Per-particle colour through the shared LUT: the seeded jitter occupies the
     // band `hue_center + (seed - 0.5)*hue_spread` (was a hardcoded `seed*0.15`),
