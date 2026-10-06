@@ -211,7 +211,7 @@ struct ModelTransform {
 | 1 — Walking skeleton: Lorenz through the camera | dev | done | 19386418 |
 | 2 — The real lens, and `perspective` retires | dev | done | 80566e42 |
 | 3 — The shipped presets migrate by the mapping | dev | done | 7a43c794 |
-| 4 — Documentation and the references | dev | done | committed with this row |
+| 4 — Documentation and the references | dev | done | a430d6fa |
 | 5 — The 3D presets, re-curated in motion | human | not started | |
 | 6 — The moved baseline is blessed | human | not started | |
 | 7 — The preset-author reference | human | not started | |
@@ -344,13 +344,21 @@ much of the tier's particle budget is drawn (ADR-0069 / ADR-0195; absent is the 
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** yes. Phase 3 rewrote `attractor_ink`, `attractor_lorenzknot`,
+  `attractor_thomasgallery`, `attractor_thomasred`, `attractor_walkthomas`, `attractor_fernmono`,
+  `attractor_walkdejong` and `fragment_sumi`. Phase 4 regenerated `presets/README.md`'s params
+  block, `presets/preset.schema.json` and `presets/schema/attractor.schema.json`, and rewrote the
+  README's attractor-depth section.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature. The attractor's `thomas` and `lorenz` take the camera block, and
+  `perspective` is retired as a load error.
+- **Operator docs touched:** `presets/README.md`, `docs/presets.md`, `docs/specs/player-schema.json`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 58 reductions hold across
+  29 live entries, 4 unprobeable.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** 5 (re-curation brief), 6 (re-bless `attractor_depth`, which
+  Phase 3 recorded as moved) and 7 (apply the text above to the preset-author reference). All three
+  are `Blocks merge: no`.
 
 ## Followups (after this lands)
 
