@@ -8,7 +8,9 @@
 # focus as they recede. The camera turns very slowly around the pool on
 # `yaw`, and MID opens the aperture a little on dense passages. The palette
 # runs deep teal through seafoam to coral across the bands, so bass rows are
-# cold and treble rows warm. Luminance stays flat; peaks show as height.
+# cold and treble rows warm. It is deliberately bright: a hot stroke and a
+# low `bloom_threshold` make the whole pool glow, and ONSET swells the bloom
+# for a moment, so a hit reads as a flare of light on the water.
 system = "waterfall"
 name = "Tidepool"
 
@@ -31,9 +33,9 @@ height      = "0.75"
 row_spacing = "0.055"
 curve       = "0.9"
 fade        = "0.6"
-line_width  = "1.8"
-glow        = "1.1"
-brightness  = "0.9"
+line_width  = "2.6"
+glow        = "4"
+brightness  = "2"
 hue         = "0.15"
 hue_spread  = "0.85"
 yaw         = "time * 0.02"
@@ -41,6 +43,10 @@ pitch       = "0.55"
 distance    = "3.0"
 focus       = "0.08"
 aperture    = "7 + clamp(mid * 4.7, 0, 4)"
+bloom_amount    = "2.2 + clamp(onset * 1.5, 0, 0.9)"
+bloom_threshold = "0.2"
+bloom_radius    = "2.4"
 
 [smoothing]
 aperture = 0.4
+bloom_amount = 0.12
