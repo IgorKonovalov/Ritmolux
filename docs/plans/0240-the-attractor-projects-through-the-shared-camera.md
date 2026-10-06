@@ -113,7 +113,7 @@ flowchart LR
     `distance = E / p` in model units and `tan(fov / 2)` from the preset's scale and zoom, as ADR-0260
     states. Leave `zoom` at 1 on the camera, since `Camera3d` divides the angle, not its tangent.
   - A `perspective = 0` layer takes a long `distance` and a matching narrow `fov`.
-  - Do not re-bless `attractor_depth`: baselines are blessed on DX12 WARP only, and that is Phase 6.
+  - Do not re-bless `attractor_depth`: baselines are blessed on DX12 WARP only, and that is Phase 7.
     Record in the log whether its capture moved, from the off-WARP drift report the golden run prints.
   - Write a test that holds every migrated 3D preset's framed coverage within the `sanity` floor.
 - **Files touched:** `presets/attractor_*.toml` (the 3D-family set), `presets/fragment_nebula.toml`,
@@ -131,7 +131,7 @@ flowchart LR
   - `docs/presets.md` replaces `perspective` with the camera block, and says which families it
     reads on.
   - The log carries the replacement text for the preset-author reference's `## attractor` section,
-    for the owner to apply in Phase 7: the camera block in place of `perspective`, the families it
+    for the owner to apply in Phase 8: the camera block in place of `perspective`, the families it
     reads on, and the migration rule, so the content lane can re-curate from it. A headless session
     cannot edit `.claude/` (ADR-0210).
   - `scripts/tuple-sheets.mjs` still renders 3D roster entries at the default camera.
@@ -141,16 +141,41 @@ flowchart LR
   `node scripts/toc.mjs --check`, `node scripts/check-doc-links.mjs` and
   `node scripts/check-reader-prose.mjs` pass.
 
-### Phase 5 — The 3D presets, re-curated in motion
+### Phase 5 — Fog on the attractor's sprites
+- **Owner skill:** dev
+- **What:**
+  - The shared camera block gained `fog` and `solid` with Plan 0248 (ADR-0263), and both were built
+    for the `seg3d` stroke, which the attractor does not draw. Its families with depth now take `fog`:
+    each sprite's light is multiplied by the camera's `fog_light()` at its view depth, the function
+    `CAMERA_WGSL` already carries and `CameraFrame::fog_light` mirrors on the CPU. Live on the
+    families with depth, inert on the flat ones, as the rest of the block is.
+  - `solid` is not taken: sprites have no stroke to sort far to near. The attractor's setter answers
+    only the params it declares, as the swarm's does, so a `solid` binding on the attractor is an
+    undeclared param.
+  - The params block, `presets/schema/`, `.taplo.toml` and `docs/specs/player-schema.json` are
+    regenerated, `docs/presets.md` names `fog` among the attractor's camera params, and the log's
+    reference text for Phase 8 gains `fog`.
+- **Files touched:** `core/src/render/scenes/particles/mod.rs`,
+  `core/src/render/scenes/particles/shaders.rs`, `core/src/render/scenes/particles/encode.rs`,
+  `core/src/render/scenes/particles/tests.rs`, `core/tests/attractor.rs`, `presets/README.md`,
+  `presets/schema/`, `.taplo.toml`, `docs/specs/player-schema.json`, `docs/presets.md`.
+- **Done when:**
+  - `preset::declared_params_match_set_param` passes, and the whole `-P fast` profile is green.
+  - A test holds that, on a 3D family at `fog = 1`, the summed light of the far half of the figure
+    by view depth falls relative to `fog = 0`, and the near half falls less.
+  - At `fog = 0` a 3D capture is byte-identical to the same capture before this phase, and the flat
+    fixtures are byte-identical, both checked on the session's adapter.
+
+### Phase 6 — The 3D presets, re-curated in motion
 - **Owner skill:** human
 - **Blocks merge:** no
 - **What:** the owner runs the ten 3D attractor presets and the two fragment layers live, now with
-  `pitch` and a real `distance` available, and briefs `preset-author` on which to re-curate and how.
-  The migration already keeps each close to its old picture, so the merge does not wait (ADR-0249).
+  `pitch`, a real `distance` and `fog` available, and briefs `preset-author` on which to re-curate
+  and how. The migration already keeps each close to its old picture, so the merge does not wait (ADR-0249).
 - **Files touched:** none.
 - **Done when:** the owner records the brief, or a keep per preset, in this plan's log.
 
-### Phase 6 — The moved baseline is blessed
+### Phase 7 — The moved baseline is blessed
 - **Owner skill:** human
 - **Blocks merge:** no
 - **What:** if Phase 3's log says `attractor_depth` moved, re-bless it on DX12 WARP, and nothing else.
@@ -158,7 +183,7 @@ flowchart LR
 - **Files touched:** `core/tests/golden/attractor_depth.png`.
 - **Done when:** the Windows CI golden job is green on `main`.
 
-### Phase 7 — The preset-author reference
+### Phase 8 — The preset-author reference
 - **Owner skill:** human
 - **Blocks merge:** no
 - **What:** the owner applies, in an interactive session, the text Phase 4 left in the log to
@@ -199,7 +224,7 @@ struct ModelTransform {
 
 - Move the flat families onto the camera (ADR-0260, Alternative C).
 - Change any roster entry's index, coefficients or measured framing (ADR-0093).
-- Re-curate the presets' look. That is Phase 5's brief and `preset-author`'s work.
+- Re-curate the presets' look. That is Phase 6's brief and `preset-author`'s work.
 
 ## Implementation log
 
@@ -211,9 +236,10 @@ struct ModelTransform {
 | 2 — The real lens, and `perspective` retires | dev | not started | |
 | 3 — The shipped presets migrate by the mapping | dev | not started | |
 | 4 — Documentation and the references | dev | not started | |
-| 5 — The 3D presets, re-curated in motion | human | not started | |
-| 6 — The moved baseline is blessed | human | not started | |
-| 7 — The preset-author reference | human | not started | |
+| 5 — Fog on the attractor's sprites | dev | not started | |
+| 6 — The 3D presets, re-curated in motion | human | not started | |
+| 7 — The moved baseline is blessed | human | not started | |
+| 8 — The preset-author reference | human | not started | |
 
 ### Notes
 
@@ -229,5 +255,5 @@ struct ModelTransform {
 
 ## Followups (after this lands)
 
-- `preset-author`: the re-curation per Phase 5's brief.
+- `preset-author`: the re-curation per Phase 6's brief.
 - Accept ADR-0260 at the close, and mark ADR-0076 and ADR-0257 amended in the ADR index.
