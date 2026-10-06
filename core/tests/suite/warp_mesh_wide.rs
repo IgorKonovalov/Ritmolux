@@ -123,7 +123,7 @@ fn the_converted_chain_matches_its_wide_baseline() {
     let Some((fresh, renderer)) = capture() else {
         return;
     };
-    let bless = common::bless_requested(&renderer);
+    let bless = common::bless_requested(&renderer, STEM);
     std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
 
     if bless {

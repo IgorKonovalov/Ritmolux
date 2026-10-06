@@ -190,7 +190,6 @@ fn composite_stages_match_golden_baselines() {
         return;
     };
     let frame = common::fixed_frame();
-    let bless = common::bless_requested(&renderer);
     let home = common::baseline_adapter(&renderer);
     std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
 
@@ -227,7 +226,7 @@ fn composite_stages_match_golden_baselines() {
             );
         }
 
-        if bless {
+        if common::bless_requested(&renderer, stem) {
             common::encode(&fresh, &path);
             println!("blessed {}", path.display());
             continue;

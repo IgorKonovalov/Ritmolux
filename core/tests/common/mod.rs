@@ -189,18 +189,87 @@ pub fn baseline_adapter(renderer: &Renderer) -> Result<(), String> {
     }
 }
 
-/// Whether `RLX_BLESS` asks this run to rewrite baselines — **panicking** if it
-/// does and `renderer` is not on the blessing adapter, since a baseline written
-/// anywhere else would hold every later WARP run to another rasterizer's frame.
-pub fn bless_requested(renderer: &Renderer) -> bool {
-    let bless = std::env::var_os("RLX_BLESS").is_some();
-    if bless && let Err(adapter) = baseline_adapter(renderer) {
+/// Which baselines a set `RLX_BLESS` names.
+#[derive(Debug, PartialEq, Eq)]
+pub enum BlessList {
+    /// `RLX_BLESS=1`: every baseline the run reaches.
+    All,
+    /// Any other value: exactly these stems, the file names under
+    /// `tests/golden/` without `.png`.
+    Stems(Vec<String>),
+}
+
+impl BlessList {
+    /// Whether the baseline `stem` is one this list blesses.
+    pub fn covers(&self, stem: &str) -> bool {
+        match self {
+            BlessList::All => true,
+            BlessList::Stems(stems) => stems.iter().any(|s| s == stem),
+        }
+    }
+}
+
+/// Parse a set `RLX_BLESS` value. `1` (whitespace aside) is [`BlessList::All`];
+/// anything else is a comma-separated list of stems, each trimmed, empty
+/// entries dropped. A value naming no stem at all is an `Err`, not an empty
+/// list: an empty list would bless nothing and look like a bless that ran.
+pub fn parse_bless(value: &str) -> Result<BlessList, String> {
+    let value = value.trim();
+    if value == "1" {
+        return Ok(BlessList::All);
+    }
+    let stems: Vec<String> = value
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+        .collect();
+    if stems.is_empty() {
+        return Err(format!(
+            "RLX_BLESS={value:?} names no baseline: set it to `1` for every baseline \
+             or to a comma-separated list of stems"
+        ));
+    }
+    Ok(BlessList::Stems(stems))
+}
+
+/// Whether `RLX_BLESS` asks this run to rewrite the baseline `stem` —
+/// **panicking** if it is set at all and `renderer` is not on the blessing
+/// adapter, since a baseline written anywhere else would hold every later WARP
+/// run to another rasterizer's frame.
+///
+/// A list naming a stem with no `tests/golden/<stem>.png` also panics, with
+/// every such name. The check reads the directory rather than recording which
+/// tests ran, so it holds whatever the run's filter selected and however
+/// nextest splits the run into processes. The cost: a baseline that does not
+/// exist yet cannot be named, and is first blessed with `RLX_BLESS=1` under a
+/// test filter that reaches only it.
+pub fn bless_requested(renderer: &Renderer, stem: &str) -> bool {
+    let Some(value) = std::env::var_os("RLX_BLESS") else {
+        return false;
+    };
+    if let Err(adapter) = baseline_adapter(renderer) {
         panic!(
             "RLX_BLESS refused: baselines are blessed on DX12 WARP only, and this \
              run is on {adapter}"
         );
     }
-    bless
+    let value = value
+        .into_string()
+        .unwrap_or_else(|v| panic!("RLX_BLESS is not UTF-8: {v:?}"));
+    let list = parse_bless(&value).unwrap_or_else(|e| panic!("{e}"));
+    if let BlessList::Stems(stems) = &list {
+        let unknown: Vec<&String> = stems
+            .iter()
+            .filter(|s| !golden_dir().join(format!("{s}.png")).is_file())
+            .collect();
+        assert!(
+            unknown.is_empty(),
+            "RLX_BLESS names baselines with no PNG under {}: {unknown:?}",
+            golden_dir().display()
+        );
+    }
+    list.covers(stem)
 }
 
 /// The skip notice a baseline comparison prints off WARP, in ADR-0016's shape.
@@ -222,8 +291,8 @@ pub fn golden_dir() -> PathBuf {
         .join("golden")
 }
 
-/// Write a capture out as the baseline PNG at `path`. `RLX_BLESS=1` is what
-/// reaches this.
+/// Write a capture out as the baseline PNG at `path`. A set `RLX_BLESS` naming
+/// the baseline is what reaches this.
 pub fn encode(img: &CaptureImage, path: &Path) {
     let buffer = image::RgbaImage::from_raw(img.width, img.height, img.rgba.clone())
         .expect("capture buffer matches its declared dimensions");

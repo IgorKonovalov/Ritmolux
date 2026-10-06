@@ -1,6 +1,6 @@
 # 0249 — A dispatched CI job blesses the named WARP baselines
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-10-06
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0264](../adrs/0264-a-warp-baseline-is-blessed-by-a-dispatched-ci-job-until-the-reference-moves-to-lavapipe.md)
@@ -149,15 +149,30 @@ flowchart LR
 
 ## Implementation log
 
-**Lane:**
+**Lane:** `plan-0249-a-dispatched-ci-job-blesses-the-named-warp-baselines`, worktree
+`/home/igor/Work/rlx-plan-0249`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `RLX_BLESS` takes a list of names | dev | not started | |
+| 1 — `RLX_BLESS` takes a list of names | dev | done | committed with this row |
 | 2 — `bless.yml` and its report | dev | not started | |
 | 3 — First bless: 0248's four | human | not started | |
 
 ### Notes
+
+- Phase 1, the unknown-name check: `bless_requested` checks each listed stem against
+  `core/tests/golden/<stem>.png` on every call, after the adapter check. It reads the directory, not
+  the set of tests that ran, so a test filtered out of the run cannot hide a stem; the cost is that a
+  baseline with no PNG yet cannot be named and is blessed first with `RLX_BLESS=1` under a filter.
+- Phase 1, an empty value (or one of only commas and whitespace) panics as naming no baseline,
+  rather than blessing nothing.
+- Phase 1, the parse's unit test `rlx_bless_parses_all_or_a_list_of_stems` lives in
+  `core/tests/golden.rs`, which `-P fast` excludes; it was run by name and passed.
+- Phase 1, the non-WARP refusal, quoted from `RLX_BLESS=waterfall_ramp ... --test golden
+  the_waterfall_holds_a_ramped_ring` (and the same from `RLX_BLESS=no_such_stem ... --test suite
+  line_joints::`, showing the adapter check precedes the name check): `RLX_BLESS refused: baselines
+  are blessed on DX12 WARP only, and this run is on llvmpipe (LLVM 22.1.8, 256 bits) (Vulkan, Cpu),
+  driver llvmpipe Mesa 26.2.2-arch1.1 (LLVM 22.1.8)`.
 
 ### Close triggers
 
