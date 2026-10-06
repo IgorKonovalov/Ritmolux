@@ -566,6 +566,13 @@ flowchart TB
   judged the same composition with the swarm layer re-projected. No other fixture with a baseline draws
   the swarm (`backdrop_ramp` / `backdrop_band` carry one and passed).
 
+- **Close review round 1, findings 0, 1 and 2 (89b8854c):** `check (ubuntu-latest)` gained a
+  Linux-only `cargo nextest run -p rlx-core --test golden` step after `-P fast`; `ci.yml`'s
+  comments, `nfr.md` §CI and `developing.md` now say where the comparisons assert. The first
+  `ubuntu-latest` run after the push is unread.
+- **Close review round 1, finding 5 (858fe882):** the tonemap layout-collision message carries the
+  dated WARP mark. Findings 3 and 4 were left to the close.
+
 ### Close triggers
 
 - **`presets/` touched:** no
