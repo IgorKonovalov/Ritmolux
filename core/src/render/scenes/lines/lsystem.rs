@@ -125,13 +125,24 @@ const SYMBOL_BUDGET: usize = 65_536;
 /// most of the view: the flat view spans `[-1, 1]` vertically and the camera's
 /// default distance shows about three units. On a flat figure `scale`
 /// multiplies it.
-const ENDLESS_STEP: f32 = 0.025;
+const ENDLESS_STEP: f64 = 0.025;
 
-/// One segment in an endless figure's ring, in draw-step units.
+/// `[generator] follow_window`'s default: how many of the newest segments the
+/// follow point is the centroid of.
+pub const DEFAULT_FOLLOW_WINDOW: u32 = 32;
+
+/// How far the pen may walk from the origin, in draw steps, before the
+/// origin moves to it. Every position is a grid point (`turtle::on_grid`)
+/// and the move is a whole number of steps, so the move is exact; this bound
+/// keeps every position the ring and the pen hold inside the grid's reach,
+/// `2^22` steps, with the trail's own length to spare.
+const REBASE_RADIUS: f64 = 1024.0;
+
+/// One segment in an endless figure's ring, in draw steps, on the grid.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct RingSeg {
-    a: [f32; 3],
-    b: [f32; 3],
+    a: [f64; 3],
+    b: [f64; 3],
     /// The generation it was drawn at: the colour axis (ADR-0059).
     generation: u32,
     /// Whether it continues the segment drawn before it.
@@ -143,11 +154,18 @@ struct RingSeg {
 }
 
 /// An endless figure's CPU state (Plan 0237): the stream, the pen walking it,
-/// the ring of the newest `trail` segments and the integrated rate. No GPU in
-/// it, so every claim about it is testable on the CPU.
+/// the ring of the newest `trail` segments, the integrated rate and the
+/// follow point. No GPU in it, so every claim about it is testable on the CPU.
 ///
 /// **Nothing here allocates after construction.** The stream's frames, the
 /// pen's branch stack and the ring are each reserved at their bound.
+///
+/// **Every position is relative to an origin that moves with the pen.** When
+/// the pen passes [`REBASE_RADIUS`] the origin moves to it, rounded to whole
+/// steps, and the pen, its saved branches, the ring and the follow point all
+/// move by the same exact amount ([`rebase`](Self::rebase)). What is drawn is
+/// each point less the follow point, which that move leaves bit for bit
+/// unchanged.
 #[derive(Debug, Clone)]
 pub(crate) struct Endless {
     stream: grammar::Stream,
@@ -161,17 +179,29 @@ pub(crate) struct Endless {
     phase: f64,
     /// Draw steps taken since the start.
     emitted: u64,
+    /// How many of the newest segments the follow point is the centroid of.
+    window: usize,
+    /// The follow point, in draw steps, on the grid: what the view centres on.
+    follow: [f64; 3],
+    /// Its velocity, in draw steps a second.
+    follow_velocity: [f64; 3],
+    /// Every re-base's offset, summed: where the current origin sits in the
+    /// first one's frame, for a test to measure motion across a re-base.
+    #[cfg(test)]
+    origin: [f64; 3],
 }
 
 impl Endless {
     /// The endless walk of `axiom` under `rules`, at `angle` radians, keeping
-    /// `trail` segments, through [`grammar::STREAM_DEPTH`] levels.
+    /// `trail` segments, through [`grammar::STREAM_DEPTH`] levels, followed at
+    /// the centroid of the newest `window`.
     pub(crate) fn new(
         axiom: &str,
         rules: &[(char, String)],
         angle: f32,
         mode: TurtleMode,
         trail: usize,
+        window: usize,
     ) -> Self {
         let trail = trail.max(1);
         let depth = grammar::STREAM_DEPTH;
@@ -183,6 +213,100 @@ impl Endless {
             head: 0,
             phase: 0.0,
             emitted: 0,
+            window: window.max(1),
+            follow: [0.0; 3],
+            follow_velocity: [0.0; 3],
+            #[cfg(test)]
+            origin: [0.0; 3],
+        }
+    }
+
+    /// Move the follow point toward the centroid of the newest `window`
+    /// segments' midpoints, as a critically damped spring of time constant
+    /// `tau` seconds, over `dt` seconds.
+    ///
+    /// The step is the spring's exact solution for a target held over the
+    /// frame, `e(t) = (e0 + (v0 + w e0) t) exp(-w t)` with `w = 1 / tau`, not a
+    /// numerical integration, so it neither overshoots nor depends on the
+    /// display rate. A centroid rather than the tip, so a `]` that jumps the
+    /// tip back moves the target by one segment's share of the window rather
+    /// than the whole jump. A `tau` that is not finite and positive holds the
+    /// point still.
+    pub(crate) fn follow_step(&mut self, tau: f32, dt: f32) {
+        let Some(target) = self.follow_target() else {
+            return;
+        };
+        if !(tau.is_finite() && tau > 0.0) {
+            return;
+        }
+        let w = 1.0 / f64::from(tau);
+        let dt = f64::from(dt);
+        let decay = (-w * dt).exp();
+        let mut point = self.follow;
+        for k in 0..3 {
+            let (Some(x), Some(v), Some(t)) = (
+                point.get_mut(k),
+                self.follow_velocity.get_mut(k),
+                target.get(k),
+            ) else {
+                continue;
+            };
+            let e = *x - t;
+            let c = *v + w * e;
+            *x = t + (e + c * dt) * decay;
+            *v = (*v - w * c * dt) * decay;
+        }
+        self.follow = turtle::on_grid(point);
+    }
+
+    /// The centroid of the newest `window` segments' midpoints, in draw steps,
+    /// or `None` while the ring is empty.
+    fn follow_target(&self) -> Option<[f64; 3]> {
+        let n = self.window.min(self.ring.len());
+        if n == 0 {
+            return None;
+        }
+        let mut target = [0.0f64; 3];
+        for age in 0..n {
+            if let Some(seg) = self.at(age) {
+                for (t, (a, b)) in target.iter_mut().zip(seg.a.iter().zip(seg.b)) {
+                    *t += 0.5 * (a + b);
+                }
+            }
+        }
+        for t in &mut target {
+            *t /= n as f64;
+        }
+        Some(target)
+    }
+
+    /// `p`, in draw steps, as the world position it is drawn at: relative to
+    /// the follow point and scaled by [`ENDLESS_STEP`].
+    fn relative(&self, p: [f64; 3]) -> [f32; 3] {
+        let f = self.follow;
+        [
+            ((p[0] - f[0]) * ENDLESS_STEP) as f32,
+            ((p[1] - f[1]) * ENDLESS_STEP) as f32,
+            ((p[2] - f[2]) * ENDLESS_STEP) as f32,
+        ]
+    }
+
+    /// Move the origin to the pen, rounded to whole steps: the pen, its saved
+    /// branches, the ring and the follow point all move by the same amount,
+    /// which is exact on the grid, so nothing drawn moves at all.
+    fn rebase(&mut self) {
+        let p = self.pen.position();
+        let origin = [p[0].round(), p[1].round(), p[2].round()];
+        let back = |q: [f64; 3]| [q[0] - origin[0], q[1] - origin[1], q[2] - origin[2]];
+        self.pen.shift(origin);
+        for seg in &mut self.ring {
+            seg.a = back(seg.a);
+            seg.b = back(seg.b);
+        }
+        self.follow = back(self.follow);
+        #[cfg(test)]
+        for (total, step) in self.origin.iter_mut().zip(origin) {
+            *total += step;
         }
     }
 
@@ -204,10 +328,11 @@ impl Endless {
 
     /// One frame's growth: `grow` draw steps a second for `dt` seconds,
     /// integrated (ADR-0019), and at most [`EMIT_CEILING`] of them. A negative
-    /// or non-finite `grow` or `dt` grows nothing.
+    /// or non-finite `grow` grows nothing. `dt` is the renderer's, already a
+    /// finite positive frame delta (ADR-0191).
     pub(crate) fn advance(&mut self, grow: f32, dt: f32) {
-        let safe = |v: f32| if v.is_finite() { v.max(0.0) } else { 0.0 };
-        self.phase += f64::from(safe(grow)) * f64::from(safe(dt));
+        let rate = if grow.is_finite() { grow.max(0.0) } else { 0.0 };
+        self.phase += f64::from(rate) * f64::from(dt);
         let owed = (self.phase.floor() as u64).saturating_sub(self.emitted);
         let mut budget = SYMBOL_BUDGET;
         for _ in 0..owed.min(EMIT_CEILING) {
@@ -236,6 +361,10 @@ impl Endless {
             if let Some(drawn) = self.pen.read(ch) {
                 self.push(drawn);
                 self.emitted += 1;
+                let p = self.pen.position();
+                if p[0] * p[0] + p[1] * p[1] + p[2] * p[2] > REBASE_RADIUS * REBASE_RADIUS {
+                    self.rebase();
+                }
                 return true;
             }
         }
@@ -257,11 +386,14 @@ impl Endless {
         {
             // The flat joint, measured as the flat walk measures it: the
             // extension depends only on the turn, so draw-step units serve.
+            // In the joint's own frame, so the three points are small numbers
+            // however far the pen has walked.
+            let at = |p: [f64; 3]| [(p[0] - prev.b[0]) as f32, (p[1] - prev.b[1]) as f32];
             let ext = super::renderer::miter_extension(
                 super::PLACEHOLDER_WIDTH,
-                [prev.a[0], prev.a[1]],
-                [prev.b[0], prev.b[1]],
-                [drawn.b[0], drawn.b[1]],
+                at(prev.a),
+                at(prev.b),
+                at(drawn.b),
             );
             prev.ext_b = ext;
             seg.ext_a = ext;
@@ -336,6 +468,7 @@ const DEFAULT_MIRROR_ORDER: f32 = 1.0;
 const DEFAULT_MIRROR_REFLECT: f32 = 0.0;
 const DEFAULT_GROW: f32 = default_of(PARAMS, "grow");
 const DEFAULT_TAIL: f32 = default_of(PARAMS, "tail");
+const DEFAULT_FOLLOW: f32 = default_of(PARAMS, "follow");
 
 /// A generator scene driven by an L-system grammar.
 pub struct LSystemScene {
@@ -446,6 +579,8 @@ pub struct LSystemScene {
     grow: f32,
     /// `tail`: the oldest fraction of the ring that fades.
     tail: f32,
+    /// `follow`: the follow spring's time constant, in seconds.
+    follow: f32,
     /// The endless ring's bounding radius about the orbit target, in world
     /// units, measured in `update`: what `focus` resolves against.
     endless_radius: f32,
@@ -480,6 +615,7 @@ impl LSystemScene {
             dt: super::super::FALLBACK_DT,
             grow: DEFAULT_GROW,
             tail: DEFAULT_TAIL,
+            follow: DEFAULT_FOLLOW,
             endless_radius: SPACE_RADIUS,
             renderer,
             cached: Vec::new(),
@@ -720,6 +856,7 @@ impl LSystemScene {
         angle_deg: f32,
         mode: TurtleMode,
         trail: u32,
+        window: u32,
     ) {
         self.cached.clear();
         self.cached3d.clear();
@@ -740,7 +877,14 @@ impl LSystemScene {
             },
             cap,
         });
-        let endless = Endless::new(axiom, rules, angle_deg.to_radians(), mode, asked.min(cap));
+        let endless = Endless::new(
+            axiom,
+            rules,
+            angle_deg.to_radians(),
+            mode,
+            asked.min(cap),
+            window as usize,
+        );
         // One colour slot per generation the pen can reach, sized here so the
         // per-frame fill neither allocates nor indexes out of range.
         self.depth_colors.clear();
@@ -749,44 +893,57 @@ impl LSystemScene {
         self.endless = Some(endless);
     }
 
-    /// An endless frame's CPU half: grow the ring by this frame's `grow`,
-    /// colour the generations, and on the plane lay the ring into the draw
-    /// buffer, oldest first, fading by age over the `tail`.
+    /// An endless frame's CPU half: grow the ring by this frame's `grow`, move
+    /// the follow point, colour the generations, and lay the ring out relative
+    /// to the follow point — on the plane into the draw buffer, in space as the
+    /// radius `focus` resolves against.
     fn update_endless(&mut self) {
         self.mirror_overflow = None;
-        self.draw_buf.clear();
         let ramp = self.ramp();
         let Some(endless) = self.endless.as_mut() else {
+            self.draw_buf.clear();
             return;
         };
         endless.advance(self.grow, self.dt);
+        endless.follow_step(self.follow, self.dt);
         fill_depth_colors(
             &mut self.depth_colors,
             &self.palette,
             ramp,
             endless.generations(),
         );
+        self.lay_endless();
+    }
+
+    /// Lay the endless ring out for this frame's draw, relative to the follow
+    /// point: on the plane into the draw buffer, oldest first, faded by age
+    /// over the `tail`; in space only the ring's reach about the follow point,
+    /// which `focus` resolves against, since the segments are clipped against
+    /// the camera at render.
+    fn lay_endless(&mut self) {
+        self.draw_buf.clear();
+        let Some(endless) = self.endless.as_ref() else {
+            return;
+        };
         let len = endless.len();
         let trunk = self.depth_colors.first().copied().unwrap_or([1.0; 3]);
 
         if self.turtle == TurtleMode::Space {
-            // The ring's reach about the orbit target, for `focus`.
             let mut reach = 0.0f32;
             for age in 0..len {
                 if let Some(seg) = endless.at(age) {
                     for p in [seg.a, seg.b] {
-                        let w = endless_world(p);
+                        let w = endless.relative(p);
                         reach = reach.max((w[0] * w[0] + w[1] * w[1] + w[2] * w[2]).sqrt());
                     }
                 }
             }
-            self.endless_radius = reach.max(ENDLESS_STEP);
+            self.endless_radius = reach.max(ENDLESS_STEP as f32);
             return;
         }
 
         let width = super::half_width(self.thickness);
         let (sin, cos) = self.rotation.sin_cos();
-        let step = ENDLESS_STEP;
         for age in (0..len).rev() {
             let Some(seg) = endless.at(age) else {
                 continue;
@@ -794,9 +951,10 @@ impl LSystemScene {
             // The oldest segment's predecessor has left the ring, so its
             // joint has nothing to reach toward.
             let ext_a = if age + 1 < len { seg.ext_a } else { 0.0 };
+            let (a, b) = (endless.relative(seg.a), endless.relative(seg.b));
             let flat = SegmentInstance {
-                a: [seg.a[0] * step, seg.a[1] * step],
-                b: [seg.b[0] * step, seg.b[1] * step],
+                a: [a[0], a[1]],
+                b: [b[0], b[1]],
                 color: [1.0; 3],
                 width: super::PLACEHOLDER_WIDTH,
                 alpha: 1.0,
@@ -837,6 +995,23 @@ impl LSystemScene {
         if self.mirror_overflow.is_none() {
             self.mirror_overflow = frame.blur;
         }
+        self.lay_endless_space(&frame);
+        self.lines3d.draw_3d(
+            queue,
+            encoder,
+            view,
+            &frame,
+            self.glow,
+            self.softness,
+            &self.instances3d,
+        );
+    }
+
+    /// Lay the endless ring into the 3D instance buffer through `frame`: each
+    /// segment relative to the follow point, which the camera orbits, clipped
+    /// against the near plane, culled when wholly off one edge, faded by age
+    /// and joined to its neighbours in the ring.
+    fn lay_endless_space(&mut self, frame: &camera::CameraFrame) {
         let width = if self.thickness.is_finite() {
             self.thickness.max(0.0)
         } else {
@@ -852,19 +1027,19 @@ impl LSystemScene {
                     continue;
                 };
                 let before = if seg.joined && age + 1 < len {
-                    endless.at(age + 1).map(|p| endless_world(p.a))
+                    endless.at(age + 1).map(|p| endless.relative(p.a))
                 } else {
                     None
                 };
                 let after = match age.checked_sub(1).and_then(|n| endless.at(n)) {
-                    Some(next) if next.joined => Some(endless_world(next.b)),
+                    Some(next) if next.joined => Some(endless.relative(next.b)),
                     _ => None,
                 };
                 let Some([prev, a, b, next]) = joined_chord(
                     &frame.view,
                     before,
-                    endless_world(seg.a),
-                    endless_world(seg.b),
+                    endless.relative(seg.a),
+                    endless.relative(seg.b),
                     after,
                 ) else {
                     continue;
@@ -888,26 +1063,8 @@ impl LSystemScene {
                 });
             }
         }
-        self.lines3d.draw_3d(
-            queue,
-            encoder,
-            view,
-            &frame,
-            self.glow,
-            self.softness,
-            &instances,
-        );
         self.instances3d = instances;
     }
-}
-
-/// A point of an endless figure, from draw-step units to world units.
-fn endless_world(p: [f32; 3]) -> [f32; 3] {
-    [
-        p[0] * ENDLESS_STEP,
-        p[1] * ENDLESS_STEP,
-        p[2] * ENDLESS_STEP,
-    ]
 }
 
 /// Fill `out[g]` with generation `g`'s stroke colour, walking the shared
@@ -984,6 +1141,7 @@ pub const PARAMS: &[ParamSpec] = &[
     SOLID,
     GROW,
     TAIL,
+    FOLLOW,
 ];
 
 const VISIBLE_DEPTH: ParamSpec = ParamSpec {
@@ -1014,6 +1172,16 @@ const TAIL: ParamSpec = ParamSpec {
           segment at full light until it is dropped.",
     kind: ParamKind::Modal,
     group: ParamGroup::Light,
+    main: false,
+};
+const FOLLOW: ParamSpec = ParamSpec {
+    name: "follow",
+    default: 0.3,
+    range: Some([0.05, 3.0]),
+    doc: "How slowly the view follows an endless figure's growing tip, in seconds: short \
+          keeps the tip near the centre, long lets it lead and glides after a branch's jump.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Motion,
     main: false,
 };
 
@@ -1187,6 +1355,7 @@ pub const FAMILY_PARAMS: &[FamilyParam] = &[
     in_space!(SOLID),
     endless!(GROW),
     endless!(TAIL),
+    endless!(FOLLOW),
 ];
 
 impl Scene for LSystemScene {
@@ -1222,6 +1391,7 @@ impl Scene for LSystemScene {
         self.camera.reset();
         self.grow = DEFAULT_GROW;
         self.tail = DEFAULT_TAIL;
+        self.follow = DEFAULT_FOLLOW;
     }
 
     fn set_target_size(&mut self, width: u32, height: u32) {
@@ -1250,6 +1420,7 @@ impl Scene for LSystemScene {
             "mirror_reflect" => self.mirror_reflect = value,
             "grow" => self.grow = value,
             "tail" => self.tail = value,
+            "follow" => self.follow = value,
             _ => {}
         }
     }
@@ -1273,6 +1444,7 @@ impl Scene for LSystemScene {
             turtle,
             growth,
             trail,
+            follow_window,
         } = cfg
         {
             self.endless = None;
@@ -1280,7 +1452,14 @@ impl Scene for LSystemScene {
             match growth {
                 Growth::Fixed => self.build(axiom, rules, *angle_deg, *max_depth, *turtle),
                 Growth::Endless => {
-                    self.configure_endless(axiom, rules, *angle_deg, *turtle, *trail);
+                    self.configure_endless(
+                        axiom,
+                        rules,
+                        *angle_deg,
+                        *turtle,
+                        *trail,
+                        *follow_window,
+                    );
                     return self.trail_overflow;
                 }
             }
@@ -1663,7 +1842,7 @@ mod tests {
         let plane = ["rotation", "scale", "stroke_blend"];
         let mirror = ["mirror_order", "mirror_reflect"];
         let fixed = ["visible_depth", "draw_progress"];
-        let endless = ["grow", "tail"];
+        let endless = ["grow", "tail", "follow"];
         fn joined(parts: &[&[&'static str]]) -> Vec<&'static str> {
             let mut all: Vec<&str> = parts.iter().flat_map(|p| p.iter().copied()).collect();
             all.sort_unstable();
@@ -1699,7 +1878,14 @@ mod tests {
     /// stream outlasts any test by far.
     fn vine(trail: usize) -> Endless {
         let rules = [('F', "F[+F]F[-F]F".to_string())];
-        Endless::new("F", &rules, 25f32.to_radians(), TurtleMode::Flat, trail)
+        Endless::new(
+            "F",
+            &rules,
+            25f32.to_radians(),
+            TurtleMode::Flat,
+            trail,
+            DEFAULT_FOLLOW_WINDOW as usize,
+        )
     }
 
     /// Plan 0237 Phase 4's done-when: the figure grows by integrated time, not
@@ -1771,7 +1957,7 @@ mod tests {
     fn a_short_stream_restarts_without_a_jump() {
         // Two draw steps, then the end: depth 32 of a rule that never grows.
         let rules = [('F', "F+".to_string())];
-        let mut endless = Endless::new("FF", &rules, 0.3, TurtleMode::Flat, 50);
+        let mut endless = Endless::new("FF", &rules, 0.3, TurtleMode::Flat, 50, 8);
         for _ in 0..120 {
             endless.advance(20.0, 1.0 / 60.0);
         }
@@ -1784,6 +1970,173 @@ mod tests {
                 "segment {age} does not begin where the one before it ended"
             );
         }
+    }
+
+    /// A point in the first origin's frame: `p` plus every re-base so far.
+    fn absolute(endless: &Endless, p: [f64; 3]) -> [f64; 3] {
+        [
+            p[0] + endless.origin[0],
+            p[1] + endless.origin[1],
+            p[2] + endless.origin[2],
+        ]
+    }
+
+    fn distance(a: [f64; 3], b: [f64; 3]) -> f64 {
+        ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
+    }
+
+    /// Plan 0237 Phase 5's done-when: across a `]` that throws the tip back,
+    /// the follow point never moves more in a frame than the spring allows —
+    /// `dt / follow` times the farthest it has been from its target, the
+    /// speed bound of a critically damped spring — so there is no jump.
+    #[test]
+    fn the_follow_point_glides_across_a_branchs_jump() {
+        let dt = 1.0 / 60.0;
+        let mut endless = vine(2000);
+        let w = 1.0 / f64::from(DEFAULT_FOLLOW);
+        let mut farthest = 0.0f64;
+        let mut biggest_jump = 0.0f64;
+        let mut follow_at_jump = 0.0f64;
+        for frame in 0..6000 {
+            let tip = absolute(&endless, endless.pen.position());
+            let before = absolute(&endless, endless.follow);
+            endless.advance(DEFAULT_GROW, dt);
+            if let Some(target) = endless.follow_target() {
+                farthest = farthest.max(distance(target, endless.follow));
+            }
+            endless.follow_step(DEFAULT_FOLLOW, dt);
+            let moved = distance(absolute(&endless, endless.follow), before);
+            let allowed = w * f64::from(dt) * farthest;
+            assert!(
+                moved <= allowed + 1e-9,
+                "frame {frame}: the follow point moved {moved} steps, past the \
+                 spring's {allowed}"
+            );
+            let jump = distance(absolute(&endless, endless.pen.position()), tip);
+            if jump > biggest_jump {
+                biggest_jump = jump;
+                follow_at_jump = moved;
+            }
+        }
+        println!("largest tip jump {biggest_jump:.1} steps, follow moved {follow_at_jump:.3}");
+        assert!(
+            biggest_jump >= 10.0,
+            "the vine never jumped back (largest {biggest_jump}), so this proves nothing"
+        );
+        assert!(
+            follow_at_jump * 10.0 < biggest_jump,
+            "on the frame the tip jumped {biggest_jump} steps the follow point moved \
+             {follow_at_jump}"
+        );
+    }
+
+    /// Plan 0237 Phase 5's done-when: a non-branching vine followed at the
+    /// default `follow` keeps its tip inside the frame for 6,000 frames — on
+    /// the plane at 1280x800, and in space at 1920x1080 through the default
+    /// camera.
+    #[test]
+    fn the_tip_of_a_vine_stays_in_frame() {
+        let dt = 1.0 / 60.0;
+        for (grammar, turtle) in [
+            ("F+F-F-F+F", TurtleMode::Flat),
+            ("F+F-F&F^F", TurtleMode::Space),
+        ] {
+            let rules = [('F', grammar.to_string())];
+            let mut endless = Endless::new(
+                "F",
+                &rules,
+                std::f32::consts::FRAC_PI_2,
+                turtle,
+                2000,
+                DEFAULT_FOLLOW_WINDOW as usize,
+            );
+            let camera = CameraParams::default();
+            let mut worst = 0.0f32;
+            for frame in 0..6000 {
+                endless.advance(DEFAULT_GROW, dt);
+                endless.follow_step(DEFAULT_FOLLOW, dt);
+                let tip = endless.relative(endless.pen.position());
+                let ndc = match turtle {
+                    TurtleMode::Flat => [tip[0] / (1280.0 / 800.0), tip[1]],
+                    TurtleMode::Space => {
+                        let view = camera
+                            .frame(1920.0 / 1080.0, 1.0, [0.0, 0.0], (1920, 1080), 1.0, 12.0)
+                            .view;
+                        let c = view.clip(tip);
+                        assert!(c[3] > 0.0, "frame {frame}: the tip is behind the eye");
+                        [c[0] / c[3], c[1] / c[3]]
+                    }
+                };
+                let reach = ndc[0].abs().max(ndc[1].abs());
+                worst = worst.max(reach);
+                assert!(
+                    reach <= 1.0,
+                    "{turtle:?} frame {frame}: the tip left the frame at {ndc:?}"
+                );
+            }
+            println!("{turtle:?}: the tip reached {worst:.3} of the frame's half-extent");
+        }
+    }
+
+    /// Plan 0237 Phase 5's done-when: after a million draw steps the newest
+    /// segment is one step long to `1e-5`, as step 0 was, because re-basing
+    /// has kept every position near the origin.
+    #[test]
+    fn a_million_steps_on_the_newest_segment_is_still_one_step_long() {
+        let rules = [('F', "FF".to_string())];
+        let mut endless = Endless::new("F", &rules, 0.4, TurtleMode::Space, 1000, 32);
+        let first = {
+            endless.advance(60.0, 1.0 / 60.0);
+            endless.at(0).map(|s| distance(s.a, s.b))
+        };
+        assert_eq!(first, Some(1.0), "step 0");
+        while endless.emitted() < 1_000_000 {
+            endless.advance(1.0e9, 1.0 / 60.0);
+        }
+        let newest = endless.at(0).map(|s| distance(s.a, s.b)).unwrap_or(0.0);
+        assert!(
+            (newest - 1.0).abs() <= 1e-5,
+            "the newest segment is {newest} steps long"
+        );
+        let pen = endless.pen.position();
+        assert!(
+            distance(pen, [0.0; 3]) <= REBASE_RADIUS + 1.0,
+            "the pen stands {} steps from the origin after {} steps",
+            distance(pen, [0.0; 3]),
+            endless.emitted()
+        );
+        assert!(
+            distance(endless.origin, [0.0; 3]) > 999_000.0,
+            "the origin moved with the vine"
+        );
+    }
+
+    /// Plan 0237 Phase 5's done-when: a re-base changes nothing drawn. Every
+    /// position the frame is laid out from is a point less the follow point,
+    /// and both move by the same whole number of steps, exactly — so each one
+    /// is the same bits after the move as before it.
+    #[test]
+    fn a_rebase_leaves_every_drawn_position_bit_for_bit() {
+        let mut endless = vine(2000);
+        for _ in 0..3000 {
+            endless.advance(DEFAULT_GROW, 1.0 / 60.0);
+            endless.follow_step(DEFAULT_FOLLOW, 1.0 / 60.0);
+        }
+        let drawn = |e: &Endless| -> Vec<[f32; 3]> {
+            (0..e.len())
+                .filter_map(|age| e.at(age))
+                .flat_map(|s| [e.relative(s.a), e.relative(s.b)])
+                .chain([e.relative(e.pen.position())])
+                .collect()
+        };
+        let before = drawn(&endless);
+        let origin = endless.origin;
+        endless.rebase();
+        assert_ne!(
+            endless.origin, origin,
+            "the probe must actually move the origin"
+        );
+        assert_eq!(drawn(&endless), before, "a re-base moved something drawn");
     }
 
     /// The fade is full light until the oldest `tail` of the ring, then falls
@@ -1857,6 +2210,7 @@ mod tests {
                 turtle,
                 growth: Growth::Endless,
                 trail: 1000,
+                follow_window: DEFAULT_FOLLOW_WINDOW,
             });
             assert_eq!(overflow, None, "{turtle:?}: a trail inside the cap");
             let capacities = |s: &LSystemScene| {
@@ -1894,6 +2248,35 @@ mod tests {
                 assert_eq!(scene.draw_buf.len(), 1000, "the whole ring is drawn");
             }
             assert_eq!(capacities(&scene), built, "{turtle:?}: a buffer grew");
+
+            // A re-base changes no byte the GPU is handed: the instances laid
+            // out after it are the instances laid out before it.
+            let frame =
+                scene
+                    .camera
+                    .frame(1.0, 1.0, [0.0, 0.0], (64, 64), scene.endless_radius, 12.0);
+            let laid = |s: &mut LSystemScene| -> (Vec<u8>, Vec<u8>, u32) {
+                s.lay_endless();
+                s.lay_endless_space(&frame);
+                (
+                    bytemuck::cast_slice(&s.draw_buf).to_vec(),
+                    bytemuck::cast_slice(&s.instances3d).to_vec(),
+                    s.endless_radius.to_bits(),
+                )
+            };
+            let before = laid(&mut scene);
+            assert!(
+                !before.0.is_empty() || !before.1.is_empty(),
+                "something is laid out"
+            );
+            if let Some(endless) = scene.endless.as_mut() {
+                endless.rebase();
+            }
+            assert_eq!(
+                laid(&mut scene),
+                before,
+                "{turtle:?}: a re-base moved a byte"
+            );
         }
     }
 

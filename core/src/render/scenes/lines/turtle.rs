@@ -202,10 +202,10 @@ fn normalize(a: [f32; 3]) -> [f32; 3] {
 /// before it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Drawn {
-    /// Where the step began.
-    pub a: [f32; 3],
+    /// Where the step began, on [`on_grid`]'s grid.
+    pub a: [f64; 3],
     /// Where it ended, one unit along the heading.
-    pub b: [f32; 3],
+    pub b: [f64; 3],
     /// How many branch pushes were open: the colour axis (ADR-0059).
     pub generation: u32,
     /// Whether the pen was still on the paper from the previous draw step, so
@@ -223,13 +223,35 @@ pub struct Drawn {
 /// brackets allow (`grammar::bracket_bound`), and a push past it is refused
 /// rather than grown, so stepping never allocates. Only an unbalanced grammar
 /// reaches the bound; there a later `]` restores an older state.
+///
+/// **Its position is `f64` on [`on_grid`]'s grid**, not the `f32` the cached
+/// walk uses, and the turtle's own `pos` is unused: the frame turns in `f32`,
+/// the pen moves in `f64`. Every position an endless figure holds is a grid
+/// point, so a re-base by a whole number of steps ([`shift`](Self::shift)) is
+/// exact, and a step's length keeps its precision however far the pen walks.
 #[derive(Debug, Clone)]
 pub struct Pen {
     turtle: Turtle3d,
-    stack: Vec<Turtle3d>,
+    pos: [f64; 3],
+    stack: Vec<(Turtle3d, [f64; 3])>,
     mode: TurtleMode,
     angle: f32,
     run: bool,
+}
+
+/// The grid an endless figure's positions are held on: `2^-30` of a draw step.
+/// Far below anything drawn, and coarse enough that a position within `2^22`
+/// steps of the origin is a whole number of grid cells inside an `f64`'s 53
+/// bits — so adding or subtracting a whole number of steps is exact.
+const GRID: f64 = 1_073_741_824.0;
+
+/// `p` rounded to the nearest point of the [`GRID`].
+pub fn on_grid(p: [f64; 3]) -> [f64; 3] {
+    [
+        (p[0] * GRID).round() / GRID,
+        (p[1] * GRID).round() / GRID,
+        (p[2] * GRID).round() / GRID,
+    ]
 }
 
 impl Pen {
@@ -238,6 +260,7 @@ impl Pen {
     pub fn new(mode: TurtleMode, angle: f32, stack_bound: usize) -> Self {
         Self {
             turtle: Turtle3d::default(),
+            pos: [0.0; 3],
             stack: Vec::with_capacity(stack_bound),
             mode,
             angle,
@@ -245,30 +268,41 @@ impl Pen {
         }
     }
 
+    /// One step along the heading, landing on the grid.
+    fn step(&mut self) {
+        let h = self.turtle.heading;
+        self.pos = on_grid([
+            self.pos[0] + f64::from(h[0]),
+            self.pos[1] + f64::from(h[1]),
+            self.pos[2] + f64::from(h[2]),
+        ]);
+    }
+
     /// Read one symbol, and say what it drew, if anything.
     pub fn read(&mut self, ch: char) -> Option<Drawn> {
         match ch {
             'F' | 'G' => {
-                let a = self.turtle.pos;
-                self.turtle.step();
+                let a = self.pos;
+                self.step();
                 let drawn = Drawn {
                     a,
-                    b: self.turtle.pos,
+                    b: self.pos,
                     generation: self.stack.len() as u32,
                     joined: self.run,
                 };
                 self.run = true;
                 return Some(drawn);
             }
-            'f' => self.turtle.step(),
+            'f' => self.step(),
             '[' => {
                 if self.stack.len() < self.stack.capacity() {
-                    self.stack.push(self.turtle);
+                    self.stack.push((self.turtle, self.pos));
                 }
             }
             ']' => {
-                if let Some(saved) = self.stack.pop() {
-                    self.turtle = saved;
+                if let Some((turtle, pos)) = self.stack.pop() {
+                    self.turtle = turtle;
+                    self.pos = pos;
                 }
             }
             '+' | '-' => {
@@ -294,14 +328,25 @@ impl Pen {
         self.run = false;
     }
 
-    /// Where the pen stands.
-    pub fn position(&self) -> [f32; 3] {
-        self.turtle.pos
+    /// Where the pen stands, in draw steps.
+    pub fn position(&self) -> [f64; 3] {
+        self.pos
     }
 
     /// The branch stack's reserved room.
     pub fn stack_capacity(&self) -> usize {
         self.stack.capacity()
+    }
+
+    /// Move the origin to `origin`, a whole number of steps: the pen and every
+    /// saved branch point move by `-origin`, exactly, for a grid point within
+    /// the grid's reach.
+    pub fn shift(&mut self, origin: [f64; 3]) {
+        let back = |p: [f64; 3]| [p[0] - origin[0], p[1] - origin[1], p[2] - origin[2]];
+        self.pos = back(self.pos);
+        for (_, pos) in &mut self.stack {
+            *pos = back(*pos);
+        }
     }
 }
 

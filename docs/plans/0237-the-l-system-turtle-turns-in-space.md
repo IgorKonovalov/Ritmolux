@@ -319,8 +319,8 @@ and `follow_window`.
 | 1 — Walking skeleton: a tree in depth | dev | done | aaf32332 |
 | 2 — What is inert in space, and the frame's drift | dev | done | 6d5c4129 |
 | 3 — Caps and the space golden | dev | done | 927564c3 |
-| 4 — Endless: the lazy stream and the ring | dev | done | committed with this row |
-| 5 — The camera follows the growth | dev | not started | |
+| 4 — Endless: the lazy stream and the ring | dev | done | 263296bd |
+| 5 — The camera follows the growth | dev | done | committed with this row |
 | 6 — Endless cost and the endless golden | dev | not started | |
 | 7 — Documentation and the references | dev | not started | |
 | 8 — The look, judged | human | not started | |
@@ -387,6 +387,26 @@ and `follow_window`.
   successor nesting. On `F=F[+F]F[-F]F` the first 1,200 frames drew in generations far below it,
   so `hue_spread` spans little of the palette there.
 - Phase 4 byte-identity re-checked with `shot` as in Phase 1: identical.
+- Phase 5 holds the pen, the ring and the follow point in `f64`, snapped to a grid of `2^-30`
+  draw steps (`turtle::on_grid`), rather than the `f32` of the plan's data shapes. The turtle's
+  frame still turns in `f32`. On the grid a re-base by whole steps is exact, so every uploaded
+  position is bit-identical across it. `REBASE_RADIUS` is 1024 draw steps. Phase 4's ring and pen
+  changed type with it.
+- Phase 5's "a re-base changes no rendered pixel" is asserted on what the GPU is handed, not on a
+  capture. The flat draw buffer, the 3D instances and the focus radius are compared byte for byte
+  before and after a forced re-base, in `an_endless_scene_grows_no_buffer_it_owns`. The positions
+  they are laid out from are compared in `a_rebase_leaves_every_drawn_position_bit_for_bit`.
+- Phase 5's spring step is the critically damped spring's closed-form solution over the frame,
+  with the target held. The no-jump test bounds each frame's move by `dt / follow` times the
+  farthest the point has been from its target. On `F=F[+F]F[-F]F` over 6,000 frames, the largest
+  tip jump was 80.1 steps, and the follow point moved 0.031 steps on that frame.
+- Phase 5's in-frame test drives `Endless` on the CPU and projects the tip, through the flat
+  view's mapping at 1280x800 and the default camera at 1920x1080. It renders nothing. The tip
+  reached 0.237 (flat, `F+F-F-F+F`) and 0.157 (space, `F+F-F&F^F`) of the half-extent. `follow`
+  defaults to 0.3 s, and `follow_window` is a `[generator]` key (default 32), which adds a field
+  to `GeneratorConfig::LSystem` in `core/src/render/scenes/mod.rs`.
+- Phase 5 dropped Phase 4's sanitizing of `dt`: `hygiene::a_frame_delta_is_checked_for_finiteness_in_exactly_one_place`
+  allows only the renderer's (ADR-0191). `grow` and `follow` are still sanitized.
 
 ### Close triggers
 

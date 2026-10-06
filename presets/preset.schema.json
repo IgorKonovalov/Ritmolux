@@ -418,6 +418,7 @@
             "solid": { "$ref": "#/definitions/param.solid.lsystem" },
             "grow": { "$ref": "#/definitions/param.grow" },
             "tail": { "$ref": "#/definitions/param.tail" },
+            "follow": { "$ref": "#/definitions/param.follow" },
             "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
             "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
             "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
@@ -1617,7 +1618,8 @@
             "fog": { "$ref": "#/definitions/param.fog.lsystem" },
             "solid": { "$ref": "#/definitions/param.solid.lsystem" },
             "grow": { "$ref": "#/definitions/param.grow" },
-            "tail": { "$ref": "#/definitions/param.tail" }
+            "tail": { "$ref": "#/definitions/param.tail" },
+            "follow": { "$ref": "#/definitions/param.follow" }
           } } } } } }
     },
     {
@@ -2221,6 +2223,11 @@
           "type": "integer",
           "description": "L-system, endless: how many segments the vine keeps behind its tip, held to the quality tier's cap.",
           "markdownDescription": "L-system, endless: how many segments the vine keeps behind its tip, held to the quality tier's cap.\n\nDefault `2000`."
+        },
+        "follow_window": {
+          "type": "integer",
+          "description": "L-system, endless: how many of the newest segments the view follows the centre of; wider smooths the jump a branch's return makes.",
+          "markdownDescription": "L-system, endless: how many of the newest segments the view follows the centre of; wider smooths the jump a branch's return makes.\n\nDefault `32`."
         },
         "seed": {
           "anyOf": [
@@ -3081,6 +3088,11 @@
       "type": "string",
       "description": "The oldest fraction of an endless figure's trail that fades out; 0 keeps every segment at full light until it is dropped.",
       "markdownDescription": "The oldest fraction of an endless figure's trail that fades out; 0 keeps every segment at full light until it is dropped.\n\n- default `0.5`\n- typical range depends on the family: `flat endless` `0.0` to `1.0`, `space endless` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `flat`, `space` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.follow": {
+      "type": "string",
+      "description": "How slowly the view follows an endless figure's growing tip, in seconds: short keeps the tip near the centre, long lets it lead and glides after a branch's jump.",
+      "markdownDescription": "How slowly the view follows an endless figure's growing tip, in seconds: short keeps the tip near the centre, long lets it lead and glides after a branch's jump.\n\n- default `0.3`\n- typical range depends on the family: `flat endless` `0.05` to `3.0`, `space endless` `0.05` to `3.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `flat`, `space` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.variant": {
       "type": "string",

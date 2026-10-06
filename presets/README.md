@@ -607,6 +607,7 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `solid` | `0` | `space` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `flat endless` | 1 paints a space tree's near branches over its far ones, so it reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every segment by depth each frame. | light |
 | `grow` | `20` | `flat endless` `0` – `120`; `space endless` `0` – `120`; inert on `flat`, `space` | How fast an endless figure grows, in draw steps a second; bind it to onset to make it surge. | motion, main |
 | `tail` | `0.5` | `flat endless` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `space` | The oldest fraction of an endless figure's trail that fades out; 0 keeps every segment at full light until it is dropped. | light |
+| `follow` | `0.3` | `flat endless` `0.05` – `3`; `space endless` `0.05` – `3`; inert on `flat`, `space` | How slowly the view follows an endless figure's growing tip, in seconds: short keeps the tip near the centre, long lets it lead and glides after a branch's jump. | motion |
 
 ### System: `star_pattern`
 

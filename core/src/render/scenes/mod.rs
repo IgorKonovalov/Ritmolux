@@ -395,6 +395,10 @@ pub enum GeneratorConfig {
         /// trail`, validated at load against the stream's length and held to
         /// the tier's cap by the scene. Inert on a fixed figure.
         trail: u32,
+        /// How many of an endless figure's newest segments its follow point is
+        /// the centroid of, from `[generator] follow_window`. Inert on a fixed
+        /// figure.
+        follow_window: u32,
     },
     /// A Hankin star pattern: an `n`-fold star rosette built at load, with a few
     /// contact-angle variants a beat can switch between — and, since ADR-0079,

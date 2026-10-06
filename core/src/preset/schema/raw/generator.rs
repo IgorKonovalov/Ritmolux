@@ -6,7 +6,7 @@
 use super::super::*;
 use super::*;
 use crate::render::scenes::lines::grammar;
-use crate::render::scenes::lines::lsystem::{DEFAULT_TRAIL, Growth};
+use crate::render::scenes::lines::lsystem::{DEFAULT_FOLLOW_WINDOW, DEFAULT_TRAIL, Growth};
 use crate::render::scenes::lines::turtle::TurtleMode;
 
 /// The raw `[curve]` table: declarative structure for a parametric-curve scene.
@@ -62,6 +62,10 @@ pub(in crate::preset::schema) struct RawGenerator {
     /// a negative literal reaches the validation below and is named there.
     #[serde(default)]
     pub(in crate::preset::schema) trail: Option<i64>,
+    /// L-system, endless only: how many of the newest segments the view
+    /// follows the centroid of. An `i64` for `trail`'s reason.
+    #[serde(default)]
+    pub(in crate::preset::schema) follow_window: Option<i64>,
     /// The preset's random salt — what the grammar's `hash()`/`noise()` mix into
     /// their argument (ADR-0051): a number, or `"random"` for a salt drawn per
     /// app launch. **Not** an L-system key despite living in the L-system's
@@ -180,6 +184,19 @@ impl RawGenerator {
                 ))
             })?;
 
+        let follow_window = self
+            .follow_window
+            .unwrap_or(i64::from(DEFAULT_FOLLOW_WINDOW));
+        let follow_window = u32::try_from(follow_window)
+            .ok()
+            .filter(|&w| w >= 1)
+            .ok_or_else(|| {
+                PresetError::Config(format!(
+                    "lsystem follow_window must be a whole number of segments, 1 or more, \
+                     got {follow_window}"
+                ))
+            })?;
+
         // An endless figure restarts its stream when the stream runs out, so a
         // stream shorter than the trail would restart before the ring filled.
         // Counted, not expanded: the stream is far too long to write out.
@@ -207,6 +224,7 @@ impl RawGenerator {
             turtle,
             growth,
             trail,
+            follow_window,
         })
     }
 
@@ -378,6 +396,13 @@ pub(in crate::preset::schema) const GENERATOR: TableDesc = TableDesc {
             default: "2000",
             doc: "L-system, endless: how many segments the vine keeps behind its tip, held to \
                   the quality tier's cap.",
+        },
+        KeyDesc {
+            name: "follow_window",
+            kind: KeyKind::Int,
+            default: "32",
+            doc: "L-system, endless: how many of the newest segments the view follows the \
+                  centre of; wider smooths the jump a branch's return makes.",
         },
         KeyDesc {
             name: "seed",

@@ -386,6 +386,11 @@
           "description": "L-system, endless: how many segments the vine keeps behind its tip, held to the quality tier's cap.",
           "markdownDescription": "L-system, endless: how many segments the vine keeps behind its tip, held to the quality tier's cap.\n\nDefault `2000`."
         },
+        "follow_window": {
+          "type": "integer",
+          "description": "L-system, endless: how many of the newest segments the view follows the centre of; wider smooths the jump a branch's return makes.",
+          "markdownDescription": "L-system, endless: how many of the newest segments the view follows the centre of; wider smooths the jump a branch's return makes.\n\nDefault `32`."
+        },
         "seed": {
           "anyOf": [
             { "type": "number" },
