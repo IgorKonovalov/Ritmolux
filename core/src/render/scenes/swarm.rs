@@ -12,10 +12,10 @@
 //! # The world is a torus in frustum coordinates
 //!
 //! A particle holds `(u, v, z)`: `z` is a view depth inside the slab
-//! [`Z_NEAR`]`..`[`Z_FAR`], and `u`, `v` in `[-1, 1)` are its place across the
-//! frustum's cross-section **at its own depth**, times [`MARGIN`]. Its world
+//! `Z_NEAR..Z_FAR`, and `u`, `v` in `[-1, 1)` are its place across the
+//! frustum's cross-section **at its own depth**, times `MARGIN`. Its world
 //! position is `(u * hx(z), v * hy(z))` with `hx`, `hy` the rest frustum's
-//! half-extents at `z` scaled by the margin ([`half_extent`]). The torus wraps
+//! half-extents at `z` scaled by the margin (`half_extent`). The torus wraps
 //! in `u` and `v`, so the seam sits the same margin outside the frame at every
 //! depth — a box of fixed world bounds would show its seam at one end of the
 //! slab or waste its population at the other (ADR-0259).
@@ -29,8 +29,8 @@
 //!
 //! # The camera is a subset of the shared block
 //!
-//! The eye orbits the slab's centre at [`PIVOT`] and looks down `-z`. `yaw` and
-//! `pitch` are held to a sway the margin covers ([`sway_bound`]), and there is
+//! The eye orbits the slab's centre at `PIVOT` and looks down `-z`. `yaw` and
+//! `pitch` are held to a sway the margin covers (`sway_bound`), and there is
 //! no `distance`: the slab is defined relative to the camera, so an orbit would
 //! show the edge of the world. `zoom` divides the field of view and `pan_*`
 //! shift after the projection (ADR-0257); neither re-maps the simulation, and a
