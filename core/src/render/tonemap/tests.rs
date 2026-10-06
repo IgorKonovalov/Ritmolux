@@ -1119,7 +1119,8 @@ fn the_two_present_layouts_added_for_occlude_are_shapes_nothing_else_has() {
             "`{label}` is {}, and so is {sharers:?}. This pass carries \
              `occlude` (ADR-0085), and a colliding layout is why an earlier \
              shape of it silently did nothing on WARP while working on \
-             hardware. The odd-looking arrangement — a sampler before the \
+             hardware (a WARP reading, unverified on lavapipe as of \
+             2026-10-06). The odd-looking arrangement — a sampler before the \
              uniform in one, a sampler bound twice in the other — is what buys \
              the uniqueness this asserts; pick another free shape rather than \
              tidying it away.",
