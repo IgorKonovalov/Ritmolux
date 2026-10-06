@@ -67,7 +67,9 @@ use super::{
 use crate::dsp::AnalysisFrame;
 use crate::render::camera::{self, CameraParams};
 use crate::render::palette::Palette;
-use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{
+    FamilyParam, FamilyRange, ParamGroup, ParamKind, ParamSpec, default_of,
+};
 
 /// The bounding sphere a space figure is fitted into, in world units: the
 /// volume the camera orbits, and the radius `focus` is normalized across.
@@ -502,15 +504,7 @@ pub const PARAMS: &[ParamSpec] = &[
         group: ParamGroup::Shape,
         main: true,
     },
-    ParamSpec {
-        name: "rotation",
-        default: 0.0,
-        range: Some([0.0, std::f32::consts::TAU]),
-        doc: "Turns the whole figure, in radians.",
-        kind: ParamKind::Modal,
-        group: ParamGroup::Motion,
-        main: false,
-    },
+    ROTATION,
     crate::render::scenes::common::hue(DEFAULT_HUE),
     crate::render::scenes::lines::hue_spread(DEFAULT_HUE_SPREAD),
     crate::render::scenes::common::SATURATION,
@@ -518,25 +512,155 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::common::PALETTE_STEPS,
     crate::render::scenes::common::PALETTE_CONTOUR,
     crate::render::scenes::lines::DRAW_PROGRESS,
-    crate::render::scenes::lines::thickness(DEFAULT_THICKNESS),
-    crate::render::scenes::lines::scale(DEFAULT_SCALE),
+    THICKNESS,
+    SCALE,
     crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
     crate::render::scenes::lines::GLOW,
     crate::render::scenes::lines::SOFTNESS,
     crate::render::scenes::common::zoom(DEFAULT_ZOOM),
     crate::render::scenes::common::PAN_X,
     crate::render::scenes::common::PAN_Y,
-    crate::render::scenes::lines::STROKE_BLEND,
-    crate::render::scenes::lines::MIRROR_ORDER,
-    crate::render::scenes::lines::MIRROR_REFLECT,
-    camera::YAW,
-    camera::PITCH,
-    camera::DISTANCE,
-    camera::FOV,
-    camera::FOCUS,
-    camera::APERTURE,
-    camera::FOG,
-    camera::SOLID,
+    STROKE_BLEND,
+    MIRROR_ORDER,
+    MIRROR_REFLECT,
+    YAW,
+    PITCH,
+    DISTANCE,
+    FOV,
+    FOCUS,
+    APERTURE,
+    FOG,
+    SOLID,
+];
+
+// The specs whose reading depends on the turtle, re-declared with a doc line of
+// this system's own. The editor schema keys a family row by the whole
+// declaration, so one shared with another system would print this system's
+// modes on that system's hover. Default, range and kind stay the shared
+// block's, so only the wording can differ.
+const ROTATION: ParamSpec = ParamSpec {
+    name: "rotation",
+    default: 0.0,
+    range: Some([0.0, std::f32::consts::TAU]),
+    doc: "Turns a flat figure in its plane, in radians.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Motion,
+    main: false,
+};
+const THICKNESS: ParamSpec = ParamSpec {
+    doc: "Stroke width: on a flat figure in the shared line units, on a space figure in pixels \
+          at the focal plane, wider nearer and narrower farther.",
+    ..crate::render::scenes::lines::thickness(DEFAULT_THICKNESS)
+};
+const SCALE: ParamSpec = ParamSpec {
+    doc: "Scales a flat figure about its centre; a space figure is sized by the camera's \
+          distance instead.",
+    ..crate::render::scenes::lines::scale(DEFAULT_SCALE)
+};
+const STROKE_BLEND: ParamSpec = ParamSpec {
+    doc: "Moves a flat L-system's stroke from additive light toward opaque paint, so \
+          crossing branches stop brightening.",
+    ..crate::render::scenes::lines::STROKE_BLEND
+};
+const MIRROR_ORDER: ParamSpec = ParamSpec {
+    doc: "Repeats a flat L-system this many times around the centre; 1 draws it once.",
+    ..crate::render::scenes::lines::MIRROR_ORDER
+};
+const MIRROR_REFLECT: ParamSpec = ParamSpec {
+    doc: "Alternates a flat L-system's repeats into mirror images rather than plain rotations.",
+    ..crate::render::scenes::lines::MIRROR_REFLECT
+};
+const YAW: ParamSpec = ParamSpec {
+    doc: "Turns the camera around a space tree, in radians; bind it to a slow clock to orbit.",
+    ..camera::YAW
+};
+const PITCH: ParamSpec = ParamSpec {
+    doc: "Raises the camera above a space tree, in radians; negative looks up from below.",
+    ..camera::PITCH
+};
+const DISTANCE: ParamSpec = ParamSpec {
+    doc: "How far the camera sits from a space tree's centre; nearer makes the tree larger \
+          and exaggerates the perspective.",
+    ..camera::DISTANCE
+};
+const FOV: ParamSpec = ParamSpec {
+    doc: "The camera's vertical field of view onto a space tree, in radians; zoom divides it.",
+    ..camera::FOV
+};
+const FOCUS: ParamSpec = ParamSpec {
+    doc: "Where the focal plane sits in a space tree's depth: 0 at its nearest point, 1 at its \
+          farthest.",
+    ..camera::FOCUS
+};
+const APERTURE: ParamSpec = ParamSpec {
+    doc: "The blur of a space tree's far side, in pixels; branches nearer than the focal plane \
+          blur more, up to the tier's cap. 0 keeps every branch sharp, and wider costs fill.",
+    ..camera::APERTURE
+};
+const FOG: ParamSpec = ParamSpec {
+    doc: "Fades a space tree toward black with depth: at 1 its farthest point is black and its \
+          nearest keeps its light. 0 is off.",
+    ..camera::FOG
+};
+const SOLID: ParamSpec = ParamSpec {
+    doc: "1 paints a space tree's near branches over its far ones, so it reads as an object and \
+          crossings stop brightening; 0 is the additive glow. Solid sorts every segment by \
+          depth each frame.",
+    ..camera::SOLID
+};
+
+/// One row of [`FAMILY_PARAMS`], its ranges in [`TurtleMode::ALL`]'s order:
+/// `flat`, then `space`. `None` is a mode that does not read the parameter.
+macro_rules! per_turtle {
+    ($name:expr; $flat:expr, $space:expr $(,)?) => {
+        FamilyParam {
+            name: $name,
+            ranges: &[
+                FamilyRange {
+                    family: "flat",
+                    range: $flat,
+                },
+                FamilyRange {
+                    family: "space",
+                    range: $space,
+                },
+            ],
+        }
+    };
+}
+
+/// A row read by the flat turtle only: what `seg3d` does not draw (ADR-0258).
+macro_rules! flat_only {
+    ($spec:expr) => {
+        per_turtle!($spec.name; $spec.range, None)
+    };
+}
+
+/// A row read by the space turtle only: the camera block.
+macro_rules! space_only {
+    ($spec:expr) => {
+        per_turtle!($spec.name; None, $spec.range)
+    };
+}
+
+/// Every parameter whose reading depends on the turtle (ADR-0258, ADR-0180
+/// rule 4): the in-plane transform, the mirror and the opaque stroke path on
+/// the flat turtle alone, and the camera block on the space turtle alone. The
+/// generated reference prints each as inert on the mode that ignores it.
+pub const FAMILY_PARAMS: &[FamilyParam] = &[
+    flat_only!(ROTATION),
+    flat_only!(SCALE),
+    flat_only!(STROKE_BLEND),
+    flat_only!(MIRROR_ORDER),
+    flat_only!(MIRROR_REFLECT),
+    space_only!(YAW),
+    space_only!(PITCH),
+    space_only!(DISTANCE),
+    space_only!(FOV),
+    space_only!(FOCUS),
+    space_only!(APERTURE),
+    space_only!(FOG),
+    space_only!(SOLID),
 ];
 
 impl Scene for LSystemScene {
@@ -932,6 +1056,55 @@ mod tests {
                 generations[i]
             );
         }
+    }
+
+    /// [`FAMILY_PARAMS`] is held to the engine: each row names a declared
+    /// parameter once, lists every turtle mode by the name a preset writes and
+    /// in [`TurtleMode::ALL`]'s order, and carries a spec range that is one of
+    /// its modes' — and the mode-dependent set is exactly the in-plane
+    /// transform, the mirror, the opaque path and the camera block (ADR-0258).
+    #[test]
+    fn the_turtle_table_is_the_roster_and_names_every_inert_parameter() {
+        let modes: Vec<&str> = TurtleMode::ALL.iter().map(|m| m.as_str()).collect();
+        let mut seen = Vec::new();
+        for row in FAMILY_PARAMS {
+            assert!(!seen.contains(&row.name), "`{}` has two rows", row.name);
+            seen.push(row.name);
+            let spec = PARAMS
+                .iter()
+                .find(|spec| spec.name == row.name)
+                .unwrap_or_else(|| panic!("`{}` is not a declared parameter", row.name));
+            let listed: Vec<&str> = row.ranges.iter().map(|r| r.family).collect();
+            assert_eq!(listed, modes, "`{}` must list every mode", row.name);
+            assert!(
+                row.ranges.iter().any(|r| r.range == spec.range),
+                "`{}`'s spec range is no mode's range",
+                row.name
+            );
+        }
+        let inert_on = |mode: &str| -> Vec<&str> {
+            FAMILY_PARAMS
+                .iter()
+                .filter(|row| {
+                    row.ranges
+                        .iter()
+                        .any(|r| r.family == mode && r.range.is_none())
+                })
+                .map(|row| row.name)
+                .collect()
+        };
+        assert_eq!(
+            inert_on("space"),
+            [
+                "rotation",
+                "scale",
+                "stroke_blend",
+                "mirror_order",
+                "mirror_reflect"
+            ]
+        );
+        let camera: Vec<&str> = CameraParams::SPECS.iter().map(|s| s.name).collect();
+        assert_eq!(inert_on("flat"), camera);
     }
 
     #[test]

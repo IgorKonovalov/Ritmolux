@@ -32,6 +32,62 @@ fn capture(renderer: &mut Renderer, toml: &str) -> CaptureImage {
         .expect("capture")
 }
 
+/// The flat fixture the `lsystem` golden is rendered from.
+const FLAT_FIXTURE: &str = include_str!("../fixtures/lsystem.toml");
+
+/// Plan 0237 Phase 2 (ADR-0258): what each turtle declares inert does not
+/// move a pixel. The space tree ignores the in-plane transform, the mirror and
+/// the opaque stroke path; the flat figure ignores the camera block.
+#[test]
+fn each_turtle_ignores_what_it_declares_inert() {
+    const SIZE: u32 = 96;
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let space = capture(&mut renderer, FIXTURE);
+    let space_moved = capture(
+        &mut renderer,
+        &format!(
+            "{FIXTURE}rotation = \"1.3\"\nscale = \"0.4\"\nstroke_blend = \"1\"\n\
+             mirror_order = \"3\"\nmirror_reflect = \"1\"\n"
+        ),
+    );
+    assert!(
+        space.rgba == space_moved.rgba,
+        "a flat-only parameter moved the space tree by {}",
+        frame_diff(&space, &space_moved)
+    );
+
+    let flat = capture(&mut renderer, FLAT_FIXTURE);
+    let flat_moved = capture(
+        &mut renderer,
+        &format!(
+            "{FLAT_FIXTURE}yaw = \"1.1\"\npitch = \"-0.7\"\ndistance = \"2\"\nfov = \"1.6\"\n\
+             focus = \"0.9\"\naperture = \"9\"\nfog = \"1\"\nsolid = \"1\"\n"
+        ),
+    );
+    assert!(
+        flat.rgba == flat_moved.rgba,
+        "a camera parameter moved the flat figure by {}",
+        frame_diff(&flat, &flat_moved)
+    );
+
+    // And the controls: the same parameters do move the mode that reads them.
+    let turned = capture(
+        &mut renderer,
+        &FLAT_FIXTURE.replace("rotation      = \"0\"", "rotation      = \"1.3\""),
+    );
+    assert!(
+        flat.rgba != turned.rgba,
+        "rotation must turn the flat figure"
+    );
+    let orbited = capture(
+        &mut renderer,
+        &FIXTURE.replace("yaw           = \"0.4\"", "yaw           = \"1.1\""),
+    );
+    assert!(space.rgba != orbited.rgba, "yaw must turn the space tree");
+}
+
 /// Plan 0237 Phase 1's done-when: the space fixture, a branching grammar
 /// that pitches with `&` and rolls with `/`, draws a tree that covers a real
 /// part of the frame, and turning the camera's `yaw` moves it.

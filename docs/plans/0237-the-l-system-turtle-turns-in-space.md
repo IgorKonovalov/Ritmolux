@@ -316,8 +316,8 @@ and `follow_window`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: a tree in depth | dev | done | committed with this row |
-| 2 — What is inert in space, and the frame's drift | dev | not started | |
+| 1 — Walking skeleton: a tree in depth | dev | done | aaf32332 |
+| 2 — What is inert in space, and the frame's drift | dev | done | committed with this row |
 | 3 — Caps and the space golden | dev | not started | |
 | 4 — Endless: the lazy stream and the ring | dev | not started | |
 | 5 — The camera follows the growth | dev | not started | |
@@ -344,6 +344,14 @@ and `follow_window`.
 - Phase 1's `lsystem` scene now builds a `seg3d` renderer at construction, so every golden
   captured after `lsystem` in the roster runs on a device with one more set of GPU resources.
   Windows CI's golden job is the first WARP reading of that.
+- Phase 2 declares the inert params as `lsystem`'s own family table, with the modes `flat` and
+  `space` as its families, registered in `family_params` in `core/src/render/scenes/mod.rs`
+  (outside the phase list). The 13 mode-dependent params are re-declared with `lsystem` doc lines,
+  because the schema keys a family row by declaration. `rotation`'s doc line changed with it.
+  Phase 2 regenerated the same generated files as Phase 1.
+- Phase 2's inert claim is also asserted on pixels, in `core/tests/suite/lsystem_space.rs`: the
+  flat-only params leave the space fixture byte-identical, and the camera block leaves the flat
+  fixture byte-identical.
 
 ### Close triggers
 

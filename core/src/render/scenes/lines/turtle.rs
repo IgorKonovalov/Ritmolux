@@ -111,7 +111,24 @@ impl Turtle3d {
             }
             _ => return false,
         }
+        self.orthonormalize();
         true
+    }
+
+    /// Pull the frame back onto an orthonormal one, by Gram-Schmidt in the
+    /// order `H`, `L`, then `U = H x L`.
+    ///
+    /// Each turn is a rotation in exact arithmetic, but in `f32` it leaves the
+    /// three vectors a few ulps off unit length and off square, and the error
+    /// compounds: an unbounded walk would shear and grow its steps. Restoring
+    /// after every turn holds the error to one turn's worth. `H` is kept as
+    /// turned, so a step goes exactly where the turn pointed it.
+    pub fn orthonormalize(&mut self) {
+        let h = normalize(self.heading);
+        let l = normalize(mix(self.left, 1.0, h, -dot(self.left, h)));
+        self.heading = h;
+        self.left = l;
+        self.up = cross(h, l);
     }
 
     /// One step along `H`.
@@ -156,6 +173,28 @@ fn add(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
 
 fn neg(a: [f32; 3]) -> [f32; 3] {
     [-a[0], -a[1], -a[2]]
+}
+
+fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+/// `a` at unit length, or `a` unchanged where it has none to scale.
+fn normalize(a: [f32; 3]) -> [f32; 3] {
+    let len = dot(a, a).sqrt();
+    if len.is_finite() && len > f32::EPSILON {
+        [a[0] / len, a[1] / len, a[2] / len]
+    } else {
+        a
+    }
 }
 
 /// [`walk_with_depths`] for the space turtle: `s` walked into 3D segments in
@@ -658,6 +697,39 @@ mod tests {
                 seg.b
             );
         }
+    }
+
+    /// Plan 0237 Phase 2: the frame stays orthonormal however long the walk
+    /// turns. 100,000 turns, each a seeded draw of symbol and angle, and the
+    /// three vectors are unit length and mutually square to within `1e-4`.
+    #[test]
+    fn the_frame_stays_orthonormal_over_a_hundred_thousand_turns() {
+        const TURNS: [char; 7] = ['+', '-', '&', '^', '\\', '/', '|'];
+        let mut turtle = Turtle3d::default();
+        // A 64-bit LCG (Knuth's MMIX constants): seeded, so the run repeats.
+        let mut state: u64 = 0x0237;
+        let mut next = || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 33) as u32
+        };
+        for _ in 0..100_000 {
+            let symbol = TURNS[next() as usize % TURNS.len()];
+            let angle = (next() as f32 / (1u64 << 31) as f32) * std::f32::consts::PI;
+            assert!(turtle.turn(symbol, angle));
+        }
+        let (h, l, u) = (turtle.heading, turtle.left, turtle.up);
+        for (name, v) in [("H", h), ("L", l), ("U", u)] {
+            let len = dot(v, v).sqrt();
+            assert!((len - 1.0).abs() <= 1e-4, "|{name}| drifted to {len}");
+        }
+        for (name, a, b) in [("H.L", h, l), ("H.U", h, u), ("L.U", l, u)] {
+            let d = dot(a, b);
+            assert!(d.abs() <= 1e-4, "{name} drifted to {d}");
+        }
+        let hand = dot(cross(h, l), u);
+        assert!((hand - 1.0).abs() <= 1e-4, "the frame flipped hand: {hand}");
     }
 
     /// The space walk is the flat walk where it only yaws: a grammar of `+`
