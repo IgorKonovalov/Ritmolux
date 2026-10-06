@@ -301,7 +301,7 @@ flowchart TB
 | 2 — The baselines move to lavapipe | dev | done | 8c2ec152 |
 | 3 — Judge the 44 | human | done - all 53 drift, no finding | effc6503 |
 | 4 — Every WARP claim takes one of three exits | dev | done | d2ebef49 |
-| 5 — The documents take the stance | dev | done | committed with this row |
+| 5 — The documents take the stance | dev | done | 69347332 |
 | 6 — A rehearsal on the box | human | owed | |
 
 ### Notes
@@ -558,13 +558,20 @@ flowchart TB
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** test harness, baselines and docs only. The golden baselines were recaptured on
+  lavapipe and gated there. The harness's hardware path moved to the high-performance adapter. The
+  WARP bless job and its report script were deleted. Every `core/src` edit is a comment, a WGSL
+  comment inside a shader string, or test code; no shipped behaviour changed.
+- **Operator docs touched:** `docs/testing.md`, `docs/capturing.md`, `docs/nfr.md`,
+  `docs/on-device-validation.md`, `docs/roadmap-visual-richness.md`, `docs/developing.md`,
+  `README.md`, `CLAUDE.md`, `scripts/README.md`, `core/tests/fixtures/README.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 58 stated reductions hold
+  across 29 live entries, 4 unprobeable
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
+- **Outstanding `human` phases:** Phase 6 (a rehearsal on the box). Phase 1's second-display
+  readings (`D` and the console on another display) are also owed, per its row.
 
 ## Followups (after this lands)
 
