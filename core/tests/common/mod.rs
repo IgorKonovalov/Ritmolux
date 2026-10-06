@@ -21,19 +21,38 @@
 use std::path::{Path, PathBuf};
 
 use rlx_core::dsp::AnalysisFrame;
-use rlx_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, Tier};
+use rlx_core::render::{AdapterChoice, CaptureImage, HeadlessOptions, RenderError, Renderer, Tier};
 
 /// The one place the ADR-0016 skip lives: build a renderer, or return `None`
 /// after printing the notice when the runner has no GPU adapter at all. Any
 /// other build error still panics loudly, so a genuinely broken device cannot
 /// pass as an absent one.
-fn build(opts: HeadlessOptions, tier: Option<Tier>) -> Option<Renderer> {
-    let built = match tier {
-        Some(tier) => Renderer::new_headless_tiered(opts, tier),
-        None => Renderer::new_headless(opts),
+///
+/// `software` picks [`AdapterChoice::Software`]; otherwise the build asks for
+/// [`AdapterChoice::HighPerformance`], the preference the live path resolves,
+/// so on a hybrid machine a hardware test reads the discrete GPU rather than
+/// whichever one wgpu's default hands a console process (ADR-0243). A hardware
+/// build prints the adapter it resolved, name and driver, so every reading it
+/// produces names its machine (ADR-0071). `tier` is `None` for
+/// [`Tier::Floor`], which is what [`Renderer::new_headless`] pins.
+fn build(width: u32, height: u32, software: bool, tier: Option<Tier>) -> Option<Renderer> {
+    let choice = if software {
+        AdapterChoice::Software
+    } else {
+        AdapterChoice::HighPerformance
     };
-    match built {
-        Ok(r) => Some(r),
+    let opts = HeadlessOptions {
+        width,
+        height,
+        prefer_software: software,
+    };
+    match Renderer::new_headless_on(opts, tier.unwrap_or(Tier::Floor), &choice) {
+        Ok(r) => {
+            if !software {
+                eprintln!("hardware adapter: {}", r.adapter_description());
+            }
+            Some(r)
+        }
         Err(RenderError::RequestAdapter(_)) => {
             eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
             None
@@ -45,24 +64,18 @@ fn build(opts: HeadlessOptions, tier: Option<Tier>) -> Option<Renderer> {
 /// A headless renderer on the **software** adapter, or `None` (a logged skip)
 /// when the runner exposes no GPU adapter at all (ADR-0016).
 ///
-/// WARP is the default because a guard whose failure mode is "nobody looked"
-/// has to run in CI, and the software rasterizer is what makes a capture
-/// reproducible across runners.
+/// Software is the default because a guard whose failure mode is "nobody
+/// looked" has to run in CI, and the software rasterizer is what makes a
+/// capture reproducible across runners.
 pub fn headless(width: u32, height: u32) -> Option<Renderer> {
     headless_on(width, height, true)
 }
 
 /// [`headless`] with the adapter preference spelled out, for the files that
-/// capture the same fixture on both adapters.
+/// capture the same fixture on both adapters. `false` is the high-performance
+/// hardware adapter, as in [`headless_hardware_for`].
 pub fn headless_on(width: u32, height: u32, prefer_software: bool) -> Option<Renderer> {
-    build(
-        HeadlessOptions {
-            width,
-            height,
-            prefer_software,
-        },
-        None,
-    )
+    build(width, height, prefer_software, None)
 }
 
 /// The default-adapter twin of [`headless`], for an assertion WARP cannot host.
@@ -105,15 +118,7 @@ pub fn headless_hardware_for(
     tier: Option<Tier>,
     reason: &str,
 ) -> Option<Renderer> {
-    let built = build(
-        HeadlessOptions {
-            width,
-            height,
-            prefer_software: false,
-        },
-        tier,
-    );
-    match built {
+    match build(width, height, false, tier) {
         Some(r) if r.adapter_is_software() => {
             eprintln!("skipped: only a software rasterizer is available — {reason}");
             None
@@ -125,14 +130,7 @@ pub fn headless_hardware_for(
 /// [`headless`] at an explicit quality [`Tier`], for the post stages whose
 /// resources the tier sizes.
 pub fn headless_tiered(width: u32, height: u32, tier: Tier) -> Option<Renderer> {
-    build(
-        HeadlessOptions {
-            width,
-            height,
-            prefer_software: true,
-        },
-        Some(tier),
-    )
+    build(width, height, true, Some(tier))
 }
 
 /// The fixed frame a baseline is rendered under: mid-energy, all three scalars
@@ -171,21 +169,30 @@ pub fn fixed_frame_spectrum() -> AnalysisFrame {
 /// Whether `renderer` sits on the adapter every PNG under `tests/golden/` was
 /// blessed on — `Ok(())` — or on another one, named in the `Err`.
 ///
-/// The baselines are a **measurement taken on DX12 WARP**, not a property of a
-/// correct rasterizer: their tolerance absorbs WARP's own run-to-run drift, and
-/// llvmpipe or lavapipe drift further than that on the stateful and chaotic
+/// The baselines are a **measurement taken on lavapipe**, Mesa's software
+/// Vulkan rasterizer on the reference machine (ADR-0242), not a property of a
+/// correct rasterizer: their tolerance absorbs lavapipe's own run-to-run drift,
+/// and another rasterizer drifts further than that on the stateful and chaotic
 /// fixtures without anything being wrong (ADR-0071, ADR-0131). So a comparison
-/// asserts only on WARP, and elsewhere reports what it read through
-/// [`skip_off_baseline`].
+/// asserts only on lavapipe, and elsewhere — DX12 WARP, any hardware adapter —
+/// reports what it read through [`skip_off_baseline`]. macOS has no software
+/// Metal adapter and never reaches this.
 ///
-/// "Software on Windows" *is* WARP: DX12 is the only wgpu backend
-/// `core/Cargo.toml` compiles for Windows, and WARP is its only software
-/// adapter. Enabling a second Windows backend breaks that equivalence.
+/// "Software on Linux" is lavapipe: Vulkan is the only wgpu backend
+/// `core/Cargo.toml` compiles for Linux, and lavapipe is the software Vulkan
+/// driver Mesa ships. The name check holds the equivalence against another
+/// software Vulkan driver installed beside it; lavapipe reports its device as
+/// `llvmpipe (LLVM …)`. Enabling a second Linux backend would let GL's llvmpipe
+/// match the name too, so that change revisits this predicate.
 pub fn baseline_adapter(renderer: &Renderer) -> Result<(), String> {
-    if cfg!(windows) && renderer.adapter_is_software() {
+    let description = renderer.adapter_description();
+    if cfg!(target_os = "linux")
+        && renderer.adapter_is_software()
+        && description.starts_with("llvmpipe")
+    {
         Ok(())
     } else {
-        Err(renderer.adapter_description().to_owned())
+        Err(description.to_owned())
     }
 }
 
@@ -235,8 +242,8 @@ pub fn parse_bless(value: &str) -> Result<BlessList, String> {
 
 /// Whether `RLX_BLESS` asks this run to rewrite the baseline `stem` —
 /// **panicking** if it is set at all and `renderer` is not on the blessing
-/// adapter, since a baseline written anywhere else would hold every later WARP
-/// run to another rasterizer's frame.
+/// adapter, since a baseline written anywhere else would hold every later
+/// lavapipe run to another rasterizer's frame.
 ///
 /// A list naming a stem with no `tests/golden/<stem>.png` also panics, with
 /// every such name. The check reads the directory rather than recording which
@@ -250,7 +257,7 @@ pub fn bless_requested(renderer: &Renderer, stem: &str) -> bool {
     };
     if let Err(adapter) = baseline_adapter(renderer) {
         panic!(
-            "RLX_BLESS refused: baselines are blessed on DX12 WARP only, and this \
+            "RLX_BLESS refused: baselines are blessed on lavapipe only, and this \
              run is on {adapter}"
         );
     }
@@ -272,14 +279,14 @@ pub fn bless_requested(renderer: &Renderer, stem: &str) -> bool {
     list.covers(stem)
 }
 
-/// The skip notice a baseline comparison prints off WARP, in ADR-0016's shape.
-/// `drifted` lists what would have failed on WARP — printed, never asserted —
-/// so the reading is kept rather than discarded.
+/// The skip notice a baseline comparison prints off lavapipe, in ADR-0016's
+/// shape. `drifted` lists what would have failed on lavapipe — printed, never
+/// asserted — so the reading is kept rather than discarded.
 pub fn skip_off_baseline(adapter: &str, drifted: &[String]) {
     eprintln!(
-        "skipped: the baselines are a measurement taken on DX12 WARP, and this run \
-         is on {adapter} (ADR-0071). {} comparison(s) past WARP's tolerance here: \
-         {drifted:#?}",
+        "skipped: the baselines are a measurement taken on lavapipe, and this run \
+         is on {adapter} (ADR-0071, ADR-0242). {} comparison(s) past lavapipe's \
+         tolerance here: {drifted:#?}",
         drifted.len()
     );
 }

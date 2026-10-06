@@ -85,9 +85,3 @@ runs it when the disk fills; it judges no build ([Developing](../docs/developing
 **A HOOK HELPER, the fourth kind:** push-scope.mjs answers whether a pushed range touches a path in
 push-scope.manifest.mjs - data, like the gate manifest - and pre-push runs its cargo steps only when
 it does (ADR-0237). The hook calls it; its --self-test runs only by hand.
-
-**A DISPATCHED REPORT, the fifth kind:** bless-report.mjs writes the report `bless.yml` uploads
-beside the WARP baselines it blessed by name, and refuses a list that is not stems with a committed
-PNG each (ADR-0264). It runs only when that workflow is dispatched by hand, so nothing runs it on a
-push; its --self-test runs by hand, over scripts/fixtures/bless-report/. It is deleted with
-`bless.yml` when the reference moves to lavapipe.

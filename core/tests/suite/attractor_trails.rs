@@ -15,11 +15,11 @@
 //! # What this pins, and what it does not
 //!
 //! It is **coverage, not evidence of correctness**. The baseline is blessed on
-//! WARP like every other one in this repository, so if this configuration does
-//! alias, the committed PNG is a picture of the wrong thing and every later run
-//! agrees with it. That is the whole failure mode ADR-0058 exists for, and the
-//! check for it is the hardware-vs-WARP comparison ADR-0058 requires — not this
-//! file. What this file catches is *drift*: a change to the attractor, to the
+//! the software adapter like every other one in this repository — lavapipe
+//! (ADR-0242) — so if this configuration aliases there, the committed PNG is a
+//! picture of the wrong thing and every later run agrees with it. That is the
+//! whole failure mode ADR-0058 exists for, and the check for it is the
+//! hardware-vs-software comparison ADR-0058 requires — not this file. What this file catches is *drift*: a change to the attractor, to the
 //! trails stage, or to the seam between them that moves the picture.
 //!
 //! # A file of its own, for two reasons

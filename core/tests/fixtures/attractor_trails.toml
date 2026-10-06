@@ -17,8 +17,9 @@
 # every `composite_*` fixture is a line scene. So the one configuration where the
 # most pipelines coexist on the software adapter - which is what ADR-0058's
 # hazard keys on - was pinned by nothing. This is coverage, NOT evidence of
-# correctness: a baseline blessed on WARP is a picture of whatever WARP did.
-# ADR-0058's hardware-vs-WARP comparison is the check.
+# correctness: a baseline blessed on the software adapter (lavapipe) is a
+# picture of whatever it did. ADR-0058's hardware-vs-software comparison is the
+# check.
 #
 # `fade` IS SHORTER THAN `trails`, AND THAT RELATION IS THE POINT. The attractor
 # owns its own accumulation buffer and decays it by `fade`; the engine stage

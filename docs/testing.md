@@ -129,7 +129,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `reaction_diffusion` | HARD | the first stateful-feedback scene: seed reproducibility, regime response ([ADR-0012](adrs/0012-stateful-feedback-render-system.md)) |
 | `attractor` | HARD | the first compute-particle scene: seed reproducibility + beat perturbation ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
 | `line_joints` | HARD (+ tolerance) | a **flagged joint stops leaving a hole** in the stroke ([ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)): against a purpose-built zigzag `polyline`, a vertex is not a local luminance minimum relative to the segment interiors either side of it. Threshold-free, and captured at **512x512** because the wedge it measures is a fraction of a stroke-width across. The same capture is then pinned to a committed baseline (Plan 0040), since the reported defect had no pixel guard anywhere; the relative claim runs **first, even under `RLX_BLESS`**, so the notch cannot be blessed back in. Bless with `--test suite line_joints::`, which cannot reach the golden roster |
-| `attractor_trails` | HARD (tolerance) | the attractor with the engine `trails` stage bound — the attractor's four pipelines and the stage's two in **one command buffer**, which is the densest pipeline coexistence any shipped preset produces and the thing [ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md)'s hazard keys on. `attractor.toml` binds no trails and every `composite_*` fixture is a line scene, so nothing pinned it before Plan 0053. Captured at **160x100** (a non-square, per ADR-0037) and, like every baseline here, blessed on WARP — so it is **coverage, not evidence of correctness**; ADR-0058's hardware-vs-WARP comparison is the check and this is the drift guard. Its own module, so `RLX_BLESS=1 … --test suite attractor_trails::` can reach nothing else. A second, GPU-free test asserts the fixture still puts *both* accumulations live (`trails` > `fade`, `spin` non-zero), since at or below the scene's own tail the stage is a bit-for-bit passthrough |
+| `attractor_trails` | HARD (tolerance) | the attractor with the engine `trails` stage bound — the attractor's four pipelines and the stage's two in **one command buffer**, which is the densest pipeline coexistence any shipped preset produces and the thing [ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md)'s hazard keys on. `attractor.toml` binds no trails and every `composite_*` fixture is a line scene, so nothing pinned it before Plan 0053. Captured at **160x100** (a non-square, per ADR-0037) and, like every baseline here, blessed on the software adapter (lavapipe, ADR-0242) — so it is **coverage, not evidence of correctness**; ADR-0058's hardware-vs-software comparison is the check and this is the drift guard. Its own module, so `RLX_BLESS=1 … --test suite attractor_trails::` can reach nothing else. A second, GPU-free test asserts the fixture still puts *both* accumulations live (`trails` > `fade`, `spin` non-zero), since at or below the scene's own tail the stage is a bit-for-bit passthrough |
 | `warp_mesh_wide` | HARD (tolerance) | the **converted** `warp_mesh` chain — the bytecode VM's mesh and a translated shader module, `milk_wash_fog_tunnel.toml` — captured at **160x120**, a 4:3 target, against a baseline of its own. This is what the three square *converted* `warp_mesh` fixtures in `golden` — `warp_mesh_milk`, `warp_mesh_shader` and `warp_mesh_stroke`, the three carrying a `[milk]` table, the rostered `warp_mesh.toml` carrying none — structurally cannot see: at 128x128 the aspect correction is the identity in *both* halves — `mesh::vertex_position`'s x multiply and the `U.aspect` lanes a translated shader reads ([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) — so dropping either term moves none of those three by a byte, and 16:9 is the other shape the ADR records the confusion as invisible at. `core/tests/suite/warp_mesh.rs` asserts what the chain *computes*; this pins the *picture* it draws where the correction is live, which is the incidental-drift class a baseline exists for. Its own module, so `RLX_BLESS=1 … --test suite warp_mesh_wide::` reaches no other baseline. **What it guards is stated as a probe, not as a size:** forcing `self.aspect = 1.0` at the converted chain's entry must fail this fixture, and does — on the **outlier** term, 75 against a tolerance of 48, while the mean stays inside its own at 0.0139 against 0.02. A warp redistributes edges rather than shifting the frame's average, so the outlier is the term that convicts and the mean alone would have said nothing. Measured on the development machine, and the three square converted fixtures pass that same probe unchanged. The subject is the one of four candidates the probe convicts; three declare `zoom`, `rot` or `warp` and still read 0.0000 and 0, so declaring motion is not the same as rendering a picture the corrected space reaches. A second, GPU-free test holds the capture size off 1:1 and off 16:9, since a baseline at either would pass forever and guard nothing. **Its first baseline was a person's** — it was captured, opened and judged before the test was released (Plan 0201 Phase 4b), because a first baseline is compared against nothing and no run can say whether the picture is the one the fixture meant to draw. From here it is an ordinary baseline: an absent `warp_mesh_wide.png` fails, as it does for every other fixture |
 | `ink` | HARD | the final tone-remap **inverts** tone, and `ink_amount = 0` is byte-identical to an unbound frame ([ADR-0028](adrs/0028-final-stage-ink-tone-remap.md)) |
 | `geometry_extent` | HARD | the **in-frame geometry fraction**, for the four line families *only* ([ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)): that the diagnostic is **byte-identical** to having it off, and that each of the two frozen over-scaled configurations measures below the shipped preset it was recovered from. **Neither engine-wide nor a threshold** — read the section below before using its numbers |
@@ -326,31 +326,21 @@ unknown names, so a typo is an error rather than a bless of nothing. The check
 reads the directory, not the tests that ran, so a name is checked whatever the
 test filter selected. The cost is that a baseline that does not exist yet cannot
 be named: bless it first with `RLX_BLESS=1` under a filter that reaches only it.
-A value that names nothing, such as an empty one, also fails. Off DX12 WARP any
-value at all is refused, as it always was.
+A value that names nothing, such as an empty one, also fails. Off lavapipe any
+value at all is refused.
 
-**Without a Windows machine, a dispatched CI job blesses by name**
-([ADR-0264](adrs/0264-a-warp-baseline-is-blessed-by-a-dispatched-ci-job-until-the-reference-moves-to-lavapipe.md)).
-`.github/workflows/bless.yml` runs on `windows-latest`, whose software adapter
-is WARP. It compares the golden and pinned roster against what is committed,
-then blesses only the names it was given, and uploads those PNGs at their
-repository paths with a `report.md` as the artifact `blessed-<run id>`. The
-report lists each named baseline's mean and max outlier against the committed
-one, and every baseline nobody named that is over tolerance, marked "not
-blessed, still failing". The same report is the run's job summary. The job
-cannot commit anything. You look at the pictures and commit them:
-
-```bash
-gh workflow run bless.yml -f baselines=waterfall,waterfall_ramp   # dispatch on main; add --ref <branch> for another
-gh run download <run id> -n blessed-<run id> -D target/blessed      # once the run is done
-cp target/blessed/core/tests/golden/*.png core/tests/golden/        # after reading report.md
-```
-
-`gh run list --workflow bless.yml` gives the run id. The job only accepts
-names: `1` is refused, as is a name with no committed PNG. The job is retired
-when [Plan 0218](plans/0218-the-reference-machine-becomes-arch.md) Phase 2
-lands. Then delete `bless.yml` and `scripts/bless-report.mjs`, because the
-baselines then live on lavapipe and Windows skips them.
+**The baselines are blessed on lavapipe**, Mesa's software Vulkan rasterizer,
+on the Arch reference machine
+([ADR-0242](adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)).
+`common::baseline_adapter` is the one predicate: a comparison asserts only when
+the run is on Linux and its software adapter reports itself as `llvmpipe`, and
+anywhere else — DX12 WARP on Windows, a hardware adapter — it prints each
+fixture's mean and max outlier, then skips with a notice naming the adapter it
+ran on, in [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)'s shape. macOS has
+no software Metal adapter and skips before it captures anything. Those printed
+readings are kept in a passing run's output: `.config/nextest.toml` names each
+comparison test under `success-output = "immediate"`. So the Windows arm's drift
+against the lavapipe baselines can still be read, even though nothing asserts it.
 
 **Eyeball the regenerated PNGs before committing** — the first baseline is easy
 to enshrine wrong. The compare tolerates minor cross-GPU rasterization drift; a

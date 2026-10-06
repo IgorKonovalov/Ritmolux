@@ -1,6 +1,6 @@
 # 0218 — The reference machine becomes Arch
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-20
 > **Approved:** 2026-09-24 (user) — approved and deliberately NOT in
 > `tools/conductor/queue.json`. See the 2026-09-24 amendment below for what it waits on.
@@ -292,12 +292,12 @@ flowchart TB
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** `main` for the log; Phase 1 changes no code
+**Lane:** `main` for Phase 1's log; from Phase 2, branch `plan-0218-the-reference-machine-becomes-arch`, worktree `/home/igor/Work/rlx-plan-0218`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Ask Hyprland what a client may do | human | done - one display, so D and a second-display console were not answerable | committed with this row |
-| 2 — The baselines move to lavapipe | dev | not started | |
+| 1 — Ask Hyprland what a client may do | human | done - one display, so D and a second-display console were not answerable | b1543a29 |
+| 2 — The baselines move to lavapipe | dev | done | committed with this row |
 | 3 — Judge the 44 | human | not started | |
 | 4 — Every WARP claim takes one of three exits | dev | not started | |
 | 5 — The documents take the stance | dev | not started | |
@@ -337,6 +337,103 @@ flowchart TB
     where every other client names itself (`code`, `firefox`). A user cannot target the show with a
     window rule (a workspace, a monitor, "no blur") by class, only by title, and the title changes
     with every preset. This is a reading for the architect, not a defect repaired here.
+- **Phase 2: 53 baselines, not 44.** `core/tests/golden/` holds 53 PNGs: 37 in `golden.rs` (the
+  16-system roster, 20 `EXTRA_FIXTURES`, `waterfall_ramp`), 10 `composite_*`, 3 `layer_*`, and
+  `line_joint_zigzag`, `attractor_trails` and `warp_mesh_wide`. All 53 were recaptured with
+  `RLX_BLESS=1` on `llvmpipe (LLVM 22.1.8, 256 bits) (Vulkan, Cpu), driver llvmpipe Mesa
+  26.2.2-arch1.1`. 48 files changed. `plexus`, `plexus_sheet`, `lsystem_space`,
+  `lsystem_endless_flat` and `lsystem_endless_space` re-encoded byte-identical.
+- **Phase 2: the gate predicate.** `baseline_adapter` is `cfg!(target_os = "linux") &&
+  adapter_is_software() && description.starts_with("llvmpipe")`. The name check is an addition
+  beyond "software on Linux".
+- **Phase 2: the hardware path.** `common::build` asks for `AdapterChoice::HighPerformance` on every
+  non-software build. That covers `headless_on(_, _, false)` (`collage_layout`, `warp_mesh`) as well as
+  `headless_hardware*`. It prints `hardware adapter: <description>` once per build, centrally, not
+  per site. The description carries the name and the driver info. One `headless_hardware` site
+  (`layer::a_multiply_layer_meets_a_lit_backdrop`, run with `--no-capture`) printed: `hardware
+  adapter: NVIDIA GeForce RTX 3080 Laptop GPU (Vulkan, DiscreteGpu), driver NVIDIA 610.57.04`.
+- **Phase 2: files outside the phase's list.** `core/tests/common/mod.rs`, `.config/nextest.toml`
+  and `core/tests/suite/layer.rs` are named by the 2026-09-22 amendments. The golden suite is
+  `core/tests/golden.rs`. Not named anywhere, and edited because the move made their text false:
+  - the `.github/workflows/ci.yml` header comment;
+  - `core/tests/fixtures/README.md`, which said to bless "on Windows WARP";
+  - the comment block of `core/tests/fixtures/attractor_trails.toml`. Only the comment changed, and
+    the baseline reads 0.0000 / 0 after the edit.
+  - the `attractor_trails` row of `docs/testing.md`'s table.
+- **Phase 2: `.config/nextest.toml`.** A second `success-output = "immediate"` block names the seven
+  comparison tests: two in `golden`, one in each of the five suite modules.
+- **Phase 2: retired.** `.github/workflows/bless.yml`, `scripts/bless-report.mjs` and
+  `scripts/fixtures/bless-report/` were deleted. `scripts/README.md` lost the "fifth kind" paragraph,
+  and `docs/testing.md` lost the dispatched-job section. Nothing else referenced them, and
+  `check-gate-carriers.mjs` stays green.
+- **Phase 2: CI is unmeasured.** `ubuntu-latest` now asserts the goldens against baselines from
+  this box's Mesa 26.2.2 / LLVM 22.1.8 lavapipe. The runner's Mesa is a different build. No CI run
+  was read.
+- **Phase 2: cost.** On lavapipe, `scenes_match_golden_baselines` took 19.5 s and the seven
+  comparison tests 19.6 s wall. `-P fast` took 333 s, 1920 passed. `background_composite`,
+  `reaction_diffusion` and `golden` were run in full because the hardware path changed under them,
+  and all 7 passed.
+- **Phase 2: per-fixture readings of the lavapipe capture against its WARP predecessor.** Taken
+  before the predicate moved, from the skip path's printed readings. The tolerance is mean 0.02 /
+  outlier 48 for every fixture. Rows marked **over** exceed it. Four of those (`reaction_diffusion`,
+  `waterfall`, `parametric_lissajous_3d`, `attractor`) were opened beside their predecessors, and each
+  showed the same figure. That is not Phase 3's verdict. No recapture was withheld.
+
+  | fixture | mean | max outlier | |
+  |---|---|---|---|
+  | fragment_field | 0.0006 | 2 | |
+  | swarm | 0.0005 | 1 | |
+  | parametric_curve | 0.0003 | 2 | |
+  | lsystem | 0.0001 | 2 | |
+  | star_pattern | 0.0000 | 1 | |
+  | reaction_diffusion | 0.0110 | 190 | **over** |
+  | attractor | 0.0018 | 114 | **over** |
+  | spectrum | 0.0000 | 1 | |
+  | emitter | 0.0000 | 1 | |
+  | shape_field | 0.0012 | 8 | |
+  | warp_mesh | 0.0005 | 2 | |
+  | shape_collage | 0.0007 | 1 | |
+  | analytic_field | 0.0007 | 5 | |
+  | cellular | 0.0002 | 1 | |
+  | plexus | 0.0000 | 0 | |
+  | waterfall | 0.0017 | 213 | **over** |
+  | attractor_depth | 0.0022 | 62 | **over** |
+  | attractor_ifs | 0.0001 | 3 | |
+  | swarm_shaped | 0.0001 | 1 | |
+  | backdrop_ramp | 0.0009 | 2 | |
+  | backdrop_band | 0.0008 | 2 | |
+  | warp_mesh_milk | 0.0006 | 3 | |
+  | warp_mesh_shader | 0.0002 | 1 | |
+  | shape_collage_roster | 0.0014 | 1 | |
+  | warp_mesh_stroke | 0.0002 | 2 | |
+  | shape_field_path | 0.0009 | 4 | |
+  | analytic_field_escape | 0.0007 | 6 | |
+  | cellular_trail | 0.0006 | 2 | |
+  | cellular_ltl | 0.0001 | 1 | |
+  | cellular_cyclic | 0.0009 | 1 | |
+  | plexus_sheet | 0.0000 | 0 | |
+  | parametric_torus_knot | 0.0010 | 208 | **over** |
+  | parametric_lissajous_3d | 0.0010 | 224 | **over** |
+  | lsystem_space | 0.0000 | 0 | |
+  | lsystem_endless_flat | 0.0000 | 0 | |
+  | lsystem_endless_space | 0.0000 | 0 | |
+  | waterfall_ramp | 0.0011 | 159 | **over** |
+  | composite_trails | 0.0001 | 2 | |
+  | composite_kaleido | 0.0005 | 1 | |
+  | composite_kaleido_squash | 0.0005 | 1 | |
+  | composite_overlap | 0.0001 | 2 | |
+  | composite_bloom | 0.0001 | 1 | |
+  | composite_bloom_exposed | 0.0000 | 1 | |
+  | composite_symmetry | 0.0005 | 1 | |
+  | composite_warp_swirl | 0.0001 | 1 | |
+  | composite_warp_ripple | 0.0001 | 2 | |
+  | composite_warp_fisheye | 0.0004 | 4 | |
+  | layer_under | 0.0006 | 4 | |
+  | layer_over | 0.0004 | 3 | |
+  | layer_multiply | 0.0006 | 2 | |
+  | line_joint_zigzag | 0.0000 | 1 | |
+  | attractor_trails | 0.0009 | 89 | **over** |
+  | warp_mesh_wide | 0.0006 | 2 | |
 
 ### Close triggers
 

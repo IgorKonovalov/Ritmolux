@@ -29,6 +29,15 @@
 filter = 'test(dual_live_keeps_the_outgoing_side_animating) + test(raw_levels_are_bit_identical_to_the_pre_normalization_build) + test(the_estimator_decomposes_into_its_terms) + test(the_degradation_ladder_says_which_axis_is_steep)'
 success-output = "immediate"
 
+# The pinned-baseline comparisons, on the same grounds: each prints one mean and
+# max-outlier reading per baseline, and off the blessing adapter (lavapipe,
+# ADR-0242) it asserts nothing and passes, so on the Windows arm the printed
+# reading is the only result the run has. One per module that calls
+# `common::baseline_adapter`.
+[[profile.default.overrides]]
+filter = 'test(=scenes_match_golden_baselines) + test(=the_waterfall_holds_a_ramped_ring) + test(=composite::composite_stages_match_golden_baselines) + test(=layer::layered_fixtures_match_golden_baselines) + test(=line_joints::the_joined_polyline_holds_its_shape_and_its_pixels) + test(=attractor_trails::the_attractor_over_the_trails_stage_matches_its_baseline) + test(=warp_mesh_wide::the_converted_chain_matches_its_wide_baseline)'
+success-output = "immediate"
+
 # --- job 2: the narrowed set ---
 #
 # The nine GPU-heavy suites, which iterate the shipped preset library or every

@@ -16,11 +16,11 @@
 //! The tolerance absorbs cross-GPU rasterization drift (the software adapter
 //! keeps it small); a genuine engine change — a perturbed shader or scene math —
 //! moves a frame well past it. Baselines are ordinary PNGs, viewable in the repo
-//! and PR diffs; they are WARP-only. The comparison asserts only on WARP, and
-//! on any other adapter — llvmpipe, lavapipe — prints its readings and skips
-//! (`common::baseline_adapter`); macOS has no software Metal fallback and skips
-//! earlier, per ADR-0016. `RLX_BLESS` panics off WARP. Eyeball each baseline
-//! before blessing (Plan 0013 Phase 8 habit).
+//! and PR diffs; they are lavapipe-only (ADR-0242). The comparison asserts only
+//! on lavapipe, and on any other adapter — DX12 WARP included — prints its
+//! readings and skips (`common::baseline_adapter`); macOS has no software Metal
+//! fallback and skips earlier, per ADR-0016. `RLX_BLESS` panics off lavapipe.
+//! Eyeball each baseline before blessing (Plan 0013 Phase 8 habit).
 
 use rlx_core::preset::{Preset, SystemKind};
 use rlx_core::render::metrics::{set_extent_diagnostic, take_draw_extent};

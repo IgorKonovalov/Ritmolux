@@ -5,13 +5,13 @@
 # chain), the rlx-core coverage ratchet (ADR-0033), and Miri over rlx-ring's
 # unsafe.
 #
-# Live audio is out of CI scope. GPU rendering partly is not: on Windows the DX12
-# WARP software adapter makes headless rendering deterministic, which the golden
-# suite and the tier-4 chain test ride on. macOS has no software Metal fallback
-# (ADR-0016), so the GPU suites skip there. Linux resolves Mesa's lavapipe, a
-# software Vulkan rasterizer this repo's goldens were never blessed against
-# (ADR-0131 Alternative H). Real-vendor GPU and live-loopback checks stay manual
-# - see docs/on-device-validation.md.
+# Live audio is out of CI scope. GPU rendering partly is not: a software adapter
+# makes headless rendering deterministic - Mesa's lavapipe on Linux, DX12 WARP on
+# Windows. The golden baselines are blessed on lavapipe (ADR-0242), so the
+# comparisons assert on the Linux runner and print their readings and skip on
+# Windows. macOS has no software Metal fallback (ADR-0016), so the GPU suites
+# skip there. Real-vendor GPU and live-loopback checks stay manual - see
+# docs/on-device-validation.md.
 name: CI
 
 on:

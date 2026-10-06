@@ -716,11 +716,11 @@ fn a_dark_particle_layer_in_a_multiply_slot() {
 ///
 /// `RLX_BLESS=1 cargo test -p rlx-core --test suite layer::` rewrites these two —
 /// and, run without the `layer::` filter or against the whole suite, **other
-/// baselines as well**. Bless by that filter and check `git status`. Both
-/// baselines were adapter-compared before blessing (the ADR-0058 standing
-/// rule): the WARP capture agrees with the hardware adapter's within the
-/// cross-rasterizer tolerance, so the baseline pins a picture hardware also
-/// draws, not a WARP artifact.
+/// baselines as well**. Bless by that filter and check `git status`. The
+/// baselines are lavapipe captures (ADR-0242). Their WARP predecessors were
+/// adapter-compared before blessing (the ADR-0058 standing rule) and agreed
+/// with the hardware adapter within the cross-rasterizer tolerance; the
+/// lavapipe recapture has not been compared against hardware.
 #[test]
 fn layered_fixtures_match_golden_baselines() {
     const MEAN_TOL: f32 = 0.02;

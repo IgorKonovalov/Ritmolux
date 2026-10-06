@@ -33,12 +33,12 @@ wildcard arm. To add one:
    itself, since Plan 0030 Phase 3 retired this file's duplicate `SYSTEMS` list.
    `EXTRA_FIXTURES` — see below — is a different thing and is not part of adding
    a scene.)
-3. Bless the baseline on Windows WARP:
+3. Bless the baseline on Linux, where the software adapter is lavapipe:
    `RLX_BLESS=1 cargo test -p rlx-core --test golden`, then eyeball the new PNG
    under `core/tests/golden/` to confirm the scene actually drew.
 
-Baselines are WARP-only (macOS skips per ADR-0016) and must be blessed on WARP or
-they will drift. **`RLX_BLESS=1` rewrites every baseline, not just the one you
+Baselines are lavapipe-only (ADR-0242; Windows prints its readings and skips,
+macOS skips per ADR-0016) and must be blessed on lavapipe or they will drift. **`RLX_BLESS=1` rewrites every baseline, not just the one you
 are adding** — check `git status` afterwards and restore any file you did not
 mean to move, or you will silently re-baseline an unrelated scene's drift.
 
@@ -127,10 +127,10 @@ by nothing. Its own test also keeps those six pipelines off the devices the othe
 capture tests build, because nextest runs each test in a process of its own, which
 is the rule `composite.rs` states.
 
-It is **coverage, not evidence of correctness** — the baseline is blessed on WARP
-like every other one here, so if this configuration aliases, the PNG is a picture
-of the wrong thing. ADR-0058's hardware-vs-WARP comparison is the check; this is
-the drift guard.
+It is **coverage, not evidence of correctness** — the baseline is blessed on the
+software adapter (lavapipe) like every other one here, so if this configuration
+aliases there, the PNG is a picture of the wrong thing. ADR-0058's
+hardware-vs-software comparison is the check; this is the drift guard.
 
 `fade = 0.6` under `trails = 0.98` is load-bearing for the reason the
 `attractor_*_fb_*` family's header gives at the bottom of this file, and the
