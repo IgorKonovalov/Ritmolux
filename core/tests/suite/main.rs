@@ -52,6 +52,7 @@ mod hygiene;
 mod kaleidoscope;
 mod layer;
 mod line_joints;
+mod lsystem_space;
 mod r#override;
 mod palette_contour;
 mod palette_srgb;

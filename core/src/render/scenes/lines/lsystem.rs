@@ -56,14 +56,22 @@ use std::rc::Rc;
 
 use super::super::Scene;
 use super::super::common;
-use super::renderer::{LineRenderer, SegmentInstance, StrokeMetric};
+use super::renderer::{
+    LineRenderer, Segment3dInstance, SegmentInstance, StrokeMetric, joined_chord,
+};
+use super::turtle::TurtleMode;
 use super::{
     CapOverflow, ColorRamp, GeneratorConfig, MAX_LSYSTEM_DEPTH, MirrorSpec, OverflowContext,
     ViewTransform, grammar, replicate_mirror, transform_cached, turtle,
 };
 use crate::dsp::AnalysisFrame;
+use crate::render::camera::{self, CameraParams};
 use crate::render::palette::Palette;
 use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
+
+/// The bounding sphere a space figure is fitted into, in world units: the
+/// volume the camera orbits, and the radius `focus` is normalized across.
+const SPACE_RADIUS: f32 = 1.0;
 
 const DEFAULT_VISIBLE_DEPTH: f32 = default_of(PARAMS, "visible_depth");
 const DEFAULT_ROTATION: f32 = default_of(PARAMS, "rotation");
@@ -156,13 +164,60 @@ pub struct LSystemScene {
     zoom: f32,
     mirror_order: f32,
     mirror_reflect: f32,
+
+    /// Which turtle the configured grammar was walked by (ADR-0258).
+    turtle: TurtleMode,
+    /// The space turtle's own renderer: the `seg3d` pipeline and an instance
+    /// buffer of the tier's
+    /// [`seg3d_segments`](crate::render::TierConfig::seg3d_segments), built with
+    /// the scene so a preset switch to a space grammar allocates nothing on the
+    /// GPU. The shared 2D renderer above has no `seg3d` pipeline.
+    lines3d: LineRenderer,
+    /// The tier's `seg3d_segments`: the most segments a space depth caches.
+    seg3d_cap: usize,
+    /// The tier's cap on the circle of confusion, in pixels.
+    max_coc: f32,
+    /// The render target's size in pixels, handed in every frame.
+    target: (u32, u32),
+    /// The shared camera block, read in `space` mode.
+    camera: CameraParams,
+    /// The space walk per depth (index `d - 1`), fitted into a sphere of
+    /// [`SPACE_RADIUS`], built once in `configure`. Empty in `flat` mode, as
+    /// [`cached`](Self::cached) is in `space`; [`cached_depths`](Self::cached_depths)
+    /// and [`cached_max_depth`](Self::cached_max_depth) serve whichever is built.
+    cached3d: Vec<Vec<Segment3dInstance>>,
+    /// The cached space depth this frame draws, picked in `update`.
+    space_depth: usize,
+    /// How many of that depth's segments this frame's `draw_progress` reveals.
+    space_keep: usize,
+    /// Reused 3D instance buffer, preallocated to `seg3d_cap`.
+    instances3d: Vec<Segment3dInstance>,
 }
 
 impl LSystemScene {
     /// Build the scene over the shared line renderer, preallocating the draw
-    /// buffer. No grammar is expanded until a preset configures one.
-    pub fn new(renderer: Rc<RefCell<LineRenderer>>, max_segments: usize) -> Self {
+    /// buffer, and the space turtle's own `seg3d` renderer with `seg3d_cap`
+    /// instances and blur held to `max_coc` pixels — the tier's caps. No grammar
+    /// is expanded until a preset configures one.
+    pub fn new(
+        renderer: Rc<RefCell<LineRenderer>>,
+        max_segments: usize,
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        seg3d_cap: usize,
+        max_coc: f32,
+    ) -> Self {
         Self {
+            turtle: TurtleMode::Flat,
+            lines3d: LineRenderer::new_3d(device, surface_format, seg3d_cap, "lsystem-3d"),
+            seg3d_cap,
+            max_coc,
+            target: (1, 1),
+            camera: CameraParams::default(),
+            cached3d: Vec::new(),
+            space_depth: 0,
+            space_keep: 0,
+            instances3d: Vec::with_capacity(seg3d_cap),
             renderer,
             cached: Vec::new(),
             cached_depths: Vec::new(),
@@ -196,32 +251,59 @@ impl LSystemScene {
 
     /// Expand + turtle-walk each depth `1..=max_depth` into a cached buffer.
     /// Off the hot path (called from `configure`).
-    fn build(&mut self, axiom: &str, rules: &[(char, String)], angle_deg: f32, max_depth: u32) {
+    fn build(
+        &mut self,
+        axiom: &str,
+        rules: &[(char, String)],
+        angle_deg: f32,
+        max_depth: u32,
+        mode: TurtleMode,
+    ) {
         self.cached.clear();
+        self.cached3d.clear();
         self.cached_depths.clear();
         self.cached_max_depth.clear();
         self.overflow = None;
+        self.turtle = mode;
         let depth = max_depth.clamp(1, MAX_LSYSTEM_DEPTH);
         let angle = angle_deg.to_radians();
 
         for d in 1..=depth {
             let string = grammar::expand(axiom, rules, d);
-            let mut segs = Vec::new();
             let mut generations = Vec::new();
-            let dropped = turtle::walk_with_depths(
-                &string,
-                angle,
-                self.max_segments,
-                &mut segs,
-                &mut generations,
-            );
-            turtle::normalize_fit(&mut segs, 0.9);
+            let dropped = match mode {
+                TurtleMode::Flat => {
+                    let mut segs = Vec::new();
+                    let dropped = turtle::walk_with_depths(
+                        &string,
+                        angle,
+                        self.max_segments,
+                        &mut segs,
+                        &mut generations,
+                    );
+                    turtle::normalize_fit(&mut segs, 0.9);
+                    self.cached.push(segs);
+                    dropped
+                }
+                TurtleMode::Space => {
+                    let mut segs = Vec::new();
+                    let dropped = turtle::walk_3d_with_depths(
+                        &string,
+                        angle,
+                        self.seg3d_cap,
+                        &mut segs,
+                        &mut generations,
+                    );
+                    turtle::sphere_fit(&mut segs, SPACE_RADIUS);
+                    self.cached3d.push(segs);
+                    dropped
+                }
+            };
             if dropped > 0 && self.overflow.is_none() {
                 self.overflow = Some((d, dropped));
             }
             self.cached_max_depth
                 .push(generations.iter().copied().max().unwrap_or(0));
-            self.cached.push(segs);
             self.cached_depths.push(generations);
         }
         // One colour slot per reachable generation, sized once here so the
@@ -235,6 +317,134 @@ impl LSystemScene {
             .saturating_add(1) as usize;
         self.depth_colors.clear();
         self.depth_colors.resize(generations, [0.0; 3]);
+    }
+
+    /// The cached depth `visible_depth` names, as an index into whichever cache
+    /// was built, or `None` before a grammar is configured.
+    fn depth_index(&self, depths: usize) -> Option<usize> {
+        if depths == 0 {
+            return None;
+        }
+        let want = self.visible_depth.max(1.0) as usize;
+        Some(want.min(depths).saturating_sub(1))
+    }
+
+    /// The colour ramp this frame's palette knobs describe.
+    fn ramp(&self) -> ColorRamp {
+        ColorRamp {
+            hue: self.colour.hue,
+            hue_spread: self.hue_spread,
+            palette_mix: self.colour.mix,
+            palette_steps: self.colour.steps,
+            saturation: self.colour.saturation,
+            brightness: self.colour.brightness,
+        }
+    }
+
+    /// A space frame's CPU half (ADR-0258): pick the depth, colour its
+    /// generations and count the `draw_progress` prefix. No rotation, scale or
+    /// mirror reaches it, and the flat buffer is emptied so nothing 2D is drawn
+    /// beside it.
+    fn update_space(&mut self) {
+        self.draw_buf.clear();
+        self.mirror_overflow = None;
+        let Some(idx) = self.depth_index(self.cached3d.len()) else {
+            self.space_keep = 0;
+            return;
+        };
+        let ramp = self.ramp();
+        fill_depth_colors(
+            &mut self.depth_colors,
+            &self.palette,
+            ramp,
+            self.cached_max_depth.get(idx).copied().unwrap_or(0),
+        );
+        let len = self.cached3d.get(idx).map_or(0, Vec::len);
+        // The same rounding `transform_cached` reveals the flat prefix by.
+        self.space_keep = ((len as f32) * self.draw_progress.clamp(0.0, 1.0)).round() as usize;
+        self.space_depth = idx;
+    }
+
+    /// Draw the cached space depth through the shared camera: each segment
+    /// clipped against the near plane, culled when wholly off one edge of the
+    /// frame, coloured by its generation (ADR-0059), and stroked `thickness`
+    /// pixels wide at the focal plane.
+    fn render_space(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        aspect: f32,
+    ) {
+        // The aspect is the render target's, handed in here (ADR-0037).
+        let frame = self.camera.frame(
+            aspect,
+            self.zoom,
+            [self.pan.x, self.pan.y],
+            self.target,
+            SPACE_RADIUS,
+            self.max_coc,
+        );
+        if self.mirror_overflow.is_none() {
+            self.mirror_overflow = frame.blur;
+        }
+        let width = if self.thickness.is_finite() {
+            self.thickness.max(0.0)
+        } else {
+            DEFAULT_THICKNESS
+        };
+        let trunk = self.depth_colors.first().copied().unwrap_or([1.0; 3]);
+        let base = self
+            .cached3d
+            .get(self.space_depth)
+            .map_or(&[][..], Vec::as_slice);
+        let generations = self
+            .cached_depths
+            .get(self.space_depth)
+            .map_or(&[][..], Vec::as_slice);
+        let keep = self.space_keep.min(base.len());
+
+        let mut instances = std::mem::take(&mut self.instances3d);
+        instances.clear();
+        for (i, seg) in base.iter().take(keep).enumerate() {
+            // A joined end names its neighbour's far point; a free end names
+            // itself (`walk_3d_with_depths`). A neighbour past the revealed
+            // prefix is not drawn, so that end draws free.
+            let before = (seg.prev != seg.a).then_some(seg.prev);
+            let after = (seg.next != seg.b && i + 1 < keep).then_some(seg.next);
+            let Some([prev, a, b, next]) = joined_chord(&frame.view, before, seg.a, seg.b, after)
+            else {
+                continue;
+            };
+            if frame.view.outside(a, b, frame.margin) {
+                continue;
+            }
+            let color = generations
+                .get(i)
+                .and_then(|&g| self.depth_colors.get(g as usize))
+                .copied()
+                .unwrap_or(trunk);
+            instances.push(Segment3dInstance {
+                a,
+                b,
+                color,
+                width,
+                alpha: 1.0,
+                prev,
+                next,
+                skirt: 0.0,
+            });
+        }
+        self.lines3d.draw_3d(
+            queue,
+            encoder,
+            view,
+            &frame,
+            self.glow,
+            self.softness,
+            &instances,
+        );
+        self.instances3d = instances;
     }
 }
 
@@ -319,6 +529,14 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::lines::STROKE_BLEND,
     crate::render::scenes::lines::MIRROR_ORDER,
     crate::render::scenes::lines::MIRROR_REFLECT,
+    camera::YAW,
+    camera::PITCH,
+    camera::DISTANCE,
+    camera::FOV,
+    camera::FOCUS,
+    camera::APERTURE,
+    camera::FOG,
+    camera::SOLID,
 ];
 
 impl Scene for LSystemScene {
@@ -345,12 +563,18 @@ impl Scene for LSystemScene {
         self.zoom = DEFAULT_ZOOM;
         self.mirror_order = DEFAULT_MIRROR_ORDER;
         self.mirror_reflect = DEFAULT_MIRROR_REFLECT;
+        self.camera.reset();
+    }
+
+    fn set_target_size(&mut self, width: u32, height: u32) {
+        self.target = (width, height);
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
         // The shared param blocks first, this scene's own names after
-        // (`scenes::common`).
-        if self.colour.set(name, value) || self.pan.set(name, value) {
+        // (`scenes::common`, `render::camera`).
+        if self.colour.set(name, value) || self.pan.set(name, value) || self.camera.set(name, value)
+        {
             return;
         }
         match name {
@@ -386,16 +610,22 @@ impl Scene for LSystemScene {
             angle_deg,
             max_depth,
             seed: _,
+            turtle,
         } = cfg
         {
-            self.build(axiom, rules, *angle_deg, *max_depth);
+            self.build(axiom, rules, *angle_deg, *max_depth, *turtle);
         }
         // Surface a cap truncation so the frontend can report it — never a
-        // silent cut (ADR-0007). `None` when every depth fit (the norm).
+        // silent cut (ADR-0007). `None` when every depth fit (the norm). The
+        // cap that bit is the one the active turtle walked under.
+        let cap = match self.turtle {
+            TurtleMode::Flat => self.max_segments,
+            TurtleMode::Space => self.seg3d_cap,
+        };
         self.overflow.map(|(depth, dropped)| CapOverflow {
             dropped,
             context: OverflowContext::Depth(depth),
-            cap: self.max_segments,
+            cap,
         })
     }
 
@@ -404,14 +634,15 @@ impl Scene for LSystemScene {
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {
-        // Pick the visible depth (1-based) and its cached base geometry.
-        let depths = self.cached.len();
-        if depths == 0 {
-            self.draw_buf.clear();
+        if self.turtle == TurtleMode::Space {
+            self.update_space();
             return;
         }
-        let want = self.visible_depth.max(1.0) as usize;
-        let idx = want.min(depths).saturating_sub(1);
+        // Pick the visible depth (1-based) and its cached base geometry.
+        let Some(idx) = self.depth_index(self.cached.len()) else {
+            self.draw_buf.clear();
+            return;
+        };
         let Some(base) = self.cached.get(idx) else {
             self.draw_buf.clear();
             return;
@@ -488,6 +719,10 @@ impl Scene for LSystemScene {
         view: &wgpu::TextureView,
         aspect: f32,
     ) {
+        if self.turtle == TurtleMode::Space {
+            self.render_space(queue, encoder, view, aspect);
+            return;
+        }
         let xform = ViewTransform {
             zoom: self.zoom,
             pan: [self.pan.x, self.pan.y],

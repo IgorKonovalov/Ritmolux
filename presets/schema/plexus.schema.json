@@ -31,14 +31,14 @@
         "drift": { "$ref": "#/definitions/param.drift.plexus" },
         "wave": { "$ref": "#/definitions/param.wave" },
         "wave_scale": { "$ref": "#/definitions/param.wave_scale" },
-        "yaw": { "$ref": "#/definitions/param.yaw.plexus" },
-        "pitch": { "$ref": "#/definitions/param.pitch.plexus" },
-        "distance": { "$ref": "#/definitions/param.distance.plexus" },
-        "fov": { "$ref": "#/definitions/param.fov.plexus" },
-        "focus": { "$ref": "#/definitions/param.focus.plexus" },
-        "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
-        "fog": { "$ref": "#/definitions/param.fog.plexus" },
-        "solid": { "$ref": "#/definitions/param.solid.plexus" },
+        "yaw": { "$ref": "#/definitions/param.yaw.lsystem" },
+        "pitch": { "$ref": "#/definitions/param.pitch.lsystem" },
+        "distance": { "$ref": "#/definitions/param.distance.lsystem" },
+        "fov": { "$ref": "#/definitions/param.fov.lsystem" },
+        "focus": { "$ref": "#/definitions/param.focus.lsystem" },
+        "aperture": { "$ref": "#/definitions/param.aperture.lsystem" },
+        "fog": { "$ref": "#/definitions/param.fog.lsystem" },
+        "solid": { "$ref": "#/definitions/param.solid.lsystem" },
         "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
         "hue_center": { "$ref": "#/definitions/param.hue_center.plexus" },
         "hue_spread": { "$ref": "#/definitions/param.hue_spread.plexus" },
@@ -359,6 +359,12 @@
           "type": "integer",
           "description": "L-system: how many iterations to expand and cache.",
           "markdownDescription": "L-system: how many iterations to expand and cache.\n\nDefault `4`."
+        },
+        "turtle": {
+          "type": "string",
+          "enum": ["flat", "space"],
+          "description": "L-system: \"flat\" walks the plane; \"space\" walks in depth through the camera, where & and ^ pitch, \\ and / roll and | turns around.",
+          "markdownDescription": "L-system: \"flat\" walks the plane; \"space\" walks in depth through the camera, where & and ^ pitch, \\ and / roll and | turns around.\n\nDefault `flat`."
         },
         "seed": {
           "anyOf": [
@@ -810,6 +816,46 @@
       "description": "The scene's overall light level, multiplying what it draws before the composite.",
       "markdownDescription": "The scene's overall light level, multiplying what it draws before the composite.\n\n- default `1.0`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
+    "param.yaw.lsystem": {
+      "type": "string",
+      "description": "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.",
+      "markdownDescription": "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.\n\n- default `0.0`\n- typical range `-3.1415927` to `3.1415927` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.pitch.lsystem": {
+      "type": "string",
+      "description": "Raises the camera above the scene's volume, in radians; negative looks up from below.",
+      "markdownDescription": "Raises the camera above the scene's volume, in radians; negative looks up from below.\n\n- default `0.25`\n- typical range `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.distance.lsystem": {
+      "type": "string",
+      "description": "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.",
+      "markdownDescription": "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.\n\n- default `3.5`\n- typical range `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.fov.lsystem": {
+      "type": "string",
+      "description": "The camera's vertical field of view in radians; zoom divides it.",
+      "markdownDescription": "The camera's vertical field of view in radians; zoom divides it.\n\n- default `0.8`\n- typical range `0.2` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.focus.lsystem": {
+      "type": "string",
+      "description": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.",
+      "markdownDescription": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.aperture.lsystem": {
+      "type": "string",
+      "description": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
+      "markdownDescription": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.fog.lsystem": {
+      "type": "string",
+      "description": "Fades strokes toward black with depth: at 1 the farthest point of the scene's volume is black and the nearest keeps its light. 0 is off.",
+      "markdownDescription": "Fades strokes toward black with depth: at 1 the farthest point of the scene's volume is black and the nearest keeps its light. 0 is off.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.solid.lsystem": {
+      "type": "string",
+      "description": "1 paints near strokes over far ones, so the scene reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every stroke by depth each frame.",
+      "markdownDescription": "1 paints near strokes over far ones, so the scene reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every stroke by depth each frame.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
     "param.link_distance": {
       "type": "string",
       "description": "How close two points must be to be joined, in the layout's own units; the cube is 2 across.",
@@ -849,46 +895,6 @@
       "type": "string",
       "description": "How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop.",
       "markdownDescription": "How broad a sheet's ripples are; larger is a slower swell, smaller a fine chop.\n\n- default `1.0`\n- typical range depends on the family: `sheet` `0.3` to `3.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cloud` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.yaw.plexus": {
-      "type": "string",
-      "description": "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.",
-      "markdownDescription": "Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit.\n\n- default `0.0`\n- typical range `-3.1415927` to `3.1415927` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.pitch.plexus": {
-      "type": "string",
-      "description": "Raises the camera above the scene's volume, in radians; negative looks up from below.",
-      "markdownDescription": "Raises the camera above the scene's volume, in radians; negative looks up from below.\n\n- default `0.25`\n- typical range `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.distance.plexus": {
-      "type": "string",
-      "description": "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.",
-      "markdownDescription": "How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective.\n\n- default `3.5`\n- typical range `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.fov.plexus": {
-      "type": "string",
-      "description": "The camera's vertical field of view in radians; zoom divides it.",
-      "markdownDescription": "The camera's vertical field of view in radians; zoom divides it.\n\n- default `0.8`\n- typical range `0.2` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.focus.plexus": {
-      "type": "string",
-      "description": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.",
-      "markdownDescription": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.aperture.plexus": {
-      "type": "string",
-      "description": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
-      "markdownDescription": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.fog.plexus": {
-      "type": "string",
-      "description": "Fades strokes toward black with depth: at 1 the farthest point of the scene's volume is black and the nearest keeps its light. 0 is off.",
-      "markdownDescription": "Fades strokes toward black with depth: at 1 the farthest point of the scene's volume is black and the nearest keeps its light. 0 is off.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.solid.plexus": {
-      "type": "string",
-      "description": "1 paints near strokes over far ones, so the scene reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every stroke by depth each frame.",
-      "markdownDescription": "1 paints near strokes over far ones, so the scene reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every stroke by depth each frame.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.hue_center.plexus": {
       "type": "string",

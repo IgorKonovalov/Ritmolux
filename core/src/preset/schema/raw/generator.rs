@@ -5,6 +5,7 @@
 // into.
 use super::super::*;
 use super::*;
+use crate::render::scenes::lines::turtle::TurtleMode;
 
 /// The raw `[curve]` table: declarative structure for a parametric-curve scene.
 #[derive(Deserialize)]
@@ -49,6 +50,9 @@ pub(in crate::preset::schema) struct RawGenerator {
     /// L-system: iterations to precompute.
     #[serde(default)]
     pub(in crate::preset::schema) max_depth: Option<u32>,
+    /// L-system: which turtle walks the grammar, `"flat"` or `"space"`.
+    #[serde(default)]
+    pub(in crate::preset::schema) turtle: Option<String>,
     /// The preset's random salt — what the grammar's `hash()`/`noise()` mix into
     /// their argument (ADR-0051): a number, or `"random"` for a salt drawn per
     /// app launch. **Not** an L-system key despite living in the L-system's
@@ -129,6 +133,20 @@ impl RawGenerator {
             )));
         }
 
+        let turtle = match self.turtle.as_deref() {
+            None => TurtleMode::default(),
+            Some(name) => TurtleMode::from_name(name).ok_or_else(|| {
+                PresetError::Config(format!(
+                    "unknown lsystem turtle '{name}' (expected one of: {})",
+                    TurtleMode::ALL
+                        .iter()
+                        .map(|m| m.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ))
+            })?,
+        };
+
         Ok(GeneratorConfig::LSystem {
             axiom,
             rules,
@@ -138,6 +156,7 @@ impl RawGenerator {
             // `"random"` seed reads as its numeric fallback here rather than
             // pulling entropy into a structural config.
             seed: self.seed.map_or(0, RawSeed::numeric),
+            turtle,
         })
     }
 
@@ -287,6 +306,13 @@ pub(in crate::preset::schema) const GENERATOR: TableDesc = TableDesc {
             kind: KeyKind::Int,
             default: "4",
             doc: "L-system: how many iterations to expand and cache.",
+        },
+        KeyDesc {
+            name: "turtle",
+            kind: KeyKind::Roster(Roster::Turtle),
+            default: "flat",
+            doc: "L-system: \"flat\" walks the plane; \"space\" walks in depth through the \
+                  camera, where & and ^ pitch, \\ and / roll and | turns around.",
         },
         KeyDesc {
             name: "seed",

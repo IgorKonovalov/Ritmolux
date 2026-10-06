@@ -1,6 +1,6 @@
 # 0237 — The L-system turtle turns in space, and can grow without end
 
-> **Status:** approved (2026-10-01). Runs after Plan 0236 closes.
+> **Status:** in-progress (2026-10-05). Runs after Plan 0236 closes.
 > **Created:** 2026-10-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md) (proposed), [ADR-0257](../adrs/0257-a-shared-camera-projects-3d-primitives-and-depth-of-field-is-a-per-endpoint-circle-of-confusion.md), [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md), [ADR-0019](../adrs/0019-eased-parameters.md)
@@ -312,11 +312,11 @@ and `follow_window`.
 
 ## Implementation log
 
-**Lane:**
+**Lane:** branch `plan-0237-the-l-system-turtle-turns-in-space`, worktree `/home/igor/Work/rlx-plan-0237`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: a tree in depth | dev | not started | |
+| 1 — Walking skeleton: a tree in depth | dev | done | committed with this row |
 | 2 — What is inert in space, and the frame's drift | dev | not started | |
 | 3 — Caps and the space golden | dev | not started | |
 | 4 — Endless: the lazy stream and the ring | dev | not started | |
@@ -326,6 +326,24 @@ and `follow_window`.
 | 8 — The look, judged | human | not started | |
 
 ### Notes
+
+- The shipped set holds four `lsystem` presets, not six: `lsystem_icecrystal`, `lsystem_rime`,
+  `lsystem_sumimono` and `lsystem_thicket`. `bower`, `coral` and `vellum` are not in `presets/`.
+  Every "six shipped presets" done-when was checked against these four.
+- Phase 1 byte-identity: `shot --size 640x400 --frames 60` of `core/tests/fixtures/lsystem.toml`
+  and the four presets, before and after the phase on the same machine (llvmpipe), compared with
+  `cmp`. All five identical. The `lsystem` golden itself is WARP-only and was not read.
+- Phase 1 touched files outside its list. `GeneratorConfig::LSystem` gains `turtle` in
+  `core/src/render/scenes/mod.rs`, which also builds `LSystemScene` with the device and the tier's
+  `seg3d_segments` and `max_coc_px`. `Roster::Turtle` is in `core/src/preset/schema/export.rs`,
+  with its parser check in `core/src/preset/schema/tests.rs`. The test module is registered in
+  `core/tests/suite/main.rs`.
+- Phase 1 regenerated `presets/README.md`'s params block, `presets/preset.schema.json`,
+  `presets/schema/*.json` and `docs/specs/player-schema.json`, which Phase 7 lists. The new key
+  and the spliced camera params made their drift tests red otherwise.
+- Phase 1's `lsystem` scene now builds a `seg3d` renderer at construction, so every golden
+  captured after `lsystem` in the roster runs on a device with one more set of GPU resources.
+  Windows CI's golden job is the first WARP reading of that.
 
 ### Close triggers
 

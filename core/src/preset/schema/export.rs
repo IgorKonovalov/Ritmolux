@@ -99,6 +99,8 @@ pub enum Roster {
     CellularFamily,
     /// `[plexus] layout`.
     PlexusLayout,
+    /// `[generator] turtle`.
+    Turtle,
 }
 
 impl Roster {
@@ -132,6 +134,10 @@ impl Roster {
             Roster::TrapShape => TrapShape::ALL.iter().map(|t| t.as_str()).collect(),
             Roster::CellularFamily => CellularFamily::ALL.iter().map(|f| f.as_str()).collect(),
             Roster::PlexusLayout => PlexusLayout::ALL.iter().map(|l| l.as_str()).collect(),
+            Roster::Turtle => crate::render::scenes::lines::turtle::TurtleMode::ALL
+                .iter()
+                .map(|m| m.as_str())
+                .collect(),
         }
     }
 

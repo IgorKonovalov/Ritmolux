@@ -369,6 +369,12 @@
           "description": "L-system: how many iterations to expand and cache.",
           "markdownDescription": "L-system: how many iterations to expand and cache.\n\nDefault `4`."
         },
+        "turtle": {
+          "type": "string",
+          "enum": ["flat", "space"],
+          "description": "L-system: \"flat\" walks the plane; \"space\" walks in depth through the camera, where & and ^ pitch, \\ and / roll and | turns around.",
+          "markdownDescription": "L-system: \"flat\" walks the plane; \"space\" walks in depth through the camera, where & and ^ pitch, \\ and / roll and | turns around.\n\nDefault `flat`."
+        },
         "seed": {
           "anyOf": [
             { "type": "number" },

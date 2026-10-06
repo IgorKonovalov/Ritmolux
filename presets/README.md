@@ -597,6 +597,14 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
 | `stroke_blend` | `0` | `0` – `1` | Moves the stroke from additive light toward opaque paint, so crossings stop brightening. | light |
 | `mirror_reflect` | `0` | `0` – `1` | Alternates the repeats into mirror images rather than plain rotations. | shape |
+| `yaw` | `0` | `-3.1415927` – `3.1415927` | Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit. | motion |
+| `pitch` | `0.25` | `-1.55` – `1.55` | Raises the camera above the scene's volume, in radians; negative looks up from below. | motion |
+| `distance` | `3.5` | `1.5` – `8` | How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective. | motion |
+| `fov` | `0.8` | `0.2` – `2` | The camera's vertical field of view in radians; zoom divides it. | motion |
+| `focus` | `0.5` | `0` – `1` | Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest. | light, main |
+| `aperture` | `0` | `0` – `24` | The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill. | light, main |
+| `fog` | `0` | `0` – `1` | Fades strokes toward black with depth: at 1 the farthest point of the scene's volume is black and the nearest keeps its light. 0 is off. | light |
+| `solid` | `0` | `0` – `1` | 1 paints near strokes over far ones, so the scene reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every stroke by depth each frame. | light |
 
 ### System: `star_pattern`
 

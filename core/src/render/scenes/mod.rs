@@ -384,6 +384,9 @@ pub enum GeneratorConfig {
         max_depth: u32,
         /// Reserved seed for future stochastic rules; deterministic today.
         seed: u64,
+        /// Which turtle walks the expansion, from `[generator] turtle`
+        /// (ADR-0258). `Flat` is the default and the plane walk.
+        turtle: lines::turtle::TurtleMode,
     },
     /// A Hankin star pattern: an `n`-fold star rosette built at load, with a few
     /// contact-angle variants a beat can switch between — and, since ADR-0079,
@@ -1343,9 +1346,14 @@ fn create(
             tier.seg3d_segments as usize,
             tier.max_coc_px as f32,
         )),
-        SystemKind::LSystem => {
-            Box::new(lines::LSystemScene::new(line_renderer(), tier.max_segments))
-        }
+        SystemKind::LSystem => Box::new(lines::LSystemScene::new(
+            line_renderer(),
+            tier.max_segments,
+            device,
+            surface_format,
+            tier.seg3d_segments as usize,
+            tier.max_coc_px as f32,
+        )),
         SystemKind::StarPattern => Box::new(lines::StarPatternScene::new(
             line_renderer(),
             tier.max_segments,
