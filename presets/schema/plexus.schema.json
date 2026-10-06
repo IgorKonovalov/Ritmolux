@@ -357,8 +357,30 @@
         },
         "max_depth": {
           "type": "integer",
-          "description": "L-system: how many iterations to expand and cache.",
-          "markdownDescription": "L-system: how many iterations to expand and cache.\n\nDefault `4`."
+          "description": "L-system: how many iterations to expand and cache. Inert under growth = \"endless\", whose stream is walked to its own fixed depth.",
+          "markdownDescription": "L-system: how many iterations to expand and cache. Inert under growth = \"endless\", whose stream is walked to its own fixed depth.\n\nDefault `4`."
+        },
+        "turtle": {
+          "type": "string",
+          "enum": ["flat", "space"],
+          "description": "L-system: \"flat\" walks the plane; \"space\" walks in depth through the camera, where & and ^ pitch, \\ and / roll and | turns around.",
+          "markdownDescription": "L-system: \"flat\" walks the plane; \"space\" walks in depth through the camera, where & and ^ pitch, \\ and / roll and | turns around.\n\nDefault `flat`."
+        },
+        "growth": {
+          "type": "string",
+          "enum": ["fixed", "endless"],
+          "description": "L-system: \"fixed\" draws one cached depth; \"endless\" grows a vine that never ends at the rate grow sets, keeping the newest trail segments.",
+          "markdownDescription": "L-system: \"fixed\" draws one cached depth; \"endless\" grows a vine that never ends at the rate grow sets, keeping the newest trail segments.\n\nDefault `fixed`."
+        },
+        "trail": {
+          "type": "integer",
+          "description": "L-system, endless: how many segments the vine keeps behind its tip, held to the quality tier's cap.",
+          "markdownDescription": "L-system, endless: how many segments the vine keeps behind its tip, held to the quality tier's cap.\n\nDefault `2000`."
+        },
+        "follow_window": {
+          "type": "integer",
+          "description": "L-system, endless: how many of the newest segments the view follows the centre of; wider smooths the jump a branch's return makes.",
+          "markdownDescription": "L-system, endless: how many of the newest segments the view follows the centre of; wider smooths the jump a branch's return makes.\n\nDefault `32`."
         },
         "seed": {
           "anyOf": [

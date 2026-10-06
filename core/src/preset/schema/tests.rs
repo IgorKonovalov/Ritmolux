@@ -703,7 +703,7 @@ fn every_roster_value_parses_through_its_owners_parser() {
     /// A roster beside the parser that owns it.
     type RosterCheck = (Roster, fn(&str) -> bool);
 
-    let checks: [RosterCheck; 17] = [
+    let checks: [RosterCheck; 19] = [
         (Roster::System, |n| SystemKind::from_name(n).is_some()),
         (Roster::CurveFamily, |n| CurveFamily::from_name(n).is_some()),
         (Roster::AttractorFamily, |n| {
@@ -733,6 +733,12 @@ fn every_roster_value_parses_through_its_owners_parser() {
         }),
         (Roster::PlexusLayout, |n| {
             PlexusLayout::from_name(n).is_some()
+        }),
+        (Roster::Turtle, |n| {
+            crate::render::scenes::lines::turtle::TurtleMode::from_name(n).is_some()
+        }),
+        (Roster::Growth, |n| {
+            crate::render::scenes::lines::lsystem::Growth::from_name(n).is_some()
         }),
     ];
 

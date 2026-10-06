@@ -573,30 +573,41 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | Parameter | Default | Range | What it does | Group |
 |---|---|---|---|---|
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. | colour |
-| `mirror_order` | `1` | `1` – `12` | Repeats the geometry this many times around the centre; 1 draws it once. | shape |
+| `mirror_order` | `1` | `flat` `1` – `12`; inert on `space`, `flat endless`, `space endless` | Repeats a flat L-system this many times around the centre; 1 draws it once. | shape |
 
 **Modal**
 
 | Parameter | Default | Range | What it does | Group |
 |---|---|---|---|---|
-| `visible_depth` | `1` | `1` – `7` | Which recursion generation is drawn, counted from 1 and capped at `max_depth`; a fraction floors to the generation below it, and anything under 2 draws the first. | shape, main |
-| `rotation` | `0` | `0` – `6.2831855` | Turns the whole figure, in radians. | motion |
+| `visible_depth` | `1` | `flat` `1` – `7`; `space` `1` – `7`; inert on `flat endless`, `space endless` | Which recursion generation is drawn, counted from 1 and capped at `max_depth`; a fraction floors to the generation below it, and anything under 2 draws the first. | shape, main |
+| `rotation` | `0` | `flat` `0` – `6.2831855`; `flat endless` `0` – `6.2831855`; inert on `space`, `space endless` | Turns a flat figure in its plane, in radians. | motion |
 | `hue` | `0.3` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. | colour, main |
 | `hue_spread` | `0` | `0` – `1` | How far along the palette the colour travels from one end of the figure to the other. | colour |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. | colour |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. | colour |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. | colour |
-| `draw_progress` | `1` | `0` – `1` | How much of the figure is drawn, from its start; below 1 the line is still arriving. | motion |
-| `thickness` | `1.8` | `0.5` – `12` | Stroke width in pixels at the render target, before softness widens the falloff. | shape, main |
-| `scale` | `1` | `0.1` – `2` | Size of the figure within the frame, before the shared zoom is applied. | shape |
+| `draw_progress` | `1` | `flat` `0` – `1`; `space` `0` – `1`; inert on `flat endless`, `space endless` | How much of a fixed L-system is drawn, from its first segment: 0 none, 1 all of it. | motion |
+| `thickness` | `1.8` | `0.5` – `12` | Stroke width: on a flat figure in the shared line units, on a space figure in pixels at the focal plane, wider nearer and narrower farther. | shape, main |
+| `scale` | `1` | `flat` `0.1` – `2`; `flat endless` `0.1` – `2`; inert on `space`, `space endless` | Scales a flat figure about its centre; a space figure is sized by the camera's distance instead. | shape |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
 | `glow` | `1` | `0` – `4` | Brightness of the halo around each stroke, on top of the stroke itself. | light, main |
 | `softness` | `0.25` | `0` – `1` | How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core. | light |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. | shape |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
-| `stroke_blend` | `0` | `0` – `1` | Moves the stroke from additive light toward opaque paint, so crossings stop brightening. | light |
-| `mirror_reflect` | `0` | `0` – `1` | Alternates the repeats into mirror images rather than plain rotations. | shape |
+| `stroke_blend` | `0` | `flat` `0` – `1`; `flat endless` `0` – `1`; inert on `space`, `space endless` | Moves a flat L-system's stroke from additive light toward opaque paint, so crossing branches stop brightening. | light |
+| `mirror_reflect` | `0` | `flat` `0` – `1`; inert on `space`, `flat endless`, `space endless` | Alternates a flat L-system's repeats into mirror images rather than plain rotations. | shape |
+| `yaw` | `0` | `space` `-3.1415927` – `3.1415927`; `space endless` `-3.1415927` – `3.1415927`; inert on `flat`, `flat endless` | Turns the camera around a space tree, in radians; bind it to a slow clock to orbit. | motion |
+| `pitch` | `0.25` | `space` `-1.55` – `1.55`; `space endless` `-1.55` – `1.55`; inert on `flat`, `flat endless` | Raises the camera above a space tree, in radians; negative looks up from below. | motion |
+| `distance` | `3.5` | `space` `1.5` – `8`; `space endless` `1.5` – `8`; inert on `flat`, `flat endless` | How far the camera sits from a space tree's centre; nearer makes the tree larger and exaggerates the perspective. | motion |
+| `fov` | `0.8` | `space` `0.2` – `2`; `space endless` `0.2` – `2`; inert on `flat`, `flat endless` | The camera's vertical field of view onto a space tree, in radians; zoom divides it. | motion |
+| `focus` | `0.5` | `space` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `flat endless` | Where the focal plane sits in a space tree's depth: 0 at its nearest point, 1 at its farthest. | light, main |
+| `aperture` | `0` | `space` `0` – `24`; `space endless` `0` – `24`; inert on `flat`, `flat endless` | The blur of a space tree's far side, in pixels; branches nearer than the focal plane blur more, up to the tier's cap. 0 keeps every branch sharp, and wider costs fill. | light, main |
+| `fog` | `0` | `space` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `flat endless` | Fades a space tree toward black with depth: at 1 its farthest point is black and its nearest keeps its light. 0 is off. | light |
+| `solid` | `0` | `space` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `flat endless` | 1 paints a space tree's near branches over its far ones, so it reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every segment by depth each frame. | light |
+| `grow` | `20` | `flat endless` `0` – `120`; `space endless` `0` – `120`; inert on `flat`, `space` | How fast an endless figure grows, in draw steps a second; bind it to onset to make it surge. | motion, main |
+| `tail` | `0.5` | `flat endless` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `space` | The oldest fraction of an endless figure's trail that fades out; 0 keeps every segment at full light until it is dropped. | light |
+| `follow` | `0.3` | `flat endless` `0.05` – `3`; `space endless` `0.05` – `3`; inert on `flat`, `space` | How slowly the view follows an endless figure's growing tip, in seconds: short keeps the tip near the centre, long lets it lead and glides after a branch's jump. | motion |
 
 ### System: `star_pattern`
 
@@ -4475,12 +4486,40 @@ expressions. Validated at load; a bad value is a surfaced error.
 | `axiom`     | string          | Starting string. Required, non-empty.                       |
 | `rules`     | table `k = "v"` | Each key a single character (the predecessor). Required.    |
 | `angle_deg` | number          | Turn angle for `+`/`-`. Default 25.                         |
-| `max_depth` | integer         | Iterations to precompute; clamped to `1..=7`. Default 4.    |
+| `max_depth` | integer         | Iterations to precompute; clamped to `1..=7`. Default 4. Inert under `growth = "endless"`. |
+| `turtle`    | `flat` / `space` | Which turtle walks the string. Default `flat`, the plane walk. `space` walks in depth, seen through the camera block. An unknown name is a load error naming both. |
+| `growth`    | `fixed` / `endless` | Default `fixed`: one cached depth, picked by `visible_depth`. `endless` grows a vine that never ends, at the rate `grow` sets. An unknown name is a load error naming both. |
+| `trail`     | integer         | Endless only: how many segments the vine keeps behind its tip. Default 2000. Held to the tier's cap (`seg3d_segments` in `space`, `max_segments` in `flat`), and the clamp is announced. A grammar whose whole stream is shorter than `trail` is a load error. |
+| `follow_window` | integer     | Endless only: how many of the newest segments the view follows the centre of. Default 32. Wider smooths the jump a `]` makes. |
 | `seed`      | integer or `"random"` | The salt for `hash()`/`noise()` — see [Seeded randomness](#seeded-randomness--hash-noise-and-generator-seed). **Not** an L-system key: the expansion is deterministic and ignores it, and any system's preset may declare one. Default 0. |
 
 Turtle vocabulary in the expanded string: `F`/`G` draw forward, `f` moves without
 drawing, `+`/`-` turn by `angle_deg`, `[`/`]` push/pop the branch state, any other
 character is an inert grammar variable.
+
+Under `turtle = "space"` the turtle carries a heading, a left and an up direction,
+and five more symbols turn it, each by `angle_deg`: `&`/`^` pitch down and up,
+`\`/`/` roll, and `|` turns it around. `+`/`-` still turn it left and right. Under
+`flat` those five stay inert variables, so a grammar that names them as variables
+walks what it always did. The space figure is drawn through the camera block
+(`yaw`, `pitch`, `distance`, `fov`, `focus`, `aperture`, `fog`, `solid`), and
+`thickness` is in pixels at the focal plane. A segment is a straight stroke with no
+join, so a sharp turn shows a facet at any width above a hairline.
+
+Under `growth = "endless"` nothing is cached. The turtle walks the grammar's
+derivation one symbol at a time at a fixed internal depth, `grow` draw steps a
+second, and keeps the newest `trail` segments; the oldest `tail` fraction of them
+fades out. The view follows the centre of the newest `follow_window` segments on a
+spring with time constant `follow`. In `space` the camera orbits that point; in
+`flat` the figure pans by it, on top of `pan_x`/`pan_y`. The walk is depth-first,
+so a `]` sends the tip back to its branch point: vines and short-branched coral
+suit `endless`, and a deep tree, whose `]` jumps a long way back, does not.
+
+What each mode makes inert is in the generated table under
+[System: `lsystem`](#system-lsystem): `rotation`, `scale`, `stroke_blend`,
+`mirror_order` and `mirror_reflect` are flat-only; the camera block is space-only;
+`visible_depth`, `draw_progress` and the mirror pair are inert under `endless`, and
+`grow`, `tail` and `follow` under `fixed`.
 
 ### `[generator]` — for `star_pattern`
 

@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0237 - The L-system turtle turns in space, and can grow without end](#0237---the-l-system-turtle-turns-in-space-and-can-grow-without-end)
   - [0248 - 3D strokes gain joins, depth cues and a solid mode](#0248---3d-strokes-gain-joins-depth-cues-and-a-solid-mode)
   - [0238 - The waterfall system](#0238---the-waterfall-system)
   - [0247 - The studio renders a neural clip](#0247---the-studio-renders-a-neural-clip)
@@ -287,6 +288,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0233 - The close reviews' small findings are repaired](done/0233-the-close-reviews-small-findings-are-repaired.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.153.0**. Closes 0263-0272 bar 0267. [Write-up](README-archive.md).
 - [0234 - A conductor session writes only where it works](done/0234-a-conductor-session-writes-only-where-it-works.md) - closed 2026-09-29. Review: **no blockers, no majors, two minors (fixed), two nits.** Version: none. ADR-0255 accepted, Outcome. Closes 0273. [Write-up](README-archive.md).
 - [0212 - The diffused render gains a timeline](done/0212-the-diffused-render-gains-a-timeline.md) - closed 2026-09-28. Review: **two rounds; one major (fixed), five minors (four fixed).** Version: **0.152.0**. ADR-0236 accepted. Closes 0126. [Write-up](README-archive.md).
 - [0211 - The diffused frame's resolution is measured before it is designed](done/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) - closed 2026-09-27. Review: **no blockers, no majors, three minors (two fixed).** Version: none. Closes 0125; filed 0262. [Write-up](README-archive.md).
@@ -492,6 +494,27 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0237 - The L-system turtle turns in space, and can grow without end](done/0237-the-l-system-turtle-turns-in-space.md)
+
+- closed 2026-10-06 by a conductor close on the lane `plan-0237-the-l-system-turtle-turns-in-space`.
+The phases landed in `aaf32332` (Phase 1), `6d5c4129` (2), `927564c3` (3), `263296bd` (4),
+`6222ae74` (5), `d50a77fb` (6) and `b8d2cd95` (7). **Phases 8 and 9 are owed** (`Blocks merge: no`,
+ADR-0249): the owner judging the space tree and the endless vine live, and applying the
+preset-author reference text the log carries. The round 1 review found **no blockers, no majors,
+five minors**. The close repaired the stale `lsystem.rs` and `grammar.rs` module docs in `363848de`
+and put the hand-off text under its own heading in `108ae312`. The endless `hue_spread` divisor and
+the eagerly built `seg3d` renderer are code and stay open. Version: **0.165.0** (minor: a feature).
+ADR-0258 was already accepted by Plan 0236. The close closes no backlog entry. Upstream CI read red
+(`coverage`) at the close. The full review is the plan's own `## Close review`.
+- **What landed.** `[generator] turtle = "space"`: a 3D turtle with pitch, roll and turn-around,
+  fitted by bounding sphere and drawn through a scene-owned `seg3d` renderer and the shared camera.
+  `[generator] growth = "endless"`: a lazy depth-first stream of the derivation into a fixed ring of
+  `trail` segments at an integrated `grow` rate, with a damped-spring follow point and exact re-basing
+  on an `f64` grid. Mode-dependent inert params are a family table the generated reference reads.
+- **Open.** On an endless vine `hue_spread = 1` reaches only a fraction of the palette. The three new
+  goldens' first WARP reading, and whether the eager `seg3d` renderer moves later WARP captures, is
+  the Windows golden job after the push.
 
 ### [0248 - 3D strokes gain joins, depth cues and a solid mode](done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md)
 

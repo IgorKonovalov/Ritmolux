@@ -1,0 +1,29 @@
+# An endless vine walked by the space turtle, for the illustrated guide's
+# picture of `growth = "endless"`. Teaching material, not a shipped preset.
+# A short-branched grammar, so a `]` sends the tip back only a little way. The
+# vine grows faster on each onset, keeps its newest `trail` segments and fades
+# the oldest half of them, and the camera orbits the point it follows.
+system = "lsystem"
+name = "Endless vine"
+
+[generator]
+axiom     = "F"
+rules     = { F = "F[&+F]F[^-F]/F" }
+angle_deg = 25
+turtle    = "space"
+growth    = "endless"
+trail     = 240
+
+[params]
+grow       = "60 + onset * 60"
+tail       = "0.5"
+follow     = "0.4"
+hue        = "0.55"
+hue_spread = "0.8"
+thickness  = "3"
+yaw        = "time * 0.1"
+pitch      = "0.3"
+distance   = "1.5"
+fov        = "0.9"
+focus      = "0.4"
+aperture   = "6"

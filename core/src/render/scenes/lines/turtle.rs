@@ -11,6 +11,16 @@
 //! - `[`      — push position + heading
 //! - `]`      — pop position + heading
 //! - anything else — no-op (grammar variables such as `X` that only expand)
+//!
+//! The space turtle ([`TurtleMode::Space`]) reads the same commands, with `+`
+//! and `-` yawing about its up vector, and five more, each turning by the
+//! configured angle:
+//! - `&`, `^` — pitch down, up (about the left vector)
+//! - `\`, `/` — roll left, right (about the heading)
+//! - `|`      — turn around (yaw by 180 degrees)
+//!
+//! `[` and `]` push and pop the whole frame. The flat turtle leaves those five
+//! symbols inert.
 
 // Under render/, so it carries the panic pragma even though it runs only at
 // preset load. Written panic-free (no unwrap/index/panic).
@@ -25,7 +35,460 @@
 use std::f32::consts::FRAC_PI_2;
 
 use super::PLACEHOLDER_WIDTH;
-use super::renderer::{SegmentInstance, miter_extension};
+use super::renderer::{Segment3dInstance, SegmentInstance, miter_extension};
+
+/// Which turtle walks the grammar: `[generator] turtle` (ADR-0258).
+///
+/// `Flat` is the plane walk above, and the default, so a preset that does not
+/// name a turtle walks exactly what it always did. `Space` carries a full
+/// orientation frame and reads the five space symbols; in `Flat` they stay
+/// inert grammar variables.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TurtleMode {
+    /// The plane turtle: `x`, `y` and one heading.
+    #[default]
+    Flat,
+    /// The space turtle: a position and a heading, left and up frame.
+    Space,
+}
+
+impl TurtleMode {
+    /// Every mode, in the order the loader names them.
+    pub const ALL: [TurtleMode; 2] = [TurtleMode::Flat, TurtleMode::Space];
+
+    /// The mode as a preset writes it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TurtleMode::Flat => "flat",
+            TurtleMode::Space => "space",
+        }
+    }
+
+    /// The mode a preset's spelling names, or `None` for an unknown one.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|mode| mode.as_str() == name)
+    }
+}
+
+/// The space turtle's state: a position and an orientation frame of three unit
+/// vectors, heading `H`, left `L` and up `U`, with `U = H x L`.
+///
+/// It starts at the origin heading world `+y` with left `-x` and up `+z`, so a
+/// grammar that only yaws draws in the `xy` plane facing a camera at yaw `0`,
+/// and turns the same way round as the flat turtle does.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Turtle3d {
+    /// Where the pen is.
+    pub pos: [f32; 3],
+    /// `H`: the direction a step moves.
+    pub heading: [f32; 3],
+    /// `L`: the direction a `+` turns toward.
+    pub left: [f32; 3],
+    /// `U`: `H x L`.
+    pub up: [f32; 3],
+}
+
+impl Default for Turtle3d {
+    fn default() -> Self {
+        Self {
+            pos: [0.0; 3],
+            heading: [0.0, 1.0, 0.0],
+            left: [-1.0, 0.0, 0.0],
+            up: [0.0, 0.0, 1.0],
+        }
+    }
+}
+
+impl Turtle3d {
+    /// Apply one turn symbol by `angle` radians, and say whether `ch` was one.
+    ///
+    /// - `+` and `-` yaw about `U`, turning `H` toward and away from `L`;
+    /// - `&` and `^` pitch about `L`, turning `H` away from and toward `U`;
+    /// - `\` and `/` roll about `H`, turning `L` toward and away from `U`;
+    /// - `|` yaws half a turn.
+    pub fn turn(&mut self, ch: char, angle: f32) -> bool {
+        match ch {
+            '+' => self.yaw(angle),
+            '-' => self.yaw(-angle),
+            '&' => self.pitch(angle),
+            '^' => self.pitch(-angle),
+            '\\' => self.roll(angle),
+            '/' => self.roll(-angle),
+            '|' => {
+                // Exact rather than `yaw(PI)`, whose `sin(PI)` is not zero.
+                self.heading = neg(self.heading);
+                self.left = neg(self.left);
+            }
+            _ => return false,
+        }
+        self.orthonormalize();
+        true
+    }
+
+    /// Pull the frame back onto an orthonormal one, by Gram-Schmidt in the
+    /// order `H`, `L`, then `U = H x L`.
+    ///
+    /// Each turn is a rotation in exact arithmetic, but in `f32` it leaves the
+    /// three vectors a few ulps off unit length and off square, and the error
+    /// compounds: an unbounded walk would shear and grow its steps. Restoring
+    /// after every turn holds the error to one turn's worth. `H` is kept as
+    /// turned, so a step goes exactly where the turn pointed it.
+    pub fn orthonormalize(&mut self) {
+        let h = normalize(self.heading);
+        let l = normalize(mix(self.left, 1.0, h, -dot(self.left, h)));
+        self.heading = h;
+        self.left = l;
+        self.up = cross(h, l);
+    }
+
+    /// One step along `H`.
+    pub fn step(&mut self) {
+        self.pos = add(self.pos, self.heading);
+    }
+
+    fn yaw(&mut self, angle: f32) {
+        let (s, c) = angle.sin_cos();
+        let (h, l) = (self.heading, self.left);
+        self.heading = mix(h, c, l, s);
+        self.left = mix(l, c, h, -s);
+    }
+
+    fn pitch(&mut self, angle: f32) {
+        let (s, c) = angle.sin_cos();
+        let (h, u) = (self.heading, self.up);
+        self.heading = mix(h, c, u, -s);
+        self.up = mix(u, c, h, s);
+    }
+
+    fn roll(&mut self, angle: f32) {
+        let (s, c) = angle.sin_cos();
+        let (l, u) = (self.left, self.up);
+        self.left = mix(l, c, u, s);
+        self.up = mix(u, c, l, -s);
+    }
+}
+
+/// `a * ca + b * cb`.
+fn mix(a: [f32; 3], ca: f32, b: [f32; 3], cb: f32) -> [f32; 3] {
+    [
+        a[0] * ca + b[0] * cb,
+        a[1] * ca + b[1] * cb,
+        a[2] * ca + b[2] * cb,
+    ]
+}
+
+fn add(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+}
+
+fn neg(a: [f32; 3]) -> [f32; 3] {
+    [-a[0], -a[1], -a[2]]
+}
+
+fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+/// `a` at unit length, or `a` unchanged where it has none to scale.
+fn normalize(a: [f32; 3]) -> [f32; 3] {
+    let len = dot(a, a).sqrt();
+    if len.is_finite() && len > f32::EPSILON {
+        [a[0] / len, a[1] / len, a[2] / len]
+    } else {
+        a
+    }
+}
+
+/// One draw step the [`Pen`] took: a segment in draw-step units, the
+/// generation it was drawn at, and whether it continues the segment drawn just
+/// before it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Drawn {
+    /// Where the step began, on [`on_grid`]'s grid.
+    pub a: [f64; 3],
+    /// Where it ended, one unit along the heading.
+    pub b: [f64; 3],
+    /// How many branch pushes were open: the colour axis (ADR-0059).
+    pub generation: u32,
+    /// Whether the pen was still on the paper from the previous draw step, so
+    /// the two meet on one joint. A move, a push or a pop breaks the run.
+    pub joined: bool,
+}
+
+/// The turtle an endless figure walks with, one symbol at a time.
+///
+/// The flat mode reads `+` and `-` alone, as the plane walk does, and leaves
+/// the space symbols inert; the space mode reads them all. Either way the
+/// state is a [`Turtle3d`], so a flat figure lies in the `xy` plane.
+///
+/// **The branch stack is reserved once**, at the bound the grammar's
+/// brackets allow (`grammar::bracket_bound`), and a push past it is refused
+/// rather than grown, so stepping never allocates. Only an unbalanced grammar
+/// reaches the bound; there a later `]` restores an older state.
+///
+/// **Its position is `f64` on [`on_grid`]'s grid**, not the `f32` the cached
+/// walk uses, and the turtle's own `pos` is unused: the frame turns in `f32`,
+/// the pen moves in `f64`. Every position an endless figure holds is a grid
+/// point, so a re-base by a whole number of steps ([`shift`](Self::shift)) is
+/// exact, and a step's length keeps its precision however far the pen walks.
+#[derive(Debug, Clone)]
+pub struct Pen {
+    turtle: Turtle3d,
+    pos: [f64; 3],
+    stack: Vec<(Turtle3d, [f64; 3])>,
+    mode: TurtleMode,
+    angle: f32,
+    run: bool,
+}
+
+/// The grid an endless figure's positions are held on: `2^-30` of a draw step.
+/// Far below anything drawn, and coarse enough that a position within `2^22`
+/// steps of the origin is a whole number of grid cells inside an `f64`'s 53
+/// bits — so adding or subtracting a whole number of steps is exact.
+const GRID: f64 = 1_073_741_824.0;
+
+/// `p` rounded to the nearest point of the `GRID`.
+pub fn on_grid(p: [f64; 3]) -> [f64; 3] {
+    [
+        (p[0] * GRID).round() / GRID,
+        (p[1] * GRID).round() / GRID,
+        (p[2] * GRID).round() / GRID,
+    ]
+}
+
+impl Pen {
+    /// A pen at the origin for `mode`, turning by `angle` radians, with room
+    /// for `stack_bound` open branches.
+    pub fn new(mode: TurtleMode, angle: f32, stack_bound: usize) -> Self {
+        Self {
+            turtle: Turtle3d::default(),
+            pos: [0.0; 3],
+            stack: Vec::with_capacity(stack_bound),
+            mode,
+            angle,
+            run: false,
+        }
+    }
+
+    /// One step along the heading, landing on the grid.
+    fn step(&mut self) {
+        let h = self.turtle.heading;
+        self.pos = on_grid([
+            self.pos[0] + f64::from(h[0]),
+            self.pos[1] + f64::from(h[1]),
+            self.pos[2] + f64::from(h[2]),
+        ]);
+    }
+
+    /// Read one symbol, and say what it drew, if anything.
+    pub fn read(&mut self, ch: char) -> Option<Drawn> {
+        match ch {
+            'F' | 'G' => {
+                let a = self.pos;
+                self.step();
+                let drawn = Drawn {
+                    a,
+                    b: self.pos,
+                    generation: self.stack.len() as u32,
+                    joined: self.run,
+                };
+                self.run = true;
+                return Some(drawn);
+            }
+            'f' => self.step(),
+            '[' => {
+                if self.stack.len() < self.stack.capacity() {
+                    self.stack.push((self.turtle, self.pos));
+                }
+            }
+            ']' => {
+                if let Some((turtle, pos)) = self.stack.pop() {
+                    self.turtle = turtle;
+                    self.pos = pos;
+                }
+            }
+            '+' | '-' => {
+                // A turn keeps the pen on the paper.
+                self.turtle.turn(ch, self.angle);
+                return None;
+            }
+            _ => {
+                if self.mode == TurtleMode::Space {
+                    self.turtle.turn(ch, self.angle);
+                }
+                return None;
+            }
+        }
+        self.run = false;
+        None
+    }
+
+    /// Close every open branch where the turtle stands, and lift the pen: a
+    /// restarted stream opens its brackets from nothing.
+    pub fn clear_branches(&mut self) {
+        self.stack.clear();
+        self.run = false;
+    }
+
+    /// Where the pen stands, in draw steps.
+    pub fn position(&self) -> [f64; 3] {
+        self.pos
+    }
+
+    /// The branch stack's reserved room.
+    pub fn stack_capacity(&self) -> usize {
+        self.stack.capacity()
+    }
+
+    /// Move the origin to `origin`, a whole number of steps: the pen and every
+    /// saved branch point move by `-origin`, exactly, for a grid point within
+    /// the grid's reach.
+    pub fn shift(&mut self, origin: [f64; 3]) {
+        let back = |p: [f64; 3]| [p[0] - origin[0], p[1] - origin[1], p[2] - origin[2]];
+        self.pos = back(self.pos);
+        for (_, pos) in &mut self.stack {
+            *pos = back(*pos);
+        }
+    }
+}
+
+/// [`walk_with_depths`] for the space turtle: `s` walked into 3D segments in
+/// `out`, with each segment's generation depth in `depths`, index-aligned the
+/// same way and under the same cap. Both are cleared first; the returned
+/// `usize` is how many draw steps the cap dropped.
+///
+/// A segment that continues the pen's run carries the run's neighbouring
+/// points in [`prev`](Segment3dInstance::prev) and
+/// [`next`](Segment3dInstance::next), so the two meet on one mitred corner; a
+/// free end carries its own endpoint there, which is how the `seg3d` pipeline
+/// reads "free". The run breaks where the flat walk's does: at `f`, `[`, `]`
+/// and a segment lost to the cap. Colour, width and alpha are placeholders
+/// the scene fills per frame.
+pub fn walk_3d_with_depths(
+    s: &str,
+    angle: f32,
+    max_segments: usize,
+    out: &mut Vec<Segment3dInstance>,
+    depths: &mut Vec<u32>,
+) -> usize {
+    out.clear();
+    depths.clear();
+
+    let mut turtle = Turtle3d::default();
+    let mut stack: Vec<Turtle3d> = Vec::new();
+    let mut dropped = 0usize;
+    let mut run: Option<usize> = None;
+
+    for ch in s.chars() {
+        match ch {
+            'F' | 'G' => {
+                let a = turtle.pos;
+                turtle.step();
+                let b = turtle.pos;
+                if out.len() < max_segments {
+                    let mut prev = a;
+                    if let Some(before) = run.and_then(|i| out.get_mut(i)) {
+                        before.next = b;
+                        prev = before.a;
+                    }
+                    run = Some(out.len());
+                    depths.push(stack.len() as u32);
+                    out.push(Segment3dInstance {
+                        a,
+                        b,
+                        color: [1.0, 1.0, 1.0],
+                        width: 1.0,
+                        alpha: 1.0,
+                        prev,
+                        next: b,
+                        skirt: 0.0,
+                    });
+                } else {
+                    dropped += 1;
+                    run = None;
+                }
+            }
+            'f' => {
+                turtle.step();
+                run = None;
+            }
+            '[' => {
+                stack.push(turtle);
+                run = None;
+            }
+            ']' => {
+                if let Some(saved) = stack.pop() {
+                    turtle = saved;
+                }
+                run = None;
+            }
+            // A turn keeps the pen on the paper, so it does not break the run.
+            _ => {
+                turtle.turn(ch, angle);
+            }
+        }
+    }
+    dropped
+}
+
+/// Centre `segs` on their bounding box's centre and scale them uniformly so
+/// every endpoint lies within a sphere of radius `radius` about the origin,
+/// and return the sphere's radius after the fit — `radius`, or `0` for an
+/// empty or degenerate set, which is left untouched.
+///
+/// A sphere rather than a box because the figure turns under a camera: a
+/// sphere's extent is the same from every side, so the fit does not depend on
+/// the view. The run neighbours in `prev` and `next` move with the endpoints.
+pub fn sphere_fit(segs: &mut [Segment3dInstance], radius: f32) -> f32 {
+    let mut min = [f32::INFINITY; 3];
+    let mut max = [f32::NEG_INFINITY; 3];
+    for seg in segs.iter() {
+        for p in [seg.a, seg.b] {
+            for ((lo, hi), v) in min.iter_mut().zip(max.iter_mut()).zip(p) {
+                *lo = lo.min(v);
+                *hi = hi.max(v);
+            }
+        }
+    }
+    let centre = [
+        0.5 * (min[0] + max[0]),
+        0.5 * (min[1] + max[1]),
+        0.5 * (min[2] + max[2]),
+    ];
+    let mut reach = 0.0f32;
+    for seg in segs.iter() {
+        for p in [seg.a, seg.b] {
+            let d = [p[0] - centre[0], p[1] - centre[1], p[2] - centre[2]];
+            reach = reach.max((d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt());
+        }
+    }
+    if !reach.is_finite() || reach <= f32::EPSILON {
+        return 0.0;
+    }
+    let scale = radius / reach;
+    let fit = |p: [f32; 3]| {
+        [
+            (p[0] - centre[0]) * scale,
+            (p[1] - centre[1]) * scale,
+            (p[2] - centre[2]) * scale,
+        ]
+    };
+    for seg in segs.iter_mut() {
+        seg.a = fit(seg.a);
+        seg.b = fit(seg.b);
+        seg.prev = fit(seg.prev);
+        seg.next = fit(seg.next);
+    }
+    radius
+}
 
 /// Walk `s` into `out` (cleared first) as base geometry — positions only; the
 /// scene fills colour/width per frame. `angle` is in radians. Segments beyond
@@ -346,6 +809,162 @@ mod tests {
         let dropped = walk("FFFFFFFFFF", 0.0, 3, &mut out);
         assert_eq!(out.len(), 3, "only the cap is kept");
         assert_eq!(dropped, 7, "the overflow is counted, never silent");
+    }
+
+    /// Plan 0237 Phase 1: `&` is a pitch in space and an inert variable on
+    /// the plane. Four pitched steps at a right angle close a square standing
+    /// in the vertical `yz` plane; the same string walked flat is four steps
+    /// up one line.
+    #[test]
+    fn a_pitched_square_stands_up_in_space_and_lies_straight_on_the_plane() {
+        let mut space = Vec::new();
+        let mut depths = Vec::new();
+        walk_3d_with_depths("F&F&F&F", FRAC_PI_2, 100, &mut space, &mut depths);
+        assert_eq!(space.len(), 4, "four draw steps");
+        let close = |p: [f32; 3], q: [f32; 3]| (0..3).all(|k| (p[k] - q[k]).abs() < 1e-6);
+        let corners = [
+            [0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 1.0, -1.0],
+            [0.0, 0.0, -1.0],
+        ];
+        for (k, seg) in space.iter().enumerate() {
+            assert!(
+                close(seg.a, corners[k]) && close(seg.b, corners[(k + 1) % 4]),
+                "side {k} runs {:?} -> {:?}, not along the square",
+                seg.a,
+                seg.b
+            );
+            assert!(
+                seg.a[0].abs() < 1e-6 && seg.b[0].abs() < 1e-6,
+                "side {k} leaves the vertical yz plane"
+            );
+        }
+        assert!(
+            close(space[3].b, space[0].a),
+            "the fourth side ends where the first began"
+        );
+
+        let mut flat = Vec::new();
+        walk("F&F&F&F", FRAC_PI_2, 100, &mut flat);
+        assert_eq!(flat.len(), 4, "four draw steps");
+        for (k, seg) in flat.iter().enumerate() {
+            let y = k as f32;
+            assert!(
+                seg.a[0].abs() < 1e-6
+                    && seg.b[0].abs() < 1e-6
+                    && (seg.a[1] - y).abs() < 1e-5
+                    && (seg.b[1] - (y + 1.0)).abs() < 1e-5,
+                "flat step {k} runs {:?} -> {:?}, off the straight line up",
+                seg.a,
+                seg.b
+            );
+        }
+    }
+
+    /// Plan 0237 Phase 2: the frame stays orthonormal however long the walk
+    /// turns. 100,000 turns, each a seeded draw of symbol and angle, and the
+    /// three vectors are unit length and mutually square to within `1e-4`.
+    #[test]
+    fn the_frame_stays_orthonormal_over_a_hundred_thousand_turns() {
+        const TURNS: [char; 7] = ['+', '-', '&', '^', '\\', '/', '|'];
+        let mut turtle = Turtle3d::default();
+        // A 64-bit LCG (Knuth's MMIX constants): seeded, so the run repeats.
+        let mut state: u64 = 0x0237;
+        let mut next = || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 33) as u32
+        };
+        for _ in 0..100_000 {
+            let symbol = TURNS[next() as usize % TURNS.len()];
+            let angle = (next() as f32 / (1u64 << 31) as f32) * std::f32::consts::PI;
+            assert!(turtle.turn(symbol, angle));
+        }
+        let (h, l, u) = (turtle.heading, turtle.left, turtle.up);
+        for (name, v) in [("H", h), ("L", l), ("U", u)] {
+            let len = dot(v, v).sqrt();
+            assert!((len - 1.0).abs() <= 1e-4, "|{name}| drifted to {len}");
+        }
+        for (name, a, b) in [("H.L", h, l), ("H.U", h, u), ("L.U", l, u)] {
+            let d = dot(a, b);
+            assert!(d.abs() <= 1e-4, "{name} drifted to {d}");
+        }
+        let hand = dot(cross(h, l), u);
+        assert!((hand - 1.0).abs() <= 1e-4, "the frame flipped hand: {hand}");
+    }
+
+    /// The space walk is the flat walk where it only yaws: a grammar of `+`
+    /// and `-` draws the same figure in the `xy` plane, turning the same way.
+    #[test]
+    fn a_yaw_only_grammar_walks_the_flat_figure_in_the_xy_plane() {
+        let s = "F+F-F[+F]F";
+        let mut flat = Vec::new();
+        walk(s, 0.4, 100, &mut flat);
+        let mut space = Vec::new();
+        let mut depths = Vec::new();
+        walk_3d_with_depths(s, 0.4, 100, &mut space, &mut depths);
+        assert_eq!(flat.len(), space.len());
+        for (f, p) in flat.iter().zip(&space) {
+            for (a, b) in [(f.a, p.a), (f.b, p.b)] {
+                assert!(
+                    (a[0] - b[0]).abs() < 1e-5 && (a[1] - b[1]).abs() < 1e-5 && b[2].abs() < 1e-6,
+                    "flat {a:?} against space {b:?}"
+                );
+            }
+        }
+    }
+
+    /// The space walk's run carries the flat walk's breaks: a joined end names
+    /// its neighbour's far point, a free end names itself.
+    #[test]
+    fn the_space_walk_joins_within_a_run_and_breaks_at_a_branch() {
+        let mut out = Vec::new();
+        let mut depths = Vec::new();
+        walk_3d_with_depths("FF[&F]F", FRAC_PI_2, 100, &mut out, &mut depths);
+        assert_eq!(out.len(), 4);
+        assert_eq!(depths, vec![0, 0, 1, 0]);
+        let free_a = |s: &Segment3dInstance| s.prev == s.a;
+        let free_b = |s: &Segment3dInstance| s.next == s.b;
+        assert!(free_a(&out[0]) && !free_b(&out[0]) && out[0].next == out[1].b);
+        assert!(!free_a(&out[1]) && out[1].prev == out[0].a && free_b(&out[1]));
+        assert!(
+            free_a(&out[2]) && free_b(&out[2]),
+            "the branch stands alone"
+        );
+        assert!(free_a(&out[3]) && free_b(&out[3]), "a pop breaks the run");
+
+        // The cap drops and counts, and keeps the two channels aligned.
+        let dropped = walk_3d_with_depths("F[&FFF]F", FRAC_PI_2, 2, &mut out, &mut depths);
+        assert_eq!((out.len(), depths.len(), dropped), (2, 2, 3));
+    }
+
+    /// The sphere fit centres the figure and holds every endpoint inside the
+    /// asked radius, with at least one on it; neighbours move with endpoints.
+    #[test]
+    fn the_sphere_fit_holds_the_figure_inside_its_radius() {
+        let mut out = Vec::new();
+        let mut depths = Vec::new();
+        walk_3d_with_depths("FF&F/F^F", 0.7, 100, &mut out, &mut depths);
+        let radius = sphere_fit(&mut out, 1.0);
+        assert_eq!(radius, 1.0);
+        let len = |p: [f32; 3]| (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
+        let reach = out
+            .iter()
+            .flat_map(|s| [len(s.a), len(s.b)])
+            .fold(0.0f32, f32::max);
+        assert!(
+            (reach - 1.0).abs() < 1e-5,
+            "the farthest end reaches {reach}"
+        );
+        for pair in out.windows(2) {
+            if pair[0].next != pair[0].b {
+                assert_eq!(pair[0].next, pair[1].b, "a joined neighbour moved apart");
+                assert_eq!(pair[1].prev, pair[0].a);
+            }
+        }
+        assert_eq!(sphere_fit(&mut [], 1.0), 0.0, "nothing to fit");
     }
 
     #[test]

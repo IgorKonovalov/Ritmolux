@@ -1,0 +1,38 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# An endless vine walked by the space turtle, captured after the harness's
+# fixed number of frames under its one analysis frame, through a fixed camera
+# orbiting the follow point with an open aperture.
+#
+#  - A branching vine that pitches with `&` and `^` and rolls with `/`, so
+#    the ring stands in depth.
+#  - `grow` bound well above the default, so the capture reaches past the
+#    ring's `trail` and the oldest segments are fading by `tail`.
+#  - Every follow, colour and camera param bound, so neither a change of
+#    default nor the scene clock can move this baseline.
+system = "lsystem"
+name   = "fixture_lsystem_endless_space"
+
+[generator]
+axiom     = "F"
+rules     = { F = "F[&+F]F[^-F]/F" }
+angle_deg = 25
+turtle    = "space"
+growth    = "endless"
+trail     = 48
+follow_window = 8
+
+[params]
+grow       = "72"
+tail       = "0.5"
+follow     = "0.05"
+hue        = "0.55"
+hue_spread = "0.8"
+thickness  = "2.5"
+brightness = "1.0"
+yaw        = "0.5"
+pitch      = "0.3"
+distance   = "0.9"
+fov        = "0.9"
+focus      = "0.3"
+aperture   = "4"
