@@ -58,7 +58,9 @@ hue = "0"
 hue_spread = "0.45"
 hue_center = "0.82"
 saturation = "0.9"
-zoom = "0.78"
+# At least 0.8: the torus reaches a quarter past the frame at every depth, so
+# below 1/1.25 its seam shows as empty borders at every depth at once.
+zoom = "0.85"
 
 # The smear that makes it a murmuration instead of a dot field.
 trails = "0.86"
