@@ -156,7 +156,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — `RLX_BLESS` takes a list of names | dev | done | b88d3fc2 |
 | 2 — `bless.yml` and its report | dev | done | 74fc0b4f |
-| 3 — First bless: 0248's four | human | not started | |
+| 3 — First bless: 0248's four | human | owed | |
 
 ### Notes
 
