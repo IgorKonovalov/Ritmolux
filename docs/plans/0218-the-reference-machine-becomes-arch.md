@@ -556,6 +556,12 @@ flowchart TB
   gained a *Linux leads and Windows is a peer* platform note, and its status line and capture note
   now name Linux capture as exercised.
 
+- **Pre-review, 2026-10-06 (owner): the swarm pair re-blessed on lavapipe.** Main brought Plan
+  0239's camera swarm into the lane (8bd43bb7), and `swarm` / `swarm_shaped` were still this plan's
+  pre-0239 recapture, so `scenes_match_golden_baselines` failed on those two alone. Re-blessed with
+  `RLX_BLESS=swarm,swarm_shaped` on llvmpipe; old and new opened side by side show the same field
+  re-projected through the camera. This settles Plan 0239 Phase 7.
+
 ### Close triggers
 
 - **`presets/` touched:** no
