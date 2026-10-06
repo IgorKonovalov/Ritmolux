@@ -95,8 +95,8 @@ copy here does:
 `<family>_<look>.toml`, where the family is one `_`-separated segment of the system name
 (`curve_*` is `parametric_curve`, `collage_*` is `shape_collage`, `analytic_*` is
 `analytic_field` — `SystemKind::family` is the map), so the *shipped* roster is in the filenames.
-It under-reports the systems, though: a system can exist with no shipped preset yet (`waterfall`
-has only `docs/examples/waterfall/` today), so for "which systems exist" `SystemKind::ALL` and
+It under-reports the systems, though: a system can exist with no shipped preset yet (only a teaching
+file under `docs/examples/`), so for "which systems exist" `SystemKind::ALL` and
 `docs/preset-guide.md` are the answer, not `ls`.
 
 **Every** preset, whatever its system, may additionally bind the engine-wide composite: the

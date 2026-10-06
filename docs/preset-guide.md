@@ -419,7 +419,7 @@ by thin straight lines to its nearest neighbours, the network densest at the cen
 single strands toward the edges](images/gallery/plexus.png)
 
 *`layout = "cloud"` — the teaching preset
-[`docs/examples/plexus/cloud.toml`](examples/plexus/cloud.toml); the system ships no preset yet*
+[`docs/examples/plexus/cloud.toml`](examples/plexus/cloud.toml); the shipped set has `plexus_*.toml`*
 
 A **network in three dimensions**: a few hundred points, each joined by a line to every other point
 closer than `link_distance`, seen through a camera that orbits the network's centre. A line fades in
@@ -456,7 +456,7 @@ peaks in the middle and settling into low magenta ridges on the right, the rows 
 horizon on black](images/gallery/waterfall.png)
 
 *The teaching preset [`docs/examples/waterfall/landscape.toml`](examples/waterfall/landscape.toml);
-the system ships no preset yet*
+the shipped set has `waterfall_*.toml`*
 
 The **spectrum's recent past as terrain**. Every fraction of a second the current band levels become
 a new row at the front, and the rows before it step back into the distance, so a sustained note

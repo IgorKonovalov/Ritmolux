@@ -649,9 +649,10 @@ same 0-nearest scale, and does nothing on the flat maps.
 (`waterfall_*.toml`). The band array `spectrum` draws, kept as history: every `row_period` seconds
 the current levels become a new row at the front, and older rows recede until the oldest leaves.
 Seen through the shared camera (ADR-0257), so `yaw`, `pitch`, `distance`, `fov`, `focus` and
-`aperture` behave as on `plexus`. **No preset ships yet**: the ranges come from
-`docs/examples/waterfall/landscape.toml`, the golden fixture and the plan's cost probes, so treat
-them as a starting point and sweep. The `[waterfall]` table (`elements`, `rows`, `row_period`,
+`aperture` behave as on `plexus`. `waterfall_ridgeline` is the shipped reference: solid white
+rows seen front-on and low (`pitch` about `0.2`, `yaw` `0`) read as terrain, and `curve` a little
+above 1 keeps the quiet bands flat so the peaks stand up. The other ranges come from
+`docs/examples/waterfall/landscape.toml` and the golden fixture, so sweep from there. The `[waterfall]` table (`elements`, `rows`, `row_period`,
 `smoothing`) is in `docs/presets.md`. Also declared: `curve` (an exponent on each band's level —
 below 1 lifts quiet detail), `glow`, `hue_spread` (lowest band to highest), and the camera's `fog`
 and `solid`; `docs/examples/waterfall/landscape_solid.toml` shows the latter.
