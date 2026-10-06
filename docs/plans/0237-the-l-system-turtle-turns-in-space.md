@@ -331,7 +331,7 @@ and `follow_window`.
 | 4 — Endless: the lazy stream and the ring | dev | done | 263296bd |
 | 5 — The camera follows the growth | dev | done | 6222ae74 |
 | 6 — Endless cost and the endless golden | dev | done | d50a77fb |
-| 7 — Documentation and the references | dev | done | committed with this row |
+| 7 — Documentation and the references | dev | done | b8d2cd95 |
 | 8 — The look, judged | human | not started | |
 | 9 — The preset-author reference | human | not started | |
 
@@ -478,13 +478,19 @@ and `follow_window`.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** yes. `presets/README.md` (the generated params block and the
+  `[generator]` section), `presets/preset.schema.json` and every `presets/schema/*.schema.json`,
+  all regenerated or documentation. No preset `.toml` added, changed or removed.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature. The `turtle` and `growth` `[generator]` keys on `lsystem`, with
+  `trail`, `follow_window` and the `grow`, `tail` and `follow` params.
+- **Operator docs touched:** `presets/README.md`, `docs/preset-guide.md` (with
+  `docs/examples/lsystem/` and `docs/images/lsystem/`), `docs/specs/player-schema.json`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0. 58 stated reductions
+  hold across 29 live entries, 4 unprobeable.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** Phase 8 (the look, judged) and Phase 9 (the preset-author
+  reference), both `Blocks merge: no`.
 
 ## Followups (after this lands)
 
