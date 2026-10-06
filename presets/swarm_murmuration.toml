@@ -58,8 +58,10 @@ hue = "0"
 hue_spread = "0.45"
 hue_center = "0.82"
 saturation = "0.9"
-# At least 0.8: the torus reaches a quarter past the frame at every depth, so
-# below 1/1.25 its seam shows as empty borders at every depth at once.
+# At least about 0.82: the torus reaches a quarter past the frame at every
+# depth, and `zoom` divides `fov` through a tangent, so the seam reaches the
+# frame edge where 1.25 * tan(0.4) = tan(0.4 / zoom). Below that it shows as
+# empty borders at every depth at once.
 zoom = "0.85"
 
 # The smear that makes it a murmuration instead of a dot field.

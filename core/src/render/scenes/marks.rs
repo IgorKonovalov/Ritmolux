@@ -218,10 +218,11 @@ pub(crate) const DEFAULT_POINTS: f32 = default_of(PARAMS, "points");
 /// One camera-facing quad, expanded in the vertex shader from a centre, a size
 /// and a colour (ADR-0007).
 ///
-/// The **fourth attribute is the scene's own**: the swarm resolves its
-/// particle's depth parallax into it, the emitter its sprite's orientation in
-/// radians. Both shaders read it at `@location(3)`; nothing shared interprets
-/// it, which is why it has no name of its own here.
+/// The **fourth attribute is the scene's own**: the emitter carries its
+/// sprite's orientation in radians in it, read at `@location(3)`; nothing
+/// shared interprets it, which is why it has no name of its own here. The swarm
+/// projects through the shared camera and builds its own instance layout, so it
+/// does not use this type.
 ///
 /// **`attr` stays last.** `vertex_attr_array!` assigns shader locations by
 /// declaration order and offsets by field order, so a field inserted anywhere
@@ -264,22 +265,21 @@ pub(crate) struct QuadUniform {
 }
 
 /// The instance buffer, the [`QuadUniform`], the instanced-quad pipeline and the
-/// draw — everything `swarm` and `emitter` need to put marks on screen once
-/// their simulations have decided where the marks are.
+/// draw — everything `emitter` needs to put marks on screen once its simulation
+/// has decided where the marks are. The emitter is its one user: the swarm
+/// builds its own two-entry pipeline (the quad uniform and the camera).
 ///
 /// # It is handed a layout, never asked to build one
 ///
-/// The two scenes' bind-group layouts are **deliberately different shapes**, and
-/// that difference is the third recorded instance of ADR-0058's hazard: written
-/// byte-identical, the emitter's pipeline made the *swarm* read the emitter's
-/// uniform on DX12 WARP. `emitter.rs` carries the measurement and says not to
-/// tidy it back. A constructor that built the layout from a visibility mask and a
-/// size argument would hide that difference behind two parameters, and would also
-/// take both layouts out of the enumeration
-/// `no_two_layouts_share_a_shape_without_recorded_evidence` builds by scanning
-/// `core/src` for `create_bind_group_layout` with literal entries — removing the
-/// pair the guard exists for. So each scene declares its own layout and passes
-/// it here.
+/// Bind-group layouts that come out byte-identical are ADR-0058's hazard: when
+/// the emitter's and the swarm's layouts were written alike, the emitter's
+/// pipeline made the *swarm* read the emitter's uniform on DX12 WARP.
+/// `emitter.rs` carries the measurement and says not to tidy its layout back. A
+/// constructor that built the layout from a visibility mask and a size argument
+/// would hide a layout's shape behind two parameters, and would also take it out
+/// of the enumeration `no_two_layouts_share_a_shape_without_recorded_evidence`
+/// builds by scanning `core/src` for `create_bind_group_layout` with literal
+/// entries. So the caller declares its own layout and passes it here.
 pub(crate) struct InstancedQuads {
     pipeline: wgpu::RenderPipeline,
     instances: wgpu::Buffer,

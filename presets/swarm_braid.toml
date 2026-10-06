@@ -119,7 +119,7 @@ saturation = "1.0"
 
 # THE WHOLE TORUS, NOT A SUB-WINDOW. The swarm lives in a frustum-shaped torus
 # that follows the render target and extends a quarter past the frame at every
-# depth, so the wrap seam is off-screen; a zoom below 0.8 brings it into view
+# depth, so the wrap seam is off-screen; a zoom below about 0.82 brings it into view
 # at every depth at once. 1.0 also keeps the density waves reading as waves
 # rather than as clumps and voids.
 zoom  = "1.0"

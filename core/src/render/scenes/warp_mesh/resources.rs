@@ -561,10 +561,11 @@ fn build_draw_layer(
         "warp-mesh-shape-uniform",
         std::mem::size_of::<ShapeUniform>(),
     );
-    // A vertex-visible sized uniform, which is a shape nothing else in
-    // `core/src` holds (ADR-0058): `swarm-bind-layout` is the same kind and
-    // visibility with **no** declared size, and that difference is exactly
-    // what Plan 0053 Phase 3 measured as a real separation. Do not tidy it.
+    // A single vertex-visible sized uniform, which is a shape nothing else in
+    // `core/src` holds (ADR-0058): `swarm-bind-layout` opens with the same kind
+    // and visibility with **no** declared size and adds a second, camera entry,
+    // and a declared size alone is what Plan 0053 Phase 3 measured as a real
+    // separation. Do not tidy it.
     let shape_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("warp-mesh-shape-layout"),
         entries: &[wgpu::BindGroupLayoutEntry {
