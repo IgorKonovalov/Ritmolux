@@ -227,8 +227,8 @@ struct Particle {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Walking skeleton: the swarm in a camera | dev | done | b70e1488 |
-| 2 — Depth of field on the swarm's sprites | dev | done | committed with this row |
-| 3 — Caps, cost and the goldens | dev | not started | |
+| 2 — Depth of field on the swarm's sprites | dev | done | b598e6c5 |
+| 3 — Caps, cost and the goldens | dev | done | committed with this row |
 | 4 — The shipped presets keep rendering | dev | not started | |
 | 5 — Documentation and the references | dev | not started | |
 | 6 — The three presets, judged and re-tuned | human | not started | |
@@ -261,6 +261,25 @@ struct Particle {
   captures of the `swarm`, `swarm_shaped` and `swarm_lit_backdrop` fixtures at 160x100 on the
   session's software adapter at b70e1488 and after Phase 2 — identical. The committed test compares
   `aperture = "0"` (with `focus` moved) against unbound, byte for byte.
+- Phase 3 probe (`mark_cost::a_blurred_swarm_is_priced_against_the_sharp_one`, release, 1920x1080,
+  `trails = 0.8`, `focus = 0`, `aperture = 40`, best of 3 over 240 frames of slope, two runs):
+  - `Floor`, 10,000 sprites, AMD Radeon RADV RENOIR (integrated), Mesa 26.2.2: sharp 3.681 / 3.741 ms,
+    blurred 5.996 / 5.868 ms, ratio 1.63 / 1.57.
+  - `Rich`, 30,000 sprites, NVIDIA GeForce RTX 3080 Laptop GPU (discrete), driver 610.57.04: sharp
+    3.308 ms, blurred 4.186 ms, ratio 1.27. A `Rich` run on the integrated GPU read 6.998 / 18.364 ms,
+    ratio 2.62.
+  - The ladder stopped before rung 1: the shared cap met the budget on both tiers. `swarm_max_coc_px`
+    exists in `TierConfig` at the shared cap's values, `Floor` 12 and `Rich` 24, and the scene takes
+    the lower of it and `max_coc_px`. Rung 2 was not built; rung 3 was not taken.
+- Phase 3, budget terms as read: NFR section 1's 16.67 ms, and its recorded ~2.7x headroom, which is
+  16.67 / 2.7 = 6.17 ms.
+- Phase 3 edits `core/src/render/scenes/mod.rs` again (the constructor argument becomes
+  `swarm_max_coc_px.min(max_coc_px)`).
+- Phase 3 goldens, on llvmpipe (the session's adapter; the baselines are DX12 WARP, so the suite
+  reports and skips): `swarm` moved, mean 0.1480 (tol 0.02), max outlier 171 (tol 48);
+  `swarm_shaped` moved, mean 0.0208, max outlier 125. `backdrop_ramp` (mean 0.0014, outlier 20) and
+  `backdrop_band` (0.0013, 21) stayed inside tolerance. The `post::tests`, `backdrop` and swarm
+  lit-backdrop tests pass.
 - Phase 1 left stale: `warp_mesh/resources.rs`'s comment describing `swarm-bind-layout` as a single
   unsized vertex uniform (outside the phase's files).
 

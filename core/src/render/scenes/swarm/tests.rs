@@ -16,8 +16,9 @@ use crate::render::scenes::SeededRng;
 /// every golden capture draws (Plan 0044).
 const FLOOR_PARTICLES: usize = crate::render::TierConfig::FLOOR.swarm_particles;
 
-/// The floor tier's blur cap, which every scene these tests build is held to.
-const MAX_COC: f32 = crate::render::TierConfig::FLOOR.max_coc_px as f32;
+/// The floor tier's swarm blur cap, which every scene these tests build is
+/// held to.
+const MAX_COC: f32 = crate::render::TierConfig::FLOOR.swarm_max_coc_px as f32;
 
 /// Target aspects worth checking a domain against: 16:9, 16:10, 4:3, an
 /// ultrawide, and a portrait.
@@ -1309,6 +1310,59 @@ fn a_zero_aperture_renders_the_sharp_swarm_byte_for_byte() {
         differing * 10 > unbound.rgba.len() / 4,
         "a bound aperture must reach the sprites: {differing} pixels differ"
     );
+}
+
+/// **A sprite's circle of confusion never exceeds the tier's
+/// `swarm_max_coc_px`, at any aperture** (Plan 0239 Phase 3), on either tier,
+/// at every depth across the slab and every focus; and an aperture past the cap
+/// is announced as a blur clamp. The swarm's cap never sits above the shared
+/// one.
+#[test]
+fn the_circle_of_confusion_never_exceeds_the_swarm_cap() {
+    use crate::render::TierConfig;
+    use crate::render::camera::Lens;
+
+    let Some((_renderer, mut scene)) = scene(1) else {
+        return;
+    };
+    for tier in [TierConfig::FLOOR, TierConfig::RICH] {
+        assert!(
+            tier.swarm_max_coc_px <= tier.max_coc_px,
+            "{:?}: the swarm's cap must not exceed the shared one",
+            tier.tier
+        );
+        let cap = tier.swarm_max_coc_px as f32;
+        scene.max_coc = cap;
+        let mut worst = 0.0f32;
+        for aperture in [0.0, 1.0, cap, cap + 0.5, 40.0, 1e6, f32::INFINITY, f32::NAN] {
+            for focus in [0.0, 0.5, 1.0] {
+                scene.set_param("aperture", aperture);
+                scene.set_param("focus", focus);
+                let frame = scene.camera_frame(16.0 / 9.0, scene.max_coc);
+                let [a, focal, max_coc, _] = frame.uniform.lens;
+                let lens = Lens::new(a, focal, max_coc);
+                for step in 0..=48 {
+                    let depth = Z_NEAR + Z_SPAN * step as f32 / 48.0;
+                    let coc = lens.coc(depth);
+                    worst = worst.max(coc);
+                    assert!(
+                        coc <= cap,
+                        "{:?}: coc {coc} at depth {depth}, aperture {aperture}, focus {focus} \
+                         exceeds the cap {cap}",
+                        tier.tier
+                    );
+                }
+                assert_eq!(
+                    frame.blur.is_some(),
+                    aperture.is_finite() && aperture > cap,
+                    "{:?}: an aperture of {aperture} against the cap {cap} must be announced \
+                     exactly when it is past it",
+                    tier.tier
+                );
+            }
+        }
+        assert_eq!(worst, cap, "{:?}: the sweep must reach the cap", tier.tier);
+    }
 }
 
 /// **A sprite far from the focal depth covers more pixels and has a lower

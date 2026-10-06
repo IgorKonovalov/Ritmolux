@@ -729,6 +729,19 @@ pub struct TierConfig {
     /// were measured the same way (Plan 0238 Phase 2) and stay under twice their
     /// sharp cost. `Rich`'s 20 000 is not measured.
     pub seg3d_segments: u32,
+
+    /// The largest circle of confusion a swarm sprite is blurred by, as a
+    /// radius in pixels (ADR-0259): the swarm's own ceiling beside
+    /// [`max_coc_px`](Self::max_coc_px), and never above it.
+    ///
+    /// Blur grows a sprite's **area**, and the swarm blurs its whole tier of
+    /// sprites, so it is the one 3D population whose cap may need to sit below
+    /// the shared one. Both values below are the shared cap: measured with the
+    /// whole population defocused past the cap under `trails` at 1080p, each
+    /// tier's blurred frame stayed under twice its sharp one and inside the
+    /// frame budget (Plan 0239 Phase 3). A clamp to this cap is announced as
+    /// the shared one is ([`OverflowContext::Blur`](super::scenes::OverflowContext::Blur)).
+    pub swarm_max_coc_px: u32,
 }
 
 impl TierConfig {
@@ -754,6 +767,7 @@ impl TierConfig {
         plexus_edges: 6_000,
         max_coc_px: 12,
         seg3d_segments: 8_000,
+        swarm_max_coc_px: 12,
     };
 
     /// The midrange-discrete tier.
@@ -785,6 +799,7 @@ impl TierConfig {
         plexus_edges: 20_000,
         max_coc_px: 24,
         seg3d_segments: 20_000,
+        swarm_max_coc_px: 24,
     };
 
     /// The config for `tier`.
