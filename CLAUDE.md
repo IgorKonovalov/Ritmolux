@@ -132,6 +132,11 @@ The opt-in linker override, why there is no shared artifact store, and why depen
 with no debug info live in [Developing](docs/developing.md#machine-setup-the-linker-override-opt-in-and-inert-if-skipped)
 under "Building": read it when setting up a machine or chasing a backtrace.
 
+The reference machine is an **Arch** box on PipeWire, and a Windows box is its peer
+([ADR-0241](docs/adrs/0241-linux-leads-and-windows-is-a-peer.md)). Its packages are in
+[A fresh Arch Linux checkout](docs/developing.md#a-fresh-arch-linux-checkout). **The linker override
+is Windows-only**: a Linux checkout needs none, because the toolchain already links with `rust-lld`.
+
 ## How we work (canonical workflow)
 
 This project runs a **four-skill** plan-driven harness (`.claude/skills/`), adapted from the

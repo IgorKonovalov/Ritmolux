@@ -56,6 +56,31 @@ Release build, AMD iGPU dev box, post-cull (2-scene) standalone, 1080p, steady s
 The low-end box need not match these — it need only clear the **≥ 60 fps** floor and report *its*
 footprint so the vendor spread is on record.
 
+## Where each check runs first
+
+**Linux leads, and Windows is the peer it is checked against**
+([ADR-0241](adrs/0241-linux-leads-and-windows-is-a-peer.md), [NFR §9](nfr.md#9-test-hardware-matrix-what-the-user-has)).
+A live check — capture, a second display, a projector, a rehearsal — runs on the Arch reference box
+first. The Windows box takes it second, for the peer platform. A check that names a Windows-only
+surface runs only there, and one gated on the iGPU floor box waits for that box. The Linux column
+says what is expected, not what has been run. Each section's own record says that.
+
+| Check | Linux (Arch, the reference) | Windows (the peer) |
+|-------|-----------------------------|--------------------|
+| The stereo field, by ear | First | Second |
+| Frame cost and look, on the low-end box | Not the floor box | The older iGPU PC |
+| The overlay's frame-time p99; the dither on a second display | First | Second |
+| A live input unplugged and re-plugged; a 96 kHz interface | No device picker (ADR-0131) | Only here |
+| The live video-out's size ceiling (Spout) | No Spout | Only here |
+| The operator console on two displays | First; Plan 0218 Phase 1 had one display, so the two-display half is owed | Second |
+| The `Rich` tier calibration | First, on the dGPU | Second |
+| The foobar2000 component's install | No foobar2000 | Only here |
+| The studio beside the player | First | Ran 2026-09-11 |
+| The OSC bindings at the rig | First | Second |
+| The Linux standalone on a real desktop | Arch, and the Ubuntu box (Plan 0214 Phase 6) | — |
+| The adapter switch on a two-adapter box | First; the Arch box has two | Second, on a hybrid box |
+| The Floor reading NFR §1 asserts | Not the floor box | The older iGPU PC |
+
 ## Checklist
 
 ### The stereo field, by ear
@@ -930,7 +955,8 @@ From the repo root on the target box:
 
 ```
 cargo build -p standalone --release --bin ritmolux
-./target/release/ritmolux.exe --tier floor
+./target/release/ritmolux --tier floor        # Linux
+./target/release/ritmolux.exe --tier floor    # Windows
 ```
 
 **Pin the tier.** Every iGPU item above is a `Floor` measurement, and unpinned the app starts on
@@ -964,8 +990,12 @@ Play any audio (loopback capture feeds the visuals). Then, in the window:
 The 1 Hz log lands at:
 
 ```
-%APPDATA%\Ritmolux\diagnostics.log
+~/.local/share/Ritmolux/diagnostics.log     # Linux ($XDG_DATA_HOME/Ritmolux/ when that is set)
+%APPDATA%\Ritmolux\diagnostics.log          # Windows
 ```
+
+On Linux the `audio` line reads `live PulseAudio 48000/2 @DEFAULT_MONITOR@` rather than a WASAPI
+endpoint (ADR-0131).
 
 Columns: `unix_ms  fps  frame_ms_avg  frame_ms_p99  frames_total  frames_dropped  gpu_bytes  rss_bytes
 bass  mid  treb  onset  downbeat_confidence  downbeat_locked  capture`.

@@ -168,6 +168,11 @@ the decision that moved it is linked.
 - **Linux:** Ubuntu 24.04 or newer, x86_64 (the release runner's glibc is the floor), Vulkan via
   wgpu, and a PulseAudio-protocol sound server — PipeWire's `pipewire-pulse` or PulseAudio itself
   ([ADR-0131](adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md)).
+  **The reference machine runs Arch** on the PipeWire stack
+  ([ADR-0241](adrs/0241-linux-leads-and-windows-is-a-peer.md)), which sits above this floor on
+  purpose. The floor is the release runner's glibc, because a binary linked against a rolling
+  distribution's glibc runs on nothing older, so the tarball is built on `ubuntu-latest` and never
+  on the reference box.
 - **foobar2000:** current stable release, Windows only (per [ADR-0001](adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)).
 - Scene code never branches on backend or OS; the baseline constrains shader features globally.
 
@@ -436,16 +441,28 @@ later plan + human task.
 
 ## 9. Test hardware matrix (what the user has)
 
-| Machine | Validates |
-|---------|-----------|
-| Primary Windows dev box | Standalone Windows path, plugin, day-to-day dev |
-| Older Windows PC (iGPU) | The performance floor (§1) on baseline hardware (§2) — **still a class rather than a configuration, and the reading is owed** ([On-device validation](on-device-validation.md)) |
-| Arch Linux laptop (AMD iGPU + NVIDIA dGPU, PipeWire) | The Linux standalone path, live monitor capture, Vulkan on hardware and llvmpipe |
-| foobar2000 (installed) | Plugin loading + `visualisation_stream` behavior |
+| Machine | Standing | Validates |
+|---------|----------|-----------|
+| Arch Linux laptop: AMD Renoir iGPU, NVIDIA RTX 3080 Laptop dGPU, Hyprland on Wayland, PipeWire | **Primary, the reference** ([ADR-0241](adrs/0241-linux-leads-and-windows-is-a-peer.md)) | Day-to-day development and the pre-push gate; the golden baselines, blessed and judged on its lavapipe ([ADR-0242](adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)); hardware readings on its dGPU, named by adapter and driver ([ADR-0243](adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)); the Linux standalone path and live monitor capture; the live checks of [On-device validation](on-device-validation.md), first |
+| Windows dev box | **Peer**, checked against the reference | The Windows standalone path: DX12, WASAPI loopback and device selection, now-playing, the Spout video-out; the foobar2000 component |
+| Older Windows PC (iGPU) | The floor | The performance floor (§1) on baseline hardware (§2) — **still a class rather than a configuration, and the reading is owed** ([On-device validation](on-device-validation.md)) |
+| foobar2000 (installed on the Windows box) | Peer | Plugin loading + `visualisation_stream` behavior |
+
+**A reading is taken on the Arch box and checked against on the Windows box.** A frame time, a
+blessed picture, a capture verdict or a rehearsal is first measured on the reference, and it names
+the machine and the adapter it was taken on
+([ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)). The
+Windows box answers whether the same claim holds on the peer platform. A difference there is a
+Windows finding: it does not correct the reference reading, and it is recorded beside it rather
+than over it. The §1 floor is the one claim neither box can settle; it waits on the older iGPU PC.
+
+**"The dev box" in a reading taken before the move to Arch means the Windows box.** The move landed
+with [Plan 0219](plans/done/0219-the-arch-box-builds-tests-and-runs-every-lane.md) on 2026-09-22.
+A reading in this document dated before then, and not naming its machine, was taken on Windows.
 
 **There is no Mac in this matrix, and that is the point of §8's macOS artifact.** An earlier
 revision of this table listed a "Mac, macOS 13+" as available hardware; it is not, which is why
-the dev box cannot link a Mach-O binary and a macOS runner is the only build host
+neither the Arch box nor the Windows box can link a Mach-O binary and a macOS runner is the only build host
 ([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)). The macOS standalone path — Metal through wgpu, ScreenCaptureKit capture, glyphon's
 font loading — is therefore validated by a **recipient**, not in-house, and until one reports
 back it has never executed on Apple hardware at all.

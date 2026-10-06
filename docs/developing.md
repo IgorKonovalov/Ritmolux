@@ -68,15 +68,21 @@ dGPU, AMD Vega iGPU, lavapipe from Mesa 26.2.2), with `target/` already built:
 | `.githooks/pre-push`, run by hand so every step runs | **333 s** | green, no step skipped; the test step alone took 297 s, 1695 passed and 86 skipped |
 | `cargo nextest run --workspace` | **454 s** | 1774 passed, 7 skipped |
 
-Two parts of that green are expected skips, not coverage:
+That table is the first green, taken while the golden baselines were still WARP's. Two things
+about a run on this box today:
 
-- **The pinned-baseline tests skip on lavapipe with a notice.** The golden baselines were blessed on
-  DX12 WARP. On any other adapter, `common::baseline_adapter` prints how many comparisons would have
-  failed and skips the assertion, until the baselines are recaptured on lavapipe
+- **The pinned-baseline tests assert here, and nowhere else does.** The golden baselines are
+  lavapipe captures, blessed on this box
   ([ADR-0242](adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)).
-  So on Linux a golden mismatch is reported, not failed. Only a Windows run asserts one.
-- **The hardware tests take whichever GPU wgpu's default picks.** On that laptop this is the Vega
-  iGPU, not the dGPU. They pass there, but their timing reports name the iGPU.
+  `common::baseline_adapter` asserts a comparison only on Linux's lavapipe. On any other adapter,
+  DX12 WARP included, it prints each fixture's reading and skips. So a golden mismatch fails on the
+  Arch box and is only reported on Windows. A rebless (`RLX_BLESS`) runs here too, and is refused
+  anywhere else.
+- **The hardware tests take the high-performance adapter**, which on this laptop is the RTX 3080
+  dGPU and not the iGPU
+  ([ADR-0243](adrs/0243-the-reference-boxs-hardware-adapter-is-its-discrete-gpu-and-a-reading-names-it.md)).
+  Each hardware build prints a `hardware adapter:` line naming the GPU and its driver, so a reading
+  it produces names its machine.
 
 **npm 11 runs a dependency's install script only when `allowScripts` names it.** The studio's
 `package.json` lists each approved package pinned as `pkg@version`, and a new entry is a reviewed
@@ -436,8 +442,10 @@ authority, so the narrowing is never silent. **CI runs all of them regardless, b
 only.** The `check` matrix runs `-P fast` on Windows, macOS and Ubuntu. Since
 [ADR-0073](adrs/0073-the-windows-ci-critical-path.md), the nine run in the `coverage` job alone,
 on `windows-latest`, so one Windows job underwrites that promise. No CI job runs them on Linux.
-Locally, the full `cargo nextest run --workspace` runs them on any machine, and it is green on
-Arch (see [A fresh Arch Linux checkout](#a-fresh-arch-linux-checkout)).
+**One of the nine is `golden`, and on Windows it skips**, because its baselines are lavapipe's. So
+the golden roster is asserted only by a full run on a Linux box with lavapipe, which is the Arch
+reference box's own full run. Locally, the full `cargo nextest run --workspace` runs them on any
+machine, and it is green on Arch (see [A fresh Arch Linux checkout](#a-fresh-arch-linux-checkout)).
 
 The **rustdoc step** fails a broken or private intra-doc link in **any of the five workspace
 members** before CI's `cargo doc --workspace` job does. Scoping it to `-p rlx-core` left the other
@@ -445,7 +453,7 @@ four documented in CI and nowhere else — a rustdoc error in one of them was un
 push, and it fired twice in sixteen days, both times repaired after a release tag had been written
 on top of the red
 ([ADR-0217](adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md)).
-On the reference machine the widened step measures
+On the Windows box, then the reference machine, the widened step measures
 7.8 s warm after an edit to `rlx-ring` (the deepest crate, so every member re-documents), 0.5 s warm
 with nothing changed, and 20.1 s after a `cargo clean --doc` — about two seconds more than the
 scoped step it replaces.
@@ -538,7 +546,7 @@ Run it when the disk is short, and after anything that changes many units at onc
 dependency bump, or a session of narrowed `-p` runs.
 
 **`target/debug/incremental/` holds one directory per compiled unit, and up to two sessions in
-each.** Measured on the reference machine on 2026-09-15, in a lane built by the three commands
+each.** Measured on the Windows box, then the reference machine, on 2026-09-15, in a lane built by the three commands
 above: 171 unit directories and 1.95 GB. One edit to `core/src/render/metrics.rs` and the three
 commands again took it to 3.62 GB with no new directory, because each rebuilt unit now kept its
 previous session beside the new one. Three more edit-and-revert rounds left it at 3.59 GB, still

@@ -33,8 +33,8 @@ preset that ships.
 > picture anywhere of the preset browser, the settings menu or the `F3` overlay.
 
 > **Status: pre-1.0, in active development.** Both frontends run **and both ship**: the standalone
-> app renders live WASAPI loopback on Windows (and ships for macOS and Linux beside it), and the
-> foobar2000 component links the core's C ABI
+> app renders live system audio on Linux through PipeWire and on Windows through WASAPI loopback
+> (and ships for macOS beside them), and the foobar2000 component links the core's C ABI
 > and is attached to every `v*` tag since `v0.70.0`. The preset format and the C ABI may still
 > change between releases — stability begins at 1.0.0. See [`docs/plans/`](docs/plans/) for what's
 > in flight.
@@ -377,8 +377,8 @@ OpenGL) recorded.
 
 - **Loopback capture is not symmetric.** Windows has first-class WASAPI loopback and needs no
   permission; macOS has no equivalent, so the Mac path goes through **ScreenCaptureKit** (macOS
-  13+) and a user-granted Screen Recording permission. Both are implemented; only the Windows
-  one has been exercised on real hardware. A virtual device (BlackHole) remains the fallback if
+  13+) and a user-granted Screen Recording permission. Both are implemented; the Mac one has
+  never been exercised on real hardware. A virtual device (BlackHole) remains the fallback if
   the SCK route disappoints — set it as the output and no capture code is needed. Linux has no
   kernel-level answer: recording what the machine plays is a sound-server concept, so the Linux
   path opens the default sink's **monitor** source through PulseAudio's protocol, which
@@ -386,8 +386,17 @@ OpenGL) recorded.
   ([ADR-0131](docs/adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md)). It
   has no device picker. The foobar plugin sidesteps capture entirely, which is part of why plugin
   parity is valuable on Mac.
-- **The Mac build is made by CI, not here.** The dev box is Windows and cannot link a Mach-O
-  binary, so a macOS runner is the only build host — which is why the `.app` arrives through a
+- **Linux leads and Windows is a peer**
+  ([ADR-0241](docs/adrs/0241-linux-leads-and-windows-is-a-peer.md)). The project is developed,
+  judged and hand-validated on an Arch box on PipeWire, and its golden baselines are blessed on
+  that box's lavapipe
+  ([ADR-0242](docs/adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)).
+  A Windows box re-checks each claim for its own platform and is the only host of the foobar2000
+  component. Release artifacts are still built by CI, never on either box: the tarball on
+  `ubuntu-latest`, the zip on `windows-latest`. Which machine a reading is taken on is in
+  [NFR §9](docs/nfr.md#9-test-hardware-matrix-what-the-user-has).
+- **The Mac build is made by CI, not here.** Neither the Arch box nor the Windows box can link a
+  Mach-O binary, so a macOS runner is the only build host — which is why the `.app` arrives through a
   tag-driven release rather than from anyone's machine
   ([ADR-0038](docs/adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)). `packaging/macos/bundle.sh`
   is checked in and runs standalone on any Mac, so that is not a permanent condition.

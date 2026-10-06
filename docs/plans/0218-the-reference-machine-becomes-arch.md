@@ -300,8 +300,8 @@ flowchart TB
 | 1 — Ask Hyprland what a client may do | human | done - one display, so D and a second-display console were not answerable | b1543a29 |
 | 2 — The baselines move to lavapipe | dev | done | 8c2ec152 |
 | 3 — Judge the 44 | human | done - all 53 drift, no finding | effc6503 |
-| 4 — Every WARP claim takes one of three exits | dev | done | committed with this row |
-| 5 — The documents take the stance | dev | not started | |
+| 4 — Every WARP claim takes one of three exits | dev | done | d2ebef49 |
+| 5 — The documents take the stance | dev | done | committed with this row |
 | 6 — A rehearsal on the box | human | owed | |
 
 ### Notes
@@ -540,6 +540,21 @@ flowchart TB
   ubuntu arm. Also, the `.github/workflows/ci.yml` comment at the `-P fast` step still says a
   baseline is "a measurement taken on WARP" that "prints its reading and skips". Neither file is in
   Phase 4's list.
+- **Phase 5: §2 already had its Linux row** (Plan 0120). Phase 5 added a note under it naming Arch
+  as the reference and the release runner's glibc as the floor. §9's table gained a `Standing`
+  column, and two paragraphs follow it: which machine a reading is taken on and which is checked
+  against it, and that an undated "dev box" reading from before 2026-09-22 is a Windows one.
+- **Phase 5: `on-device-validation.md` has no per-platform columns**, so the Linux column is a new
+  table, *Where each check runs first*, with a Linux and a Windows column per checklist section.
+  *How to run* gained the Linux binary and log path.
+- **Phase 5: `developing.md`'s Arch loop was 0219's** and was not re-walked. Its two bullets about
+  the golden skip and the default adapter were rewritten, because Phase 2 made both false. A new
+  sentence states the finding above: `golden` is asserted only by a full run on a Linux box with
+  lavapipe. Two readings dated 2026-09-15 and 2026-09-19 that said "the reference machine" now
+  say the Windows box.
+- **Phase 5: `CLAUDE.md`** gained one paragraph under *Machine setup and debug info*. `README.md`
+  gained a *Linux leads and Windows is a peer* platform note, and its status line and capture note
+  now name Linux capture as exercised.
 
 ### Close triggers
 
