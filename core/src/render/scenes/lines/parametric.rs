@@ -494,67 +494,29 @@ impl ParametricCurveScene {
         // The full walk's chord count is the divisor, as on the flat path
         // (`color_along_path`), so a reveal draws the gradient on.
         let span = self.samples3d.saturating_sub(1).max(1) as f32;
-        let n = self.points3d.len();
-        let chords = if self.closed3d {
-            n
-        } else {
-            n.saturating_sub(1)
-        };
 
         let mut instances = std::mem::take(&mut self.instances3d);
         instances.clear();
-        for k in 0..chords {
-            let (Some(&pa), Some(&pb)) = (self.points3d.get(k), self.points3d.get((k + 1) % n))
-            else {
-                continue;
-            };
-            // The walk is one polyline (ADR-0263): every chord joins the one
-            // before and after it, and a closed walk wraps, so only an open
-            // walk's two outer ends are free.
-            let before = if k > 0 {
-                self.points3d.get(k - 1).copied()
-            } else if self.closed3d {
-                self.points3d.last().copied()
-            } else {
-                None
-            };
-            let after = if k + 2 < n || self.closed3d {
-                self.points3d.get((k + 2) % n).copied()
-            } else {
-                None
-            };
-            let Some([prev, a, b, next]) = joined_chord(&frame.view, before, pa, pb, after) else {
-                continue;
-            };
-            if frame.view.outside(a, b, frame.margin) {
-                continue;
-            }
-            let along = k as f32 / span;
-            let u = if self.hue_axis > 0.0 {
-                let mid = [
-                    0.5 * (a[0] + b[0]),
-                    0.5 * (a[1] + b[1]),
-                    0.5 * (a[2] + b[2]),
-                ];
-                space_coordinate(
-                    along,
-                    frame.volume_depth(frame.view.depth(mid)),
-                    self.hue_axis,
-                )
-            } else {
-                along
-            };
-            instances.push(Segment3dInstance {
-                a,
-                b,
-                color: ramp.at(&self.palette, u),
-                width,
-                alpha: 1.0,
-                prev,
-                next,
-                skirt: 0.0,
-            });
-        }
+        let palette = &self.palette;
+        space_chords(
+            &frame,
+            &self.points3d,
+            self.closed3d,
+            span,
+            self.hue_axis,
+            |chord| {
+                instances.push(Segment3dInstance {
+                    a: chord.a,
+                    b: chord.b,
+                    color: ramp.at(palette, chord.u),
+                    width,
+                    alpha: 1.0,
+                    prev: chord.prev,
+                    next: chord.next,
+                    skirt: 0.0,
+                });
+            },
+        );
         self.lines3d.draw_3d(
             queue,
             encoder,
@@ -565,6 +527,85 @@ impl ParametricCurveScene {
             &instances,
         );
         self.instances3d = instances;
+    }
+}
+
+/// One chord of a space walk as [`space_chords`] hands it to the draw: the
+/// joined, near-clipped endpoints and the palette coordinate it is coloured
+/// at, plus, for a test, its index `k` on the walk.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SpaceChord {
+    #[cfg(test)]
+    pub(crate) k: usize,
+    pub(crate) prev: [f32; 3],
+    pub(crate) a: [f32; 3],
+    pub(crate) b: [f32; 3],
+    pub(crate) next: [f32; 3],
+    pub(crate) u: f32,
+}
+
+/// Every drawn chord of the space walk `points` through `frame`, in walk
+/// order: each chord joined to its neighbours and clipped against the near
+/// plane ([`joined_chord`]), culled when wholly off one edge of the frame, and
+/// given its palette coordinate -- its place `k / span` along the walk, moved
+/// toward the depth of its **clipped** midpoint by `hue_axis`
+/// ([`space_coordinate`]). `span` is the full walk's chord count, so a reveal
+/// draws the gradient on rather than re-tinting it.
+pub(crate) fn space_chords(
+    frame: &camera::CameraFrame,
+    points: &[[f32; 3]],
+    closed: bool,
+    span: f32,
+    hue_axis: f32,
+    mut emit: impl FnMut(SpaceChord),
+) {
+    let n = points.len();
+    let chords = if closed { n } else { n.saturating_sub(1) };
+    for k in 0..chords {
+        let (Some(&pa), Some(&pb)) = (points.get(k), points.get((k + 1) % n)) else {
+            continue;
+        };
+        // The walk is one polyline (ADR-0263): every chord joins the one
+        // before and after it, and a closed walk wraps, so only an open
+        // walk's two outer ends are free.
+        let before = if k > 0 {
+            points.get(k - 1).copied()
+        } else if closed {
+            points.last().copied()
+        } else {
+            None
+        };
+        let after = if k + 2 < n || closed {
+            points.get((k + 2) % n).copied()
+        } else {
+            None
+        };
+        let Some([prev, a, b, next]) = joined_chord(&frame.view, before, pa, pb, after) else {
+            continue;
+        };
+        if frame.view.outside(a, b, frame.margin) {
+            continue;
+        }
+        let along = k as f32 / span;
+        let u = if hue_axis > 0.0 {
+            let mid = [
+                0.5 * (a[0] + b[0]),
+                0.5 * (a[1] + b[1]),
+                0.5 * (a[2] + b[2]),
+            ];
+            space_coordinate(along, frame.volume_depth(frame.view.depth(mid)), hue_axis)
+        } else {
+            along
+        };
+        emit(SpaceChord {
+            #[cfg(test)]
+            k,
+            prev,
+            a,
+            b,
+            next,
+            u,
+        });
     }
 }
 
@@ -1681,12 +1722,14 @@ mod tests {
     }
 
     /// **At `hue_axis = 1` a knot is coloured by depth alone** (ADR-0263): over
-    /// every chord of a (2, 3) torus knot seen from an oblique camera, the
-    /// palette coordinate is the chord's place across the volume's depth, so
-    /// two chords at one depth share a coordinate however far apart they sit
-    /// on the walk, and two at different depths do not. At `0` the coordinate
-    /// is the walk position, bit for bit, and the pair of chords farthest apart
-    /// on the walk at the nearest depths shows the two axes disagree.
+    /// every chord [`space_chords`] hands the draw for a (2, 3) torus knot seen
+    /// from an oblique camera, the palette coordinate is the depth of the chord
+    /// it actually emits, so two chords at one depth share a coordinate however
+    /// far apart they sit on the walk, and two at different depths do not. At
+    /// `0` the coordinate is the walk position, bit for bit. A camera close
+    /// enough to cut chords at the near plane holds the coordinate to the
+    /// **clipped** chord's depth, so a swapped or unclipped depth inside the
+    /// seam reads differently here.
     #[test]
     fn a_full_hue_axis_colours_a_knot_by_depth_alone() {
         let arm = curves::arm3d(CurveFamily::TorusKnot).unwrap_or_else(|| panic!("a space family"));
@@ -1710,71 +1753,102 @@ mod tests {
         let mut points = Vec::new();
         let closed = (arm.sample)(&params, &mut points);
         assert!(closed && points.len() > 100, "a closed knot walk");
-        let camera = CameraParams {
-            yaw: 0.4,
-            pitch: 0.7,
-            distance: 3.2,
-            ..CameraParams::default()
-        };
-        let frame = camera.frame(
-            16.0 / 9.0,
-            1.0,
-            [0.0, 0.0],
-            (1280, 720),
-            (arm.extent)(&params),
-            16.0,
-        );
         let span = samples.saturating_sub(1).max(1) as f32;
-        let n = points.len();
-        let chords: Vec<(f32, f32)> = (0..n)
-            .map(|k| {
-                let (a, b) = (points[k], points[(k + 1) % n]);
-                let mid = [
-                    0.5 * (a[0] + b[0]),
-                    0.5 * (a[1] + b[1]),
-                    0.5 * (a[2] + b[2]),
-                ];
-                (k as f32 / span, frame.volume_depth(frame.view.depth(mid)))
-            })
-            .collect();
-        for &(along, depth) in &chords {
+        let frame_at = |distance: f32| {
+            CameraParams {
+                yaw: 0.4,
+                pitch: 0.7,
+                distance,
+                ..CameraParams::default()
+            }
+            .frame(
+                16.0 / 9.0,
+                1.0,
+                [0.0, 0.0],
+                (1280, 720),
+                (arm.extent)(&params),
+                16.0,
+            )
+        };
+        let emitted = |frame: &camera::CameraFrame, hue_axis: f32| {
+            let mut out = Vec::new();
+            space_chords(frame, &points, closed, span, hue_axis, |c| out.push(c));
+            out
+        };
+        // The depth the draw should colour a chord by: its emitted midpoint's.
+        let depth_of = |frame: &camera::CameraFrame, c: &SpaceChord| {
+            let mid = [
+                0.5 * (c.a[0] + c.b[0]),
+                0.5 * (c.a[1] + c.b[1]),
+                0.5 * (c.a[2] + c.b[2]),
+            ];
+            frame.volume_depth(frame.view.depth(mid))
+        };
+
+        let frame = frame_at(3.2);
+        let by_path = emitted(&frame, 0.0);
+        let by_depth = emitted(&frame, 1.0);
+        assert_eq!(by_path.len(), points.len(), "every chord is drawn");
+        for c in &by_path {
             assert_eq!(
-                space_coordinate(along, depth, 0.0).to_bits(),
-                along.to_bits()
-            );
-            assert_eq!(
-                space_coordinate(along, depth, 1.0).to_bits(),
-                depth.to_bits()
+                c.u.to_bits(),
+                (c.k as f32 / span).to_bits(),
+                "chord {}",
+                c.k
             );
         }
-        for (i, &(_, di)) in chords.iter().enumerate() {
-            for &(_, dj) in &chords[i + 1..] {
-                let (ui, uj) = (
-                    space_coordinate(0.0, di, 1.0),
-                    space_coordinate(1.0, dj, 1.0),
-                );
+        for c in &by_depth {
+            assert_eq!(
+                c.u.to_bits(),
+                depth_of(&frame, c).to_bits(),
+                "chord {} is coloured by its own depth",
+                c.k
+            );
+        }
+        // Depth runs near to far: the chord nearest the camera takes the lowest
+        // coordinate and the farthest the highest, which a swapped depth inverts.
+        let nearest = by_depth
+            .iter()
+            .min_by(|x, y| frame.view.depth(x.a).total_cmp(&frame.view.depth(y.a)))
+            .unwrap_or_else(|| panic!("chords"));
+        let farthest = by_depth
+            .iter()
+            .max_by(|x, y| frame.view.depth(x.a).total_cmp(&frame.view.depth(y.a)))
+            .unwrap_or_else(|| panic!("chords"));
+        assert!(
+            nearest.u < 0.2 && farthest.u > 0.8,
+            "near reads low and far reads high: {} .. {}",
+            nearest.u,
+            farthest.u
+        );
+        for (i, ci) in by_depth.iter().enumerate() {
+            for cj in &by_depth[i + 1..] {
+                let (di, dj) = (depth_of(&frame, ci), depth_of(&frame, cj));
                 assert_eq!(
                     di == dj,
-                    ui == uj,
-                    "depths {di} and {dj} took {ui} and {uj}"
+                    ci.u == cj.u,
+                    "depths {di} and {dj} took {} and {}",
+                    ci.u,
+                    cj.u
                 );
             }
         }
-        // Non-vacuity: the knot does span its depth, and a pair of chords at
-        // nearly one depth sits far apart on the walk, where the path axis
-        // colours them apart.
-        let (lo, hi) = chords
+        // Non-vacuity: the knot spans its depth, and a pair of chords at nearly
+        // one depth sits far apart on the walk, where the path axis colours
+        // them apart.
+        let (lo, hi) = by_depth
             .iter()
-            .fold((1.0f32, 0.0f32), |(lo, hi), &(_, d)| (lo.min(d), hi.max(d)));
+            .fold((1.0f32, 0.0f32), |(lo, hi), c| (lo.min(c.u), hi.max(c.u)));
         assert!(
             hi - lo > 0.5,
             "the knot spans the volume's depth: {lo}..{hi}"
         );
+        let n = by_depth.len();
         let mut pair = (0, 0, f32::INFINITY);
         for i in 0..n {
             // At least a quarter of the closed walk apart, either way round.
             for j in (i + n / 4)..(i + 3 * n / 4).min(n) {
-                let gap = (chords[i].1 - chords[j].1).abs();
+                let gap = (by_depth[i].u - by_depth[j].u).abs();
                 if gap < pair.2 {
                     pair = (i, j, gap);
                 }
@@ -1785,15 +1859,42 @@ mod tests {
             gap < 1e-3,
             "two chords a quarter-walk apart share a depth: {gap}"
         );
-        let path = |k: usize| space_coordinate(chords[k].0, chords[k].1, 0.0);
-        let depth = |k: usize| space_coordinate(chords[k].0, chords[k].1, 1.0);
         assert!(
-            (path(i) - path(j)).abs() > 0.2,
+            (by_path[i].u - by_path[j].u).abs() > 0.2,
             "the path axis colours them apart"
         );
+
+        // A camera inside the knot's reach cuts chords at the near plane; the
+        // coordinate is still the emitted, clipped chord's depth.
+        // A chord the near plane cuts: a two-point walk from the volume's far
+        // side straight through the eye along the view axis, so the cut end
+        // stays at the centre of the frame instead of being culled off it. The
+        // coordinate is the emitted, clipped chord's depth, which the unclipped
+        // chord's midpoint would not give.
+        let (sy, cy) = 0.4f32.sin_cos();
+        let (sp, cp) = 0.7f32.sin_cos();
+        let toward_eye = [cp * sy, sp, cp * cy];
+        let along_axis = |t: f32| toward_eye.map(|v| v * t);
+        let (pa, pb) = (along_axis(-1.0), along_axis(frame.view.distance + 1.0));
+        let mut cut = Vec::new();
+        space_chords(&frame, &[pa, pb], false, 1.0, 1.0, |c| cut.push(c));
+        let [c] = cut.as_slice() else {
+            panic!("the axial chord is drawn: {cut:?}");
+        };
         assert!(
-            (depth(i) - depth(j)).abs() <= gap,
-            "the depth axis colours them alike"
+            c.a == pa && c.b != pb,
+            "the near plane cuts the chord's far end"
+        );
+        assert_eq!(c.u.to_bits(), depth_of(&frame, c).to_bits());
+        let unclipped = frame.volume_depth(frame.view.depth([
+            0.5 * (pa[0] + pb[0]),
+            0.5 * (pa[1] + pb[1]),
+            0.5 * (pa[2] + pb[2]),
+        ]));
+        assert!(
+            (c.u - unclipped).abs() > 0.05,
+            "the clipped chord reads a different depth from the unclipped one: {} vs {unclipped}",
+            c.u
         );
     }
 

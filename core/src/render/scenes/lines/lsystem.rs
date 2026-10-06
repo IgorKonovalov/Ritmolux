@@ -191,6 +191,9 @@ pub(crate) struct Endless {
     follow: [f64; 3],
     /// Its velocity, in draw steps a second.
     follow_velocity: [f64; 3],
+    /// The deepest generation any segment has been drawn at since the start:
+    /// a running maximum, never reset by a ring turnover or a stream restart.
+    reached: u32,
     /// Every re-base's offset, summed: where the current origin sits in the
     /// first one's frame, for a test to measure motion across a re-base.
     #[cfg(test)]
@@ -222,6 +225,7 @@ impl Endless {
             window: window.max(1),
             follow: [0.0; 3],
             follow_velocity: [0.0; 3],
+            reached: 0,
             #[cfg(test)]
             origin: [0.0; 3],
         }
@@ -316,9 +320,20 @@ impl Endless {
         }
     }
 
-    /// The deepest generation a segment can be drawn at: the ramp's divisor.
+    /// The deepest generation a segment can be drawn at: how many colour
+    /// slots the scene sizes, not the ramp's divisor.
     pub(crate) fn generations(&self) -> u32 {
         u32::try_from(self.pen.stack_capacity()).unwrap_or(u32::MAX)
+    }
+
+    /// The colour ramp's divisor: the deepest generation drawn so far, at
+    /// least `1`. A vine whose stream nests far less than [`bracket_bound`]
+    /// allows still spans the palette at `hue_spread = 1`, and since it only
+    /// grows, a segment's colour holds as the ring turns over.
+    ///
+    /// [`bracket_bound`]: grammar::bracket_bound
+    pub(crate) fn ramp_divisor(&self) -> u32 {
+        self.reached.max(1)
     }
 
     /// Draw steps taken since the start.
@@ -379,6 +394,7 @@ impl Endless {
 
     /// Write one segment over the oldest, or beside it while the ring fills.
     fn push(&mut self, drawn: turtle::Drawn) {
+        self.reached = self.reached.max(drawn.generation);
         let mut seg = RingSeg {
             a: drawn.a,
             b: drawn.b,
@@ -550,10 +566,15 @@ pub struct LSystemScene {
     turtle: TurtleMode,
     /// The space turtle's own renderer: the `seg3d` pipeline and an instance
     /// buffer of the tier's
-    /// [`seg3d_segments`](crate::render::TierConfig::seg3d_segments), built with
-    /// the scene so a preset switch to a space grammar allocates nothing on the
-    /// GPU. The shared 2D renderer above has no `seg3d` pipeline.
-    lines3d: LineRenderer,
+    /// [`seg3d_segments`](crate::render::TierConfig::seg3d_segments). `None`
+    /// until a configure first selects the space turtle, so a scene that only
+    /// ever draws flat grammars holds no `seg3d` buffer; once built it is kept
+    /// across preset switches. The shared 2D renderer above has no `seg3d`
+    /// pipeline.
+    lines3d: Option<LineRenderer>,
+    /// What [`lines3d`](Self::lines3d) is built with when it is first needed.
+    device: wgpu::Device,
+    surface_format: wgpu::TextureFormat,
     /// The tier's `seg3d_segments`: the most segments a space depth caches.
     seg3d_cap: usize,
     /// The tier's cap on the circle of confusion, in pixels.
@@ -571,7 +592,8 @@ pub struct LSystemScene {
     space_depth: usize,
     /// How many of that depth's segments this frame's `draw_progress` reveals.
     space_keep: usize,
-    /// Reused 3D instance buffer, preallocated to `seg3d_cap`.
+    /// Reused 3D instance buffer, reserved to `seg3d_cap` with
+    /// [`lines3d`](Self::lines3d) and empty until then.
     instances3d: Vec<Segment3dInstance>,
 
     /// The endless figure, when `[generator] growth = "endless"`; `None` for
@@ -594,9 +616,10 @@ pub struct LSystemScene {
 
 impl LSystemScene {
     /// Build the scene over the shared line renderer, preallocating the draw
-    /// buffer, and the space turtle's own `seg3d` renderer with `seg3d_cap`
-    /// instances and blur held to `max_coc` pixels — the tier's caps. No grammar
-    /// is expanded until a preset configures one.
+    /// buffer. The space turtle's own `seg3d` renderer, of `seg3d_cap`
+    /// instances with blur held to `max_coc` pixels — the tier's caps — waits
+    /// for the first space configure. No grammar is expanded until a preset
+    /// configures one.
     pub fn new(
         renderer: Rc<RefCell<LineRenderer>>,
         max_segments: usize,
@@ -607,7 +630,9 @@ impl LSystemScene {
     ) -> Self {
         Self {
             turtle: TurtleMode::Flat,
-            lines3d: LineRenderer::new_3d(device, surface_format, seg3d_cap, "lsystem-3d"),
+            lines3d: None,
+            device: device.clone(),
+            surface_format,
             seg3d_cap,
             max_coc,
             target: (1, 1),
@@ -615,7 +640,7 @@ impl LSystemScene {
             cached3d: Vec::new(),
             space_depth: 0,
             space_keep: 0,
-            instances3d: Vec::with_capacity(seg3d_cap),
+            instances3d: Vec::new(),
             endless: None,
             trail_overflow: None,
             dt: super::super::FALLBACK_DT,
@@ -651,6 +676,21 @@ impl LSystemScene {
             zoom: DEFAULT_ZOOM,
             mirror_order: DEFAULT_MIRROR_ORDER,
             mirror_reflect: DEFAULT_MIRROR_REFLECT,
+        }
+    }
+
+    /// Build the space turtle's renderer and reserve its instance buffer, once:
+    /// called from `configure` whenever it selects the space turtle, off the
+    /// hot path, and a no-op after the first.
+    fn ensure_space_renderer(&mut self) {
+        if self.lines3d.is_none() {
+            self.lines3d = Some(LineRenderer::new_3d(
+                &self.device,
+                self.surface_format,
+                self.seg3d_cap,
+                "lsystem-3d",
+            ));
+            self.instances3d.reserve_exact(self.seg3d_cap);
         }
     }
 
@@ -840,15 +880,17 @@ impl LSystemScene {
                 skirt: 0.0,
             });
         }
-        self.lines3d.draw_3d(
-            queue,
-            encoder,
-            view,
-            &frame,
-            self.glow,
-            self.softness,
-            &instances,
-        );
+        if let Some(lines3d) = self.lines3d.as_mut() {
+            lines3d.draw_3d(
+                queue,
+                encoder,
+                view,
+                &frame,
+                self.glow,
+                self.softness,
+                &instances,
+            );
+        }
         self.instances3d = instances;
     }
 
@@ -916,7 +958,7 @@ impl LSystemScene {
             &mut self.depth_colors,
             &self.palette,
             ramp,
-            endless.generations(),
+            endless.ramp_divisor(),
         );
         self.lay_endless();
     }
@@ -1002,15 +1044,17 @@ impl LSystemScene {
             self.mirror_overflow = frame.blur;
         }
         self.lay_endless_space(&frame);
-        self.lines3d.draw_3d(
-            queue,
-            encoder,
-            view,
-            &frame,
-            self.glow,
-            self.softness,
-            &self.instances3d,
-        );
+        if let Some(lines3d) = self.lines3d.as_mut() {
+            lines3d.draw_3d(
+                queue,
+                encoder,
+                view,
+                &frame,
+                self.glow,
+                self.softness,
+                &self.instances3d,
+            );
+        }
     }
 
     /// Lay the endless ring into the 3D instance buffer through `frame`: each
@@ -1455,6 +1499,9 @@ impl Scene for LSystemScene {
         {
             self.endless = None;
             self.trail_overflow = None;
+            if *turtle == TurtleMode::Space {
+                self.ensure_space_renderer();
+            }
             match growth {
                 Growth::Fixed => self.build(axiom, rules, *angle_deg, *max_depth, *turtle),
                 Growth::Endless => {
@@ -2284,6 +2331,117 @@ mod tests {
                 "{turtle:?}: a re-base moved a byte"
             );
         }
+    }
+
+    /// The endless ramp's divisor is the deepest generation the vine has drawn
+    /// so far — well under the pen's `bracket_bound` capacity — and a running
+    /// maximum: it equals the deepest generation every frame's ring has held,
+    /// and never falls as the ring turns over, even once the deepest
+    /// segments have left it.
+    #[test]
+    fn the_endless_ramp_divides_by_the_deepest_generation_reached() {
+        let trail = 40;
+        let mut endless = vine(trail);
+        let capacity = endless.generations();
+        assert_eq!(
+            capacity, 32,
+            "the vine's bracket_bound over the stream depth"
+        );
+        let mut seen = 0u32;
+        let mut last = endless.ramp_divisor();
+        let mut ring_fell_below = false;
+        // One draw step a frame, so every segment is in the ring for at least
+        // one of the frames read below.
+        for _ in 0..(trail * 20) {
+            endless.advance(60.0, 1.0 / 60.0);
+            let ring_max = (0..endless.len())
+                .filter_map(|age| endless.at(age))
+                .map(|seg| seg.generation)
+                .max()
+                .unwrap_or(0);
+            seen = seen.max(ring_max);
+            let divisor = endless.ramp_divisor();
+            assert_eq!(divisor, seen.max(1), "the divisor is the deepest reached");
+            assert!(divisor >= last, "the divisor fell: {last} -> {divisor}");
+            ring_fell_below |= ring_max < divisor;
+            last = divisor;
+        }
+        assert!(
+            endless.emitted() > (trail as u64) * 10,
+            "the ring turned over many times"
+        );
+        assert!(
+            last > 1 && last * 4 <= capacity,
+            "the vine nests well under its bound: reached {last} of {capacity}"
+        );
+        assert!(
+            ring_fell_below,
+            "the deepest segments left the ring and the divisor held"
+        );
+    }
+
+    /// A scene that only draws flat grammars builds no `seg3d` renderer and
+    /// reserves no 3D instance buffer; the first space grammar builds both, and
+    /// a switch back to a flat one keeps them.
+    #[test]
+    fn the_space_renderer_is_built_by_the_first_space_grammar() {
+        use crate::render::context::{RenderContext, RenderError};
+
+        let ctx = match RenderContext::new_headless(64, 64, true) {
+            Ok(ctx) => ctx,
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return;
+            }
+            Err(e) => panic!("headless context build failed: {e}"),
+        };
+        let tier = crate::render::TierConfig::FLOOR;
+        let format = crate::render::COMPOSITE_FORMAT;
+        let shared = Rc::new(RefCell::new(LineRenderer::new(
+            &ctx.device,
+            format,
+            tier.max_segments,
+            "lsystem-test",
+        )));
+        let mut scene = LSystemScene::new(
+            shared,
+            tier.max_segments,
+            &ctx.device,
+            format,
+            tier.seg3d_segments as usize,
+            tier.max_coc_px as f32,
+        );
+        let grammar = |turtle| GeneratorConfig::LSystem {
+            axiom: "F".into(),
+            rules: vec![('F', "F[+F]F[-F]F".into())],
+            angle_deg: 25.0,
+            max_depth: 3,
+            seed: 0,
+            turtle,
+            growth: Growth::Fixed,
+            trail: 1000,
+            follow_window: DEFAULT_FOLLOW_WINDOW,
+        };
+        assert!(scene.lines3d.is_none(), "nothing built before a grammar");
+        scene.configure(&grammar(TurtleMode::Flat));
+        assert!(
+            scene.lines3d.is_none(),
+            "a flat grammar builds no seg3d renderer"
+        );
+        assert_eq!(scene.instances3d.capacity(), 0, "nor a 3D instance buffer");
+
+        scene.configure(&grammar(TurtleMode::Space));
+        assert!(
+            scene.lines3d.is_some(),
+            "a space grammar builds the renderer"
+        );
+        assert!(
+            scene.instances3d.capacity() >= tier.seg3d_segments as usize,
+            "and reserves the instance buffer at the tier's cap"
+        );
+
+        scene.configure(&grammar(TurtleMode::Flat));
+        assert!(scene.lines3d.is_some(), "a switch back keeps it");
     }
 
     #[test]

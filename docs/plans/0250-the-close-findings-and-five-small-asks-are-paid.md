@@ -200,8 +200,8 @@ had already judged the length warranted.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The loader and the reference stop misleading an author | dev | done | committed with this row |
-| 2 — The 3D findings | dev | not started | |
+| 1 — The loader and the reference stop misleading an author | dev | done | `5c53d893` |
+| 2 — The 3D findings | dev | done | committed with this row |
 | 3 — The two gates that cannot see what shipped | dev | not started | |
 | 4 — Window names, thumbnail dates, tooling | dev | not started | |
 | 5 — The render service stops leaking | studio-builder | not started | |
@@ -215,6 +215,14 @@ had already judged the length warranted.
   (`warn_unknown_keys` in `load.rs`). Chosen by the owner in-session.
 - Phase 1: the done-when's `--check --strict presets` spelling exits 2 (`--check` takes the path); the
   run was `--strict --check presets`, 93 files, 0 warnings. `.taplo.toml` did not change on regeneration.
+- Phase 2: the depth seam is `space_chords` in `parametric.rs`, which `render_space` now calls. The
+  knot camera clips no drawn chord (every near-cut chord is culled off-frame), so the clipped-depth
+  case uses a two-point axial walk. Both mutations (depth `1 - d`, unclipped endpoints) turned the test
+  red and were reverted.
+- Phase 2: the lazy build also defers the CPU `instances3d` reservation, not only the `seg3d` renderer.
+- Phase 2: goldens re-blessed by name, `RLX_BLESS=lsystem_endless_flat,lsystem_endless_space`.
+- Phase 2: the README camera row names Plexus Cyanotype (`1.5` at `noise = 0`) as the shipped minimum;
+  Lorenz Knot now reaches `1.515`.
 
 ### Close triggers
 

@@ -65,8 +65,11 @@ spin = "0.10 + clamp(mid * 0.28, 0, 0.24)"
 # `2 * atan(perspective / (0.584 * 1.05))`, written as a quadratic in the bass
 # term (within 0.001 rad) since expressions have no `atan`. Bass brings the
 # camera in and widens the lens together, so the figure keeps its size and only
-# its depth deepens. Level, as it always was; re-curation is owed.
-distance = "1 / (0.42 + clamp(bass * 0.33, 0, 0.28))"
+# its depth deepens. The distance's bass term stops at 0.24 rather than the
+# lens's 0.28, so its nearest is `1 / 0.66 = 1.515`, outside the camera's
+# declared `1.5`; at full bass the lens widens a little past what holds the
+# size. Level, as it always was; re-curation is owed.
+distance = "1 / (0.42 + clamp(bass * 0.33, 0, 0.24))"
 fov = "1.2009 + clamp(bass * 0.33, 0, 0.28) * 2.1949 - pow(clamp(bass * 0.33, 0, 0.28), 2) * 1.4396"
 pitch = "0"
 depth_fade = "0.38 + clamp(mid * 0.24, 0, 0.20)"

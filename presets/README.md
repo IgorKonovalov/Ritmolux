@@ -1353,7 +1353,7 @@ reads as wind. That asymmetry is deliberate; do not read it as an oversight.
 
 | Param | What it does | Range that means something |
 |---|---|---|
-| `distance` | How far the camera sits from the figure's centre, in figure radii. Nearer exaggerates the perspective: near material grows and far material shrinks, position and sprite size together. | `1.5` .. `8`; the shipped 3-D presets run from about `1.4` (Lorenz Knot on a bass hit) to `5`. The range documents and does not clamp |
+| `distance` | How far the camera sits from the figure's centre, in figure radii. Nearer exaggerates the perspective: near material grows and far material shrinks, position and sprite size together. | `1.5` .. `8`; the shipped 3-D presets run from `1.5` (Plexus Cyanotype at its nearest; Lorenz Knot reaches `1.52` on a bass hit) to `5`. The range documents and does not clamp |
 | `fov` | The vertical field of view, in radians. A narrow `fov` at a long `distance` flattens the figure toward orthographic. | `0.2` .. `2` |
 | `depth_fade`  | Attenuates brightness with distance — the substitute for occlusion, which this scene does not do. `1` takes the far end to black. | `0` (off) .. `1` |
 | `depth_hue`   | Shifts the palette coordinate by `±depth_hue/2` across the depth range, so distance moves *colour* as well as contrast — **on a ramp that travels in hue at roughly constant lightness.** On a dark-to-light ramp (which is what the 3-D presets have shipped) it duplicates `depth_fade` instead, and under `ink_amount = 1` it is structurally dead, like `saturation`. [design-backlog 0062](../docs/design-backlog.md) | `0` (off) .. **`2 * min(hue_center, 1 - hue_center)`**, past which the offset wraps on the LUT's repeat sampler and far material lands on the near colour |
