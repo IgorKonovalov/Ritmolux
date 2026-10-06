@@ -155,7 +155,7 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `RLX_BLESS` takes a list of names | dev | done | b88d3fc2 |
-| 2 — `bless.yml` and its report | dev | done | committed with this row |
+| 2 — `bless.yml` and its report | dev | done | 74fc0b4f |
 | 3 — First bless: 0248's four | human | not started | |
 
 ### Notes
@@ -194,10 +194,14 @@ flowchart LR
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** docs-chore-only for the shipped artifacts: test-harness code under
+  `core/tests/`, a dispatch-only workflow, a script and docs; nothing a release archive carries.
+- **Operator docs touched:** `docs/testing.md` (Golden baselines), `scripts/README.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 58 reductions hold across 29
+  live entries (4 unprobeable).
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). `-P fast` at Phase 1: exit 0,
+  1920 passed, 94 skipped.
+- **Outstanding `human` phases:** Phase 3 (`Blocks merge: no`) — the first dispatch, after the merge
+  and a push.
