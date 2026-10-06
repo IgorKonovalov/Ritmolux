@@ -437,6 +437,7 @@ pub const FAMILY_PARAMS: &[FamilyParam] = &[
     per_family!("fov": None, None, super::FOV.range, super::FOV.range),
     per_family!("focus": None, None, super::FOCUS.range, super::FOCUS.range),
     per_family!("aperture": None, None, super::APERTURE.range, super::APERTURE.range),
+    per_family!("fog": None, None, super::FOG.range, super::FOG.range),
 ];
 
 /// One roster entry's framing (ADR-0093): where the figure is and how big, as

@@ -398,7 +398,8 @@ struct Draw {
     //    path never reads it.
     // mdl: x the model transform's 1 / framed half-extent, y the sprite radius
     //    in target pixels at `cam.viewport.z`, z 1 / the model depth that is one
-    //    unit of normalized depth, w unused. Zeroed on a flat family.
+    //    unit of normalized depth, w the camera's `fog` (ADR-0263), finite and
+    //    in [0, 1]. Zeroed on a flat family.
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
@@ -706,6 +707,12 @@ fn vs_main(
             px = clip_to_px(cam, head) + corner * (r * grow);
             local = corner;
         }
+        // Fog (ADR-0263) on the light, never the size, at the head's view
+        // depth - the trail behind it keeps the light it had there. The
+        // camera's volume is the unit model, so the figure's nearest extent
+        // keeps all its light and its farthest keeps `1 - fog`. Exactly 1.0
+        // at fog 0.
+        keep = keep * fog_light(cam, draw.mdl.w, head.w);
         // Past the near plane every corner lands on one point off screen, so
         // the quad has no area and draws nothing.
         ndc = select(vec2<f32>(-2.0, -2.0), px_to_ndc(cam, px), visible);

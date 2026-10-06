@@ -78,9 +78,10 @@ pub(super) struct UniformInputs {
     pub(super) palette_steps: f32,
     pub(super) zoom: f32,
     pub(super) pan: [f32; 2],
-    /// The shared camera block (ADR-0258), raw as bound: the orbit and lens a
-    /// family with depth projects through (ADR-0260), made safe by
-    /// `Camera3d::view` and `Lens::new` as the frame is built.
+    /// The shared camera block (ADR-0258), raw as bound: the orbit, lens and
+    /// fog a family with depth projects through (ADR-0260), made safe by
+    /// `Camera3d::view`, `Lens::new` and `CameraParams::frame` as the frame is
+    /// built. Its `solid` is never set: the attractor does not declare it.
     pub(super) camera: CameraParams,
     /// The tier's cap on the circle of confusion, in pixels.
     pub(super) max_coc: f32,
@@ -507,8 +508,9 @@ fn camera_rows(inputs: &UniformInputs) -> (CameraUniform, [f32; 4]) {
     let mut cam = frame.uniform;
     // Sprite sizes are stated at the orbit target, the figure's centre, rather
     // than at the focal plane, so moving the focus never resizes a sprite.
-    let [w, h, _, unused] = cam.viewport;
-    cam.viewport = [w, h, frame.view.distance, unused];
+    // `viewport.w` is the volume's nearest extent, which `fog_light()` reads.
+    let [w, h, _, near_extent] = cam.viewport;
+    cam.viewport = [w, h, frame.view.distance, near_extent];
     let sprite_px = sprite_radius_px(
         POINT_BASE * inputs.size / model.footprint,
         &frame.view,
@@ -516,7 +518,12 @@ fn camera_rows(inputs: &UniformInputs) -> (CameraUniform, [f32; 4]) {
     );
     (
         cam,
-        [model.inv_framed_half, sprite_px, model.inv_unit_depth, 0.0],
+        [
+            model.inv_framed_half,
+            sprite_px,
+            model.inv_unit_depth,
+            frame.fog,
+        ],
     )
 }
 

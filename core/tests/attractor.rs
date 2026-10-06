@@ -802,6 +802,88 @@ fn a_lorenz_figure_pitches_through_the_camera() {
     );
 }
 
+/// **Fog darkens a 3D figure and nothing else** (ADR-0263): `fog = 0` renders
+/// byte for byte what an unset `fog` does, `fog = 1` darkens Thomas and Lorenz
+/// over the pixels they light, and a flat family renders identically at any
+/// `fog`. `solid` is not the attractor's: a sprite has no stroke to sort, so a
+/// binding to it loads with the undeclared-parameter warning.
+#[test]
+fn fog_darkens_a_3d_figure_and_leaves_a_flat_one_alone() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let lively = AnalysisFrame {
+        bass: 0.5,
+        mid: 0.4,
+        treb: 0.5,
+        ..Default::default()
+    };
+    let mut presets = Vec::new();
+    for family in ["thomas", "lorenz", "de_jong"] {
+        presets.push(attractor_bare_preset(
+            &format!("{family}_unset"),
+            family,
+            "",
+        ));
+        presets.push(attractor_bare_preset(
+            &format!("{family}_fog0"),
+            family,
+            "fog = \"0\"\n",
+        ));
+        presets.push(attractor_bare_preset(
+            &format!("{family}_fog1"),
+            family,
+            "fog = \"1\"\n",
+        ));
+    }
+    renderer.set_presets(presets);
+    let mut capture = |name: &str| {
+        renderer
+            .capture_preset(name, &lively, 60)
+            .expect("capture a fog probe")
+    };
+    for family in ["thomas", "lorenz"] {
+        let unset = capture(&format!("{family}_unset"));
+        let off = capture(&format!("{family}_fog0"));
+        let full = capture(&format!("{family}_fog1"));
+        assert_eq!(
+            unset.rgba, off.rgba,
+            "{family}: `fog = 0` must render exactly what an unset `fog` does"
+        );
+        let mask = lit_mask(&unset);
+        assert!(
+            mask.iter().filter(|&&l| l).count() > 500,
+            "{family}: the bare figure lit almost nothing"
+        );
+        let (clear, fogged) = (mean_luma_over(&unset, &mask), mean_luma_over(&full, &mask));
+        println!("{family}: mean luma over the figure {clear:.2} -> {fogged:.2} at fog 1");
+        assert!(
+            fogged < clear * 0.95,
+            "{family}: `fog = 1` did not darken the figure ({clear:.2} -> {fogged:.2})"
+        );
+    }
+    let flat = capture("de_jong_unset");
+    let flat_fogged = capture("de_jong_fog1");
+    assert_eq!(
+        flat.rgba, flat_fogged.rgba,
+        "`fog` must be inert on a flat family"
+    );
+
+    let solid = Preset::from_toml_str(
+        "system = \"attractor\"\nname = \"solid\"\n[particles]\nfamily = \"thomas\"\n\
+         [params]\nsolid = \"1\"\n",
+    )
+    .expect("an undeclared param is a warning, not an error");
+    assert!(
+        solid
+            .warnings
+            .iter()
+            .any(|w| w.param.as_deref() == Some("solid") || w.message.contains("solid")),
+        "a `solid` binding on the attractor must warn as undeclared: {:?}",
+        solid.warnings
+    );
+}
+
 /// **A binding to the retired `perspective` fails to load, naming what replaced
 /// it** (ADR-0260): at the top level and in a layer, on any family, so a user
 /// preset never loads without the depth it asked for. The camera block that

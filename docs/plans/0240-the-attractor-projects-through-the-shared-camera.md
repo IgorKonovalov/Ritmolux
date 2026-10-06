@@ -237,7 +237,7 @@ struct ModelTransform {
 | 2 — The real lens, and `perspective` retires | dev | done | 80566e42 |
 | 3 — The shipped presets migrate by the mapping | dev | done | 7a43c794 |
 | 4 — Documentation and the references | dev | done | a430d6fa |
-| 5 — Fog on the attractor's sprites | dev | not started | |
+| 5 — Fog on the attractor's sprites | dev | done | committed with this row |
 | 6 — The 3D presets, re-curated in motion | human | not started | |
 | 7 — The moved baseline is blessed | human | not started | |
 | 8 — The preset-author reference | human | not started | |
@@ -339,6 +339,31 @@ struct ModelTransform {
   `the_parameter_reference_block_is_current`, 14 tests) pass without the regenerate switches.
   `toc.mjs --check` was stale after the README heading rename. `node scripts/toc.mjs` rewrote
   the block, and the check, `check-doc-links.mjs` and `check-reader-prose.mjs` all exit 0.
+- Phase 5: the attractor's `set_param` no longer delegates to `CameraParams::set`. It matches the
+  seven camera names it declares itself, because the delegation also answers `solid`. With that
+  change, `declared_params_match_set_param` scans those seven names like the rest of the
+  attractor's arms.
+- Phase 5 touched `core/src/render/scenes/particles/family.rs`, which its file list does not name:
+  `FAMILY_PARAMS` gained a `fog` row, live on `thomas` and `lorenz` and inert on the flat families,
+  as the other six camera rows are. The generated reference's `fog` row comes from it.
+- Phase 5: fog is applied at the head's view depth, on the scale of the unit model volume
+  (`MODEL_RADIUS`), and it multiplies the light only. It rides `mdl.w`, which was unused. The
+  uniform did not grow.
+- Phase 5: the near/far test is `fog_dims_the_far_half_of_a_3d_figure_more_than_the_near_half`
+  (`particles/tests.rs`). It reads a converged GPU cloud back, splits it at the median view depth,
+  and sums `CameraFrame::fog_light`, the CPU mirror. It also checks the shader's 3D path for the
+  `fog_light` call. At `fog = 1` Thomas's near half keeps 0.721 of its light and its far half
+  0.281. Lorenz's keep 0.639 and 0.356. The engine-level test,
+  `fog_darkens_a_3d_figure_and_leaves_a_flat_one_alone` (`core/tests/attractor.rs`), measured
+  the figure's mean luma at 78.27 -> 66.83 on Thomas and 103.57 -> 97.62 on Lorenz. It also holds
+  `fog = 0` byte-equal to an unset `fog`, and holds De Jong byte-equal at `fog = 1`.
+- Phase 5: the byte-identity done-when was checked on this session's adapter with `shot` captures
+  (320x180, 60 frames) before and after the phase, compared with `cmp`. The 3D captures were
+  `attractor_depth` and `presets/attractor_thomasgallery.toml`, both at `fog` unset. The flat
+  captures were `attractor`, `attractor_trails` and `attractor_ifs`. All five were identical.
+- Phase 5: `.taplo.toml` did not change on regeneration. `presets/preset.schema.json` did, and the
+  file list does not name it. `-P fast`: 1920 run, 1920 passed. The deferred `attractor` suite
+  passed, 11 of 11.
 
 #### Replacement text for Phase 8 (`.claude/skills/preset-author/references/systems.md`, `## attractor`)
 
@@ -349,9 +374,12 @@ paragraphs below, and leave the rest of the section as it is:
 **The 3D families — `thomas` and `lorenz` — are seen through the shared camera** (ADR-0260), the
 same block as `plexus`: `yaw` (on top of `spin`), `pitch` (default `0.25`, slightly from above),
 `distance` (in **figure radii**, `1.5 – 8`; nearer exaggerates the perspective, near-to-far
-magnification `(D + 1) / (D - 1)`), `fov` (`0.2 – 2` rad; the engine `zoom` divides it), and the
-real lens `focus` / `aperture` (off-focus sprites draw wider and dimmer). All six are **inert on
-`de_jong`, `clifford` and the five IFS figures**, which keep their in-plane view. **`perspective` is
+magnification `(D + 1) / (D - 1)`), `fov` (`0.2 – 2` rad; the engine `zoom` divides it), the
+real lens `focus` / `aperture` (off-focus sprites draw wider and dimmer), and `fog` (`0 – 1`; at `1`
+the figure's farthest point is black and its nearest keeps its light, light only, never size; it
+multiplies with `depth_fade`). All seven are **inert on `de_jong`, `clifford` and the five IFS
+figures**, which keep their in-plane view. `solid` is **not** an attractor param: a sprite has no
+stroke to sort, so binding it warns as undeclared. **`perspective` is
 retired, and binding it is a load error** naming `distance` and `fov`. To migrate an old value `p`
 on an entry of depth half-extent `E`: `distance = E / p`, `tan(fov / 2) = p / (scale * E * zoom)`,
 camera `zoom = 1`, `pitch = 0`. A `perspective = 0` look takes a long `distance` with a matching
@@ -374,13 +402,14 @@ much of the tier's particle budget is drawn (ADR-0069 / ADR-0195; absent is the 
   `attractor_thomasgallery`, `attractor_thomasred`, `attractor_walkthomas`, `attractor_fernmono`,
   `attractor_walkdejong` and `fragment_sumi`. Phase 4 regenerated `presets/README.md`'s params
   block, `presets/preset.schema.json` and `presets/schema/attractor.schema.json`, and rewrote the
-  README's attractor-depth section.
+  README's attractor-depth section. Phase 5 regenerated the same three files for `fog` and added
+  a `fog` paragraph to that section. No preset `.toml` changed in Phase 4 or 5.
 - **Plan header `Closes:`** none
-- **What shipped:** feature. The attractor's `thomas` and `lorenz` take the camera block, and
-  `perspective` is retired as a load error.
+- **What shipped:** feature. The attractor's `thomas` and `lorenz` take the camera block, `fog`
+  included and `solid` excluded, and `perspective` is retired as a load error.
 - **Operator docs touched:** `presets/README.md`, `docs/presets.md`, `docs/specs/player-schema.json`.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 58 reductions hold across
-  29 live entries, 4 unprobeable.
+  29 live entries, 4 unprobeable (re-run after Phase 5).
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
 - **Outstanding `human` phases:** 6 (re-curation brief), 7 (re-bless `attractor_depth`, which
   Phase 3 recorded as moved) and 8 (apply the text above to the preset-author reference). All three

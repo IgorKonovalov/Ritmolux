@@ -842,10 +842,11 @@ pub struct AttractorScene {
     /// Shared view transform (ADR-0018 / Plan 0025 Phase 4): `zoom` scales the
     /// projected cloud about the screen centre, `pan_*` offsets it.
     zoom: f32,
-    /// The shared camera block (ADR-0258): the orbit, the lens, and `focus` and
-    /// `aperture` on it. Live on the families with depth, which project through
-    /// it with the spin folded into its yaw (ADR-0260); inert on the 2D families,
-    /// and the blur inert everywhere at `aperture = 0`.
+    /// The shared camera block (ADR-0258): the orbit, the lens, `focus` and
+    /// `aperture` on it, and `fog` (ADR-0263). Live on the families with depth,
+    /// which project through it with the spin folded into its yaw (ADR-0260);
+    /// inert on the 2D families, the blur inert everywhere at `aperture = 0` and
+    /// the fog at `fog = 0`. `solid` is not declared, so it stays at its rest.
     camera: CameraParams,
     /// The tier's cap on the circle of confusion, in pixels.
     max_coc: f32,
@@ -1444,6 +1445,10 @@ const APERTURE: ParamSpec = ParamSpec {
     doc: "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.",
     ..camera::APERTURE
 };
+const FOG: ParamSpec = ParamSpec {
+    doc: "Fades a 3D figure's sprites toward black with depth: at 1 its farthest point is black and its nearest keeps its light. 0 is off; inert on the flat maps.",
+    ..camera::FOG
+};
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
@@ -1553,6 +1558,7 @@ pub const PARAMS: &[ParamSpec] = &[
     FOV,
     FOCUS,
     APERTURE,
+    FOG,
     ParamSpec {
         name: "depth_fade",
         default: 0.0,
@@ -1857,11 +1863,21 @@ impl Scene for AttractorScene {
     fn set_param(&mut self, name: &str, value: f32) {
         // The shared param blocks first, this scene's own names after
         // (`scenes::common`).
-        if self.colour.set(name, value) || self.pan.set(name, value) || self.camera.set(name, value)
-        {
+        if self.colour.set(name, value) || self.pan.set(name, value) {
             return;
         }
         match name {
+            // The camera block's names, matched here rather than delegated to
+            // `CameraParams::set`: the attractor declares all of it but
+            // `solid`, which needs a stroke to sort and a sprite has none, and
+            // a delegation would answer that undeclared name too.
+            "yaw" => self.camera.yaw = value,
+            "pitch" => self.camera.pitch = value,
+            "distance" => self.camera.distance = value,
+            "fov" => self.camera.fov = value,
+            "focus" => self.camera.focus = value,
+            "aperture" => self.camera.aperture = value,
+            "fog" => self.camera.fog = value,
             "a" => self.a = value,
             "b" => self.b = value,
             "c" => self.c = value,

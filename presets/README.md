@@ -711,6 +711,7 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `fov` | `0.8` | `thomas` `0.2` – `2`; `lorenz` `0.2` – `2`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | The camera's vertical field of view onto a 3D figure, in radians; zoom divides it. | motion |
 | `focus` | `0.5` | `thomas` `0` – `1`; `lorenz` `0` – `1`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Where the focal plane sits in a 3D figure's depth: 0 at its nearest point, 1 at its farthest. | light, main |
 | `aperture` | `0` | `thomas` `0` – `24`; `lorenz` `0` – `24`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps. | light, main |
+| `fog` | `0` | `thomas` `0` – `1`; `lorenz` `0` – `1`; inert on `de_jong`, `clifford`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Fades a 3D figure's sprites toward black with depth: at 1 its farthest point is black and its nearest keeps its light. 0 is off; inert on the flat maps. | light |
 | `depth_fade` | `0` | `0` – `1` | How much depth dims a particle, which is what reads as air between the layers. | light |
 | `depth_hue` | `0` | `-1` – `1` | Shifts colour with depth, so far parts of the figure sit elsewhere on the palette. | colour |
 | `spin` | `0` | `-2` – `2` | Turns per second the figure rotates by about its vertical axis. | motion, main |
@@ -1309,6 +1310,14 @@ farthest; `aperture` is the blur of the far side in pixels, and a sprite off the
 focal plane draws wider and dimmer, so its light stays the same. A sprite's size
 is stated at the figure's centre, so moving `focus` never resizes one; nearer
 sprites draw larger and farther ones smaller, as nearer material should.
+
+**`fog` darkens a sprite with its depth**, on the scale `focus` uses: at `1` the
+figure's farthest point is black and its nearest keeps all its light, and `0`
+is off. It takes light and never size, at the particle's own depth, so the trace
+behind a particle keeps the light it had where it was. Its scale is the figure
+brought to unit radius, so it reads the same on every roster entry. `depth_fade` is the older cue on the same idea, measured on the entry's
+depth half-extent; the two multiply. `solid` is not an attractor parameter: a
+sprite has no line to paint over another.
 
 **The camera, `depth_fade` and `depth_hue` are exact no-ops on every flat
 family**, the same way `a b c d` already carry family-specific meanings. On

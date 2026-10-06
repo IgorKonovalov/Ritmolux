@@ -291,10 +291,13 @@ Two things still follow from a stage being a *resample*:
 The `attractor`'s `thomas` and `lorenz` families are drawn through the shared camera
 ([ADR-0260](adrs/0260-the-attractors-3d-families-project-through-the-shared-camera-and-perspective-retires.md)).
 `yaw`, `pitch`, `distance` and `fov` place it, and `focus` with `aperture` blur a particle away from
-the focal plane, wider and dimmer. `distance` is in figure radii, because every roster entry is
-brought to the same size first, and `spin` turns the figure on top of `yaw`. All six do nothing on
-the flat families (`de_jong`, `clifford` and the five IFS figures), which keep their in-plane view.
-`fog`, `solid` and `hue_axis` are not attractor parameters.
+the focal plane, wider and dimmer. `fog`, `0` to `1`, darkens a particle with its depth: at `1` the
+figure's farthest point is black and its nearest keeps all its light, and the trace a particle
+leaves keeps the light it had where it was. `distance` is in figure radii, because every roster
+entry is brought to the same size first, and `spin` turns the figure on top of `yaw`. All seven do
+nothing on the flat families (`de_jong`, `clifford` and the five IFS figures), which keep their
+in-plane view. `solid` and `hue_axis` are not attractor parameters: a particle has no line to paint
+over another, so binding `solid` on the attractor warns that nothing reads it.
 
 **`perspective` is gone, and a preset that binds it on the attractor fails to load**, with a message
 naming `distance` and `fov`. The exact rewrite of an old value onto the camera, and what each camera
@@ -595,7 +598,7 @@ blurs the attractor's 3D families.
 
 **Fog and solid strokes.** Two more camera parameters make depth read, and both are off until a
 preset sets them. They work the same on `plexus`, on the two space families of `parametric_curve`
-and on `waterfall`.
+and on `waterfall`. The attractor's 3D families take `fog` and not `solid`.
 
 - `fog`, `0` to `1`, fades light toward black with depth, on the same nearest-to-farthest scale
   `focus` uses: at `1` the farthest point of the volume is black and the nearest keeps all its

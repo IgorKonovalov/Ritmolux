@@ -4428,6 +4428,93 @@ fn a_sprite_away_from_the_focal_depth_grows_and_dims() {
     );
 }
 
+/// **Fog takes light from a 3D figure's far half, and less from its near
+/// half** (ADR-0263). A converged cloud is read back off the GPU, carried into
+/// the camera's model space and projected; split at the median view depth, the
+/// summed light each half keeps at `fog = 1` is set against the same half at
+/// `fog = 0`. The light per sprite is
+/// [`CameraFrame::fog_light`](crate::render::camera::CameraFrame::fog_light),
+/// the CPU half of the `fog_light()` the draw shader multiplies the 3D path's
+/// light by, over the unit volume the uniform names. A flat family's path
+/// reads no fog at all.
+#[test]
+fn fog_dims_the_far_half_of_a_3d_figure_more_than_the_near_half() {
+    for family in [AttractorFamily::Thomas, AttractorFamily::Lorenz] {
+        let Some(mut h) = Harness::new(family) else {
+            return;
+        };
+        h.run(CONVERGE_FRAMES);
+        let model = canonical_model(family);
+        let frame_at = |fog: f32| {
+            super::encode::spun(
+                CameraParams {
+                    fog,
+                    ..CameraParams::default()
+                },
+                0.0,
+            )
+            .frame(
+                1.0,
+                1.0,
+                [0.0, 0.0],
+                (64, 64),
+                super::encode::MODEL_RADIUS,
+                TierConfig::FLOOR.max_coc_px as f32,
+            )
+        };
+        let (clear, fogged) = (frame_at(0.0), frame_at(1.0));
+        let mut depths: Vec<f32> = h
+            .positions()
+            .into_iter()
+            .map(|q| clear.view.clip(model.apply(q))[3])
+            .filter(|w| w.is_finite() && *w >= camera::NEAR)
+            .collect();
+        assert!(
+            depths.len() > TEST_PARTICLES as usize / 2,
+            "{family:?}: most of the cloud must be in front of the camera"
+        );
+        depths.sort_by(f32::total_cmp);
+        let (near, far) = depths.split_at(depths.len() / 2);
+        let light = |frame: &crate::render::camera::CameraFrame, half: &[f32]| -> f64 {
+            half.iter().map(|&w| f64::from(frame.fog_light(w))).sum()
+        };
+        for &w in &depths {
+            assert_eq!(clear.fog_light(w), 1.0, "fog 0 keeps every sprite's light");
+        }
+        let far_kept = light(&fogged, far) / light(&clear, far);
+        let near_kept = light(&fogged, near) / light(&clear, near);
+        println!(
+            "{family:?} at fog 1: the near half keeps {near_kept:.3}, the far half {far_kept:.3}"
+        );
+        assert!(
+            far_kept < 0.75,
+            "{family:?}: fog 1 left the far half {far_kept:.3} of its light"
+        );
+        assert!(
+            near_kept > far_kept,
+            "{family:?}: the near half ({near_kept:.3}) fell as far as the far half ({far_kept:.3})"
+        );
+    }
+    let three_d = super::DRAW_SHADER
+        .split_once("if (draw.d.w != 0.0) {")
+        .and_then(|(_, rest)| rest.split_once("// A flat family keeps its in-plane path"))
+        .map(|(path, _)| path)
+        .expect("the draw shader names its 3D path");
+    assert!(
+        three_d.contains("keep = keep * fog_light(cam, draw.mdl.w, head.w);"),
+        "the 3D path must scale its light by the camera's fog at the head's depth"
+    );
+    let flat_path = super::DRAW_SHADER
+        .split_once("// A flat family keeps its in-plane path")
+        .and_then(|(_, rest)| rest.split_once("// Per-particle colour"))
+        .map(|(path, _)| path)
+        .expect("the draw shader names its flat path");
+    assert!(
+        !flat_path.contains("fog_light("),
+        "the flat path must not fog"
+    );
+}
+
 /// **An aperture past the tier's cap is announced** (ADR-0007, ADR-0257): the
 /// aperture, the far side's blur, is checked against `max_coc_px` every frame;
 /// the near side's blur, which grows past it and saturates at the cap, is not
