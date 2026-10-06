@@ -867,6 +867,20 @@ impl Surface {
     }
 }
 
+/// Parameters a system declared once and retired, each with what replaced it.
+///
+/// A binding to one is a **load error**, where any other undeclared name is a
+/// warning: a retired name is not a typo, and a preset that kept it would load
+/// and quietly render without what it asked for — on the attractor, without
+/// its depth (ADR-0260).
+const RETIRED_PARAMS: &[(SystemKind, &str, &str)] = &[(
+    SystemKind::Attractor,
+    "perspective",
+    "the attractor's 3D figures project through the shared camera now (ADR-0260): \
+     bind `distance` and `fov` instead, with `distance = E / perspective` and \
+     `tan(fov / 2) = perspective / (E * footprint)` reproducing the old picture",
+)];
+
 /// Compile a `[params]` table into bindings, warning about every name the
 /// surface does not consume.
 ///
@@ -891,6 +905,15 @@ pub(super) fn compile_bindings(
     let mut out = Vec::with_capacity(params.len());
     for (param, source) in params {
         let labelled = format!("{prefix}{param}");
+        if let Some((_, _, instead)) = RETIRED_PARAMS
+            .iter()
+            .find(|(owner, name, _)| *owner == system && *name == param)
+        {
+            return Err(PresetError::Config(format!(
+                "{prefix}parameter '{param}' was retired from system '{}': {instead}",
+                system.as_str()
+            )));
+        }
         let expr =
             expr::compile_with_latches(&source, latch_names).map_err(|err| PresetError::Expr {
                 param: labelled.clone(),

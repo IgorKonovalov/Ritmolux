@@ -4,10 +4,10 @@
 
 use super::{
     AttractorFamily, AttractorScene, Basis, CLOUD_DENSITY, DEFAULT_BRIGHTNESS, DEFAULT_DEPTH_FADE,
-    DEFAULT_DEPTH_HUE, DEFAULT_SPIN, FIXED_STEP, JITTER_MODE, MAX_PERSPECTIVE,
-    MIN_PARTICLE_DENSITY, PARTICLE_ATTRIBUTES, Particle, Phase, RESEED_DRAWS_STREAK, SPIN_RATE,
-    STEP_SLOTS, Scene, StepUniform, TRACE_DENSITY, active_particles, brightness_factor,
-    deposit_scale, family, ifs, projection_mirror, spin_phase, streak_flag,
+    DEFAULT_DEPTH_HUE, DEFAULT_SPIN, FIXED_STEP, JITTER_MODE, MIN_PARTICLE_DENSITY,
+    PARTICLE_ATTRIBUTES, Particle, Phase, RESEED_DRAWS_STREAK, SPIN_RATE, STEP_SLOTS, Scene,
+    StepUniform, TRACE_DENSITY, active_particles, brightness_factor, deposit_scale, family, ifs,
+    projection_mirror, spin_phase, streak_flag,
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::camera::{self, CameraParams, CameraView};
@@ -499,9 +499,13 @@ fn the_camera_breaks_the_orthographic_mirror() {
 
 /// **The mapping is the retired projection** (ADR-0260): a camera at
 /// `distance = E / p` through the matching `fov` projects every point the
-/// pseudo-perspective `magnify` drew inside its depth clamp to where that drew
+/// retired pseudo-perspective drew inside its depth clamp to where that drew
 /// it, at every spin — `spun` turning the eye so the figure turns the way it
 /// did. Points past the clamp are where the two part, by design.
+///
+/// The retired projection is written out here, since nothing draws it any
+/// more: the in-plane position scaled by `1 / (1 - p * dn)`, `dn` the depth
+/// in units of the figure's depth half-extent.
 #[test]
 fn the_mapped_camera_reproduces_the_retired_magnification() {
     for family in [AttractorFamily::Lorenz, AttractorFamily::Thomas] {
@@ -528,7 +532,9 @@ fn the_mapped_camera_reproduces_the_retired_magnification() {
                     if dn.abs() > 1.0 {
                         continue;
                     }
-                    let [ox, oy] = projection_mirror::world(q, family, cs, sn, p);
+                    let magnify = 1.0 / (1.0 - p * dn);
+                    let [wx, wy] = projection_mirror::world(q, family, cs, sn);
+                    let [ox, oy] = [wx * magnify, wy * magnify];
                     let [nx, ny] = ndc_of(&view, model.apply(q));
                     assert!(
                         (ox - nx).abs() < 1e-4 && (oy - ny).abs() < 1e-4,
@@ -622,17 +628,24 @@ fn every_3d_entry_stays_clear_of_the_near_plane() {
     );
 }
 
-/// **The flat families are untouched at every `perspective`.**
+/// **The camera is exactly inert on the flat families** (ADR-0260).
 ///
-/// Stated as invariance rather than as the mirror identity above, and the
-/// difference is not pedantry: a 2D map's projection is a full *in-plane*
-/// rotation, so its half turn is a point reflection (both axes negated), not
-/// an `x`-mirror — that identity was never true for them and is not what
-/// this change is about. What must hold is that the depth machinery is
-/// **exactly the identity** here, which is what `inv_depth_extent() == 0`
-/// buys: same bits at every perspective, including the ceiling.
+/// A flat family has no model transform, so its path never reaches the
+/// camera and no camera binding can move it — the engine-level half of this
+/// is `a_lorenz_figure_pitches_through_the_camera`. What its own path does is
+/// a full *in-plane* rotation, so its half turn is a point reflection (both
+/// axes negated), not the `x`-mirror a 3D figure's orthographic half turn is.
 #[test]
-fn perspective_is_exactly_inert_on_a_flat_family() {
+fn the_camera_is_exactly_inert_on_a_flat_family() {
+    let flat = [AttractorFamily::DeJong, AttractorFamily::Clifford]
+        .into_iter()
+        .chain(IfsFigure::ALL.map(AttractorFamily::Ifs));
+    for family in flat {
+        assert!(
+            canonical(family).model(family).is_none(),
+            "{family:?} is flat and must keep its in-plane path"
+        );
+    }
     for family in [AttractorFamily::DeJong, AttractorFamily::Clifford] {
         for q in [
             [1.2f32, -0.7, 0.0],
@@ -642,60 +655,14 @@ fn perspective_is_exactly_inert_on_a_flat_family() {
             // it must still not become a depth.
             [0.8, -1.1, 5.0],
         ] {
-            for (cs, sn) in [REST, HALF_TURN, (0.6, 0.8)] {
-                let base = projection_mirror::world(q, family, cs, sn, 0.0);
-                for p in [0.25, 0.5, MAX_PERSPECTIVE] {
-                    assert_eq!(
-                        projection_mirror::world(q, family, cs, sn, p),
-                        base,
-                        "{family:?} sample {q:?} moved at perspective {p} — a flat family \
-                         must have no depth to spend"
-                    );
-                }
-            }
-            // ...and the in-plane rotation is what it always was: a half turn
-            // negates both axes exactly.
+            assert_eq!(projection_mirror::project(q, family, 0.6, 0.8).depth, 0.0);
             let ([rx, ry], [hx, hy]) = (
-                projection_mirror::world(q, family, REST.0, REST.1, 0.0),
-                projection_mirror::world(q, family, HALF_TURN.0, HALF_TURN.1, 0.0),
+                projection_mirror::world(q, family, REST.0, REST.1),
+                projection_mirror::world(q, family, HALF_TURN.0, HALF_TURN.1),
             );
             assert_eq!((hx, hy), (-rx, -ry));
         }
     }
-}
-
-/// The magnification's arithmetic, which is what makes `perspective` legible
-/// rather than magic: it means the figure's depth half-extent as a fraction
-/// of the camera distance, so the near-to-far ratio is `(1 + p) / (1 - p)`.
-#[test]
-fn the_magnification_matches_the_documented_ratio() {
-    for (p, expected) in [(0.0, 1.0), (0.5, 3.0), (MAX_PERSPECTIVE, 9.0)] {
-        let near = projection_mirror::magnify(1.0, p);
-        let far = projection_mirror::magnify(-1.0, p);
-        assert!(
-            (near / far - expected).abs() < 1e-5,
-            "perspective {p} gives a near/far ratio of {:.4}, not the documented {expected}",
-            near / far
-        );
-    }
-    // The two ends ADR-0076 quotes at the ceiling.
-    assert!((projection_mirror::magnify(1.0, MAX_PERSPECTIVE) - 5.0).abs() < 1e-5);
-    assert!((projection_mirror::magnify(-1.0, MAX_PERSPECTIVE) - 0.5556).abs() < 1e-3);
-
-    // At `perspective = 0` it is **exactly** 1.0 — not nearly. A multiply by
-    // exactly 1.0 is an identity in IEEE arithmetic, which is what makes the
-    // default byte-identical rather than merely close.
-    for dn in [-1.0f32, -0.37, 0.0, 0.42, 1.0] {
-        assert_eq!(projection_mirror::magnify(dn, 0.0), 1.0);
-    }
-
-    // The clamp keeps the divisor away from the singularity at `p = 1`: a
-    // converged figure overruns its seed box, so `d_n` before clamping
-    // reaches past 1 and an unclamped magnification would blow up.
-    assert_eq!(projection_mirror::depth_norm(100.0, 1.0 / 26.0), 1.0);
-    assert_eq!(projection_mirror::depth_norm(-100.0, 1.0 / 26.0), -1.0);
-    // A flat family's zero extent survives even an absurd depth.
-    assert_eq!(projection_mirror::depth_norm(1e30, 0.0), 0.0);
 }
 
 // -----------------------------------------------------------------------
@@ -754,11 +721,14 @@ fn distance_dims_the_far_material() {
     // far end to black and leaves the near end untouched.
     assert_eq!(projection_mirror::haze(-1.0, 1.0, deep), 0.0);
     assert_eq!(projection_mirror::haze(1.0, 1.0, deep), 1.0);
-    // Never negative anywhere in the clamped range — a negative deposit would
-    // subtract light from the additive accumulation.
+    // Never negative anywhere — a negative deposit would subtract light from
+    // the additive accumulation. Past the depth half-extent too, where a
+    // converged figure's far lobes reach and `depth01` saturates.
     for i in 0..SAMPLES {
         assert!(projection_mirror::haze(dn_at(i), 1.0, deep) >= 0.0);
     }
+    assert_eq!(projection_mirror::haze(-1.4, 1.0, deep), 0.0);
+    assert_eq!(projection_mirror::haze(1.4, 1.0, deep), 1.0);
 }
 
 /// Both cues are **exactly** the identity at their defaults, which is why no
@@ -777,10 +747,10 @@ fn the_atmosphere_is_off_by_default() {
         // mid-depth is `1 - depth_fade/2`, a uniform 45% dimmer at 0.9, which
         // is design-backlog 0067 — so the fade term is zeroed by the family's
         // zero inverse extent instead (Plan 0075 Phase 2). Exactly 1.0, the
-        // identity ADR-0076 always claimed.
+        // identity ADR-0076 always claimed. The flat path's `dn` is exactly 0.
         let flat_extent = canonical_depth(AttractorFamily::DeJong);
         assert_eq!(flat_extent, 0.0);
-        let flat = projection_mirror::depth_norm(1e6, flat_extent);
+        let flat = 0.0;
         assert_eq!(projection_mirror::haze(flat, 1.0, flat_extent), 1.0);
         assert_eq!(projection_mirror::depth_tint(flat, 1.0), 0.0);
     }
@@ -4380,43 +4350,82 @@ fn field_light(ctx: &RenderContext, scene: &AttractorScene) -> f64 {
         .sum()
 }
 
+/// The lens and the sprite a family with depth draws with, as the draw
+/// uniform packs them: the camera's frame for `camera` at no spin on a
+/// `width` x `height` target, its lens, and the sprite radius in target pixels
+/// at view depth `w` — the shader's `at_depth(cam, mdl.y, w)`.
+fn lens_and_sprite(
+    model: &family::ModelTransform,
+    camera: CameraParams,
+    (width, height): (u32, u32),
+) -> (crate::render::camera::Lens, impl Fn(f32) -> f32) {
+    let frame = super::encode::spun(camera, 0.0).frame(
+        width as f32 / height as f32,
+        1.0,
+        [0.0, 0.0],
+        (width, height),
+        super::encode::MODEL_RADIUS,
+        40.0,
+    );
+    let [aperture, focal, max_coc, _] = frame.uniform.lens;
+    let lens = crate::render::camera::Lens::new(aperture, focal, max_coc);
+    let r_ref =
+        super::encode::sprite_radius_px(super::POINT_BASE / model.footprint, &frame.view, height);
+    let reference = frame.view.distance;
+    (lens, move |w: f32| r_ref * reference / w)
+}
+
 /// **A 3D figure's sprites blur with their distance from the focal depth** —
-/// wider and dimmer away from it, untouched on it (ADR-0257), read off the CPU
-/// transcription of the draw shader's depth-of-field terms.
+/// wider and dimmer away from it, untouched on it — through the camera's own
+/// lens (ADR-0257, ADR-0260): [`Lens::coc`](crate::render::camera::Lens::coc),
+/// which the camera's test pins to the shader's `coc()`, composed with the draw
+/// shader's sprite and blur terms. A flat family's path has no lens at all.
 #[test]
 fn a_sprite_away_from_the_focal_depth_grows_and_dims() {
     use projection_mirror as m;
 
     for family in [AttractorFamily::Thomas, AttractorFamily::Lorenz] {
-        let inv = family.canonical_framing().inv_depth_extent(family);
-        assert!(inv > 0.0, "{family:?} has depth");
-        let r_px = 2.0;
-        // Focus at mid depth, `dn = 0`.
-        let at_focus = m::blur_growth(r_px, m::figure_coc(0.0, 20.0, 0.5, 40.0, inv));
+        let model = canonical_model(family);
+        let camera = CameraParams {
+            focus: 0.5,
+            aperture: 20.0,
+            ..CameraParams::default()
+        };
+        let (lens, sprite) = lens_and_sprite(&model, camera, (1920, 1080));
+        let focal = lens.focal_depth;
+        let at_focus = m::blur_growth(sprite(focal), lens.coc(focal));
         assert_eq!(at_focus, 1.0, "in focus, a sprite keeps its size");
         let mut prev = at_focus;
-        for dn in [-0.25, -0.5, -0.75, -1.0] {
-            let grow = m::blur_growth(r_px, m::figure_coc(dn, 20.0, 0.5, 40.0, inv));
+        // Out to the far extent of the unit model, behind the focal plane.
+        for step in 1..=4 {
+            let w = focal + 0.25 * step as f32;
+            let grow = m::blur_growth(sprite(w), lens.coc(w));
             let keep = 1.0 / (grow * grow);
-            assert!(grow > prev, "{family:?} at dn {dn}: no wider than {prev}");
+            assert!(grow > prev, "{family:?} at depth {w}: no wider than {prev}");
             assert!(keep < 1.0, "and dimmer");
             prev = grow;
         }
         // Nearer than the focus blurs too.
-        assert!(m::figure_coc(0.8, 20.0, 0.5, 40.0, inv) > 0.0);
+        assert!(lens.coc(focal - 0.8) > 0.0);
         // A pinhole blurs nothing anywhere.
-        for dn in [-1.0, 0.0, 1.0] {
-            assert_eq!(m::figure_coc(dn, 0.0, 0.2, 40.0, inv), 0.0);
+        let pinhole = crate::render::camera::Lens::new(0.0, focal, lens.max_coc);
+        for w in [focal - 1.0, focal, focal + 1.0] {
+            assert_eq!(pinhole.coc(w), 0.0);
         }
     }
-    // The flat maps have no depth, so no aperture blurs them.
+    // The flat maps keep their in-plane path, and it reads no lens.
     for family in [AttractorFamily::DeJong, AttractorFamily::Clifford] {
-        let inv = family.canonical_framing().inv_depth_extent(family);
-        assert_eq!(inv, 0.0);
-        for focus in [0.0, 0.3, 1.0] {
-            assert_eq!(m::figure_coc(0.0, 30.0, focus, 40.0, inv), 0.0);
-        }
+        assert!(canonical(family).model(family).is_none());
     }
+    let flat_path = super::DRAW_SHADER
+        .split_once("// A flat family keeps its in-plane path")
+        .and_then(|(_, rest)| rest.split_once("// Per-particle colour"))
+        .map(|(path, _)| path)
+        .expect("the draw shader names its flat path");
+    assert!(
+        !flat_path.contains("coc(") && !flat_path.contains("blur_growth("),
+        "the flat path must not blur"
+    );
 }
 
 /// **An aperture past the tier's cap is announced** (ADR-0007, ADR-0257): the
@@ -4450,17 +4459,6 @@ fn a_blur_past_the_tier_cap_is_announced() {
     // Focus moves the near side's blur and never the notice: an aperture under
     // the cap stays quiet at whichever depth is sharp.
     assert!(super::blur_overflow(super::asked_blur(cap - 1.0, true), cap).is_none());
-    // The scene's lens is the shader's: the CPU copy of the virtual lens names
-    // the constants the draw shader declares.
-    for (name, value) in [
-        ("FIGURE_DISTANCE", super::FIGURE_DISTANCE),
-        ("FIGURE_RADIUS", super::FIGURE_RADIUS),
-    ] {
-        assert!(
-            super::DRAW_SHADER.contains(&format!("const {name}: f32 = {value:?};")),
-            "the draw shader's {name} is not {value:?}"
-        );
-    }
 
     // Through the scene: a 3D figure reports it per frame, a flat map never.
     let Some(mut h) = Harness::new(AttractorFamily::Thomas) else {
@@ -4492,12 +4490,11 @@ fn a_blur_past_the_tier_cap_is_announced() {
 }
 
 /// **The blur is a width on screen, whatever size the trail field is drawn
-/// at** (ADR-0257, ADR-0037): the draw shader turns a circle of confusion in
-/// pixels into world units through the height it is handed, and that height is
-/// the render target's. At a grid scale of `0.5` the trail field is half the
-/// target, so a blur measured in its pixels would come out twice as wide on
-/// screen; here the same figure, lens and target give the same on-screen
-/// sprite at both scales.
+/// at** (ADR-0257, ADR-0037): the camera works in pixels of the target it is
+/// handed, and that target is the render target's, never the trail grid's. At
+/// a grid scale of `0.5` the trail field is half the target, so a blur measured
+/// in its pixels would come out twice as wide on screen; here the same figure,
+/// lens and target give the same on-screen sprite at both scales.
 #[test]
 fn the_blur_is_in_target_pixels_whatever_the_grid_scale() {
     use crate::render::tier::GridScale;
@@ -4506,21 +4503,22 @@ fn the_blur_is_in_target_pixels_whatever_the_grid_scale() {
     let Some(mut h) = Harness::new(AttractorFamily::Thomas) else {
         return;
     };
-    let inv = AttractorFamily::Thomas
-        .canonical_framing()
-        .inv_depth_extent(AttractorFamily::Thomas);
-    let (zoom, sprite_world, (w, ht)) = (1.0f32, 0.004f32, (1920u32, 1080u32));
+    let model = canonical_model(AttractorFamily::Thomas);
+    let (w, ht) = (1920u32, 1080u32);
+    h.scene.set_param("focus", 0.0);
+    h.scene.set_param("aperture", 12.0);
     // The on-screen radius, in target pixels, of a sprite at the figure's far
     // extent through a lens focused at its near one: the shader's
-    // `sprite * grow`, carried to pixels by the same height it is handed.
+    // `r * grow`, built from the target the scene was handed.
     let mut reading = |scale: f32| {
         h.scene
             .set_grid_scale(GridScale::new(scale).expect("a valid grid scale"));
         h.scene.set_target_size(w, ht);
-        let px_per_world = zoom * h.scene.target_h as f32 * 0.5;
-        let r_px = sprite_world * px_per_world;
-        let grow = m::blur_growth(r_px, m::figure_coc(-1.0, 12.0, 0.0, 40.0, inv));
-        ((h.scene.trail_w, h.scene.trail_h), r_px * grow)
+        let target = (h.scene.target_w, h.scene.target_h);
+        let (lens, sprite) = lens_and_sprite(&model, h.scene.camera, target);
+        let far = lens.focal_depth + 2.0 * super::encode::MODEL_RADIUS;
+        let grow = m::blur_growth(sprite(far), lens.coc(far));
+        ((h.scene.trail_w, h.scene.trail_h), sprite(far) * grow)
     };
     let (full_grid, full) = reading(1.0);
     let (half_grid, half) = reading(0.5);
@@ -4560,7 +4558,7 @@ fn an_aperture_blurs_a_3d_figure_and_leaves_a_flat_map_alone() {
     let capture = |renderer: &mut Renderer, family: &str, aperture: f32| {
         let preset = Preset::from_toml_str(&format!(
             "system = \"attractor\"\nname = \"dof_probe\"\n[particles]\nfamily = \"{family}\"\n\
-             [params]\nperspective = \"0.5\"\nfocus = \"0.0\"\naperture = \"{aperture}\"\n"
+             [params]\nfocus = \"0.0\"\naperture = \"{aperture}\"\n"
         ))
         .expect("the probe loads");
         renderer.set_presets(vec![preset]);

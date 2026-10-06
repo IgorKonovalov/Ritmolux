@@ -672,11 +672,11 @@ fn the_ifs_tint_channels_move_colour_without_moving_the_figure() {
     }
 }
 
-/// **All three depth cues are exact identities on a flat family** (Plan 0075
-/// Phase 2, closing design-backlog 0067) — ADR-0076's stated property, asserted
-/// at the capture with byte equality.
+/// **The depth cues and the camera are exact identities on a flat family**
+/// (Plan 0075 Phase 2, closing design-backlog 0067; ADR-0260) — ADR-0076's
+/// stated property, asserted at the capture with byte equality.
 ///
-/// The property held for `perspective` and `depth_hue` from the day they
+/// The property held for the projection and `depth_hue` from the day they
 /// landed and was **false** for `depth_fade`: `dn` is identically 0 on a flat
 /// family, `depth01(0)` is 0.5 — arithmetically "mid depth" — so the haze
 /// multiplier was a uniform `1 - depth_fade/2`. Measured on `attractor_dissolve`
@@ -710,7 +710,11 @@ fn the_depth_cues_are_exact_no_ops_on_a_flat_family() {
 
     renderer.set_presets(vec![
         attractor_bare_preset("at_flat_base", "de_jong", ""),
-        attractor_bare_preset("at_flat_persp", "de_jong", "perspective = \"0.7\"\n"),
+        attractor_bare_preset(
+            "at_flat_cam",
+            "de_jong",
+            "distance = \"2.0\"\nfov = \"1.2\"\npitch = \"0.6\"\naperture = \"30\"\n",
+        ),
         attractor_bare_preset("at_flat_hue", "de_jong", "depth_hue = \"0.6\"\n"),
         attractor_bare_preset("at_flat_fade", "de_jong", "depth_fade = \"0.9\"\n"),
         attractor_bare_preset("at_deep_base", "lorenz", ""),
@@ -724,7 +728,7 @@ fn the_depth_cues_are_exact_no_ops_on_a_flat_family() {
     assert!(lit > 500, "the bare De Jong lit only {lit} pixels");
 
     for (name, param) in [
-        ("at_flat_persp", "perspective = 0.7"),
+        ("at_flat_cam", "the camera block"),
         ("at_flat_hue", "depth_hue = 0.6"),
         ("at_flat_fade", "depth_fade = 0.9"),
     ] {
@@ -795,6 +799,37 @@ fn a_lorenz_figure_pitches_through_the_camera() {
     assert_eq!(
         flat.rgba, flat_pitched.rgba,
         "`pitch` must be inert on a flat family"
+    );
+}
+
+/// **A binding to the retired `perspective` fails to load, naming what replaced
+/// it** (ADR-0260): at the top level and in a layer, on any family, so a user
+/// preset never loads without the depth it asked for. The camera block that
+/// replaced it loads.
+#[test]
+fn a_perspective_binding_is_a_load_error_naming_the_camera() {
+    let top = "system = \"attractor\"\nname = \"retired\"\n[particles]\nfamily = \"lorenz\"\n\
+               [params]\nperspective = \"0.3\"\n";
+    let layered = "system = \"fragment_field\"\nname = \"retired_layer\"\n[params]\n\
+                   [layer]\nsystem = \"attractor\"\n[layer.particles]\nfamily = \"thomas\"\n\
+                   [layer.params]\nperspective = \"0.2\"\n";
+    for (surface, toml) in [("top level", top), ("layer", layered)] {
+        let err = match Preset::from_toml_str(toml) {
+            Ok(_) => panic!("a {surface} `perspective` binding loaded"),
+            Err(err) => err.to_string(),
+        };
+        assert!(
+            err.contains("perspective") && err.contains("`distance`") && err.contains("`fov`"),
+            "the {surface} error must name the retired param and its replacement: {err}"
+        );
+    }
+    let replaced = "system = \"attractor\"\nname = \"camera\"\n[particles]\nfamily = \"lorenz\"\n\
+                    [params]\ndistance = \"2.0\"\nfov = \"1.18\"\n";
+    let loaded = Preset::from_toml_str(replaced).expect("the camera block loads");
+    assert!(
+        loaded.warnings.is_empty(),
+        "the camera block is declared on the attractor: {:?}",
+        loaded.warnings
     );
 }
 

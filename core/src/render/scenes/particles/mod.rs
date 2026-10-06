@@ -198,12 +198,7 @@ const DEFAULT_HUE: f32 = 0.0;
 /// particle marks and this is the one lever that says how bright; a fourth name
 /// for it would be a vocabulary an author has to re-learn per scene.
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
-/// Depth-cue defaults (ADR-0076): **exactly the pre-ADR-0076 behaviour**. At
-/// `perspective = 0` the magnification is `1 / (1 - 0 * d_n)` = `1`, and a
-/// multiply by `1.0` is exact — so an unbound preset is byte-identical and no
-/// golden baseline moves.
-const DEFAULT_PERSPECTIVE: f32 = default_of(PARAMS, "perspective");
-/// The two atmospheric cues, likewise inert at their defaults: `depth_fade = 0`
+/// The two atmospheric cues (ADR-0076), inert at their defaults: `depth_fade = 0`
 /// leaves the brightness multiplier exactly `1`, and `depth_hue = 0` adds an
 /// exact `0` to the palette coordinate.
 ///
@@ -225,16 +220,6 @@ const DEFAULT_DEPTH_HUE: f32 = default_of(PARAMS, "depth_hue");
 /// same claim — *the default is the identity* — and it is the claim, not the
 /// number, that has to hold.
 const DEFAULT_CHANNEL_COLOUR: f32 = 0.0;
-/// Ceiling on `perspective`, applied silently where the uniform is packed.
-///
-/// `perspective` means **the figure's depth half-extent as a fraction of the
-/// camera distance**, so the near-to-far magnification ratio is
-/// `(1 + p) / (1 - p)`: `0.5` gives 3:1 and this value gives 9:1 (the far end at
-/// 0.556, the near end at 5.0). The singularity — a point reaching the camera
-/// plane — sits at exactly `1`, and this is well short of it. The arithmetic
-/// holds because `d_n` is clamped to `[-1, 1]` before it is used — see
-/// `depth_norm` in the draw shader for why that clamp is not decoration.
-const MAX_PERSPECTIVE: f32 = 0.8;
 // Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5). The per-particle
 // seed jitter occupies `hue_center + (seed - 0.5)*hue_spread`; the defaults
 // (`spread = 0.15`, `center = 0.075`) reduce to `seed*0.15` — the prior hardcoded
@@ -567,7 +552,7 @@ const MIN_EMERGENCE: f32 = 1.0;
 /// The per-step brightness increment the draw uniform carries, from a bound
 /// `emergence` in **steps**.
 ///
-/// Clamped here rather than in the shader for the reason `perspective` is
+/// Clamped here rather than in the shader for the reason `depth_fade` is
 /// (ADR-0076): this is the one place the value crosses into the GPU, so a preset
 /// asking for something the maths does not accept gets the floor rather than a
 /// divisor approaching zero. **A smoothing curve makes this necessary rather
@@ -857,14 +842,9 @@ pub struct AttractorScene {
     /// Shared view transform (ADR-0018 / Plan 0025 Phase 4): `zoom` scales the
     /// projected cloud about the screen centre, `pan_*` offsets it.
     zoom: f32,
-    /// Perspective strength (ADR-0076): the figure's depth half-extent as a
-    /// fraction of the camera distance, clamped to [`MAX_PERSPECTIVE`] where the
-    /// uniform is packed. `0` is the orthographic projection this scene shipped
-    /// with, and it is inert on the 2D families whatever it is set to.
-    perspective: f32,
     /// The shared camera block (ADR-0258): the orbit, the lens, and `focus` and
     /// `aperture` on it. Live on the families with depth, which project through
-    /// it with the spin added to its yaw (ADR-0260); inert on the 2D families,
+    /// it with the spin folded into its yaw (ADR-0260); inert on the 2D families,
     /// and the blur inert everywhere at `aperture = 0`.
     camera: CameraParams,
     /// The tier's cap on the circle of confusion, in pixels.
@@ -877,12 +857,12 @@ pub struct AttractorScene {
     /// `[0, 1]` where the uniform is packed — past `1` the multiplier would go
     /// negative and *subtract* light from the additive accumulation), and
     /// `depth_hue` shifts its palette coordinate by `±depth_hue/2` across the
-    /// depth range. Both inert on the 2D families, like `perspective`.
+    /// depth range. Both inert on the 2D families, like the camera.
     depth_fade: f32,
     depth_hue: f32,
     /// The last-map colour channel's two routes (ADR-0087), **IFS-only** — every
     /// other family leaves `Particle::map` at `0.0`, so both are exactly inert
-    /// there without a branch, the way `perspective` is inert on a 2D family.
+    /// there without a branch, the way the camera is inert on a 2D family.
     ///
     /// `map_tint` shifts the particle's palette coordinate by `±map_tint/2`
     /// across the four maps, so the colour comes from the preset's own
@@ -928,7 +908,7 @@ pub struct AttractorScene {
     /// Rate multiplier on [`SPIN_RATE`] (ADR-0076). Unlike the depth cues this is
     /// **not** inert on the 2D families: the discrete maps rotate in-plane
     /// through the same angle, so `spin` reaches all four families where
-    /// `perspective`, `depth_fade` and `depth_hue` reach two. That asymmetry is
+    /// the camera, `depth_fade` and `depth_hue` reach two. That asymmetry is
     /// deliberate — an in-plane spin is a real look on De Jong today.
     spin: f32,
     /// The active baked palette. Held here rather than only in the pipelines'
@@ -1026,7 +1006,6 @@ impl AttractorScene {
             hue_spread: DEFAULT_HUE_SPREAD,
             hue_center: DEFAULT_HUE_CENTER,
             zoom: DEFAULT_ZOOM,
-            perspective: DEFAULT_PERSPECTIVE,
             camera: CameraParams::default(),
             max_coc,
             blur_clamp: None,
@@ -1568,15 +1547,6 @@ pub const PARAMS: &[ParamSpec] = &[
         group: ParamGroup::Motion,
         main: false,
     },
-    ParamSpec {
-        name: "perspective",
-        default: 0.0,
-        range: Some([0.0, 1.0]),
-        doc: "How strongly depth shrinks a particle, turning a flat figure into a solid one.",
-        kind: ParamKind::Modal,
-        group: ParamGroup::Shape,
-        main: false,
-    },
     YAW,
     PITCH,
     DISTANCE,
@@ -1868,7 +1838,6 @@ impl Scene for AttractorScene {
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.hue_center = DEFAULT_HUE_CENTER;
         self.zoom = DEFAULT_ZOOM;
-        self.perspective = DEFAULT_PERSPECTIVE;
         self.depth_fade = DEFAULT_DEPTH_FADE;
         self.camera.reset();
         self.depth_hue = DEFAULT_DEPTH_HUE;
@@ -1905,7 +1874,6 @@ impl Scene for AttractorScene {
             "hue_spread" => self.hue_spread = value,
             "hue_center" => self.hue_center = value,
             "zoom" => self.zoom = value,
-            "perspective" => self.perspective = value,
             "depth_fade" => self.depth_fade = value,
             "depth_hue" => self.depth_hue = value,
             "map_tint" => self.map_tint = value,
@@ -2143,7 +2111,6 @@ impl Scene for AttractorScene {
             hue_center,
             zoom,
             pan,
-            perspective,
             camera,
             max_coc,
             target_h,
@@ -2209,7 +2176,6 @@ impl Scene for AttractorScene {
                 palette_steps: colour.steps,
                 zoom: *zoom,
                 pan: [pan.x, pan.y],
-                perspective: *perspective,
                 camera: *camera,
                 max_coc: *max_coc,
                 target: (*target_w, *target_h),
@@ -2258,24 +2224,15 @@ impl Scene for AttractorScene {
 // `swap()` placement. Free functions rather than methods because `render`
 // destructures `self` to borrow the resources and the params at once.
 
-/// Mirrors `FIGURE_DISTANCE` / `FIGURE_RADIUS` in [`DRAW_SHADER`]: the virtual
-/// lens a figure's normalized depth is laid on (ADR-0257), its orbit target one
-/// unit away and the figure half a unit deep either side of it. Only the
-/// shader's CPU transcription reads them; the scene judges the bare aperture.
-#[cfg(test)]
-pub(super) const FIGURE_DISTANCE: f32 = 1.0;
-#[cfg(test)]
-pub(super) const FIGURE_RADIUS: f32 = 0.5;
-
 /// The blur, in pixels, the tier's cap is judged against: the aperture, which
 /// is the circle of confusion of the far field — behind focus the lens rises
 /// toward it and never passes it. In front of focus the blur grows past it
 /// without bound and saturates at the cap by design, so that side is never
-/// judged (ADR-0257). `aperture` is the raw bound value, sanitized as the
-/// uniform packing sanitizes it.
+/// judged (ADR-0257). `aperture` is the raw bound value, sanitized as
+/// [`Lens::new`](crate::render::camera::Lens::new) sanitizes it.
 ///
-/// **Exactly 0 on a family without depth**, which `figure_coc()` in the draw
-/// shader zeroes whatever the aperture, so a flat map never announces a blur.
+/// **Exactly 0 on a family without depth**, whose in-plane path has no lens
+/// at all, so a flat map never announces a blur.
 pub(super) fn asked_blur(aperture: f32, has_depth: bool) -> f32 {
     if !has_depth || !aperture.is_finite() {
         return 0.0;

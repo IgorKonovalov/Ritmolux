@@ -197,8 +197,8 @@ struct ModelTransform {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: Lorenz through the camera | dev | done | committed with this row |
-| 2 — The real lens, and `perspective` retires | dev | not started | |
+| 1 — Walking skeleton: Lorenz through the camera | dev | done | 19386418 |
+| 2 — The real lens, and `perspective` retires | dev | done | committed with this row |
 | 3 — The shipped presets migrate by the mapping | dev | not started | |
 | 4 — Documentation and the references | dev | not started | |
 | 5 — The 3D presets, re-curated in motion | human | not started | |
@@ -231,6 +231,26 @@ struct ModelTransform {
   `the_generated_editor_files_are_current`. The second compares `docs/specs/player-schema.json`,
   which Phase 4's file list does not name; `RLX_UPDATE_PRESET_SCHEMA=1` rewrites it with the rest.
   The other 1882 tests pass.
+- Phase 2: the loader was not silent before this phase. An undeclared param was a load warning
+  (`unknown parameter ... binding kept, but nothing reads it`), not an error. The done-when names a
+  load error, so `load.rs` gained `RETIRED_PARAMS`: a binding to `perspective` on the attractor, at
+  the top level or in a layer, fails with `PresetError::Config` naming `distance` and `fov`.
+- Phase 2: the `dn` clamp left `depth_norm`, which is gone, and became a saturation in `depth01`,
+  because the haze goes negative past the far extent. The flat path's `dn` is now a literal 0.
+- Phase 2: `core/tests/fixtures/attractor_depth.toml` moved off `perspective = 0.5`,
+  `zoom = 1.30` onto the mapping (`distance = 2.0`, `fov = 1.1839`, `pitch = 0`, zoom 1),
+  because the retired binding no longer loads. Its baseline was not re-blessed.
+- Phase 2 touched `core/src/render/scenes/particles/projection_mirror.rs`, which only Phase 1
+  lists. Its transcriptions of `depth_norm`, `magnify` and `figure_coc` went with the shader
+  functions they mirror, `world` lost its `perspective` argument, and `depth01` gained the
+  saturation.
+- Phase 2: the flat fixtures stayed byte-identical on this adapter (the same `shot` and `cmp`
+  check as Phase 1).
+- Between Phase 2 and Phase 3, the shipped presets that still bind `perspective` fail to load. In
+  this phase that reddened `attractor_contract` and `attractor_projects_at_the_target_aspect`,
+  which load `attractor_walkdejong`.
+- Followup noticed: `core/src/render/scenes/particles/ifs.rs` (the `SIGMA_CEILING` doc) still cites
+  `perspective` as a silently clamped param. The file is outside every phase of this plan.
 
 ### Close triggers
 

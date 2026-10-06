@@ -78,10 +78,9 @@ pub(super) struct UniformInputs {
     pub(super) palette_steps: f32,
     pub(super) zoom: f32,
     pub(super) pan: [f32; 2],
-    pub(super) perspective: f32,
     /// The shared camera block (ADR-0258), raw as bound: the orbit and lens a
-    /// family with depth projects through (ADR-0260), and its `focus` and
-    /// `aperture`, sanitized where they are packed.
+    /// family with depth projects through (ADR-0260), made safe by
+    /// `Camera3d::view` and `Lens::new` as the frame is built.
     pub(super) camera: CameraParams,
     /// The tier's cap on the circle of confusion, in pixels.
     pub(super) max_coc: f32,
@@ -239,21 +238,11 @@ pub(super) fn upload_uniforms(
                     0.0
                 },
             ],
-            // The lens rides the three padding lanes the basis and the centre
-            // rows already had, so the uniform keeps its size (ADR-0257).
-            bh: [hx, hy, hz, finite_or(inputs.camera.aperture, 0.0).max(0.0)],
-            bv: [
-                vx,
-                vy,
-                vz,
-                finite_or(inputs.camera.focus, 0.5).clamp(0.0, 1.0),
-            ],
+            // The lens rides `cam` below (ADR-0257, ADR-0260).
+            bh: [hx, hy, hz, 0.0],
+            bv: [vx, vy, vz, 0.0],
             d: [
-                // Clamped here, silently, and not in the shader: this is the one
-                // place the value crosses into the GPU, so a preset asking for
-                // more gets the ceiling rather than a divisor approaching zero
-                // (ADR-0076). `presets/README.md` documents that it is silent.
-                inputs.perspective.clamp(0.0, MAX_PERSPECTIVE),
+                0.0,
                 // Clamped for a harder reason than a ceiling: past `1` the haze
                 // multiplier goes negative, and negative light in an additive
                 // accumulation *subtracts* from whatever the trail already holds.
@@ -263,7 +252,7 @@ pub(super) fn upload_uniforms(
                 inputs.depth_hue,
                 inputs.framing.inv_depth_extent(inputs.family),
             ],
-            ctr: [centre[0], centre[1], centre[2], inputs.max_coc.max(0.0)],
+            ctr: [centre[0], centre[1], centre[2], 0.0],
             // The four colour channels, unclamped for the same reason
             // `depth_hue` above is: the LUT sampler repeats, so any
             // palette-coordinate shift is legitimate, and the hue route takes
@@ -310,15 +299,10 @@ pub(super) fn upload_uniforms(
                     emergence_rate(inputs.emergence),
                     0.0,
                     palette::band_steps(inputs.palette_steps),
-                    inputs.target.1 as f32,
+                    0.0,
                 ]
             } else {
-                [
-                    0.0,
-                    1.0,
-                    palette::band_steps(inputs.palette_steps),
-                    inputs.target.1 as f32,
-                ]
+                [0.0, 1.0, palette::band_steps(inputs.palette_steps), 0.0]
             },
             cam,
             mdl,
@@ -553,10 +537,4 @@ fn focal_scale(view: &CameraView) -> f32 {
     let along = u0 * f0 + u1 * f1 + u2 * f2;
     let (a, b, c) = (u0 - along * f0, u1 - along * f1, u2 - along * f2);
     (a * a + b * b + c * c).sqrt()
-}
-
-/// `v` when it is finite, `fallback` when a binding evaluated to NaN or an
-/// infinity.
-fn finite_or(v: f32, fallback: f32) -> f32 {
-    if v.is_finite() { v } else { fallback }
 }
