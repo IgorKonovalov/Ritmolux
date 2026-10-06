@@ -318,8 +318,8 @@ and `follow_window`.
 |---|---|---|---|
 | 1 — Walking skeleton: a tree in depth | dev | done | aaf32332 |
 | 2 — What is inert in space, and the frame's drift | dev | done | 6d5c4129 |
-| 3 — Caps and the space golden | dev | done | committed with this row |
-| 4 — Endless: the lazy stream and the ring | dev | not started | |
+| 3 — Caps and the space golden | dev | done | 927564c3 |
+| 4 — Endless: the lazy stream and the ring | dev | done | committed with this row |
 | 5 — The camera follows the growth | dev | not started | |
 | 6 — Endless cost and the endless golden | dev | not started | |
 | 7 — Documentation and the references | dev | not started | |
@@ -365,6 +365,28 @@ and `follow_window`.
   renderer contributes.
 - Phase 3 ran `-P fast` over `rlx-core` only (1268 passed): the phase changes core tests and a
   baseline and nothing another crate builds.
+- Phase 4: one draw step is `ENDLESS_STEP` = 0.025 world units, not one unit. A whole unit is most
+  of the view: the flat view spans `[-1, 1]` vertically, and the camera at its default distance
+  shows about three units. On the plane `scale` multiplies it.
+- Phase 4: `growth` and `trail` are `[generator]` keys, because the loader checks `trail` against
+  the stream. `grow` and `tail` are `[params]`. `STREAM_DEPTH` is 32. The stream-equals-`expand`
+  test walks the stream at depth 7, the depth the done-when names. The clamp of `trail` to the
+  tier's cap is announced through a new `OverflowContext::Trail`, and `Roster::Growth` lists the
+  modes. Both are outside the phase list, in `core/src/render/scenes/mod.rs` and
+  `core/src/preset/schema/export.rs`, with `Roster::Growth`'s parser check in
+  `core/src/preset/schema/tests.rs`.
+- Phase 4 inert declarations: the family table's modes are `flat`, `space`, `flat endless` and
+  `space endless`. `rotation`, `scale` and `stroke_blend` read on `flat endless`. `max_depth` is a
+  `[generator]` key, so its inertness under `endless` is in its key doc, not the table. The
+  generated files were regenerated again.
+- Phase 4 adds a per-frame budget of 65,536 stream symbols beside the plan's emit ceiling of 1024
+  draw steps: a draw step can sit behind any number of symbols that draw nothing. A frame that
+  cannot pay what it owes drops the backlog. The pen's branch stack refuses a push past the
+  bracket bound, which only an unbalanced grammar reaches.
+- Phase 4's colour divisor for an endless figure is the bracket bound, 32 times the deepest
+  successor nesting. On `F=F[+F]F[-F]F` the first 1,200 frames drew in generations far below it,
+  so `hue_spread` spans little of the palette there.
+- Phase 4 byte-identity re-checked with `shot` as in Phase 1: identical.
 
 ### Close triggers
 

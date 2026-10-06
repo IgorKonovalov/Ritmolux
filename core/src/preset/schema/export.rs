@@ -101,6 +101,8 @@ pub enum Roster {
     PlexusLayout,
     /// `[generator] turtle`.
     Turtle,
+    /// `[generator] growth`.
+    Growth,
 }
 
 impl Roster {
@@ -137,6 +139,10 @@ impl Roster {
             Roster::Turtle => crate::render::scenes::lines::turtle::TurtleMode::ALL
                 .iter()
                 .map(|m| m.as_str())
+                .collect(),
+            Roster::Growth => crate::render::scenes::lines::lsystem::Growth::ALL
+                .iter()
+                .map(|g| g.as_str())
                 .collect(),
         }
     }

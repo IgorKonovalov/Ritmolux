@@ -573,38 +573,40 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | Parameter | Default | Range | What it does | Group |
 |---|---|---|---|---|
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. | colour |
-| `mirror_order` | `1` | `flat` `1` – `12`; inert on `space` | Repeats a flat L-system this many times around the centre; 1 draws it once. | shape |
+| `mirror_order` | `1` | `flat` `1` – `12`; inert on `space`, `flat endless`, `space endless` | Repeats a flat L-system this many times around the centre; 1 draws it once. | shape |
 
 **Modal**
 
 | Parameter | Default | Range | What it does | Group |
 |---|---|---|---|---|
-| `visible_depth` | `1` | `1` – `7` | Which recursion generation is drawn, counted from 1 and capped at `max_depth`; a fraction floors to the generation below it, and anything under 2 draws the first. | shape, main |
-| `rotation` | `0` | `flat` `0` – `6.2831855`; inert on `space` | Turns a flat figure in its plane, in radians. | motion |
+| `visible_depth` | `1` | `flat` `1` – `7`; `space` `1` – `7`; inert on `flat endless`, `space endless` | Which recursion generation is drawn, counted from 1 and capped at `max_depth`; a fraction floors to the generation below it, and anything under 2 draws the first. | shape, main |
+| `rotation` | `0` | `flat` `0` – `6.2831855`; `flat endless` `0` – `6.2831855`; inert on `space`, `space endless` | Turns a flat figure in its plane, in radians. | motion |
 | `hue` | `0.3` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. | colour, main |
 | `hue_spread` | `0` | `0` – `1` | How far along the palette the colour travels from one end of the figure to the other. | colour |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. | colour |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. | colour |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. | colour |
-| `draw_progress` | `1` | `0` – `1` | How much of the figure is drawn, from its start; below 1 the line is still arriving. | motion |
+| `draw_progress` | `1` | `flat` `0` – `1`; `space` `0` – `1`; inert on `flat endless`, `space endless` | How much of a fixed L-system is drawn, from its first segment: 0 none, 1 all of it. | motion |
 | `thickness` | `1.8` | `0.5` – `12` | Stroke width: on a flat figure in the shared line units, on a space figure in pixels at the focal plane, wider nearer and narrower farther. | shape, main |
-| `scale` | `1` | `flat` `0.1` – `2`; inert on `space` | Scales a flat figure about its centre; a space figure is sized by the camera's distance instead. | shape |
+| `scale` | `1` | `flat` `0.1` – `2`; `flat endless` `0.1` – `2`; inert on `space`, `space endless` | Scales a flat figure about its centre; a space figure is sized by the camera's distance instead. | shape |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
 | `glow` | `1` | `0` – `4` | Brightness of the halo around each stroke, on top of the stroke itself. | light, main |
 | `softness` | `0.25` | `0` – `1` | How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core. | light |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. | shape |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
-| `stroke_blend` | `0` | `flat` `0` – `1`; inert on `space` | Moves a flat L-system's stroke from additive light toward opaque paint, so crossing branches stop brightening. | light |
-| `mirror_reflect` | `0` | `flat` `0` – `1`; inert on `space` | Alternates a flat L-system's repeats into mirror images rather than plain rotations. | shape |
-| `yaw` | `0` | `space` `-3.1415927` – `3.1415927`; inert on `flat` | Turns the camera around a space tree, in radians; bind it to a slow clock to orbit. | motion |
-| `pitch` | `0.25` | `space` `-1.55` – `1.55`; inert on `flat` | Raises the camera above a space tree, in radians; negative looks up from below. | motion |
-| `distance` | `3.5` | `space` `1.5` – `8`; inert on `flat` | How far the camera sits from a space tree's centre; nearer makes the tree larger and exaggerates the perspective. | motion |
-| `fov` | `0.8` | `space` `0.2` – `2`; inert on `flat` | The camera's vertical field of view onto a space tree, in radians; zoom divides it. | motion |
-| `focus` | `0.5` | `space` `0` – `1`; inert on `flat` | Where the focal plane sits in a space tree's depth: 0 at its nearest point, 1 at its farthest. | light, main |
-| `aperture` | `0` | `space` `0` – `24`; inert on `flat` | The blur of a space tree's far side, in pixels; branches nearer than the focal plane blur more, up to the tier's cap. 0 keeps every branch sharp, and wider costs fill. | light, main |
-| `fog` | `0` | `space` `0` – `1`; inert on `flat` | Fades a space tree toward black with depth: at 1 its farthest point is black and its nearest keeps its light. 0 is off. | light |
-| `solid` | `0` | `space` `0` – `1`; inert on `flat` | 1 paints a space tree's near branches over its far ones, so it reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every segment by depth each frame. | light |
+| `stroke_blend` | `0` | `flat` `0` – `1`; `flat endless` `0` – `1`; inert on `space`, `space endless` | Moves a flat L-system's stroke from additive light toward opaque paint, so crossing branches stop brightening. | light |
+| `mirror_reflect` | `0` | `flat` `0` – `1`; inert on `space`, `flat endless`, `space endless` | Alternates a flat L-system's repeats into mirror images rather than plain rotations. | shape |
+| `yaw` | `0` | `space` `-3.1415927` – `3.1415927`; `space endless` `-3.1415927` – `3.1415927`; inert on `flat`, `flat endless` | Turns the camera around a space tree, in radians; bind it to a slow clock to orbit. | motion |
+| `pitch` | `0.25` | `space` `-1.55` – `1.55`; `space endless` `-1.55` – `1.55`; inert on `flat`, `flat endless` | Raises the camera above a space tree, in radians; negative looks up from below. | motion |
+| `distance` | `3.5` | `space` `1.5` – `8`; `space endless` `1.5` – `8`; inert on `flat`, `flat endless` | How far the camera sits from a space tree's centre; nearer makes the tree larger and exaggerates the perspective. | motion |
+| `fov` | `0.8` | `space` `0.2` – `2`; `space endless` `0.2` – `2`; inert on `flat`, `flat endless` | The camera's vertical field of view onto a space tree, in radians; zoom divides it. | motion |
+| `focus` | `0.5` | `space` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `flat endless` | Where the focal plane sits in a space tree's depth: 0 at its nearest point, 1 at its farthest. | light, main |
+| `aperture` | `0` | `space` `0` – `24`; `space endless` `0` – `24`; inert on `flat`, `flat endless` | The blur of a space tree's far side, in pixels; branches nearer than the focal plane blur more, up to the tier's cap. 0 keeps every branch sharp, and wider costs fill. | light, main |
+| `fog` | `0` | `space` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `flat endless` | Fades a space tree toward black with depth: at 1 its farthest point is black and its nearest keeps its light. 0 is off. | light |
+| `solid` | `0` | `space` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `flat endless` | 1 paints a space tree's near branches over its far ones, so it reads as an object and crossings stop brightening; 0 is the additive glow. Solid sorts every segment by depth each frame. | light |
+| `grow` | `20` | `flat endless` `0` – `120`; `space endless` `0` – `120`; inert on `flat`, `space` | How fast an endless figure grows, in draw steps a second; bind it to onset to make it surge. | motion, main |
+| `tail` | `0.5` | `flat endless` `0` – `1`; `space endless` `0` – `1`; inert on `flat`, `space` | The oldest fraction of an endless figure's trail that fades out; 0 keeps every segment at full light until it is dropped. | light |
 
 ### System: `star_pattern`
 

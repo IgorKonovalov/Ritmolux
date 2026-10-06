@@ -31,7 +31,7 @@
         "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
         "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
         "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
-        "draw_progress": { "$ref": "#/definitions/param.draw_progress" },
+        "draw_progress": { "$ref": "#/definitions/param.draw_progress.parametric_curve" },
         "thickness": { "$ref": "#/definitions/param.thickness.parametric_curve" },
         "scale": { "$ref": "#/definitions/param.scale.star_pattern" },
         "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
@@ -355,14 +355,25 @@
         },
         "max_depth": {
           "type": "integer",
-          "description": "L-system: how many iterations to expand and cache.",
-          "markdownDescription": "L-system: how many iterations to expand and cache.\n\nDefault `4`."
+          "description": "L-system: how many iterations to expand and cache. Inert under growth = \"endless\", whose stream is walked to its own fixed depth.",
+          "markdownDescription": "L-system: how many iterations to expand and cache. Inert under growth = \"endless\", whose stream is walked to its own fixed depth.\n\nDefault `4`."
         },
         "turtle": {
           "type": "string",
           "enum": ["flat", "space"],
           "description": "L-system: \"flat\" walks the plane; \"space\" walks in depth through the camera, where & and ^ pitch, \\ and / roll and | turns around.",
           "markdownDescription": "L-system: \"flat\" walks the plane; \"space\" walks in depth through the camera, where & and ^ pitch, \\ and / roll and | turns around.\n\nDefault `flat`."
+        },
+        "growth": {
+          "type": "string",
+          "enum": ["fixed", "endless"],
+          "description": "L-system: \"fixed\" draws one cached depth; \"endless\" grows a vine that never ends at the rate grow sets, keeping the newest trail segments.",
+          "markdownDescription": "L-system: \"fixed\" draws one cached depth; \"endless\" grows a vine that never ends at the rate grow sets, keeping the newest trail segments.\n\nDefault `fixed`."
+        },
+        "trail": {
+          "type": "integer",
+          "description": "L-system, endless: how many segments the vine keeps behind its tip, held to the quality tier's cap.",
+          "markdownDescription": "L-system, endless: how many segments the vine keeps behind its tip, held to the quality tier's cap.\n\nDefault `2000`."
         },
         "seed": {
           "anyOf": [
@@ -839,7 +850,7 @@
       "description": "How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core.",
       "markdownDescription": "How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core.\n\n- default `0.25`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.draw_progress": {
+    "param.draw_progress.parametric_curve": {
       "type": "string",
       "description": "How much of the figure is drawn, from its start; below 1 the line is still arriving.",
       "markdownDescription": "How much of the figure is drawn, from its start; below 1 the line is still arriving.\n\n- default `1.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."

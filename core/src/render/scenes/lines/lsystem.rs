@@ -61,8 +61,8 @@ use super::renderer::{
 };
 use super::turtle::TurtleMode;
 use super::{
-    CapOverflow, ColorRamp, GeneratorConfig, MAX_LSYSTEM_DEPTH, MirrorSpec, OverflowContext,
-    ViewTransform, grammar, replicate_mirror, transform_cached, turtle,
+    CapOverflow, ColorRamp, GeneratorConfig, LineInstance, MAX_LSYSTEM_DEPTH, MirrorSpec,
+    OverflowContext, ViewTransform, grammar, replicate_mirror, transform_cached, turtle,
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::camera::{self, CameraParams};
@@ -74,6 +74,244 @@ use crate::render::scenes::{
 /// The bounding sphere a space figure is fitted into, in world units: the
 /// volume the camera orbits, and the radius `focus` is normalized across.
 const SPACE_RADIUS: f32 = 1.0;
+
+/// How the figure is grown: `[generator] growth`.
+///
+/// `Fixed` is the default and the cached model: every depth expanded and
+/// walked once at load. `Endless` caches nothing and walks an effectively
+/// infinite derivation a few steps a frame, keeping the newest `trail`
+/// segments.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Growth {
+    /// Every depth cached at load; a frame picks one.
+    #[default]
+    Fixed,
+    /// A vine that never ends: a lazy stream walked into a ring.
+    Endless,
+}
+
+impl Growth {
+    /// Every mode, in the order the loader names them.
+    pub const ALL: [Growth; 2] = [Growth::Fixed, Growth::Endless];
+
+    /// The mode as a preset writes it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Growth::Fixed => "fixed",
+            Growth::Endless => "endless",
+        }
+    }
+
+    /// The mode a preset's spelling names, or `None` for an unknown one.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|mode| mode.as_str() == name)
+    }
+}
+
+/// `[generator] trail`'s default: how many segments an endless figure keeps.
+pub const DEFAULT_TRAIL: u32 = 2000;
+
+/// The most draw steps one frame emits, however fast `grow` asks. A frame past
+/// it emits this many and drops the rest of its backlog, so a huge `grow`
+/// costs a bounded frame rather than a stall.
+const EMIT_CEILING: u64 = 1024;
+
+/// The most stream symbols one frame reads. A draw step can sit behind many
+/// symbols that draw nothing, so the ceiling on draw steps alone does not
+/// bound the work; this does, for any grammar.
+const SYMBOL_BUDGET: usize = 65_536;
+
+/// The world size of one draw step of an endless figure. A whole unit would be
+/// most of the view: the flat view spans `[-1, 1]` vertically and the camera's
+/// default distance shows about three units. On a flat figure `scale`
+/// multiplies it.
+const ENDLESS_STEP: f32 = 0.025;
+
+/// One segment in an endless figure's ring, in draw-step units.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct RingSeg {
+    a: [f32; 3],
+    b: [f32; 3],
+    /// The generation it was drawn at: the colour axis (ADR-0059).
+    generation: u32,
+    /// Whether it continues the segment drawn before it.
+    joined: bool,
+    /// The flat joint extensions, in [`PLACEHOLDER_WIDTH`](super::PLACEHOLDER_WIDTH)
+    /// units, as the flat walk stores them.
+    ext_a: f32,
+    ext_b: f32,
+}
+
+/// An endless figure's CPU state (Plan 0237): the stream, the pen walking it,
+/// the ring of the newest `trail` segments and the integrated rate. No GPU in
+/// it, so every claim about it is testable on the CPU.
+///
+/// **Nothing here allocates after construction.** The stream's frames, the
+/// pen's branch stack and the ring are each reserved at their bound.
+#[derive(Debug, Clone)]
+pub(crate) struct Endless {
+    stream: grammar::Stream,
+    pen: turtle::Pen,
+    ring: Vec<RingSeg>,
+    trail: usize,
+    /// Where the next segment is written once the ring is full: its oldest.
+    head: usize,
+    /// `grow * dt`, integrated: draw steps owed since the start. `f64`, so a
+    /// long run keeps whole steps exact.
+    phase: f64,
+    /// Draw steps taken since the start.
+    emitted: u64,
+}
+
+impl Endless {
+    /// The endless walk of `axiom` under `rules`, at `angle` radians, keeping
+    /// `trail` segments, through [`grammar::STREAM_DEPTH`] levels.
+    pub(crate) fn new(
+        axiom: &str,
+        rules: &[(char, String)],
+        angle: f32,
+        mode: TurtleMode,
+        trail: usize,
+    ) -> Self {
+        let trail = trail.max(1);
+        let depth = grammar::STREAM_DEPTH;
+        Self {
+            stream: grammar::Stream::new(axiom, rules, depth),
+            pen: turtle::Pen::new(mode, angle, grammar::bracket_bound(axiom, rules, depth)),
+            ring: Vec::with_capacity(trail),
+            trail,
+            head: 0,
+            phase: 0.0,
+            emitted: 0,
+        }
+    }
+
+    /// The deepest generation a segment can be drawn at: the ramp's divisor.
+    pub(crate) fn generations(&self) -> u32 {
+        u32::try_from(self.pen.stack_capacity()).unwrap_or(u32::MAX)
+    }
+
+    /// Draw steps taken since the start.
+    #[cfg(test)]
+    fn emitted(&self) -> u64 {
+        self.emitted
+    }
+
+    /// Segments the ring holds.
+    pub(crate) fn len(&self) -> usize {
+        self.ring.len()
+    }
+
+    /// One frame's growth: `grow` draw steps a second for `dt` seconds,
+    /// integrated (ADR-0019), and at most [`EMIT_CEILING`] of them. A negative
+    /// or non-finite `grow` or `dt` grows nothing.
+    pub(crate) fn advance(&mut self, grow: f32, dt: f32) {
+        let safe = |v: f32| if v.is_finite() { v.max(0.0) } else { 0.0 };
+        self.phase += f64::from(safe(grow)) * f64::from(safe(dt));
+        let owed = (self.phase.floor() as u64).saturating_sub(self.emitted);
+        let mut budget = SYMBOL_BUDGET;
+        for _ in 0..owed.min(EMIT_CEILING) {
+            if !self.step(&mut budget) {
+                break;
+            }
+        }
+        // A frame that could not pay what it owed drops the rest, rather than
+        // carrying a backlog that would burst on the frames after it.
+        if (self.phase.floor() as u64) > self.emitted {
+            self.phase = self.emitted as f64;
+        }
+    }
+
+    /// Read the stream until the pen draws one step, within `budget` symbols.
+    /// Where the stream ends it starts again from the axiom, with the pen
+    /// standing where it stopped, so the ring fades on without a jump.
+    fn step(&mut self, budget: &mut usize) -> bool {
+        while *budget > 0 {
+            *budget -= 1;
+            let Some(ch) = self.stream.next_symbol() else {
+                self.stream.restart();
+                self.pen.clear_branches();
+                continue;
+            };
+            if let Some(drawn) = self.pen.read(ch) {
+                self.push(drawn);
+                self.emitted += 1;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Write one segment over the oldest, or beside it while the ring fills.
+    fn push(&mut self, drawn: turtle::Drawn) {
+        let mut seg = RingSeg {
+            a: drawn.a,
+            b: drawn.b,
+            generation: drawn.generation,
+            joined: drawn.joined,
+            ext_a: 0.0,
+            ext_b: 0.0,
+        };
+        if drawn.joined
+            && let Some(prev) = self.newest_mut()
+        {
+            // The flat joint, measured as the flat walk measures it: the
+            // extension depends only on the turn, so draw-step units serve.
+            let ext = super::renderer::miter_extension(
+                super::PLACEHOLDER_WIDTH,
+                [prev.a[0], prev.a[1]],
+                [prev.b[0], prev.b[1]],
+                [drawn.b[0], drawn.b[1]],
+            );
+            prev.ext_b = ext;
+            seg.ext_a = ext;
+        }
+        if self.ring.len() < self.trail {
+            self.ring.push(seg);
+            self.head = self.ring.len() % self.trail;
+        } else if let Some(slot) = self.ring.get_mut(self.head) {
+            *slot = seg;
+            self.head = (self.head + 1) % self.trail;
+        }
+    }
+
+    /// The ring index of the segment `age` steps old, `0` the newest.
+    fn index(&self, age: usize) -> Option<usize> {
+        (age < self.ring.len()).then(|| (self.head + self.trail - 1 - age) % self.trail)
+    }
+
+    /// The segment `age` steps old, `0` the newest.
+    fn at(&self, age: usize) -> Option<&RingSeg> {
+        self.index(age).and_then(|i| self.ring.get(i))
+    }
+
+    fn newest_mut(&mut self) -> Option<&mut RingSeg> {
+        self.index(0).and_then(|i| self.ring.get_mut(i))
+    }
+
+    /// The reserved room of every buffer this holds, for a test to hold
+    /// against growth.
+    #[cfg(test)]
+    fn capacities(&self) -> [usize; 2] {
+        [self.ring.capacity(), self.pen.stack_capacity()]
+    }
+}
+
+/// How much light a segment `age` steps old keeps in a ring of `trail`:
+/// full until it reaches the oldest `tail` fraction, then falling linearly to
+/// nothing at the ring's end. `tail` is clamped to `[0, 1]`; `0` fades none.
+pub(crate) fn fade(age: usize, trail: usize, tail: f32) -> f32 {
+    let tail = if tail.is_finite() {
+        tail.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let zone = tail * trail as f32;
+    if zone <= 0.0 {
+        return 1.0;
+    }
+    (trail.saturating_sub(age) as f32 / zone).min(1.0)
+}
 
 const DEFAULT_VISIBLE_DEPTH: f32 = default_of(PARAMS, "visible_depth");
 const DEFAULT_ROTATION: f32 = default_of(PARAMS, "rotation");
@@ -96,6 +334,8 @@ const DEFAULT_ZOOM: f32 = 1.0;
 // Geometry mirror (Phase 4): identity by default.
 const DEFAULT_MIRROR_ORDER: f32 = 1.0;
 const DEFAULT_MIRROR_REFLECT: f32 = 0.0;
+const DEFAULT_GROW: f32 = default_of(PARAMS, "grow");
+const DEFAULT_TAIL: f32 = default_of(PARAMS, "tail");
 
 /// A generator scene driven by an L-system grammar.
 pub struct LSystemScene {
@@ -194,6 +434,21 @@ pub struct LSystemScene {
     space_keep: usize,
     /// Reused 3D instance buffer, preallocated to `seg3d_cap`.
     instances3d: Vec<Segment3dInstance>,
+
+    /// The endless figure, when `[generator] growth = "endless"`; `None` for
+    /// a fixed one, whose geometry is the caches above.
+    endless: Option<Endless>,
+    /// The clamp of `trail` to the tier's cap, announced from `configure`.
+    trail_overflow: Option<CapOverflow>,
+    /// This frame's elapsed time, stored by `advance` for `update`.
+    dt: f32,
+    /// `grow`: draw steps a second.
+    grow: f32,
+    /// `tail`: the oldest fraction of the ring that fades.
+    tail: f32,
+    /// The endless ring's bounding radius about the orbit target, in world
+    /// units, measured in `update`: what `focus` resolves against.
+    endless_radius: f32,
 }
 
 impl LSystemScene {
@@ -220,6 +475,12 @@ impl LSystemScene {
             space_depth: 0,
             space_keep: 0,
             instances3d: Vec::with_capacity(seg3d_cap),
+            endless: None,
+            trail_overflow: None,
+            dt: super::super::FALLBACK_DT,
+            grow: DEFAULT_GROW,
+            tail: DEFAULT_TAIL,
+            endless_radius: SPACE_RADIUS,
             renderer,
             cached: Vec::new(),
             cached_depths: Vec::new(),
@@ -448,6 +709,205 @@ impl LSystemScene {
         );
         self.instances3d = instances;
     }
+
+    /// Set up an endless figure (Plan 0237): no cache, a stream and a ring of
+    /// `trail` segments, held to the tier's cap for the turtle — `seg3d_segments`
+    /// in space, `max_segments` on the plane — and the clamp kept to announce.
+    fn configure_endless(
+        &mut self,
+        axiom: &str,
+        rules: &[(char, String)],
+        angle_deg: f32,
+        mode: TurtleMode,
+        trail: u32,
+    ) {
+        self.cached.clear();
+        self.cached3d.clear();
+        self.cached_depths.clear();
+        self.cached_max_depth.clear();
+        self.overflow = None;
+        self.turtle = mode;
+        let cap = match mode {
+            TurtleMode::Flat => self.max_segments,
+            TurtleMode::Space => self.seg3d_cap,
+        };
+        let asked = trail as usize;
+        self.trail_overflow = (asked > cap).then(|| CapOverflow {
+            dropped: asked - cap,
+            context: OverflowContext::Trail {
+                asked: trail,
+                space: mode == TurtleMode::Space,
+            },
+            cap,
+        });
+        let endless = Endless::new(axiom, rules, angle_deg.to_radians(), mode, asked.min(cap));
+        // One colour slot per generation the pen can reach, sized here so the
+        // per-frame fill neither allocates nor indexes out of range.
+        self.depth_colors.clear();
+        self.depth_colors
+            .resize(endless.generations() as usize + 1, [0.0; 3]);
+        self.endless = Some(endless);
+    }
+
+    /// An endless frame's CPU half: grow the ring by this frame's `grow`,
+    /// colour the generations, and on the plane lay the ring into the draw
+    /// buffer, oldest first, fading by age over the `tail`.
+    fn update_endless(&mut self) {
+        self.mirror_overflow = None;
+        self.draw_buf.clear();
+        let ramp = self.ramp();
+        let Some(endless) = self.endless.as_mut() else {
+            return;
+        };
+        endless.advance(self.grow, self.dt);
+        fill_depth_colors(
+            &mut self.depth_colors,
+            &self.palette,
+            ramp,
+            endless.generations(),
+        );
+        let len = endless.len();
+        let trunk = self.depth_colors.first().copied().unwrap_or([1.0; 3]);
+
+        if self.turtle == TurtleMode::Space {
+            // The ring's reach about the orbit target, for `focus`.
+            let mut reach = 0.0f32;
+            for age in 0..len {
+                if let Some(seg) = endless.at(age) {
+                    for p in [seg.a, seg.b] {
+                        let w = endless_world(p);
+                        reach = reach.max((w[0] * w[0] + w[1] * w[1] + w[2] * w[2]).sqrt());
+                    }
+                }
+            }
+            self.endless_radius = reach.max(ENDLESS_STEP);
+            return;
+        }
+
+        let width = super::half_width(self.thickness);
+        let (sin, cos) = self.rotation.sin_cos();
+        let step = ENDLESS_STEP;
+        for age in (0..len).rev() {
+            let Some(seg) = endless.at(age) else {
+                continue;
+            };
+            // The oldest segment's predecessor has left the ring, so its
+            // joint has nothing to reach toward.
+            let ext_a = if age + 1 < len { seg.ext_a } else { 0.0 };
+            let flat = SegmentInstance {
+                a: [seg.a[0] * step, seg.a[1] * step],
+                b: [seg.b[0] * step, seg.b[1] * step],
+                color: [1.0; 3],
+                width: super::PLACEHOLDER_WIDTH,
+                alpha: 1.0,
+                ext_a,
+                ext_b: seg.ext_b,
+            };
+            let color = self
+                .depth_colors
+                .get(seg.generation as usize)
+                .copied()
+                .unwrap_or(trunk);
+            let mut instance = flat
+                .rotate_scale(sin, cos, self.rotation, self.scale)
+                .styled(color, width);
+            instance.alpha = fade(age, endless.trail, self.tail);
+            self.draw_buf.push(instance);
+        }
+    }
+
+    /// Draw an endless space figure's ring through the shared camera, oldest
+    /// first, each segment faded by age and joined to its neighbours in the
+    /// ring.
+    fn render_endless_space(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        aspect: f32,
+    ) {
+        let frame = self.camera.frame(
+            aspect,
+            self.zoom,
+            [self.pan.x, self.pan.y],
+            self.target,
+            self.endless_radius,
+            self.max_coc,
+        );
+        if self.mirror_overflow.is_none() {
+            self.mirror_overflow = frame.blur;
+        }
+        let width = if self.thickness.is_finite() {
+            self.thickness.max(0.0)
+        } else {
+            DEFAULT_THICKNESS
+        };
+        let trunk = self.depth_colors.first().copied().unwrap_or([1.0; 3]);
+        let mut instances = std::mem::take(&mut self.instances3d);
+        instances.clear();
+        if let Some(endless) = self.endless.as_ref() {
+            let len = endless.len();
+            for age in (0..len).rev() {
+                let Some(seg) = endless.at(age) else {
+                    continue;
+                };
+                let before = if seg.joined && age + 1 < len {
+                    endless.at(age + 1).map(|p| endless_world(p.a))
+                } else {
+                    None
+                };
+                let after = match age.checked_sub(1).and_then(|n| endless.at(n)) {
+                    Some(next) if next.joined => Some(endless_world(next.b)),
+                    _ => None,
+                };
+                let Some([prev, a, b, next]) = joined_chord(
+                    &frame.view,
+                    before,
+                    endless_world(seg.a),
+                    endless_world(seg.b),
+                    after,
+                ) else {
+                    continue;
+                };
+                if frame.view.outside(a, b, frame.margin) {
+                    continue;
+                }
+                instances.push(Segment3dInstance {
+                    a,
+                    b,
+                    color: self
+                        .depth_colors
+                        .get(seg.generation as usize)
+                        .copied()
+                        .unwrap_or(trunk),
+                    width,
+                    alpha: fade(age, endless.trail, self.tail),
+                    prev,
+                    next,
+                    skirt: 0.0,
+                });
+            }
+        }
+        self.lines3d.draw_3d(
+            queue,
+            encoder,
+            view,
+            &frame,
+            self.glow,
+            self.softness,
+            &instances,
+        );
+        self.instances3d = instances;
+    }
+}
+
+/// A point of an endless figure, from draw-step units to world units.
+fn endless_world(p: [f32; 3]) -> [f32; 3] {
+    [
+        p[0] * ENDLESS_STEP,
+        p[1] * ENDLESS_STEP,
+        p[2] * ENDLESS_STEP,
+    ]
 }
 
 /// Fill `out[g]` with generation `g`'s stroke colour, walking the shared
@@ -494,16 +954,7 @@ pub(crate) fn apply_depth_colors(
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](crate::render::scenes::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
 pub const PARAMS: &[ParamSpec] = &[
-    ParamSpec {
-        name: "visible_depth",
-        default: 1.0,
-        range: Some([1.0, 7.0]),
-        doc: "Which recursion generation is drawn, counted from 1 and capped at `max_depth`; a \
-              fraction floors to the generation below it, and anything under 2 draws the first.",
-        kind: ParamKind::Modal,
-        group: ParamGroup::Shape,
-        main: true,
-    },
+    VISIBLE_DEPTH,
     ROTATION,
     crate::render::scenes::common::hue(DEFAULT_HUE),
     crate::render::scenes::lines::hue_spread(DEFAULT_HUE_SPREAD),
@@ -511,7 +962,7 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::common::PALETTE_MIX,
     crate::render::scenes::common::PALETTE_STEPS,
     crate::render::scenes::common::PALETTE_CONTOUR,
-    crate::render::scenes::lines::DRAW_PROGRESS,
+    DRAW_PROGRESS,
     THICKNESS,
     SCALE,
     crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
@@ -531,13 +982,50 @@ pub const PARAMS: &[ParamSpec] = &[
     APERTURE,
     FOG,
     SOLID,
+    GROW,
+    TAIL,
 ];
 
-// The specs whose reading depends on the turtle, re-declared with a doc line of
-// this system's own. The editor schema keys a family row by the whole
-// declaration, so one shared with another system would print this system's
-// modes on that system's hover. Default, range and kind stay the shared
-// block's, so only the wording can differ.
+const VISIBLE_DEPTH: ParamSpec = ParamSpec {
+    name: "visible_depth",
+    default: 1.0,
+    range: Some([1.0, 7.0]),
+    doc: "Which recursion generation is drawn, counted from 1 and capped at `max_depth`; a \
+          fraction floors to the generation below it, and anything under 2 draws the first.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Shape,
+    main: true,
+};
+const GROW: ParamSpec = ParamSpec {
+    name: "grow",
+    default: 20.0,
+    range: Some([0.0, 120.0]),
+    doc: "How fast an endless figure grows, in draw steps a second; bind it to onset to make \
+          it surge.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Motion,
+    main: true,
+};
+const TAIL: ParamSpec = ParamSpec {
+    name: "tail",
+    default: 0.5,
+    range: Some([0.0, 1.0]),
+    doc: "The oldest fraction of an endless figure's trail that fades out; 0 keeps every \
+          segment at full light until it is dropped.",
+    kind: ParamKind::Modal,
+    group: ParamGroup::Light,
+    main: false,
+};
+
+// The specs whose reading depends on the turtle or the growth, re-declared with
+// a doc line of this system's own. The editor schema keys a family row by the
+// whole declaration, so one shared with another system would print this
+// system's modes on that system's hover. Default, range and kind stay the
+// shared block's, so only the wording can differ.
+const DRAW_PROGRESS: ParamSpec = ParamSpec {
+    doc: "How much of a fixed L-system is drawn, from its first segment: 0 none, 1 all of it.",
+    ..crate::render::scenes::lines::DRAW_PROGRESS
+};
 const ROTATION: ParamSpec = ParamSpec {
     name: "rotation",
     default: 0.0,
@@ -609,58 +1097,96 @@ const SOLID: ParamSpec = ParamSpec {
     ..camera::SOLID
 };
 
-/// One row of [`FAMILY_PARAMS`], its ranges in [`TurtleMode::ALL`]'s order:
-/// `flat`, then `space`. `None` is a mode that does not read the parameter.
-macro_rules! per_turtle {
-    ($name:expr; $flat:expr, $space:expr $(,)?) => {
+/// The modes [`FAMILY_PARAMS`] is written against: each turtle, fixed and
+/// endless, in that order.
+pub const MODES: [&str; 4] = ["flat", "space", "flat endless", "space endless"];
+
+/// One row of [`FAMILY_PARAMS`], its ranges in [`MODES`]' order. `None` is a
+/// mode that does not read the parameter.
+macro_rules! per_mode {
+    ($name:expr; $flat:expr, $space:expr, $flat_endless:expr, $space_endless:expr $(,)?) => {
         FamilyParam {
             name: $name,
             ranges: &[
                 FamilyRange {
-                    family: "flat",
+                    family: MODES[0],
                     range: $flat,
                 },
                 FamilyRange {
-                    family: "space",
+                    family: MODES[1],
                     range: $space,
+                },
+                FamilyRange {
+                    family: MODES[2],
+                    range: $flat_endless,
+                },
+                FamilyRange {
+                    family: MODES[3],
+                    range: $space_endless,
                 },
             ],
         }
     };
 }
 
-/// A row read by the flat turtle only: what `seg3d` does not draw (ADR-0258).
-macro_rules! flat_only {
+/// A row read on the plane, fixed or endless: the in-plane transform and the
+/// opaque stroke path, which `seg3d` does not draw (ADR-0258).
+macro_rules! plane {
     ($spec:expr) => {
-        per_turtle!($spec.name; $spec.range, None)
+        per_mode!($spec.name; $spec.range, None, $spec.range, None)
     };
 }
 
-/// A row read by the space turtle only: the camera block.
-macro_rules! space_only {
+/// A row read by the flat fixed figure alone: the mirror, which neither the
+/// space turtle nor an endless figure replicates.
+macro_rules! flat_fixed {
     ($spec:expr) => {
-        per_turtle!($spec.name; None, $spec.range)
+        per_mode!($spec.name; $spec.range, None, None, None)
     };
 }
 
-/// Every parameter whose reading depends on the turtle (ADR-0258, ADR-0180
-/// rule 4): the in-plane transform, the mirror and the opaque stroke path on
-/// the flat turtle alone, and the camera block on the space turtle alone. The
-/// generated reference prints each as inert on the mode that ignores it.
+/// A row read by the space turtle, fixed or endless: the camera block.
+macro_rules! in_space {
+    ($spec:expr) => {
+        per_mode!($spec.name; None, $spec.range, None, $spec.range)
+    };
+}
+
+/// A row read by a fixed figure alone: the cached depth and its reveal.
+macro_rules! fixed {
+    ($spec:expr) => {
+        per_mode!($spec.name; $spec.range, $spec.range, None, None)
+    };
+}
+
+/// A row read by an endless figure alone: its rate and its fade.
+macro_rules! endless {
+    ($spec:expr) => {
+        per_mode!($spec.name; None, None, $spec.range, $spec.range)
+    };
+}
+
+/// Every parameter whose reading depends on the turtle or the growth
+/// (ADR-0258, ADR-0180 rule 4). The generated reference prints each as inert
+/// on the modes that ignore it.
 pub const FAMILY_PARAMS: &[FamilyParam] = &[
-    flat_only!(ROTATION),
-    flat_only!(SCALE),
-    flat_only!(STROKE_BLEND),
-    flat_only!(MIRROR_ORDER),
-    flat_only!(MIRROR_REFLECT),
-    space_only!(YAW),
-    space_only!(PITCH),
-    space_only!(DISTANCE),
-    space_only!(FOV),
-    space_only!(FOCUS),
-    space_only!(APERTURE),
-    space_only!(FOG),
-    space_only!(SOLID),
+    fixed!(VISIBLE_DEPTH),
+    fixed!(DRAW_PROGRESS),
+    plane!(ROTATION),
+    plane!(SCALE),
+    plane!(STROKE_BLEND),
+    flat_fixed!(MIRROR_ORDER),
+    flat_fixed!(MIRROR_REFLECT),
+    in_space!(YAW),
+    in_space!(PITCH),
+    in_space!(DISTANCE),
+    in_space!(FOV),
+    in_space!(FOCUS),
+    in_space!(APERTURE),
+    in_space!(FOG),
+    in_space!(SOLID),
+    endless!(GROW),
+    endless!(TAIL),
 ];
 
 impl Scene for LSystemScene {
@@ -670,6 +1196,12 @@ impl Scene for LSystemScene {
 
     fn set_time(&mut self, time: f32) {
         self.time = time;
+    }
+
+    fn advance(&mut self, dt: f32) {
+        // Stored, not integrated: `update` grows the endless figure, so the
+        // scene has one integration site.
+        self.dt = dt;
     }
 
     fn reset_params(&mut self) {
@@ -688,6 +1220,8 @@ impl Scene for LSystemScene {
         self.mirror_order = DEFAULT_MIRROR_ORDER;
         self.mirror_reflect = DEFAULT_MIRROR_REFLECT;
         self.camera.reset();
+        self.grow = DEFAULT_GROW;
+        self.tail = DEFAULT_TAIL;
     }
 
     fn set_target_size(&mut self, width: u32, height: u32) {
@@ -714,6 +1248,8 @@ impl Scene for LSystemScene {
             "stroke_blend" => self.stroke_blend = value,
             "mirror_order" => self.mirror_order = value,
             "mirror_reflect" => self.mirror_reflect = value,
+            "grow" => self.grow = value,
+            "tail" => self.tail = value,
             _ => {}
         }
     }
@@ -735,9 +1271,19 @@ impl Scene for LSystemScene {
             max_depth,
             seed: _,
             turtle,
+            growth,
+            trail,
         } = cfg
         {
-            self.build(axiom, rules, *angle_deg, *max_depth, *turtle);
+            self.endless = None;
+            self.trail_overflow = None;
+            match growth {
+                Growth::Fixed => self.build(axiom, rules, *angle_deg, *max_depth, *turtle),
+                Growth::Endless => {
+                    self.configure_endless(axiom, rules, *angle_deg, *turtle, *trail);
+                    return self.trail_overflow;
+                }
+            }
         }
         // Surface a cap truncation so the frontend can report it — never a
         // silent cut (ADR-0007). `None` when every depth fit (the norm). The
@@ -758,6 +1304,10 @@ impl Scene for LSystemScene {
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {
+        if self.endless.is_some() {
+            self.update_endless();
+            return;
+        }
         if self.turtle == TurtleMode::Space {
             self.update_space();
             return;
@@ -844,7 +1394,11 @@ impl Scene for LSystemScene {
         aspect: f32,
     ) {
         if self.turtle == TurtleMode::Space {
-            self.render_space(queue, encoder, view, aspect);
+            if self.endless.is_some() {
+                self.render_endless_space(queue, encoder, view, aspect);
+            } else {
+                self.render_space(queue, encoder, view, aspect);
+            }
             return;
         }
         let xform = ViewTransform {
@@ -1059,13 +1613,25 @@ mod tests {
     }
 
     /// [`FAMILY_PARAMS`] is held to the engine: each row names a declared
-    /// parameter once, lists every turtle mode by the name a preset writes and
-    /// in [`TurtleMode::ALL`]'s order, and carries a spec range that is one of
-    /// its modes' — and the mode-dependent set is exactly the in-plane
-    /// transform, the mirror, the opaque path and the camera block (ADR-0258).
+    /// parameter once, lists every mode — each turtle, fixed and endless, by
+    /// the names a preset writes — and carries a spec range that is one of its
+    /// modes'. The mode-dependent set is exactly the in-plane transform, the
+    /// mirror, the opaque path and the camera block (ADR-0258), the fixed
+    /// figure's depth and reveal, and the endless figure's rate and fade.
     #[test]
     fn the_turtle_table_is_the_roster_and_names_every_inert_parameter() {
-        let modes: Vec<&str> = TurtleMode::ALL.iter().map(|m| m.as_str()).collect();
+        let turtles: Vec<&str> = TurtleMode::ALL.iter().map(|m| m.as_str()).collect();
+        let expected: Vec<String> = Growth::ALL
+            .iter()
+            .flat_map(|g| {
+                turtles.iter().map(move |t| match g {
+                    Growth::Fixed => (*t).to_string(),
+                    Growth::Endless => format!("{t} {}", g.as_str()),
+                })
+            })
+            .collect();
+        assert_eq!(MODES.to_vec(), expected, "the modes are the roster's");
+        let modes = MODES.to_vec();
         let mut seen = Vec::new();
         for row in FAMILY_PARAMS {
             assert!(!seen.contains(&row.name), "`{}` has two rows", row.name);
@@ -1093,18 +1659,242 @@ mod tests {
                 .map(|row| row.name)
                 .collect()
         };
-        assert_eq!(
-            inert_on("space"),
-            [
-                "rotation",
-                "scale",
-                "stroke_blend",
-                "mirror_order",
-                "mirror_reflect"
-            ]
-        );
         let camera: Vec<&str> = CameraParams::SPECS.iter().map(|s| s.name).collect();
-        assert_eq!(inert_on("flat"), camera);
+        let plane = ["rotation", "scale", "stroke_blend"];
+        let mirror = ["mirror_order", "mirror_reflect"];
+        let fixed = ["visible_depth", "draw_progress"];
+        let endless = ["grow", "tail"];
+        fn joined(parts: &[&[&'static str]]) -> Vec<&'static str> {
+            let mut all: Vec<&str> = parts.iter().flat_map(|p| p.iter().copied()).collect();
+            all.sort_unstable();
+            all
+        }
+        let sorted = |mut v: Vec<&'static str>| {
+            v.sort_unstable();
+            v
+        };
+        assert_eq!(
+            sorted(inert_on("flat")),
+            joined(&[&camera, &endless]),
+            "flat"
+        );
+        assert_eq!(
+            sorted(inert_on("space")),
+            joined(&[&plane, &mirror, &endless]),
+            "space"
+        );
+        assert_eq!(
+            sorted(inert_on("flat endless")),
+            joined(&[&camera, &mirror, &fixed]),
+            "flat endless"
+        );
+        assert_eq!(
+            sorted(inert_on("space endless")),
+            joined(&[&plane, &mirror, &fixed]),
+            "space endless"
+        );
+    }
+
+    /// The vine every endless test below grows: a branching grammar whose
+    /// stream outlasts any test by far.
+    fn vine(trail: usize) -> Endless {
+        let rules = [('F', "F[+F]F[-F]F".to_string())];
+        Endless::new("F", &rules, 25f32.to_radians(), TurtleMode::Flat, trail)
+    }
+
+    /// Plan 0237 Phase 4's done-when: the figure grows by integrated time, not
+    /// by frames — ten seconds at 60 Hz and at 144 Hz emit within one step of
+    /// each other, and of `grow * 10`.
+    #[test]
+    fn the_endless_rate_is_the_same_at_any_display_rate() {
+        let mut slow = vine(1000);
+        for _ in 0..600 {
+            slow.advance(20.0, 1.0 / 60.0);
+        }
+        let mut fast = vine(1000);
+        for _ in 0..1440 {
+            fast.advance(20.0, 1.0 / 144.0);
+        }
+        let (a, b) = (slow.emitted(), fast.emitted());
+        assert!(a.abs_diff(b) <= 1, "60 Hz emitted {a}, 144 Hz {b}");
+        assert!(
+            a.abs_diff(200) <= 1,
+            "ten seconds at 20 a second is 200, not {a}"
+        );
+    }
+
+    /// Plan 0237 Phase 4's done-when: after 6,000 frames at `grow = 20` the
+    /// ring holds exactly `trail` segments, and nothing the endless state
+    /// holds has grown since it was built.
+    #[test]
+    fn the_ring_fills_to_its_trail_and_nothing_grows() {
+        let mut endless = vine(1000);
+        let built = endless.capacities();
+        for _ in 0..6000 {
+            endless.advance(20.0, 1.0 / 60.0);
+        }
+        assert_eq!(endless.emitted(), 2000, "100 seconds at 20 a second");
+        assert_eq!(endless.len(), 1000, "the ring holds exactly its trail");
+        assert_eq!(endless.capacities(), built, "a buffer grew");
+        // Newest first, each segment begins where the pen stood: the ring is
+        // in emission order, and the newest really is the last emitted.
+        let newest = endless.at(0).map(|s| s.b);
+        assert_eq!(newest, Some(endless.pen.position()));
+    }
+
+    /// A `grow` far past the ceiling emits the ceiling and drops its backlog:
+    /// the frame after it emits what that frame owes, not the arrears.
+    #[test]
+    fn a_huge_grow_is_held_to_the_ceiling_without_a_backlog() {
+        let mut endless = vine(4000);
+        endless.advance(1.0e9, 1.0 / 60.0);
+        assert_eq!(endless.emitted(), EMIT_CEILING);
+        endless.advance(60.0, 1.0 / 60.0);
+        assert_eq!(
+            endless.emitted(),
+            EMIT_CEILING + 1,
+            "one step owed, one taken"
+        );
+        endless.advance(f32::NAN, 1.0 / 60.0);
+        endless.advance(-5.0, 1.0 / 60.0);
+        assert_eq!(
+            endless.emitted(),
+            EMIT_CEILING + 1,
+            "nothing grows backwards"
+        );
+    }
+
+    /// A stream that runs out starts again from the axiom with the pen where
+    /// it stood: the ring keeps growing, and the step after the restart
+    /// begins where the last one ended.
+    #[test]
+    fn a_short_stream_restarts_without_a_jump() {
+        // Two draw steps, then the end: depth 32 of a rule that never grows.
+        let rules = [('F', "F+".to_string())];
+        let mut endless = Endless::new("FF", &rules, 0.3, TurtleMode::Flat, 50);
+        for _ in 0..120 {
+            endless.advance(20.0, 1.0 / 60.0);
+        }
+        assert_eq!(endless.emitted(), 40);
+        for age in 0..endless.len() - 1 {
+            let (newer, older) = (endless.at(age), endless.at(age + 1));
+            assert_eq!(
+                newer.map(|s| s.a),
+                older.map(|s| s.b),
+                "segment {age} does not begin where the one before it ended"
+            );
+        }
+    }
+
+    /// The fade is full light until the oldest `tail` of the ring, then falls
+    /// to nothing at the ring's end; `tail = 0` fades nothing.
+    #[test]
+    fn the_fade_falls_over_the_oldest_tail() {
+        assert_eq!(fade(0, 100, 0.5), 1.0);
+        assert_eq!(fade(49, 100, 0.5), 1.0);
+        assert!((fade(75, 100, 0.5) - 0.5).abs() < 1e-6);
+        assert!(fade(99, 100, 0.5) <= 0.02 + 1e-6);
+        assert_eq!(fade(99, 100, 0.0), 1.0);
+        assert_eq!(fade(99, 100, f32::NAN), 1.0);
+    }
+
+    /// The scene owns every buffer it draws from at its construction size:
+    /// 6,000 frames of an endless figure in each turtle, rendered as it goes,
+    /// grow none of them.
+    #[test]
+    fn an_endless_scene_grows_no_buffer_it_owns() {
+        use crate::render::context::{RenderContext, RenderError};
+
+        let ctx = match RenderContext::new_headless(64, 64, true) {
+            Ok(ctx) => ctx,
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return;
+            }
+            Err(e) => panic!("headless context build failed: {e}"),
+        };
+        let tier = crate::render::TierConfig::FLOOR;
+        let format = crate::render::COMPOSITE_FORMAT;
+        let shared = Rc::new(RefCell::new(LineRenderer::new(
+            &ctx.device,
+            format,
+            tier.max_segments,
+            "lsystem-test",
+        )));
+        let target = ctx
+            .device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("lsystem-endless-target"),
+                size: wgpu::Extent3d {
+                    width: 64,
+                    height: 64,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            })
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        for turtle in TurtleMode::ALL {
+            let mut scene = LSystemScene::new(
+                Rc::clone(&shared),
+                tier.max_segments,
+                &ctx.device,
+                format,
+                tier.seg3d_segments as usize,
+                tier.max_coc_px as f32,
+            );
+            scene.set_target_size(64, 64);
+            let overflow = scene.configure(&GeneratorConfig::LSystem {
+                axiom: "F".into(),
+                rules: vec![('F', "F[+F]F[-F]F".into())],
+                angle_deg: 25.0,
+                max_depth: 4,
+                seed: 0,
+                turtle,
+                growth: Growth::Endless,
+                trail: 1000,
+            });
+            assert_eq!(overflow, None, "{turtle:?}: a trail inside the cap");
+            let capacities = |s: &LSystemScene| {
+                (
+                    [
+                        s.draw_buf.capacity(),
+                        s.single_buf.capacity(),
+                        s.instances3d.capacity(),
+                        s.depth_colors.capacity(),
+                    ],
+                    s.endless.as_ref().map(Endless::capacities),
+                )
+            };
+            let built = capacities(&scene);
+            let frame = AnalysisFrame::default();
+            for i in 0..6000 {
+                scene.reset_params();
+                scene.set_param("grow", 20.0);
+                scene.advance(1.0 / 60.0);
+                scene.update(&frame);
+                if i % 500 == 0 || i == 5999 {
+                    let mut encoder = ctx
+                        .device
+                        .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+                    scene.render(&ctx.queue, &mut encoder, &target, 1.0);
+                    ctx.queue.submit([encoder.finish()]);
+                }
+            }
+            assert_eq!(
+                scene.endless.as_ref().map(Endless::len),
+                Some(1000),
+                "{turtle:?}: the ring holds exactly its trail"
+            );
+            if turtle == TurtleMode::Flat {
+                assert_eq!(scene.draw_buf.len(), 1000, "the whole ring is drawn");
+            }
+            assert_eq!(capacities(&scene), built, "{turtle:?}: a buffer grew");
+        }
     }
 
     #[test]

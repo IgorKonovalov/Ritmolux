@@ -5,6 +5,8 @@
 // into.
 use super::super::*;
 use super::*;
+use crate::render::scenes::lines::grammar;
+use crate::render::scenes::lines::lsystem::{DEFAULT_TRAIL, Growth};
 use crate::render::scenes::lines::turtle::TurtleMode;
 
 /// The raw `[curve]` table: declarative structure for a parametric-curve scene.
@@ -53,6 +55,13 @@ pub(in crate::preset::schema) struct RawGenerator {
     /// L-system: which turtle walks the grammar, `"flat"` or `"space"`.
     #[serde(default)]
     pub(in crate::preset::schema) turtle: Option<String>,
+    /// L-system: `"fixed"` caches every depth, `"endless"` grows a vine.
+    #[serde(default)]
+    pub(in crate::preset::schema) growth: Option<String>,
+    /// L-system, endless only: how many segments the vine keeps. An `i64` so
+    /// a negative literal reaches the validation below and is named there.
+    #[serde(default)]
+    pub(in crate::preset::schema) trail: Option<i64>,
     /// The preset's random salt — what the grammar's `hash()`/`noise()` mix into
     /// their argument (ADR-0051): a number, or `"random"` for a salt drawn per
     /// app launch. **Not** an L-system key despite living in the L-system's
@@ -147,6 +156,45 @@ impl RawGenerator {
             })?,
         };
 
+        let growth = match self.growth.as_deref() {
+            None => Growth::default(),
+            Some(name) => Growth::from_name(name).ok_or_else(|| {
+                PresetError::Config(format!(
+                    "unknown lsystem growth '{name}' (expected one of: {})",
+                    Growth::ALL
+                        .iter()
+                        .map(|g| g.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ))
+            })?,
+        };
+
+        let trail = self.trail.unwrap_or(i64::from(DEFAULT_TRAIL));
+        let trail = u32::try_from(trail)
+            .ok()
+            .filter(|&t| t >= 1)
+            .ok_or_else(|| {
+                PresetError::Config(format!(
+                    "lsystem trail must be a whole number of segments, 1 or more, got {trail}"
+                ))
+            })?;
+
+        // An endless figure restarts its stream when the stream runs out, so a
+        // stream shorter than the trail would restart before the ring filled.
+        // Counted, not expanded: the stream is far too long to write out.
+        if growth == Growth::Endless {
+            let draws = grammar::stream_draws(&axiom, &rules, grammar::STREAM_DEPTH);
+            if draws < u64::from(trail) {
+                return Err(PresetError::Config(format!(
+                    "lsystem growth = \"endless\" needs a stream at least as long as its trail: \
+                     this grammar's stream is {draws} draw step(s) at depth {}, and trail is \
+                     {trail}; give a rule that adds draw steps (F or G) as it rewrites",
+                    grammar::STREAM_DEPTH
+                )));
+            }
+        }
+
         Ok(GeneratorConfig::LSystem {
             axiom,
             rules,
@@ -157,6 +205,8 @@ impl RawGenerator {
             // pulling entropy into a structural config.
             seed: self.seed.map_or(0, RawSeed::numeric),
             turtle,
+            growth,
+            trail,
         })
     }
 
@@ -305,7 +355,8 @@ pub(in crate::preset::schema) const GENERATOR: TableDesc = TableDesc {
             name: "max_depth",
             kind: KeyKind::Int,
             default: "4",
-            doc: "L-system: how many iterations to expand and cache.",
+            doc: "L-system: how many iterations to expand and cache. Inert under growth = \
+                  \"endless\", whose stream is walked to its own fixed depth.",
         },
         KeyDesc {
             name: "turtle",
@@ -313,6 +364,20 @@ pub(in crate::preset::schema) const GENERATOR: TableDesc = TableDesc {
             default: "flat",
             doc: "L-system: \"flat\" walks the plane; \"space\" walks in depth through the \
                   camera, where & and ^ pitch, \\ and / roll and | turns around.",
+        },
+        KeyDesc {
+            name: "growth",
+            kind: KeyKind::Roster(Roster::Growth),
+            default: "fixed",
+            doc: "L-system: \"fixed\" draws one cached depth; \"endless\" grows a vine that \
+                  never ends at the rate grow sets, keeping the newest trail segments.",
+        },
+        KeyDesc {
+            name: "trail",
+            kind: KeyKind::Int,
+            default: "2000",
+            doc: "L-system, endless: how many segments the vine keeps behind its tip, held to \
+                  the quality tier's cap.",
         },
         KeyDesc {
             name: "seed",

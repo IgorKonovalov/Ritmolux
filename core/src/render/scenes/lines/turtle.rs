@@ -197,6 +197,114 @@ fn normalize(a: [f32; 3]) -> [f32; 3] {
     }
 }
 
+/// One draw step the [`Pen`] took: a segment in draw-step units, the
+/// generation it was drawn at, and whether it continues the segment drawn just
+/// before it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Drawn {
+    /// Where the step began.
+    pub a: [f32; 3],
+    /// Where it ended, one unit along the heading.
+    pub b: [f32; 3],
+    /// How many branch pushes were open: the colour axis (ADR-0059).
+    pub generation: u32,
+    /// Whether the pen was still on the paper from the previous draw step, so
+    /// the two meet on one joint. A move, a push or a pop breaks the run.
+    pub joined: bool,
+}
+
+/// The turtle an endless figure walks with, one symbol at a time.
+///
+/// The flat mode reads `+` and `-` alone, as the plane walk does, and leaves
+/// the space symbols inert; the space mode reads them all. Either way the
+/// state is a [`Turtle3d`], so a flat figure lies in the `xy` plane.
+///
+/// **The branch stack is reserved once**, at the bound the grammar's
+/// brackets allow (`grammar::bracket_bound`), and a push past it is refused
+/// rather than grown, so stepping never allocates. Only an unbalanced grammar
+/// reaches the bound; there a later `]` restores an older state.
+#[derive(Debug, Clone)]
+pub struct Pen {
+    turtle: Turtle3d,
+    stack: Vec<Turtle3d>,
+    mode: TurtleMode,
+    angle: f32,
+    run: bool,
+}
+
+impl Pen {
+    /// A pen at the origin for `mode`, turning by `angle` radians, with room
+    /// for `stack_bound` open branches.
+    pub fn new(mode: TurtleMode, angle: f32, stack_bound: usize) -> Self {
+        Self {
+            turtle: Turtle3d::default(),
+            stack: Vec::with_capacity(stack_bound),
+            mode,
+            angle,
+            run: false,
+        }
+    }
+
+    /// Read one symbol, and say what it drew, if anything.
+    pub fn read(&mut self, ch: char) -> Option<Drawn> {
+        match ch {
+            'F' | 'G' => {
+                let a = self.turtle.pos;
+                self.turtle.step();
+                let drawn = Drawn {
+                    a,
+                    b: self.turtle.pos,
+                    generation: self.stack.len() as u32,
+                    joined: self.run,
+                };
+                self.run = true;
+                return Some(drawn);
+            }
+            'f' => self.turtle.step(),
+            '[' => {
+                if self.stack.len() < self.stack.capacity() {
+                    self.stack.push(self.turtle);
+                }
+            }
+            ']' => {
+                if let Some(saved) = self.stack.pop() {
+                    self.turtle = saved;
+                }
+            }
+            '+' | '-' => {
+                // A turn keeps the pen on the paper.
+                self.turtle.turn(ch, self.angle);
+                return None;
+            }
+            _ => {
+                if self.mode == TurtleMode::Space {
+                    self.turtle.turn(ch, self.angle);
+                }
+                return None;
+            }
+        }
+        self.run = false;
+        None
+    }
+
+    /// Close every open branch where the turtle stands, and lift the pen: a
+    /// restarted stream opens its brackets from nothing.
+    pub fn clear_branches(&mut self) {
+        self.stack.clear();
+        self.run = false;
+    }
+
+    /// Where the pen stands.
+    pub fn position(&self) -> [f32; 3] {
+        self.turtle.pos
+    }
+
+    /// The branch stack's reserved room.
+    pub fn stack_capacity(&self) -> usize {
+        self.stack.capacity()
+    }
+}
+
 /// [`walk_with_depths`] for the space turtle: `s` walked into 3D segments in
 /// `out`, with each segment's generation depth in `depths`, index-aligned the
 /// same way and under the same cap. Both are cleared first; the returned
