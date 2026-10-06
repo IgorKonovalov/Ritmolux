@@ -8,9 +8,10 @@
 //! the densest coexistence of pipelines any shipped preset produces, and
 //! ADR-0058's hazard — the DX12 WARP software adapter handing a pipeline whose
 //! bind-group layout matches another live one *the other pass's* resources —
-//! keys on exactly that. `golden.rs`'s `attractor.toml` binds no trails, and
-//! every `composite_*` fixture is a line scene, so nothing rendered it under a
-//! pinned baseline.
+//! keys on exactly that (a WARP reading, unverified on lavapipe as of
+//! 2026-10-06). `golden.rs`'s `attractor.toml` binds no trails, and every
+//! `composite_*` fixture is a line scene, so nothing rendered it under a pinned
+//! baseline.
 //!
 //! # What this pins, and what it does not
 //!

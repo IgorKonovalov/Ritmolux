@@ -22,11 +22,12 @@
 //! actionable message rather than passing silently.
 //!
 //! The GPU-free cases all exit before a renderer is constructed, so they run
-//! everywhere. The rendering cases need a real adapter (`shot` asks for hardware,
-//! not WARP) and **skip with a printed reason** where none exists — macOS has no
-//! software Metal fallback (ADR-0016), and CI runners generally have no GPU. The
-//! skip is keyed on the adapter error itself rather than on the OS, so an
-//! adapterless Windows runner is handled too and any *other* failure still fails.
+//! everywhere. The rendering cases need a real adapter (`shot` asks for
+//! hardware, not a software rasterizer) and **skip with a printed reason** where
+//! none exists — macOS has no software Metal fallback (ADR-0016), and CI runners
+//! generally have no GPU. The skip is keyed on the adapter error itself rather
+//! than on the OS, so an adapterless Windows runner is handled too and any
+//! *other* failure still fails.
 
 use crate::common;
 

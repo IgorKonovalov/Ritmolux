@@ -298,9 +298,9 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Ask Hyprland what a client may do | human | done - one display, so D and a second-display console were not answerable | b1543a29 |
-| 2 — The baselines move to lavapipe | dev | done | committed with this row |
-| 3 — Judge the 44 | human | done - all 53 drift, no finding | committed with this row |
-| 4 — Every WARP claim takes one of three exits | dev | not started | |
+| 2 — The baselines move to lavapipe | dev | done | 8c2ec152 |
+| 3 — Judge the 44 | human | done - all 53 drift, no finding | effc6503 |
+| 4 — Every WARP claim takes one of three exits | dev | done | committed with this row |
 | 5 — The documents take the stance | dev | not started | |
 | 6 — A rehearsal on the box | human | owed | |
 
@@ -494,6 +494,52 @@ flowchart TB
   - `warp_mesh_wide` (mean 0.0006 / outlier 2): drift.
   - `waterfall` (mean 0.0017 / outlier 213, over): drift, plus the intended change 0248 Phase 7 owed on WARP; same figure.
   - `waterfall_ramp` (mean 0.0011 / outlier 159, over): drift, plus the intended change 0248 Phase 7 owed on WARP; same figure.
+- **Phase 4: exit counts.** A site is one comment block or one string literal making a claim. A
+  block that pairs a "the golden suite captures on WARP" fact with a WARP claim was split: the fact
+  was generalised and the claim marked, and it counts once under each. There are about 13 such
+  blocks.
+
+  | | re-measured | generalised | marked |
+  |---|---|---|---|
+  | `.rs` files | 4 | 53 | 120 |
+  | the five documents | 1 | 6 | 9 |
+
+  About 60 further uppercase `WARP` lines are MilkDrop or warp-mesh identifiers (`WARP_GROUP`,
+  `WARP_SHADER`, `DEFAULT_WARP_*`, `RLX_WARP_*`, `WARP_CONTROL`) and were left. Every mark reads
+  *unverified on lavapipe as of 2026-10-06*. The `.rs` sweep was split by file across four
+  subagents, and the counts above are their tallies plus the re-measured sites.
+- **Phase 4: the four re-measured sites**, on the Arch box: lavapipe `llvmpipe (LLVM 22.1.8)`, Mesa
+  26.2.2; hardware `NVIDIA GeForce RTX 3080 Laptop GPU`, driver 610.57.04.
+  - `the_dither_is_one_encoded_level_at_both_ends_of_the_range` reads a worst move of 1 in both
+    sweeps (mean 0.3328 dark, 0.3384 bright). WARP's was 2 in the dark sweep. The `is_software`
+    bound of 2 was left in code, because Windows CI still runs the test on WARP.
+  - `the_dither_dissolves_a_dark_ramps_plateaus` reads 130 px → 19 px.
+  - `the_adapters_agree_on_the_authored_contour` reads `frame_diff` 0.000871.
+  - `the_adapters_agree_on_the_warp_mesh` reads `frame_diff` 0.000539.
+- **Phase 4: code beyond comments.** The two adapter-agreement tests print each adapter's
+  description, and their `WARP mean rgb` label became `software`.
+  `the_adapters_agree_on_the_authored_contour` was moved from `Renderer::new_headless` (the
+  `Default` adapter, the iGPU on this box) to `new_headless_on` with `HighPerformance` /
+  `Software`, matching `common::build`. Runtime strings that blamed WARP now carry the mark or name
+  the class: the `headless_hardware` reason, `background_composite`'s reason, the
+  `reaction_diffusion` long-run reason, `dissolve_at`'s skip notice, `NEEDS_HARDWARE_FOR_TIMING`,
+  one `#[ignore]` reason in `sanity.rs`, and three assert messages in `tonemap/tests.rs`.
+- **Phase 4: left unmarked.** These were left as they are:
+  - four pointer phrases that refer back to a marked block (`background.rs` "WARP quirk", "WARP +
+    passthrough", "NFR §1 + WARP"; `trails.rs` "WARP-sensitive part");
+  - the `RIG` const and the `ALLOWED` evidence strings in `tonemap/tests.rs`, which the `RIG` doc
+    comment's mark covers. ADR-0058 quotes `RIG`.
+  - the "DX12 backend's shader compiler" lost-device claims in `marks.rs` and `marks/tests.rs`, which
+    do not say WARP.
+  - `nfr.md`'s coverage-floor note that the dev box has hardware where CI has WARP. It states where
+    CI runs, not how WARP behaves.
+- **Phase 4: found, not acted on.** `golden.rs` is one of the nine binaries `-P fast` excludes, and
+  `coverage`, a Windows job, is the only CI place that runs them. Since Phase 2 the roster skips
+  there, so **the 37 `golden.rs` fixtures assert nowhere in CI**. The suite-module baselines
+  (`composite`, `layer`, `line_joints`, `attractor_trails`, `warp_mesh_wide`) do assert, on the
+  ubuntu arm. Also, the `.github/workflows/ci.yml` comment at the `-P fast` step still says a
+  baseline is "a measurement taken on WARP" that "prints its reading and skips". Neither file is in
+  Phase 4's list.
 
 ### Close triggers
 

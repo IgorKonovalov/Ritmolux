@@ -2303,7 +2303,8 @@ fn no_arm_returns_a_negative_normalized_distance() {
 /// texel of `0` blends the gradient's last texel with its first — on a
 /// non-cyclic palette, a bright speck exactly where this test looks. Reproduced
 /// identically on the hardware adapter, on WARP, and with this phase's change
-/// reverted; offsetting the centre moves the claim off that seam.
+/// reverted (the WARP reading unverified on lavapipe as of 2026-10-06);
+/// offsetting the centre moves the claim off that seam.
 ///
 /// **The frame size is even.** `atan2(0, 0)` is undefined, and the star and
 /// polygon arms fold on it — so a target whose pixel grid puts a fragment centre

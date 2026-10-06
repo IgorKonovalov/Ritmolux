@@ -118,9 +118,10 @@ const VEC4S_PER_PIECE: usize = 4;
 /// read-only storage entry after this layout's uniform would make its shape
 /// byte-identical to `shape-collage-bind-layout`, which is live in the same
 /// frame during a preset dissolve. Two layouts of one shape alias on the DX12
-/// WARP adapter the whole golden suite captures on, so the collision would be
-/// blessed rather than caught. Packing into the uniform leaves the layout's
-/// four entries exactly as they were.
+/// WARP adapter (a WARP reading, unverified on lavapipe as of 2026-10-06), and
+/// the whole golden suite captures on a software adapter, so the collision
+/// would be blessed rather than caught. Packing into the uniform leaves the
+/// layout's four entries exactly as they were.
 const PATH_VEC4S: usize = VEC4S_PER_PIECE * MAX_ARC_PIECES;
 
 /// The WGSL below spells the array length as a literal — `format!` cannot reach
@@ -285,8 +286,9 @@ struct Params {
 
 // **One bind group, sampler first and uniform last — and that arrangement is
 // what buys this pipeline a layout shape nothing else holds** (ADR-0058: two
-// byte-identical layouts alias on the DX12 WARP adapter, and the whole golden
-// suite runs there, so a collision is blessed rather than caught).
+// byte-identical layouts alias on the DX12 WARP adapter, a WARP reading
+// unverified on lavapipe as of 2026-10-06, and the whole golden suite runs on a
+// software adapter, so a collision is blessed rather than caught).
 //
 // It is deliberately not `fragment_field`'s two-group split, because that split
 // has no free shape left for a tenth scene. A lone uniform group can vary only

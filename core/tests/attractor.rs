@@ -13,7 +13,7 @@
 //!
 //! The checks share one renderer in a single `#[test]` (one per file, like the
 //! other GPU suites): distinct headless renderers built in parallel each spin up
-//! a WARP device and can crash the software driver.
+//! a software device and can crash the software driver.
 
 use rlx_core::dsp::AnalysisFrame;
 use rlx_core::preset::Preset;
@@ -34,14 +34,16 @@ const SIZE: u32 = 96;
 /// drives its reseed, which the beat-perturbation check reads; Thomas
 /// Gallery is the continuous flow, captured at frame 90 (1.5 s), inside the
 /// first of its roster steps. The bare inline `lorenz`-family presets further
-/// down are unaffected — the family still ships, only its preset retired.
+/// down are unaffected — the family still ships, only its preset retired. (The
+/// trails quirk is a WARP reading, unverified on lavapipe as of 2026-10-06.)
 const MAP_2D: &str = "De Jong Walk";
 const FLOW_3D: &str = "Thomas Gallery";
 
 /// A De Jong attractor preset with an extra `[params]` line, isolating the view
 /// transform (Phase 4): the compute/accumulation path is identical, so any render
 /// difference is the vertex-shader zoom/pan. The transform touches only the draw
-/// projection (no background pipeline), so it is faithful on WARP.
+/// projection (no background pipeline), so it is faithful on WARP (a WARP
+/// reading, unverified on lavapipe as of 2026-10-06).
 fn attractor_view_preset(name: &str, extra: &str) -> Preset {
     let toml =
         format!("system = \"attractor\"\nname = \"{name}\"\n[params]\nsize = \"1.0\"\n{extra}");
@@ -1120,8 +1122,8 @@ const QUANTIZED_TARGET: (u32, u32) = (288, 216);
 const ASPECT_FRAMES: u32 = 90;
 
 /// Capture one preset at an explicit target size, building and dropping a renderer
-/// so only one WARP device is ever live (the file docs' constraint). `None` is the
-/// no-adapter skip (ADR-0016).
+/// so only one software device is ever live (the file docs' constraint). `None` is
+/// the no-adapter skip (ADR-0016).
 fn capture_at(size: (u32, u32), preset: &str, frame: &AnalysisFrame) -> Option<CaptureImage> {
     let mut renderer = common::headless(size.0, size.1)?;
     let img = renderer

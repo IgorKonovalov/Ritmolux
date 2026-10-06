@@ -77,8 +77,9 @@ struct Params {
 // layout stays distinct from the screen-space kaleidoscope's single 3-entry
 // [uniform, texture, sampler] group — two byte-identical layouts mis-render when
 // they coexist on the DX12 WARP software adapter (the same quirk the shared line
-// renderer and the lazy feedback scenes work around). Two LUTs (A/B) for the
-// `palette_mix` crossfade; one shared sampler.
+// renderer and the lazy feedback scenes work around; a WARP reading, unverified
+// on lavapipe as of 2026-10-06). Two LUTs (A/B) for the `palette_mix`
+// crossfade; one shared sampler.
 @group(1) @binding(0) var lut_a: texture_2d<f32>;
 @group(1) @binding(1) var lut_b: texture_2d<f32>;
 @group(1) @binding(2) var lut_samp: sampler;
@@ -323,7 +324,8 @@ impl FragmentFieldScene {
         });
         // The LUT texture + sampler live in their own group (group 1) — see the
         // WGSL note: keeping this pipeline's layout distinct from the
-        // kaleidoscope's avoids the DX12 WARP identical-layout mis-render.
+        // kaleidoscope's avoids the DX12 WARP identical-layout mis-render
+        // (unverified on lavapipe as of 2026-10-06).
         let lut_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("fragment-field-lut-layout"),
             entries: &[

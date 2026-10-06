@@ -370,7 +370,7 @@ draw_progress = "1"
 /// Builds and drops **one** renderer per call rather than holding three: a
 /// second live device in a binary is what the software adapter falls over on,
 /// and building GPU resources mid-run shifts what a later stage resolves to on
-/// WARP.
+/// WARP (a WARP reading, unverified on lavapipe as of 2026-10-06).
 fn capture_at_thickness(thickness: f32) -> Option<crate::render::CaptureImage> {
     use crate::dsp::AnalysisFrame;
     use crate::preset::Preset;

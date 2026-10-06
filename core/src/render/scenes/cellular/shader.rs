@@ -58,7 +58,8 @@ fn live(c: vec2<i32>, n: i32, wrap: bool) -> u32 {
 /// here and `2r + 1` there, where summing it in one pass costs `(2r + 1)^2` —
 /// 42 reads a cell against 441 at radius 10. The loop runs to the constant
 /// `MAX_RADIUS` and skips the steps past `radius`, since a trip count read from
-/// a uniform is what lost the device on WARP for the analytic field.
+/// a uniform is what lost the device on WARP for the analytic field (a WARP
+/// reading, unverified on lavapipe as of 2026-10-06).
 pub(super) const ROWS_SHADER: &str = r#"
 @group(0) @binding(0) var field: texture_2d<f32>;
 @group(0) @binding(1) var<uniform> params: Step;

@@ -1475,7 +1475,7 @@ fn still_field_params() -> Vec<(&'static str, f32)> {
 /// reads the field itself.
 ///
 /// Measured 2026-08-19 on WARP at 64x64, 300 frames, deposit at the centre, no
-/// warp motion:
+/// warp motion (WARP readings, unverified on lavapipe as of 2026-10-06):
 ///
 /// ```text
 ///   steps    frame  mean      peak
@@ -1559,7 +1559,8 @@ fn the_field_equilibrates_only_when_the_quantizer_runs() {
 ///   255 (on)   300  0.0787    0.000001   <- pinned at black
 /// ```
 ///
-/// (Measured 2026-08-19 on the development box.)
+/// (Measured 2026-08-19 on the development box; WARP readings, unverified on
+/// lavapipe as of 2026-10-06.)
 #[test]
 fn the_quantized_background_stays_black() {
     let mut params = still_field_params();
@@ -1640,7 +1641,8 @@ fn the_quantized_background_stays_black() {
 /// # What it read
 ///
 /// Measured on the development box (Windows 10, DX12), 64x64, decay `0.5455`/s
-/// over 2.650 s of undeposited field:
+/// over 2.650 s of undeposited field, on the software adapter there (WARP
+/// readings, unverified on lavapipe as of 2026-10-06):
 ///
 /// ```text
 ///                            2026-08-19   2026-09-17

@@ -607,7 +607,8 @@ impl Pipeline {
         // rendered **alone**, with no dissolve running and this pipeline never
         // built, each of the two presets agrees between the adapters to 0.014 of
         // one 8-bit level. Only the cross-fade — the one moment both layouts are
-        // on the device — diverges, and only on WARP.
+        // on the device — diverges, and only on WARP. (A WARP reading, unverified
+        // on lavapipe as of 2026-10-06.)
         //
         // This mattered nowhere in the suite because no capture test runs a
         // dissolve between two `trails`-binding presets; `core/tests/suite/transition.rs`

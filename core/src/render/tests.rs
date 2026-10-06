@@ -295,8 +295,9 @@ fn a_bad_smoothing_constant_is_a_load_error_naming_the_parameter() {
 /// runner exposes no usable GPU adapter (ADR-0016). A missing adapter is an
 /// environmental property of the CI runner — macOS has no software Metal
 /// fallback — not a code failure, so the GPU-capture tests skip on it rather
-/// than panic; any *other* build error still panics loudly. On Windows WARP
-/// an adapter is always present, so the callers' assertions run in full.
+/// than panic; any *other* build error still panics loudly. Where a software
+/// rasterizer is installed (WARP on Windows, lavapipe on Linux) an adapter is
+/// always present, so the callers' assertions run in full.
 fn headless_or_skip(opts: HeadlessOptions) -> Option<Renderer> {
     match Renderer::new_headless(opts) {
         Ok(r) => Some(r),
@@ -389,9 +390,9 @@ fn set_presets_clamps_active_when_the_roster_shrinks() {
 }
 
 /// Phase 1 (Plan 0013): a surface-less renderer captures the active preset
-/// into an offscreen texture. `prefer_software` (WARP on DX12) keeps it
-/// reproducible on any adapter. Asserts a full tight RGBA buffer with at
-/// least one non-black pixel — the preset actually drew.
+/// into an offscreen texture. `prefer_software` (WARP on DX12, lavapipe on
+/// Vulkan) keeps it reproducible on any adapter. Asserts a full tight RGBA
+/// buffer with at least one non-black pixel — the preset actually drew.
 #[test]
 fn headless_captures_a_non_black_frame() {
     let Some(mut renderer) = headless_or_skip(HeadlessOptions {
@@ -2029,8 +2030,9 @@ const COLD: usize = 1;
 /// history or thirty. That is the same coexisting-pipeline quirk
 /// `trails.rs` documents and `tests/background_composite.rs` skips for; on
 /// hardware the dissolve's opening frame is byte-identical to the ordinary
-/// frame it replaces. Checks that only compare two dissolves against each other
-/// stay on WARP, where they run in CI.
+/// frame it replaces. (The reset is a WARP reading, unverified on lavapipe as of
+/// 2026-10-06.) Checks that only compare two dissolves against each other stay
+/// on the software adapter, where they run in CI.
 fn dissolve_at(
     mode: Mode,
     frames: usize,
@@ -2045,7 +2047,8 @@ fn dissolve_at(
     if !software && renderer.adapter_is_software() {
         eprintln!(
             "skipped: only a software rasterizer is available (WARP drops the \
-             trails accumulation when the dissolve allocates; see dissolve_at)"
+             trails accumulation when the dissolve allocates, a WARP reading \
+             unverified on lavapipe; see dissolve_at)"
         );
         return None;
     }
@@ -2070,7 +2073,8 @@ fn dissolve_at(
 /// drift rather than signal (its `MEAN_TOL`, per ADR-0023). Reused here only as
 /// a **lower bound on the control**: a denominator that sits inside the declared
 /// noise band cannot calibrate anything above it. Mechanism-derived rather than
-/// measured — the control peak reads `0.4078` on the local WARP, 20x this.
+/// measured — the control peak reads `0.4078` on the local WARP, 20x this (a
+/// WARP reading, unverified on lavapipe as of 2026-10-06).
 const NOISE_FLOOR: f32 = 0.02;
 
 /// **A dual-live dissolve runs, and its picture is not freeze's.** Same
@@ -2099,7 +2103,7 @@ const NOISE_FLOOR: f32 = 0.02;
 ///
 /// The **magnitude** half is deliberately not calibrated from this statistic.
 /// Plan 0060 Phase 2 read the printed ratio off both machines and it did not
-/// travel:
+/// travel (WARP readings, unverified on lavapipe as of 2026-10-06):
 ///
 /// | statistic | local WARP 10.0.19041 | CI WARP 10.0.26100 | spread |
 /// |---|---|---|---|
@@ -2224,7 +2228,8 @@ const HW_RATIO_FLOOR: f32 = 0.018;
 /// decision — a number that reproduces on two configurations is still a
 /// measurement, not a portable floor — but it is the first evidence about *which*
 /// WARP reading was anomalous, and it belongs to the open question that ADR-0074
-/// left for Plan 0053.
+/// left for Plan 0053. (The WARP columns and the sibling's quirk are WARP
+/// readings, unverified on lavapipe as of 2026-10-06.)
 ///
 /// **The signal sits under [`NOISE_FLOOR`], and that is not the objection it
 /// looks like.** That band is cross-*rasterizer* drift; this comparison is two
@@ -2233,9 +2238,10 @@ const HW_RATIO_FLOOR: f32 = 0.018;
 /// it opens at exactly `0.0000` and climbs monotonically, which is an animation
 /// accumulating, not noise.
 ///
-/// **CI never enforces this.** It skips on both runners — `windows-latest` offers
-/// only WARP, `macos-latest` has no software Metal at all (ADR-0016) — so the
-/// local gate and `.githooks/pre-push` are what run it.
+/// **CI never enforces this.** It skips on every runner — `windows-latest` offers
+/// only WARP, `ubuntu-latest` only lavapipe, `macos-latest` has no software Metal
+/// at all (ADR-0016) — so the local gate and `.githooks/pre-push` are what run
+/// it.
 #[test]
 fn a_dual_live_dissolve_moves_the_picture_against_its_own_progression() {
     const FRAMES: usize = 40;
@@ -2323,7 +2329,8 @@ fn mean_luma(img: &CaptureImage) -> f32 {
 /// which is the claim.
 ///
 /// **Real hardware only** — WARP cannot show a trail surviving the dissolve's
-/// allocations at all (see [`dissolve_at`]).
+/// allocations at all (see [`dissolve_at`]; a WARP reading, unverified on
+/// lavapipe as of 2026-10-06).
 #[test]
 fn a_dual_live_dissolve_carries_the_outgoing_trail() {
     const FRAMES: usize = 4;

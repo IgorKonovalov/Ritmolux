@@ -160,7 +160,8 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
-/// capture resolves to. For the same reason a new entry goes at the **end**.
+/// capture resolves to (a WARP reading, unverified on lavapipe as of
+/// 2026-10-06). For the same reason a new entry goes at the **end**.
 const EXTRA_FIXTURES: [(&str, &str); 20] = [
     (
         "attractor_depth",

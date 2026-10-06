@@ -17,7 +17,7 @@ use crate::dsp::AnalysisFrame;
 use crate::preset::Preset;
 use crate::render::scenes::marks;
 use crate::render::scenes::{ParamSpec, declares};
-use crate::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use crate::render::{AdapterChoice, CaptureImage, HeadlessOptions, RenderError, Renderer, Tier};
 
 /// A preset driving this scene, with `extra` spliced into `[params]`.
 fn preset(name: &str, extra: &str) -> Preset {
@@ -1915,8 +1915,8 @@ fn morph_is_an_ordinary_binding_that_smoothing_reaches() {
 /// **The two adapters agree on the authored-contour fixture** — the ADR-0058
 /// standing rule, run before its golden baseline is blessed.
 ///
-/// The whole golden suite captures on the DX12 WARP software adapter, and two
-/// bind-group layouts of one shape alias there: a pass is handed another pass's
+/// The whole golden suite captures on a software adapter, and on DX12 WARP two
+/// bind-group layouts of one shape alias: a pass is handed another pass's
 /// resources, and a mis-render is blessed rather than caught. This scene's
 /// layout is unchanged by the `[path]` work — the contour rides the existing
 /// uniform precisely so it stays a shape nothing else holds — so this is
@@ -1929,16 +1929,26 @@ fn morph_is_an_ordinary_binding_that_smoothing_reaches() {
 /// before the baseline was blessed: hardware mean rgb
 /// `102.584 151.021 102.340`, WARP `102.621 151.036 102.322`, `frame_diff`
 /// `0.000232`.** Agreement to well under one 8-bit level.
+///
+/// **Re-measured 2026-10-06 on the Arch reference box**, same size and frames:
+/// hardware (RTX 3080 Laptop, NVIDIA 610.57.04) `102.573 151.032 102.344`,
+/// lavapipe (Mesa 26.2.2) `102.496 151.051 102.407`, `frame_diff` `0.000871`.
 #[test]
 #[ignore = "needs both a hardware and a software adapter; run locally before blessing"]
 fn the_adapters_agree_on_the_authored_contour() {
     const SIZE: u32 = 160;
     let build = |prefer_software: bool| -> Option<Renderer> {
-        match Renderer::new_headless(HeadlessOptions {
+        let choice = if prefer_software {
+            AdapterChoice::Software
+        } else {
+            AdapterChoice::HighPerformance
+        };
+        let opts = HeadlessOptions {
             width: SIZE,
             height: SIZE,
             prefer_software,
-        }) {
+        };
+        match Renderer::new_headless_on(opts, Tier::Floor, &choice) {
             Ok(r) => Some(r),
             Err(RenderError::RequestAdapter(_)) => None,
             Err(e) => panic!("headless renderer build failed: {e}"),
@@ -1975,8 +1985,11 @@ fn the_adapters_agree_on_the_authored_contour() {
     };
     let difference = crate::render::metrics::frame_diff(&hw, &sw);
     println!(
-        "[shape_field_path] hardware mean rgb {:?}, WARP mean rgb {:?}, frame_diff {difference:.6}",
+        "[shape_field_path] hardware ({}) mean rgb {:?}, software ({}) mean rgb {:?}, \
+         frame_diff {difference:.6}",
+        hardware.adapter_description(),
         mean(&hw),
+        software.adapter_description(),
         mean(&sw)
     );
     assert!(

@@ -17,8 +17,9 @@
 //! visible in a mean. It binds no `bg_*`, so the background pass stays a plain
 //! clear and the only pipelines coexisting on the adapter are the line renderer's
 //! and the remap's — faithful on the WARP software rasterizer (unlike the
-//! background-gradient coexistence `background_composite.rs` documents). Skips
-//! with no adapter per ADR-0016.
+//! background-gradient coexistence `background_composite.rs` documents; a WARP
+//! reading, unverified on lavapipe as of 2026-10-06). Skips with no adapter per
+//! ADR-0016.
 
 use rlx_core::dsp::AnalysisFrame;
 use rlx_core::preset::Preset;

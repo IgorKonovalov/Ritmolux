@@ -962,7 +962,7 @@ include!(concat!(env!("OUT_DIR"), "/sanity_shape_tests.rs"));
 /// is retuned upward or retired, which is exactly when a re-measure is owed.
 ///
 /// It runs off the captures the caller already took. A second sweep would be 35
-/// more WARP renders to recompute numbers that are already in hand.
+/// more software renders to recompute numbers that are already in hand.
 fn report_coverage_distribution(by_system: &[(SystemKind, f32, String)]) -> Vec<String> {
     let mut slack = Vec::new();
     println!("coverage by system (floor, then every preset lowest-first):");
@@ -2510,7 +2510,7 @@ fn report_ground_verdict_changes(
 /// It is `#[ignore]`d and contains no assertion. That is the phase's own
 /// done-when: a harness built to inform a **stop gate** must not be able to
 /// redden CI on its own, or the gate is decided by whichever candidate happens
-/// to be green. It is also 82 WARP captures, which is a second reason not to
+/// to be green. It is also 82 software captures, which is a second reason not to
 /// put it in the everyday loop.
 ///
 /// Run it with:
@@ -2531,7 +2531,7 @@ fn report_ground_verdict_changes(
 /// already read `coverage = 1.0000`. Those twelve are the nearest evidence
 /// available, and they are what the table can speak to.
 #[test]
-#[ignore = "measurement, not a gate: Plan 0116 Phase 1 informs a human stop gate, and it is 82 WARP captures"]
+#[ignore = "measurement, not a gate: Plan 0116 Phase 1 informs a human stop gate, and it is 82 software captures"]
 fn each_candidate_ground_is_tabled_against_the_library() {
     let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;

@@ -586,7 +586,8 @@ fn a_lit_backdrop_survives_where_the_strokes_drew_nothing() {
     /// Builds and drops **one** renderer per call rather than holding four:
     /// a second live device in a binary is what the software adapter falls
     /// over on, and building GPU resources mid-run shifts what the trails
-    /// stage resolves to on WARP.
+    /// stage resolves to on WARP (a WARP reading, unverified on lavapipe as of
+    /// 2026-10-06).
     fn linear_composite(bg_bright: f32, draw_progress: f32, glow: Option<f32>) -> Option<Vec<f32>> {
         let mut renderer = match Renderer::new_headless(HeadlessOptions {
             width: CAPTURE_SIZE,
@@ -1361,8 +1362,8 @@ fn the_arc_stroke_falls_off_quadratically_like_a_segment() {
 ///
 /// The capability is opt-in for the reason `over_pipeline` records — an unused
 /// pipeline still allocates, and on WARP a changed allocation order changes a
-/// later pass — so "did not ask for it" has to be a defined state and not an
-/// accident.
+/// later pass (unverified on lavapipe as of 2026-10-06) — so "did not ask for
+/// it" has to be a defined state and not an accident.
 #[test]
 fn a_renderer_without_the_arc_pipeline_draws_no_arcs() {
     let arc = super::ArcInstance {

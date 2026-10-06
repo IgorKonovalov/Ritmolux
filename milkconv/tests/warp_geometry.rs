@@ -303,7 +303,8 @@ fn the_ang_round_trip_reflects_about_the_horizontal_midline() {
     //   round trip  0.140 0.173 0.104 0.077 | 0.079 0.107 0.177 0.144
     //   control     0.105 0.105 0.073 0.053 | 0.104 0.144 0.225 0.190
     // The first is its own reflection to three decimals; the second is
-    // bottom-weighted, which is where the fixture's one shape actually is.
+    // bottom-weighted, which is where the fixture's one shape actually is. (A WARP
+    // reading, unverified on lavapipe as of 2026-10-06.)
     println!(
         "[warp_geometry] distance from being its own vertical mirror — \
          `uv` rebuilt from `ang`: {mirrored:.4}, sampled directly: {direct:.4}"
@@ -390,7 +391,8 @@ fn a_negative_scale_mirrors_rather_than_collapsing() {
     // 96x96 over 12 frames: `sx = -zoom` 0.0047, `sx = zoom` 0.1055 - a factor
     // of 22. Before the fix the two arms read 0.1055 and 0.1055, identical to
     // four places, which is the signature of a sign that never arrived rather
-    // than one that arrived and was clamped.
+    // than one that arrived and was clamped. (A WARP reading, unverified on
+    // lavapipe as of 2026-10-06.)
     println!(
         "[warp_geometry] distance from being its own left-right mirror — \
          `sx = -zoom`: {flipped:.4}, `sx = zoom`: {held:.4}"

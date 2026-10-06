@@ -155,8 +155,9 @@ the decision that moved it is linked.
 - **Captures pin `Floor`.** Headless capture is floor-tier by construction (`Renderer::new_headless`
   cannot produce another tier, and `set_tier` is a **no-op on a surface-less context** — the guard
   [ADR-0054](adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md) adds so the runtime switch cannot reopen this), so every golden baseline stays
-  byte-reproducible on the WARP
-  software adapter and the suite's cost does not scale with the rich tier. `Rich` is covered by
+  byte-reproducible on the software adapter it is captured on (lavapipe,
+  [ADR-0242](adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md))
+  and the suite's cost does not scale with the rich tier. `Rich` is covered by
   capture-level spot checks plus the on-device checklist — a real QA gap, named rather than solved
   ([ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md) Consequences). See [capturing.md](capturing.md).
 
@@ -347,11 +348,13 @@ the decision that moved it is linked.
   instrumented in `coverage` at the same moment on two identical runners (≈ 1930 duplicated CPU-
   seconds). `check` now carries the same exclusion `.githooks/pre-push` does, which makes **`coverage`
   the only place they execute on Windows** — so that job is load-bearing for *correctness*, not only
-  for the ratchet. Disabling it, skipping it, or letting `cargo-llvm-cov` fail to install takes the
-  golden guard and every GPU behavioural suite with it.
-- **Live audio** cannot run in CI. **GPU rendering partly can**: on Windows the DX12 **WARP**
-  software adapter makes headless rendering deterministic, which is what the golden suite and
-  the tier-4 chain test ride on. macOS has no software Metal fallback ([ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)),
+  for the ratchet. Disabling it, skipping it, or letting `cargo-llvm-cov` fail to install takes
+  every GPU behavioural suite with it. The golden roster skips there: its baselines are lavapipe
+  captures ([ADR-0242](adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)).
+- **Live audio** cannot run in CI. **GPU rendering partly can**: a software adapter — Mesa's
+  **lavapipe** on Linux, the DX12 **WARP** adapter on Windows — makes headless rendering
+  deterministic, which is what the golden suite and the tier-4 chain test ride on. The golden
+  baselines are lavapipe's, so their comparison asserts only there. macOS has no software Metal fallback ([ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)),
   so the GPU suites skip there with a printed reason. Real-GPU-vendor and live-loopback checks
   stay manual — see [`on-device-validation.md`](on-device-validation.md).
 - **Coverage ratchet** ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)):

@@ -242,8 +242,8 @@ pub struct HeadlessOptions {
     pub width: u32,
     /// Offscreen render height in pixels.
     pub height: u32,
-    /// Force a fallback (software) adapter — WARP on DX12 — so captures
-    /// rasterize identically across machines. Tests want this on.
+    /// Force a fallback (software) adapter — WARP on DX12, lavapipe on Vulkan —
+    /// so captures rasterize identically across machines. Tests want this on.
     pub prefer_software: bool,
 }
 
@@ -1379,11 +1379,12 @@ impl Renderer {
         self.roster.name()
     }
 
-    /// Whether the active GPU adapter is a CPU/software rasterizer (WARP on DX12).
-    /// Visual-QA tests read this to skip differential checks the software
-    /// rasterizer can't render faithfully — notably the fullscreen-scene +
-    /// background-pipeline coexistence, which WARP mis-renders while real hardware
-    /// renders it correctly (Plan 0025 / ADR-0026).
+    /// Whether the active GPU adapter is a CPU/software rasterizer (WARP on DX12,
+    /// lavapipe on Vulkan). Visual-QA tests read this to skip differential checks
+    /// the software rasterizer can't render faithfully — notably the
+    /// fullscreen-scene + background-pipeline coexistence, which WARP mis-renders
+    /// while real hardware renders it correctly (Plan 0025 / ADR-0026; a WARP
+    /// reading, unverified on lavapipe as of 2026-10-06).
     pub fn adapter_is_software(&self) -> bool {
         self.ctx.is_software()
     }

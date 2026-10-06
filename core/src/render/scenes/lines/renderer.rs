@@ -562,8 +562,9 @@ fn arc_shader_source() -> String {
 /// Separate rather than two more entry points in the one module, so a
 /// `LineRenderer` without arcs creates exactly the resources it created before
 /// this existed. Appending to the shared module would have changed what every
-/// line scene compiles, and on the WARP software adapter the golden suite
-/// captures on, a changed resource is a changed picture (ADR-0058).
+/// line scene compiles, and on the software adapter the golden suite captures
+/// on, a changed resource is a changed picture (ADR-0058; measured on WARP,
+/// unverified on lavapipe as of 2026-10-06).
 ///
 /// # What the fragment computes, and in which space
 ///
@@ -1042,7 +1043,8 @@ struct Seg3d {
     /// The same pipeline composited **over** rather than added, for a solid
     /// frame (ADR-0263). Built with the additive one rather than on the first
     /// solid frame: a resource created mid-run moves what later passes
-    /// resolve to on the WARP software adapter the goldens capture on.
+    /// resolve to on the software adapter the goldens capture on (measured on
+    /// WARP, unverified on lavapipe as of 2026-10-06).
     over_pipeline: wgpu::RenderPipeline,
     instances: wgpu::Buffer,
     camera: wgpu::Buffer,
@@ -1419,10 +1421,11 @@ pub struct LineRenderer {
     /// and that is not a micro-optimization. Building a pipeline the scene never
     /// binds still allocates on the device, and on the WARP software adapter a
     /// changed allocation order changes what a later pass resolves to — the
-    /// hazard `core/tests/suite/composite.rs`'s header records and the golden suite
-    /// captures on. Building this for the nine line scenes that do not use it
-    /// moved five composite baselines while changing nothing a driver would
-    /// render differently.
+    /// hazard `core/tests/suite/composite.rs`'s header records, on a software
+    /// adapter like the one the golden suite captures on. Building this for the
+    /// nine line scenes that do not use it moved five composite baselines while
+    /// changing nothing a driver would render differently. (WARP readings,
+    /// unverified on lavapipe as of 2026-10-06.)
     over_pipeline: Option<wgpu::RenderPipeline>,
     /// The [`ArcInstance`] pipeline, drawn in the same additive pass from its
     /// own buffer — [`ARC_SHADER`] and ADR-0098.
@@ -1432,10 +1435,10 @@ pub struct LineRenderer {
     /// [`over_pipeline`](Self::over_pipeline) records and with the same
     /// evidence behind it: building a pipeline nobody binds still allocates on
     /// the device, and on WARP a changed allocation order changes what a later
-    /// pass resolves to. It **shares the bind-group layout, the bind group and
-    /// the pipeline layout** with the segment pipelines — one uniform, one
-    /// layout, so ADR-0058 has nothing new to separate. Only the vertex layout
-    /// and the shader module differ.
+    /// pass resolves to (unverified on lavapipe as of 2026-10-06). It **shares
+    /// the bind-group layout, the bind group and the pipeline layout** with the
+    /// segment pipelines — one uniform, one layout, so ADR-0058 has nothing new
+    /// to separate. Only the vertex layout and the shader module differ.
     arc_pipeline: Option<wgpu::RenderPipeline>,
     /// [`arc_pipeline`](Self::arc_pipeline) with the light composited **over**
     /// rather than added — the arc half of the opacity-preserving seam
@@ -1460,7 +1463,8 @@ pub struct LineRenderer {
     /// it** ([`LineRenderer::new_3d`]) — for the reason
     /// [`over_pipeline`](Self::over_pipeline) records: a pipeline nobody binds
     /// still allocates on the device, and on WARP a changed allocation order
-    /// changes what a later pass resolves to.
+    /// changes what a later pass resolves to (unverified on lavapipe as of
+    /// 2026-10-06).
     seg3d: Option<Seg3d>,
 }
 
@@ -1501,7 +1505,8 @@ impl LineRenderer {
     /// The pipelines are built here rather than on the first preset that asks,
     /// deliberately: building a GPU resource mid-run changes what a later pass
     /// resolves to on the DX12 software adapter, which would make the seam's
-    /// arrival visible in scenes that never selected it.
+    /// arrival visible in scenes that never selected it. (A WARP reading,
+    /// unverified on lavapipe as of 2026-10-06.)
     pub fn new_split_with_arcs(
         device: &wgpu::Device,
         surface_format: wgpu::TextureFormat,

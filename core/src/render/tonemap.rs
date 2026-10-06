@@ -44,8 +44,9 @@
 //! The linear region ends *at this pass's input*: the tonemap writes display-referred values at the
 //! surface format into ink's input, or straight into the surface when ink is off. Targeting a float
 //! ink-input instead needs **two** tonemap pipelines — one per destination format — against the
-//! WARP software adapter's documented sensitivity to pipeline count (ADR-0046). One pipeline, and
-//! ink's semantics are bit-for-bit unchanged.
+//! WARP software adapter's documented sensitivity to pipeline count (ADR-0046; a WARP reading,
+//! unverified on lavapipe as of 2026-10-06). One pipeline, and ink's semantics are bit-for-bit
+//! unchanged.
 //!
 //! # The write dithers (Plan 0082, ADR-0096)
 //!
@@ -65,8 +66,8 @@
 //! - **The hash is integer bit-mixing** ([`gpu::HASH_WGSL`]), never
 //!   `fract(sin(dot(p, k)) * 43758.5453)`. `sin`'s precision is
 //!   implementation-defined, so the common idiom would make this pass disagree
-//!   between WARP and hardware on essentially every pixel — the ADR-0058 defect
-//!   class, introduced by the fix for a different one.
+//!   between a software rasterizer and hardware on essentially every pixel —
+//!   the ADR-0058 defect class, introduced by the fix for a different one.
 //! - **The amplitude is divided by the sRGB slope**, because the *hardware*
 //!   encodes after the shader (the surface is `Rgba8UnormSrgb`). `dE/dL` runs
 //!   from 12.92 near black to 0.44 at white, so a flat `1/255` linear amplitude
@@ -355,7 +356,9 @@ impl Resources {
         // the **backdrop's** — and WARP then fed it `bg_hue` as the exposure and
         // `bg_bright` as the knee, again to the byte. The hardware adapter
         // rendered both configurations correctly, which is precisely what makes
-        // this class of defect expensive: the whole golden suite captures on WARP.
+        // this class of defect expensive: the whole golden suite captures on a
+        // software adapter (lavapipe, ADR-0242). The aliasing above is a WARP
+        // reading, unverified on lavapipe as of 2026-10-06.
         //
         // So: one group, with the uniform **between** the texture and the sampler
         // — `[texture, uniform, sampler]`, which
@@ -371,6 +374,7 @@ impl Resources {
         // agree (mean luma 51.84 vs 56.29, lit-pixel counts within 0.1 %), so the
         // curve was not being fed the decay pass's uniform — but a false comment
         // on a hazard surface is worse than none, and the enumeration is cheap.
+        // (A WARP reading, unverified on lavapipe as of 2026-10-06.)
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("tonemap-bind-layout"),
             entries: &[

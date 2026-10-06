@@ -81,7 +81,8 @@ impl Warp {
     /// One shader with a kind uniform, **not one pipeline per kind** (Plan 0046's
     /// own risk note): the DX12 WARP software adapter mis-renders coexisting
     /// pipelines whose bind-group layouts match, and four permutations of one
-    /// stage is exactly the shape that bites.
+    /// stage is exactly the shape that bites. (A WARP reading, unverified on
+    /// lavapipe as of 2026-10-06.)
     pub(crate) fn code(self) -> f32 {
         match self {
             Warp::None => 0.0,
@@ -331,8 +332,9 @@ const RLX_RIPPLE_FREQ: f32 = 18.0;
 // a positive strength moves the past the way the docs say.
 //
 // A `kind` selector rather than four pipelines: coexisting pipelines with matching
-// bind-group layouts mis-render on the DX12 WARP software adapter (ADR-0058), and
-// the branch here is uniform across the draw anyway.
+// bind-group layouts mis-render on the DX12 WARP software adapter (ADR-0058; a
+// WARP reading, unverified on lavapipe as of 2026-10-06), and the branch here is
+// uniform across the draw anyway.
 fn rlx_warp_source(p: vec2<f32>, wp: vec4<f32>) -> vec2<f32> {
     let kind = wp.x;
     let k = wp.y;

@@ -358,7 +358,8 @@ visually).
   pixel. Budget a deliberate re-bless with eyes on every scene, and remember `RLX_BLESS`
   rewrites all baselines, not just the targeted one.
 - **The WARP software adapter's pipeline-count sensitivity** (the documented mis-render
-  pressure against adding pipelines) is a live constraint on R1/R2/R3's test strategy —
+  pressure against adding pipelines; a WARP reading, unverified on lavapipe as of 2026-10-06)
+  is a live constraint on R1/R2/R3's test strategy —
   the suite may need per-stage gating rather than one mega-composite test.
 - **Tier bifurcation doubles the visual-QA surface** (floor and rich renders differ).
   ~~Decide in R0's ADR which tier the golden suite pins, and what the other tier gets.~~

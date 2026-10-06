@@ -14,7 +14,8 @@
 //! [`PostChain`](super::post::PostChain) skips this stage entirely: no
 //! offscreen target, no pipelines, so the NFR §1 iGPU floor pays nothing, and
 //! (like the background pass) the DX12 WARP software adapter never sees a
-//! coexisting feedback pipeline during the no-trails captures. When active,
+//! coexisting feedback pipeline during the no-trails captures (that hazard is
+//! a WARP reading, unverified on lavapipe as of 2026-10-06). When active,
 //! the pipelines build lazily and the accumulation is **reset on the capture
 //! scene-rebuild**, so a headless capture stays a pure function of its inputs
 //! (NFR §6).
@@ -183,6 +184,7 @@ struct Fade { v: vec4<f32> } // x: fade factor (unread here), y: occlude
 // buffer instead of this one — `occlude` measurably did nothing there while
 // working on the hardware adapter. Pinned by
 // `the_two_present_layouts_added_for_occlude_are_shapes_nothing_else_has`.
+// (WARP readings, unverified on lavapipe as of 2026-10-06.)
 @group(0) @binding(0) var samp: sampler;
 @group(0) @binding(1) var<uniform> u: Fade;
 @group(0) @binding(2) var t_accum: texture_2d<f32>;
@@ -735,7 +737,8 @@ impl PostStage for Trails {
     /// Drop the lazily-built resources so the accumulation restarts cleared — used
     /// on the capture scene-rebuild so a capture stays a pure function of its
     /// inputs, and so a stale trails pipeline never lingers to mis-render the next
-    /// capture's scene on the WARP adapter (module docs).
+    /// capture's scene on the WARP adapter (module docs; unverified on lavapipe as
+    /// of 2026-10-06).
     fn reset_resources(&mut self) {
         self.res = None;
     }

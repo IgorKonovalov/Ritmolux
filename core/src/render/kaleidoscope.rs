@@ -82,7 +82,8 @@
 //! [`PostChain`](super::post::PostChain) skips this stage entirely: no offscreen,
 //! no pipeline, the NFR §1 iGPU floor pays nothing, and (like the
 //! background/trails passes) the DX12 WARP software adapter never sees a
-//! coexisting fold pipeline during the no-kaleidoscope captures. When active the
+//! coexisting fold pipeline during the no-kaleidoscope captures (that hazard is
+//! a WARP reading, unverified on lavapipe as of 2026-10-06). When active the
 //! pipeline builds lazily and is dropped on the capture scene-rebuild.
 //!
 //! Runs at an internal resolution that **follows the render target** (ADR-0034),
@@ -859,7 +860,8 @@ impl Resources {
         // to transparent — it is *bit-identical* to REPLACE, since
         // `src + dst * (1 - src.a)` with `dst = 0` is `src` in every channel. One
         // pipeline covers both, so the stage's pipeline count is unchanged and the
-        // WARP sensitivity documented in `post.rs` is not disturbed.
+        // WARP sensitivity documented in `post.rs` is not disturbed (a WARP
+        // reading, unverified on lavapipe as of 2026-10-06).
         let pipeline = gpu::fullscreen_pipeline(
             device,
             &shader,
@@ -1196,7 +1198,7 @@ impl PostStage for Kaleidoscope {
 
     /// Drop the lazily-built resources — used on the capture scene-rebuild so a
     /// stale fold pipeline never lingers to mis-render the next capture's scene on
-    /// the WARP adapter (module docs).
+    /// the WARP adapter (module docs; unverified on lavapipe as of 2026-10-06).
     fn reset_resources(&mut self) {
         self.res = None;
     }

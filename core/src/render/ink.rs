@@ -43,8 +43,9 @@
 //! no offscreen, no pipeline, the NFR §1 iGPU floor pays nothing, and
 //! (like the background/trails/kaleidoscope passes) the DX12 WARP
 //! software adapter never sees a coexisting remap pipeline during the
-//! no-ink captures. When active the pipeline builds lazily and is
-//! dropped on the capture scene-rebuild.
+//! no-ink captures (that hazard is a WARP reading, unverified on
+//! lavapipe as of 2026-10-06). When active the pipeline builds lazily
+//! and is dropped on the capture scene-rebuild.
 //!
 //! The ink offscreen is **surface-sized** rather than running at a post
 //! stage's quantized internal grid: the remap is a 1:1 per-pixel
@@ -636,7 +637,7 @@ impl Ink {
 
     /// Drop the lazily-built resources — used on the capture scene-rebuild so a
     /// stale remap pipeline never lingers to mis-render the next capture's scene on
-    /// the WARP adapter (module docs).
+    /// the WARP adapter (module docs; unverified on lavapipe as of 2026-10-06).
     pub fn reset_resources(&mut self) {
         self.res = None;
     }

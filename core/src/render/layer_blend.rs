@@ -41,8 +41,9 @@
 //! **one** pipeline — a selector like the feedback warp roster, deliberately,
 //! because WARP's pipeline-count sensitivity is documented and four
 //! permutations of one pass is exactly the shape that bites (Plan 0046's risk
-//! note). All four operate **within the layer's premultiplied-alpha footprint**
-//! (ADR-0056): the blended result is `mix(chain, mode(chain, layer), coverage)`
+//! note; a WARP reading, unverified on lavapipe as of 2026-10-06). All four
+//! operate **within the layer's premultiplied-alpha footprint** (ADR-0056): the
+//! blended result is `mix(chain, mode(chain, layer), coverage)`
 //! with `coverage = layer.a * mix`, so a darkening mode darkens only where the
 //! layer has coverage, and `mix = 0` is the chain content exactly (a lerp at
 //! `t = 0` is exact in floating point).
@@ -58,7 +59,8 @@
 //! The bind-group layout here — uniform + two textures + a sampler — would be
 //! shape-identical to `blend-bind-layout`, and the two are live together
 //! whenever a dissolve crosses an `over`-join preset. WARP mis-renders
-//! coexisting identical layouts (measured, Plan 0053), so this one is
+//! coexisting identical layouts (measured, Plan 0053; unverified on lavapipe
+//! as of 2026-10-06), so this one is
 //! separated by both established levers: a **wider visibility mask**
 //! (`VERTEX_FRAGMENT`, the emitter fix's idiom) and an explicit
 //! `min_binding_size` of its own 32-byte uniform against the transition

@@ -5,8 +5,9 @@
 //! `warp_mesh` preset — and a converted one without shaders — builds none of
 //! it, which is what keeps every existing golden byte-identical: an extra
 //! device allocation changes what a later pass resolves to on WARP
-//! (`core/tests/suite/composite.rs`'s recorded hazard), so the price is only paid by
-//! the presets that need it.
+//! (`core/tests/suite/composite.rs`'s recorded hazard; a WARP reading, unverified
+//! on lavapipe as of 2026-10-06), so the price is only paid by the presets that
+//! need it.
 //!
 //! # What the surface supplies
 //!

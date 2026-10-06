@@ -262,8 +262,9 @@ struct Params {
 // read it, which is also what makes the chunk parse on its own.
 
 // **A bind-group layout shape nothing else in the crate holds** (ADR-0058: two
-// byte-identical layouts alias on the DX12 WARP adapter, and the whole golden
-// suite runs there, so a collision would be blessed rather than caught). The
+// byte-identical layouts alias on the DX12 WARP adapter, a WARP reading
+// unverified on lavapipe as of 2026-10-06, and the whole golden suite runs on a
+// software adapter, so a collision would be blessed rather than caught). The
 // fragment-visible read-only storage buffer is the discriminator — no other
 // layout here binds storage outside a compute stage — so keep binding 4 where
 // it is rather than tidying the group.
@@ -1009,7 +1010,8 @@ impl ShapeCollageScene {
         // See the WGSL's note: the fragment-visible storage buffer is what makes
         // this layout's shape unique in the crate (ADR-0058). Both buffer entries
         // are full literals so each declares a `min_binding_size`, which Plan
-        // 0053 Phase 3 measured to be half of what separates two layouts on WARP.
+        // 0053 Phase 3 measured to be half of what separates two layouts on WARP
+        // (unverified on lavapipe as of 2026-10-06).
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("shape-collage-bind-layout"),
             entries: &[

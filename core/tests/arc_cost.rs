@@ -16,9 +16,9 @@
 //! here.** The test renders the cases, prints what it saw, and asserts only two
 //! properties that hold on every machine CI offers: each reading is a positive,
 //! finite duration, and the cases measured genuinely different figures. It skips
-//! on a software rasterizer:
-//! WARP's frame time says nothing about the iGPU floor in `docs/nfr.md` §1, and
-//! a reading taken there would be a number that looks like evidence and is not.
+//! on a software rasterizer: a software frame time says nothing about the iGPU
+//! floor in `docs/nfr.md` §1, and a reading taken there would be a number that
+//! looks like evidence and is not.
 //! Its shape is `mark_cost.rs`'s — interleaved cases, a two-length slope to
 //! subtract the fixed costs, each leg minimized across several repeats — and
 //! that file's header explains each of those choices.
@@ -72,7 +72,7 @@
 //! machine the polyline was safe on.
 //!
 //! One `#[test]` per file (its own binary → its own process), so the hardware
-//! device never coexists with the other suites' WARP ones.
+//! device never coexists with the other suites' software ones.
 
 // The determinism gate bans wall-clock reads because analysis must be a pure
 // function of its input (clippy.toml, NFR §6). This file is the deliberate

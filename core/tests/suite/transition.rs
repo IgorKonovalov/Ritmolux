@@ -599,7 +599,7 @@ fn a_finished_dissolve_leaves_no_trace_on_later_frames() {
 ///
 /// The frame-budget half of the claim (that the heavy pair holds 60 fps on a
 /// low-end iGPU) is the standing on-device carry-forward in
-/// `docs/on-device-validation.md`; a WARP capture cannot speak to it.
+/// `docs/on-device-validation.md`; a software capture cannot speak to it.
 #[test]
 fn the_heavy_pair_dissolves_on_the_freeze_fallback() {
     let Some(mut renderer) = common::headless(SIZE, SIZE) else {

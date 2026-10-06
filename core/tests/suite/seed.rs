@@ -32,7 +32,8 @@ const FRAMES: u32 = 8;
 /// that can move this preset's pixels between two runs is the seed.
 ///
 /// No `trails` and no `[palette]`: one scene pipeline and nothing accumulating,
-/// which is the configuration WARP is faithful on (see `composite.rs`).
+/// which is the configuration WARP is faithful on (see `composite.rs`; a WARP
+/// reading, unverified on lavapipe as of 2026-10-06).
 fn source(seed: &str) -> String {
     format!(
         r#"

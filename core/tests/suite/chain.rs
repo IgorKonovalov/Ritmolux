@@ -21,9 +21,10 @@
 //! two can drift; that is the accepted cost, recorded here so a reader of either
 //! side knows to check the other.
 //!
-//! WARP-only for the rendering claims: macOS has no software Metal fallback, so
-//! those skip with a printed reason exactly as `golden.rs` does (ADR-0016). The
-//! boundary-validation claim needs no adapter and runs everywhere.
+//! Software-adapter only for the rendering claims: macOS has no software Metal
+//! fallback, so those skip with a printed reason exactly as `golden.rs` does
+//! (ADR-0016). The boundary-validation claim needs no adapter and runs
+//! everywhere.
 
 use rlx_core::audio::{self, AudioFormat, FormatError, SampleConsumer};
 use rlx_core::dsp::Analyzer;

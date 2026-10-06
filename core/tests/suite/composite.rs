@@ -84,7 +84,8 @@ const MAX_OUTLIER: u8 = 48;
 /// pipelines, and the WARP software adapter's sensitivity to coexisting pipelines
 /// is the reason this file exists in the shape it does; a mega-composite fixture
 /// would put every stage's pipelines on the device at once and make any
-/// mis-render impossible to attribute.
+/// mis-render impossible to attribute. (The sensitivity is a WARP reading,
+/// unverified on lavapipe as of 2026-10-06.)
 ///
 /// Four groups here **share** a stage rather than owning one. That does
 /// not break the rule above: each group binds one stage and nothing
@@ -117,7 +118,8 @@ const MAX_OUTLIER: u8 = 48;
 /// **Appended, never inserted**, for the reason `golden.rs`'s `EXTRA_FIXTURES`
 /// records: every pre-existing baseline is then rendered from the device state it
 /// always was, which matters on WARP where building GPU resources mid-run changes
-/// what a later capture resolves to.
+/// what a later capture resolves to (a WARP reading, unverified on lavapipe as of
+/// 2026-10-06).
 const FIXTURES: [(&str, &str); 10] = [
     (
         "composite_trails",

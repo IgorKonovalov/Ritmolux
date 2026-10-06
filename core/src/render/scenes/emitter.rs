@@ -1102,7 +1102,8 @@ impl EmitterScene {
         // enough. Hardware renders both correctly, which is exactly why this
         // could only be caught by looking — a bless here would have committed
         // garbage as the swarm's baseline (the failure mode ADR-0074 and Plan
-        // 0053 exist for).
+        // 0053 exist for). These are WARP readings, unverified on lavapipe as
+        // of 2026-10-06.
         //
         // Distinguishing the descriptor — a wider visibility mask and an
         // explicit `min_binding_size` — restored `swarm` to mean 0.0000 with a

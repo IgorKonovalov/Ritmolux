@@ -5,16 +5,17 @@
 //!
 //! This check is **real-hardware only**. It renders each scene under two backdrop
 //! hues over the *same* field and asserts the revealed tint tracks `bg_hue`. The
-//! DX12 WARP software rasterizer the other GPU suites use mis-renders these scenes'
-//! full pipeline set once the background pipeline coexists on the device (the same
-//! documented quirk that makes the reaction-diffusion / attractor resources build
-//! lazily), so the reveal is invisible there. We therefore request the *default*
-//! (hardware) adapter and **skip** when only a software rasterizer is available —
-//! the reveal is verified on real hardware (dev boxes, macOS Metal CI) and via the
-//! `shot` CLI, and left unasserted where the adapter can't render it.
+//! DX12 WARP software rasterizer mis-renders these scenes' full pipeline set once
+//! the background pipeline coexists on the device (the same documented quirk that
+//! makes the reaction-diffusion / attractor resources build lazily), so the reveal
+//! is invisible there — a WARP reading, unverified on lavapipe as of 2026-10-06.
+//! We therefore request the *default* (hardware) adapter and **skip** when only a
+//! software rasterizer is available — the reveal is verified on real hardware (dev
+//! boxes, macOS Metal CI) and via the `shot` CLI, and left unasserted where the
+//! adapter can't render it.
 //!
 //! One `#[test]` per file (its own test binary → its own process) so the single
-//! hardware renderer never coexists with the other suites' WARP devices.
+//! hardware renderer never coexists with the other suites' software devices.
 
 /// The shared ADR-0016 skip and headless constructors.
 mod common;
@@ -33,7 +34,8 @@ fn hardware() -> Option<Renderer> {
         SIZE,
         SIZE,
         None,
-        "WARP mis-renders the fullscreen-scene + background coexistence (see module docs)",
+        "measured on WARP, unverified on lavapipe as of 2026-10-06: WARP mis-renders the \
+         fullscreen-scene + background coexistence (see module docs)",
     )
 }
 

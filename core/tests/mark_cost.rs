@@ -16,9 +16,9 @@
 //! depends on the numbers, which is exactly the point: a threshold on this would
 //! be a re-measurement waiting for the next runner image.
 //!
-//! It also skips on a software rasterizer, with a notice. WARP's frame time says
-//! nothing about the iGPU floor in `docs/nfr.md` §7, and a reading taken there
-//! would be a number that looks like evidence and is not.
+//! It also skips on a software rasterizer, with a notice. A software frame time
+//! says nothing about the iGPU floor in `docs/nfr.md` §7, and a reading taken
+//! there would be a number that looks like evidence and is not.
 //!
 //! # Three probes, because two would not have separated the two costs
 //!
@@ -57,14 +57,15 @@
 //!
 //! Against `docs/nfr.md` §7's 16.7 ms budget none of this is a number worth
 //! tuning for, and ADR-0084's fallback — separate pipelines per shape, with its
-//! own WARP hazard under ADR-0058 — stays unneeded. Two things make that
+//! own WARP hazard under ADR-0058 (a WARP reading, unverified on lavapipe as of
+//! 2026-10-06) — stays unneeded. Two things make that
 //! unsurprising rather than suspicious: the selection is **per draw**, so the
 //! branch is uniform across a warp and the hardware takes one arm rather than
 //! both; and a swarm frame at this size is bandwidth-bound through 10 000
 //! overdrawing quads long before it is ALU-bound.
 //!
 //! One `#[test]` per file (its own binary → its own process), so the hardware
-//! device never coexists with the other suites' WARP ones.
+//! device never coexists with the other suites' software ones.
 
 // The determinism gate bans wall-clock reads because analysis must be a pure
 // function of its input (clippy.toml, NFR §6). This file is the deliberate

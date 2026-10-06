@@ -5,13 +5,14 @@
 //!
 //! `composite.rs` exists in the shape it does because building GPU resources
 //! mid-run changes what the trails stage resolves to on the DX12 WARP software
-//! adapter (ADR-0058), and its seven baselines must not be exposed to that. These
-//! guards need a **portrait** render target and several consecutive multi-frame
-//! runs, so putting them in that file would put exactly the perturbation its
-//! module docs warn about into the same process as those baselines. They live
-//! here instead, and they assert **relative** facts — how one frame of a run
-//! differs from a later frame of the same run — which needs no committed PNG and
-//! survives any cross-adapter rasterization difference.
+//! adapter (ADR-0058; a WARP reading, unverified on lavapipe as of 2026-10-06),
+//! and its seven baselines must not be exposed to that. These guards need a
+//! **portrait** render target and several consecutive multi-frame runs, so
+//! putting them in that file would put exactly the perturbation its module docs
+//! warn about into the same process as those baselines. They live here instead,
+//! and they assert **relative** facts — how one frame of a run differs from a
+//! later frame of the same run — which needs no committed PNG and survives any
+//! cross-adapter rasterization difference.
 //!
 //! # Portrait, deliberately
 //!

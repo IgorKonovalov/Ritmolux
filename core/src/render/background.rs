@@ -127,7 +127,8 @@
 //! [`Resources::build`] separates them — so the laziness above is worth having
 //! for its own reason and is not load-bearing against it. **Real hardware is
 //! never affected**, which is what makes the class expensive: the whole golden
-//! suite captures on WARP.
+//! suite captures on a software adapter (lavapipe, ADR-0242). The mis-render is
+//! a WARP reading, unverified on lavapipe as of 2026-10-06.
 //!
 //! The **fragment field** is the one scene that still draws opaquely over the
 //! backdrop, so its bg params have no visible effect. Every other scene composites
@@ -564,7 +565,8 @@ impl Resources {
         // the same argument `scenes/emitter.rs` makes for the same fix. This is
         // the measurement that **isolates** it: the emitter changed the
         // visibility mask and the size together, so which one did the work was
-        // never established. Here the size alone is sufficient.
+        // never established. Here the size alone is sufficient. (A WARP reading,
+        // unverified on lavapipe as of 2026-10-06.)
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("background-bind-layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -593,9 +595,10 @@ impl Resources {
         let lut_sampler = palette::lut_sampler(device);
         // Shape-identical to `fragment-field-lut-layout` — the ADR-0058
         // configuration where the DX12 WARP software adapter can hand a pass
-        // another live pipeline's resources. **The evidence that clears the pair
-        // is in the `Background` doc comment below**, per that ADR's rule that an
-        // entry with no recorded measurement is not an entry.
+        // another live pipeline's resources (a WARP reading, unverified on
+        // lavapipe as of 2026-10-06). **The evidence that clears the pair is in
+        // the `Background` doc comment below**, per that ADR's rule that an entry
+        // with no recorded measurement is not an entry.
         let lut_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("background-lut-layout"),
             entries: &[
@@ -686,7 +689,7 @@ impl Resources {
 /// So the new pair adds no observed aliasing, and the one configuration that could
 /// exhibit it is unreachable from shipped content and already excluded from the
 /// software adapter. If a fragment-field preset ever binds `bg_bright`, this is the
-/// measurement to re-run.
+/// measurement to re-run. (WARP readings, unverified on lavapipe as of 2026-10-06.)
 pub struct Background {
     device: wgpu::Device,
     surface_format: wgpu::TextureFormat,
@@ -1020,7 +1023,8 @@ impl Background {
     /// Called when the renderer rebuilds its scenes for a capture (Plan 0013): a
     /// capture stays a pure function of its inputs, and — on the WARP software
     /// adapter — a bg preset's pipeline never lingers to mis-render the *next*
-    /// capture's scene (module docs).
+    /// capture's scene (module docs; a WARP reading, unverified on lavapipe as of
+    /// 2026-10-06).
     pub fn reset_resources(&mut self) {
         self.res = None;
     }

@@ -7,8 +7,9 @@
 //! and they are called in the order the objects were created when it was one:
 //! a resource created earlier or later changes what a later pass resolves to on
 //! the DX12 WARP software adapter (ADR-0058, and the hazard
-//! `core/tests/suite/composite.rs` records). Moving a creation between stages is a
-//! pixel change, not a tidy. The converted-shader surface is built last for the
+//! `core/tests/suite/composite.rs` records; a WARP reading, unverified on
+//! lavapipe as of 2026-10-06). Moving a creation between stages is a pixel
+//! change, not a tidy. The converted-shader surface is built last for the
 //! same reason: a native preset's allocation sequence has to stay what it was.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
@@ -81,7 +82,8 @@ pub(super) struct Resources {
     ///
     /// Built lazily with the rest of `Resources`, so a session that never
     /// activates this scene builds no second line pipeline and cannot meet
-    /// ADR-0058's WARP hazard at all.
+    /// ADR-0058's WARP hazard at all (a WARP reading, unverified on lavapipe as
+    /// of 2026-10-06).
     pub(super) lines: lines::LineRenderer,
     /// The filled-shape pipeline and its buffers.
     pub(super) shape_pipeline: wgpu::RenderPipeline,
@@ -99,7 +101,7 @@ pub(super) struct Resources {
     /// The converted-shader surface (Plan 0100 Phase 6) — noise, blur chain,
     /// custom warp/comp pipelines. `None` for every preset without WGSL, which
     /// is what keeps the allocation sequence — and therefore every existing
-    /// WARP golden — identical to before this existed.
+    /// golden — identical to before this existed.
     pub(super) milk_shaders: Option<shader::MilkShaderResources>,
     /// The [`shader::ShaderSpec::key`] these resources were built for.
     pub(super) shader_key: u64,

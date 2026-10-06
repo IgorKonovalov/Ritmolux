@@ -84,30 +84,35 @@ pub fn headless_on(width: u32, height: u32, prefer_software: bool) -> Option<Ren
 /// and WARP aliases those (ADR-0058): the second instance's uniform wins and the
 /// first becomes a dead lever, on the software adapter only. So this skips with
 /// notice on a software-only runner rather than asserting against an adapter
-/// that mis-renders the shape under test.
+/// that mis-renders the shape under test. (A WARP reading, unverified on
+/// lavapipe as of 2026-10-06; the skip still keys on any software adapter.)
 pub fn headless_hardware(width: u32, height: u32) -> Option<Renderer> {
     headless_hardware_for(
         width,
         height,
         None,
-        "WARP aliases the identical pipeline layouts a same-system pair duplicates (ADR-0058)",
+        "measured on WARP, unverified on lavapipe as of 2026-10-06: WARP aliases the \
+         identical pipeline layouts a same-system pair duplicates (ADR-0058)",
     )
 }
 
-/// The reason a **timing** test needs hardware: a WARP frame time is a fact
-/// about a CPU rasterizer, so no threshold stated against the shipped renderer
-/// can be checked with one (ADR-0071).
+/// The reason a **timing** test needs hardware: a software-rasterizer frame
+/// time is a fact about a CPU rasterizer, so no threshold stated against the
+/// shipped renderer can be checked with one (ADR-0071). Class-level: it holds
+/// for WARP and lavapipe alike.
 pub const NEEDS_HARDWARE_FOR_TIMING: &str =
-    "a WARP frame time is not a reading about the shipped renderer (see module docs)";
+    "a software frame time is not a reading about the shipped renderer (see module docs)";
 
 /// A hardware-adapter build, skipping with the **caller's own** reason.
 ///
 /// The ADR-0016 no-adapter skip lives in `build` and is shared; this adds the
 /// second refusal, and the reason is a parameter because the files that need it
 /// do not share one. Four distinct reasons are live: a frame time that would be
-/// measuring the wrong machine, WARP aliasing byte-identical bind layouts
-/// (ADR-0058), WARP mis-rendering a fullscreen-scene and background together,
-/// and a defect that simply does not reproduce on WARP. Collapsing them onto one
+/// measuring the wrong machine (class-level, true of any software rasterizer),
+/// WARP aliasing byte-identical bind layouts (ADR-0058), WARP mis-rendering a
+/// fullscreen-scene and background together, and a defect that simply does not
+/// reproduce on WARP. The last three are WARP readings, unverified on lavapipe
+/// as of 2026-10-06, and each caller's reason says so. Collapsing them onto one
 /// notice would print an aliasing argument at a timing skip, which is how a skip
 /// notice stops being evidence about anything.
 ///

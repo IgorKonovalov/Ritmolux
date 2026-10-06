@@ -272,7 +272,8 @@ pub(crate) struct QuadUniform {
 /// The two scenes' bind-group layouts are **deliberately different shapes**, and
 /// that difference is the third recorded instance of ADR-0058's hazard: written
 /// byte-identical, the emitter's pipeline made the *swarm* read the emitter's
-/// uniform on DX12 WARP. `emitter.rs` carries the measurement and says not to
+/// uniform on DX12 WARP (unverified on lavapipe as of 2026-10-06).
+/// `emitter.rs` carries the measurement and says not to
 /// tidy it back. A constructor that built the layout from a visibility mask and a
 /// size argument would hide that difference behind two parameters, and would also
 /// take both layouts out of the enumeration
@@ -1137,7 +1138,8 @@ pub(crate) const PHASE_SALT: u32 = STAR_PHASE_SALT;
 /// **same** `mark_distance` and a roster change reaches both at once. It defines
 /// no bindings and no entry points — it is arithmetic — so splicing it in
 /// changes neither scene's bind-group layout (which on the DX12 WARP adapter is
-/// not a free thing to change; see `emitter.rs`'s layout comment and ADR-0058).
+/// not a free thing to change; see `emitter.rs`'s layout comment and ADR-0058;
+/// unverified on lavapipe as of 2026-10-06).
 pub(crate) fn sdf_wgsl() -> String {
     SDF_WGSL
         .replace("%RING_MID%", &format!("{RING_MID:?}"))

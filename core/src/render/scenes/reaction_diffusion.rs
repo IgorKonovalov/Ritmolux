@@ -15,10 +15,11 @@
 //! device handle and constructs its pipelines/textures only when it is first
 //! drawn (see `Resources`). This keeps the resources off the device until the
 //! scene is actually shown, and — importantly — lets the headless capture tests
-//! build the full roster on the DX12 WARP software adapter: WARP mis-renders the
+//! build the full roster on the software adapter: WARP mis-renders the
 //! pre-existing fragment-field pipeline once this scene's *full* set of feedback
 //! resources coexists on the device (a cumulative software-rasterizer quirk with
-//! no wgpu validation error; real hardware is unaffected). Deferring
+//! no wgpu validation error; real hardware is unaffected; a WARP reading,
+//! unverified on lavapipe as of 2026-10-06). Deferring
 //! construction means a capture that never activates this scene never builds
 //! those resources, so the other scenes' captures stay correct; a capture that
 //! *does* activate it builds them and renders this scene normally.
@@ -44,7 +45,7 @@ use crate::render::scenes::{ParamGroup, ParamKind, ParamSpec, default_of};
 
 /// Fixed internal simulation grid (square). 256² resolves the Gray-Scott
 /// patterns well while staying cheap enough that the headless capture tests run
-/// briskly on the software (WARP) adapter — a 512² grid quadruples the per-step
+/// briskly on a software adapter — a 512² grid quadruples the per-step
 /// fragment work the differential tests pay each warm-up frame (ADR-0012 gives
 /// 512² only as an example).
 const GRID: u32 = 256;
@@ -203,7 +204,9 @@ struct Present {
 @group(0) @binding(2) var<uniform> pp: Present;
 // Shared gradient LUTs (ADR-0021): A/B for the `palette_mix` crossfade, one
 // repeat sampler. Kept in this present bind group (a unique 6-entry layout) so it
-// never matches another pipeline's layout on the DX12 WARP software adapter.
+// never matches another pipeline's layout on the DX12 WARP software adapter
+// (where matching layouts alias; a WARP reading, unverified on lavapipe as of
+// 2026-10-06).
 @group(0) @binding(3) var lut_a: texture_2d<f32>;
 @group(0) @binding(4) var lut_b: texture_2d<f32>;
 @group(0) @binding(5) var lut_samp: sampler;

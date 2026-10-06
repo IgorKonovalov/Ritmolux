@@ -22,9 +22,9 @@
 //! A separate file in `background_composite.rs`'s posture: `golden` is a binary
 //! of its own and nextest runs every test in a process of its own, so the
 //! fragment-field + swarm coexistence these captures build never shares a device
-//! with the golden baselines (building GPU resources
-//! mid-run is documented to shift what WARP resolves — Plan 0053's standing
-//! rule).
+//! with the golden baselines (building GPU resources mid-run is documented to
+//! shift what WARP resolves — Plan 0053's standing rule; a WARP reading,
+//! unverified on lavapipe as of 2026-10-06).
 
 use std::path::{Path, PathBuf};
 
@@ -161,7 +161,9 @@ fn a_layer_binding_reacts_to_the_analysis_frame() {
 /// simulation is seeded like the roster's.
 ///
 /// On the hardware adapter (`headless_hardware`) because the "main is live
-/// too" half is exactly what WARP's layout aliasing breaks.
+/// too" half is exactly what WARP's layout aliasing breaks (a WARP reading,
+/// unverified on lavapipe as of 2026-10-06; the skip keys on any software
+/// adapter).
 #[test]
 fn a_same_system_pair_renders_two_independent_configurations() {
     let Some(mut renderer) = common::headless_hardware(WIDTH, HEIGHT) else {
@@ -279,7 +281,8 @@ fn a_fragment_pair_is_legal_and_the_layer_config_is_live() {
 /// discovery, recorded in `scenes::create_layer_scene`'s docs). The pixel
 /// claims here are weak by design: WARP's sensitivity to coexisting identical
 /// pipeline layouts (ADR-0058) means this pair's *look* is judged on hardware
-/// in Phase 5, not asserted on the software adapter.
+/// in Phase 5, not asserted on the software adapter. (A WARP reading,
+/// unverified on lavapipe as of 2026-10-06.)
 #[test]
 fn a_line_on_line_pair_draws_through_two_renderers() {
     let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
@@ -380,7 +383,8 @@ fn an_over_layer_at_mix_zero_is_pixel_identical_to_layerless() {
 /// Phase 3's four blend modes, pairwise distinct on one fixture pair — the
 /// GPU-checkable half of the done-when (the judged filmstrip is Phase 5's).
 /// One selector in one pipeline, so no mode adds a pipeline the others do not
-/// (the WARP pipeline-count posture, Plan 0046's precedent).
+/// (the WARP pipeline-count posture, Plan 0046's precedent; a WARP reading,
+/// unverified on lavapipe as of 2026-10-06).
 #[test]
 fn the_four_blend_modes_render_distinct_results() {
     let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
@@ -496,7 +500,8 @@ fn luma_stats(img: &CaptureImage) -> (f32, f32, f32) {
 /// So this probe varies `blend` over a **lit** backdrop, in that ADR's shape, and
 /// reports the luma minimum for both. It runs on the hardware adapter for
 /// `headless_hardware`'s reason: a fragment-on-fragment pair duplicates
-/// byte-identical bind-group layouts, which WARP aliases (ADR-0058).
+/// byte-identical bind-group layouts, which WARP aliases (ADR-0058; a WARP
+/// reading, unverified on lavapipe as of 2026-10-06).
 #[test]
 fn a_multiply_layer_meets_a_lit_backdrop() {
     let Some(mut renderer) = common::headless_hardware(WIDTH, HEIGHT) else {
@@ -763,8 +768,9 @@ fn layered_fixtures_match_golden_baselines() {
     let mut failures = Vec::new();
     // `layer_multiply` is **appended**, never inserted: building GPU resources
     // mid-run changes what a later capture resolves to on WARP (Plan 0053's
-    // standing rule), so a new entry at the end leaves the two older baselines
-    // rendered from the device state they were blessed under.
+    // standing rule; a WARP reading, unverified on lavapipe as of 2026-10-06),
+    // so a new entry at the end leaves the two older baselines rendered from the
+    // device state they were blessed under.
     for (stem, toml) in [
         ("layer_under", LAYERED),
         ("layer_over", OVER),

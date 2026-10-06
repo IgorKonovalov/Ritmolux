@@ -16,7 +16,7 @@
 //! it measured genuinely different work. Nothing about `main` being green
 //! depends on the numbers.
 //!
-//! It skips on a software rasterizer, with a notice — a WARP frame time says
+//! It skips on a software rasterizer, with a notice — a software frame time says
 //! nothing about `docs/nfr.md` §1's floor, and a reading taken there would look
 //! like evidence without being one.
 //!

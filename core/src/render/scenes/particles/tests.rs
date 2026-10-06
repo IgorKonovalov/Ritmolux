@@ -1362,7 +1362,8 @@ fn the_tail_beyond_the_active_count_never_moves() {
 // -----------------------------------------------------------------------
 
 /// Particles for the reseed tests. Small: the property is about *where* the
-/// points are, not how many, and a WARP dispatch of 50 000 buys nothing here.
+/// points are, not how many, and a software-adapter dispatch of 50 000 buys
+/// nothing here.
 const TEST_PARTICLES: u32 = 4_096;
 /// Frames run before a reseed, so the cloud has converged onto the attractor
 /// and its measured extent is the attractor's rather than the seed box's.
@@ -1391,7 +1392,7 @@ impl Harness {
     /// and returned on `count = 0`. Fixing that fixed the adapter. **A skip
     /// added to route around a symptom would have hidden the defect and left
     /// this test green and vacuous on CI**, which is the shape the skip was
-    /// about to take.
+    /// about to take. (WARP readings, unverified on lavapipe as of 2026-10-06.)
     fn new(family: AttractorFamily) -> Option<Self> {
         Self::with_density(family, 1.0)
     }
@@ -4079,20 +4080,21 @@ fn the_swept_pairs_report_whether_they_have_a_walk() {
 
 /// The anchor these tests use. Small for the same reason [`TEST_PARTICLES`] is:
 /// the properties here are about *how many* are dispatched and *how much light*
-/// lands, not about the figure, and a WARP dispatch of 150 000 buys neither.
+/// lands, not about the figure, and a software-adapter dispatch of 150 000 buys
+/// neither.
 const LAW_ANCHOR: u32 = 4_096;
 /// The ceiling they allocate at — comfortably above every budget the sizes below
 /// resolve, so the clamp under test is the law's and not the allocation's.
 const LAW_CEILING: u32 = 65_536;
-/// A trail cap small enough that a WARP field stays cheap. Chosen so the two
-/// sizes in [`a_resize_moves_the_budget_and_rebuilds_no_particle_buffer`]
+/// A trail cap small enough that a software-adapter field stays cheap. Chosen
+/// so the two sizes in [`a_resize_moves_the_budget_and_rebuilds_no_particle_buffer`]
 /// resolve **different** grids, and so the two in
 /// [`total_light_is_invariant_across_resolved_budgets`] resolve the **same** one.
 const LAW_TRAIL_CAP: (u32, u32) = (1024, 1024);
 /// The cap [`total_light_is_invariant_across_resolved_budgets`] uses. Smaller
-/// again, because that test's cost is WARP fill over the grid and it needs the
-/// grid to be *equal* across its two sizes rather than to change: every target
-/// wider than 256 lands on 256x256 here.
+/// again, because that test's cost is software-rasterizer fill over the grid
+/// and it needs the grid to be *equal* across its two sizes rather than to
+/// change: every target wider than 256 lands on 256x256 here.
 const LIGHT_TRAIL_CAP: (u32, u32) = (256, 256);
 
 /// A scene built against the density law, at `trail_cap`, with no target size set
@@ -4290,8 +4292,8 @@ fn total_light_is_invariant_across_resolved_budgets() {
     /// this is the same claim with room for a software rasterizer.
     const TOLERANCE: f64 = 0.15;
     /// Enough for the trail to reach its steady state under `fade`, and no more
-    /// — the 4x arm dispatches 16 384 particles a frame on a WARP runner, which
-    /// is what sets this test's cost.
+    /// — the 4x arm dispatches 16 384 particles a frame on a software adapter,
+    /// which is what sets this test's cost.
     const LIGHT_FRAMES: u32 = 40;
 
     /// `(grid, active_count, total light)` for one target size. `None` on a

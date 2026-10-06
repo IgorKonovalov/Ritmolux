@@ -91,7 +91,7 @@
 //! A separate file rather than more arms of `composite.rs`, following that
 //! file's posture and `ink.rs`'s: nextest runs each test in a process of its own,
 //! so the fold pipelines these captures build never coexist with another stage's
-//! on the WARP software rasterizer. Skips with no adapter per ADR-0016.
+//! on the software rasterizer. Skips with no adapter per ADR-0016.
 //!
 //! The fixture is the `parametric_curve` golden rose. A dense line web is the
 //! input this needs: the tear is a half-wedge jump in the **sampled angle**, which

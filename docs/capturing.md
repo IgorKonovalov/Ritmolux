@@ -62,8 +62,9 @@ Two reasons, and both are load-bearing:
   against a floor-tier one differs for a reason that has nothing to do with the
   change under test. A capture is a pure function of its inputs (NFR §6), and the
   tier would otherwise be a hidden input.
-- **Suite cost.** The golden and visual-QA suites run on the WARP software
-  adapter, where fill and instance count translate directly into wall-clock. At
+- **Suite cost.** The golden and visual-QA suites run on a software adapter
+  (lavapipe on Linux, WARP on Windows), where fill and instance count translate
+  directly into wall-clock. At
   rich values the same suite would draw 3x the attractor particles into a 4K-capped
   trail grid on a CPU rasterizer.
 

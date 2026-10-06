@@ -188,7 +188,8 @@ impl Renderer {
     /// readback *per frame*, not once per call. The target and readback buffer
     /// are allocated up front rather than per frame, because building GPU
     /// resources mid-sequence perturbs what the feedback stages resolve to on the
-    /// DX12 software adapter.
+    /// DX12 software adapter (a WARP reading, unverified on lavapipe as of
+    /// 2026-10-06).
     pub fn capture_preset_over(
         &mut self,
         name: &str,
@@ -273,7 +274,9 @@ impl Renderer {
     /// point in the sequence [`capture_preset`](Self::capture_preset) puts it —
     /// which is what makes the two agree pixel-for-pixel on WARP as well as on
     /// hardware. It also stays independent of the horizon requested, since the
-    /// first sample sits at the same frame index however long the run is.
+    /// first sample sits at the same frame index however long the run is. (The
+    /// perturbation and the agreement are WARP readings, unverified on lavapipe as
+    /// of 2026-10-06.)
     pub fn capture_preset_at(
         &mut self,
         name: &str,

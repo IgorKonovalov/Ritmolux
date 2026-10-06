@@ -559,7 +559,8 @@ impl PassTimer {
 /// `bind_layouts` is a slice because the fragment field splits its uniforms and
 /// its palette LUT across **two** groups — deliberately, to keep its pipeline
 /// layout structurally distinct from the kaleidoscope's and dodge a DX12 WARP
-/// identical-layout mis-render (ADR-0058). Every other caller passes one.
+/// identical-layout mis-render (ADR-0058; a WARP reading, unverified on
+/// lavapipe as of 2026-10-06). Every other caller passes one.
 pub(crate) fn fullscreen_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
@@ -805,7 +806,8 @@ impl FullscreenScene {
 ///
 /// The trig idiom is the one every shader on the internet uses and it is
 /// **disqualified in this repository** (ADR-0096): `sin`'s precision is
-/// implementation-defined, so WARP and the hardware adapter would disagree on
+/// implementation-defined, so a software rasterizer and the hardware adapter
+/// would disagree on
 /// essentially every pixel — which is indistinguishable from the ADR-0058
 /// class of defect the whole golden suite exists to catch. Integer arithmetic on
 /// `u32` is exact and identical on every adapter, so a hashed pass can be held to

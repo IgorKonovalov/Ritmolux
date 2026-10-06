@@ -228,8 +228,9 @@ pub enum AdapterChoice {
     /// what it asked for before the choice existed.
     #[default]
     Default,
-    /// Force a fallback (software) adapter - WARP on DX12 - so captures
-    /// rasterize identically across machines. What the golden suite asks for.
+    /// Force a fallback (software) adapter - WARP on DX12, lavapipe on Vulkan -
+    /// so captures rasterize identically across machines. What the golden suite
+    /// asks for.
     Software,
     /// `PowerPreference::HighPerformance`: the discrete GPU on a hybrid
     /// machine.
@@ -461,7 +462,8 @@ pub struct RenderContext {
     /// llvmpipe on Vulkan). The headless capture path forces this for
     /// reproducibility; visual-QA tests read it to skip checks the software
     /// rasterizer can't render faithfully (e.g. fullscreen-scene + background
-    /// pipeline coexistence, a documented WARP quirk).
+    /// pipeline coexistence, a documented WARP quirk, unverified on lavapipe as
+    /// of 2026-10-06).
     is_software: bool,
     /// What kind of adapter this is, for the one decision that reads it: the
     /// internal-grid scale (ADR-0245). Set beside [`is_software`](Self::is_software)
@@ -570,7 +572,8 @@ impl RenderContext {
     /// Build a surface-less context for headless capture (Plan 0013): a device
     /// and queue with no swapchain, drawing into offscreen textures. No window,
     /// no present, no added dependency. `prefer_software` forces a fallback
-    /// adapter (WARP on DX12) so tests rasterize identically on any machine.
+    /// adapter (WARP on DX12, lavapipe on Vulkan) so tests rasterize identically
+    /// on any machine.
     ///
     /// The synthesized [`wgpu::SurfaceConfiguration`] carries only the render
     /// size and the offscreen format (`HEADLESS_FORMAT`); its present-related

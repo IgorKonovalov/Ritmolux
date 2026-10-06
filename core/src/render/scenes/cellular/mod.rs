@@ -64,8 +64,8 @@
 //!
 //! **GPU resources are built lazily, on first render**, as the
 //! reaction-diffusion scene's are and for its reason: a capture that never
-//! activates this scene never builds them, so the WARP software adapter the
-//! golden suite captures on never holds them beside another scene's.
+//! activates this scene never builds them, so the software adapter the golden
+//! suite captures on never holds them beside another scene's.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). Encodes its passes every displayed frame.
@@ -682,7 +682,8 @@ pub const FAMILY_PARAMS: &[FamilyParam] = &[
 /// layout that differ only in their uniform buffer are not told apart, and a
 /// seed pass bound to a uniform of its own read the step pass's instead. With
 /// one buffer and one texture pair, every pass is bound to identical resources,
-/// so there is nothing to confuse.
+/// so there is nothing to confuse. (A WARP reading, unverified on lavapipe as
+/// of 2026-10-06.)
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct StepParams {

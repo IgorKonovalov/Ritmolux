@@ -168,7 +168,8 @@ pub(super) struct DecayUniform {
     /// returns it. Read by the decay pass; the present pass declares only `k` over
     /// the same buffer, which is legal — a uniform binding may be wider than the
     /// struct a shader lays over it — and deliberate, because the present's
-    /// bind-group layout *shape* is what the WARP adapter is sensitive to.
+    /// bind-group layout *shape* is what the WARP adapter is sensitive to (a
+    /// WARP reading, unverified on lavapipe as of 2026-10-06).
     pub(super) xf: [f32; 4],
     pub(super) tr: [f32; 4],
     pub(super) wp: [f32; 4],
@@ -382,8 +383,9 @@ impl PipelineResources {
         // dispatch read the *jitter* slot — all zeros, so `count = 0`, so every
         // invocation returned and the cloud never moved. It rendered a plausible
         // static box, moved the golden baseline, and dropped three presets to
-        // ~0.000 in `animation`. One layout and one bind group has no aliasing
-        // surface to get wrong.
+        // ~0.000 in `animation` (WARP readings, unverified on lavapipe as of
+        // 2026-10-06). One layout and one bind group has no aliasing surface to
+        // get wrong.
         let step_stride = uniform_stride(device);
         let step_uniform = gpu::uniform_buffer(
             device,
@@ -574,7 +576,8 @@ impl PipelineResources {
         // same sampler a second time, and it is there to make this layout a shape
         // nothing else in the crate has. `occlude` (ADR-0085) needed a uniform in a
         // pass that had none; see `PRESENT_SHADER` for the measurement that says a
-        // colliding shape silently mis-renders on WARP.
+        // colliding shape silently mis-renders on WARP (unverified on lavapipe as
+        // of 2026-10-06).
         let present_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("attractor-present-layout"),
             entries: &[

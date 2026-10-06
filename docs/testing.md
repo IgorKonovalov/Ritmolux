@@ -24,7 +24,20 @@ Nothing here is needed to write a preset. What a preset author reaches for is
 ## The `core/tests/` harness
 
 Most differential tests render on the **software adapter** (`prefer_software`) so
-they hold on any GPU; the exceptions say so below. Run the whole suite:
+they hold on any GPU; the exceptions say so below. That adapter is whichever
+software rasterizer the platform ships: lavapipe (Mesa's software Vulkan) on
+Linux, WARP on Windows, and nothing on macOS.
+
+**The reference adapter is lavapipe, on the Arch reference machine**
+([ADR-0242](adrs/0242-the-software-reference-rasterizer-is-lavapipe-and-a-warp-claim-is-re-measured.md)).
+Every golden baseline is captured and asserted there, and a reading this page
+gives without naming its rasterizer is a lavapipe reading. WARP still runs the
+rest of the software suite on the Windows CI arm, so the page also carries WARP
+readings. Each one says so, and one that nobody has re-taken on lavapipe is
+marked *unverified on lavapipe as of 2026-10-06*: a WARP measurement does not
+travel to lavapipe by renaming it.
+
+Run the whole suite:
 
 ```bash
 cargo nextest run -p rlx-core     # what CI runs (per-test process isolation)
@@ -50,7 +63,8 @@ either `suite/`.
 > the GPU tests do not survive.** Several of them build and drop a `Renderer` (and
 > so a wgpu device) concurrently, and the driver aborts the process with
 > `STATUS_ACCESS_VIOLATION` — `transition`'s tests every run on WARP, `--lib`
-> intermittently at teardown, `--lib render::post` since Plan 0035. **This is a
+> intermittently at teardown, `--lib render::post` since Plan 0035 (WARP
+> readings, unverified on lavapipe as of 2026-10-06). **This is a
 > runner artifact, not a failing test**: the same binaries pass in full under
 > `cargo nextest run`, which gives each test its own process. If a `cargo test`
 > invocation aborts with `0xc0000005`, re-run it under nextest (or
@@ -61,7 +75,9 @@ either `suite/`.
 > `render/mod.rs`) **skip themselves** when only a software rasterizer is present,
 > per [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md). WARP mis-renders both:
 > the fullscreen-scene + background pipeline set, and — once a dissolve allocates
-> its blend targets mid-run — what the feedback `trails` stage resolves to.
+> its blend targets mid-run — what the feedback `trails` stage resolves to. Both
+> are WARP readings, unverified on lavapipe as of 2026-10-06; the skips key on
+> any software adapter, so they hold on lavapipe too until someone measures it.
 
 ### The preset sweeps fan out in batches (ADR-0157, ADR-0222)
 
@@ -76,8 +92,8 @@ further.
 **Why a batch rather than a preset.** nextest runs every testcase in its own
 process, so a per-preset testcase pays for that process *and* for the adapter,
 device and pipeline set it builds inside it before it renders anything. Measured
-on the reference machine through WARP, that fixed part is 38–55 % of a
-testcase's wall; a batch pays it once for the eight presets it holds, and eight
+on the Windows box through WARP, that fixed part is 38–55 % of a testcase's wall
+(a WARP reading, unverified on lavapipe as of 2026-10-06); a batch pays it once for the eight presets it holds, and eight
 is where the return on a larger batch stops paying for the granularity it costs
 ([ADR-0222](adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md)).
 What makes that sound is that the capture primitives are pure functions of their
@@ -135,7 +151,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `geometry_extent` | HARD | the **in-frame geometry fraction**, for the four line families *only* ([ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)): that the diagnostic is **byte-identical** to having it off, and that each of the two frozen over-scaled configurations measures below the shipped preset it was recovered from. **Neither engine-wide nor a threshold** — read the section below before using its numbers |
 | lit-backdrop guards (**in-crate**, `--lib`) | HARD (exact) | one per **draw seam**, three of them: `swarm.rs`'s `a_lit_backdrop_survives_where_the_swarm_drew_nothing`, `lines/renderer.rs`'s `a_lit_backdrop_survives_where_the_strokes_drew_nothing`, and `emitter.rs`'s `a_lit_backdrop_survives_where_the_emitter_drew_nothing` ([ADR-0056](adrs/0056-additive-scenes-emit-premultiplied-alpha.md)). Each captures `swarm_lit_backdrop.toml` / `lines_lit_backdrop.toml` / `emitter_lit_backdrop.toml` three ways — lit backdrop, black backdrop, backdrop with the scene contributing nothing — and asserts that wherever the scene wrote no light the backdrop arrives **intact**. Bound **0** rather than a tolerance, because it reads the linear composite; see the section below. The swarm's and the lines' take a **fourth** capture at zero emitted light (Plan 0053 Phase 4), which turns the frame into a direct readout of alpha and widens the line guard's reach from 15 channels to the whole stroke footprint |
 | emitter burst (**in-crate**, `--lib`) | HARD (relative) | the emitter is the first scene whose **population** varies, so `emitter.rs`'s `a_spawn_rate_on_onset_bursts_and_then_idles` drives `emitter_onset.toml` through `capture_preset_over` with a silent lead, a six-frame transient and a second of silence, and asserts the frame is dark before, lit after, and dark again by the end. `capture_preset` cannot ask this: it holds one analysis frame for every step, so it can show that a binding is live but never that the shower **empties** when the transient passes ([ADR-0057](adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)) |
-| `background_composite` | HARD (**hardware only**) | RD / attractor presents alpha-blend over the `bg_*` backdrop; **skipped** on a software adapter, which mis-renders that pipeline set. **The stated cause of that mis-render was identified and fixed by Plan 0053 Phase 3** — it was `background-bind-layout` colliding with `rd-init-layout` / `fragment-field-uniform-layout` ([ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md)), and an explicit `min_binding_size` moved WARP onto the hardware numbers for the RD half (`087.612 165.165 156.168` hardware, against a bare layout's `087.543 064.538 …`). **Whether the skip can now be lifted is open and unmeasured**: the attractor half of this test is a different layout group and nothing probed it. The module docs here and in `background_composite.rs` still assert the quirk as live — do not read that as evidence it is, and do not lift the gate without rendering both halves on both adapters |
+| `background_composite` | HARD (**hardware only**) | RD / attractor presents alpha-blend over the `bg_*` backdrop; **skipped** on a software adapter, which mis-renders that pipeline set. **The stated cause of that mis-render was identified and fixed by Plan 0053 Phase 3** — it was `background-bind-layout` colliding with `rd-init-layout` / `fragment-field-uniform-layout` ([ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md)), and an explicit `min_binding_size` moved WARP onto the hardware numbers for the RD half (`087.612 165.165 156.168` hardware, against a bare layout's `087.543 064.538 …`). The mis-render and the fix are WARP readings, unverified on lavapipe as of 2026-10-06. **Whether the skip can now be lifted is open and unmeasured, on either rasterizer**: the attractor half of this test is a different layout group and nothing probed it. The module docs here and in `background_composite.rs` still assert the quirk as live — do not read that as evidence it is, and do not lift the gate without rendering both halves on both adapters |
 | `transition` | HARD | every switch path (cycle **and** select) renders intermediate blended frames as a ramp, reproducibly from the injected `dt`; each blend kind shows its own signature; a switch arriving mid-dissolve lands on the last index requested; a hot-reload mid-dissolve cancels cleanly; the heavy attractor ↔ reaction-diffusion pair dissolves on the freeze fallback (set `RLX_TRANSITION_STRIP=<dir>` to also dump filmstrips) |
 | `easing` | HARD | `[smoothing]` is observable: a scalar entry measures symmetric and an `{ attack, release }` pair does not, against purpose-built near-linear fixtures ([ADR-0039](adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md)). Also measures the `spectrum` `curve`↔easing **ordering** both ways round through one renderer — **every** frame count in the suite is gated on `segment_settled` first — the shared probe's window is 180 frames (3 s, 6 τ) because at 96 its own asymmetric arm was truncated, reading 61 where the settled answer is 69 |
 | `preset` | HARD | the expression evaluator and TOML schema: exact values, rejection without panic, **zero allocation** per eval, and the `PARAMS` ↔ `set_param` drift guard |
@@ -162,7 +178,8 @@ bytecode-driven `warp_mesh_milk.toml` beside it, could execute a line of that fi
 The list is **captured after the
 roster loop, never interleaved with it**, so every pre-existing baseline renders from the
 device state it always did (which matters on WARP, where building GPU resources mid-run
-changes what a later capture resolves to). `systems_rosters_every_variant` holds it to the
+changes what a later capture resolves to; a WARP reading, unverified on lavapipe as of
+2026-10-06). `systems_rosters_every_variant` holds it to the
 roster's own two conditions plus one of its own: a stem colliding with a rostered system's
 would have the two silently overwrite each other's baseline. The roster stays exhaustive —
 ADR-0023 rests on that and this does not weaken it.
@@ -347,10 +364,11 @@ to enshrine wrong. The compare tolerates minor cross-GPU rasterization drift; a
 genuine change exceeds it.
 
 > **Eyeballing the baseline is not enough on its own, and Plan 0045 is the
-> record of why.** The whole suite captures on WARP, which is documented to hand
-> a pipeline another live pipeline's resources
+> record of why.** The whole suite captures on a software adapter, and WARP is
+> documented to hand a pipeline another live pipeline's resources
 > ([ADR-0021](adrs/0021-shared-palette-system.md) / Plan 0020, the tonemap in
-> Phase 3, the bloom blur in Phase 4). A mis-rendered frame at these capture
+> Phase 3, the bloom blur in Phase 4; WARP readings, unverified on lavapipe as
+> of 2026-10-06). A mis-rendered frame at these capture
 > sizes can look entirely plausible: Phase 4's bloom halo was 2:1 elongated in
 > one draft and smeared into a column of copies in another, and the 160x100
 > baseline looked like a reasonable glow under both. **Render the same fixture on
@@ -430,6 +448,12 @@ perturbation sized by the true slope lands two levels away in some places and
 fails to move the value at all in others. **Below ~byte 20 a WARP capture is not
 a reliable instrument for one-level effects**; take those on hardware.
 
+**lavapipe was re-measured on 2026-10-06 and behaves like hardware here.** On the
+Arch reference box (Mesa 26.2.2), `the_dither_is_one_encoded_level_at_both_ends_of_the_range`
+reads a worst move of **1** in both sweeps (mean 0.3328 dark, 0.3384 bright), and
+`the_dither_dissolves_a_dark_ramps_plateaus` reads 130 px → 19 px. The table
+above is the WARP-era re-bless and stays a WARP reading.
+
 The guards live in `core/src/render/tonemap/tests.rs`:
 `the_dither_is_one_encoded_level_at_both_ends_of_the_range` (the amplitude, which
 is what a "tidied away" slope term breaks) and
@@ -487,7 +511,8 @@ backdrop, so no dark baseline anywhere in the suite executes a line of it.
 recorded in each fixture's header), because each plan grew this pass's uniform
 and therefore moved its `min_binding_size` — a Plan 0053 fix against a *measured*
 WARP mis-render, so a divergence there is a finding rather than something to
-bless.
+bless. Both comparisons are WARP readings, unverified on lavapipe as of
+2026-10-06; the baselines themselves are lavapipe recaptures.
 
 The fixtures below exist purely for this axis, and they are **additive test
 surface** rather than re-parameterized existing files, for the reason above:

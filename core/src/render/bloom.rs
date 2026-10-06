@@ -61,7 +61,8 @@
 //!
 //! The DX12 WARP software adapter hands a pipeline whose bind-group layout matches
 //! another live one *the other pass's resources* (ADR-0058). It bit this stage's
-//! blur, which is why the blur binds no uniform at all (see [`Resources`]). Every
+//! blur, which is why the blur binds no uniform at all (see [`Resources`]); a
+//! WARP reading, unverified on lavapipe as of 2026-10-06. Every
 //! layout this stage adds is a shape no other live pipeline in the engine has —
 //! **asserted, not claimed**, by
 //! `the_bloom_layouts_are_four_shapes_nothing_else_shares` in `tonemap/tests.rs`.
@@ -444,7 +445,8 @@ struct Level {
 /// absent, halo smeared into a vertical column of copies. Isolated by rendering
 /// the same fixture on both adapters at two sizes, and confirmed by zeroing each
 /// direction's step in turn — with the vertical step at zero the horizontal one
-/// changed nothing, on a square grid where the two numbers are equal.
+/// changed nothing, on a square grid where the two numbers are equal. (A WARP
+/// reading, unverified on lavapipe as of 2026-10-06.)
 ///
 /// That is the ADR-0058 hazard again, and the tonemap hit its uniform-shaped
 /// variant in Plan 0045 Phase 3. Rather than guess at which resource WARP
@@ -1150,7 +1152,8 @@ impl PostStage for Bloom {
     /// Drop the lazily-built resources, so the next active frame starts from a
     /// fresh pyramid — used on the capture scene-rebuild so a headless capture
     /// stays a pure function of its inputs (NFR §6), and so a stale bloom pipeline
-    /// never lingers to mis-render the next capture's scene on the WARP adapter.
+    /// never lingers to mis-render the next capture's scene on the WARP adapter
+    /// (a WARP reading, unverified on lavapipe as of 2026-10-06).
     fn reset_resources(&mut self) {
         self.res = None;
     }

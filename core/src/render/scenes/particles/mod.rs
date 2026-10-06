@@ -25,8 +25,8 @@
 //! reaction-diffusion scene uses (see its module docs). `create_all` builds every
 //! scene up front, but the compute pipeline + storage buffer + trail field are
 //! constructed only when this scene is first drawn, so a capture that never
-//! activates it never builds them (keeping the other scenes' WARP captures
-//! unperturbed).
+//! activates it never builds them (keeping the other scenes' software-adapter
+//! captures unperturbed).
 //!
 //! The accumulation field is sized to the render target and capped (Plan 0027
 //! Phase 2, now the tier's `attractor_trail_cap`) rather than fixed at
@@ -664,8 +664,8 @@ pub struct AttractorScene {
     /// (ADR-0140): a resize then moves [`budget`](Self::budget) and
     /// [`active_count`](Self::active_count) and rebuilds no GPU resource. Building
     /// one mid-run is what shifts what a later pass resolves to on the DX12
-    /// software adapter, and the field block stays the only rebuild a resize
-    /// costs.
+    /// software adapter (a WARP reading, unverified on lavapipe as of
+    /// 2026-10-06), and the field block stays the only rebuild a resize costs.
     particle_count: u32,
     /// The tier's sample budget **at [`REFERENCE_PX`](crate::render::tier::REFERENCE_PX)**
     /// ([`TierConfig::attractor_particles`](crate::render::TierConfig::attractor_particles)) —
@@ -833,7 +833,8 @@ pub struct AttractorScene {
     /// additive since it was written — the points draw through an additive
     /// pipeline over the decayed bed, in one pass. There is no `max` to select
     /// here without a second draw pipeline, which is exactly the WARP hazard
-    /// ADR-0048 kept the warp family out of.
+    /// ADR-0048 kept the warp family out of (a WARP reading, unverified on
+    /// lavapipe as of 2026-10-06).
     feedback: FeedbackConfig,
     /// Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5): the per-particle
     /// seed jitter band + shared desaturation + A/B crossfade.

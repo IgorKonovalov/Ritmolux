@@ -1,7 +1,7 @@
 //! The routing contract, GPU-free (ADR-0031): these are the cases the old
 //! hand-written branch ladder in `draw_frame` encoded by enumeration and that
-//! nothing tested — they were only ever exercised indirectly, through WARP
-//! captures of presets that happened to bind the right params.
+//! nothing tested — they were only ever exercised indirectly, through
+//! software-adapter captures of presets that happened to bind the right params.
 
 // Test asserts index, expect and panic freely; this is not the render path.
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
@@ -1133,7 +1133,7 @@ fn fixture_value(fixture: &str, key: &str) -> f32 {
 /// Builds and drops **one** renderer per call rather than holding four: a
 /// second live device in a binary is what the software adapter falls over on,
 /// and building GPU resources mid-run shifts what the trails stage resolves to
-/// on WARP.
+/// on WARP (a WARP reading, unverified on lavapipe as of 2026-10-06).
 ///
 /// Every override key is stripped from the fixture first and re-appended, which
 /// works because `[params]` is the last table in both fixtures.
@@ -1311,7 +1311,8 @@ fn assert_occlude_arithmetic(label: &str, fixture: &str, silence: (&str, f32)) {
     // bar is deliberately low, because what it has to exclude is a path where
     // `occlude` reaches nothing at all — which reads as **zero**, not as a small
     // number. It read exactly zero on WARP while this was being written, from a
-    // bind-group layout that collided with the backdrop's.
+    // bind-group layout that collided with the backdrop's (a WARP reading,
+    // unverified on lavapipe as of 2026-10-06).
     assert!(
         occluding * 50 > channels,
         "{label}: only {occluding} of {channels} channels differ between \

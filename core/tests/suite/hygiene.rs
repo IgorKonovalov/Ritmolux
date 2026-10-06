@@ -777,10 +777,10 @@ fn collapse_whitespace(text: &str) -> String {
 ///
 /// **It does NOT claim the images are current**, and must not grow into that.
 /// A render is not byte-reproducible across machines - a different GPU, driver
-/// or a WARP fallback moves pixels for reasons unrelated to whether the
-/// documentation is true - so freshness stays a human duty at a named cadence
-/// (ADR-0100). "Every system has a picture" is a different claim, it is
-/// mechanical, and it is the one that failed. Backlog 0133.
+/// or a software-rasterizer fallback moves pixels for reasons unrelated to
+/// whether the documentation is true - so freshness stays a human duty at a
+/// named cadence (ADR-0100). "Every system has a picture" is a different claim,
+/// it is mechanical, and it is the one that failed. Backlog 0133.
 #[test]
 fn every_system_has_a_gallery_image() {
     let root = workspace_root();

@@ -29,7 +29,8 @@
 //! backdrop pass and the swarm's sprite pipeline are the only two live here; the
 //! new `background-lut-layout` is shape-identical to `fragment-field-lut-layout`,
 //! which is the ADR-0058 aliasing configuration — the hardware-vs-WARP comparison
-//! that clears it is recorded in `core/src/render/background.rs`.
+//! that clears it is recorded in `core/src/render/background.rs` (a WARP reading,
+//! unverified on lavapipe as of 2026-10-06).
 
 /// The shared ADR-0016 skip and headless constructors.
 use crate::common;

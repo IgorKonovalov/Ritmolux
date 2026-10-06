@@ -12,7 +12,7 @@
 //!
 //! The four checks share one renderer in a single `#[test]` (one per file, like
 //! the other GPU suites): distinct headless renderers built in parallel each
-//! spin up a WARP device and can crash the software driver.
+//! spin up a software device and can crash the software driver.
 
 use rlx_core::dsp::AnalysisFrame;
 use rlx_core::preset::Preset;
@@ -35,7 +35,8 @@ const EPS: u8 = 10;
 /// An RD preset with the same lively field params plus an extra `[params]` line,
 /// isolating the view transform (Phase 2): the field is identical, so any render
 /// difference is the present-pass zoom/pan. The view transform touches only the
-/// present sampling (no background pipeline), so it is faithful on WARP.
+/// present sampling (no background pipeline), so it is faithful on WARP (a WARP
+/// reading, unverified on lavapipe as of 2026-10-06).
 fn rd_view_preset(name: &str, extra: &str) -> Preset {
     let toml = format!(
         "system = \"reaction_diffusion\"\nname = \"{name}\"\n[params]\n\
@@ -222,8 +223,8 @@ fn reaction_diffusion_contract() {
 
     // --- Long run: one unpolled stretch past the frame ceiling (Plan 0099). ---
     //
-    // The WARP renderer above is dropped first, on this file's own rule: two live
-    // headless devices in one process is the configuration that crashes the
+    // The software renderer above is dropped first, on this file's own rule: two
+    // live headless devices in one process is the configuration that crashes the
     // software driver, so the check below builds its own only after this one is
     // gone.
     drop(renderer);
@@ -254,7 +255,9 @@ fn reaction_diffusion_contract() {
 /// accumulate the way they do on DX12, so on WARP it was a three-minute no-op
 /// rather than a regression test. Windows CI has only WARP (ADR-0073), so this
 /// skips there and earns its keep on a developer box. Skipping loudly is the
-/// point: a silent pass would claim cover it does not have.
+/// point: a silent pass would claim cover it does not have. The no-op is a WARP
+/// reading, unverified on lavapipe as of 2026-10-06; the skip keys on any
+/// software adapter.
 fn long_run_past_the_old_ceiling() {
     const LONG_RUN: u32 = 6_000;
 
@@ -264,7 +267,8 @@ fn long_run_past_the_old_ceiling() {
         None,
         &format!(
             "the {LONG_RUN}-frame unpolled-stretch check needs a hardware adapter; \
-             the defect it pins does not reproduce on WARP"
+             measured on WARP, unverified on lavapipe as of 2026-10-06: the defect it \
+             pins does not reproduce on WARP"
         ),
     ) else {
         return;

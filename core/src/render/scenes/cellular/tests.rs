@@ -470,7 +470,8 @@ fn reseed_fires_once_per_rising_edge() {
 /// one another's resources — four interleaved, one run's disc landed on
 /// another's field — which is ADR-0058's hazard between instances of one
 /// layout rather than between two layouts, and the renderer never builds more
-/// than one of this scene per preset and its layer.
+/// than one of this scene per preset and its layer. (A WARP reading,
+/// unverified on lavapipe as of 2026-10-06.)
 #[test]
 fn a_reseed_refills_exactly_one_disc() {
     let Some(ctx) = context() else {

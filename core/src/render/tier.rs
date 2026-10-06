@@ -46,8 +46,9 @@
 //!
 //! Headless capture is [`Tier::Floor`] **by construction**:
 //! [`Renderer::new_headless`](super::Renderer::new_headless) cannot produce any
-//! other tier, so every golden baseline stays byte-reproducible on the WARP
-//! software adapter and the suite's cost does not scale with the rich tier.
+//! other tier, so every golden baseline stays byte-reproducible on the software
+//! adapter it is captured on (lavapipe, ADR-0242) and the suite's cost does not
+//! scale with the rich tier.
 //! [`Renderer::new_headless_tiered`](super::Renderer::new_headless_tiered) is the
 //! deliberate opt-in the `shot` CLI's `--tier` reaches.
 //!

@@ -438,6 +438,13 @@ fn encode_srgb(x: f32) -> f32 {
 ///
 /// # The per-pixel bound is adapter-dependent, and WARP is the loose one
 ///
+/// **Re-measured 2026-10-06 on lavapipe** (`llvmpipe (LLVM 22.1.8)`, Mesa
+/// 26.2.2, the Arch reference box, ADR-0242): both sweeps come back with a
+/// worst per-channel move of **1**, at mean 0.3328 (dark, bytes 7-18) and
+/// 0.3384 (bright). lavapipe behaves like the hardware adapter here, so the
+/// loose bound below is WARP's alone; it stays keyed on the software adapter
+/// because Windows CI still runs this test on WARP.
+///
 /// Measured while writing this test (Plan 0082 Phase 1, this box, DX12). On the
 /// **hardware** adapter both sweeps come back with a worst per-channel move of
 /// **1** and **zero** channels moving 2, at mean 0.3171 (dark) and 0.3408
@@ -456,11 +463,11 @@ fn encode_srgb(x: f32) -> f32 {
 /// Plan 0082 Phase 3 adds measuring 200 px -> 65 px on WARP against
 /// 137 px -> 19 px on hardware when its ramp sits at its darkest.
 ///
-/// This reaches past this test: the golden suite blesses on WARP, so Plan 0082's
-/// re-bless carries the same artifact — 212 of 2 049 408 channels across the 27
-/// baselines, 88 % of them below byte 20, every one skipping exactly one value.
-/// **Bounded-by-one is a hardware claim**, and the bound below is read off the
-/// adapter rather than assumed.
+/// That reached past this test while the golden suite blessed on WARP: Plan
+/// 0082's re-bless carried the same artifact — 212 of 2 049 408 channels across
+/// the 27 baselines, 88 % of them below byte 20, every one skipping exactly one
+/// value. **Bounded-by-one holds on hardware and on lavapipe**, and the bound
+/// below is read off the adapter rather than assumed.
 #[test]
 fn the_dither_is_one_encoded_level_at_both_ends_of_the_range() {
     /// Wide enough that the sweep crosses many rounding boundaries; tall enough
@@ -477,8 +484,9 @@ fn the_dither_is_one_encoded_level_at_both_ends_of_the_range() {
         return;
     };
     // See the doc comment: on WARP a perturbation sized by the true sRGB slope
-    // can cross two levels in the dark. Read back from the adapter rather than
-    // inferred from the `prefer_software` request.
+    // can cross two levels in the dark; on lavapipe it was measured not to.
+    // Read back from the adapter rather than inferred from the
+    // `prefer_software` request.
     let bound = if ctx.is_software() { 2 } else { 1 };
 
     // Two sweeps, each in **linear** light at this pass's input. The dark one
@@ -596,10 +604,11 @@ fn widest_plateau(image: &CaptureImage) -> u32 {
 /// deleted the two arms would be identical and the ratio would be 1.
 ///
 /// Measured when this landed: **132 px → 23 px on WARP, 133 px → 20 px on
-/// hardware**. The dithered figure is not luck — a plateau survives only where
-/// the encoded fractional part sits near a code value, and there the change
-/// probability bottoms out at 1/4, so the longest run over 512 columns is about
-/// `ln(512) / ln(4/3) ≈ 22`. That is also why the ratio *widens* as the ramp
+/// hardware**; re-measured 2026-10-06 on lavapipe (Mesa 26.2.2, the Arch
+/// reference box): **130 px → 19 px**. The dithered figure is not luck — a
+/// plateau survives only where the encoded fractional part sits near a code
+/// value, and there the change probability bottoms out at 1/4, so the longest
+/// run over 512 columns is about `ln(512) / ln(4/3) ≈ 22`. That is also why the ratio *widens* as the ramp
 /// flattens: the undithered arm grows with pixels-per-level while this one grows
 /// only logarithmically. A flat factor is the conservative claim.
 ///
@@ -610,11 +619,12 @@ fn widest_plateau(image: &CaptureImage) -> u32 {
 /// `the_dither_is_one_encoded_level_at_both_ends_of_the_range`, whose doc comment
 /// carries the evidence. Below about byte 20 a one-level perturbation there
 /// frequently fails to move the value at all, and the same ramp placed at bytes
-/// 8-12 reads **200 px → 65 px on WARP against 137 px → 19 px on hardware**. A
-/// suite that captures on WARP would then be measuring the adapter rather than
-/// the fix. Bytes 28-32 are still inside the band Plan 0082's survey found its
-/// plateaus in (values 7 to 30), and there the two adapters agree to within a few
-/// pixels.
+/// 8-12 reads **200 px → 65 px on WARP against 137 px → 19 px on hardware**
+/// (a WARP reading, unverified on lavapipe as of 2026-10-06, though lavapipe's
+/// dark sweep above moves by one level as hardware does). A suite that captures
+/// on WARP would then be measuring the adapter rather than the fix. Bytes 28-32
+/// are still inside the band Plan 0082's survey found its plateaus in (values 7
+/// to 30), and there the two adapters agree to within a few pixels.
 #[test]
 fn the_dither_dissolves_a_dark_ramps_plateaus() {
     /// Wide enough that a four-level ramp spends ~128 px on each level, which is
@@ -745,7 +755,8 @@ const MARKERS: &[(&str, Kind, Vis)] = &[
 /// explicit size — and *nothing else* — to `background-bind-layout` and to
 /// `blend-bind-layout` moved WARP onto the hardware adapter's numbers in three
 /// configurations that were rendering the wrong picture. Both sites carry the
-/// before/after tables.
+/// before/after tables. (Both measurements are WARP readings, unverified on
+/// lavapipe as of 2026-10-06.)
 ///
 /// So an explicit size is a real separation, and this shape says so: the two
 /// fixes are load-bearing, and dropping either back to a bare `gpu::uniform`
@@ -1036,7 +1047,8 @@ fn assert_scan_is_whole(all: &[Layout]) {
 /// that shape; `attractor-decay` had had it all along, built from the same
 /// three helpers. Nothing could catch that, because the claim was prose on a
 /// hazard surface (ADR-0058: WARP hands a pipeline whose layout matches another
-/// live one *the other pass's* resources).
+/// live one *the other pass's* resources — a WARP reading, unverified on
+/// lavapipe as of 2026-10-06).
 ///
 /// It is kept beside the general property below rather than folded into it
 /// (ADR-0058: "the tonemap's existing single-layout assertion is subsumed
@@ -1060,10 +1072,10 @@ fn the_tonemap_layout_is_a_shape_no_other_layout_in_core_has() {
         sharers.is_empty(),
         "`tonemap-bind-layout` is {}, and so is {sharers:?}. This pass runs \
          on every frame beside whatever the preset switched on, so it is the \
-         most exposed pipeline in the engine to the WARP identical-layout \
-         aliasing hazard. Move it to a shape this enumeration shows is free — \
-         and fix the comment in `Resources::build`, which is the thing that \
-         was wrong last time.",
+         most exposed pipeline in the engine to the identical-layout \
+         aliasing hazard (measured on WARP, ADR-0058). Move it to a shape \
+         this enumeration shows is free — and fix the comment in \
+         `Resources::build`, which is the thing that was wrong last time.",
         shape_str(&mine.shape)
     );
 }
@@ -1081,7 +1093,8 @@ fn the_tonemap_layout_is_a_shape_no_other_layout_in_core_has() {
 /// *backdrop's* buffer: `occlude` moved 0 of 196 608 channels there while moving
 /// 3 307 of them on the hardware adapter, and every capture test in the suite
 /// went green over it. That is the whole failure mode — silent, adapter-specific,
-/// and invisible to a tolerance.
+/// and invisible to a tolerance. (A WARP reading, unverified on lavapipe as of
+/// 2026-10-06.)
 ///
 /// Unlike the tonemap above, these two are also asserted **against each other**:
 /// both are present passes, and a swarm-over-trails preset and an attractor
@@ -1123,9 +1136,9 @@ fn the_two_present_layouts_added_for_occlude_are_shapes_nothing_else_has() {
 ///
 /// **An entry is not a suppression.** ADR-0058's rule is that an entry with no
 /// recorded measurement is not an entry: [`evidence`](Self::evidence) carries
-/// the same configuration rendered on the hardware adapter and on WARP, and the
-/// date it was taken. Where separating a pair is cheap, separating it is
-/// preferred — a layout that cannot collide needs no evidence and no
+/// the same configuration rendered on the hardware adapter and on a software
+/// one, and the date it was taken. Where separating a pair is cheap, separating
+/// it is preferred — a layout that cannot collide needs no evidence and no
 /// maintenance.
 struct AllowedCollision {
     /// A layout label, as the enumeration prints it. Order does not matter.
@@ -1150,6 +1163,9 @@ struct AllowedCollision {
 /// by itself aliasing. The control is the same scene with the colliding
 /// pipeline absent: there the two adapters agree to **0.02 of one 8-bit level**,
 /// which is the noise floor every "agrees" below is measured against.
+///
+/// Every reading in [`ALLOWED`] is therefore a WARP reading, unverified on
+/// lavapipe as of 2026-10-06.
 const RIG: &str = "2026-08-09, DX12 hardware vs WARP, 160x100/40 frames";
 
 /// The pairs of same-shaped layouts this crate accepts (ADR-0058).
@@ -1164,10 +1180,10 @@ const ALLOWED: &[AllowedCollision] = &[
     // --- `[Uniform:FRAGMENT]`: the fullscreen scenes' single uniforms ---
     //
     // `background-bind-layout` is deliberately NOT a member: that collision
-    // was measured rendering the wrong picture on WARP, and `background.rs`
-    // declares an explicit `min_binding_size` against it. See its comment for
-    // the measurement. What is left is the two scenes, plus the
-    // test-only disc.
+    // was measured rendering the wrong picture on WARP (unverified on
+    // lavapipe as of 2026-10-06), and `background.rs` declares an explicit
+    // `min_binding_size` against it. See its comment for the measurement. What
+    // is left is the two scenes, plus the test-only disc.
     AllowedCollision {
         a: "fragment-field-uniform-layout",
         b: "rd-init-layout",
@@ -1309,11 +1325,12 @@ fn no_two_layouts_share_a_shape_without_recorded_evidence() {
         unrecorded.is_empty(),
         "{} layout pair(s) share a shape with no ADR-0058 allowlist entry:\n  \
          {}\n\nOn the DX12 WARP software adapter a pipeline whose bind-group \
-         layout matches another live one is handed the OTHER pass's resources, \
-         and the whole golden suite captures on WARP — so a mis-render there is \
-         not caught, it is blessed. Either separate the pair (preferred where \
-         cheap: a layout that cannot collide needs no evidence) or add an \
-         `ALLOWED` entry carrying a hardware-vs-WARP comparison of the same \
+         layout matches another live one is handed the OTHER pass's resources \
+         (a WARP reading, unverified on lavapipe), and the whole golden suite \
+         captures on a software adapter (lavapipe, ADR-0242) — so a mis-render \
+         there is not caught, it is blessed. Either separate the pair (preferred \
+         where cheap: a layout that cannot collide needs no evidence) or add an \
+         `ALLOWED` entry carrying a hardware-vs-software comparison of the same \
          configuration. An entry with no recorded measurement is not an entry.",
         unrecorded.len(),
         unrecorded.join("\n  ")
@@ -1349,8 +1366,8 @@ fn no_two_layouts_share_a_shape_without_recorded_evidence() {
     assert!(
         owed.is_empty(),
         "{} of {} allowlist entries carry no measurement: {}. Render the \
-         pair's configuration on the hardware adapter and on WARP, compare, \
-         and record the numbers in `evidence` — `RIG` describes the rig and \
+         pair's configuration on the hardware adapter and on a software one, \
+         compare, and record the numbers in `evidence` — `RIG` describes the rig and \
          every existing entry shows the form. A pair that does NOT agree is a \
          defect: fix it by separation rather than by writing an entry that \
          records the mis-render. An explicit `min_binding_size` was sufficient \

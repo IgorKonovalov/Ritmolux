@@ -19,7 +19,7 @@
 //! prints what it saw, and asserts only that it measured genuinely different
 //! shaders. Nothing about `main` being green depends on the numbers.
 //!
-//! It skips on a software rasterizer, with a notice: WARP's frame time says
+//! It skips on a software rasterizer, with a notice: a software frame time says
 //! nothing about the floor in `docs/nfr.md` §1, and a reading taken there would
 //! look like evidence and not be one.
 //!
@@ -76,7 +76,7 @@
 //! result was a legitimate outcome of this phase and did not occur.
 //!
 //! One `#[test]` per file (its own binary → its own process), so the hardware
-//! device never coexists with the other suites' WARP ones.
+//! device never coexists with the other suites' software ones.
 
 // The determinism gate bans wall-clock reads because analysis must be a pure
 // function of its input (clippy.toml, NFR §6). This file is the deliberate

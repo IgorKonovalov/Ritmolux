@@ -28,11 +28,11 @@
 //! `MEAN_TOL` and `MAX_OUTLIER` are the values `golden.rs` compares a fresh
 //! render against its committed baseline with (ADR-0023) — the project's declared
 //! rasterizer-drift floor. Asserting anything tighter here, bit-equality
-//! included, would be asserting a property of WARP rather than of the engine, and
-//! ADR-0071 is explicit that a threshold at or below the noise floor measures the
-//! noise. The measured figures are printed on every run, so the headroom is
-//! visible rather than assumed: if they sit at zero, that is a reading and not a
-//! reason to move the bar.
+//! included, would be asserting a property of the software rasterizer rather
+//! than of the engine, and ADR-0071 is explicit that a threshold at or below the
+//! noise floor measures the noise. The measured figures are printed on every
+//! run, so the headroom is visible rather than assumed: if they sit at zero,
+//! that is a reading and not a reason to move the bar.
 //!
 //! **The bar is not so loose that it admits everything.** Measured by comparing
 //! each subject's batched frame against a *different* subject's solo frame — the

@@ -1664,7 +1664,8 @@ fn a_lit_backdrop_survives_where_the_emitter_drew_nothing() {
     /// Builds and drops **one** renderer per call rather than holding three:
     /// a second live device in a binary is what the software adapter falls
     /// over on, and building GPU resources mid-run shifts what the trails
-    /// stage resolves to on WARP.
+    /// stage resolves to on WARP (a WARP reading, unverified on lavapipe as of
+    /// 2026-10-06).
     fn linear_composite(bg_bright: f32, size: f32) -> Option<Vec<f32>> {
         let mut renderer = match Renderer::new_headless(HeadlessOptions {
             width: CAPTURE_SIZE,

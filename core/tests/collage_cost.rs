@@ -18,9 +18,9 @@
 //! threshold on this would be a re-measurement waiting for the next runner
 //! image.
 //!
-//! It also **skips on a software rasterizer, with a notice**. A WARP frame time
-//! says nothing about the iGPU floor in `docs/nfr.md` §7, and a reading taken
-//! there would be a number that looks like evidence and is not.
+//! It also **skips on a software rasterizer, with a notice**. A software frame
+//! time says nothing about the iGPU floor in `docs/nfr.md` §7, and a reading
+//! taken there would be a number that looks like evidence and is not.
 //!
 //! # What the sweep separates, and what it cannot
 //!
@@ -123,7 +123,7 @@
 //! throttles, as the paragraph above found the hard way.
 //!
 //! One `#[test]` per file (its own binary → its own process), so the hardware
-//! device never coexists with the other suites' WARP ones.
+//! device never coexists with the other suites' software ones.
 
 // The determinism gate bans wall-clock reads because analysis must be a pure
 // function of its input (clippy.toml, NFR §6). This file is the deliberate

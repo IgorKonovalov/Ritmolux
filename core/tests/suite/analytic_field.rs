@@ -12,7 +12,8 @@
 //!
 //! Pixels within one pixel of the band's edge are left out of every mask
 //! comparison: which side of a threshold an antialiased edge lands on is the
-//! rasterizer's business, and a claim about it would be a claim about WARP.
+//! rasterizer's business, and a claim about it would be a claim about the
+//! software rasterizer.
 //!
 //! **Software adapter**, like the rest of the GPU suites (ADR-0016).
 

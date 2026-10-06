@@ -394,11 +394,12 @@ fn the_deposit_arm_count_is_rounded_before_the_scene_sees_it() {
     );
 }
 
-/// **The three new bind-group layouts do not alias on WARP** — ADR-0058's
-/// standing rule for any plan that adds a pass, measured rather than asserted.
+/// **The three new bind-group layouts do not alias on WARP or on lavapipe** —
+/// ADR-0058's standing rule for any plan that adds a pass, measured rather than
+/// asserted.
 ///
-/// The golden baseline this scene now owns is captured on the DX12 WARP software
-/// adapter, so a layout collision there would be *blessed* rather than caught.
+/// The golden baseline this scene owns is captured on a software adapter, so a
+/// layout collision there would be *blessed* rather than caught.
 /// This renders the same fixture on both adapters and reports the difference; it
 /// skips when the machine has only one of them, which is the CI case.
 ///
@@ -415,6 +416,10 @@ fn the_deposit_arm_count_is_rounded_before_the_scene_sees_it() {
 /// `0.000303`.** Agreement to well under one 8-bit level, so the three
 /// `warp-mesh-*-layout` shapes do not alias and the committed baseline pins a
 /// picture hardware also draws.
+///
+/// **Re-measured 2026-10-06 on the Arch reference box**, same size and frames:
+/// hardware (RTX 3080 Laptop, NVIDIA 610.57.04) `56.3872 79.2036 91.3957`,
+/// lavapipe (Mesa 26.2.2) `56.3162 79.0982 91.2485`, `frame_diff` `0.000539`.
 #[test]
 #[ignore = "needs both a hardware and a software adapter; run locally before blessing"]
 fn the_adapters_agree_on_the_warp_mesh() {
@@ -448,8 +453,11 @@ fn the_adapters_agree_on_the_warp_mesh() {
         [sums[0] / n, sums[1] / n, sums[2] / n]
     };
     println!(
-        "[warp_mesh] hardware mean rgb {:?}, WARP mean rgb {:?}, frame_diff {difference:.6}",
+        "[warp_mesh] hardware ({}) mean rgb {:?}, software ({}) mean rgb {:?}, \
+         frame_diff {difference:.6}",
+        hardware.adapter_description(),
         mean(&hw),
+        software.adapter_description(),
         mean(&sw)
     );
     assert!(
@@ -1190,7 +1198,8 @@ fn the_quantized_field_reaches_exact_zero() {
     // **Measured 2026-08-17** on the development box (Windows 10, DX12 WARP),
     // 96x96 over 120 frames: on 0 / 0, off 11 / 154. The unquantized field is
     // still positive at a hundred times the gain that already shows it; the
-    // quantized one is black at both.
+    // quantized one is black at both. (A WARP reading, unverified on lavapipe as
+    // of 2026-10-06.)
     println!(
         "[warp_mesh/quantize] peak after {QUANTIZE_FRAMES} frames — \
          on {} (at 100x gain {}), off {} (at 100x gain {})",

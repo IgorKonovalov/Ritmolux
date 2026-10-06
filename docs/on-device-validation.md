@@ -127,8 +127,8 @@ footprint so the vendor spread is on record.
       stage's *composited* output and the fold's source were the surface format and are now
       `Rgba16Float` too (ADR-0046), so every hand-off between stages moved from 4 to 8 bytes a
       texel. Composite bandwidth roughly doubled on top of the 2.25x. NFR §1's ≥ 60 fps @ 1080p
-      floor is exactly the claim at risk, and no headless capture can speak to it: WARP timings say
-      nothing about an iGPU's memory bandwidth.
+      floor is exactly the claim at risk, and no headless capture can speak to it: a software
+      rasterizer's timings (WARP or lavapipe) say nothing about an iGPU's memory bandwidth.
       Load **`rose_trails`** — it binds `trails` around 0.78 and is the shipped preset that exercises
       this path (`fragment_kaleido` covers the fold). Let it settle with the
       overlay on (`F3`), and report **(a)** whether fps holds ≥ 60 and **(b)** the p99 against the
@@ -184,7 +184,8 @@ footprint so the vendor spread is on record.
       look. The present pass now calls `sample_v` **five** times per fragment, each at **nine**
       bilinear taps — roughly **45 texture fetches per fragment**, over the whole screen, every
       frame. It shipped **unmeasured on hardware**: the WARP figure first reported was retracted as
-      run-to-run noise (the same suite timed 193.6 / 224.2 / 105.2 s across three runs), and a
+      run-to-run noise (the same suite timed 193.6 / 224.2 / 105.2 s across three runs on WARP,
+      unverified on lavapipe as of 2026-10-06), and a
       software rasterizer says nothing about an iGPU's texture-unit throughput anyway. Load
       **`reaction_reef`** (or any `reaction_*` preset), let it settle with the overlay on (`F3`), and
       report **(a)** whether fps holds ≥ 60 @ 1080p and **(b)** the p99. **If it fails, that is a

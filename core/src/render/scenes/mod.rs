@@ -1183,7 +1183,8 @@ pub(crate) fn create_all(
     // renderer"). A single instanced-quad pipeline + segment buffer, borrowed by
     // whichever line scene is active — only one draws per frame. (Two separate
     // line pipelines with byte-identical vertex layouts also mis-render on the
-    // DX12 WARP software adapter the capture tests use; one renderer avoids it.)
+    // DX12 WARP software adapter, a WARP reading unverified on lavapipe as of
+    // 2026-10-06; one renderer avoids it.)
     // `new_with_arcs`, not `new`: `star_pattern`'s circular motifs are one arc
     // instance each (ADR-0098), and the arc buffer holds
     // `max_segments` because the two kinds share **one** budget — everything
@@ -1193,7 +1194,8 @@ pub(crate) fn create_all(
     // opacity-preserving seam through `stroke_blend` (ADR-0138), and the
     // pipelines are built here rather than when a preset first selects one —
     // building a GPU resource mid-run changes what a later pass resolves to on
-    // the DX12 software adapter.
+    // the DX12 software adapter (a WARP reading, unverified on lavapipe as of
+    // 2026-10-06).
     let line_renderer = Rc::new(RefCell::new(lines::LineRenderer::new_split_with_arcs(
         device,
         surface_format,
@@ -1245,6 +1247,8 @@ pub(crate) fn create_all(
 /// fragment/swarm/particle layer pays no line pipeline, and WARP's documented
 /// sensitivity to coexisting identical pipeline layouts (ADR-0058 / Plan 0053)
 /// is only ever exercised by a preset that actually declares a line layer.
+/// (That sensitivity is a WARP reading, unverified on lavapipe as of
+/// 2026-10-06.)
 pub(crate) fn create_layer_scene(
     kind: SystemKind,
     device: &wgpu::Device,
@@ -1735,7 +1739,7 @@ mod tests {
     /// which is what makes the two answers differ.
     ///
     /// No frame is rendered: `set_target_size` is CPU arithmetic, so this costs
-    /// one scene build on WARP and nothing else.
+    /// one scene build on the software adapter and nothing else.
     #[test]
     fn the_render_path_resolves_a_larger_budget_than_a_window_does() {
         use crate::render::{SampleBudget, TierConfig};

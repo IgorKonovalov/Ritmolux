@@ -48,7 +48,8 @@
 //! GPU resources are built lazily on first render, for the reason
 //! `reaction_diffusion.rs` documents: a capture that never activates this scene
 //! never builds this scene's pipelines, so it cannot perturb another scene's
-//! render on the DX12 WARP software adapter.
+//! render on the DX12 WARP software adapter (a WARP reading, unverified on
+//! lavapipe as of 2026-10-06).
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). Encodes its passes every displayed frame.

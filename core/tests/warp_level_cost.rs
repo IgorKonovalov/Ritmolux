@@ -13,8 +13,8 @@
 //! a window size rather than about the code, so **there is no threshold here**.
 //! The sweep renders the four configurations, prints what it saw, and asserts
 //! only that it genuinely rendered different ones. It **skips on a software
-//! rasterizer, with a notice**, for `collage_cost.rs`'s reason: a WARP frame time
-//! says nothing about the iGPU floor `docs/nfr.md` §7 is written against.
+//! rasterizer, with a notice**, for `collage_cost.rs`'s reason: a software frame
+//! time says nothing about the iGPU floor `docs/nfr.md` §7 is written against.
 //!
 //! The four rungs vary only `color_source` and `palette_contour`, on one fixture
 //! whose every other binding is a constant, so the differences between them are
@@ -22,7 +22,7 @@
 //! which is what keeps a GPU ramping its clocks from being read as a cost.
 //!
 //! One `#[test]` per file (its own binary → its own process), so the hardware
-//! device never coexists with the other suites' WARP ones.
+//! device never coexists with the other suites' software ones.
 
 // The determinism gate bans wall-clock reads because analysis must be a pure
 // function of its input (clippy.toml, NFR §6). This file is the deliberate

@@ -266,12 +266,13 @@ fn ident(stem: &str) -> String {
 ///
 /// A batch costs `fixed + B * variable`, where `fixed` is the process plus the
 /// adapter, device and pipeline set the testcase builds inside it. Measured on
-/// the reference machine through WARP, `fixed` is 1.9-2.2 s and `variable` is
+/// the Windows box through WARP, `fixed` is 1.9-2.2 s and `variable` is
 /// 1.5-3.6 s per preset, which puts this batch at 93 % of its time in the render
 /// — 87 % at four, 96 % at sixteen, so the knee is here. What caps it is not the
 /// arithmetic but **granularity**: the shipped library in batches of eight is
 /// fifteen scheduling units per sweep against sixteen test threads, and sixteen
-/// per batch would halve that and leave slots idle on the tail.
+/// per batch would halve that and leave slots idle on the tail. (A WARP reading,
+/// unverified on lavapipe as of 2026-10-06.)
 const BATCH: usize = 8;
 
 /// Write one batched `#[test]` per [`BATCH`] presets into `OUT_DIR/<file>`, each
