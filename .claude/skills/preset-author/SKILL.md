@@ -434,8 +434,19 @@ behavioral suite — `sanity`, `reactivity`, `animation` and `distinctness` all 
 embedded set, so a dead or blank preset fails CI for everyone:
 
 ```sh
-cargo nextest run -p rlx-core
+cargo nextest run -p rlx-core --no-fail-fast
 ```
+
+Pass `--no-fail-fast`: the default run stops at the first failure and hides the rest, and the
+whole suite takes over ten minutes. Shipping a file is more than dropping it in `presets/`. Three
+hygiene gates read the shipped set, and each one fails the suite:
+
+- **A family ships at least two presets.** `distinctness` needs a pair to compare, so the first
+  preset of a new family cannot ship alone. It waits in `presets/pending/` or ships with a sibling.
+- **At least two per family carry `representative = true`** (a top-level key, after `name`).
+- **Every shipped preset has a gallery card.** Add the name to `CARDS` in `scripts/docs-shots.mjs`
+  under its system's group, then render it with `node scripts/docs-shots.mjs <name>`. That writes
+  `docs/images/gallery/presets/<name>.png`, which is committed with the preset.
 
 Know what that green actually covers, because it is weaker than it reads and
 [`docs/testing.md`](../../../docs/testing.md) now spells it out: **`reactivity` is the only one
