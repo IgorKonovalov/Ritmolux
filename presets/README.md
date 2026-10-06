@@ -493,7 +493,7 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `burst` | `0` | `0` – `2` | An outward impulse from the centre, for a beat to throw the swarm apart. | motion |
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. | colour, main |
 | `brightness` | `0.8` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
-| `size` | `1` | `0` – `4` | Size of each particle's mark. | shape, main |
+| `size` | `1` | `0` – `4` | Size of each particle's mark at the middle of the swarm's depth; nearer marks draw larger and farther ones smaller. | shape, main |
 | `field_freq` | `2.3` | `0.5` – `8` | Spatial frequency of the flow field; higher makes smaller, busier eddies. | shape |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. | shape |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
@@ -506,6 +506,12 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `twinkle` | `0` | `0` – `1` | Per-particle brightness flicker, seeded so it is reproducible. | light |
 | `size_spread` | `0` | `0` – `1` | How much particle sizes vary about `size`; 0 makes them uniform. | shape |
 | `reseed` | `0` | `0` – `1` | Crossing zero throws every particle back to a fresh start position. | motion |
+| `depth_fade` | `0.57142854` | `0` – `1` | How much light a particle loses from the front of the swarm to the back; 0 lights every depth alike. | light |
+| `yaw` | `0` | `-0.2` – `0.2` | Turns the camera sideways within the swarm, in radians; held to the sway the margin past the frame covers, so bind it to a slow wave. | motion |
+| `pitch` | `0` | `-0.2` – `0.2` | Tilts the camera up or down within the swarm, in radians; held to the sway the margin past the frame covers. | motion |
+| `fov` | `0.8` | `0.2` – `0.9` | The camera's vertical field of view in radians; zoom divides it. Wider than the resting 0.8 uses up the margin past the frame, and much wider shows the wrap seam. | motion |
+| `focus` | `0.5` | `0` – `1` | Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest. | light, main |
+| `aperture` | `0` | `0` – `24` | The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill. | light, main |
 | `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. | shape, main |
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. | shape |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. | shape |
@@ -1429,32 +1435,53 @@ leaning on it owes a one-off soak check of its own.
 
 Two things the swarm does on its own, with nothing to bind.
 
-The **toroidal domain follows the render target** and extends a quarter past the
-frame, so the wrap seam is off-screen. That is what retired the bright top/bottom
-bar, and it is why `zoom` below `1.0` no longer exposes a hard domain rectangle —
-the camera is usable down to about **`0.84`**. Note that figure is the *near depth
-layer's*, not the domain's: `1.25 * zoom` alone would reach the frame edge at
-`0.80`, but the near layer takes 1.25x of the zoom deflection too, so it is the
-first thing to show an edge and it does so at `1.25 * (1 + (zoom - 1) * 1.25) = 1`.
-Pan pulls that further up.
+**The swarm lives in a volume and is seen through a camera**
+([ADR-0259](../docs/adrs/0259-the-swarm-projects-through-the-shared-camera-in-a-frustum-shaped-torus.md)).
+Every particle has a depth inside a slab in front of the eye, and that depth
+changes: a slow current of the same flow field carries particles toward and away
+from the camera over tens of seconds. Each sprite is projected through the same
+perspective camera as `plexus` and the space curves, so everything depth does
+falls out of the projection rather than out of a hand-made cue:
 
-And **every particle carries a depth**, 0 far to 1 near, fixed for its life from
-the seeded scatter. It scales the sprite (0.55x–1.5x), fades brightness with
-distance, gives the particle its own parallax against `zoom`/`pan_*` — a near one
-traverses the frame about 1.9x faster than a far one, so panning now sweeps the
-near field past the far one instead of sliding a flat sheet — and offsets *which
-current it rides*, so the layers follow different streamlines rather than the same
-ones at several sizes. There is no sorting and no perspective: the scene blends
-additively, so draw order does not matter, and two particles at different depths
-that overlap simply sum. That means **no occlusion** — the illusion is strongest
-on a sparse field and flattens as density rises, so a very dense preset is the one
-place depth reads weakest.
+- **Size.** `size` is stated at the middle of the slab; a near mark draws larger
+  and a far one smaller, about 2.7x apart from front to back.
+- **Speed.** The flow is evaluated in the world, so under the same current a far
+  particle crosses the screen more slowly than a near one, because it is farther
+  away.
+- **Light.** `depth_fade` dims a particle with its depth. Its default reproduces
+  the old 0.45-to-1.05 ramp; `0` lights every depth alike.
+- **Focus.** `focus` and `aperture` give the swarm a focal plane, as on `plexus`:
+  marks at the focal depth stay sharp and the layers in front and behind grow soft
+  and dim by the area they spread over. A blurred polygon reads as a soft polygon.
+  `aperture = 0`, the default, keeps every mark sharp, and the blur is clamped to
+  the tier's swarm cap.
+- **Layers.** Particles at different depths ride different currents, so the
+  layers cross and separate rather than following the same streamlines at several
+  sizes.
 
-Both cost visible density — the margin puts about a quarter of the particles
-off-screen, and the fade dims the far half — which is priced into the shipped
-presets' `size` and `brightness`. A swarm preset carried over from before Plan
-0043 will read dimmer and sparser than it used to; raise those two rather than
-assuming something broke.
+There is still no sorting and no occlusion: the scene blends additively, so two
+particles at different depths that overlap simply sum, and depth reads strongest on
+a sparse field.
+
+**The world is a torus shaped like the camera's view.** Across the frame it wraps,
+and it extends a quarter past the frame's edge at every depth, so the wrap seam is
+off-screen near and far alike. A particle that reaches either end of the slab fades
+out and re-enters at the other end, so the depth wrap never pops.
+
+**The camera is a subset of the shared block.** `fov` narrows or widens the view
+(a wider one uses up the margin, and much wider shows the seam). `yaw` and `pitch`
+turn it about the middle of the slab, so the near and far layers slide past each
+other in opposite directions; both are held to the sway the margin covers, so bind
+them to a slow wave rather than a clock. There is no `distance`: the slab is placed
+relative to the camera, and an orbit would show the edge of the world.
+
+**`zoom` and `pan_*` no longer parallax.** `zoom` divides the field of view and
+`pan_*` shift the projected picture, so both move every layer together. `zoom`
+below about **`0.82`** shows the seam, and pan spends the same margin.
+
+The margin and the fade cost visible density — about a third of the population is
+off-screen at any moment, and the far layers are dim — which is priced into the
+shipped presets' `size` and `brightness`.
 
 The swarm's mark is no longer only a round blob: `shape` and `points` give it a
 silhouette — see
@@ -3211,7 +3238,7 @@ the chain occludes the backdrop by its **coverage**, whatever light it emits: th
 frame resolves `c * g + bg * (1 - g)`, so a fragment *darkens* the backdrop
 wherever its own light `c` is dimmer than the backdrop `bg`. Raise `bg_bright`
 past the **dimmest** emitted luminance in the figure and the dim parts stop
-fading out and start reading as dark speckle: on the swarm, the depth-parallaxed
+fading out and start reading as dark speckle: on the swarm, the depth-faded
 far particles go first; on a line scene, a stroke dimmed by `glow` or by a
 low-amplitude band. Rendered at `bg_bright = 0.35`, a swarm at
 `brightness = 0.02` is black specks on a lit field. The working limit is the

@@ -200,7 +200,7 @@ that table is maintained alongside the presets and is the authoritative list.
 | `system = ` | What it draws |
 |-------------|---------------|
 | `fragment_field` | A fullscreen domain-warped light field (fragment shader). |
-| `swarm` | ~10k CPU-simulated particles on an evolving flow field. |
+| `swarm` | ~10k CPU-simulated particles on an evolving flow field in a volume, projected through the same perspective camera as `plexus`: near marks draw larger and move faster, and a focal plane blurs the layers in front of and behind it. |
 | `parametric_curve` | A sampled line curve from one of seven families — the Maurer rose, Lissajous, hypotrochoid, superformula or harmonograph in the plane, or a torus knot or 3D Lissajous figure in space ([below](#the-curve-table)). |
 | `lsystem` | An L-system turtle figure, precomputed per depth. |
 | `star_pattern` | A Hankin star pattern over a regular tiling. |

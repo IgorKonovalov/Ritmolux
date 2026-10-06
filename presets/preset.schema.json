@@ -225,6 +225,12 @@
             "twinkle": { "$ref": "#/definitions/param.twinkle.swarm" },
             "size_spread": { "$ref": "#/definitions/param.size_spread.swarm" },
             "reseed": { "$ref": "#/definitions/param.reseed.swarm" },
+            "depth_fade": { "$ref": "#/definitions/param.depth_fade.swarm" },
+            "yaw": { "$ref": "#/definitions/param.yaw.swarm" },
+            "pitch": { "$ref": "#/definitions/param.pitch.swarm" },
+            "fov": { "$ref": "#/definitions/param.fov.swarm" },
+            "focus": { "$ref": "#/definitions/param.focus.swarm" },
+            "aperture": { "$ref": "#/definitions/param.aperture.swarm" },
             "shape": { "$ref": "#/definitions/param.shape" },
             "points": { "$ref": "#/definitions/param.points" },
             "star_valley": { "$ref": "#/definitions/param.star_valley" },
@@ -643,7 +649,7 @@
             "perspective": { "$ref": "#/definitions/param.perspective" },
             "focus": { "$ref": "#/definitions/param.focus.attractor" },
             "aperture": { "$ref": "#/definitions/param.aperture.attractor" },
-            "depth_fade": { "$ref": "#/definitions/param.depth_fade" },
+            "depth_fade": { "$ref": "#/definitions/param.depth_fade.attractor" },
             "depth_hue": { "$ref": "#/definitions/param.depth_hue" },
             "spin": { "$ref": "#/definitions/param.spin.attractor" },
             "morph": { "$ref": "#/definitions/param.morph.attractor" },
@@ -1319,8 +1325,8 @@
             "pitch": { "$ref": "#/definitions/param.pitch.plexus" },
             "distance": { "$ref": "#/definitions/param.distance.plexus" },
             "fov": { "$ref": "#/definitions/param.fov.plexus" },
-            "focus": { "$ref": "#/definitions/param.focus.plexus" },
-            "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+            "focus": { "$ref": "#/definitions/param.focus.swarm" },
+            "aperture": { "$ref": "#/definitions/param.aperture.swarm" },
             "fog": { "$ref": "#/definitions/param.fog.plexus" },
             "solid": { "$ref": "#/definitions/param.solid.plexus" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
@@ -1405,8 +1411,8 @@
             "pitch": { "$ref": "#/definitions/param.pitch.waterfall" },
             "distance": { "$ref": "#/definitions/param.distance.plexus" },
             "fov": { "$ref": "#/definitions/param.fov.plexus" },
-            "focus": { "$ref": "#/definitions/param.focus.plexus" },
-            "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+            "focus": { "$ref": "#/definitions/param.focus.swarm" },
+            "aperture": { "$ref": "#/definitions/param.aperture.swarm" },
             "fog": { "$ref": "#/definitions/param.fog.plexus" },
             "solid": { "$ref": "#/definitions/param.solid.plexus" },
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
@@ -1513,6 +1519,12 @@
             "twinkle": { "$ref": "#/definitions/param.twinkle.swarm" },
             "size_spread": { "$ref": "#/definitions/param.size_spread.swarm" },
             "reseed": { "$ref": "#/definitions/param.reseed.swarm" },
+            "depth_fade": { "$ref": "#/definitions/param.depth_fade.swarm" },
+            "yaw": { "$ref": "#/definitions/param.yaw.swarm" },
+            "pitch": { "$ref": "#/definitions/param.pitch.swarm" },
+            "fov": { "$ref": "#/definitions/param.fov.swarm" },
+            "focus": { "$ref": "#/definitions/param.focus.swarm" },
+            "aperture": { "$ref": "#/definitions/param.aperture.swarm" },
             "shape": { "$ref": "#/definitions/param.shape" },
             "points": { "$ref": "#/definitions/param.points" },
             "star_valley": { "$ref": "#/definitions/param.star_valley" },
@@ -1686,7 +1698,7 @@
             "perspective": { "$ref": "#/definitions/param.perspective" },
             "focus": { "$ref": "#/definitions/param.focus.attractor" },
             "aperture": { "$ref": "#/definitions/param.aperture.attractor" },
-            "depth_fade": { "$ref": "#/definitions/param.depth_fade" },
+            "depth_fade": { "$ref": "#/definitions/param.depth_fade.attractor" },
             "depth_hue": { "$ref": "#/definitions/param.depth_hue" },
             "spin": { "$ref": "#/definitions/param.spin.attractor" },
             "morph": { "$ref": "#/definitions/param.morph.attractor" },
@@ -1977,8 +1989,8 @@
             "pitch": { "$ref": "#/definitions/param.pitch.plexus" },
             "distance": { "$ref": "#/definitions/param.distance.plexus" },
             "fov": { "$ref": "#/definitions/param.fov.plexus" },
-            "focus": { "$ref": "#/definitions/param.focus.plexus" },
-            "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+            "focus": { "$ref": "#/definitions/param.focus.swarm" },
+            "aperture": { "$ref": "#/definitions/param.aperture.swarm" },
             "fog": { "$ref": "#/definitions/param.fog.plexus" },
             "solid": { "$ref": "#/definitions/param.solid.plexus" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
@@ -2014,8 +2026,8 @@
             "pitch": { "$ref": "#/definitions/param.pitch.waterfall" },
             "distance": { "$ref": "#/definitions/param.distance.plexus" },
             "fov": { "$ref": "#/definitions/param.fov.plexus" },
-            "focus": { "$ref": "#/definitions/param.focus.plexus" },
-            "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+            "focus": { "$ref": "#/definitions/param.focus.swarm" },
+            "aperture": { "$ref": "#/definitions/param.aperture.swarm" },
             "fog": { "$ref": "#/definitions/param.fog.plexus" },
             "solid": { "$ref": "#/definitions/param.solid.plexus" },
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
@@ -2707,8 +2719,8 @@
     },
     "param.size.swarm": {
       "type": "string",
-      "description": "Size of each particle's mark.",
-      "markdownDescription": "Size of each particle's mark.\n\n- default `1.0`\n- typical range `0.0` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Size of each particle's mark at the middle of the swarm's depth; nearer marks draw larger and farther ones smaller.",
+      "markdownDescription": "Size of each particle's mark at the middle of the swarm's depth; nearer marks draw larger and farther ones smaller.\n\n- default `1.0`\n- typical range `0.0` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.field_freq": {
       "type": "string",
@@ -2739,6 +2751,36 @@
       "type": "string",
       "description": "Crossing zero throws every particle back to a fresh start position.",
       "markdownDescription": "Crossing zero throws every particle back to a fresh start position.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.depth_fade.swarm": {
+      "type": "string",
+      "description": "How much light a particle loses from the front of the swarm to the back; 0 lights every depth alike.",
+      "markdownDescription": "How much light a particle loses from the front of the swarm to the back; 0 lights every depth alike.\n\n- default `0.57142854`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.yaw.swarm": {
+      "type": "string",
+      "description": "Turns the camera sideways within the swarm, in radians; held to the sway the margin past the frame covers, so bind it to a slow wave.",
+      "markdownDescription": "Turns the camera sideways within the swarm, in radians; held to the sway the margin past the frame covers, so bind it to a slow wave.\n\n- default `0.0`\n- typical range `-0.2` to `0.2` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.pitch.swarm": {
+      "type": "string",
+      "description": "Tilts the camera up or down within the swarm, in radians; held to the sway the margin past the frame covers.",
+      "markdownDescription": "Tilts the camera up or down within the swarm, in radians; held to the sway the margin past the frame covers.\n\n- default `0.0`\n- typical range `-0.2` to `0.2` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.fov.swarm": {
+      "type": "string",
+      "description": "The camera's vertical field of view in radians; zoom divides it. Wider than the resting 0.8 uses up the margin past the frame, and much wider shows the wrap seam.",
+      "markdownDescription": "The camera's vertical field of view in radians; zoom divides it. Wider than the resting 0.8 uses up the margin past the frame, and much wider shows the wrap seam.\n\n- default `0.8`\n- typical range `0.2` to `0.9` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.focus.swarm": {
+      "type": "string",
+      "description": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.",
+      "markdownDescription": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.aperture.swarm": {
+      "type": "string",
+      "description": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
+      "markdownDescription": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.shape": {
       "type": "string",
@@ -3130,7 +3172,7 @@
       "description": "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.",
       "markdownDescription": "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.depth_fade": {
+    "param.depth_fade.attractor": {
       "type": "string",
       "description": "How much depth dims a particle, which is what reads as air between the layers.",
       "markdownDescription": "How much depth dims a particle, which is what reads as air between the layers.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
@@ -3849,16 +3891,6 @@
       "type": "string",
       "description": "The camera's vertical field of view in radians; zoom divides it.",
       "markdownDescription": "The camera's vertical field of view in radians; zoom divides it.\n\n- default `0.8`\n- typical range `0.2` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.focus.plexus": {
-      "type": "string",
-      "description": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.",
-      "markdownDescription": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.aperture.plexus": {
-      "type": "string",
-      "description": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
-      "markdownDescription": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.fog.plexus": {
       "type": "string",

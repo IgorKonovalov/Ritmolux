@@ -239,8 +239,8 @@ struct Particle {
 | 1 — Walking skeleton: the swarm in a camera | dev | done | b70e1488 |
 | 2 — Depth of field on the swarm's sprites | dev | done | b598e6c5 |
 | 3 — Caps, cost and the goldens | dev | done | d6e2299d |
-| 4 — The shipped presets keep rendering | dev | done | committed with this row |
-| 5 — Documentation and the references | dev | not started | |
+| 4 — The shipped presets keep rendering | dev | done | 65e4a600 |
+| 5 — Documentation and the references | dev | done | committed with this row |
 | 6 — The three presets, judged and re-tuned | human | not started | |
 | 7 — The moved baselines are blessed | human | not started | |
 | 8 — The preset-author reference | human | not started | |
@@ -297,16 +297,66 @@ struct Particle {
   skipped), since their batches do not separate presets by file.
 - Phase 1 left stale: `warp_mesh/resources.rs`'s comment describing `swarm-bind-layout` as a single
   unsized vertex uniform (outside the phase's files).
+- Phase 5: `.taplo.toml` did not change on regeneration. `presets/README.md`'s hand-written swarm
+  prose ("Two things the swarm does on its own", and one phrase in the `bg_bright` section) was
+  rewritten for the projected model, beside the regenerated params block.
+- Phase 5: only `docs/images/gallery/swarm.png` was re-rendered (`node scripts/docs-shots.mjs
+  docs/images/gallery/swarm.png`, on the session's adapter). The three per-preset
+  cards under `docs/images/gallery/presets/swarm_*.png` were not, and still show the 2.5D look.
+- Phase 5: `rlx-core` builds with one `dead_code` warning, `PreviewService::target` in
+  `core/src/render/preview.rs`, which arrived with the merge of `main` (bbd1e961), not from this plan.
+- Phase 5, the replacement for `.claude/skills/preset-author/references/systems.md`'s `## swarm`
+  section (lines 64-81 at bbd1e961), for Phase 8:
+
+  ````markdown
+  ## `swarm` — ~10k-particle CPU flow swarm in a camera
+  *Kinetic, dancey, physical.* Additive sprites, so density reads as glow. The particles live in a
+  volume and project through the shared perspective camera (ADR-0259): a near mark draws larger and
+  crosses the screen faster than a far one, out of the projection itself, and the layers ride
+  different currents.
+
+  | Param | Default | Typical | Controls / natural driver |
+  |-------|---------|---------|---------------------------|
+  | `force` | `1.4` | `1.4 – 7` | steering toward the flow field. Bass. |
+  | `spin` | `0.3` | `0.3 – 2.3` | how fast the field evolves. Mid. |
+  | `burst` | `0.0` | `0 – 12` | radial kick from centre. `beat * 9..11`. |
+  | `brightness` | `0.8` | `0.8 – 1.8` | global multiplier. |
+  | `size` | `1.0` | `1.0 – 2.5` | mark size at the middle of the slab; perspective carries it about 2.7x from front to back. Watch overdraw on the iGPU floor. |
+  | `hue` | `0.0` | `0 – 1` | gradient offset. |
+  | `hue_spread` | `1.0` | `0.1 – 1.0` | width of the per-particle hue band. **`1.0` is full rainbow; drop it for a coherent cloud.** |
+  | `hue_center` | `0.5` | `0 – 1` | centre of that band — two presets differing only here read as different colours. |
+  | `depth_fade` | `0.571` | `0 – 1` | light lost from the front of the slab to the back. The default is the old 0.45-to-1.05 ramp; `0` lights every depth alike. |
+  | `focus` | `0.5` | `0 – 1` | the focal plane's place in the slab, 0 nearest, 1 farthest. A slow wave racks focus through the layers. |
+  | `aperture` | `0` | `0 – 24` | blur of the far background in pixels; the layers away from `focus` soften and dim by area. Clamped to the tier's swarm cap, and it costs fill. |
+  | `fov` | `0.8` | `0.2 – 0.9` | field of view; `zoom` divides it. Wider spends the margin, much wider shows the seam. |
+  | `yaw`, `pitch` | `0` | `±0.2` | turn the camera about the slab's centre, so near and far layers slide past each other in opposite directions. Held per frame to the sway the margin covers: bind a slow wave, never a clock. |
+
+  No `distance`: the slab is placed relative to the camera, and an orbit would show the edge of the
+  world. **`zoom` and `pan_*` no longer parallax** — `zoom` divides `fov` and `pan_*` shift the
+  projected picture, so both move every layer together; `zoom` below about `0.82` shows the seam.
+  The four hand-made depth cues (sprite scale, brightness ramp, parallax, flow-phase offset) are
+  gone: the camera, `depth_fade` and the depth-varying flow replace them.
+
+  Also declared: `field_freq` (the flow field's spatial frequency — higher is smaller, busier
+  eddies), `twinkle`, `size_spread`, `reseed` (re-scatters on a crossing), and the shaped-mark params
+  (`shape`, `points`, `star_*`) shared with the emitter — `presets/README.md`, "Swarm flow-field
+  structure" and "Shaped marks".
+  ````
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** yes — `presets/swarm_braid.toml` (Phase 4), `presets/README.md`,
+  `presets/preset.schema.json` and `presets/schema/{attractor,plexus,swarm,waterfall}.schema.json`
+  (Phase 5).
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature
+- **Operator docs touched:** `presets/README.md`, `docs/presets.md`, `docs/preset-guide.md`,
+  `docs/images/gallery/swarm.png`, `docs/specs/player-schema.json`, `docs/adrs/README.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 1, one broken: backlog 0275's
+  `present: SHIPPED_ZOOMS: \[f32; 5\] = \[0\.99` in `core/src/render/scenes/swarm/tests.rs`
+  (docs/design-backlog.md:1673); the constant was removed by b70e1488.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** 6 (blocks merge), 7 and 8 (`Blocks merge: no`).
 
 ## Followups (after this lands)
 

@@ -98,14 +98,17 @@ plasma, oil-on-water.
 
 ### `swarm`
 
-![Thousands of small teal marks gathered into two parallel wavy ribbons running across a black
-field, each ribbon twisting through a bright seam at every turn](images/gallery/swarm.png)
+![Thousands of teal marks gathered into two wavy ribbons running across a black field, one high
+and one low, each twisting through a bright seam at every turn; the nearer marks are larger and
+softly blurred, the farther ones small and dim](images/gallery/swarm.png)
 
 *`presets/swarm_braid.toml`*
 
-Around ten thousand CPU-simulated particles drifting through a flow field, drawn as instanced
-additive marks. Their world is a torus, so nothing ever leaves the frame — the field stays populated
-without respawn hitches.
+Around ten thousand CPU-simulated particles drifting through a flow field in a volume, seen through
+a perspective camera and drawn as additive marks. Near marks draw larger and cross the screen faster
+than far ones, and a focal plane can keep one layer sharp while the layers in front and behind
+soften. Their world wraps, so nothing ever leaves the frame — the field stays populated without
+respawn hitches.
 
 **Reach for this when** the look is a *motion*: murmuration, drift, a shoal turning. Be warned that
 this is the system a still photograph serves worst, for exactly that reason.

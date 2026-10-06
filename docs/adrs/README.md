@@ -64,7 +64,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0041](0041-line-joins-are-per-endpoint-on-the-segment-instance.md) | Line joins are a per-endpoint flag on the segment instance, not a global cap rule | accepted (Plan 0039; Outcome) |
 | [0042](0042-reachability-measured-on-the-expression-tree.md) | Preset reachability is measured on the expression tree, not inferred from frames; `--report` reads at two levels | accepted (Plan 0041; Outcome) |
 | [0043](0043-reachability-reports-comparison-nodes.md) | Reachability reports comparison nodes, suppressed only where a `select()` already names them | accepted |
-| [0044](0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) | The swarm's world is a 2.5D torus sized from the render target, and additive blending is why the depth axis is nearly free | accepted |
+| [0044](0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) | The swarm's world is a 2.5D torus sized from the render target, and additive blending is why the depth axis is nearly free | accepted, superseded in part by 0259 |
 | [0045](0045-quality-tiers-floor-and-rich.md) | Quality tiers: a `Rich` tier beside the iGPU `Floor`, auto-selected with a manual pin | accepted |
 | [0046](0046-linear-light-hdr-composite-bloom-tonemap.md) | The composite accumulates in linear-light `Rgba16Float`, with a bloom stage and one engine-fixed tonemap at present | accepted 2026-07-31 (Plan 0045; Outcome) |
 | [0047](0047-kaleidoscope-fold-domain-disc-with-falloff.md) | The kaleidoscope folds a disc: radius clamped to the inscribed extent with a radial falloff, and a bindable fold centre | accepted 2026-07-31 (Plan 0045; Outcome) |

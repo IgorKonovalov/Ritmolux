@@ -45,7 +45,7 @@
         "perspective": { "$ref": "#/definitions/param.perspective" },
         "focus": { "$ref": "#/definitions/param.focus.attractor" },
         "aperture": { "$ref": "#/definitions/param.aperture.attractor" },
-        "depth_fade": { "$ref": "#/definitions/param.depth_fade" },
+        "depth_fade": { "$ref": "#/definitions/param.depth_fade.attractor" },
         "depth_hue": { "$ref": "#/definitions/param.depth_hue" },
         "spin": { "$ref": "#/definitions/param.spin.attractor" },
         "morph": { "$ref": "#/definitions/param.morph.attractor" },
@@ -895,7 +895,7 @@
       "description": "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.",
       "markdownDescription": "The blur of a 3D figure's far side, in pixels; its near side blurs more, up to the tier's cap. Inert on the flat maps.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.depth_fade": {
+    "param.depth_fade.attractor": {
       "type": "string",
       "description": "How much depth dims a particle, which is what reads as air between the layers.",
       "markdownDescription": "How much depth dims a particle, which is what reads as air between the layers.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."

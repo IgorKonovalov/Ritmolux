@@ -39,8 +39,8 @@
         "pitch": { "$ref": "#/definitions/param.pitch.waterfall" },
         "distance": { "$ref": "#/definitions/param.distance.plexus" },
         "fov": { "$ref": "#/definitions/param.fov.plexus" },
-        "focus": { "$ref": "#/definitions/param.focus.plexus" },
-        "aperture": { "$ref": "#/definitions/param.aperture.plexus" },
+        "focus": { "$ref": "#/definitions/param.focus.swarm" },
+        "aperture": { "$ref": "#/definitions/param.aperture.swarm" },
         "fog": { "$ref": "#/definitions/param.fog.plexus" },
         "solid": { "$ref": "#/definitions/param.solid.plexus" },
         "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
@@ -803,6 +803,16 @@
       "description": "Quantizes the palette into this many flat bands; 0 leaves it continuous.",
       "markdownDescription": "Quantizes the palette into this many flat bands; 0 leaves it continuous.\n\n- default `0.0`\n- typical range `0.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
     },
+    "param.focus.swarm": {
+      "type": "string",
+      "description": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.",
+      "markdownDescription": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.aperture.swarm": {
+      "type": "string",
+      "description": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
+      "markdownDescription": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
     "param.brightness.parametric_curve": {
       "type": "string",
       "description": "The scene's overall light level, multiplying what it draws before the composite.",
@@ -837,16 +847,6 @@
       "type": "string",
       "description": "The camera's vertical field of view in radians; zoom divides it.",
       "markdownDescription": "The camera's vertical field of view in radians; zoom divides it.\n\n- default `0.8`\n- typical range `0.2` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.focus.plexus": {
-      "type": "string",
-      "description": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.",
-      "markdownDescription": "Where the focal plane sits in the depth of the scene's volume: 0 at its nearest point, 1 at its farthest.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
-    },
-    "param.aperture.plexus": {
-      "type": "string",
-      "description": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.",
-      "markdownDescription": "The blur of the far background, in pixels; strokes nearer than the focal plane blur more, up to the tier's cap. 0 keeps every stroke sharp, and wider costs fill.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.fog.plexus": {
       "type": "string",
