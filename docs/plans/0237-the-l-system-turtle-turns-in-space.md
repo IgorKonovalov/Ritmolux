@@ -332,8 +332,8 @@ and `follow_window`.
 | 5 — The camera follows the growth | dev | done | 6222ae74 |
 | 6 — Endless cost and the endless golden | dev | done | d50a77fb |
 | 7 — Documentation and the references | dev | done | b8d2cd95 |
-| 8 — The look, judged | human | not started | |
-| 9 — The preset-author reference | human | not started | |
+| 8 — The look, judged | human | owed | |
+| 9 — The preset-author reference | human | owed | |
 
 ### Notes
 
