@@ -117,10 +117,11 @@ hue_center = "0.5 + sin(time * 0.011) * 0.08"
 hue_spread = "0.55 + clamp(treb * 0.25, 0, 0.15)"
 saturation = "1.0"
 
-# THE WHOLE TORUS, NOT A SUB-WINDOW. The domain follows the render target and
-# extends a quarter past the frame so the wrap seam is off-screen; a zoom below
-# about 0.84 exposes the near depth layer's edge. 1.0 also keeps the density
-# waves reading as waves rather than as clumps and voids.
+# THE WHOLE TORUS, NOT A SUB-WINDOW. The swarm lives in a frustum-shaped torus
+# that follows the render target and extends a quarter past the frame at every
+# depth, so the wrap seam is off-screen; a zoom below 0.8 brings it into view
+# at every depth at once. 1.0 also keeps the density waves reading as waves
+# rather than as clumps and voids.
 zoom  = "1.0"
 pan_x = "sin(time * 0.013) * 0.06"
 pan_y = "cos(time * 0.009) * 0.04"

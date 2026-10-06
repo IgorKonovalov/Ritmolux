@@ -228,8 +228,8 @@ struct Particle {
 |---|---|---|---|
 | 1 — Walking skeleton: the swarm in a camera | dev | done | b70e1488 |
 | 2 — Depth of field on the swarm's sprites | dev | done | b598e6c5 |
-| 3 — Caps, cost and the goldens | dev | done | committed with this row |
-| 4 — The shipped presets keep rendering | dev | not started | |
+| 3 — Caps, cost and the goldens | dev | done | d6e2299d |
+| 4 — The shipped presets keep rendering | dev | done | committed with this row |
 | 5 — Documentation and the references | dev | not started | |
 | 6 — The three presets, judged and re-tuned | human | not started | |
 | 7 — The moved baselines are blessed | human | not started | |
@@ -280,6 +280,10 @@ struct Particle {
   `swarm_shaped` moved, mean 0.0208, max outlier 125. `backdrop_ramp` (mean 0.0014, outlier 20) and
   `backdrop_band` (0.0013, 21) stayed inside tolerance. The `post::tests`, `backdrop` and swarm
   lit-backdrop tests pass.
+- Phase 4: no binding was removed. Phase 1 retired no param (the `DEPTH_*` cues were constants), so
+  every binding in the three presets still resolves; only Braid's seam comment changed. The
+  `sanity`, `animation`, `reactivity` and `distinctness` binaries were run whole (79 passed, 3
+  skipped), since their batches do not separate presets by file.
 - Phase 1 left stale: `warp_mesh/resources.rs`'s comment describing `swarm-bind-layout` as a single
   unsized vertex uniform (outside the phase's files).
 
