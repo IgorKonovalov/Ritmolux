@@ -311,7 +311,7 @@ struct RouteControl {
 | 1 — A sweep relaxes on the GPU and the flood is visible | dev | done | cca56596 |
 | 2 — Quiet stretches find, reveal and fade the route | dev | done | 1c41e058 |
 | 3 — The budget belongs to the tier and the references are regenerated | dev | done | 4f466a6a |
-| 4 — The owner sees the route on the labyrinth | human | not started | |
+| 4 — The owner sees the route on the labyrinth | human | owed | |
 
 ### Notes
 
