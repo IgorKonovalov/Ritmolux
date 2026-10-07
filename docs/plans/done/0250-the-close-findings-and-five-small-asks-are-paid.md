@@ -274,7 +274,11 @@ the second derives the floor from two shipped presets rather than a fixture.
 
 **Gate at the close, on the lane tip:** `cargo fmt --all --check`, `cargo clippy --workspace
 --all-targets -- -D warnings` and `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`
-exit 0. FULLSUITE
+exit 0. `cargo nextest run --workspace --no-fail-fast` at `0fa76a53`: 2019 run, 2018 passed, 8
+skipped, 1 failed. The failure was `field_cost::the_radius_coordinate_is_priced_against_the_distance`,
+a GPU timing probe that read a negative cost (`-0.353 ms`) while the close ran a concurrent
+`cargo run`. The plan touches nothing it prices, and it passed when re-run alone. The close's own
+commit changes only comments and Markdown.
 
 **What was checked against the tree, not the log:**
 
