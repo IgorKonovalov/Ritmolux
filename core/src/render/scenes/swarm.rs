@@ -122,9 +122,10 @@ const DEPTH_FIELD_FREQ: f32 = 2.6 / Z_SPAN;
 /// The depth current's share of `force`. Small, so a particle takes tens of
 /// seconds to cross the slab and depth reads as layering, not as rushing.
 const Z_FLOW: f32 = 0.3;
-/// The share of [`sway_bound`]'s exact seam-corner bound the sway may take: the
-/// rest is room for a sprite a bound `size` or `size_spread` draws larger than
-/// [`SPRITE_SIZE_MAX`].
+/// The share of [`sway_bound`]'s exact seam-corner bound the sway may take. The
+/// bound covers sprites up to [`SPRITE_SIZE_MAX`] at the default `size`; a bound
+/// `size` or `size_spread` can draw larger ones, which this share is not derived
+/// to cover.
 const SWAY_SHARE: f32 = 0.8;
 /// The largest seeded sprite radius, in normalized-device height at
 /// [`SIZE_DEPTH`] under the default `size`. [`sway_bound`] insets the seam by

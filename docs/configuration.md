@@ -540,7 +540,8 @@ preset at a time by starting the app's own executable with `--thumb`, at low pri
 Linux and macOS, below-normal priority on Windows). It parks when every preset has a current
 picture, walks the library again when an `RLX_PRESET_DIR` edit reloads it, and at the next launch
 picks up whatever is still missing. Each render runs on the graphics adapter the show is rendering
-on, following an `[output] gpu` pin and a switch from the settings menu, and the pass's
+on, following an `[output] gpu` pin; after a switch from the settings menu, the next walk of the
+library follows the new adapter, and the pass's
 `thumbnail pass: children render on` line in `diagnostics.log` names both adapters. It never waits in the
 show's frame loop, and closing the app kills a render in flight; the half-written file that leaves
 is discarded by the next pass.
