@@ -174,6 +174,65 @@ fn an_over_tier_radius_is_clamped_with_a_notice() {
     );
 }
 
+/// **Each tier hands the scene its own route rate**: the same frozen maze,
+/// searched with the route on, draws its route later on `Rich` than on `Floor`,
+/// in the ratio of the two tiers' `cellular_route_rate`s — so each scene
+/// relaxes at its own tier's rate, not one shared constant.
+///
+/// The field is frozen (no birth, every count survives), so the first frame
+/// that differs from the one before is the frame the route committed in
+/// (`route_reveal = 0` draws it whole). The search starts when the maze reads
+/// quiet, at its fifth generation — the first compares against no mask, and
+/// four still ones follow — which at 60 generations a second is 5/60 s, and
+/// it takes the same number of passes on both tiers.
+#[test]
+fn each_tier_hands_the_scene_its_own_route_rate() {
+    let floor = TierConfig::FLOOR.cellular_route_rate;
+    let rich = TierConfig::RICH.cellular_route_rate;
+    assert_ne!(
+        floor, rich,
+        "the tiers share a rate, so this test cannot tell them apart"
+    );
+    let toml = "system = \"cellular\"\nname = \"route-rate\"\n\
+                [cellular]\nfamily = \"life_like\"\ngrid = 256\n\
+                [generator]\nseed = 9\n\
+                [params]\nstep_rate = \"60\"\nbirth = \"0\"\nsurvive = \"511\"\ntrail = \"0\"\n\
+                route = \"1\"\nroute_reveal = \"0\"\n";
+    const _: () = assert!(256 <= TierConfig::FLOOR.cellular_grid);
+    let commit_time = |tier: Tier| -> Option<f64> {
+        let mut renderer = common::headless_tiered(64, 64, tier)?;
+        let name = load(&mut renderer, toml);
+        let frames = renderer
+            .capture_preset_over(&name, &vec![AnalysisFrame::default(); 120])
+            .expect("capture the route probe");
+        let first = frames
+            .windows(2)
+            .position(|pair| pair[0].rgba != pair[1].rgba)
+            .expect("the route never appeared");
+        // `windows` index `k` compares frames k and k + 1; frame `f` ends at
+        // (f + 1) / 60 s.
+        Some((first + 2) as f64 / 60.0)
+    };
+    let Some(on_floor) = commit_time(Tier::Floor) else {
+        return;
+    };
+    let Some(on_rich) = commit_time(Tier::Rich) else {
+        return;
+    };
+    let start = 5.0 / 60.0;
+    let ratio = (on_rich - start) / (on_floor - start);
+    let expected = f64::from(floor) / f64::from(rich);
+    println!(
+        "route drawn at {on_floor:.3} s on Floor ({floor}/s), {on_rich:.3} s on Rich ({rich}/s): \
+         search ratio {ratio:.3}, rates {expected:.3}"
+    );
+    assert!(on_floor - start > 0.25, "the search was too short to time");
+    assert!(
+        (ratio - expected).abs() < 0.08,
+        "the searches took {ratio:.3} of each other, where the rates are {expected:.3} apart"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Determinism
 // ---------------------------------------------------------------------------

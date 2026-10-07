@@ -62,6 +62,8 @@ export interface EditorProps {
   active: string | undefined
   /** Where the watcher is looking, or `null` when nothing resolved. */
   dir: string | null
+  /** The running judging session's preset directory, whose files are written in place. */
+  own?: string | null
   /** The player's marks, or `undefined` while no player has reported any. */
   marks: Marks | undefined
   onProblem: (reason: string | undefined) => void
@@ -95,6 +97,7 @@ export function Editor({
   roster,
   active,
   dir,
+  own = null,
   marks,
   onProblem,
 }: EditorProps): JSX.Element {
@@ -119,7 +122,7 @@ export function Editor({
         : undefined,
     [file, system, schema, active],
   )
-  const preset = useActivePreset(file, reloads, { dir, name: active, base })
+  const preset = useActivePreset(file, reloads, { dir, name: active, base, own })
   const { file: state, text, commit, write } = preset
   const [tab, setTab] = useState<Tab>('parameters')
 

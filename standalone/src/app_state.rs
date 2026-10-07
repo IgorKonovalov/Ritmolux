@@ -553,7 +553,7 @@ impl AppState {
             &rotate_for(&config.rotate, held_preset.as_deref()),
             app.events.take(),
             app.control.take(),
-            standalone::marks::resolve_marks_path(),
+            standalone::marks::resolve_marks_path(app.marks_path.take().as_deref()),
         );
 
         // `--preset` holds one scene for the run. The name was checked against

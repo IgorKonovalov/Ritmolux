@@ -756,6 +756,96 @@ fn a_headless_run_binds_the_control_listener_and_drains_it() {
     );
 }
 
+/// `--marks` moves the run's marks file: a `ctl/mark` lands in the file the
+/// flag names, and the per-user `marks.toml` under the data root is neither
+/// read nor written.
+///
+/// The per-user file is seeded with a mark of its own, so its being left alone
+/// is a byte comparison rather than an absence, and its mark not appearing in
+/// the flag's file shows the run did not load from it either.
+#[test]
+fn a_headless_run_keeps_its_marks_in_the_file_the_flag_names() {
+    let presets = scratch("marks-presets");
+    std::fs::write(presets.join("probe.toml"), GOOD).expect("write the good preset");
+    let root = scratch("marks-root");
+    let per_user = diagnostics_log_under(&root).with_file_name(standalone::marks::MARKS_FILE);
+    std::fs::create_dir_all(per_user.parent().expect("the app dir"))
+        .expect("create the per-user app dir");
+    let seeded = "favourite = [\"Elsewhere\"]\nhidden = []\n";
+    std::fs::write(&per_user, seeded).expect("seed the per-user marks file");
+    // A directory that does not exist yet, so the run has to create it.
+    let session = scratch("marks-session").join("run").join("marks.toml");
+    let session_arg = session.to_str().expect("a UTF-8 scratch path");
+
+    let (mut child, drain) = spawn_with_data_root(
+        &presets,
+        &root,
+        &[
+            "--frames",
+            "300",
+            "--control",
+            "127.0.0.1:0",
+            "--marks",
+            session_arg,
+        ],
+    );
+    let (collector, mut lines) = watch(&mut child);
+
+    let target = lines.wait_for(lines.opened, hello_control).ok();
+    let mut marked = false;
+    if let Some(target) = target {
+        let socket = UdpSocket::bind("127.0.0.1:0").expect("bind the sender");
+        let mut buf = Vec::new();
+        Action::Mark {
+            name: Name::new("Show Probe").expect("a name inside the inline cap"),
+            mark: standalone::marks::Mark::Favourite,
+            on: true,
+        }
+        .encode(&mut buf);
+        socket.send_to(&buf, target).expect("send ctl/mark");
+        // The file is written before the event is emitted, so the event is the
+        // point at which the file can be read.
+        marked = lines
+            .wait_for(Instant::now(), |line| {
+                (is_event(line, "marks") && line.contains("Show Probe")).then_some(())
+            })
+            .is_ok();
+    }
+    let Some(stderr) = finish(child, drain, collector) else {
+        return;
+    };
+    assert!(
+        target.is_some(),
+        "the run should report its control address in hello:\n{stderr}"
+    );
+    assert!(
+        marked,
+        "a ctl/mark should be answered by a marks event naming the preset:\n{stderr}"
+    );
+
+    let written = std::fs::read_to_string(&session).unwrap_or_else(|err| {
+        panic!(
+            "the run wrote no marks file at the --marks path {} ({err}):\n{stderr}",
+            session.display()
+        )
+    });
+    let marks: standalone::marks::Marks =
+        toml::from_str(&written).expect("the --marks file parses as marks");
+    assert!(
+        marks.is(standalone::marks::Mark::Favourite, "Show Probe"),
+        "the mark should be in the --marks file: {written}"
+    );
+    assert!(
+        !marks.is(standalone::marks::Mark::Favourite, "Elsewhere"),
+        "the run loaded the per-user file instead of the --marks one: {written}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&per_user).expect("the per-user file is still there"),
+        seeded,
+        "the per-user marks.toml must be untouched by a run given --marks"
+    );
+}
+
 /// A run on a machine with no per-user data directory still runs, on the
 /// embedded set, and says why in one line.
 ///

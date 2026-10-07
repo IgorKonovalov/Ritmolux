@@ -16,6 +16,7 @@ import { Footer } from './components/Footer'
 import { Preview, type PreviewStats } from './components/Preview'
 import { ProblemsModal } from './components/ProblemsModal'
 import { Rotation } from './components/Rotation'
+import { Judge } from './views/Judge'
 import { Render } from './views/Render'
 import { Settings } from './views/Settings'
 import { useHeldRotation } from './hooks/useHeldRotation'
@@ -44,6 +45,11 @@ export function App(): JSX.Element {
   const [saveProblem, setSaveProblem] = useState<string>()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [renderOpen, setRenderOpen] = useState(false)
+  const [judgeOpen, setJudgeOpen] = useState(false)
+  /** Whether the Judge view has been opened; it stays mounted from then on. */
+  const [judgeSeen, setJudgeSeen] = useState(false)
+  /** The running judging session's preset directory, which the editor writes in place. */
+  const [judgingDir, setJudgingDir] = useState<string | null>(null)
   const [problemsOpen, setProblemsOpen] = useState(false)
 
   /** `ui.reducedMotion` as the settings panel last set it, or as the file held it. */
@@ -78,6 +84,17 @@ export function App(): JSX.Element {
         <h1 className={styles.title}>Ritmolux Studio</h1>
         <span className={styles.preset}>{player.preset?.name ?? 'no preset yet'}</span>
         <Rotation held={rotation.held} onResume={rotation.resume} />
+        <button
+          type="button"
+          className={styles.judge}
+          aria-expanded={judgeOpen}
+          onClick={() => {
+            setJudgeSeen(true)
+            setJudgeOpen((open) => !open)
+          }}
+        >
+          judge
+        </button>
         <button
           type="button"
           className={styles.render}
@@ -157,6 +174,14 @@ export function App(): JSX.Element {
             onClose={() => setSettingsOpen(false)}
           />
         )}
+        {judgeSeen && (
+          <Judge
+            marks={player.marks}
+            hidden={!judgeOpen}
+            onClose={() => setJudgeOpen(false)}
+            onSession={setJudgingDir}
+          />
+        )}
         <Render
           roster={player.roster}
           active={player.preset?.name}
@@ -174,6 +199,7 @@ export function App(): JSX.Element {
             roster={player.roster}
             active={player.preset?.name}
             dir={player.dir}
+            own={judgingDir}
             marks={player.marks}
             onProblem={setSaveProblem}
           />

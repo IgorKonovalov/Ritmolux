@@ -610,6 +610,22 @@ Retargeted requirements — chosen to be enforceable by the [Plan 0011](plans/do
   terms. Re-taking the pair windowed is owed to `docs/on-device-validation.md`, not to this page.
   The fullscreen and `Floor`-pinned runs, and the whole real-iGPU side, stay
   with `docs/on-device-validation.md`.
+- **The `cellular` scene's grid is a fixed allocation sized by the preset, and its route adds 24
+  bytes a cell beside the automaton's 16** ([ADR-0266](adrs/0266-the-maze-route-is-a-double-sweep-relaxed-on-the-gpu-against-a-frozen-snapshot.md)).
+  The automaton holds its ping-pong pair at 8 bytes a texel, 16 MB at the 1024 grid `Rich`
+  allows. The route adds **six `u32` a cell** — the last compared mask, the snapshot, the
+  ping-pong pair of distances, the kept field and the route itself — so **24 bytes a cell**:
+
+  | grid | cells | the route's buffers |
+  |---|---|---|
+  | 192 (`cellular_labyrinth`) | 36 864 | 0.9 MB |
+  | 512 (`Floor`'s cap) | 262 144 | 6.3 MB |
+  | 1024 (`Rich`'s cap) | 1 048 576 | 25.2 MB (24 MiB) |
+
+  Beside them sit a few hundred bytes of control words and counters and 18 KB of per-event
+  uniform slots. **They are built only when `route > 0`**, on the scene's first frame with the
+  route on, rebuilt with the grid and never per frame; a preset that leaves `route` at 0, and every
+  `cyclic` preset, allocates none of it.
 - **Driver floor isolated ([Plan 0012](plans/done/0012-memory-floor-measure-and-scene-cull.md) Phase 2, resolved):** the once-optional dev spike ran —
   `standalone/examples/floor.rs`, a scene-less window standing up only the wgpu context — and put the
   hard **~327 MB private-commit** floor number on the split above. It confirms [ADR-0010](adrs/0010-accept-gpu-driver-memory-floor.md)'s diagnosis: the

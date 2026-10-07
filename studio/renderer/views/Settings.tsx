@@ -11,7 +11,7 @@
  * on the surface rather than implied: a control that appears to do nothing is
  * worse than one that says when it will.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { PLAYER_MODES, type PlayerMode } from '@shared/player-mode'
 import type { RenderSettingKey, RenderSettings } from '@shared/render'
@@ -164,6 +164,8 @@ export function Settings({
 
       <RenderGroup render={render ?? {}} />
 
+      <JudgingGroup />
+
       <dl className={styles.facts}>
         <dt>player</dt>
         <dd>
@@ -176,6 +178,79 @@ export function Settings({
         </dd>
       </dl>
     </section>
+  )
+}
+
+/**
+ * `judging.sourceDir`, the directory a judging session draws its sets from
+ * (ADR-0267): a text field saved on its button, or a directory dialog that
+ * writes what it picked. Read from main on mount, because the app info the
+ * other groups start from does not carry it.
+ */
+function JudgingGroup(): JSX.Element {
+  /** The file's value; `undefined` until main has answered. */
+  const [held, setHeld] = useState<string | null>()
+  const [draft, setDraft] = useState<string>()
+  const [problem, setProblem] = useState<string>()
+
+  useEffect(() => {
+    let live = true
+    void window.api.judging.getState().then((state) => {
+      if (live) setHeld(state.sourceDir)
+    })
+    return () => {
+      live = false
+    }
+  }, [])
+
+  const took = (result: { ok: true; value: string | null } | { ok: false; reason: string }): void => {
+    setProblem(result.ok ? undefined : result.reason)
+    if (!result.ok) return
+    setHeld(result.value)
+    setDraft(undefined)
+  }
+
+  const save = (): void => {
+    const next = (draft ?? held ?? '').trim()
+    void window.api.judging.setSourceDir(next === '' ? null : next).then(took)
+  }
+
+  const choose = (): void => {
+    void window.api.judging.pickSourceDir().then((result) => {
+      if (result !== null) took(result)
+    })
+  }
+
+  return (
+    <fieldset className={styles.group}>
+      <legend className={styles.legend}>Judging</legend>
+      <div className={styles.path}>
+        <label className={styles.pathLabel}>
+          <span className={styles.choiceName}>source directory</span>
+          <input
+            className={styles.pathInput}
+            value={draft ?? held ?? ''}
+            placeholder="not set: no sets to judge"
+            onChange={(event) => setDraft(event.target.value)}
+          />
+        </label>
+        <button type="button" className={styles.close} onClick={choose}>
+          choose…
+        </button>
+        <button type="button" className={styles.close} onClick={save}>
+          save
+        </button>
+      </div>
+      <p className={styles.note}>
+        Saved as <code>judging.sourceDir</code>. The Judge view draws its sets from it: a family,
+        its <code>proposed/</code> directory, or a list of its files.
+      </p>
+      {problem !== undefined && (
+        <p className={styles.problem} role="alert">
+          The setting was not written: {problem}
+        </p>
+      )}
+    </fieldset>
   )
 }
 

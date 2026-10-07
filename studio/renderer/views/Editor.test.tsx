@@ -407,6 +407,54 @@ describe('a preset from the embedded set', () => {
   })
 })
 
+describe('a judging session copy', () => {
+  const SESSION_DIR = '/u/judging/sessions/20261007T120000Z/presets'
+  const COPY = `${SESSION_DIR}/ink.toml`
+
+  it('is written in place with no prompt, because the studio made it', async () => {
+    const fake = install({ [COPY]: INK })
+    editor({ file: COPY, dir: SESSION_DIR, own: SESSION_DIR })
+    await screen.findByText(COPY)
+
+    const slider = await screen.findByLabelText('warp')
+    fireEvent.change(slider, { target: { value: '0.9' } })
+    fireEvent.pointerUp(slider)
+
+    await waitFor(() => expect(fake.writes).toHaveLength(1))
+    expect(fake.writes[0]).toMatchObject({ path: COPY, how: 'write' })
+    expect(fake.files.get(COPY)).toContain('warp  = "0.9"')
+    expect(screen.queryByLabelText('save a copy as')).toBeNull()
+  })
+
+  it('does not reach a file outside the session directory while a session runs', async () => {
+    const fake = install()
+    editor({ own: SESSION_DIR })
+    await presetLoaded()
+
+    const slider = await screen.findByLabelText('warp')
+    fireEvent.change(slider, { target: { value: '0.9' } })
+    fireEvent.pointerUp(slider)
+
+    await screen.findByLabelText('save a copy as')
+    expect(fake.writes).toHaveLength(0)
+  })
+
+  it('forks while the watcher is still on the directory the player ran on before', async () => {
+    // The player restart has not reported the session's roster yet, so `dir`
+    // is still the old one; nothing under it is the studio's.
+    const fake = install({ [COPY]: INK })
+    editor({ file: COPY, dir: DIR, own: SESSION_DIR })
+    await screen.findByText(COPY)
+
+    const slider = await screen.findByLabelText('warp')
+    fireEvent.change(slider, { target: { value: '0.9' } })
+    fireEvent.pointerUp(slider)
+
+    await screen.findByLabelText('save a copy as')
+    expect(fake.writes).toHaveLength(0)
+  })
+})
+
 describe('the prompt itself', () => {
   it('writes nothing when it is cancelled, and drops the edits it held', async () => {
     const fake = install()

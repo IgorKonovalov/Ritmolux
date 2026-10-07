@@ -58,6 +58,15 @@ export function playerArgs(mode: PlayerMode): readonly string[] {
 }
 
 /**
+ * The vector a judging session spawns: the **windowed** one whatever this
+ * machine's mode, because the owner judges on the show window, with the run's
+ * marks kept in the session's own file rather than the owner's (ADR-0267).
+ */
+export function judgingArgs(marks: string): readonly string[] {
+  return [...playerArgs('windowed'), '--marks', marks]
+}
+
+/**
  * The child, narrowed to the four things the supervisor uses.
  *
  * Narrow rather than `ChildProcess` so a test can stand in a pair of streams:
@@ -71,7 +80,15 @@ export interface PlayerChild {
   on(event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown
 }
 
-export type SpawnFn = (command: string, args: readonly string[]) => PlayerChild
+/**
+ * `env` is merged over the studio's own environment, never in place of it: the
+ * player still needs `PATH`, the display and the audio server's variables.
+ */
+export type SpawnFn = (
+  command: string,
+  args: readonly string[],
+  env?: Readonly<Record<string, string>>,
+) => PlayerChild
 
 export interface SupervisorSinks {
   onEvent: (event: PlayerEvent) => void
@@ -89,6 +106,8 @@ export interface SupervisorSinks {
 export interface SupervisorOptions extends SupervisorSinks {
   playerPath: string
   args?: readonly string[]
+  /** Variables set for this child only, such as a judging session's `RLX_PRESET_DIR`. */
+  env?: Readonly<Record<string, string>>
   spawn?: SpawnFn
 }
 
@@ -126,6 +145,7 @@ export class PlayerSupervisor {
     const child = spawnFn(
       this.options.playerPath,
       this.options.args ?? playerArgs(DEFAULT_PLAYER_MODE),
+      this.options.env,
     )
     this.child = child
 
@@ -198,8 +218,15 @@ export class PlayerSupervisor {
   }
 }
 
-function defaultSpawn(command: string, args: readonly string[]): PlayerChild {
+function defaultSpawn(
+  command: string,
+  args: readonly string[],
+  env?: Readonly<Record<string, string>>,
+): PlayerChild {
   // Standard input is closed: the player reads none, and leaving it open would
   // hold a handle the studio has no use for.
-  return nodeSpawn(command, [...args], { stdio: ['ignore', 'pipe', 'pipe'] })
+  return nodeSpawn(command, [...args], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: env === undefined ? process.env : { ...process.env, ...env },
+  })
 }

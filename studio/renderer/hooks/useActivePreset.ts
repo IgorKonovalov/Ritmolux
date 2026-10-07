@@ -14,7 +14,9 @@
  * first gesture against one is held here: the document that gesture produced is
  * captured, the surface asks for a name, and the whole document lands in a new
  * file. What this session created it writes silently from then on, at the
- * cadence a live editor needs — one write per gesture, atomically.
+ * cadence a live editor needs — one write per gesture, atomically. A judging
+ * session's copies are the studio's too: main wrote every one at Start, so a
+ * file in `own` is written in place and the session's End sees the edit.
  *
  * **The session is the unit.** The set of forks below lives as long as the
  * window, so a relaunch prompts once more for a preset this studio wrote
@@ -74,6 +76,14 @@ export interface ActivePresetOptions {
   name: string | undefined
   /** The document an embedded preset forks from, when there is one to build. */
   base: string | undefined
+  /**
+   * A directory every file of which the studio wrote — a running judging
+   * session's copies — or `null`. A file in it is written in place, but only
+   * while the watcher is on it (`dir` equal to it): during the player restart
+   * `dir` still names the directory the player ran on before, and a file there
+   * is not the studio's.
+   */
+  own?: string | null
 }
 
 export interface ActivePreset {
@@ -125,7 +135,7 @@ export interface ActivePreset {
 export function useActivePreset(
   file: string | null | undefined,
   reloads: number,
-  { dir, name, base }: ActivePresetOptions,
+  { dir, name, base, own = null }: ActivePresetOptions,
 ): ActivePreset {
   const [state, setState] = useState<PresetFileState>({ status: 'waiting' })
   const [held, setHeld] = useState<HeldGesture>()
@@ -193,7 +203,9 @@ export function useActivePreset(
   const land = useCallback(
     async (next: string): Promise<string | undefined> => {
       const path = state.status === 'ready' ? state.path : undefined
-      if (path !== undefined && ours.current.has(path)) {
+      const inOwn =
+        path !== undefined && own !== null && dir === own && path.startsWith(presetPath(own, ''))
+      if (path !== undefined && (inOwn || ours.current.has(path))) {
         const result = await window.api.preset.write(path, next)
         return result.ok ? undefined : result.reason
       }
@@ -204,7 +216,7 @@ export function useActivePreset(
       })
       return undefined
     },
-    [state, name],
+    [state, name, own, dir],
   )
 
   const commit = useCallback(
