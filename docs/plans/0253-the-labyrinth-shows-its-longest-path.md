@@ -224,7 +224,7 @@ encodes passes, hands each one its event's scene time, and never reads the state
     with no update variable set.
   - `cargo nextest run -p rlx-core --test golden` passes with `RLX_BLESS` unset, so no shipped
     preset moved.
-  - `cargo run -q -p standalone --bin ritmolux -- --check --strict presets` exits 0.
+  - `cargo run -q -p standalone --bin ritmolux -- --check presets --strict` exits 0.
 
 ### Phase 4 — The owner sees the route on the labyrinth
 - **Owner skill:** human

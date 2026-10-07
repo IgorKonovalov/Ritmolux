@@ -610,8 +610,8 @@ Retargeted requirements — chosen to be enforceable by the [Plan 0011](plans/do
   terms. Re-taking the pair windowed is owed to `docs/on-device-validation.md`, not to this page.
   The fullscreen and `Floor`-pinned runs, and the whole real-iGPU side, stay
   with `docs/on-device-validation.md`.
-- **The `cellular` scene's grid is a fixed allocation sized by the preset, and its route doubles it
-  at most** ([ADR-0266](adrs/0266-the-maze-route-is-a-double-sweep-relaxed-on-the-gpu-against-a-frozen-snapshot.md)).
+- **The `cellular` scene's grid is a fixed allocation sized by the preset, and its route adds 24
+  bytes a cell beside the automaton's 16** ([ADR-0266](adrs/0266-the-maze-route-is-a-double-sweep-relaxed-on-the-gpu-against-a-frozen-snapshot.md)).
   The automaton holds its ping-pong pair at 8 bytes a texel, 16 MB at the 1024 grid `Rich`
   allows. The route adds **six `u32` a cell** — the last compared mask, the snapshot, the
   ping-pong pair of distances, the kept field and the route itself — so **24 bytes a cell**:
