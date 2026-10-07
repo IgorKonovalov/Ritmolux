@@ -38,6 +38,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
+use common::udp_counters::UdpCounters;
 use rlx_core::preset::SystemKind;
 use standalone::osc::decode::{Action, Name, Transport};
 
@@ -249,18 +250,24 @@ struct Ask {
     /// The last `health` line read **before** the ask, which is the baseline
     /// `ctl_received` is judged against. `None` when none had been read yet.
     health_before: Option<String>,
+    /// The child's control port and the operating system's UDP counters for it
+    /// just before the ask was sent, which a miss reports the deltas of. `None`
+    /// for a line the run emits unprompted.
+    os_before: Option<(u16, UdpCounters)>,
 }
 
 impl Ask {
     /// `lines` is read for the **previous** wait's record, which is still there
     /// at this point: `wait_for` clears it, so the baseline has to be taken
-    /// before the wait this ask is about begins.
-    fn now(what: impl Into<String>, drain: &Drain, lines: &Lines) -> Self {
+    /// before the wait this ask is about begins. `target` is the child's control
+    /// address, whose port the operating system's counters are read for.
+    fn now(what: impl Into<String>, target: SocketAddr, drain: &Drain, lines: &Lines) -> Self {
         Self {
             what: what.into(),
             since: Instant::now(),
             stdout_at_ask: drain.bytes(),
             ping: None,
+            os_before: Some((target.port(), UdpCounters::take(target.port()))),
             health_before: lines
                 .read
                 .iter()
@@ -420,6 +427,7 @@ fn missed_report<T>(
         stdout_at_ask,
         ping,
         health_before,
+        os_before,
     } = ask;
     let missed_after = since.elapsed();
     let late = match missed {
@@ -463,11 +471,18 @@ fn missed_report<T>(
     let (health, other): (Vec<&String>, Vec<&String>) =
         lines.read.iter().partition(|line| is_event(line, "health"));
     let verdict = listener_verdict(health_before.as_deref(), &health);
+    let os = match os_before {
+        Some((port, before)) => {
+            format!("{} (port {port})", before.deltas(&UdpCounters::take(*port)))
+        }
+        None => "os udp: no datagram was sent for this line".to_owned(),
+    };
     let mut report = format!(
         "{what}: nothing after {:.1} s ({missed:?}, bound {LINE_DEADLINE:?}); {late}\n\
          child: {alive}\n\
          {pong}\n\
          listener: {verdict}\n\
+         {os}\n\
          stdout: {stdout_at_ask} bytes at the ask, {} bytes now\n\
          stderr since the ask: {} lines, {} of them health; the last {} other lines and \
          the last {} health lines follow\n",
@@ -878,6 +893,7 @@ fn every_system_is_reported_by_the_key_the_schema_labels_its_roster_with() {
         // `hello` precedes the first frame and so precedes every `health`
         // line: there is no baseline to take, and the report says so.
         health_before: None,
+        os_before: None,
     };
     match lines.wait_for(hello.since, hello_control) {
         Err(missed) => {
@@ -912,6 +928,7 @@ fn every_system_is_reported_by_the_key_the_schema_labels_its_roster_with() {
                         step + 1,
                         SystemKind::VARIANT_COUNT
                     ),
+                    target,
                     &drain,
                     &lines,
                 );

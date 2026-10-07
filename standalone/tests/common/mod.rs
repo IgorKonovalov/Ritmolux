@@ -18,10 +18,15 @@
 //! this one that names the player's `CARGO_BIN_EXE_` variable or `shot_bin`, so a
 //! spawn written beside this module is refused rather than reviewed for.
 //!
+//! [`udp_counters`] beside it reads the operating system's UDP counters for the
+//! control-path tests' failure reports.
+//!
 //! Not every file uses every helper, so the module allows dead code: `-D warnings`
 //! would otherwise fail the build of a file that needs only one of them.
 
 #![allow(dead_code)]
+
+pub mod udp_counters;
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};

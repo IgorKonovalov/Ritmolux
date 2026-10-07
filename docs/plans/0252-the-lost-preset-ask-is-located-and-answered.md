@@ -1,6 +1,6 @@
 # 0252 — The lost preset ask is located and answered
 
-> **Status:** approved (2026-10-07)
+> **Status:** in-progress
 > **Created:** 2026-10-07
 > **Owner skill(s):** dev, studio-builder, human
 > **Closes:** design-backlog 0219, 0220
@@ -251,11 +251,11 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:**
+**Lane:** `plan-0252-the-lost-preset-ask-is-located-and-answered`, worktree `/home/igor/Work/rlx-plan-0252`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The tests read the operating system's UDP counters at a failure | dev | not started | |
+| 1 — The tests read the operating system's UDP counters at a failure | dev | done | committed with this row |
 | 2 — The player answers a preset ask that carries an id | dev | not started | |
 | 3 — The two control-path tests resend instead of waiting once | dev | not started | |
 | 4 — The full suite | dev | not started | |

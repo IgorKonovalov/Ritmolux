@@ -26,9 +26,12 @@
     reason = "a delivery deadline on a socket this test does not schedule"
 )]
 
+mod common;
+
 use std::net::UdpSocket;
 use std::time::{Duration, Instant};
 
+use common::udp_counters::UdpCounters;
 use rlx_core::dsp::AnalysisFrame;
 use rlx_core::preset::Preset;
 use rlx_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
@@ -93,14 +96,17 @@ fn listener() -> Option<Control> {
 }
 
 /// Send `action` to `control`'s port as the bytes a sender would put on the
-/// wire.
-fn send(control: &Control, action: &Action) {
+/// wire, and hand back the operating system's UDP counters as they stood just
+/// before the send, for [`expect_delivery`] to read a miss against.
+fn send(control: &Control, action: &Action) -> UdpCounters {
     let socket = UdpSocket::bind("127.0.0.1:0").expect("bind an ephemeral sending socket");
     let mut buf = Vec::new();
     action.encode(&mut buf);
+    let before = UdpCounters::take(control.local_addr().port());
     socket
         .send_to(&buf, control.local_addr())
         .expect("send to the loopback listener");
+    before
 }
 
 /// Wait until something is queued, or give up after [`DELIVERY`].
@@ -181,8 +187,10 @@ fn verdict(r: &Readings) -> String {
 /// [`verdict`] reads settle which candidate it was: whether any datagram reached
 /// the socket at all, whether receives are failing, and whether the listener
 /// thread is still there — the three facts a report that said only "rejected 0,
-/// dropped 0" could not distinguish.
-fn expect_delivery(control: &Control, what: &str) {
+/// dropped 0" could not distinguish. Beside them it prints what moved in the
+/// operating system's UDP counters since `os_before`, the reading [`send`] took,
+/// which is the only place a datagram lost in front of the socket is counted.
+fn expect_delivery(control: &Control, os_before: &UdpCounters, what: &str) {
     let sent = Instant::now();
     let before = control.received();
     if wait_for_delivery(control) {
@@ -207,11 +215,13 @@ fn expect_delivery(control: &Control, what: &str) {
         rejected: control.rejected(),
         dropped: control.dropped(),
     };
+    let os = os_before.deltas(&UdpCounters::take(control.local_addr().port()));
     panic!(
         "{what}: nothing reached the listener within {DELIVERY:?} (gave up after \
          {:.2} s); {late}\n\
          listener readings: received +{} since the send, recv_errors {}, \
          listening {}, rejected {}, dropped {}\n\
+         {os}\n\
          verdict: {}",
         missed_after.as_secs_f64(),
         readings.arrived,
@@ -261,14 +271,14 @@ fn a_param_datagram_moves_the_next_frame() {
     let Some(mut control) = listener() else {
         return;
     };
-    send(
+    let os = send(
         &control,
         &Action::Param {
             name: Name::new("bg_bright").expect("a short name fits inline"),
             value: 0.8,
         },
     );
-    expect_delivery(&control, "ctl/param bg_bright 0.8");
+    expect_delivery(&control, &os, "ctl/param bg_bright 0.8");
 
     let Some(driven) = frame_of(vec![lit("dim", "0.2")], |renderer| {
         let applied = standalone::control::apply_to_renderer(control.drain(), renderer);
@@ -310,13 +320,13 @@ fn a_preset_datagram_selects_by_name() {
         "the roster starts at index 0"
     );
 
-    send(
+    let os = send(
         &control,
         &Action::Preset {
             name: Name::new("second").expect("a short name fits inline"),
         },
     );
-    expect_delivery(&control, "ctl/preset `second`");
+    expect_delivery(&control, &os, "ctl/preset `second`");
     let applied = standalone::control::apply_to_renderer(control.drain(), &mut renderer);
     assert!(applied.switched, "a name the roster holds switches");
 
@@ -342,13 +352,17 @@ fn a_preset_datagram_selects_by_name() {
         renderer.preset_name()
     );
 
-    send(
+    let os = send(
         &control,
         &Action::Preset {
             name: Name::new("no_such_preset").expect("a short name fits inline"),
         },
     );
-    expect_delivery(&control, "ctl/preset `no_such_preset`, the second send");
+    expect_delivery(
+        &control,
+        &os,
+        "ctl/preset `no_such_preset`, the second send",
+    );
     let applied = standalone::control::apply_to_renderer(control.drain(), &mut renderer);
     assert!(
         !applied.switched,
@@ -542,5 +556,124 @@ fn a_malformed_datagram_is_counted_and_moves_nothing() {
     assert!(
         control.drain().is_empty(),
         "a refused datagram must not reach the queue"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The operating system's UDP counters (`common::udp_counters`)
+// ---------------------------------------------------------------------------
+
+/// `/proc/net/udp` as the kernel prints it: a header whose column names do not
+/// line up with the row's, trailing padding, and two rows on port 0xA1B2 (41394),
+/// one bound to 127.0.0.1 and one to 0.0.0.0.
+const PROC_NET_UDP: &str = "   sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops            \n \
+ 9977: 3500007F:0035 00000000:0000 07 00000000:00000000 00:00000000 00000000   974        0 11504 2 000000004772641c 0         \n \
+ 1234: 0100007F:A1B2 00000000:0000 07 00000000:00000300 00:00000000 00000000  1000        0 22222 2 00000000deadbeef 5         \n \
+ 1235: 00000000:A1B2 00000000:0000 07 00000000:00000000 00:00000000 00000000  1000        0 22223 2 00000000feedface 2         \n";
+
+/// `/proc/net/snmp`'s `Udp:` pair, among the lines around it.
+const PROC_NET_SNMP: &str = "\
+Icmp: InMsgs InErrors InCsumErrors
+Icmp: 57 4 0
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors InCsumErrors IgnoredMulti MemErrors
+Udp: 14388582 463 3273 7124309 3270 112207 0 77 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors InCsumErrors IgnoredMulti MemErrors
+UdpLite: 0 0 0 0 0 0 0 0 0
+";
+
+/// `netstat -s -p udp` on Windows.
+const NETSTAT_UDP: &str = "\r
+UDP Statistics for IPv4\r
+\r
+  Datagrams Received    = 1234567\r
+  No Ports              = 89\r
+  Receive Errors        = 17\r
+  Datagrams Sent        = 765432\r
+";
+
+/// Each parser reads its counter out of literal fixture text, and the delta line
+/// names every counter that moved.
+#[test]
+fn the_udp_counter_parsers_read_their_fixtures() {
+    let read = UdpCounters::from_sources(
+        0xA1B2,
+        Some(PROC_NET_UDP),
+        Some(PROC_NET_SNMP),
+        Some("212992\n"),
+        Some(NETSTAT_UDP),
+    );
+    assert_eq!(
+        read,
+        UdpCounters {
+            socket_drops: Some(7),
+            in_errors: Some(3273),
+            rcvbuf_errors: Some(3270),
+            rmem_default: Some(212_992),
+            receive_errors: Some(17),
+        },
+        "the per-socket drops sum every row bound to the port, and the \
+         system-wide counters come from the Udp lines, not Icmp or UdpLite"
+    );
+
+    let other_port = UdpCounters::from_sources(9, Some(PROC_NET_UDP), None, None, None);
+    assert_eq!(
+        other_port.socket_drops, None,
+        "a port no row is bound to has no drops reading, not a zero one"
+    );
+
+    let later = UdpCounters {
+        socket_drops: Some(9),
+        in_errors: Some(3275),
+        ..read
+    };
+    let line = read.deltas(&later);
+    assert!(
+        line.contains("socket drops +2")
+            && line.contains("InErrors +2")
+            && line.contains("RcvbufErrors +0")
+            && line.contains("rmem_default 212992")
+            && line.contains("Receive Errors +0"),
+        "the delta line names each counter and how far it moved: {line}"
+    );
+}
+
+/// A source that is missing, empty or shaped other than expected yields
+/// "unavailable" rather than a panic or a made-up zero.
+#[test]
+fn an_unreadable_udp_counter_source_is_unavailable() {
+    let none = UdpCounters::from_sources(0xA1B2, None, None, None, None);
+    assert_eq!(none, UdpCounters::default());
+    let garbled = UdpCounters::from_sources(
+        0xA1B2,
+        Some("header only\n"),
+        Some("Udp: InErrors\n"),
+        Some("lots\n"),
+        Some("UDP Statistics for IPv4\n  Receive Errors = many\n"),
+    );
+    assert_eq!(garbled, UdpCounters::default());
+    let line = none.deltas(&garbled);
+    assert_eq!(
+        line.matches("unavailable").count(),
+        5,
+        "every counter with no reading says so: {line}"
+    );
+}
+
+/// The live reading: a socket this test binds is found in `/proc/net/udp` by its
+/// port, with nothing dropped.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_bound_socket_reads_zero_drops_by_its_port() {
+    let socket = UdpSocket::bind("127.0.0.1:0").expect("bind a loopback socket");
+    let port = socket.local_addr().expect("a bound address").port();
+    let read = UdpCounters::take(port);
+    assert_eq!(
+        read.socket_drops,
+        Some(0),
+        "a fresh socket on port {port} should be in /proc/net/udp with no drops"
+    );
+    assert!(
+        read.in_errors.is_some() && read.rcvbuf_errors.is_some() && read.rmem_default.is_some(),
+        "the system-wide counters and rmem_default are readable on Linux: {read:?}"
     );
 }
