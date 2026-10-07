@@ -47,7 +47,7 @@ place. The plan file carries the real link.
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
 | [0251](0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) | The seam, the thumbnail GPU and the timeline are tied off | draft | dev, studio-builder, human | No ADR. Backlog 0286, 0261, 0285: exact sway bound, thumb child on the show's adapter, no timeline left by a cancel. Phase 4 is non-blocking. |
 | [0252](0252-the-lost-preset-ask-is-located-and-answered.md) | The lost preset ask is located and answered | draft | dev, studio-builder, human | ADR-0265: `ctl/preset/req` acked by `preset_ack`; studio and tests resend. Studio spec-diff test red from Phase 2 to 5. Phase 6 is a blocking loaded run. |
-| [0253](0253-the-labyrinth-shows-its-longest-path.md) | The labyrinth shows its longest path | draft | dev, human | ADR-0266: GPU double sweep over a frozen maze snapshot, solid or graded. Phase 3's budget comes from Phase 1's cost. Route lags by one epoch. |
+| [0253](0253-the-labyrinth-shows-its-longest-path.md) | The labyrinth shows its longest path | draft | dev, human | ADR-0266: GPU double sweep while the maze is quiet; reveals, fades on a bite. Phase 1 reads pass cost and change counts that set Phase 2-3 constants. |
 | [0254](0254-the-studio-judges-a-preset-set.md) | The studio judges a preset set | draft | dev, studio-builder, human | ADR-0267: a Judge view over the studio's one player, after Phase 1's `--marks` flag. Replaces 0232's scratch scripts. Phase 4 is non-blocking. |
 <!-- roster:end -->
 
