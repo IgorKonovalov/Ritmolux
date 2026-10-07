@@ -233,7 +233,7 @@ studio keeps one player); the ledger leaves the studio as a clipboard table, nev
 | 1 — The player takes its marks file from a flag | dev | done | 994c9464 |
 | 2 — The session: copy, isolate, fold, ledger, write-back | studio-builder | done | 239e6652 |
 | 3 — The Judge view | studio-builder | done | 47e03e41 |
-| 4 — The owner walks a real family | human | not started | |
+| 4 — The owner walks a real family | human | owed | |
 
 ### Notes
 
