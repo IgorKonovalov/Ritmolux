@@ -204,7 +204,7 @@ had already judged the length warranted.
 | 2 — The 3D findings | dev | done | `449a9b17` |
 | 3 — The two gates that cannot see what shipped | dev | done | `f595d155` |
 | 4 — Window names, thumbnail dates, tooling | dev | done | `b25cd8cf` |
-| 5 — The render service stops leaking | studio-builder | done | committed with this row |
+| 5 — The render service stops leaking | studio-builder | done | `894b8948` |
 
 ### Notes
 
@@ -248,12 +248,16 @@ had already judged the length warranted.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** `attractor_lorenzknot.toml`; `README.md` (generated block and the camera
+  row); `preset.schema.json` and all 13 `schema/*.schema.json` (regenerated).
 - **Plan header `Closes:`** design-backlog 0260, 0275, 0282, 0283, 0284
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
+- **What shipped:** feature (unknown-key warnings, Linux app ids, versioned thumbnail cache) and fixes.
+- **Operator docs touched:** `docs/configuration.md` (`--strict`), `docs/running.md` (app ids),
+  `docs/specs/player-schema.json` (regenerated), two gallery PNGs.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 51 reductions hold; advisory
+  only.
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast` at `894b8948`, exit 0, 2019 passed,
+  8 skipped. The `golden` and `sanity` suites also ran at Phases 2 and 3.
 - **Outstanding `human` phases:** none in this plan
 
 ## Followups (after this lands)
