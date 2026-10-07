@@ -35,7 +35,7 @@ use common::udp_counters::UdpCounters;
 use rlx_core::dsp::AnalysisFrame;
 use rlx_core::preset::Preset;
 use rlx_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
-use standalone::control::Control;
+use standalone::control::{Control, PresetOutcome};
 use standalone::osc::decode::{Action, Name, Transport};
 
 /// Small offscreen: the claim is about which value arrived, not how many pixels
@@ -303,32 +303,169 @@ fn a_param_datagram_moves_the_next_frame() {
     }
 }
 
-/// A `ctl/preset` datagram lands on the named preset, and an unknown name is
+/// How many times a `ctl/preset/req` ask is sent before a test gives up on it,
+/// each attempt waiting [`DELIVERY`] (ADR-0265).
+const ATTEMPTS: u32 = 3;
+
+/// A deliberate fault in the test's own sender, so the resend path is exercised
+/// on every run rather than only when the kernel happens to lose a datagram.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Fault {
+    /// Every send goes out.
+    None,
+    /// The first send is skipped, as if the datagram were lost on the way.
+    SkipFirstSend,
+}
+
+/// The sending side of a preset ask: one socket, and the fault it carries.
+struct Asker {
+    socket: UdpSocket,
+    fault: Fault,
+    sends: u32,
+}
+
+impl Asker {
+    fn new(fault: Fault) -> Self {
+        Self {
+            socket: UdpSocket::bind("127.0.0.1:0").expect("bind an ephemeral sending socket"),
+            fault,
+            sends: 0,
+        }
+    }
+
+    /// Send `action` to `control`'s port — or, under the fault, skip the first
+    /// send — and hand back the operating system's UDP counters as they stood
+    /// just before it.
+    fn send(&mut self, control: &Control, action: &Action) -> UdpCounters {
+        let mut buf = Vec::new();
+        action.encode(&mut buf);
+        let before = UdpCounters::take(control.local_addr().port());
+        self.sends += 1;
+        if !(self.fault == Fault::SkipFirstSend && self.sends == 1) {
+            self.socket
+                .send_to(&buf, control.local_addr())
+                .expect("send to the loopback listener");
+        }
+        before
+    }
+}
+
+/// Send a `ctl/preset/req` ask for `name` carrying `req` until a drain hands
+/// over that `req`, resending the same `req` after each [`DELIVERY`] without
+/// one, up to [`ATTEMPTS`] times. On success the drained frame is
+/// [`Control::last_drained`]'s, for the caller to apply.
+///
+/// Every resend prints one `RESENT` line to standard error — the ask, the
+/// attempt and what moved in the operating system's UDP counters over the
+/// attempt that missed — and the lines are returned, so a passing run that
+/// needed a second attempt still says so. Only an ask lost [`ATTEMPTS`] times
+/// fails, with the readings [`verdict`] reads.
+fn ask_preset(control: &mut Control, asker: &mut Asker, name: &str, req: i32) -> Vec<String> {
+    let action = Action::PresetReq {
+        name: Name::new(name).expect("a short name fits inline"),
+        req,
+    };
+    let what = format!("ctl/preset/req `{name}` req {req}");
+    let received_before = control.received();
+    let first = Instant::now();
+    let mut resent = Vec::new();
+    let mut missed = String::new();
+    for attempt in 1..=ATTEMPTS {
+        if attempt > 1 {
+            let line = format!(
+                "RESENT {what}: attempt {attempt} of {ATTEMPTS}, after no delivery within \
+                 {DELIVERY:?}; {missed}"
+            );
+            eprintln!("{line}");
+            resent.push(line);
+        }
+        let os_before = asker.send(control, &action);
+        let deadline = Instant::now() + DELIVERY;
+        while Instant::now() < deadline {
+            if control.has_pending() && control.drain().preset_req() == Some(req) {
+                return resent;
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        missed = os_before.deltas(&UdpCounters::take(control.local_addr().port()));
+    }
+    let readings = Readings {
+        arrived: control.received().saturating_sub(received_before),
+        recv_errors: control.recv_errors(),
+        listening: control.listening(),
+        rejected: control.rejected(),
+        dropped: control.dropped(),
+    };
+    panic!(
+        "{what}: all {ATTEMPTS} attempts were lost, {:.2} s after the first send\n\
+         over the last attempt: {missed}\n\
+         listener readings: received +{} since the first send, recv_errors {}, \
+         listening {}, rejected {}, dropped {}\n\
+         verdict: {}",
+        first.elapsed().as_secs_f64(),
+        readings.arrived,
+        readings.recv_errors,
+        readings.listening,
+        readings.rejected,
+        readings.dropped,
+        verdict(&readings),
+    );
+}
+
+/// A `ctl/preset/req` datagram lands on the named preset, and an unknown name is
 /// reported as not having switched rather than silently doing nothing.
 #[test]
 fn a_preset_datagram_selects_by_name() {
-    let Some(mut control) = listener() else {
+    let Some(resent) = select_by_name(Fault::None) else {
         return;
     };
-    let Some(mut renderer) = headless() else {
+    // Printed rather than asserted: a datagram the kernel genuinely lost is
+    // resent and the test still passes, and that line is the reading.
+    eprintln!("{} RESENT line(s) on a sender with no fault", resent.len());
+}
+
+/// A sender that loses its first ask lands on the second attempt and prints
+/// exactly one `RESENT` line for it.
+#[test]
+fn a_lost_first_preset_ask_is_resent_and_lands_on_attempt_two() {
+    let Some(resent) = select_by_name(Fault::SkipFirstSend) else {
         return;
     };
+    assert_eq!(
+        resent.len(),
+        1,
+        "one skipped send is one resend: {resent:#?}"
+    );
+    assert!(
+        resent[0].starts_with("RESENT ctl/preset/req `second` req 1: attempt 2 of 3")
+            && resent[0].contains("os udp: "),
+        "the RESENT line names the ask, the attempt and the counter deltas: {}",
+        resent[0]
+    );
+}
+
+/// The body both preset tests run: `second` is selected through the socket and
+/// the show lands on it, then an absent name is refused. Returns every
+/// `RESENT` line the two asks printed, or `None` when the runner skipped.
+fn select_by_name(fault: Fault) -> Option<Vec<String>> {
+    let mut control = listener()?;
+    let mut renderer = headless()?;
     renderer.set_presets(vec![lit("first", "0.2"), lit("second", "0.4")]);
     assert_eq!(
         renderer.preset_name(),
         "first",
         "the roster starts at index 0"
     );
+    let mut asker = Asker::new(fault);
 
-    let os = send(
-        &control,
-        &Action::Preset {
-            name: Name::new("second").expect("a short name fits inline"),
-        },
-    );
-    expect_delivery(&control, &os, "ctl/preset `second`");
-    let applied = standalone::control::apply_to_renderer(control.drain(), &mut renderer);
+    let mut resent = ask_preset(&mut control, &mut asker, "second", 1);
+    let applied = standalone::control::apply_to_renderer(control.last_drained(), &mut renderer);
     assert!(applied.switched, "a name the roster holds switches");
+    assert_eq!(
+        applied.preset_ack.map(|ack| (ack.req, ack.outcome)),
+        Some((1, PresetOutcome::Selected)),
+        "the ask that switched is answered as selected"
+    );
 
     // `ctl/preset` **dissolves** rather than cuts, which is what the ADR's table
     // says and what an operator watching a show wants. So the roster still names
@@ -352,23 +489,19 @@ fn a_preset_datagram_selects_by_name() {
         renderer.preset_name()
     );
 
-    let os = send(
-        &control,
-        &Action::Preset {
-            name: Name::new("no_such_preset").expect("a short name fits inline"),
-        },
-    );
-    expect_delivery(
-        &control,
-        &os,
-        "ctl/preset `no_such_preset`, the second send",
-    );
-    let applied = standalone::control::apply_to_renderer(control.drain(), &mut renderer);
+    resent.extend(ask_preset(&mut control, &mut asker, "no_such_preset", 2));
+    let applied = standalone::control::apply_to_renderer(control.last_drained(), &mut renderer);
     assert!(
         !applied.switched,
         "an unknown name must not report a switch, or the shell runs its \
          post-switch bookkeeping for a switch that did not happen"
     );
+    assert_eq!(
+        applied.preset_ack.map(|ack| (ack.req, ack.outcome)),
+        Some((2, PresetOutcome::Refused)),
+        "the refused ask is answered as refused"
+    );
+    Some(resent)
 }
 
 /// A flood of one parameter name stays bounded through the socket.

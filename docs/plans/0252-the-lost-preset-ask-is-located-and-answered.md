@@ -256,8 +256,8 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The tests read the operating system's UDP counters at a failure | dev | done | e2c5c376 |
-| 2 — The player answers a preset ask that carries an id | dev | done | committed with this row |
-| 3 — The two control-path tests resend instead of waiting once | dev | not started | |
+| 2 — The player answers a preset ask that carries an id | dev | done | 27efabe2 |
+| 3 — The two control-path tests resend instead of waiting once | dev | done | committed with this row |
 | 4 — The full suite | dev | not started | |
 | 5 — The studio's library click is acknowledged | studio-builder | not started | |
 | 6 — The loaded reproduction is read | human | not started | |
@@ -272,6 +272,16 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
   `current`.
 - Phase 2 reworded spec 0003's `ctl/ping` scenario, which called it "the one message answered
   individually", and added a Provenance entry.
+- Phase 3: the fault runs as its own test, `a_lost_first_preset_ask_is_resent_and_lands_on_attempt_two`,
+  which asserts exactly one `RESENT` line. The unfaulted `a_preset_datagram_selects_by_name` prints
+  its `RESENT` count rather than asserting zero, because a datagram the kernel genuinely loses is
+  resent and passes.
+- Phase 3: the walk's per-attempt wait for a `preset_ack` is `LINE_DEADLINE` (60 s), the walk's
+  existing per-line wait, not 5 s.
+- Phase 3: `success-output = "final"` also prints the libtest harness's `running 1 test` stdout for
+  every passing test in the two binaries, not only the `RESENT` lines.
+- Phase 3 left job 5's `retries = 1` block for `a_preset_datagram_selects_by_name` in
+  `.config/nextest.toml`; per ADR-0261 it leaves when backlog 0219 closes.
 
 ### Close triggers
 

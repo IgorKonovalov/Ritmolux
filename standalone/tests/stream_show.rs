@@ -76,6 +76,10 @@ const REPORT_HEALTH_LINES: usize = 3;
 /// How many other lines a missed-wait report keeps, newest last.
 const REPORT_OTHER_LINES: usize = 40;
 
+/// How many times the walk sends one `ctl/preset/req` ask before it gives up on
+/// it, each attempt waiting [`LINE_DEADLINE`] for the `preset_ack` (ADR-0265).
+const ATTEMPTS: u32 = 3;
+
 /// The nonce sent on `ctl/ping`, distinctive enough that finding it in a line
 /// cannot be a coincidence.
 const PING_NONCE: i32 = 424_242;
@@ -506,6 +510,32 @@ fn missed_report<T>(
     report
 }
 
+/// The one line a resend prints: which ask missed, which attempt is next, what
+/// moved in the operating system's UDP counters over the attempt that missed,
+/// and what the listener's own `health` readings convict over it.
+///
+/// `lines` is read for the missed wait's record, which is still there because
+/// the next wait has not begun.
+fn resent_line(ask: &Ask, next_attempt: u32, lines: &Lines) -> String {
+    let os = match &ask.os_before {
+        Some((port, before)) => {
+            format!("{} (port {port})", before.deltas(&UdpCounters::take(*port)))
+        }
+        None => "os udp: no datagram was sent for this line".to_owned(),
+    };
+    let health: Vec<&String> = lines
+        .read
+        .iter()
+        .filter(|line| is_event(line, "health"))
+        .collect();
+    format!(
+        "RESENT {}: attempt {next_attempt} of {ATTEMPTS}, after no preset_ack within \
+         {LINE_DEADLINE:?}; {os}; listener: {}",
+        ask.what,
+        listener_verdict(ask.health_before.as_deref(), &health)
+    )
+}
+
 /// Read the child's standard error line by line **while it runs**, forwarding
 /// every line on a channel and accumulating the whole of it for the assertions.
 fn watch(child: &mut Child) -> (std::thread::JoinHandle<String>, Lines) {
@@ -866,6 +896,13 @@ fn stop(
 /// One process walks the roster over the control channel: rotation is held
 /// first, so nothing but this test moves the show, and each step waits for the
 /// `preset` event that says the dissolve finished before asking for the next.
+///
+/// Each step is a `ctl/preset/req` ask: its `preset_ack` is the delivery, and
+/// an ask with no ack after [`LINE_DEADLINE`] is resent with the same `req`, up
+/// to [`ATTEMPTS`] times, printing a `RESENT` line each time. A step fails when
+/// every attempt is lost, or when an ack read `selected` and no `preset` event
+/// followed — a dissolve that never completed, which the report names apart
+/// from a lost ask.
 #[test]
 fn every_system_is_reported_by_the_key_the_schema_labels_its_roster_with() {
     let dir = scratch("system-keys");
@@ -918,39 +955,104 @@ fn every_system_is_reported_by_the_key_the_schema_labels_its_roster_with() {
 
             for (step, kind) in SystemKind::ALL.into_iter().enumerate() {
                 let key = kind.as_str();
-                Action::Preset {
+                let req = step as i32 + 1;
+                let mut ask_bytes = Vec::new();
+                Action::PresetReq {
                     name: Name::new(key).expect("a system key inside the inline cap"),
+                    req,
                 }
-                .encode(&mut buf);
-                let mut ask = Ask::now(
-                    format!(
-                        "ctl/preset `{key}` (ask {} of {}), awaiting its `preset` event",
-                        step + 1,
-                        SystemKind::VARIANT_COUNT
-                    ),
-                    target,
-                    &drain,
-                    &lines,
-                );
-                socket.send_to(&buf, target).expect("send ctl/preset");
-                // Evidence only, never asserted: see `Ask::ping`.
-                let nonce = PING_NONCE + step as i32;
-                Action::Ping(nonce).encode(&mut buf);
-                socket.send_to(&buf, target).expect("send ctl/ping");
-                ask.ping = Some(nonce);
-                let want = |line: &str| {
+                .encode(&mut ask_bytes);
+                let acked = |line: &str| {
+                    (is_event(line, "preset_ack")
+                        && bare(line, "req").as_deref() == Some(req.to_string().as_str()))
+                    .then(|| field(line, "outcome").unwrap_or_default())
+                };
+                let shown = |line: &str| {
                     (is_event(line, "preset") && field(line, "name").as_deref() == Some(key))
                         .then(|| line.to_owned())
                 };
-                match lines.wait_for(ask.since, want) {
+                // A `preset` line for this key read while waiting for the ack —
+                // the startup one, when the first key is already on screen —
+                // is kept here, because the next wait starts a fresh record.
+                let mut shown_early: Option<String> = None;
+                let mut answered: Option<(String, Ask)> = None;
+                for attempt in 1..=ATTEMPTS {
+                    let mut ask = Ask::now(
+                        format!(
+                            "ctl/preset/req `{key}` req {req} (ask {} of {}, attempt \
+                             {attempt} of {ATTEMPTS}), awaiting its `preset_ack`",
+                            step + 1,
+                            SystemKind::VARIANT_COUNT
+                        ),
+                        target,
+                        &drain,
+                        &lines,
+                    );
+                    socket
+                        .send_to(&ask_bytes, target)
+                        .expect("send ctl/preset/req");
+                    // Evidence only, never asserted: see `Ask::ping`.
+                    let nonce = PING_NONCE + (step as i32) * 10 + attempt as i32;
+                    Action::Ping(nonce).encode(&mut buf);
+                    socket.send_to(&buf, target).expect("send ctl/ping");
+                    ask.ping = Some(nonce);
+                    let result = lines.wait_for(ask.since, acked);
+                    if shown_early.is_none() {
+                        shown_early = lines.read.iter().find_map(|line| shown(line));
+                    }
+                    match result {
+                        Ok(outcome) => {
+                            answered = Some((outcome, ask));
+                            break;
+                        }
+                        Err(Missed::Deadline) if attempt < ATTEMPTS => {
+                            eprintln!("{}", resent_line(&ask, attempt + 1, &lines));
+                        }
+                        Err(missed) => {
+                            let ask = Ask {
+                                what: format!(
+                                    "{}: no `preset_ack` for any of the {ATTEMPTS} \
+                                     attempts, so the ask was LOST",
+                                    ask.what
+                                ),
+                                ..ask
+                            };
+                            unanswered = Some(missed_report(
+                                &ask, missed, &mut lines, acked, &mut child, &drain,
+                            ));
+                            break;
+                        }
+                    }
+                }
+                let Some((outcome, ask)) = answered else {
+                    break;
+                };
+                let line = match shown_early {
+                    Some(line) => Ok(line),
+                    None => lines.wait_for(ask.since, shown),
+                };
+                match line {
                     Ok(line) => seen.push((
                         key.to_owned(),
                         field(&line, "system")
                             .unwrap_or_else(|| panic!("no system field on: {line}")),
                     )),
                     Err(missed) => {
+                        let what = if outcome == "selected" {
+                            format!(
+                                "ctl/preset/req `{key}` req {req}: the preset_ack read \
+                                 `selected` and no `preset` event followed, so this is a \
+                                 DISSOLVE THAT NEVER COMPLETED, not a lost ask"
+                            )
+                        } else {
+                            format!(
+                                "ctl/preset/req `{key}` req {req}: the preset_ack read \
+                                 `{outcome}` and no `preset` event followed"
+                            )
+                        };
+                        let ask = Ask { what, ..ask };
                         unanswered = Some(missed_report(
-                            &ask, missed, &mut lines, want, &mut child, &drain,
+                            &ask, missed, &mut lines, shown, &mut child, &drain,
                         ));
                         break;
                     }

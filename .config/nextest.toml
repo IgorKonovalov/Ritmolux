@@ -38,6 +38,16 @@ success-output = "immediate"
 filter = 'test(=scenes_match_golden_baselines) + test(=the_waterfall_holds_a_ramped_ring) + test(=composite::composite_stages_match_golden_baselines) + test(=layer::layered_fixtures_match_golden_baselines) + test(=line_joints::the_joined_polyline_holds_its_shape_and_its_pixels) + test(=attractor_trails::the_attractor_over_the_trails_stage_matches_its_baseline) + test(=warp_mesh_wide::the_converted_chain_matches_its_wide_baseline)'
 success-output = "immediate"
 
+# The two control-path binaries, on the same grounds: a `ctl/preset/req` ask that
+# was lost is resent, and every resend prints one `RESENT` line naming the ask,
+# the attempt and the UDP counter deltas (ADR-0265). The test then passes, so a
+# hidden passing output would be a suite that needed a second attempt saying
+# nothing. `final` rather than `immediate`, so the lines land in the summary at
+# the end of the run where a reader of a long suite looks.
+[[profile.default.overrides]]
+filter = 'binary(control_loopback) + binary(stream_show)'
+success-output = "final"
+
 # --- job 2: the narrowed set ---
 #
 # The nine GPU-heavy suites, which iterate the shipped preset library or every
