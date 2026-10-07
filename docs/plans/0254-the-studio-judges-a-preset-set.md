@@ -113,6 +113,9 @@ flowchart LR
     and refuses, by name, any source that moved. Last, it restarts the player on its normal vector.
   - The studio crashing mid-session leaves the session directory in place, and nothing is written to
     the ledger for it.
+  - The session service lists the session directories with their dates and deletes a chosen set of
+    them on request. It refuses the directory of a running session. Only directories under the
+    studio's own judging root are eligible; a path that resolves outside it is refused.
   - The new IPC channels are validated in main like every other action (ADR-0178).
 - **Files touched:** `studio/electron/settings.ts`, `studio/README.md` (settings table),
   `studio/electron/player/supervisor.ts`, `studio/electron/main.ts`, new
@@ -127,7 +130,9 @@ flowchart LR
       reads `tune`, and a hidden one reads `cut`;
     - ending a session appends one line per readable preset and rewrites no earlier line;
     - the write-back refuses a file whose source was changed after the copy and writes one that was
-      not.
+      not;
+    - a clean-up removes the chosen ended session directories, refuses the running session's, and
+      refuses a path outside the judging root.
   - `npm --prefix studio test -- supervisor` shows the spawn receiving `RLX_PRESET_DIR` in its
     environment and `--marks` on a windowed vector.
   - `npm --prefix studio test -- settings` passes with the new key documented.
@@ -146,6 +151,8 @@ flowchart LR
     refusal by file.
   - A ledger panel shows each stem's latest verdict for the current source directory. Its Copy as
     Markdown button puts a `| preset | verdict | run |` table on the clipboard.
+  - Outside a session, a Sessions list shows the old session directories by date with checkboxes
+    and a Delete button, the owner's clean-up for directories a crash left behind.
   - The Settings panel gains a row for `judging.sourceDir`.
 - **Files touched:** new `studio/renderer/views/Judge.tsx`, `Judge.module.css`, `Judge.test.tsx`,
   `studio/renderer/App.tsx`, `studio/renderer/views/Settings.tsx` and its test, a hook under
@@ -154,7 +161,8 @@ flowchart LR
   - Start is disabled until a source directory and a non-empty set are chosen;
   - a `marks` event moves a row from tune to keep, and to cut;
   - End lists exactly the edited files the session reported;
-  - Copy as Markdown produces one row per stem with its latest verdict.
+  - Copy as Markdown produces one row per stem with its latest verdict;
+  - Delete is hidden during a session and sends exactly the ticked directories.
 
   `npm --prefix studio test -- Settings` passes with the new row. `npm --prefix studio run
   typecheck` and `npm --prefix studio run lint` exit 0.
@@ -190,6 +198,10 @@ type LedgerLine = {
 
 ## Risks & open questions
 
+**Settled with the owner 2026-10-07:** a session is exclusive (editing pauses until it ends, the
+studio keeps one player); the ledger leaves the studio as a clipboard table, never as a write into
+`docs/`; and old session directories get a Delete in the Judge view.
+
 - **A display name shared by two files in one set.** Marks are keyed by name, so the two cannot be
   told apart. The session reports the clash at Start and refuses that set. It does not guess.
 - **Hidden presets leave rotation.** A cut preset vanishes from the walk as soon as F2 is pressed.
@@ -198,8 +210,9 @@ type LedgerLine = {
 - **The windowed vector on a `windowless` machine.** A single-screen machine gets a show window
   for the session's length, as ADR-0267 decided. The owner fullscreens it with `F` or with their
   config's `[output] fullscreen`.
-- **Leftover session directories.** The studio does not delete a session directory, so it can be
-  inspected after a crash. They accumulate under `userData` until removed by hand.
+- **Leftover session directories.** The studio never deletes a session directory on its own, so one
+  can be inspected after a crash. They accumulate under `userData` until the owner deletes them from
+  the Judge view's Sessions list (Phase 3), which the owner asked for on 2026-10-07.
 
 ## What this plan does NOT do
 
