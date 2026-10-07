@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0254 - The studio judges a preset set](#0254---the-studio-judges-a-preset-set)
   - [0253 - The labyrinth shows its longest path](#0253---the-labyrinth-shows-its-longest-path)
   - [0251 - The seam, the thumbnail GPU and the timeline are tied off](#0251---the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off)
   - [0250 - The close findings and five small asks are paid](#0250---the-close-findings-and-five-small-asks-are-paid)
@@ -295,6 +296,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0245 - A gate that runs a built binary checks it is current](done/0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) - closed 2026-10-01. Review: **two rounds; 1 major, 3 minors (all fixed).** Version: **0.160.1**. [Write-up](README-archive.md).
 - [0242 - Readiness is read when the plan is approved](done/0242-readiness-is-read-when-the-plan-is-approved.md) - closed 2026-10-01, Phase 3 done 2026-10-02. Review: **no blockers, no majors, one minor (fixed), one nit (open).** Version: **0.160.0**. [Write-up](README-archive.md).
 - [0204 - The library learns from the corpus it will not ship](done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) - closed 2026-10-01. Review: **no blockers, no majors, one minor (fixed), one nit.** Version: **0.159.0**. ADR-0227 accepted, Outcome. [Write-up](README-archive.md).
 - [0232 - The library is walked, cut and refilled](done/0232-the-library-is-walked-cut-and-refilled.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (one fixed), two nits (fixed).** Version: **0.158.0**. ADR-0253 accepted. Closed 0038. [Write-up](README-archive.md).
@@ -508,6 +510,26 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0254 - The studio judges a preset set](done/0254-the-studio-judges-a-preset-set.md)
+
+- closed 2026-10-07 by a conductor close in the lane `plan-0254-the-studio-judges-a-preset-set`,
+round 2. The phases landed in `994c9464` (Phase 1), `239e6652` (2) and `47e03e41` (3). Phase 4, the
+owner's walk over a real family and a retune written back, is `Blocks merge: no` and owed
+(ADR-0249). Round 1: **no blockers, one major, three minors, two nits.** The major (a retune forked
+the session copy, so End never saw the edit) was fixed in `28dc8172`, and the minor on the Judge view
+reading its source directory once in `86db9757`. Round 2: **no blockers, no majors, two minors, two
+nits.** The close repaired both minors in `9070c3d5`: the `judging.sourceDir` row in
+`docs/configuration.md`, and the studio README's Judge section and its windowed-vector sentence. The
+two nits are code and stay open: nothing tests the `hello` hold, and an End whose player restart
+throws strands the session in the view. Version **0.170.0** (minor: a feature). ADR-0267 accepted.
+Backlog 0277 closed. The full review is the plan's own `## Close review`.
+- **What landed.** The player's `--marks <path>`; the studio's Judge view, ten `judging:*` OS
+  channels and `judging.sourceDir`. A session copies a set into `<userData>/judging/sessions/<run>/`,
+  restarts the player there on the windowed vector, folds the last `marks` event into keep, cut and
+  tune, appends `ledger.jsonl` at End and writes edited copies back after re-hashing the sources.
+- **Open.** Phase 4's judgement: whether the walk replaces `walk.sh` and `apply.py`.
+- **Curation.** `presets/` not touched; nothing to curate.
 
 ### [0253 - The labyrinth shows its longest path](done/0253-the-labyrinth-shows-its-longest-path.md)
 

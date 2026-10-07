@@ -1,8 +1,8 @@
 # ADR-0267 — Judging a preset set is a studio session over an isolated player
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-07
 > **Date:** 2026-10-07
-> **Related plan(s):** [0254](../plans/0254-the-studio-judges-a-preset-set.md)
+> **Related plan(s):** [0254](../plans/done/0254-the-studio-judges-a-preset-set.md)
 
 ## Context
 

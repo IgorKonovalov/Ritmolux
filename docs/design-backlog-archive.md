@@ -358,7 +358,6 @@ live entry citing this one.
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
 | 0219 | A `ctl/preset` datagram on loopback never reached the listener's queue | [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md). **Promoted** |
 | 0220 | A headless walk of the system roster stalls at `emitter` | [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md). **Promoted** |
-| 0277 | The owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/` | [Plan 0254](plans/0254-the-studio-judges-a-preset-set.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -688,6 +687,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0285 | A render start that finishes its `--bars` read after a quit leaves `<output>.timeline.json` behind | [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) Phase 3. **Closed 2026-10-07** |
 | 0286 | The swarm's `sway_bound` over-allows at small headroom | [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) Phase 1. An exact bound. **Closed 2026-10-07** |
 | 0274 | The cellular scene cannot trace a route through the maze it grows | [ADR-0266](adrs/0266-the-maze-route-is-a-double-sweep-relaxed-on-the-gpu-against-a-frozen-snapshot.md) + [Plan 0253](plans/done/0253-the-labyrinth-shows-its-longest-path.md). Phase 4 owed. **Closed 2026-10-07** |
+| 0277 | The owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/` | [ADR-0267](adrs/0267-judging-a-preset-set-is-a-studio-session-over-an-isolated-player.md) + [Plan 0254](plans/done/0254-the-studio-judges-a-preset-set.md). Phase 4 owed. **Closed 2026-10-07** |
 <!-- roster:end -->
 
 ---
@@ -17239,7 +17239,15 @@ with marks read back afterwards.
   `architect` (does a judging loop belong in `scripts/`, and in what shape), then `dev`.
 - **Verified 2026-09-30** — nothing in the repository carries it:
   `absent: walk\.sh|retune\.sh|apply\.py in: scripts`
-- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0254](plans/0254-the-studio-judges-a-preset-set.md) was approved.
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0254](plans/done/0254-the-studio-judges-a-preset-set.md) was approved.
+
+**CLOSED 2026-10-07** — [Plan 0254](plans/done/0254-the-studio-judges-a-preset-set.md)
+Phases 1-3, by ADR-0267's mechanism. The player takes `--marks <path>`, and the studio's Judge view
+copies a family, `proposed/` or a list of files into a session directory, restarts its one player
+there on the windowed vector with `RLX_PRESET_DIR` and `--marks`, folds F1/F2 into keep, cut and
+tune, appends `<userData>/judging/ledger.jsonl` at End and writes edited copies back to sources it
+re-hashes first. No window placement and no Hyprland. Walking a real family with it, and saying
+whether it replaces `walk.sh` and `apply.py`, is Phase 4, owed after the merge (ADR-0249).
 
 ## 0285 — a render start that finishes its `--bars` read after a quit leaves `<output>.timeline.json` behind
 
