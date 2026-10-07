@@ -321,6 +321,13 @@ accepted cost" are different documents and only one of them is honest.
 - [0282 — a misspelled top-level table is silently ignored, so `[smothing]` passes `--check --strict` and its easing never runs](#0282--a-misspelled-top-level-table-is-silently-ignored-so-smothing-passes---check---strict-and-its-easing-never-runs)
 - [0283 — the shared `zoom` declaration says "above 1 fills more of the frame", which is backwards on `fragment_field` and `reaction_diffusion`](#0283--the-shared-zoom-declaration-says-above-1-fills-more-of-the-frame-which-is-backwards-on-fragment_field-and-reaction_diffusion)
 - [0284 — the show window reports an empty Wayland app class, so a Hyprland window rule cannot target it](#0284--the-show-window-reports-an-empty-wayland-app-class-so-a-hyprland-window-rule-cannot-target-it)
+- [0219 — a `ctl/preset` datagram on loopback never reached the listener's queue, in 3 of 79 loaded runs, and nothing counted it](#0219--a-ctlpreset-datagram-on-loopback-never-reached-the-listeners-queue-in-3-of-79-loaded-runs-and-nothing-counted-it)
+- [0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen](#0220--a-headless-walk-of-the-system-roster-stalls-at-emitter-the-ping-sent-with-the-ask-is-answered-and-the-preset-never-reaches-the-screen)
+- [0261 — the thumbnail child picks its own GPU, and on a hybrid laptop the pass moved the show's frame-time tail](#0261--the-thumbnail-child-picks-its-own-gpu-and-on-a-hybrid-laptop-the-pass-moved-the-shows-frame-time-tail)
+- [0274 — the cellular scene cannot trace a route through the maze it grows, so a labyrinth never shows its longest path](#0274--the-cellular-scene-cannot-trace-a-route-through-the-maze-it-grows-so-a-labyrinth-never-shows-its-longest-path)
+- [0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`](#0277--the-owners-hotkey-walk-and-the-live-retune-loop-exist-only-as-scratch-scripts-under-target)
+- [0285 — a render start that finishes its `--bars` read after a quit leaves `<output>.timeline.json` behind](#0285--a-render-start-that-finishes-its---bars-read-after-a-quit-leaves-outputtimelinejson-behind)
+- [0286 — the swarm's `sway_bound` over-allows at small headroom, so a swayed camera at a low zoom shows the wrap seam](#0286--the-swarms-sway_bound-over-allows-at-small-headroom-so-a-swayed-camera-at-a-low-zoom-shows-the-wrap-seam)
 <!-- toc:end -->
 
 ## The ledger
@@ -349,6 +356,13 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
+| 0219 | A `ctl/preset` datagram on loopback never reached the listener's queue | [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md). **Promoted** |
+| 0220 | A headless walk of the system roster stalls at `emitter` | [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md). **Promoted** |
+| 0261 | The thumbnail child picks its own GPU | [Plan 0251](plans/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md). **Promoted** |
+| 0274 | The cellular scene cannot trace a route through the maze it grows | [Plan 0253](plans/0253-the-labyrinth-shows-its-longest-path.md). **Promoted** |
+| 0277 | The owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/` | [Plan 0254](plans/0254-the-studio-judges-a-preset-set.md). **Promoted** |
+| 0285 | A render start that finishes its `--bars` read after a quit leaves `<output>.timeline.json` behind | [Plan 0251](plans/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md). **Promoted** |
+| 0286 | The swarm's `sway_bound` over-allows at small headroom | [Plan 0251](plans/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -16992,3 +17006,258 @@ exist.
 Phase 4. The show is `ritmolux` and the console `ritmolux-console`, set through winit's
 `with_name` on Linux, which both backends read. `docs/running.md` names both ids and gives a Hyprland
 rule. Neither has been read off a running window yet.
+
+## 0219 — a `ctl/preset` datagram on loopback never reached the listener's queue, in 3 of 79 loaded runs, and nothing counted it
+
+`a_preset_datagram_selects_by_name` in `standalone/tests/control_loopback.rs` binds a `Control` on
+`127.0.0.1:0`, builds a headless renderer, sends one `ctl/preset second` datagram and waits for
+`has_pending()`. On 2026-09-14, on the reference machine, with `golden`, `attractor` and
+`reaction_diffusion` running in a second nextest process beside it, the test failed 3 times in 79
+back-to-back runs of the `stream_show` and `control_loopback` binaries. All three failed at that
+first wait, and all three said the same thing:
+
+```text
+ctl/preset `second`: nothing reached the listener within 5s (gave up after 5.00 s); still nothing
+10.00 s after the send; listener counters: rejected 0, dropped 0
+```
+
+So the datagram was neither late, refused by the decoder, nor dropped on a full queue. It never
+reached the queue. The `send_to` had returned `Ok`. The other three tests in the binary, which
+also send on loopback, passed in all 79 runs. Of the four, this is the only one that builds the
+renderer after binding the listener and before sending. That is an observation, not a cause.
+
+**What the evidence cannot say:**
+
+- Whether the listener thread was still running. `Control` exposes no liveness, and the test was
+  not given one (ADR-0193 kept `Control`'s public surface fixed for the diagnosis).
+- Whether `recv_from` was failing. `listen` in `standalone/src/control.rs` swallows every receive
+  error with a bare `continue` and counts nothing, so a listener whose receive keeps failing looks
+  exactly like an idle one.
+
+Those two gaps are the first thing to close. The studio drives the player through this listener,
+and a lost `ctl/preset` there shows up as a click that does nothing.
+
+**Seen again 2026-09-15**, in a conductor gate with no other lane running: `gate 0175-post-close`
+on tree `05d1639` failed `a_preset_datagram_selects_by_name` (1696 passed, 1 failed, exit 100). A
+hand run on the same tree 20 minutes earlier and the same gate after `resume` both passed. That is one
+red in about five full suites that day, and it cost a park, a resume and an 11.4-minute re-run. The
+gate does not retry (ADR-0193), so while this entry is open every full suite carries that chance.
+
+- **Raised:** 2026-09-14, by `dev` during the ADR-0193 diagnosis. **Owner if taken:** `dev`; making
+  the swallowed receive error observable comes before any fix.
+- ~~**Verified 2026-09-14** — a receive error is swallowed without a count:
+  `let Ok((len, _from)) = socket.recv_from(&mut buf) else {` in `standalone/src/control.rs`~~
+  **Delivered 2026-09-19** — [Plan 0198](plans/done/0198-the-control-path-stops-failing-quietly.md)
+  Phase 1 replaced that line, which is what this probe was written to detect; it went red on
+  delivery rather than on decay. The claim it stood for is now the opposite one, re-probed below.
+- **Verified 2026-09-19** — a non-timeout receive failure is counted rather than swallowed, and the
+  listener publishes whether it is still reading:
+  `present: shared\.recv_errors\.fetch_add\(1, Ordering::Relaxed\); in: standalone/src/control.rs`
+- **Verified 2026-09-14** — the test's delivery failure reports the listener counters and a late check:
+  `present: still nothing \{:\.2\} s after the send in: standalone/tests/control_loopback.rs`
+- **Half taken 2026-09-19** — [Plan 0198](plans/done/0198-the-control-path-stops-failing-quietly.md) takes
+  the **observability half** this entry names as *"the first thing to close"*: the listener counts
+  what it receives and what it fails to receive, and publishes whether it is still listening
+  ([ADR-0221](adrs/0221-the-control-path-reports-what-it-did-not-do.md)). The cause is not taken —
+  that plan's Phase 4 re-runs the reproduction with those readings and names a candidate or records
+  that none reproduced. This entry stays live either way.
+- **The readings, 2026-09-19** — Plan 0198 Phase 4 re-ran the reproduction, 19 runs under the same
+  shape of load, and 2 failed. Run 19 was this entry's test, and the new surface reported
+  `received +0 since the send, recv_errors 0, listening true, rejected 0, dropped 0` with the
+  verdict *"the listener was reading a healthy socket and no datagram reached it, so the loss is in
+  front of the socket"*. **Three of the four candidates are now excluded by evidence** rather than
+  by argument: the listener thread was alive, the socket reported no failure, and nothing was
+  received to be discarded — the two gaps this entry named as *"the first thing to close"* are
+  closed, and they answered. **The cause is not found and this entry stays live**: what is left is
+  the datagram never reaching `recv_from`, and per-process counters cannot say where in front of the
+  socket it went. That is ADR-0221's first Negative, and naming it costs per-datagram sequencing,
+  which is a protocol change. Whoever takes this next starts there.
+
+### Priority
+
+**Medium.** It is a loopback datagram lost on the control path the studio uses. It is intermittent
+and has so far been seen only under heavy concurrent GPU load.
+- **Corrected 2026-09-29: two red conductor gates first recorded here were not this entry.**
+  `standalone::stream_show a_headless_run_emits_the_roster_the_preset_and_a_preset_error` failed
+  Plan 0211's close gate (2026-09-27) and Plan 0212's post-close gate (2026-09-29), both under load,
+  and was first noted here as this entry's flake. Plan 0212's repair session found the cause elsewhere
+  and fixed it in `1afa2e9`: `Show::reload` re-baselined the preset directory's signature *after* the
+  load that emits `roster`, so a file the test's parent wrote on reading that event could land inside
+  the new baseline and never be reported. The baseline is now taken before the load. This entry, a
+  lost `ctl/preset` datagram, is unaffected by that and stays as it was.
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md) was approved.
+
+## 0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen
+
+`every_system_is_reported_by_the_key_the_schema_labels_its_roster_with` in
+`standalone/tests/stream_show.rs` spawns the player with `--stream --events --control`, holds
+rotation, then sends one `ctl/preset` per `SystemKind::ALL` entry. After each one it waits for the
+`preset` event naming it. Each ask is followed by a `ctl/ping`. The ping is answered by the same
+`apply_control_rest` drain that applies the preset — but the two are **separate datagrams**, so a
+`pong` proves that the *ping* was drained, not that the preset was.
+
+> **Corrected 2026-09-14 at Plan 0174's close.** The entry as raised read the pong as proof the
+> ask's frame was drained, and concluded *"the ask was not lost"*. That does not follow: 0219 shows a
+> single loopback datagram vanishing with `rejected 0, dropped 0`, and the same thing happening to
+> the preset datagram while the ping behind it arrived would print exactly the report below. A lost
+> datagram is therefore a **fourth candidate**, and 0219 and 0220 may be one defect. Against it:
+> both failures stopped on the same ask, which a random loss over fifteen datagrams would do about
+> one time in fourteen. The test's `Ask::ping` doc comment carries the same overclaim.
+
+On 2026-09-14, under the load described in 0219, the walk failed twice in 79 runs. Both times it
+stopped at **ask 9 of 14, `emitter`**, with 8 systems already reported:
+
+```text
+ctl/preset `emitter` (ask 9 of 14), awaiting its `preset` event: nothing after 60.0 s (Deadline,
+bound 60s); still absent 120.0 s after the ask
+child: still running
+ctl/ping 424250 sent with the ask WAS answered
+stdout: 576000 bytes at the ask, 208857600 bytes now
+  | {"v":1,"ev":"pong","nonce":424250}
+  | {"v":1,"ev":"health","fps":29.9807,...,"ctl_rejected":0,"ctl_dropped":0,"ctl_refused":0,...}
+```
+
+The ping behind the ask was drained, the child kept drawing at 30 fps, and no `roster`, `preset` or
+`preset_error` line followed in two minutes. `report_active_preset` in `standalone/src/show.rs`
+emits only when `renderer.preset_name()` changes, so the preset on screen never became `emitter`.
+There are four candidates, none yet distinguished: the preset datagram never reached the queue (see
+0219); `select_preset_by_name` returned `false`; it returned `true` and the dissolve never completed;
+or the selection was overridden. The walk's ninth step does not follow
+on from anything earlier in the walk: the same ask succeeded in 77 other runs.
+
+The earlier red run recorded in ADR-0193 stopped at ask 2 of 12, with nothing kept that could say
+why. Whether it was the same defect is unknown.
+
+- **Raised:** 2026-09-14, by `dev` during the ADR-0193 diagnosis. **Owner if taken:** `dev`.
+- **Verified 2026-09-14, re-pointed 2026-09-16** — the `preset` event fires only on a change of what
+  is on screen. [Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) Phase 4 moved
+  the comparison into `Show::preset_report` and widened the key from the name alone to name, system
+  and family, so the probe names the new shape. **The claim this entry rests on is unchanged** — a
+  repeat of the same preset still emits nothing:
+  `present: seen == name && \*was == system && \*drew == family in: standalone/src/show.rs`
+- **Verified 2026-09-14** — the pong is emitted by the drain that applies the preset:
+  `present: events\.emit\(&Event::Pong \{ nonce: \*nonce \}\); in: standalone/src/show.rs`
+- **Verified 2026-09-14** — the walk sends a ping with every ask:
+  `present: Evidence only, never asserted: see .Ask::ping. in: standalone/tests/stream_show.rs`
+- **Verified 2026-09-14** (the close's correction) — the ping goes out as its own datagram after the
+  preset's: `present: Action::Ping\(nonce\)\.encode\(&mut buf\); in: standalone/tests/stream_show.rs`
+- **Half taken 2026-09-19** — [Plan 0198](plans/done/0198-the-control-path-stops-failing-quietly.md) takes
+  the **observability half**: one of this entry's four candidates, a `select_preset_by_name` that
+  returns `false`, stops being silent and reports a `preset_error`
+  ([ADR-0221](adrs/0221-the-control-path-reports-what-it-did-not-do.md)), and the listener's counters
+  separate the lost-datagram candidate from a dead listener. The stall itself is not taken. The
+  `Ask::ping` doc comment's overclaim, corrected in this body on 2026-09-14, is corrected in the
+  source by that plan's Phase 3.
+- **The readings, 2026-09-19** — Plan 0198 Phase 4's reproduction caught this walk too, at run 2,
+  stalled at **ask 2 of 14, `swarm`** rather than at `emitter`, which retires *"both failures
+  stopped on the same ask"* as an argument for one defect. `ctl_received` read 4 and stayed 4 across
+  the three `health` lines covering the 120 s the test waited, with `ctl_recv_errors 0` and
+  `ctl_listening true`, and the `ctl/ping` sent **behind** the `ctl/preset` was answered — so four
+  of the five datagrams sent by then reached the socket and one did not. **No `preset_error`
+  appeared, which retires `select_preset_by_name` returning `false` as a candidate for this
+  failure**: that arm now reports itself and did not. A dead listener, a failing socket, a decoder
+  refusal and a full queue are excluded by the same lines. What is left is the same reading 0219
+  ends on, one step less tightly held — the report noted `no health line preceded the ask, so
+  ctl_received (4) has no baseline`, because `Lines::wait_for` clears its record and ask 1 resolved
+  before a `health` line landed in it. **Two of the four candidates remain and this entry stays
+  live**: a lost datagram, or a `true` whose dissolve never completed.
+
+### Priority
+
+**Medium.** A `ctl/preset` the player drains and does not show is the studio's library click doing
+nothing. It is intermittent and has so far been seen only under heavy concurrent GPU load.
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md) was approved.
+
+## 0261 — the thumbnail child picks its own GPU, and on a hybrid laptop the pass moved the show's frame-time tail
+
+The thumbnail pass starts each child as `--thumb <name>` with no `--gpu`, so the child takes the
+default adapter whatever the show was pinned to, and which adapter it drew on is not read. Plan
+0206 Phase 4's reading on the reference laptop: beside a show on the RTX 3080 nothing moved; beside
+a show pinned to the AMD RADV RENOIR iGPU the median held at 24.4 fps and the tail did not, the worst
+p99 going from 50.0 ms to 76.8 ms and the lowest second from 23.8 fps to 21.4. The table is in
+[Plan 0206](plans/done/0206-the-browser-shows-the-look.md)'s implementation log.
+
+**Two candidate moves:** pass the show's adapter choice to the child, or read and log which adapter
+the child used, so the next reading can say whether the two were competing for one GPU. Neither is
+designed; the first is the cheaper question to answer.
+
+- **Raised:** 2026-09-26 by `architect`, from Plan 0206's close review (round 1, minor 5).
+  **Owner if taken:** `dev`, after `architect` picks the move.
+- **Verified 2026-09-26** — the child command carries no adapter flag:
+  `absent: --gpu in: standalone/src/thumbs.rs`
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0251](plans/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) was approved.
+
+## 0274 — the cellular scene cannot trace a route through the maze it grows, so a labyrinth never shows its longest path
+
+At the 0232 retune the owner asked for `cellular_labyrinth` to print, in red, the longest path through
+the maze the automaton is growing. The scene has no notion of a path. It holds each cell's state and,
+for a dead cell, how many generations ago it died, and it colours from those two numbers alone. So
+the red the retune could give it marks cells that changed recently, not a route. A route needs a
+search over the live grid: a breadth-first pass from one open cell, then a second from the farthest
+cell it reached, which finds the longest shortest path in a maze with no loops. It would have to run
+on the GPU, or on a readback of a grid of up to 1024 by 1024 cells, and be repeated as the maze
+changes. The drawn route could be one new overlay colour, or a distance a palette reads.
+
+- **Raised:** 2026-09-30 by the owner at the Plan 0232 Phase 4 retune, filed by `preset-author`.
+  **Owner if taken:** `architect` (does the route run on the GPU or on a readback, and how often
+  is it refreshed), then `dev`.
+- **Verified 2026-09-30** — the scene has no route search:
+  `absent: [Bb]readth|\bbfs\b|\bBFS\b|[Ll]ongest path in: core/src/render/scenes/cellular`
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0253](plans/0253-the-labyrinth-shows-its-longest-path.md) was approved.
+
+## 0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`
+
+Plan 0232's walk (Phase 2) and its retunes and sittings (Phase 4) ran on two throwaway scripts. They
+live in the gitignored `target/p0232/`. `walk.sh` loads one family into a player on its own
+`RLX_PRESET_DIR` and `XDG_DATA_HOME`, moves the window to a workspace and makes it fullscreen. The
+owner then marks keep and cut with F1 and F2, and `apply.py` folds that run's `marks.toml` into the
+ledger. `retune.sh` loads a named set of presets, which are edited in place while the player
+hot-reloads them. The owner called the hotkey walk a large speed-up, and every Phase 4 verdict came
+from it. Plan 0204 Phase 4 and 0232 Phase 6 both need the same loop, and a `cargo clean` deletes it.
+The window placement is Hyprland-specific, which is one reason it is not a script in `scripts/`
+today. The part worth keeping is portable: a preset set loaded into an isolated data directory,
+with marks read back afterwards.
+
+- **Raised:** 2026-09-30 by `preset-author`, at the end of Plan 0232 Phase 4. **Owner if taken:**
+  `architect` (does a judging loop belong in `scripts/`, and in what shape), then `dev`.
+- **Verified 2026-09-30** — nothing in the repository carries it:
+  `absent: walk\.sh|retune\.sh|apply\.py in: scripts`
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0254](plans/0254-the-studio-judges-a-preset-set.md) was approved.
+
+## 0285 — a render start that finishes its `--bars` read after a quit leaves `<output>.timeline.json` behind
+
+Plan 0250 Phase 5 made `abandon()` reach a start still in its preparation window and made a start
+that never launches remove the `<output>.bars.json` it wrote. One path still leaks. `abandon()`
+aborts the signal, but a `--bars` read that has already finished resolves anyway. The neural branch
+of `RenderService.start` then checks the grid, calls `writeTimeline`, and only after that reaches
+the `abort.signal.aborted` refusal. The `finally` removes the grid and not the timeline, so
+`<output>.timeline.json` stays beside an MP4 that was never rendered. The window is one event-loop
+turn wide, so it is rare, and the file is small. The fix is to move the aborted check ahead of
+`writeTimeline`, or to remove the timeline in the same `finally` as the grid. The service test
+already holds a transcode open, and the same pattern can hold a `--bars` read open.
+
+- **Raised:** 2026-10-07 by `architect`, at Plan 0250's close review (minor, left open: code).
+  **Owner if taken:** `studio-builder` (a reordered check and one test; no ADR).
+- **Verified 2026-10-07** — the timeline is written before the aborted check:
+  `present: writeTimeline\(files\.timeline, neural\.timeline\) in: studio/electron/render/service.ts`
+- **Verified 2026-10-07** — `present: if \(abort\.signal\.aborted\) return refuse in: studio/electron/render/service.ts`
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0251](plans/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) was approved.
+
+## 0286 — the swarm's `sway_bound` over-allows at small headroom, so a swayed camera at a low zoom shows the wrap seam
+
+Plan 0250 Phase 3 extended `the_wrap_seam_stays_outside_the_frame_at_every_depth` to the lowest
+`zoom` a shipped swarm preset binds (`0.85`, Murmuration). At that zoom, with the camera swayed to
+`sway_bound`, 233 particle-frames at 1280x800 reached 0.9961 NDC, just inside the frame. The bound's
+first-order model of how far a yaw or pitch moves the seam is loose when the headroom between the
+seam and the frame edge is small. The test therefore measures the shipped zoom at rest only. That is
+true of what ships today, because no shipped swarm preset binds `yaw` or `pitch`. The first one
+that sways at a zoom below about `0.9` can show the seam, and no test will see it. The fix is
+either an exact bound (project the seam's corner through the swayed view rather than linearising)
+or a safety factor derived from the headroom, and then the swayed case at the shipped minimum zoom.
+
+- **Raised:** 2026-10-07 by `architect`, filing the followup Plan 0250 Phase 3's implementation log
+  named. **Owner if taken:** `dev` (the bound's arithmetic and the swayed case; no ADR).
+- **Verified 2026-10-07** — the shipped zoom is measured unswayed:
+  `present: The shipped zoom is measured at rest only in: core/src/render/scenes/swarm/tests.rs`
+- **Verified 2026-10-07** — `present: fn sway_bound\(fov: f32, zoom: f32 in: core/src/render/scenes/swarm.rs`
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0251](plans/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) was approved.

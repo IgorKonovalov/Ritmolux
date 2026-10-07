@@ -1,6 +1,6 @@
 # 0253 — The labyrinth shows its longest path
 
-> **Status:** draft
+> **Status:** approved (2026-10-07)
 > **Created:** 2026-10-07
 > **Owner skill(s):** dev, human
 > **Closes:** design-backlog 0274

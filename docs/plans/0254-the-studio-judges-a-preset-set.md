@@ -1,6 +1,6 @@
 # 0254 — The studio judges a preset set
 
-> **Status:** draft
+> **Status:** approved (2026-10-07)
 > **Created:** 2026-10-07
 > **Owner skill(s):** dev, studio-builder, human
 > **Closes:** design-backlog 0277

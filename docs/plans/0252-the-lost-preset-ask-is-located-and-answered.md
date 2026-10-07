@@ -1,6 +1,6 @@
 # 0252 — The lost preset ask is located and answered
 
-> **Status:** draft
+> **Status:** approved (2026-10-07)
 > **Created:** 2026-10-07
 > **Owner skill(s):** dev, studio-builder, human
 > **Closes:** design-backlog 0219, 0220

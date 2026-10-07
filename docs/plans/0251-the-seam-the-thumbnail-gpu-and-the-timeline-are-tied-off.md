@@ -1,6 +1,6 @@
 # 0251 — The seam, the thumbnail GPU and the timeline are tied off
 
-> **Status:** draft
+> **Status:** approved (2026-10-07)
 > **Created:** 2026-10-07
 > **Owner skill(s):** dev, studio-builder, human
 > **Closes:** design-backlog 0261, 0285, 0286
