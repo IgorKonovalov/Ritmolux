@@ -260,7 +260,7 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
 | 3 — The two control-path tests resend instead of waiting once | dev | done | decbb4f5 |
 | 4 — The full suite | dev | done | 0236e5dc |
 | 5 — The studio's library click is acknowledged | studio-builder | done | 543f4aac |
-| 6 — The loaded reproduction is read | human | not started | |
+| 6 — The loaded reproduction is read | human | done | |
 
 ### Notes
 
@@ -306,6 +306,18 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
 - Phase 5: `npm --prefix studio run typecheck`, `npm --prefix studio run lint` and
   `npm --prefix studio test` (45 files, 405 tests, `protocol.spec.test.ts` included) passed, and
   `node scripts/check-comment-hygiene.mjs` was OK.
+- Phase 6, Linux (the reference Arch box, 2026-10-07 18:32-18:49, lane at 6ab5e0f3):
+  `cargo nextest run -p standalone --test control_loopback --test stream_show --stress-count 80
+  --no-fail-fast`, beside a second process looping `cargo nextest run -p rlx-core -E 'binary(golden)
+  + binary(attractor) + binary(reaction_diffusion)' --no-fail-fast` for the whole period (18 load
+  passes, all green). Result: `80/80 stress run iterations: 80 passed` (18 tests each, 1026 s).
+  Losses: none. The 80 `RESENT` lines are all the faulted test's designed one per iteration
+  (`RESENT ctl/preset/req second req 1: attempt 2 of 3 ... socket drops +0, InErrors +0,
+  RcvbufErrors +0, rmem_default 212992, Receive Errors unavailable`). The unfaulted
+  `a_preset_datagram_selects_by_name` printed `0 RESENT line(s)` in all 80, and the `stream_show`
+  walk printed no `RESENT` line. No `selected` ack without a `preset`, no give-up. The loss did not
+  reproduce on Linux under this load; per Risks, that is a no-reproduction row.
+- Phase 6, Windows: not taken (the rig was not available in this session).
 
 ### Close triggers
 
@@ -321,7 +333,7 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
   20 live entries (3 unprobeable), and 31 advisory moved-path lines name no entry this plan closes.
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207). The Phase 4 run at decbb4f5
   is in Notes, and the studio suite at 543f4aac passed 405 of 405.
-- **Outstanding `human` phases:** Phase 6, the loaded reproduction, on Linux and on Windows when
-  that rig is available.
+- **Outstanding `human` phases:** none. Phase 6's Linux row is a no-reproduction (80/80) and its
+  Windows row is not taken.
 
 ## Followups (after this lands)
