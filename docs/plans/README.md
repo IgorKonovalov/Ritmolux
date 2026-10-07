@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0251** (ADRs are a separate sequence — next free there is **0265**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0255** (ADRs are a separate sequence — next free there is **0268**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -45,6 +45,10 @@ place. The plan file carries the real link.
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) | The rig session measures the wave modes and judges the fourth gate | approved | human, dev | 0202's Phases 4-7. Not queued until the owner has the Windows rig; commit Phase 1's eight rows on main, then queue. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
+| [0251](0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) | The seam, the thumbnail GPU and the timeline are tied off | draft | dev, studio-builder, human | No ADR. Backlog 0286, 0261, 0285: exact sway bound, thumb child on the show's adapter, no timeline left by a cancel. Phase 4 is non-blocking. |
+| [0252](0252-the-lost-preset-ask-is-located-and-answered.md) | The lost preset ask is located and answered | draft | dev, studio-builder, human | ADR-0265: `ctl/preset/req` acked by `preset_ack`; studio and tests resend. Studio spec-diff test red from Phase 2 to 5. Phase 6 is a blocking loaded run. |
+| [0253](0253-the-labyrinth-shows-its-longest-path.md) | The labyrinth shows its longest path | draft | dev, human | ADR-0266: GPU double sweep over a frozen maze snapshot, solid or graded. Phase 3's budget comes from Phase 1's cost. Route lags by one epoch. |
+| [0254](0254-the-studio-judges-a-preset-set.md) | The studio judges a preset set | draft | dev, studio-builder, human | ADR-0267: a Judge view over the studio's one player, after Phase 1's `--marks` flag. Replaces 0232's scratch scripts. Phase 4 is non-blocking. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two

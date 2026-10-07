@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0265.** *(0120 was reserved for
+**Next free number: 0268.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -286,4 +286,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0262](0262-the-studio-renders-a-clip-by-piping-three-children-and-transcodes-what-the-player-cannot-read.md) | The studio renders a clip by piping three children, and transcodes what the player cannot read | accepted 2026-10-02, Plan 0247; amends 0175 |
 | [0263](0263-a-3d-stroke-may-be-solid-by-a-back-to-front-sort-and-depth-cues-ride-the-shared-camera.md) | A 3D stroke may be solid by a back-to-front sort, and the depth cues ride the shared camera | accepted 2026-10-05, Plan 0248 |
 | [0264](0264-a-warp-baseline-is-blessed-by-a-dispatched-ci-job-until-the-reference-moves-to-lavapipe.md) | A WARP baseline is blessed by a dispatched CI job, by name, until the reference moves to lavapipe | accepted 2026-10-06, Plan 0249 |
+| [0265](0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md) | A preset ask carries a request id and the player answers it at the drain | proposed 2026-10-07, Plan 0252 |
+| [0266](0266-the-maze-route-is-a-double-sweep-relaxed-on-the-gpu-against-a-frozen-snapshot.md) | The maze route is a double sweep relaxed on the GPU against a frozen snapshot | proposed 2026-10-07, Plan 0253 |
+| [0267](0267-judging-a-preset-set-is-a-studio-session-over-an-isolated-player.md) | Judging a preset set is a studio session over an isolated player | proposed 2026-10-07, Plan 0254 |
 <!-- roster:end -->
