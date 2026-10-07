@@ -90,6 +90,12 @@ export interface SessionInfo {
   /** The session's start, also its directory name. */
   run: string
   set: string
+  /**
+   * `<session>/presets/`, the directory the player runs on: every file in it
+   * the studio wrote at Start, so the editor writes there in place rather than
+   * forking (ADR-0189).
+   */
+  presetDir: string
   presets: SessionPreset[]
   /** The sets of the last `marks` event the session folded; empty before the first. */
   marks: MarkSets

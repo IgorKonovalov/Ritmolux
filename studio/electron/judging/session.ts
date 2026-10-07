@@ -135,6 +135,7 @@ export class JudgingService {
     return {
       run: s.run,
       set: s.set,
+      presetDir: join(s.dir, 'presets'),
       presets: s.files.map((file) => ({ stem: file.stem, name: file.name })),
       marks: s.marks,
     }

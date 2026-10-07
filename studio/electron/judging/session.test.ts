@@ -102,6 +102,9 @@ describe('JudgingService', () => {
     expect(h.launches).toEqual([
       { presetDir: join(dir, 'presets'), marks: join(dir, 'marks.toml') },
     ])
+    // The renderer is told the directory the player runs on, which is what lets
+    // the editor write a copy in place.
+    expect(started.value.presetDir).toBe(join(dir, 'presets'))
     // The player is the marks file's only writer; the session makes none.
     expect(existsSync(join(dir, 'marks.toml'))).toBe(false)
   })

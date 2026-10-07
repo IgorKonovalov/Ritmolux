@@ -48,6 +48,8 @@ export function App(): JSX.Element {
   const [judgeOpen, setJudgeOpen] = useState(false)
   /** Whether the Judge view has been opened; it stays mounted from then on. */
   const [judgeSeen, setJudgeSeen] = useState(false)
+  /** The running judging session's preset directory, which the editor writes in place. */
+  const [judgingDir, setJudgingDir] = useState<string | null>(null)
   const [problemsOpen, setProblemsOpen] = useState(false)
 
   /** `ui.reducedMotion` as the settings panel last set it, or as the file held it. */
@@ -177,6 +179,7 @@ export function App(): JSX.Element {
             marks={player.marks}
             hidden={!judgeOpen}
             onClose={() => setJudgeOpen(false)}
+            onSession={setJudgingDir}
           />
         )}
         <Render
@@ -196,6 +199,7 @@ export function App(): JSX.Element {
             roster={player.roster}
             active={player.preset?.name}
             dir={player.dir}
+            own={judgingDir}
             marks={player.marks}
             onProblem={setSaveProblem}
           />

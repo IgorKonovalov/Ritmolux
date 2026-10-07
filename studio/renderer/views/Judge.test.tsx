@@ -22,6 +22,7 @@ const LISTING: SourceListing = {
 const SESSION: SessionInfo = {
   run: '20261007T120000Z',
   set: 'family:attractor',
+  presetDir: '/u/judging/sessions/20261007T120000Z/presets',
   presets: [
     { stem: 'attractor_clifford', name: 'Clifford' },
     { stem: 'attractor_lorenz', name: 'Lorenz' },
@@ -198,6 +199,18 @@ describe('End', () => {
     const results = screen.getByRole('list', { name: 'write-back results' })
     expect(results.textContent).toContain('attractor_lorenz')
     expect(results.textContent).toContain('changed since it was copied')
+  })
+
+  it('tells the window the session preset directory while it runs, and none after', async () => {
+    const onSession = vi.fn()
+    await act(async () => {
+      render(<Judge marks={undefined} onClose={vi.fn()} onSession={onSession} />)
+    })
+    expect(onSession).toHaveBeenLastCalledWith(null)
+    await click(startButton())
+    expect(onSession).toHaveBeenLastCalledWith(SESSION.presetDir)
+    await click(screen.getByRole('button', { name: 'End' }))
+    expect(onSession).toHaveBeenLastCalledWith(null)
   })
 })
 

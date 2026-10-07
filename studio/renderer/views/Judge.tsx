@@ -43,6 +43,8 @@ export interface JudgeProps {
    */
   hidden?: boolean
   onClose: () => void
+  /** The running session's preset directory, or `null` once none runs. */
+  onSession?: (presetDir: string | null) => void
 }
 
 type PickKind = SetPick['kind']
@@ -75,7 +77,7 @@ function toggled(set: ReadonlySet<string>, item: string, on: boolean): Set<strin
   return next
 }
 
-export function Judge({ marks, hidden = false, onClose }: JudgeProps): JSX.Element {
+export function Judge({ marks, hidden = false, onClose, onSession }: JudgeProps): JSX.Element {
   /** `judging.sourceDir`; `undefined` until main has answered. */
   const [sourceDir, setSourceDir] = useState<string | null>()
   const [listing, setListing] = useState<SourceListing>()
@@ -137,6 +139,11 @@ export function Judge({ marks, hidden = false, onClose }: JudgeProps): JSX.Eleme
       live = false
     }
   }, [sourceDir])
+
+  const presetDir = session?.presetDir ?? null
+  useEffect(() => {
+    onSession?.(presetDir)
+  }, [presetDir, onSession])
 
   useEffect(() => {
     if (session !== null && marks !== undefined && marks !== marksAtStart.current) {
