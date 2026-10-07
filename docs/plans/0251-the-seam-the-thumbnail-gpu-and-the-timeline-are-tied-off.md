@@ -187,7 +187,7 @@ settled here:
 | 1 — The swarm's sway bound is exact at the shipped minimum zoom | dev | done | b647003b |
 | 2 — The thumbnail child renders on the show's adapter and says which | dev | done | 5d5c6caa |
 | 3 — A cancelled render leaves no timeline beside the output | studio-builder | done | 8900f044 |
-| 4 — The thumbnail reading is re-taken with both adapters named | human | not started | |
+| 4 — The thumbnail reading is re-taken with both adapters named | human | owed | |
 
 ### Notes
 
