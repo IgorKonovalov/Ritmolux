@@ -8,7 +8,7 @@
  * frame with nothing painting it is dropped and counted, which is what the
  * footer's number means.
  */
-import type { BrowserWindow } from 'electron'
+import type { BrowserWindow, MessagePortMain } from 'electron'
 import { app, dialog, MessageChannelMain } from 'electron'
 import { accessSync, constants, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -17,14 +17,16 @@ import { IPC_CHANNELS } from '@shared/ipc-channels'
 import type { PlayerEvent } from '@shared/protocol'
 
 import { registerAppHandlers, type AppInfo } from './ipc/appHandlers'
+import { registerJudgingHandlers } from './ipc/judgingHandlers'
 import { registerPlayerHandlers } from './ipc/playerHandlers'
+import { JudgingService } from './judging/session'
 import { registerPresetHandlers, type PresetScope } from './ipc/presetHandlers'
 import { registerRenderHandlers, renderEmitter, stayAwake } from './ipc/renderHandlers'
 import { RenderService } from './render/service'
 import { TranscodeCache } from './render/transcode'
 import { SchemaCache } from './player/schema'
 import { ControlSender } from './player/control'
-import { playerArgs, PlayerSupervisor } from './player/supervisor'
+import { judgingArgs, playerArgs, PlayerSupervisor } from './player/supervisor'
 import { resolvePlayer, type ResolvedPlayer } from './player/resolve'
 import type { PlayerMode } from '@shared/player-mode'
 
@@ -35,6 +37,8 @@ import {
   readSettings,
   reducedMotionOf,
   settingsFile,
+  sourceDirOf,
+  withJudgingSource,
   withRender,
   writeSettings,
   type StudioSettings,
@@ -45,6 +49,9 @@ import { captureRequest, runCapture } from './capture'
 const isDev = process.env.ELECTRON_RENDERER_URL !== undefined
 
 let supervisor: PlayerSupervisor | undefined
+/** The renderer's end of the frame channel, kept so a restarted player's pump can attach to it. */
+let framePort: MessagePortMain | undefined
+let judging: JudgingService | undefined
 let render: { service: RenderService; cache: TranscodeCache } | undefined
 const control = new ControlSender()
 let resolved: ResolvedPlayer | undefined
@@ -76,6 +83,55 @@ function send(window: BrowserWindow, event: PlayerEvent): void {
     return
   }
   if (!window.isDestroyed()) window.webContents.send(IPC_CHANNELS.PLAYER_EVENT, event)
+}
+
+/**
+ * Stop the running player, if any, and spawn one on `args`.
+ *
+ * What the old player named is forgotten first: its control address, its
+ * preset and its directory belong to a process that is gone, and acting on
+ * them would aim the next action, or the next write, at the wrong place. Its
+ * pipes can still deliver a line after the kill, so an event from any
+ * supervisor but the current one is dropped.
+ */
+function spawnPlayer(
+  window: BrowserWindow,
+  playerPath: string,
+  args: readonly string[],
+  env?: Readonly<Record<string, string>>,
+): void {
+  supervisor?.stop()
+  control.aim(null)
+  scope.file = undefined
+  scope.dir = undefined
+  const self: PlayerSupervisor = new PlayerSupervisor({
+    playerPath,
+    args,
+    env,
+    onEvent: (event) => {
+      if (supervisor !== self) return
+      // The sender is aimed from the player's own answer, which is `null` when
+      // it opened no listener.
+      if (event.ev === 'hello') {
+        control.aim(event.control)
+        // A judging session steps only on the owner's keys (ADR-0267).
+        if (judging?.session != null && event.control !== null) {
+          control.send({ kind: 'transport', verb: 'hold' })
+        }
+      }
+      if (event.ev === 'preset') scope.file = event.file ?? undefined
+      if (event.ev === 'roster') scope.dir = event.dir ?? undefined
+      if (event.ev === 'marks') judging?.marks(event)
+      send(window, event)
+    },
+    onDiagnostic: (line) => console.log(`[player] ${line}`),
+    onMalformed: (line, reason) => console.warn(`[player] unreadable event (${reason}): ${line}`),
+    onRefused: (reason) => console.error(`[player] refused: ${reason}`),
+    onExit: (code, signal) => console.error(`[player] exited: code=${code} signal=${signal}`),
+  })
+  supervisor = self
+  if (framePort !== undefined) self.pump.attach(framePort)
+  self.start()
 }
 
 function start(): void {
@@ -141,6 +197,27 @@ function start(): void {
   render = { service, cache }
   registerRenderHandlers(service, () => shown, (next) => update(withRender(settings, next)))
 
+  // A session takes over the one player (ADR-0183): Start restarts it on the
+  // session's copy and End on the vector this launch chose.
+  judging = new JudgingService({
+    root: join(app.getPath('userData'), 'judging'),
+    sourceDir: () => sourceDirOf(settings),
+    restartPlayer: (launch) => {
+      const player = resolved?.path
+      if (player === undefined || shown === undefined) throw new Error('no player was found')
+      if (launch === undefined) spawnPlayer(shown, player, playerArgs(mode))
+      else {
+        spawnPlayer(shown, player, judgingArgs(launch.marks), { RLX_PRESET_DIR: launch.presetDir })
+      }
+    },
+  })
+  registerJudgingHandlers({
+    service: judging,
+    window: () => shown,
+    sourceDir: () => sourceDirOf(settings),
+    setSourceDir: (next) => update(withJudgingSource(settings, next)),
+  })
+
   installCsp(isDev)
   const { rendererFile, preloadPath } = getRendererPaths()
   const window = createWindow({
@@ -171,6 +248,7 @@ function start(): void {
     const channel = new MessageChannelMain()
     channel.port1.on('message', () => supervisor?.pump.ack())
     channel.port1.start()
+    framePort = channel.port1
     supervisor?.pump.attach(channel.port1)
     window.webContents.postMessage(IPC_CHANNELS.PLAYER_FRAME, null, [channel.port2])
 
@@ -189,23 +267,7 @@ function start(): void {
     return
   }
 
-  supervisor = new PlayerSupervisor({
-    playerPath: resolved.path,
-    args: playerArgs(mode),
-    onEvent: (event) => {
-      // The sender is aimed from the player's own answer, which is `null` when
-      // it opened no listener.
-      if (event.ev === 'hello') control.aim(event.control)
-      if (event.ev === 'preset') scope.file = event.file ?? undefined
-      if (event.ev === 'roster') scope.dir = event.dir ?? undefined
-      send(window, event)
-    },
-    onDiagnostic: (line) => console.log(`[player] ${line}`),
-    onMalformed: (line, reason) => console.warn(`[player] unreadable event (${reason}): ${line}`),
-    onRefused: (reason) => console.error(`[player] refused: ${reason}`),
-    onExit: (code, signal) => console.error(`[player] exited: code=${code} signal=${signal}`),
-  })
-  supervisor.start()
+  spawnPlayer(window, resolved.path, playerArgs(mode))
 }
 
 app

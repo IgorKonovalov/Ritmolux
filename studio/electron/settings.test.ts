@@ -18,9 +18,31 @@ import {
   readSettings,
   reducedMotionOf,
   settingsFile,
+  sourceDirOf,
+  withJudgingSource,
   withRender,
   writeSettings,
 } from './settings'
+
+describe('judging.sourceDir', () => {
+  it('reads the key and drops one of the wrong shape', () => {
+    expect(readSettings(withContent('{"judging":{"sourceDir":"/w/presets"}}'))).toEqual({
+      judging: { sourceDir: '/w/presets' },
+    })
+    expect(readSettings(withContent('{"judging":{"sourceDir":3},"playerPath":"/p"}'))).toEqual({
+      playerPath: '/p',
+    })
+  })
+
+  it('is set and cleared without touching the other keys', () => {
+    const set = withJudgingSource({ playerPath: '/p' }, '/w/presets')
+    expect(set).toEqual({ playerPath: '/p', judging: { sourceDir: '/w/presets' } })
+    expect(sourceDirOf(set)).toBe('/w/presets')
+    expect(withJudgingSource(set, null)).toEqual({ playerPath: '/p' })
+    expect(withJudgingSource(set, '  ')).toEqual({ playerPath: '/p' })
+    expect(sourceDirOf({})).toBeUndefined()
+  })
+})
 
 function withContent(content: string): string {
   const file = join(mkdtempSync(join(tmpdir(), 'rlx-studio-')), 'settings.json')

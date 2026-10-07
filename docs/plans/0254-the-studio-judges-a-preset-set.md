@@ -231,7 +231,7 @@ studio keeps one player); the ledger leaves the studio as a clipboard table, nev
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The player takes its marks file from a flag | dev | done | committed with this row |
-| 2 — The session: copy, isolate, fold, ledger, write-back | studio-builder | not started | |
+| 2 — The session: copy, isolate, fold, ledger, write-back | studio-builder | done | committed with this row |
 | 3 — The Judge view | studio-builder | not started | |
 | 4 — The owner walks a real family | human | not started | |
 
@@ -241,6 +241,15 @@ studio keeps one player); the ledger leaves the studio as a clipboard table, nev
   `--marks` there, before the window, and carries it on `App` to `app_state.rs`.
   `standalone/tests/help_cli.rs` enumerates no flags and was not touched. The end-to-end test is
   `a_headless_run_keeps_its_marks_in_the_file_the_flag_names` in `standalone/tests/stream_show.rs`.
+- Phase 2: the ledger line carries one field beyond the Data shapes sketch, `source` (the source
+  directory the set was drawn from), so Phase 3's panel can show "the latest verdict for the
+  current source directory" from the ledger alone. A run name is ISO 8601's basic form
+  (`20261007T123005Z`), because the extended form's colons are not a Windows file name; a second
+  session started in the same second gets a `-2` suffix. The windowed session vector is
+  `judgingArgs(marks)` in `supervisor.ts`. `main.ts` gained `spawnPlayer`, which stops the old
+  player, forgets its control address and preset scope, drops a late event from it, and reattaches
+  the frame port, so a restart keeps the preview. The bridge is `preload/api/judging.ts` plus its
+  line in `preload/index.ts`. Ten OS channels, `judging:*`; no domain channel and no protocol row.
 
 ### Close triggers
 

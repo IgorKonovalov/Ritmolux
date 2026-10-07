@@ -23,6 +23,13 @@ export interface StudioSettings {
   ui?: UiSettings
   /** Where a clip render finds its encoder and puts its file (ADR-0262). */
   render?: RenderSettings
+  /** Where a judging session draws its sets from (ADR-0267). */
+  judging?: JudgingSettings
+}
+
+export interface JudgingSettings {
+  /** A preset directory, typically a checkout's `presets/`. Absent means none chosen. */
+  sourceDir?: string
 }
 
 export interface UiSettings {
@@ -76,6 +83,26 @@ function readDiffusion(value: unknown): DiffusionSettings | undefined {
   const script = pathValue(record.script)
   if (script !== undefined) diffusion.script = script
   return Object.keys(diffusion).length === 0 ? undefined : diffusion
+}
+
+/** The `judging` object, kept key by key like `render`. */
+function readJudging(value: unknown): JudgingSettings | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const sourceDir = pathValue((value as Record<string, unknown>).sourceDir)
+  return sourceDir === undefined ? undefined : { sourceDir }
+}
+
+/** The directory judging sets are drawn from, or `undefined` when none is set. */
+export function sourceDirOf(settings: StudioSettings): string | undefined {
+  return settings.judging?.sourceDir
+}
+
+/** `settings` with `judging.sourceDir` set, or removed by `null` or an empty path. */
+export function withJudgingSource(settings: StudioSettings, sourceDir: string | null): StudioSettings {
+  const judging = readJudging({ ...settings.judging, sourceDir })
+  const rest: StudioSettings = { ...settings }
+  delete rest.judging
+  return judging === undefined ? rest : { ...rest, judging }
 }
 
 /** The `ffmpeg` a render runs — the one place its default is applied. */
@@ -136,6 +163,8 @@ export function readSettings(file: string): StudioSettings {
     }
     const render = readRender(record.render)
     if (render !== undefined) settings.render = render
+    const judging = readJudging(record.judging)
+    if (judging !== undefined) settings.judging = judging
     return settings
   } catch {
     return {}

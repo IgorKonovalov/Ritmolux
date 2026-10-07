@@ -9,12 +9,14 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { FRAME_PORT_SENTINEL, IPC_CHANNELS } from '@shared/ipc-channels'
 
 import { appApi } from './api/app'
+import { judgingApi } from './api/judging'
 import { presetApi } from './api/preset'
 import { playerApi } from './api/player'
 import { renderApi } from './api/render'
 
 const api = {
   app: appApi,
+  judging: judgingApi,
   player: playerApi,
   preset: presetApi,
   render: renderApi,

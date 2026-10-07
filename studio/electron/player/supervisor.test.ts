@@ -11,7 +11,7 @@ import type { FrameMessage } from '@shared/frames'
 import { PLAYER_MODES } from '@shared/player-mode'
 import { EXPECTED_PLAYER_VERSION, PIXEL_FORMATS, type PlayerEvent } from '@shared/protocol'
 
-import { PlayerSupervisor, playerArgs, type SpawnFn } from './supervisor'
+import { judgingArgs, PlayerSupervisor, playerArgs, type SpawnFn } from './supervisor'
 import type { FramePort } from './frames'
 
 /** A child whose two pipes the test writes to by hand. */
@@ -106,6 +106,35 @@ describe('PlayerSupervisor', () => {
         expect(playerArgs(mode)).not.toContain(format)
       }
     }
+  })
+
+  it('spawns a judging session windowed, with its marks file and its preset directory', () => {
+    // The session's copy reaches the player through the environment and its
+    // marks file through the flag (ADR-0267); the spawn sees both, and the
+    // vector is the windowed one whatever the machine's mode.
+    const child = new FakeChild()
+    const calls: { args: readonly string[]; env: Readonly<Record<string, string>> | undefined }[] = []
+    const spawn: SpawnFn = (_command, args, env) => {
+      calls.push({ args, env })
+      return child as unknown as ReturnType<SpawnFn>
+    }
+    const supervisor = new PlayerSupervisor({
+      playerPath: '/bin/ritmolux',
+      args: judgingArgs('/s/run/marks.toml'),
+      env: { RLX_PRESET_DIR: '/s/run/presets' },
+      spawn,
+      onEvent: () => undefined,
+      onDiagnostic: () => undefined,
+      onMalformed: () => undefined,
+      onRefused: () => undefined,
+      onExit: () => undefined,
+    })
+    supervisor.start()
+    expect(calls).toHaveLength(1)
+    expect(calls[0].env).toEqual({ RLX_PRESET_DIR: '/s/run/presets' })
+    expect(calls[0].args).toEqual([...playerArgs('windowed'), '--marks', '/s/run/marks.toml'])
+    expect(calls[0].args).toContain('--preview')
+    expect(calls[0].args).not.toContain('--stream')
   })
 
   it('reports the control address the player actually bound', () => {

@@ -103,6 +103,34 @@ export const IPC_CHANNELS = {
    */
   RENDER_OPEN_JOB: 'render:open-job',
 
+  /**
+   * The judging session's OS surface (ADR-0267). None of these carries a
+   * message of the control protocol: a session is files under `userData`, a
+   * copy of a set, and a restart of the one player, which the sandboxed
+   * renderer can reach no other way. The marks it folds arrive on
+   * `player:event` like every other event.
+   */
+  /** `judging.sourceDir` and the running session, if any. */
+  JUDGING_GET_STATE: 'judging:get-state',
+  /** Write `judging.sourceDir` into the settings file (ADR-0240); `null` clears it. */
+  JUDGING_SET_SOURCE_DIR: 'judging:set-source-dir',
+  /** The directory dialog for `judging.sourceDir`, written when chosen. */
+  JUDGING_PICK_SOURCE_DIR: 'judging:pick-source-dir',
+  /** The families, `proposed/` and files of the source directory. */
+  JUDGING_LIST_SETS: 'judging:list-sets',
+  /** Copy a set and restart the player on it; refused while one runs. */
+  JUDGING_START: 'judging:start',
+  /** Append the verdicts, report the edited copies, restart the player as it was. */
+  JUDGING_END: 'judging:end',
+  /** Write chosen copies of the ended session over their unmoved sources. */
+  JUDGING_WRITE_BACK: 'judging:write-back',
+  /** Every ledger line that parses. */
+  JUDGING_LEDGER: 'judging:ledger',
+  /** The session directories under the judging root, newest first. */
+  JUDGING_LIST_SESSIONS: 'judging:list-sessions',
+  /** Remove chosen session directories; the running one is refused. */
+  JUDGING_DELETE_SESSIONS: 'judging:delete-sessions',
+
   /** `shell.openExternal`, the only way a link leaves the window. */
   SHELL_OPEN_EXTERNAL: 'shell:open-external',
 } as const

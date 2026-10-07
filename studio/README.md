@@ -193,6 +193,7 @@ window, which is what they are for.
 | `playerMode` | `windowed` or `windowless`    | Which sink the player is spawned with, read at spawn (ADR-0186)  |
 | `ui`         | `{ "reducedMotion": bool }`   | `reducedMotion` (default `false`) stops the window's transitions; applied at once |
 | `render`     | `{ "ffmpegPath": path, "outputDir": path, "diffusion": { "python": path, "script": path } }` | The clip render's encoder (default `ffmpeg` on `PATH`), where its file goes (default the Videos directory), and the diffusion sidecar's interpreter and script (both absent by default, which keeps the neural switch off); read per render |
+| `judging`    | `{ "sourceDir": path }`       | The preset directory a judging session draws its sets from (ADR-0267), typically a checkout's `presets/`; absent until chosen, read per session |
 
 All are optional, and a file that is missing, is not JSON, or carries a key of
 the wrong shape degrades to "no setting" rather than failing the launch — the
