@@ -232,7 +232,7 @@ studio keeps one player); the ledger leaves the studio as a clipboard table, nev
 |---|---|---|---|
 | 1 — The player takes its marks file from a flag | dev | done | 994c9464 |
 | 2 — The session: copy, isolate, fold, ledger, write-back | studio-builder | done | 239e6652 |
-| 3 — The Judge view | studio-builder | done | committed with this row |
+| 3 — The Judge view | studio-builder | done | 47e03e41 |
 | 4 — The owner walks a real family | human | not started | |
 
 ### Notes
@@ -257,5 +257,16 @@ studio keeps one player); the ledger leaves the studio as a clipboard table, nev
   No hook was added; the view holds its own state.
 
 ### Close triggers
+
+- `presets/`: not touched.
+- Closes: design-backlog 0277 (plan header).
+- Shipped: a feature. The player gains `--marks <path>`; the studio gains the Judge view, ten
+  `judging:*` OS channels and the `judging.sourceDir` settings key.
+- Operator docs moved: `docs/configuration.md` (the `--marks` row), `studio/README.md` (the
+  `judging` settings row).
+- `node scripts/check-backlog-claims.mjs`: exit 0, no entry named (advisory list only).
+- Full suite: owed to the conductor's pre-review gate (ADR-0207). Studio gate at 47e03e41:
+  `npm --prefix studio test` 48 files / 431 tests passed, typecheck and lint exit 0.
+- `human` phases remaining: Phase 4 (`Blocks merge: no`).
 
 ## Followups (after this lands)
