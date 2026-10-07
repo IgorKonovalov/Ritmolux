@@ -126,9 +126,10 @@ default-filter = 'not (binary(golden) + binary(attractor) + binary(reaction_diff
 # refuses a clock read without one: every integration test file carrying it is
 # named here by binary, or by single test where the exemption is fn-level (`dsp`).
 # `stream_show` and `control_loopback` carry it and are deliberately absent:
-# under load each has reproduced a `ctl/preset` that is lost or not acted on
-# (backlog 0219, 0220), and running them alone would hide that rather than
-# remove load.
+# under load each once reproduced a `ctl/preset` that was lost or not acted on
+# (backlog 0219, 0220, closed by Plan 0252). Each now resends an unanswered ask
+# and prints a `RESENT` line, and running them alone would hide a loss under
+# load rather than remove the load.
 #
 # `profile.fast` inherits this block, like job 1's. Checked from the record, not
 # from a green run, on cargo-nextest 0.9.140: in a `-P fast` JUnit report no other
@@ -146,9 +147,6 @@ threads-required = "num-test-threads"
 # suite ledger records the name and its digest prints it (ADR-0261). A red test with no live entry is
 # never retried, whatever it looks like: a retry would have passed the `Show::reload` race twice.
 #
-# Backlog 0219: a `ctl/preset` datagram on loopback lost in 3 of 79 loaded runs.
-#
-# `profile.fast` inherits this block, like the ones above.
-[[profile.default.overrides]]
-filter = 'test(=a_preset_datagram_selects_by_name)'
-retries = 1
+# No test is on the list. An entry is a `[[profile.default.overrides]]` block holding the one
+# `filter = 'test(=exact_name)'` and `retries = 1`, under a comment naming its backlog entry;
+# `profile.fast` inherits it, like the blocks above.
