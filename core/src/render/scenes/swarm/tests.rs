@@ -130,14 +130,13 @@ fn lowest_shipped_zoom() -> (f32, String) {
 /// **Over 600 frames of the default flow, no particle within one sprite radius
 /// of the wrap seam projects inside the frame**, at 1280x800 and at 1920x1080
 /// (Plan 0239 Phase 1, ADR-0037's disagreeing pair) — at rest and with the
-/// camera swayed to [`sway_bound`] in each of the four diagonal directions at
-/// `zoom = 1`, and at rest at the lowest `zoom` a shipped swarm preset binds
+/// camera swayed to [`sway_bound`] in each of the four diagonal directions, at
+/// `zoom = 1` and at the lowest `zoom` a shipped swarm preset binds
 /// ([`lowest_shipped_zoom`]).
 ///
-/// **The shipped zoom is measured at rest only.** No shipped swarm preset binds
-/// `yaw` or `pitch`, and at a zoom near the seam the headroom is small enough
-/// that [`sway_bound`]'s first-order model lets a sprite's edge a few
-/// thousandths of the frame inside it.
+/// At `zoom = 1` the bound must leave a usable sway on both axes; at the
+/// shipped zoom the headroom is a few hundredths of the frame, so the bound
+/// need only be above zero there.
 ///
 /// The projection is the camera's own CPU mirror of `project()`, through the
 /// frame `render` would build, so this asserts on what the GPU draws.
@@ -146,16 +145,15 @@ fn the_wrap_seam_stays_outside_the_frame_at_every_depth() {
     use crate::dsp::AnalysisFrame;
 
     let (shipped, from) = lowest_shipped_zoom();
-    let mut zooms = vec![(1.0, "zoom = 1, swayed".to_string(), true)];
+    let mut zooms = vec![(1.0, "zoom = 1, swayed".to_string())];
     if shipped != 1.0 {
         zooms.push((
             shipped,
-            format!("the lowest shipped zoom, from {from}, at rest"),
-            false,
+            format!("the lowest shipped zoom, from {from}, swayed"),
         ));
     }
-    for (zoom, source, swayed) in &zooms {
-        let (zoom, swayed) = (*zoom, *swayed);
+    for (zoom, source) in &zooms {
+        let zoom = *zoom;
         for (width, height) in TARGETS {
             let Some((_renderer, mut scene)) = scene(FLOOR_PARTICLES) else {
                 return;
@@ -165,18 +163,13 @@ fn the_wrap_seam_stays_outside_the_frame_at_every_depth() {
             scene.target = (width, height);
             scene.zoom = zoom;
 
-            let [yaw, pitch] = if swayed {
-                sway_bound(REST_FOV, zoom, aspect, [0.0, 0.0])
-            } else {
-                [0.0, 0.0]
-            };
-            if swayed {
-                assert!(
-                    yaw > 0.02 && pitch > 0.02,
-                    "the margin must leave a usable sway at {width}x{height}: yaw {yaw:.4}, \
-                     pitch {pitch:.4}"
-                );
-            }
+            let [yaw, pitch] = sway_bound(REST_FOV, zoom, aspect, [0.0, 0.0]);
+            let floor = if zoom == 1.0 { 0.02 } else { 0.0 };
+            assert!(
+                yaw > floor && pitch > floor,
+                "the margin must leave a sway above {floor} at {width}x{height}, zoom {zoom}: \
+                 yaw {yaw:.4}, pitch {pitch:.4}"
+            );
             let views: Vec<_> = [
                 (0.0, 0.0),
                 (yaw, pitch),

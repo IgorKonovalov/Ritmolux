@@ -1,6 +1,6 @@
 # 0251 — The seam, the thumbnail GPU and the timeline are tied off
 
-> **Status:** approved (2026-10-07)
+> **Status:** in-progress
 > **Created:** 2026-10-07
 > **Owner skill(s):** dev, studio-builder, human
 > **Closes:** design-backlog 0261, 0285, 0286
@@ -179,16 +179,25 @@ settled here:
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:**
+**Lane:** branch `plan-0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off`, worktree
+`/home/igor/Work/rlx-plan-0251`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The swarm's sway bound is exact at the shipped minimum zoom | dev | not started | |
+| 1 — The swarm's sway bound is exact at the shipped minimum zoom | dev | done | committed with this row |
 | 2 — The thumbnail child renders on the show's adapter and says which | dev | not started | |
 | 3 — A cancelled render leaves no timeline beside the output | studio-builder | not started | |
 | 4 — The thumbnail reading is re-taken with both adapters named | human | not started | |
 
 ### Notes
+
+- Phase 1: the exact corner bound alone reproduced the first-order sizes (zoom 0.85 at 1280x800:
+  yaw 0.0146, pitch 0.0158) and still put 238 particle-frames at 0.9961 NDC. Per the plan's
+  sprite-radius risk, the bound now insets the seam by the largest seeded sprite at the default
+  `size` (new `SPRITE_SIZE_MAX = 0.011`, the scatter's existing upper limit) and `SWAY_SHARE`
+  stays 0.8 on top. Resulting bounds: zoom 1 yaw 0.0770 / 0.0724, pitch 0.0833 / 0.0820; zoom 0.85
+  yaw 0.0089 / 0.0083, pitch 0.0096 / 0.0094 (1280x800 / 1920x1080). The `size` and `size_spread`
+  params can draw sprites larger than the inset covers; `sway_bound`'s signature does not see them.
 
 ### Close triggers
 
