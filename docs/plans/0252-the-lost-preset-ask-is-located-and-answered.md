@@ -258,8 +258,8 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
 | 1 — The tests read the operating system's UDP counters at a failure | dev | done | e2c5c376 |
 | 2 — The player answers a preset ask that carries an id | dev | done | 27efabe2 |
 | 3 — The two control-path tests resend instead of waiting once | dev | done | decbb4f5 |
-| 4 — The full suite | dev | done | committed with this row |
-| 5 — The studio's library click is acknowledged | studio-builder | done | committed with this row |
+| 4 — The full suite | dev | done | 0236e5dc |
+| 5 — The studio's library click is acknowledged | studio-builder | done | 543f4aac |
 | 6 — The loaded reproduction is read | human | not started | |
 
 ### Notes
@@ -309,12 +309,19 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none (`git diff --stat main...HEAD`).
 - **Plan header `Closes:`** design-backlog 0219, 0220
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature. A new control row, `ctl/preset/req`, and a new event, `preset_ack`, in
+  the player. The studio's library selection now goes out on that row and is resent. The two
+  control-path test binaries resend a lost ask and read the OS UDP counters.
+- **Operator docs touched:** `docs/specs/0003-studio-control-protocol.md` (both tables, invariants,
+  scenarios, Provenance). `.config/nextest.toml` changed. No `studio/README.md`,
+  `docs/configuration.md` or `docs/developing.md` change.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 43 reductions hold across
+  20 live entries (3 unprobeable), and 31 advisory moved-path lines name no entry this plan closes.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). The Phase 4 run at decbb4f5
+  is in Notes, and the studio suite at 543f4aac passed 405 of 405.
+- **Outstanding `human` phases:** Phase 6, the loaded reproduction, on Linux and on Windows when
+  that rig is available.
 
 ## Followups (after this lands)
