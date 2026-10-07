@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0252 - The lost preset ask is located and answered](#0252---the-lost-preset-ask-is-located-and-answered)
   - [0254 - The studio judges a preset set](#0254---the-studio-judges-a-preset-set)
   - [0253 - The labyrinth shows its longest path](#0253---the-labyrinth-shows-its-longest-path)
   - [0251 - The seam, the thumbnail GPU and the timeline are tied off](#0251---the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off)
@@ -296,6 +297,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0202 - The three mechanisms get their gate](done/0202-the-three-mechanisms-get-their-gate.md) - closed 2026-10-02 at Phase 3. Review: **no blockers, no majors, five minors (four fixed).** Version: **0.160.2**. [Write-up](README-archive.md).
 - [0245 - A gate that runs a built binary checks it is current](done/0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) - closed 2026-10-01. Review: **two rounds; 1 major, 3 minors (all fixed).** Version: **0.160.1**. [Write-up](README-archive.md).
 - [0242 - Readiness is read when the plan is approved](done/0242-readiness-is-read-when-the-plan-is-approved.md) - closed 2026-10-01, Phase 3 done 2026-10-02. Review: **no blockers, no majors, one minor (fixed), one nit (open).** Version: **0.160.0**. [Write-up](README-archive.md).
 - [0204 - The library learns from the corpus it will not ship](done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) - closed 2026-10-01. Review: **no blockers, no majors, one minor (fixed), one nit.** Version: **0.159.0**. ADR-0227 accepted, Outcome. [Write-up](README-archive.md).
@@ -510,6 +512,27 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0252 - The lost preset ask is located and answered](done/0252-the-lost-preset-ask-is-located-and-answered.md)
+
+- closed 2026-10-07 by a conductor close in the lane
+`plan-0252-the-lost-preset-ask-is-located-and-answered`, round 2. The phases landed in `e2c5c376`
+(Phase 1), `27efabe2` (2), `decbb4f5` (3), `0236e5dc` (4) and `543f4aac` (5). Phase 6, the loaded
+reproduction, was a blocking `human` phase and ran before the review. Round 1: **no blockers, one
+major, one minor.** The major was the nextest `retries = 1` override for
+`a_preset_datagram_selects_by_name`, which would have outlived backlog 0219. It was fixed in
+`3431f395`. Round 2: **no blockers, no majors, two minors.** Both are code and stay open: nothing
+tests the studio's give-up reducer (`reduceLostAsk`), and the two `CLOCK_ALONE_EXEMPT` reason strings
+in `core/tests/suite/hygiene.rs` still cite 0219 and 0220 as live. Version **0.171.0** (minor: a
+feature). ADR-0265 accepted. Backlog 0219 and 0220 closed. The full review is the plan's own
+`## Close review`.
+- **What landed.** `/rlx/v1/ctl/preset/req` (`s name, i req`) answered by a `preset_ack` event at
+  the drain, with outcome `selected`, `current` or `refused`. A `req` ask for the preset on screen,
+  or for the preset dissolving in, is inert. The studio's library click resends every 1 s up to 3
+  times and then reports that the player did not answer. The two control-path tests resend, print
+  `RESENT` with the OS UDP counter deltas, and show their passing output.
+- **Open.** The loss did not reproduce on Linux (80 of 80). The Windows run was not taken.
+- **Curation.** `presets/` not touched; nothing to curate.
 
 ### [0254 - The studio judges a preset set](done/0254-the-studio-judges-a-preset-set.md)
 

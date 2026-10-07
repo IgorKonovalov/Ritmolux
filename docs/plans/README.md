@@ -45,7 +45,6 @@ place. The plan file carries the real link.
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) | The rig session measures the wave modes and judges the fourth gate | approved | human, dev | 0202's Phases 4-7. Not queued until the owner has the Windows rig; commit Phase 1's eight rows on main, then queue. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
-| [0252](0252-the-lost-preset-ask-is-located-and-answered.md) | The lost preset ask is located and answered | approved | dev, studio-builder, human | ADR-0265: `ctl/preset/req` acked by `preset_ack`; studio and tests resend. Studio spec-diff test red from Phase 2 to 5. Phase 6 is a blocking loaded run. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -1039,6 +1038,7 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 [Closed earlier (index bullets)](README-archive.md#closed-earlier-index-bullets).
 
 <!-- roster:begin cap=320 -->
+- [0252 - The lost preset ask is located and answered](done/0252-the-lost-preset-ask-is-located-and-answered.md) - closed 2026-10-07. Review: **two rounds; 1 major (fixed), 2 minors (open).** Version: **0.171.0**. ADR-0265 accepted. Closed 0219, 0220. [Write-up](README-archive.md).
 - [0254 - The studio judges a preset set](done/0254-the-studio-judges-a-preset-set.md) - closed 2026-10-07, Phase 4 owed. Review: **two rounds; 1 major (fixed), 3 minors (all fixed), 2 nits.** Version: **0.170.0**. ADR-0267 accepted. Closed 0277. [Write-up](README-archive.md).
 - [0253 - The labyrinth shows its longest path](done/0253-the-labyrinth-shows-its-longest-path.md) - closed 2026-10-07, Phase 4 owed. Review: **no blockers, no majors, two minors (fixed), two nits (one fixed).** Version: **0.169.0**. ADR-0266 accepted, Outcome. Closed 0274. [Write-up](README-archive.md).
 - [0251 - The seam, the thumbnail GPU and the timeline are tied off](done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) - closed 2026-10-07, Phase 4 owed. Review: **no blockers, no majors, two minors (fixed), one nit.** Version: **0.168.1**. Closed 0261, 0285, 0286. [Write-up](README-archive.md).
@@ -1053,7 +1053,6 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 - [0247 - The studio renders a neural clip](done/0247-the-studio-renders-a-neural-clip.md) - closed 2026-10-02, Phase 6 owed. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.162.0**. ADR-0262 accepted. [Write-up](README-archive.md).
 - [0236 - Space curves, and the camera becomes a shared block](done/0236-space-curves-and-the-camera-becomes-a-shared-block.md) - closed 2026-10-02, Phase 6 judged: three engine findings. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.161.0**. ADR-0258 accepted. [Write-up](README-archive.md).
 - [0244 - Sessions start lighter](done/0244-sessions-start-lighter.md) - closed 2026-10-02, Phase 3 done the same day. Review: **no blockers, no majors, one minor, one nit (both fixed).** Version: none. [Write-up](README-archive.md).
-- [0202 - The three mechanisms get their gate](done/0202-the-three-mechanisms-get-their-gate.md) - closed 2026-10-02 at Phase 3. Review: **no blockers, no majors, five minors (four fixed).** Version: **0.160.2**. [Write-up](README-archive.md).
 
 <!-- roster:end -->
 

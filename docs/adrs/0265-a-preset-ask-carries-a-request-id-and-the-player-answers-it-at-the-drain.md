@@ -1,8 +1,8 @@
 # ADR-0265 — A preset ask carries a request id, and the player answers it at the drain
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-07 (Plan 0252)
 > **Date:** 2026-10-07
-> **Related plan(s):** [0252](../plans/0252-the-lost-preset-ask-is-located-and-answered.md)
+> **Related plan(s):** [0252](../plans/done/0252-the-lost-preset-ask-is-located-and-answered.md)
 > **Extends:** [0176](0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md),
 > [0221](0221-the-control-path-reports-what-it-did-not-do.md) and
 > [spec 0003](../specs/0003-studio-control-protocol.md) (both tables)

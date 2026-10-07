@@ -1,10 +1,12 @@
 # 0252 — The lost preset ask is located and answered
 
-> **Status:** in-progress
+> **Status:** done - Phases 1-5 (e2c5c376, 27efabe2, decbb4f5, 0236e5dc, 543f4aac) and Phase 6's
+> loaded run (Linux 80/80, no loss; Windows not taken). Conductor close review round 2: no blockers,
+> no majors, two minors left open (both code). Round 1's major resolved in 3431f395.
 > **Created:** 2026-10-07
 > **Owner skill(s):** dev, studio-builder, human
 > **Closes:** design-backlog 0219, 0220
-> **Related ADRs:** [ADR-0265](../adrs/0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md)
+> **Related ADRs:** [ADR-0265](../../adrs/0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md)
 > (this plan's decision), ADR-0176 (OSC control-in, the contract rule), ADR-0221 (the listener's
 > counters and the refused-selection `preset_error`), ADR-0193 (why the two control-path tests are
 > not isolated)
@@ -338,5 +340,126 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
   is in Notes, and the studio suite at 543f4aac passed 405 of 405.
 - **Outstanding `human` phases:** none. Phase 6's Linux row is a no-reproduction (80/80) and its
   Windows row is not taken.
+
+## Close review
+
+The conductor's round 2 review, in full. Headings are one level down from the review file.
+
+### Plan 0252 — Mode 4 review, round 2
+
+Graded at tip `0dfc60adcc407ed93b278bd1c7c45d29cabfcf38` (tree `d1aed478`), lane
+`/home/igor/Work/rlx-plan-0252` on `plan-0252-the-lost-preset-ask-is-located-and-answered`.
+
+**Verdict:** Round 1's major is fixed. The plan is clean to close: **no blockers, no majors, two
+minors**. Neither minor is one a close may repair, because both are code (ADR-0209), so both stay open
+past the close.
+
+#### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` did not re-run. It
+  printed this ledger record:
+  `with-lock: skipped cargo nextest run --workspace: tree d1aed47 is green in the suite ledger, run by gate 0252-fix-1 at 2026-10-07T17:15:45.838Z: 2051 tests run: 2051 passed (10 slow), 9 skipped`.
+  `git rev-parse HEAD^{tree}` is `d1aed47839cb…`, so the record covers this exact tree. That record is
+  the lens-1 full-suite evidence.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: clean.
+- `node scripts/check-comment-hygiene.mjs`: OK.
+- `git status --porcelain` was empty before and after this review. Nothing was committed.
+- The studio suite is not re-run here. The fix round touched no file under `studio/`, so round 1's
+  run (443 passed, plus typecheck and lint) still covers it.
+
+#### What the fix round changed (b7659cd1..0dfc60ad)
+
+`3431f395` made these changes:
+
+- **`.config/nextest.toml`:**
+  - It deletes job 5's `[[profile.default.overrides]]` block for
+    `test(=a_preset_datagram_selects_by_name)` / `retries = 1`, together with its `Backlog 0219` line.
+  - Job 5 now states the list is empty and describes the shape an entry takes.
+  - Job 4's comment now says the 0219/0220 losses happened once, are closed by this plan, and that each
+    binary now resends and prints `RESENT`.
+- **`docs/testing.md`:** it now says "Today the list is empty".
+
+`0dfc60ad` records the fix in the plan's Notes.
+
+All of this is what round 1 asked for. ADR-0261 rule 4 now holds: no test retries without a live
+backlog entry, and the test resends by itself instead. The `success-output = "final"` override that
+Phase 3 added is still in place (`.config/nextest.toml:49`). **Round 1, Major 1: resolved in
+3431f395.**
+
+#### Lenses 1–5
+
+Nothing in round 1's reading of lenses 1 to 5 has changed. The fix round touched only TOML comments,
+one config block and Markdown, and no Rust or TypeScript. Round 1's alignment, layering, contract,
+correctness and design readings therefore still apply at this tip:
+
+- every phase has one in-vocabulary owner tag;
+- each phase meets its done-when, and Phase 5's renderer-side asker is an accepted deviation with a
+  stated reason;
+- the protocol widening is recorded in ADR-0265 and spec 0003;
+- the core gains one read-only accessor;
+- no frozen numeric assertion was added.
+
+The log's Close triggers still say the full suite is "owed to the conductor's pre-review gate". In
+conductor mode that is correct, and the ledger record above discharges it.
+
+#### Findings
+
+##### Minor
+
+1. **`studio/renderer/hooks/usePlayerEvents.ts:192` — the give-up's surfacing is still untested (round
+   1, Minor 1, carried).**
+   - **What:** `reduceLost`, exported as `reduceLostAsk`, turns a `LostAsk` into the `problems` entry
+     the banner shows. No test calls it. Phase 5's done-when asks for "exactly one surfaced message",
+     but `preset-ask.test.ts` only proves `onLost` fires once.
+   - **Why it matters:** Nothing checks the reducer's wording ("the player did not answer"), its
+     `file` field or its cap.
+   - **Fix:** `studio-builder` adds a reducer test beside the `reducePlayerEvent` tests. It asserts
+     that one `LostAsk` yields one `kind: 'error'` problem naming the preset and reading "the player
+     did not answer".
+   - A close cannot add a test (ADR-0209). This stays open.
+
+2. **`core/tests/suite/hygiene.rs:1415` and `:1419` — the `CLOCK_ALONE_EXEMPT` reasons still state
+   backlog 0219 and 0220 as live diagnoses.**
+   - **What:** The two reason strings read "backlog 0219: under load a loopback ctl/preset never
+     reached the listener, and running alone would hide it…" and the same for 0220. They are the
+     Rust-side twin of the job-4 comment that 3431f395 reworded. This plan closes both entries, so the
+     strings now give a closed entry as the reason for a live exemption.
+   - **Why it matters:** The exemption itself is still right, because the binaries still should not
+     run alone. Only the stated reason is out of date.
+   - **Fix:** In a later `dev` touch of the file, reword both strings to match the job-4 comment. For
+     example: "under load a loopback ctl/preset was once lost (backlog 0219, closed by ADR-0265's
+     resend); the test now resends and prints RESENT, and running alone would hide a loss rather than
+     remove load". The same edit can drop the run of spaces inside "running          alone", which
+     predates this plan.
+   - The strings are constant values, not comment or assertion text, so a close may not repair them.
+
+#### Bookkeeping the close owes
+
+- Plan → `done/` with `Status: done`, plus a `## Close review` section carrying this review and the
+  line "Round 1 Major 1 resolved in 3431f395".
+- ADR-0265 → `accepted`, and `docs/adrs/README.md` refreshed.
+- Backlog 0219 and 0220 → move from the archive's `### Promoted` table to `### Closed`, each with its
+  CLOSED marker.
+- Spec 0003's Provenance link → re-point it at `../plans/done/0252-…` (step 1b).
+- `presets/` is untouched, so there is no curation sweep.
+- Version bump: **minor** (a feature, a new protocol row and studio behaviour), plus the studio's two
+  version copies.
+
+### Earlier rounds
+
+- Round 1 (0 blockers, 1 major, 1 minor), Major 1 (`.config/nextest.toml`: the `retries = 1` override
+  for `a_preset_datagram_selects_by_name` outlived backlog 0219): resolved in 3431f395.
+- Round 1, Minor 1 (the give-up reducer untested): not resolved; carried as round 2's Minor 1.
+
+### Close notes
+
+- Upstream CI (`node scripts/check-upstream-ci.mjs`): OK, run 37652517555 on main at 596c2e7.
+- Backlog probes: exit 0, 43 reductions across 20 live entries (3 unprobeable). The 31 moved-path
+  advisories name no entry this plan touched.
+- Translations: `docs/running.ru.md` is behind `docs/running.md` (stamped fb237a6c). This plan did
+  not move that source.
+- `presets/` untouched: no curation verdict owed. No preset header cites this plan or its entries.
+- Both minors stay open: a studio reducer test, and the two `CLOCK_ALONE_EXEMPT` reason strings in
+  `core/tests/suite/hygiene.rs`.
 
 ## Followups (after this lands)

@@ -320,7 +320,7 @@ and it is here so a reader who wants the history has it in one place rather than
 
 **Added 2026-10-07**, from one plan:
 
-- **[Plan 0252](../plans/0252-the-lost-preset-ask-is-located-and-answered.md) Phase 2** added the
+- **[Plan 0252](../plans/done/0252-the-lost-preset-ask-is-located-and-answered.md) Phase 2** added the
   `ctl/preset/req` message and the `preset_ack` event, on ADR-0265's decision, after a `ctl/preset`
   datagram was lost in front of the socket with every counter on the player's side at zero. The
   plain row is unchanged; the new one is the second message a player answers individually, after

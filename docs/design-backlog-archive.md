@@ -356,8 +356,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0219 | A `ctl/preset` datagram on loopback never reached the listener's queue | [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md). **Promoted** |
-| 0220 | A headless walk of the system roster stalls at `emitter` | [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -688,6 +686,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0286 | The swarm's `sway_bound` over-allows at small headroom | [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) Phase 1. An exact bound. **Closed 2026-10-07** |
 | 0274 | The cellular scene cannot trace a route through the maze it grows | [ADR-0266](adrs/0266-the-maze-route-is-a-double-sweep-relaxed-on-the-gpu-against-a-frozen-snapshot.md) + [Plan 0253](plans/done/0253-the-labyrinth-shows-its-longest-path.md). Phase 4 owed. **Closed 2026-10-07** |
 | 0277 | The owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/` | [ADR-0267](adrs/0267-judging-a-preset-set-is-a-studio-session-over-an-isolated-player.md) + [Plan 0254](plans/done/0254-the-studio-judges-a-preset-set.md). Phase 4 owed. **Closed 2026-10-07** |
+| 0219 | A `ctl/preset` datagram on loopback never reached the listener's queue | [ADR-0265](adrs/0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md) + [Plan 0252](plans/done/0252-the-lost-preset-ask-is-located-and-answered.md). Acked and resent. **Closed 2026-10-07** |
+| 0220 | A headless walk of the system roster stalls at `emitter` | [ADR-0265](adrs/0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md) + [Plan 0252](plans/done/0252-the-lost-preset-ask-is-located-and-answered.md). Acked and resent. **Closed 2026-10-07** |
 <!-- roster:end -->
 
 ---
@@ -17085,7 +17085,16 @@ and has so far been seen only under heavy concurrent GPU load.
   load that emits `roster`, so a file the test's parent wrote on reading that event could land inside
   the new baseline and never be reported. The baseline is now taken before the load. This entry, a
   lost `ctl/preset` datagram, is unaffected by that and stays as it was.
-- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md) was approved.
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0252](plans/done/0252-the-lost-preset-ask-is-located-and-answered.md) was approved.
+
+**CLOSED 2026-10-07** — [Plan 0252](plans/done/0252-the-lost-preset-ask-is-located-and-answered.md)
+Phases 1-6, by ADR-0265's mechanism. The two control-path tests read the OS's own UDP counters at a
+miss (`/proc/net/udp`'s per-socket `drops`, `/proc/net/snmp`'s `InErrors` and `RcvbufErrors`, and
+`netstat -s -p udp` on Windows). The player answers `ctl/preset/req` with a `preset_ack` at the
+drain. The tests and the studio's library click resend the same `req` on a miss and print every
+resend. Phase 6's loaded run on the reference Linux box was 80 of 80 with no loss and every counter
+at zero, so the loss did not reproduce there. The Windows run was not taken. A Windows loss found
+later is a new entry, and it will carry these counters.
 
 ## 0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen
 
@@ -17166,7 +17175,14 @@ why. Whether it was the same defect is unknown.
 
 **Medium.** A `ctl/preset` the player drains and does not show is the studio's library click doing
 nothing. It is intermittent and has so far been seen only under heavy concurrent GPU load.
-- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md) was approved.
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0252](plans/done/0252-the-lost-preset-ask-is-located-and-answered.md) was approved.
+
+**CLOSED 2026-10-07** — [Plan 0252](plans/done/0252-the-lost-preset-ask-is-located-and-answered.md)
+Phases 2-3 and 6, by ADR-0265's mechanism. The walk now asks on `ctl/preset/req`, so the
+`preset_ack` separates the two remaining candidates. If no ack arrives, the ask was lost and is
+resent. If the ack reads `selected` and no `preset` event follows, the failure message names a
+dissolve that never completed. Phase 6's 80 loaded runs caught neither case. A dissolve that never
+completes, if one is caught later, is a new entry; this plan does not fix it.
 
 ## 0261 — the thumbnail child picks its own GPU, and on a hybrid laptop the pass moved the show's frame-time tail
 
