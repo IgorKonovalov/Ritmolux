@@ -255,6 +255,13 @@ studio keeps one player); the ledger leaves the studio as a clipboard table, nev
   ended session's edit list outlives closing the panel. The Settings row is a `JudgingGroup` that
   reads `judging.sourceDir` from `judging:get-state` itself, since `AppInfo` does not carry it.
   No hook was added; the view holds its own state.
+- Close review round 1, finding 0 (major), fixed in 28dc8172: `SessionInfo` carries `presetDir`,
+  the Judge view reports it to `App`, and `useActivePreset` writes a file under it in place while
+  `roster.dir` equals it, so a retune edits the copy End hashes. Tests in `Editor.test.tsx`,
+  `Judge.test.tsx`, `session.test.ts`; `npm --prefix studio test` 48 files / 436 tests passed.
+- Close review round 1, finding 3 (minor), fixed in 86db9757: the Judge view re-reads
+  `judging:get-state` on every reveal. Findings 1, 2 (Markdown, left to the close), 4 and 5 (nits)
+  were left.
 
 ### Close triggers
 
