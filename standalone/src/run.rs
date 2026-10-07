@@ -27,8 +27,8 @@ use crate::capture_start::list_devices_and_exit;
 use crate::cli::{
     InputSource, missing_companion, parse_check_arg, parse_console_flag, parse_control_arg,
     parse_downbeat_log_arg, parse_events_flag, parse_grid_scale_arg, parse_input_args,
-    parse_osc_arg, parse_preview_arg, parse_soak_arg, parse_strict_flag, parse_tier_arg,
-    print_help, resolve_config_path, resolve_control, resolve_input, resolve_osc,
+    parse_marks_arg, parse_osc_arg, parse_preview_arg, parse_soak_arg, parse_strict_flag,
+    parse_tier_arg, print_help, resolve_config_path, resolve_control, resolve_input, resolve_osc,
     unrecognized_flag, valued_valueless_flag, windowed_flag,
 };
 use crate::console;
@@ -66,6 +66,9 @@ pub(crate) struct App {
     /// The preset `--preset` holds for this run, already checked against the
     /// roster this launch will load. `None` rotates on the operator's config.
     pub(crate) held_preset: Option<String>,
+    /// The marks file `--marks` named for this run, already checked for a
+    /// value. `None` keeps the per-user `marks.toml`.
+    pub(crate) marks_path: Option<PathBuf>,
     /// The capture selection, already resolved across `--input` / `--device` /
     /// `[input]` (Plan 0130). Held beside `config` rather than written into it,
     /// so a flag pins this launch without persisting itself on the next save.
@@ -854,6 +857,15 @@ pub fn run() {
         }
     };
 
+    // A bare `--marks` is a usage error before any window, like `--preset`.
+    let marks_path = match parse_marks_arg() {
+        Ok(path) => path,
+        Err(err) => {
+            eprintln!("{err}");
+            std::process::exit(2);
+        }
+    };
+
     let mut app = App {
         config,
         config_path,
@@ -864,6 +876,7 @@ pub fn run() {
         adapter,
         adapter_source,
         held_preset,
+        marks_path,
         input,
         osc,
         control,

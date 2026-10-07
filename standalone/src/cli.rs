@@ -171,6 +171,12 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
         help: "<host:port> listen for studio control messages as OSC over UDP",
     },
     FlagSpec {
+        name: "--marks",
+        takes_value: true,
+        requires: &[],
+        help: "<path> read and write preset marks in this file for the run",
+    },
+    FlagSpec {
         name: "--soak",
         takes_value: true,
         requires: &[],
@@ -925,6 +931,38 @@ pub(crate) fn parse_control_arg_from(
     Ok(listen)
 }
 
+/// `--marks <path>`, or `None` when the flag is absent.
+///
+/// Read on both run modes: the windowed path calls this, and `stream::parse`
+/// calls [`parse_marks_arg_from`] over the same argument list.
+pub(crate) fn parse_marks_arg() -> Result<Option<PathBuf>, String> {
+    parse_marks_arg_from(std::env::args().skip(1))
+}
+
+/// [`parse_marks_arg`]'s rule as a pure function of the argument list.
+///
+/// `Err` on the flag with no value, with an empty one, and with a flag-shaped
+/// one: there is no default file to fall back to that would not be the per-user
+/// one the flag exists to avoid, so a run that asked to be isolated and could
+/// not be is refused rather than started on the owner's marks.
+pub(crate) fn parse_marks_arg_from(
+    args: impl Iterator<Item = String>,
+) -> Result<Option<PathBuf>, String> {
+    const EXPECTED: &str = "--marks: expected the path of a marks file";
+    let mut args = args.peekable();
+    let mut path = None;
+    while let Some(arg) = args.next() {
+        if let Some(value) = flag_value(&arg, "--marks", &mut args) {
+            let value = value.map_err(|_| EXPECTED.to_owned())?;
+            if value.trim().is_empty() || flag_name(&value).is_some() {
+                return Err(EXPECTED.to_owned());
+            }
+            path = Some(PathBuf::from(value));
+        }
+    }
+    Ok(path)
+}
+
 /// Resolve the control-in address: `--control` over `[control]`. `None` means no
 /// socket is bound — the constructor is never called, so there is nothing to
 /// enumerate.
@@ -961,10 +999,11 @@ pub(crate) fn default_downbeat_log_path() -> PathBuf {
 pub(crate) mod tests {
     use super::{
         FLAGS, INTERNAL_FLAGS, InputSource, config, help_text, missing_companion, nearest_flag,
-        parse_control_arg_from, parse_grid_scale_from, parse_input_args_from, parse_osc_arg_from,
-        resolve_control, resolve_input, resolve_osc, rostered, unrecognized_flag,
-        valued_valueless_flag,
+        parse_control_arg_from, parse_grid_scale_from, parse_input_args_from, parse_marks_arg_from,
+        parse_osc_arg_from, resolve_control, resolve_input, resolve_osc, rostered,
+        unrecognized_flag, valued_valueless_flag,
     };
+    use std::path::PathBuf;
 
     /// `--grid-scale` in both spellings, `auto` included, and every refusal a
     /// usage error that names the range (ADR-0245): an out-of-range number,
@@ -1112,6 +1151,33 @@ pub(crate) mod tests {
             parse_control_arg_from(["--control=".to_owned()].into_iter()).is_err(),
             "an empty address is a usage error, not a bind of nothing"
         );
+    }
+
+    /// `--marks` takes both spellings, and every spelling with no usable value —
+    /// bare at the end, empty, or followed by the next flag — is a usage error
+    /// that names the flag, never a run on the per-user file.
+    #[test]
+    fn the_marks_flag_takes_a_path_and_refuses_a_bare_flag() {
+        let argv = |args: &[&str]| args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+        let parse = |args: &[&str]| parse_marks_arg_from(argv(args).into_iter());
+
+        assert_eq!(
+            parse(&["--marks", "/x/m.toml"]),
+            Ok(Some(PathBuf::from("/x/m.toml")))
+        );
+        assert_eq!(
+            parse(&["--marks=/x/m.toml"]),
+            Ok(Some(PathBuf::from("/x/m.toml")))
+        );
+        assert_eq!(parse(&["--events"]), Ok(None), "absent is no override");
+        for bad in [&["--marks"][..], &["--marks="], &["--marks", "--events"]] {
+            let err = parse(bad).expect_err("a marks flag with no path");
+            assert!(
+                err.starts_with("--marks"),
+                "the error names the flag: {err}"
+            );
+        }
+        assert_eq!(orphaned(&["--marks", "/x/m.toml"]), None);
     }
 
     /// Both spellings of both flags, and the fact that an absent flag stays

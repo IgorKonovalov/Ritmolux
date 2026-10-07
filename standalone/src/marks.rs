@@ -29,12 +29,25 @@ use crate::{APP_DIR_NAME, preset_data_root};
 /// The file the marks live in, beside `config.toml`.
 pub const MARKS_FILE: &str = "marks.toml";
 
-/// Resolve `marks.toml` under the per-user app dir (the same base as the presets,
-/// `config.toml` and the diagnostics log). `None` if the OS data root cannot be
-/// resolved — marks then apply live and are not persisted, the rule
-/// `config.toml` already follows.
-pub fn resolve_marks_path() -> Option<PathBuf> {
-    preset_data_root().map(|root| root.join(APP_DIR_NAME).join(MARKS_FILE))
+/// Resolve the marks file: the path `--marks` named for this run, otherwise
+/// `marks.toml` under the per-user app dir (the same base as the presets,
+/// `config.toml` and the diagnostics log). `None` if neither is available — marks
+/// then apply live and are not persisted, the rule `config.toml` already follows.
+///
+/// The flag is a one-run override: it moves where this run reads and writes its
+/// marks, and nothing records it, so the next run without it is back on the
+/// per-user file.
+pub fn resolve_marks_path(flag: Option<&Path>) -> Option<PathBuf> {
+    resolve_marks_path_from(flag, preset_data_root())
+}
+
+/// [`resolve_marks_path`] as a pure function of its two inputs, so the rule is
+/// testable without touching the process environment.
+fn resolve_marks_path_from(flag: Option<&Path>, root: Option<PathBuf>) -> Option<PathBuf> {
+    match flag {
+        Some(path) => Some(path.to_path_buf()),
+        None => root.map(|root| root.join(APP_DIR_NAME).join(MARKS_FILE)),
+    }
 }
 
 /// One of the two marks a preset can carry.
@@ -284,6 +297,29 @@ mod tests {
             !marks.apply(Mark::Favourite, "Gyre", false),
             "clearing a mark that is not set must report no change"
         );
+    }
+
+    /// `--marks` names the file for the run; without it the file is the per-user
+    /// one under the data root, and with neither there is no file.
+    #[test]
+    fn the_marks_flag_overrides_the_per_user_file() {
+        let root = Some(PathBuf::from("/data"));
+        assert_eq!(
+            resolve_marks_path_from(Some(Path::new("/x/m.toml")), root.clone()),
+            Some(PathBuf::from("/x/m.toml")),
+            "the flag's path is the file, whatever the data root"
+        );
+        assert_eq!(
+            resolve_marks_path_from(None, root),
+            Some(PathBuf::from("/data").join(APP_DIR_NAME).join(MARKS_FILE)),
+            "without the flag the file is <data root>/{APP_DIR_NAME}/{MARKS_FILE}"
+        );
+        assert_eq!(
+            resolve_marks_path_from(Some(Path::new("/x/m.toml")), None),
+            Some(PathBuf::from("/x/m.toml")),
+            "the flag needs no data root"
+        );
+        assert_eq!(resolve_marks_path_from(None, None), None);
     }
 
     /// The word a mark is written as round-trips, so the file key, the wire

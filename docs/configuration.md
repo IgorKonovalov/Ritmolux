@@ -33,6 +33,7 @@ telemetry.
 | `--grid-scale` | `0.25`–`1` \| `auto` | Draw the internal grids at this fraction of the frame — the window and `--stream` both. Overrides `[quality] grid_scale` for one run |
 | `--osc` | `<host:port>` | Publish analyzer telemetry as OSC over UDP, and turn the sink on |
 | `--control` | `<host:port>` | Listen for studio control messages as OSC over UDP, and turn the listener on |
+| `--marks` | `<path>` | Read and write the preset marks in this file instead of the per-user `marks.toml` — the window and `--stream` both. Overrides the marks file's location for one run and writes nothing to `config.toml` |
 | `--soak` | `[path]` | Write a long-run frame-time trace; bare, a default path |
 | `--downbeat-log` | `[path]` | Write the per-beat downbeat decomposition; bare, a default path |
 | `--stream` | — | Run headless and publish every frame to a sink |

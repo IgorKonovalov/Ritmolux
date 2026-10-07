@@ -28,6 +28,7 @@
 //! tested with no GPU, no audio device and no Spout SDK.
 
 use std::io::Write;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use rlx_core::render::{GridScale, InternalGrids, PixelOrder};
@@ -157,6 +158,9 @@ pub struct StreamRequest {
     /// neither `[quality] grid_scale` nor `RLX_GRID_SCALE` reaches it, as
     /// neither tier source does.
     pub grid_scale: Option<GridScale>,
+    /// `--marks`: the file this run reads and writes its preset marks in.
+    /// `None` keeps the per-user `marks.toml`.
+    pub marks: Option<PathBuf>,
 }
 
 impl Default for StreamRequest {
@@ -171,6 +175,7 @@ impl Default for StreamRequest {
             frames: None,
             preset: None,
             grid_scale: None,
+            marks: None,
         }
     }
 }
@@ -268,6 +273,9 @@ pub fn parse(args: &[String]) -> Result<Option<StreamRequest>, String> {
             }
         }
     }
+    // Both spellings and the same refusals as the windowed reader, through the
+    // one parser, since the roster claims the flag for both run modes.
+    request.marks = crate::cli::parse_marks_arg_from(args.iter().cloned())?;
     let (default_width, default_height, default_fps) = request.sink.default_geometry();
     let (width, height) = size.unwrap_or((default_width, default_height));
     request.width = width;
@@ -866,7 +874,7 @@ pub fn run(
         },
         events,
         control,
-        standalone::marks::resolve_marks_path(),
+        standalone::marks::resolve_marks_path(request.marks.as_deref()),
     );
     // Judged against the set the show just installed, which is the per-user
     // directory when one resolved and the embedded set otherwise.

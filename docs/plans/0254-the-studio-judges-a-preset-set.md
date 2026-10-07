@@ -1,6 +1,6 @@
 # 0254 — The studio judges a preset set
 
-> **Status:** approved (2026-10-07)
+> **Status:** in-progress (2026-10-07)
 > **Created:** 2026-10-07
 > **Owner skill(s):** dev, studio-builder, human
 > **Closes:** design-backlog 0277
@@ -226,16 +226,21 @@ studio keeps one player); the ledger leaves the studio as a clipboard table, nev
 
 ## Implementation log
 
-**Lane:**
+**Lane:** branch `plan-0254-the-studio-judges-a-preset-set`, worktree `/home/igor/Work/rlx-plan-0254`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The player takes its marks file from a flag | dev | not started | |
+| 1 — The player takes its marks file from a flag | dev | done | committed with this row |
 | 2 — The session: copy, isolate, fold, ledger, write-back | studio-builder | not started | |
 | 3 — The Judge view | studio-builder | not started | |
 | 4 — The owner walks a real family | human | not started | |
 
 ### Notes
+
+- Phase 1 touched `standalone/src/run.rs`, outside its file list: the windowed path parses
+  `--marks` there, before the window, and carries it on `App` to `app_state.rs`.
+  `standalone/tests/help_cli.rs` enumerates no flags and was not touched. The end-to-end test is
+  `a_headless_run_keeps_its_marks_in_the_file_the_flag_names` in `standalone/tests/stream_show.rs`.
 
 ### Close triggers
 
