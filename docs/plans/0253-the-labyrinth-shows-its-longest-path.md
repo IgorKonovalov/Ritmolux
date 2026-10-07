@@ -309,8 +309,8 @@ struct RouteControl {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — A sweep relaxes on the GPU and the flood is visible | dev | done | cca56596 |
-| 2 — Quiet stretches find, reveal and fade the route | dev | committed with this row | |
-| 3 — The budget belongs to the tier and the references are regenerated | dev | not started | |
+| 2 — Quiet stretches find, reveal and fade the route | dev | done | 1c41e058 |
+| 3 — The budget belongs to the tier and the references are regenerated | dev | committed with this row | |
 | 4 — The owner sees the route on the labyrinth | human | not started | |
 
 ### Notes
@@ -384,6 +384,39 @@ struct RouteControl {
   a route 79 long, matching the CPU. Over 72 driven beats with the route on, at 60, 120 and 240
   passes/s alike: **22 commits, 0 abandoned**, last epoch 18 passes, and a route drawn (not
   fading) in 455, 498 and 517 of 1 080 frames.
+- **Phase 3, the rule's arithmetic**, from Phase 1's integrated-adapter reading (AMD Radeon
+  Graphics, RADV RENOIR, Mesa 26.2.2):
+  - `Floor`, grid 512: 8 step passes cost 8 x 0.1062 = 0.850 ms a frame; a relax pass costs
+    0.2150 ms, so 3.95 of them fit, and 3.95 x 60 = **237 passes/s** (0.849 ms a frame).
+  - `Rich`, grid 1024: 8 x 0.3268 = 2.614 ms; a relax pass 0.8154 ms, 3.21 a frame, **192
+    passes/s** (2.609 ms a frame).
+  - The control pass after each relax pass (0.0012-0.0013 ms) is outside the rule and adds about
+    0.6 % at `Floor`. Phase 2's re-run of the same probe on the same adapter read higher step and
+    relax costs (above), from which the rule would give 293 and 235.
+- **Phase 3, an epoch against a still stretch.** At `Floor`'s 237 passes/s the labyrinth's
+  measured epochs — 14 work passes from the centre rule at generation 600, 24 forced into the
+  largest component, 18 on the driven run — take 0.06 s, 0.10 s and 0.08 s. Phase 1's standing
+  stretch runs about 1.4 s from 0.6 s after a bite to the next, of which the 4-generation hold takes
+  0.29 s: an epoch fits inside the stretch about ten times over. The route it finds is short (16 to
+  79 steps), because the maze's open cells are 2 881 separate four-connected pockets, the largest
+  142 cells.
+- **Phase 3, the timer's query set** was not widened: at 237 passes/s a 30 fps frame encodes 8
+  route passes, 16 timed passes with their control passes, beside at most 16 for generations;
+  `MAX_TIMED_PASSES` is 256.
+- **Phase 3, outside the file list:** `core/src/render/scenes/cellular/tests.rs`, because
+  `CellularScene::new` gained the rate argument (its two call sites, and a test-local
+  `ROUTE_RATE` of 240 replacing the route module's constant); and `docs/specs/player-schema.json`
+  and `presets/preset.schema.json`, regenerated with the per-system schemas. `.taplo.toml` did not
+  change on regeneration.
+- **Phase 3, `docs/nfr.md`** had no cellular figure for the route to join; a new bullet in §12
+  states the automaton's 16 MB and the route's 24 bytes a cell.
+- **Phase 3, the tier test** (`each_tier_hands_the_scene_its_own_route_rate`) is behavioural: it
+  times the frame a frozen 256-grid maze's route first draws on each tier and holds the ratio of
+  the two searches to the ratio of the rates (read 1.211 against 1.234, tolerance 0.08). It counts
+  the search from the fifth generation, which is where `QUIET_HOLD = 4` puts the quiet.
+- **Phase 3, the preset check** was run as `cargo run -q -p standalone --bin ritmolux -- --check
+  presets --strict` (exit 0, 93 files, 0 errors, 0 warnings): `--check` takes its path as its
+  value, so the plan's `--check --strict presets` reads `--strict` as the path and exits 2.
 
 ### Close triggers
 

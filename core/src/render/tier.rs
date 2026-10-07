@@ -669,6 +669,26 @@ pub struct TierConfig {
     /// a constant to measure**, with `cellular_radius`, on one frame.
     pub cellular_grid: u32,
 
+    /// How many relax passes a second the `cellular` route searches with
+    /// (ADR-0266), over injected `dt`, so its GPU cost is proportional to wall
+    /// time and not to the refresh rate.
+    ///
+    /// **A budget, not a cap on content**: nothing is clamped or announced. A
+    /// smaller rate lengthens an epoch, and an epoch longer than the maze's
+    /// still stretch draws no route that stretch.
+    ///
+    /// # Where the numbers come from
+    ///
+    /// **Measured** (Plan 0253 Phase 1), on the reference laptop's integrated
+    /// adapter (AMD Radeon Graphics, RADV RENOIR) with the ADR-0245 per-pass
+    /// timer. The rule: at the tier's own [`cellular_grid`](Self::cellular_grid)
+    /// and a 60 Hz frame, the route's relax passes cost no more GPU time a frame
+    /// than the `MAX_GENERATIONS_PER_FRAME` (8) step passes on the same grid.
+    /// `Floor` at 512: a step 0.1062 ms, a relax pass 0.2150 ms, so
+    /// `60 * 8 * 0.1062 / 0.2150 = 237`. `Rich` at 1024: a step 0.3268 ms, a
+    /// relax pass 0.8154 ms, so `60 * 8 * 0.3268 / 0.8154 = 192`.
+    pub cellular_route_rate: u32,
+
     /// The most points a `plexus` preset draws (ADR-0257), holding its
     /// `[plexus] points` at load.
     ///
@@ -764,6 +784,7 @@ impl TierConfig {
         field_iterations: 64,
         cellular_radius: 6,
         cellular_grid: 512,
+        cellular_route_rate: 237,
         plexus_points: 600,
         plexus_edges: 6_000,
         max_coc_px: 12,
@@ -796,6 +817,7 @@ impl TierConfig {
         field_iterations: 512,
         cellular_radius: 10,
         cellular_grid: 1024,
+        cellular_route_rate: 192,
         plexus_points: 1_500,
         plexus_edges: 20_000,
         max_coc_px: 24,

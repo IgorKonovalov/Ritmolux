@@ -1437,6 +1437,7 @@ fn create(
             surface_format,
             tier.cellular_radius,
             tier.cellular_grid,
+            tier.cellular_route_rate,
         )),
         SystemKind::Plexus => Box::new(plexus::PlexusScene::new(
             device,

@@ -62,9 +62,6 @@ use super::{MAX_GENERATIONS_PER_FRAME, ReadPair, WHOLE_SLACK, shader};
 use crate::render::feedback::PingPongField;
 use crate::render::gpu;
 
-/// Relax passes owed per second of injected `dt`.
-pub(crate) const ROUTE_RATE: f32 = 240.0;
-
 /// The most route passes one frame encodes. Past it a backlog is dropped, as
 /// [`MAX_GENERATIONS_PER_FRAME`] drops generations, so a stall slows the search
 /// rather than queueing passes without bound.

@@ -1008,6 +1008,10 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `reseed` | `0` | `0` – `1` | A rise past 0.5 refills one disc of the grid with fresh seeded cells, once per rise; bind a beat or a latch to it. | motion |
 | `trail` | `12` | `life_like` `0` – `64`; `larger_than_life` `0` – `64`; inert on `cyclic` | How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells. | motion |
 | `age_tint` | `0.35` | `life_like` `0` – `1`; `larger_than_life` `0` – `1`; inert on `cyclic` | How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour. | colour |
+| `route` | `0` | `life_like` `0` – `1`; `larger_than_life` `0` – `1`; inert on `cyclic` | How strongly the route through the maze is drawn over it: the longest path the open cells hold, found while the maze stands still. 0 draws none and runs no search; inert on cyclic, which has no open cells. | colour |
+| `route_coord` | `0.5` | `life_like` `0` – `1`; `larger_than_life` `0` – `1`; inert on `cyclic` | Where on the palette the route is painted, at its first end. | colour |
+| `route_grade` | `0` | `life_like` `-1` – `1`; `larger_than_life` `-1` – `1`; inert on `cyclic` | How far along the palette the route's colour travels from one end to the other; 0 paints it one solid colour. | colour |
+| `route_reveal` | `1` | `life_like` `0` – `10`; `larger_than_life` `0` – `10`; inert on `cyclic` | Seconds a found route takes to draw in along its length, end to end; it fades out over a quarter of this when the maze moves. 0 draws it whole at once. | motion |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. | colour, main |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. | shape |

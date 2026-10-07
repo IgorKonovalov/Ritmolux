@@ -717,6 +717,15 @@ pub const FAMILY_PARAMS: &[FamilyParam] = &[
     // nothing there.
     per_family!("trail": Some([0.0, 64.0]), Some([0.0, 64.0]), None),
     per_family!("age_tint": Some([0.0, 1.0]), Some([0.0, 1.0]), None),
+    // A route walks the dead cells, and cyclic has none.
+    per_family!("route": Some([0.0, 1.0]), Some([0.0, 1.0]), None),
+    per_family!("route_coord": Some([0.0, 1.0]), Some([0.0, 1.0]), None),
+    per_family!("route_grade": Some([-1.0, 1.0]), Some([-1.0, 1.0]), None),
+    per_family!(
+        "route_reveal": Some([0.0, route::MAX_REVEAL]),
+        Some([0.0, route::MAX_REVEAL]),
+        None,
+    ),
 ];
 
 /// The one uniform every step-shader pass reads, written once a frame.
@@ -1213,7 +1222,8 @@ pub struct CellularScene {
     route_coord: f32,
     route_grade: f32,
     route_reveal: f32,
-    /// Route passes owed per second of `dt` (ADR-0266).
+    /// Route passes owed per second of `dt` (ADR-0266): the tier's
+    /// [`cellular_route_rate`](crate::render::TierConfig::cellular_route_rate).
     route_rate: f32,
     route_clock: route::RouteClock,
     /// This frame's generations and route passes, scheduled by `update` for
@@ -1245,13 +1255,16 @@ impl CellularScene {
     /// The CPU-side state, holding a bound `larger_than_life` radius to
     /// `radius_cap` and a preset's grid to `grid_cap` — the tier's
     /// [`cellular_radius`](crate::render::TierConfig::cellular_radius) and
-    /// [`cellular_grid`](crate::render::TierConfig::cellular_grid). GPU
-    /// resources are deferred to the first render (module docs).
+    /// [`cellular_grid`](crate::render::TierConfig::cellular_grid) — and
+    /// searching for the route at `route_rate` relax passes a second, the
+    /// tier's [`cellular_route_rate`](crate::render::TierConfig::cellular_route_rate).
+    /// GPU resources are deferred to the first render (module docs).
     pub fn new(
         device: &wgpu::Device,
         surface_format: wgpu::TextureFormat,
         radius_cap: u32,
         grid_cap: u32,
+        route_rate: u32,
     ) -> Self {
         let config = CellularConfig::default();
         Self {
@@ -1286,7 +1299,7 @@ impl CellularScene {
             route_coord: DEFAULT_ROUTE_COORD,
             route_grade: DEFAULT_ROUTE_GRADE,
             route_reveal: DEFAULT_ROUTE_REVEAL,
-            route_rate: route::ROUTE_RATE,
+            route_rate: route_rate as f32,
             route_clock: route::RouteClock::default(),
             generation_ticks: route::Ticks::default(),
             pass_ticks: route::Ticks::default(),

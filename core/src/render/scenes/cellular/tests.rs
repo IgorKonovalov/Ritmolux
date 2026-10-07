@@ -39,16 +39,22 @@ fn scene_with(ctx: &RenderContext, config: CellularConfig) -> CellularScene {
     // `COMPOSITE_FORMAT`, not the surface format: a scene draws into the
     // composite chain's linear target (`scenes::create_all`).
     // Every radius the family declares, so a probe's radius is its own and
-    // never the tier's; the tier's cap has its own test.
+    // never the tier's; the tier's cap has its own test. The route runs at
+    // `ROUTE_RATE`, not a tier's.
     let mut scene = CellularScene::new(
         &ctx.device,
         crate::render::COMPOSITE_FORMAT,
         MAX_RADIUS as u32,
         MAX_GRID,
+        ROUTE_RATE,
     );
     scene.configure(&GeneratorConfig::Cellular(config));
     scene
 }
+
+/// The route passes a second the probes search at: 60 a frame at
+/// [`ONE_GEN`]'s quarter second, inside the per-frame cap.
+const ROUTE_RATE: u32 = 240;
 
 fn ltl(grid: u32, wrap: bool, salt: u32) -> CellularConfig {
     CellularConfig {
@@ -1079,6 +1085,7 @@ fn the_tier_caps_the_radius_the_shader_is_given() {
             crate::render::COMPOSITE_FORMAT,
             tier.cellular_radius,
             tier.cellular_grid,
+            tier.cellular_route_rate,
         );
         scene.configure(&GeneratorConfig::Cellular(ltl(64, true, 1)));
         scene.reset_params();
@@ -2188,7 +2195,7 @@ fn a_stamp_mid_epoch_abandons_it_and_the_next_quiet_commits_the_new_maze() {
     let new_maze = states(&ctx, &scene);
     assert!(new_maze != maze, "the stamp changed nothing");
 
-    scene.route_rate = route::ROUTE_RATE;
+    scene.route_rate = ROUTE_RATE as f32;
     let mut frames = 0;
     let words = loop {
         driver.frame(&mut scene, ONE_GEN.0, &frozen);
