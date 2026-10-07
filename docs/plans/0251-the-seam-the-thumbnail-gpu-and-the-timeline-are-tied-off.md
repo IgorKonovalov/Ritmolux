@@ -185,8 +185,8 @@ settled here:
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The swarm's sway bound is exact at the shipped minimum zoom | dev | done | b647003b |
-| 2 — The thumbnail child renders on the show's adapter and says which | dev | done | committed with this row |
-| 3 — A cancelled render leaves no timeline beside the output | studio-builder | not started | |
+| 2 — The thumbnail child renders on the show's adapter and says which | dev | done | 5d5c6caa |
+| 3 — A cancelled render leaves no timeline beside the output | studio-builder | done | committed with this row |
 | 4 — The thumbnail reading is re-taken with both adapters named | human | not started | |
 
 ### Notes
@@ -202,6 +202,9 @@ settled here:
   `windowed_flag`, and `cli.rs` carries only the companion test. A switch through
   `AppState::swap_adapter` reaches the next walk (the worker places the adapter once per walk), not
   a later child of a walk already running.
+- Phase 3: the new test was run against `service.ts` as of 5d5c6caa and failed on the
+  `.timeline.json` assertion. The neural branch keeps the existing aborted check after the branch
+  and adds a second one ahead of `writeTimeline`, rather than moving the one.
 
 ### Close triggers
 

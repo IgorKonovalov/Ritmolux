@@ -36,13 +36,17 @@ function silentWav(): Buffer {
   return bytes
 }
 
-/** A transcode the test holds open: what it was handed, and how to finish it. */
-interface HeldTranscode {
+/** A tool run the test holds open: what it was handed, and how to finish it. */
+interface HeldRun {
   signal: AbortSignal | undefined
   finish: () => void
 }
 
-function harness(hold?: (held: HeldTranscode) => void) {
+/**
+ * `hold` receives the run `holds` names — the transcode, or the `--bars` read —
+ * instead of it finishing at once.
+ */
+function harness(hold?: (held: HeldRun) => void, holds: 'transcode' | 'bars' = 'transcode') {
   const dir = mkdtempSync(join(tmpdir(), 'rlx-service-'))
   const source = join(dir, 'track.flac')
   writeFileSync(source, 'flac')
@@ -54,7 +58,7 @@ function harness(hold?: (held: HeldTranscode) => void) {
     // ffmpeg's transcode writes its last argument; --bars writes after --out.
     const out = args.includes('--out') ? args[args.indexOf('--out') + 1] : (args.at(-1) as string)
     const write = (): void => writeFileSync(out, args.includes('--bars') ? GRID : silentWav())
-    if (hold !== undefined && !args.includes('--bars')) {
+    if (hold !== undefined && args.includes('--bars') === (holds === 'bars')) {
       return new Promise<string>((resolve) =>
         hold({
           signal,
@@ -156,7 +160,7 @@ describe('the render service', () => {
 
 describe('quitting while a job is still being prepared', () => {
   it('tells the transcode to stop and launches nothing afterwards', async () => {
-    let held: HeldTranscode | undefined
+    let held: HeldRun | undefined
     const { service, source, spawned, events } = harness((h) => (held = h))
     service.grant(source)
     const output = service.suggestOutput(source, 'Gyre')
@@ -258,6 +262,25 @@ describe('a neural job', () => {
     if (!output.ok) throw new Error(output.reason)
     const result = await service.start(neuralRequest(source, output.value, [{ at_bar: 3, prompt: 'late' }]))
     expect(result).toMatchObject({ ok: false, reason: expect.stringContaining('past the track') })
+    expect(spawned).toEqual([])
+    expect(existsSync(`${output.value}.bars.json`)).toBe(false)
+    expect(existsSync(`${output.value}.timeline.json`)).toBe(false)
+  })
+
+  it('quit during its --bars read, leaves neither the grid nor the timeline beside the output', async () => {
+    let held: HeldRun | undefined
+    const { service, source, spawned } = harness((h) => (held = h), 'bars')
+    service.grant(source)
+    const output = service.suggestOutput(source, 'Gyre')
+    if (!output.ok) throw new Error(output.reason)
+    const started = service.start(neuralRequest(source, output.value, [{ at_bar: 1, prompt: 'a canyon' }]))
+    await vi.waitFor(() => expect(held).toBeDefined())
+
+    service.abandon()
+    expect(held?.signal?.aborted).toBe(true)
+    // The read finishes anyway, and writes its grid beside the output.
+    held?.finish()
+    expect(await started).toEqual({ ok: false, reason: 'the studio is quitting' })
     expect(spawned).toEqual([])
     expect(existsSync(`${output.value}.bars.json`)).toBe(false)
     expect(existsSync(`${output.value}.timeline.json`)).toBe(false)

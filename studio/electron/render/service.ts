@@ -152,10 +152,10 @@ export class RenderService {
     const abort = new AbortController()
     this.preparing = abort
     const run: RunTool = (command, args) => this.run(command, args, abort.signal)
-    // A grid written beside the output for a job that never launched is
-    // removed: nothing would read it, and it would sit beside a clip that was
-    // never rendered.
-    let bars: string | undefined
+    // The grid and the timeline written beside the output for a job that never
+    // launched are removed: nothing would read them, and they would sit beside
+    // a clip that was never rendered.
+    let beside: string[] = []
     let launched = false
     try {
       let sidecar: StageCommand | undefined
@@ -178,10 +178,12 @@ export class RenderService {
         // The grid is written beside the output by the player itself, so the
         // sidecar reads the bars the strip showed, byte for byte.
         const files = neuralFiles(request.output)
-        bars = files.bars
+        beside = [files.bars, files.timeline]
         grid = await readBars(run, player, wav, request.fps, files.bars)
         const problem = timelineProblem(neural.timeline, grid.bar_starts.length)
         if (problem !== undefined) return refuse(`the neural render cannot start: ${problem}`)
+        // A read that finished despite the abort writes no timeline.
+        if (abort.signal.aborted) return refuse('the studio is quitting')
         writeTimeline(files.timeline, neural.timeline)
         sidecar = {
           stage: 'sidecar',
@@ -198,7 +200,7 @@ export class RenderService {
     } catch (error) {
       return refuse(abort.signal.aborted ? 'the studio is quitting' : (error as Error).message)
     } finally {
-      if (!launched && bars !== undefined) rmSync(bars, { force: true })
+      if (!launched) for (const file of beside) rmSync(file, { force: true })
       this.preparing = undefined
       this.starting = false
     }
