@@ -257,8 +257,8 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
 |---|---|---|---|
 | 1 — The tests read the operating system's UDP counters at a failure | dev | done | e2c5c376 |
 | 2 — The player answers a preset ask that carries an id | dev | done | 27efabe2 |
-| 3 — The two control-path tests resend instead of waiting once | dev | done | committed with this row |
-| 4 — The full suite | dev | not started | |
+| 3 — The two control-path tests resend instead of waiting once | dev | done | decbb4f5 |
+| 4 — The full suite | dev | done | committed with this row |
 | 5 — The studio's library click is acknowledged | studio-builder | not started | |
 | 6 — The loaded reproduction is read | human | not started | |
 
@@ -282,6 +282,13 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
   every passing test in the two binaries, not only the `RESENT` lines.
 - Phase 3 left job 5's `retries = 1` block for `a_preset_datagram_selects_by_name` in
   `.config/nextest.toml`; per ADR-0261 it leaves when backlog 0219 closes.
+- Phase 4: `cargo nextest run --workspace` (through the suite lock) exited 0 at decbb4f5:
+  `Summary [ 672.733s] 2033 tests run: 2033 passed (16 slow), 8 skipped`. Its `RESENT` lines: one,
+  from the faulted test (`RESENT ctl/preset/req `second` req 1: attempt 2 of 3, after no delivery
+  within 5s; os udp: socket drops +0, InErrors +0, RcvbufErrors +0, rmem_default 212992, Receive
+  Errors unavailable`); the unfaulted test printed `0 RESENT line(s)`. `cargo fmt --all --check`,
+  `cargo clippy --workspace --all-targets -- -D warnings` and
+  `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` were clean.
 
 ### Close triggers
 
