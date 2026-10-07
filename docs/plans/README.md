@@ -46,7 +46,6 @@ place. The plan file carries the real link.
 | [0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) | The rig session measures the wave modes and judges the fourth gate | approved | human, dev | 0202's Phases 4-7. Not queued until the owner has the Windows rig; commit Phase 1's eight rows on main, then queue. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
 | [0252](0252-the-lost-preset-ask-is-located-and-answered.md) | The lost preset ask is located and answered | approved | dev, studio-builder, human | ADR-0265: `ctl/preset/req` acked by `preset_ack`; studio and tests resend. Studio spec-diff test red from Phase 2 to 5. Phase 6 is a blocking loaded run. |
-| [0253](0253-the-labyrinth-shows-its-longest-path.md) | The labyrinth shows its longest path | approved | dev, human | ADR-0266: GPU double sweep while the maze is quiet; reveals, fades on a bite. Phase 1 reads pass cost and change counts that set Phase 2-3 constants. |
 | [0254](0254-the-studio-judges-a-preset-set.md) | The studio judges a preset set | approved | dev, studio-builder, human | ADR-0267: a Judge view over the studio's one player, after Phase 1's `--marks` flag. Replaces 0232's scratch scripts. Phase 4 is non-blocking. |
 <!-- roster:end -->
 
@@ -1041,6 +1040,7 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 [Closed earlier (index bullets)](README-archive.md#closed-earlier-index-bullets).
 
 <!-- roster:begin cap=320 -->
+- [0253 - The labyrinth shows its longest path](done/0253-the-labyrinth-shows-its-longest-path.md) - closed 2026-10-07, Phase 4 owed. Review: **no blockers, no majors, two minors (fixed), two nits (one fixed).** Version: **0.169.0**. ADR-0266 accepted, Outcome. Closed 0274. [Write-up](README-archive.md).
 - [0251 - The seam, the thumbnail GPU and the timeline are tied off](done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) - closed 2026-10-07, Phase 4 owed. Review: **no blockers, no majors, two minors (fixed), one nit.** Version: **0.168.1**. Closed 0261, 0285, 0286. [Write-up](README-archive.md).
 - [0250 - The close findings and five small asks are paid](done/0250-the-close-findings-and-five-small-asks-are-paid.md) - closed 2026-10-07. Review: **no blockers, no majors, two minors (filed 0285, 0286), three nits (two fixed).** Version: **0.168.0**. Closed 0260, 0275, 0282-0284. [Write-up](README-archive.md).
 - [0218 - The reference machine becomes Arch](done/0218-the-reference-machine-becomes-arch.md) - closed 2026-10-06, Phase 6 owed. Review: **two rounds; 1 major (fixed), 4 minors (three fixed), 1 nit (fixed).** Version: none. ADR-0243 accepted, Outcome. Filed 0284. [Write-up](README-archive.md).
@@ -1055,7 +1055,6 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 - [0244 - Sessions start lighter](done/0244-sessions-start-lighter.md) - closed 2026-10-02, Phase 3 done the same day. Review: **no blockers, no majors, one minor, one nit (both fixed).** Version: none. [Write-up](README-archive.md).
 - [0202 - The three mechanisms get their gate](done/0202-the-three-mechanisms-get-their-gate.md) - closed 2026-10-02 at Phase 3. Review: **no blockers, no majors, five minors (four fixed).** Version: **0.160.2**. [Write-up](README-archive.md).
 - [0245 - A gate that runs a built binary checks it is current](done/0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) - closed 2026-10-01. Review: **two rounds; 1 major, 3 minors (all fixed).** Version: **0.160.1**. [Write-up](README-archive.md).
-- [0242 - Readiness is read when the plan is approved](done/0242-readiness-is-read-when-the-plan-is-approved.md) - closed 2026-10-01, Phase 3 done 2026-10-02. Review: **no blockers, no majors, one minor (fixed), one nit (open).** Version: **0.160.0**. [Write-up](README-archive.md).
 
 <!-- roster:end -->
 

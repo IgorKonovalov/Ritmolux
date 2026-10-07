@@ -358,7 +358,6 @@ live entry citing this one.
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
 | 0219 | A `ctl/preset` datagram on loopback never reached the listener's queue | [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md). **Promoted** |
 | 0220 | A headless walk of the system roster stalls at `emitter` | [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md). **Promoted** |
-| 0274 | The cellular scene cannot trace a route through the maze it grows | [Plan 0253](plans/0253-the-labyrinth-shows-its-longest-path.md). **Promoted** |
 | 0277 | The owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/` | [Plan 0254](plans/0254-the-studio-judges-a-preset-set.md). **Promoted** |
 <!-- roster:end -->
 
@@ -688,6 +687,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0261 | The thumbnail child picks its own GPU | [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) Phase 2. The show's adapter; Phase 4 owed. **Closed 2026-10-07** |
 | 0285 | A render start that finishes its `--bars` read after a quit leaves `<output>.timeline.json` behind | [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) Phase 3. **Closed 2026-10-07** |
 | 0286 | The swarm's `sway_bound` over-allows at small headroom | [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) Phase 1. An exact bound. **Closed 2026-10-07** |
+| 0274 | The cellular scene cannot trace a route through the maze it grows | [ADR-0266](adrs/0266-the-maze-route-is-a-double-sweep-relaxed-on-the-gpu-against-a-frozen-snapshot.md) + [Plan 0253](plans/done/0253-the-labyrinth-shows-its-longest-path.md). Phase 4 owed. **Closed 2026-10-07** |
 <!-- roster:end -->
 
 ---
@@ -17211,7 +17211,16 @@ changes. The drawn route could be one new overlay colour, or a distance a palett
   is it refreshed), then `dev`.
 - **Verified 2026-09-30** — the scene has no route search:
   `absent: [Bb]readth|\bbfs\b|\bBFS\b|[Ll]ongest path in: core/src/render/scenes/cellular`
-- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0253](plans/0253-the-labyrinth-shows-its-longest-path.md) was approved.
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0253](plans/done/0253-the-labyrinth-shows-its-longest-path.md) was approved.
+
+**CLOSED 2026-10-07** — [Plan 0253](plans/done/0253-the-labyrinth-shows-its-longest-path.md)
+Phases 1-3, by ADR-0266's mechanism. `cellular` finds the double sweep's longest shortest path
+through its open cells while the maze stands still, on the GPU against a frozen snapshot, reveals it
+along its length over `route_reveal` and fades it when a bite moves the maze. `route`, `route_coord`,
+`route_grade` and `route_reveal` are its params, and `route = 0` is an identity. On the labyrinth
+the open cells are 2 881 separate pockets, so the route is a 16-79-cell trace inside one of them.
+Binding it on `cellular_labyrinth`, red by default, and judging whether it reads is Phase 4, owed
+after the merge (ADR-0249).
 
 ## 0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`
 

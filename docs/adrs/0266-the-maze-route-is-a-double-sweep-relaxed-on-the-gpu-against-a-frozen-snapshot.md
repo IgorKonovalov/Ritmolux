@@ -1,8 +1,8 @@
 # ADR-0266 — The maze route is found in the quiet stretches by a double sweep on the GPU against a frozen snapshot
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-07 (Plan 0253), with an Outcome
 > **Date:** 2026-10-07
-> **Related plan(s):** [0253](../plans/0253-the-labyrinth-shows-its-longest-path.md); design-backlog 0274
+> **Related plan(s):** [0253](../plans/done/0253-the-labyrinth-shows-its-longest-path.md); design-backlog 0274
 
 ## Context
 

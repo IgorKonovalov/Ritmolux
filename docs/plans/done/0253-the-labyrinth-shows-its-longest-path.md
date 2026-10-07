@@ -1,10 +1,12 @@
 # 0253 — The labyrinth shows its longest path
 
-> **Status:** in-progress
+> **Status:** done - Phase 4 owed, ADR-0249. Phases 1-3 landed in `cca56596`, `1c41e058` and
+> `4f466a6a`; conductor close review round 1: no blockers, no majors, two minors and one nit
+> repaired in `f371c89b`, one nit under `.claude/` open. ADR-0266 accepted with an Outcome. v0.169.0.
 > **Created:** 2026-10-07
 > **Owner skill(s):** dev, human
 > **Closes:** design-backlog 0274
-> **Related ADRs:** [ADR-0266](../adrs/0266-the-maze-route-is-a-double-sweep-relaxed-on-the-gpu-against-a-frozen-snapshot.md)
+> **Related ADRs:** [ADR-0266](../../adrs/0266-the-maze-route-is-a-double-sweep-relaxed-on-the-gpu-against-a-frozen-snapshot.md)
 > (the route's mechanism and its quiet stretches), ADR-0012 (the ping-pong grid), ADR-0170 (`ParamSpec` declarations),
 > ADR-0180 (per-family params), ADR-0058 (unique bind group layouts), ADR-0245 (the per-pass timer),
 > ADR-0037 (a grid is a resolution)
@@ -432,5 +434,183 @@ struct RouteControl {
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Run at Phase 3 under its own
   done-when: `cargo nextest run -p rlx-core --test golden` (exit 0, 5 passed, 0 skipped).
 - **Outstanding `human` phases:** Phase 4 (`Blocks merge: no`).
+
+## Close review
+
+The conductor's round-1 review, in full (its headings one level down), graded at tip `34e2b006`.
+No earlier round raised a finding, so there are no fix-round lines. The close repaired m1, m2 and n1
+in `f371c89b`; n2 is under `.claude/` and stays open for the owner, who applies the paragraph it
+names. **Phase 4 is owed** (ADR-0249): it has not yet checked whether a 16-79-cell route inside one
+pocket of the labyrinth reads as "the longest path" at all, nor how the solid, graded and reveal
+looks read live through bites and a loosening window.
+
+### Plan 0253 — close review, round 1
+
+Graded at tip `34e2b00632b477a9107a574efaed0fdcf4cbd923` (tree `22ac0bd`), lane
+`/home/igor/Work/rlx-plan-0253` on `plan-0253-the-labyrinth-shows-its-longest-path`.
+
+**Verdict: Plan 0253 landed cleanly. No blockers, no majors, two minors and two nits.** All four are
+documentation. The route works as ADR-0266 describes it. The GPU double sweep matches the CPU mirror
+on a tree and on a loop. The control state stays on the GPU. The encode allocates nothing.
+`route = 0` is an identity, and the goldens confirm it.
+
+#### Evidence
+
+- **Full suite (lens 1).** Run as
+  `node "/home/igor/Work/Ritmolux/tools/conductor/with-lock.mjs" suite -- cargo nextest run --workspace`.
+  The wrapper printed the ledger record instead of re-running:
+  `with-lock: skipped cargo nextest run --workspace: tree 22ac0bd is green in the suite ledger, run by gate 0253-pre-review at 2026-10-07T13:58:40.849Z: 2038 tests run: 2038 passed (11 slow), 9 skipped`.
+  `git rev-parse HEAD^{tree}` is `22ac0bd5660f…`, so that record covers this tip.
+- **`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`**: clean.
+- **`node scripts/check-comment-hygiene.mjs`**: OK, with no escapes in use.
+- **Owner tags**: four phases, each with a single in-vocabulary tag (`dev`, `dev`, `dev`, `human`).
+  `Blocks merge: no` appears only on the `human` Phase 4, and no later phase reads that phase.
+
+#### Lens 1 — alignment
+
+The phase-to-commit table matches the history: Phase 1 `cca56596`, Phase 2 `1c41e058` and
+Phase 3 `4f466a6a`. Phase 4 is `owed`. I read the test for each done-when and checked its
+assertions:
+
+- Phase 1: `converged_sweeps_are_the_cpu_breadth_first_searches` (torus and bordered, sentinel on
+  walls and unreachable cells), `the_compare_count_is_the_cpu_change_count`,
+  `thirty_and_one_hundred_forty_four_fps_reach_the_same_route`, `route_zero_draws_the_frame_unchanged`.
+  The log reports the three readings, each naming its adapter. Pass cost is from RADV RENOIR and an
+  RTX 3080 Laptop GPU; sweep convergence and change counts are from llvmpipe.
+- Phase 2: `on_a_tree_maze_the_route_is_the_diameter` (brute-force diameter),
+  `on_a_loop_the_route_takes_both_equal_branches`, `a_maze_that_never_stands_still_never_commits`,
+  `a_stamp_mid_epoch_abandons_it_and_the_next_quiet_commits_the_new_maze`,
+  `a_broken_route_fades_and_never_paints_a_wall`, `the_route_reveals_along_its_length` (the front at
+  1 s and the whole route at 2 s with `route_reveal = 2`), `route_grade_paints_the_ends_at_their_coordinates`
+  (one colour at grade 0, and the ends at `route_coord` and `route_coord + grade`),
+  `cyclic_runs_no_route`, `a_standing_maze_relaxes_nothing_after_its_commit`.
+- Phase 3: `each_tier_hands_the_scene_its_own_route_rate` in `core/tests/suite/cellular.rs`. It
+  checks behaviour rather than a field: it compares the frame at which the route first commits on
+  each tier, and holds the ratio of the two search times to the ratio of the tiers' rates. The pass
+  count is deterministic and the clock integrates over `dt`, so the 0.08 tolerance stands for about
+  one frame of quantization over an ~18-frame search, not for adapter noise. The log works through
+  the rule's arithmetic and reports the epoch against the still stretch.
+
+**Deviations, logged and accepted.**
+- Phase 2 promised that a standing maze "encodes no relax pass after its commit" and that a test
+  would read "a pass counter on the scene". After a commit the CPU still encodes the work pass, but
+  the control pass has written a zero indirect workgroup count, so the pass dispatches nothing. The
+  test reads the GPU's own relax counter. This is the only implementation the plan's no-readback
+  rule allows, and the plan's wording was wrong to ask for more.
+- Phase 1's byte-identity is tested within the phase, not against a build from before it. The
+  `route = 0` present shader is the old text, concatenated, and the golden suite passes with
+  `RLX_BLESS` unset.
+
+#### Lens 2 — layering and real-time safety
+
+There is nothing source-specific in `core/` and no raw backend call. The C ABI and the control
+protocol do not change. On the render path, `Timeline` is an iterator over two `Ticks`, never
+collected. The per-frame event slots are written into a staging `Vec` sized at build and uploaded
+once. WGSL text is formatted only in `RouteResources::build`. `route.rs` carries the hot-path deny
+pragma, and the hygiene guard scans all of `render/scenes/` recursively. The route's passes share
+one storage-buffer set and choose their behaviour by entry point or control word, never by a
+uniform field, which follows the `StepParams` WARP note.
+
+#### Lens 3 — docs and bookkeeping
+
+The generated parameter block and the schemas were regenerated, and `.taplo.toml` did not change.
+`docs/nfr.md` gained a cellular memory bullet; see finding m1. No preset `.toml` changed.
+
+**What the close owes:**
+- the plan to `done - Phase 4 owed, ADR-0249` and `git mv` to `done/`, with links re-pointed;
+- ADR-0266 `proposed → accepted`, with the dated Outcome in m2;
+- backlog 0274: a CLOSED marker and the row moved from Promoted to Closed in the archive;
+- the plans index, carrying "Phase 4 owed";
+- **a minor version bump** for a feature plan, plus the studio's two version copies.
+
+Curation needs little: the only `presets/` files touched are generated, so there is no new content
+to curate. The plan fixed no engine defect, so the grep for stale workarounds owes nothing.
+
+#### Lens 4 — correctness and determinism
+
+- Relaxation is Jacobi: it reads one half of the pair, writes the other, and holds the halo at the
+  read values. A pass that changes no tile is a true fixed point, so `changed == 0` really means
+  convergence, and the reduction's `far` is the field's maximum. The parity flip before
+  `find_index` means `d_B` is copied from the half the last pass wrote.
+- The quiet test, `moved * 512 <= open`, stays inside `u32` up to `MAX_GRID`. `C_STILL_RUN` is
+  saturated, so a standing maze starts exactly one epoch. A not-still generation abandons the epoch
+  and flips `SHOWN_ON` to `FADING`, stamped with the event's own time rather than the frame's.
+- The generation clock's `Ticks` are built from the same `applied_step_rate` and `owed` that
+  `GenerationClock::advance` integrates, so the merged timeline cannot disagree with the
+  generations it orders.
+- No aspect ratio is derived from the grid. The present indexes cells exactly as `PRESENT_MAIN`
+  does.
+- Numeric assertions in the new tests are exact (BFS equality, route equality, colour-set size) or
+  have a stated mechanism (0.02 palette tolerance, 0.08 frame quantization). The tier doc comment
+  names its adapter.
+
+#### Lens 5 — design integrity
+
+The `Scene` trait does not widen. `CellularScene::new` gains a `route_rate` argument, threaded from
+`TierConfig` the same way `cellular_grid` already is. The route sits in its own module, owns its own
+resources, and is dropped with the field textures its bind groups read. There is no god-module
+growth worth flagging: `mod.rs` gained a dispatch, not the route's logic.
+
+#### Findings
+
+##### minor
+
+**m1 — `docs/nfr.md:613`: the new bullet's lead claim is false.** It says the route "doubles it at
+most", where "it" is the grid's allocation. The bullet's own figures say otherwise. The automaton's
+pair is 16 MB at 1024 and the route adds 24 bytes a cell, about 25 MB, so the total is about 2.5
+times the automaton alone. *Why it matters:* `nfr.md` is the page that quantifies "lightweight",
+and its headline claim is the one a reader quotes. *Fix (prose, close-repairable):* change the lead
+to "…sized by the preset, and its route adds 24 bytes a cell beside the automaton's 16".
+**Fixed in `f371c89b`.**
+
+**m2 — `docs/adrs/0266-…-frozen-snapshot.md:35`: the ADR's sizing premise is falsified for the
+labyrinth by Phase 1's reading.** The ADR sizes the search as a tree maze threading "~18 000 steps"
+at the labyrinth's 192 grid (lines 35, 141 and 187). Phase 1 measured something else. The
+labyrinth's open cells form **2 881 separate four-connected pockets**, the largest only 142 cells.
+The centre rule's route is 16 long, and the longest forced route is 79. The ADR's Notes (line 157,
+"the route lives in one component") predicted the kind, but not that it would be the common case.
+*Why it matters:* Phase 4's owner judgement and any later coarse-to-fine work would be argued from
+the 18 000 figure. *Fix (close-repairable, ADR-0054 precedent):* accept ADR-0266 with a dated
+`## Outcome (2026-10-07, Plan 0253)` that records the pocket count, the largest component, the
+16–79 route lengths, and the measured epochs (14–24 work passes, about 0.1 s at `Floor`). It should
+state that the labyrinth draws a short route inside a pocket, not a path across the maze, and that
+Phase 4 judges whether that reads. The 18 000 figure stays as the worst case on a connected maze.
+**Fixed in `f371c89b`.**
+
+##### nit
+
+**n1 — plan line 227: the Phase 3 done-when spells the preset check wrong.**
+`--check --strict presets` reads `--strict` as `--check`'s path and exits 2. The log records that
+the session ran `--check presets --strict` (exit 0). *Fix (close-repairable prose):* correct the
+done-when to `cargo run -q -p standalone --bin ritmolux -- --check presets --strict`.
+**Fixed in `f371c89b`.**
+
+**n2 — `.claude/skills/preset-author/references/systems.md:614`: the `cellular` section says nothing
+of the route, and Phase 4 is a `preset-author` session.** The generated `presets/README.md` rows
+carry the four params, but this section has no row for them. It also does not warn that `route` is
+both the overlay's strength and its on switch. Bound to a band that falls to 0, `route` halts the
+search, so the next rise starts from scratch. The close cannot apply this edit (ADR-0210). The owner
+should insert this paragraph after line 614, the "…no working range for that lever yet." paragraph,
+replacing nothing:
+
+```markdown
+**The route (`route`, `route_coord`, `route_grade`, `route_reveal`; ADR-0266) has no shipped
+working range yet** — Plan 0253 Phase 4 binds it on Labyrinth. `route` is the overlay's strength
+**and its switch**: at exactly 0 no search runs and none is owed, so bind it to a constant or to
+something with a floor above 0 (`0.6 + 0.4 * bass`), never to a bare band that rests at 0. The
+route is found only while the maze stands still and fades over `route_reveal / 4` when a reseed
+bites, so a preset that bites on every beat never shows one. It walks dead cells, so it is inert on
+`cyclic`. On Labyrinth's B3/S12345 the open cells are thousands of small pockets (Plan 0253
+Phase 1), so the route is a short trace inside one pocket, not a path across the whole maze.
+```
+
+**Open** — for the owner to apply.
+
+#### Close notes for the close session
+
+- There is no translation impact from this plan: no reader doc in the `.ru.md` set changed.
+- Phase 4 stays `owed`. What it has not yet checked: whether a 16–79-cell route inside one pocket
+  of the labyrinth reads as "the longest path" at all (m2), and how the solid, graded and reveal
+  looks read live through bites and a loosening window.
 
 ## Followups (after this lands)
