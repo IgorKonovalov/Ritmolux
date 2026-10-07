@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0251 - The seam, the thumbnail GPU and the timeline are tied off](#0251---the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off)
   - [0250 - The close findings and five small asks are paid](#0250---the-close-findings-and-five-small-asks-are-paid)
   - [0218 - The reference machine becomes Arch](#0218---the-reference-machine-becomes-arch)
   - [0239 - The swarm moves into a real camera](#0239---the-swarm-moves-into-a-real-camera)
@@ -293,6 +294,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0204 - The library learns from the corpus it will not ship](done/0204-the-library-learns-from-the-corpus-it-will-not-ship.md) - closed 2026-10-01. Review: **no blockers, no majors, one minor (fixed), one nit.** Version: **0.159.0**. ADR-0227 accepted, Outcome. [Write-up](README-archive.md).
 - [0232 - The library is walked, cut and refilled](done/0232-the-library-is-walked-cut-and-refilled.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (one fixed), two nits (fixed).** Version: **0.158.0**. ADR-0253 accepted. Closed 0038. [Write-up](README-archive.md).
 - [0241 - The conductor parks only on what the owner must settle](done/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (two fixed), one nit (fixed).** Version: **0.157.0**. ADR-0261 accepted. [Write-up](README-archive.md).
 - [0235 - The plexus system, and a shared camera with depth of field](done/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md) - closed 2026-10-01. Review: **three rounds; 3 majors, 3 minors (all fixed), two nits.** Version: **0.156.0**. ADR-0257 accepted. [Write-up](README-archive.md).
@@ -504,6 +506,26 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0251 - The seam, the thumbnail GPU and the timeline are tied off](done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md)
+
+- closed 2026-10-07 by a conductor close in the lane
+`plan-0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off`, round 1. The phases landed in
+`b647003b` (Phase 1), `5d5c6caa` (2) and `8900f044` (3, `studio-builder`). Phase 4, the human
+reading on the reference laptop, is `Blocks merge: no` and owed (ADR-0249). Review: **no blockers, no
+majors, two minors, one nit.** The close repaired both minors in `ed7d9447`: the `[thumbnails]`
+sentence in `configuration.md` now says a settings-menu switch reaches the next walk, and the
+`SWAY_SHARE` doc no longer claims a derived margin for a bound `size`. The nit (memoising
+`sway_bound`) is left open. Version **0.168.1** (patch: three fixes). No ADR paired. The full review
+is the plan's own `## Close review`.
+- **What landed.** `sway_bound` is an exact bound: it bisects one shared turn against the seam's
+  slab corners projected through the swayed view, with the seam inset by the largest seeded sprite.
+  The seam test sways the shipped minimum zoom 0.85 in four diagonals. The thumbnail child renders
+  on the show's adapter through `--gpu <index>`, prints its adapter, and the pass logs one note per
+  walk naming both. A cancelled studio render removes the timeline beside the grid.
+- **Open.** Phase 4's reading. A bound `size` or `size_spread` can draw sprites the seam inset does
+  not cover; nothing ships that binds them with a sway.
+- **Curation.** `presets/` untouched.
 
 ### [0250 - The close findings and five small asks are paid](done/0250-the-close-findings-and-five-small-asks-are-paid.md)
 

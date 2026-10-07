@@ -1348,6 +1348,16 @@ pub(crate) mod tests {
         assert_eq!(orphaned(&["--preset", "Clifford"]), None);
     }
 
+    /// **The thumbnail child's `--gpu` is accepted beside `--thumb`**: the pass
+    /// sends the show's adapter index that way, and neither flag asks for a
+    /// companion the other is not.
+    #[test]
+    fn the_thumbnail_child_takes_a_gpu() {
+        assert_eq!(orphaned(&["--thumb", "x", "--gpu", "1"]), None);
+        let argv = ["--thumb", "x", "--gpu", "1"].map(str::to_owned);
+        assert!(super::unrecognized_flag(argv.into_iter()).is_none());
+    }
+
     /// [`valued_valueless_flag`] reduced to the name the operator is shown.
     fn over_valued(args: &[&str]) -> Option<&'static str> {
         let argv = args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();

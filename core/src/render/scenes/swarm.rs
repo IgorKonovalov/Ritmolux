@@ -122,9 +122,15 @@ const DEPTH_FIELD_FREQ: f32 = 2.6 / Z_SPAN;
 /// The depth current's share of `force`. Small, so a particle takes tens of
 /// seconds to cross the slab and depth reads as layering, not as rushing.
 const Z_FLOW: f32 = 0.3;
-/// The share of [`sway_bound`]'s first-order bound the sway may take: the rest
-/// absorbs the second-order terms that model leaves out.
+/// The share of [`sway_bound`]'s exact seam-corner bound the sway may take. The
+/// bound covers sprites up to [`SPRITE_SIZE_MAX`] at the default `size`; a bound
+/// `size` or `size_spread` can draw larger ones, which this share is not derived
+/// to cover.
 const SWAY_SHARE: f32 = 0.8;
+/// The largest seeded sprite radius, in normalized-device height at
+/// [`SIZE_DEPTH`] under the default `size`. [`sway_bound`] insets the seam by
+/// it, so a sprite whose centre is just inside the seam stays off screen too.
+const SPRITE_SIZE_MAX: f32 = 0.011;
 /// The light of a particle at the near slab bound, under `depth_fade`. With the
 /// default fade it falls to 0.45 at the far bound: the ramp ADR-0044 tuned.
 const DEPTH_LIGHT_NEAR: f32 = 1.05;
@@ -722,7 +728,7 @@ impl SwarmScene {
             z: Z_NEAR + rng.next_f32() * Z_SPAN,
             hue: rng.next_f32(),
             bright: rng.range(0.5, 1.0),
-            size: rng.range(0.004, 0.011),
+            size: rng.range(0.004, SPRITE_SIZE_MAX),
             // Neutral; `new` overwrites all three from the particle's index.
             // Deliberately not drawn from `rng` — see the comment there.
             twinkle_freq: 0.0,
@@ -783,35 +789,38 @@ fn half_extent(z: f32, aspect: f32) -> (f32, f32) {
 ///
 /// At rest the seam projects to normalized-device `MARGIN * tan(REST_FOV / 2)
 /// / tan(fov / 2)` on both axes; what is left past the frame edge and the pan
-/// is that axis's headroom `h`. Turning the eye by `θ` about [`PIVOT`] moves a
-/// seam point at depth `z` along the turn's own axis by `θ * (1 + s^2 - PIVOT /
-/// z)` in tangent units, to first order, where `s` is the seam's rest tangent
-/// on that axis — the turn itself, its foreshortening, and the eye's own
-/// displacement. Alone, an axis may turn by `h` over the worst of that drift
-/// across the slab.
+/// is that axis's headroom `h`. Zero where either axis has none, so a pan or a
+/// `fov` that already shows the seam is not made worse by a sway.
 ///
-/// The two turns also couple: a yaw `θ` pushes one side of the frame deeper,
-/// which divides the other axis's tangents by up to `1 + θ * s_x` at the seam's
-/// corner, and a pitch likewise. So both alone-bounds are scaled by one shared
-/// `c`, the largest for which `seam / (1 + c * a) >= 1 + pan + c * h` holds on
-/// both axes, with `a` the other turn's coupling at its alone-bound; and then by
-/// [`SWAY_SHARE`] for the terms this first-order model leaves out. Zero where
-/// either axis has no headroom, so a pan or a `fov` that already shows the seam
-/// is not made worse by a sway.
+/// The bound's **shape** is first-order: turning the eye by `θ` about
+/// [`PIVOT`] moves a seam point at depth `z` along the turn's own axis by
+/// `θ * (1 + s^2 - PIVOT / z)` in tangent units, where `s` is the seam's rest
+/// tangent on that axis, so an axis alone may turn by about `h` over the worst
+/// of that drift across the slab. Its **size** is exact: one scale `c` shared
+/// by both axes is bisected against the real view ([`seam_clear`]), the largest
+/// that keeps every seam face, inset by the largest sprite's radius, outside
+/// the frame with the turn at any sign combination of the two bounds, either
+/// axis alone included. Each inset face is a planar quad between the slab's
+/// near and far depths, and a perspective projection maps it to a convex quad,
+/// so its four corners carry the face's extremes. The result is then scaled by
+/// [`SWAY_SHARE`]. Zero, too, where the inset seam already shows at rest.
 fn sway_bound(fov: f32, zoom: f32, aspect: f32, pan: [f32; 2]) -> [f32; 2] {
+    /// The largest share of the first-order bound searched, and the bisection
+    /// steps; 24 halvings put the scale within `4 / 2^24` of the limit.
+    const SCALE_MAX: f32 = 4.0;
+    const STEPS: u32 = 24;
     let finite = |v: f32, fallback: f32| if v.is_finite() { v } else { fallback };
     let zoom = finite(zoom, 1.0).max(1e-3);
-    let fov = (finite(fov, REST_FOV) / zoom).clamp(camera::MIN_FOV, camera::MAX_FOV);
+    let bound_fov = finite(fov, REST_FOV);
+    let fov = (bound_fov / zoom).clamp(camera::MIN_FOV, camera::MAX_FOV);
     let aspect = finite(aspect, 1.0).max(0.1);
+    let pan = [finite(pan[0], 0.0), finite(pan[1], 0.0)];
     let rest = (0.5 * REST_FOV).tan();
     let open = (0.5 * fov).tan();
     let seam = MARGIN * rest / open;
     // Each axis's pan in normalized-device units, the frame edge's tangent and
     // the seam's rest tangent.
-    let (pan_x, pan_y) = (
-        finite(pan[0], 0.0).abs() / aspect,
-        finite(pan[1], 0.0).abs(),
-    );
+    let (pan_x, pan_y) = (pan[0].abs() / aspect, pan[1].abs());
     let (frame_x, frame_y) = (open * aspect, open);
     let (slope_x, slope_y) = (MARGIN * rest * aspect, MARGIN * rest);
     let (h_x, h_y) = (seam - 1.0 - pan_x, seam - 1.0 - pan_y);
@@ -828,17 +837,73 @@ fn sway_bound(fov: f32, zoom: f32, aspect: f32, pan: [f32; 2]) -> [f32; 2] {
         h_x * frame_x / drift(slope_x),
         h_y * frame_y / drift(slope_y),
     );
-    // The largest `c` in `[0, 1]` with `c^2 h a + c (h + a (1 + pan)) - h <= 0`:
-    // the coupled condition above, rearranged.
-    let share = |h: f32, a: f32, pan: f32| {
-        if a <= f32::EPSILON {
-            return 1.0;
-        }
-        let b = h + a * (1.0 + pan);
-        ((-b + (b * b + 4.0 * h * h * a).sqrt()) / (2.0 * h * a)).clamp(0.0, 1.0)
+    let clear = |c: f32| {
+        seam_clear(
+            [c * alone_yaw, c * alone_pitch],
+            bound_fov,
+            zoom,
+            aspect,
+            pan,
+        )
     };
-    let c = share(h_x, alone_pitch * slope_y, pan_x).min(share(h_y, alone_yaw * slope_x, pan_y));
+    let c = if clear(SCALE_MAX) {
+        SCALE_MAX
+    } else {
+        // `hi` never clears; `lo` does, or stays at zero when even the rest
+        // view does not.
+        let (mut lo, mut hi) = (0.0f32, SCALE_MAX);
+        for _ in 0..STEPS {
+            let mid = 0.5 * (lo + hi);
+            if clear(mid) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        lo
+    };
     [SWAY_SHARE * c * alone_yaw, SWAY_SHARE * c * alone_pitch]
+}
+
+/// Whether every face of the wrap seam projects outside the frame with the eye
+/// turned to each of `±bound[0]` yaw and `±bound[1]` pitch, and to each alone.
+///
+/// The `u = ±1` faces must project wholly past `x = ±1` and the `v = ±1` faces
+/// past `y = ±1`, through the view [`camera_frame`](SwarmScene::camera_frame)
+/// builds; a corner nearer the eye than [`camera::NEAR`] fails.
+///
+/// Each face is inset by [`SPRITE_SIZE_MAX`]'s radius at the corner's depth,
+/// `SPRITE_SIZE_MAX * SIZE_DEPTH / z` in normalized-device height, which in
+/// world units is the depth-independent `SPRITE_SIZE_MAX * SIZE_DEPTH *
+/// tan(REST_FOV / 2)` on both axes: the inset face stays planar.
+fn seam_clear(bound: [f32; 2], fov: f32, zoom: f32, aspect: f32, pan: [f32; 2]) -> bool {
+    let unit = half_extent(1.0, aspect);
+    let inset = SPRITE_SIZE_MAX * SIZE_DEPTH * (0.5 * REST_FOV).tan();
+    let turns = [-1.0f32, 0.0, 1.0];
+    turns.into_iter().all(|sy| {
+        turns.into_iter().all(|sp| {
+            let view = camera::Camera3d {
+                yaw: sy * bound[0],
+                pitch: sp * bound[1],
+                distance: PIVOT,
+                fov,
+                focus: 0.5,
+                aperture: 0.0,
+            }
+            .view(aspect, zoom, pan);
+            [Z_NEAR, Z_FAR].into_iter().all(|z| {
+                let (hx, hy) = (unit.0 * z - inset, unit.1 * z - inset);
+                [-1.0f32, 1.0].into_iter().all(|a| {
+                    [-1.0f32, 1.0].into_iter().all(|b| {
+                        // Corner `(a, b)` lies on the `u = a` face and the
+                        // `v = b` face both.
+                        let c = view.clip([a * hx, b * hy, PIVOT - z]);
+                        c[3] >= camera::NEAR && a * c[0] / c[3] >= 1.0 && b * c[1] / c[3] >= 1.0
+                    })
+                })
+            })
+        })
+    })
 }
 
 /// The light a particle keeps at view depth `z` under `depth_fade`:

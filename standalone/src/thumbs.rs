@@ -27,14 +27,14 @@
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, UNIX_EPOCH};
 
 use rlx_core::preset::Preset;
-use rlx_core::render::Tier;
+use rlx_core::render::{AdapterChoice, Tier};
 use standalone::{APP_DIR_NAME, PresetDir, preset_data_root, resolve_preset_dir, shot};
 
 /// The cache directory's name, under the per-user app directory that holds
@@ -400,6 +400,32 @@ const NICE: &str = "10";
 #[cfg(windows)]
 const CREATION_FLAGS: u32 = 0x0000_4000 | 0x0800_0000;
 
+/// What follows ``--thumb `<name>` `` on the line a child prints to standard error
+/// before the adapter's description, once its renderer exists. The pass finds
+/// the child's adapter by it, so the child's line and the pass's reader are one
+/// string.
+const ADAPTER_LINE: &str = ": adapter: ";
+
+/// The adapter a walk's children are sent to: the show's running adapter, as
+/// `Renderer::adapter_description` gives it, and its position in
+/// `list_adapters()`'s roster when the roster holds it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Gpu {
+    show: String,
+    /// Passed to each child as `--gpu <index>`. `None` sends no flag, and the
+    /// child takes the high-performance default the unflagged window takes.
+    index: Option<usize>,
+}
+
+impl Gpu {
+    /// `show` placed in `roster`, a list of adapter descriptions in roster
+    /// order, by the full-description equality `AppState::adapter_index` uses.
+    fn place(show: String, roster: &[String]) -> Gpu {
+        let index = roster.iter().position(|detail| *detail == show);
+        Gpu { show, index }
+    }
+}
+
 /// What the pass reports to the frame loop.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum PassEvent {
@@ -425,6 +451,11 @@ pub(crate) enum PassEvent {
 /// says the roster was reloaded; it then walks again and renders only what the
 /// stamps say is stale. A pass that gave up, was stopped, or could not start a
 /// child has ended for the launch, and a rescan of it does nothing.
+///
+/// **Its children render on the show's adapter.** Each walk places the show's
+/// running adapter in the roster and passes its index to every child as
+/// `--gpu`; [`follow_adapter`](Self::follow_adapter) moves it after a switch,
+/// and the next walk follows.
 pub(crate) struct Pass {
     stop: Arc<AtomicBool>,
     events: Receiver<PassEvent>,
@@ -432,37 +463,66 @@ pub(crate) struct Pass {
     /// leave.
     rescans: Option<Sender<()>>,
     worker: Option<JoinHandle<()>>,
+    /// The show's running adapter's description, read by the worker at the
+    /// start of each walk.
+    show_adapter: Arc<Mutex<String>>,
 }
 
+/// The work a pass's thread runs: the stop flag, the event sender, the rescan
+/// receiver and the show's adapter.
+type Work = dyn FnOnce(&AtomicBool, &Sender<PassEvent>, &Receiver<()>, &Mutex<String>) + Send;
+
 impl Pass {
-    /// Start the pass. A worker thread that cannot be spawned is reported as
-    /// one note on the first drain and the pass is simply absent.
-    pub(crate) fn start() -> Pass {
-        Pass::spawn(walk)
+    /// Start the pass, its children following `show_adapter`, the show's
+    /// running adapter as `Renderer::adapter_description` gives it. A worker
+    /// thread that cannot be spawned is reported as one note on the first drain
+    /// and the pass is simply absent.
+    pub(crate) fn start(show_adapter: &str) -> Pass {
+        Pass::spawn(show_adapter, Box::new(walk))
     }
 
     /// A pass whose walks render what `survey` returns, with `exe` standing in
     /// for the player and `dir` for the cache its children write into — the
-    /// render loop without the library behind it.
+    /// render loop without the library behind it. The show is on `show`, and
+    /// `roster` stands in for `list_adapters()`'s descriptions.
+    #[cfg(all(test, unix))]
+    fn start_on(
+        exe: PathBuf,
+        dir: PathBuf,
+        show: &str,
+        roster: Vec<String>,
+        survey: impl FnMut() -> (Vec<Job>, usize) + Send + 'static,
+    ) -> Pass {
+        Pass::spawn(
+            show,
+            Box::new(move |stop, tx, rescans, show| {
+                let gpu = || Gpu::place(show_now(show), &roster);
+                serve(&exe, &dir, stop, tx, rescans, survey, gpu);
+            }),
+        )
+    }
+
+    /// [`start_on`](Self::start_on) with an empty roster, so no child is sent a
+    /// `--gpu`.
     #[cfg(all(test, unix))]
     fn start_with(
         exe: PathBuf,
         dir: PathBuf,
         survey: impl FnMut() -> (Vec<Job>, usize) + Send + 'static,
     ) -> Pass {
-        Pass::spawn(move |stop, tx, rescans| serve(&exe, &dir, stop, tx, rescans, survey))
+        Pass::start_on(exe, dir, "Show GPU", Vec::new(), survey)
     }
 
-    fn spawn(
-        work: impl FnOnce(&AtomicBool, &Sender<PassEvent>, &Receiver<()>) + Send + 'static,
-    ) -> Pass {
+    fn spawn(show_adapter: &str, work: Box<Work>) -> Pass {
         let stop = Arc::new(AtomicBool::new(false));
+        let show_adapter = Arc::new(Mutex::new(show_adapter.to_owned()));
         let (tx, events) = mpsc::channel();
         let (rescans, rescan_rx) = mpsc::channel();
         let flag = Arc::clone(&stop);
+        let show = Arc::clone(&show_adapter);
         let worker = std::thread::Builder::new()
             .name("rlx-thumbnails".to_owned())
-            .spawn(move || work(&flag, &tx, &rescan_rx));
+            .spawn(move || work(&flag, &tx, &rescan_rx, &show));
         let worker = match worker {
             Ok(handle) => Some(handle),
             Err(err) => {
@@ -475,6 +535,7 @@ impl Pass {
                     events: rx,
                     rescans: None,
                     worker: None,
+                    show_adapter,
                 };
             }
         };
@@ -483,6 +544,15 @@ impl Pass {
             events,
             rescans: Some(rescans),
             worker,
+            show_adapter,
+        }
+    }
+
+    /// The show moved to the adapter `description` names: the next walk's
+    /// children render on it. Never waits beyond the worker's own brief read.
+    pub(crate) fn follow_adapter(&self, description: &str) {
+        if let Ok(mut show) = self.show_adapter.lock() {
+            description.clone_into(&mut show);
         }
     }
 
@@ -546,9 +616,18 @@ enum Walk {
     Ended,
 }
 
+/// The show's adapter as the pass last heard it. A poisoned lock still holds
+/// the last description written, which is the one to use.
+fn show_now(show: &Mutex<String>) -> String {
+    show.lock()
+        .map(|show| show.clone())
+        .unwrap_or_else(|poisoned| poisoned.into_inner().clone())
+}
+
 /// The worker: resolve the cache and the executable once, then serve walks of
-/// the library for as long as the pass lives.
-fn walk(stop: &AtomicBool, tx: &Sender<PassEvent>, rescans: &Receiver<()>) {
+/// the library for as long as the pass lives, each walk's children on the
+/// show's adapter as placed in a fresh `list_adapters()` roster.
+fn walk(stop: &AtomicBool, tx: &Sender<PassEvent>, rescans: &Receiver<()>, show: &Mutex<String>) {
     let note = |line: String| {
         let _ = tx.send(PassEvent::Note(line));
     };
@@ -564,7 +643,7 @@ fn walk(stop: &AtomicBool, tx: &Sender<PassEvent>, rescans: &Receiver<()>) {
             ));
         }
     };
-    serve(&exe, &dir, stop, tx, rescans, || {
+    let survey = || {
         let presets = library();
         let total = presets.len();
         let library = presets.into_iter().map(|preset| {
@@ -572,7 +651,15 @@ fn walk(stop: &AtomicBool, tx: &Sender<PassEvent>, rescans: &Receiver<()>) {
             (preset.name, stamp)
         });
         (stale(&dir, library), total)
-    });
+    };
+    let gpu = || {
+        let roster: Vec<String> = rlx_core::render::list_adapters()
+            .into_iter()
+            .map(|adapter| adapter.detail)
+            .collect();
+        Gpu::place(show_now(show), &roster)
+    };
+    serve(&exe, &dir, stop, tx, rescans, survey, gpu);
 }
 
 /// The presets of `library` whose cached picture is missing or does not match
@@ -590,7 +677,8 @@ fn stale(dir: &Path, library: impl Iterator<Item = (String, Stamp)>) -> Vec<Job>
 ///
 /// `survey` returns the stale jobs and the library's size. A job that failed
 /// this launch is not tried again at the **same** stamp — a rescan is not a
-/// retry — but an edit that moves its stamp makes it a new job.
+/// retry — but an edit that moves its stamp makes it a new job. `gpu` places
+/// the show's adapter, once per walk that has anything to render.
 fn serve(
     exe: &Path,
     dir: &Path,
@@ -598,6 +686,7 @@ fn serve(
     tx: &Sender<PassEvent>,
     rescans: &Receiver<()>,
     mut survey: impl FnMut() -> (Vec<Job>, usize),
+    mut gpu: impl FnMut() -> Gpu,
 ) {
     let mut failed: Vec<Job> = Vec::new();
     loop {
@@ -611,7 +700,8 @@ fn serve(
                 "thumbnail pass: start, {} of {total} presets to render",
                 jobs.len()
             )));
-            if let Walk::Ended = render_all(exe, dir, &jobs, stop, tx, &mut failed) {
+            let gpu = gpu();
+            if let Walk::Ended = render_all(exe, dir, &jobs, &gpu, stop, tx, &mut failed) {
                 return;
             }
         }
@@ -625,11 +715,13 @@ fn serve(
 
 /// Render each of `jobs` in turn, one child at a time, until the list is done,
 /// the pass is stopped, or it gives up. Each job that fails is added to
-/// `failed`.
+/// `failed`. The first child that names its adapter produces the walk's one
+/// [`adapter_note`].
 fn render_all(
     exe: &Path,
     dir: &Path,
     jobs: &[Job],
+    gpu: &Gpu,
     stop: &AtomicBool,
     tx: &Sender<PassEvent>,
     failed: &mut Vec<Job>,
@@ -639,12 +731,19 @@ fn render_all(
     };
     let (mut rendered, mut failures, mut streak) = (0usize, 0usize, 0u32);
     let mut plain_priority = false;
+    let mut named = false;
     for job in jobs {
         let name = &job.name;
         if stop.load(Ordering::Relaxed) {
             break;
         }
-        match render_child(exe, dir, name, stop, &mut plain_priority, &note) {
+        let (outcome, adapter) =
+            render_child(exe, dir, name, gpu.index, stop, &mut plain_priority, &note);
+        if let (false, Some(adapter)) = (named, adapter) {
+            named = true;
+            note(adapter_note(&adapter, gpu));
+        }
+        match outcome {
             Render::Wrote => {
                 rendered += 1;
                 streak = 0;
@@ -685,6 +784,38 @@ fn render_all(
     Walk::Covered
 }
 
+/// The walk's one line naming the adapter a child rendered on, `child`, and
+/// the show's, and whether the two are one adapter.
+fn adapter_note(child: &str, gpu: &Gpu) -> String {
+    let how = match gpu.index {
+        Some(_) => "",
+        None => {
+            " (the high-performance default: the show's adapter is not in this \
+             launch's roster)"
+        }
+    };
+    let same = if child == gpu.show {
+        "the same adapter"
+    } else {
+        "different adapters"
+    };
+    format!(
+        "thumbnail pass: children render on {child}{how}, the show on {} ({same})",
+        gpu.show
+    )
+}
+
+/// The adapter a child named on its standard error, from the line
+/// [`render_still`] prints, or `None` when it printed none — a child that found
+/// its picture current never builds a renderer.
+fn child_adapter(stderr: &str) -> Option<String> {
+    stderr.lines().find_map(|line| {
+        line.strip_prefix("--thumb ")
+            .and_then(|rest| rest.split_once(ADAPTER_LINE))
+            .map(|(_, adapter)| adapter.trim().to_owned())
+    })
+}
+
 /// Remove the temporary files process `pid` — one of this pass's own children,
 /// once it has ended — left behind, so a half-written entry is discarded rather
 /// than kept. [`read_entry`] never opens one either way; this is housekeeping,
@@ -707,11 +838,14 @@ fn discard_partials(dir: &Path, pid: u32) {
     }
 }
 
-/// The command that renders `name` in a child, at low OS priority.
+/// The command that renders `name` in a child, at low OS priority, on the
+/// adapter at roster position `gpu` when there is one.
 ///
 /// On a Unix the priority is `nice`'s, because the standard library has no call
 /// for it; `plain` spawns the executable directly, for a system with no `nice`.
-fn child_command(exe: &Path, name: &str, plain: bool) -> Command {
+/// The index is valid in the child because the child is this executable on
+/// this machine, enumerating the same roster.
+fn child_command(exe: &Path, name: &str, plain: bool, gpu: Option<usize>) -> Command {
     #[cfg(unix)]
     let mut command = if plain {
         Command::new(exe)
@@ -730,35 +864,40 @@ fn child_command(exe: &Path, name: &str, plain: bool) -> Command {
         use std::os::windows::process::CommandExt;
         command.creation_flags(CREATION_FLAGS);
     }
+    command.arg("--thumb").arg(name);
+    if let Some(index) = gpu {
+        command.arg("--gpu").arg(index.to_string());
+    }
     command
-        .arg("--thumb")
-        .arg(name)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
     command
 }
 
-/// Render `name` in one child and wait for it, polling so the stop flag is
-/// honoured while it runs, then discard whatever temporary file that child left
-/// in `dir` — a child killed mid-write is the one case that leaves one.
+/// Render `name` in one child on the adapter at roster position `gpu`, and wait
+/// for it, polling so the stop flag is honoured while it runs, then discard
+/// whatever temporary file that child left in `dir` — a child killed mid-write
+/// is the one case that leaves one. Returns how it ended and the adapter it
+/// named, if it named one.
 fn render_child(
     exe: &Path,
     dir: &Path,
     name: &str,
+    gpu: Option<usize>,
     stop: &AtomicBool,
     plain: &mut bool,
     note: &impl Fn(String),
-) -> Render {
-    let mut child = match spawn_child(exe, name, plain, note) {
+) -> (Render, Option<String>) {
+    let mut child = match spawn_child(exe, name, gpu, plain, note) {
         Ok(child) => child,
-        Err(err) => return Render::Unstartable(err),
+        Err(err) => return (Render::Unstartable(err), None),
     };
     // `nice` execs the player, so the pid the child writes under is this one.
     let pid = child.id();
-    let outcome = await_child(&mut child, stop);
+    let (outcome, stderr) = await_child(&mut child, stop);
     discard_partials(dir, pid);
-    outcome
+    (outcome, child_adapter(&stderr))
 }
 
 /// Start the child that renders `name`, falling back to normal priority once
@@ -766,16 +905,17 @@ fn render_child(
 fn spawn_child(
     exe: &Path,
     name: &str,
+    gpu: Option<usize>,
     plain: &mut bool,
     note: &impl Fn(String),
 ) -> Result<Child, String> {
-    match child_command(exe, name, *plain).spawn() {
+    match child_command(exe, name, *plain, gpu).spawn() {
         Ok(child) => Ok(child),
         // No `nice` on this system: run at normal priority, and say so once.
         Err(err) if !*plain && err.kind() == std::io::ErrorKind::NotFound => {
             *plain = true;
             note("thumbnail pass: `nice` not found, renders run at normal priority".to_owned());
-            child_command(exe, name, true)
+            child_command(exe, name, true, gpu)
                 .spawn()
                 .map_err(|err| err.to_string())
         }
@@ -784,10 +924,11 @@ fn spawn_child(
 }
 
 /// Wait for `child`, polling so the stop flag is honoured while it runs, and
-/// say how it ended.
-fn await_child(child: &mut Child, stop: &AtomicBool) -> Render {
+/// say how it ended, with what it printed on standard error when it exited on
+/// its own — empty when it was killed.
+fn await_child(child: &mut Child, stop: &AtomicBool) -> (Render, String) {
     // Drained on its own thread so a chatty child cannot fill the pipe and
-    // stall; read after it exits for the failure's reason.
+    // stall; read after it exits for its adapter and a failure's reason.
     let stderr = child.stderr.take().map(|mut pipe| {
         std::thread::spawn(move || {
             let mut text = String::new();
@@ -795,39 +936,41 @@ fn await_child(child: &mut Child, stop: &AtomicBool) -> Render {
             text
         })
     });
-    let reason = |stderr: Option<JoinHandle<String>>| {
+    let read = |stderr: Option<JoinHandle<String>>| {
         stderr
             .and_then(|reader| reader.join().ok())
-            .and_then(|text| {
-                text.lines()
-                    .rev()
-                    .find(|l| !l.trim().is_empty())
-                    .map(str::to_owned)
-            })
+            .unwrap_or_default()
     };
 
     for _ in 0..CHILD_POLLS {
         if stop.load(Ordering::Relaxed) {
             kill(child);
-            return Render::Stopped;
+            return (Render::Stopped, String::new());
         }
         match child.try_wait() {
-            Ok(Some(status)) if status.success() => return Render::Wrote,
+            Ok(Some(status)) if status.success() => return (Render::Wrote, read(stderr)),
             Ok(Some(status)) => {
-                return Render::Failed(reason(stderr).unwrap_or_else(|| status.to_string()));
+                let text = read(stderr);
+                let reason = text
+                    .lines()
+                    .rev()
+                    .find(|l| !l.trim().is_empty())
+                    .map_or_else(|| status.to_string(), str::to_owned);
+                return (Render::Failed(reason), text);
             }
             Ok(None) => std::thread::sleep(CHILD_POLL),
             Err(err) => {
                 kill(child);
-                return Render::Failed(err.to_string());
+                return (Render::Failed(err.to_string()), String::new());
             }
         }
     }
     kill(child);
-    Render::Failed(format!(
+    let reason = format!(
         "no picture after {} s",
         CHILD_POLL.as_millis() * u128::from(CHILD_POLLS) / 1000
-    ))
+    );
+    (Render::Failed(reason), String::new())
 }
 
 fn kill(child: &mut Child) {
@@ -843,9 +986,21 @@ fn kill(child: &mut Child) {
 /// shape `--schema` and `--check` have, one level earlier because its caller is
 /// the player itself rather than an operator.
 pub(crate) fn child_mode() -> Option<i32> {
-    match crate::cli::parse_thumb_arg() {
-        Ok(None) => None,
-        Ok(Some(name)) => Some(render_one(&name)),
+    let name = match crate::cli::parse_thumb_arg() {
+        Ok(None) => return None,
+        Ok(Some(name)) => name,
+        Err(message) => {
+            eprintln!("{message}");
+            return Some(2);
+        }
+    };
+    // The pass passes `--gpu <index>` when the show's adapter is in the roster;
+    // without it the child asks for what the unflagged window asks for.
+    match crate::cli::windowed_flag("--gpu") {
+        Ok(wanted) => Some(render_one(
+            &name,
+            &standalone::gpu::window_choice(wanted.as_deref()),
+        )),
         Err(message) => {
             eprintln!("{message}");
             Some(2)
@@ -853,12 +1008,13 @@ pub(crate) fn child_mode() -> Option<i32> {
     }
 }
 
-/// Render `name`'s still into the cache and report what happened.
+/// Render `name`'s still into the cache, on `adapter`, and report what
+/// happened.
 ///
 /// Exit codes follow the launch path's own split: 2 for an argument list that is
 /// wrong in shape — a preset name no library holds — and 1 for a recognized
 /// request whose effect failed.
-fn render_one(name: &str) -> i32 {
+fn render_one(name: &str, adapter: &AdapterChoice) -> i32 {
     let dir = match ensure_cache_dir() {
         Ok(dir) => dir,
         Err(reason) => {
@@ -888,7 +1044,7 @@ fn render_one(name: &str) -> i32 {
             );
             return Err(0);
         }
-        render_still(name)
+        render_still(name, adapter)
     });
     let image = match image {
         Ok(image) => image,
@@ -942,9 +1098,15 @@ fn bracketed<T>(source: Option<&Path>, work: impl FnOnce(Stamp) -> T) -> (Stamp,
     (before, out, settled)
 }
 
-/// Load the library — after the caller's stamp — and render `name`'s still,
-/// or the exit code of the reason it could not be.
-fn render_still(name: &str) -> Result<rlx_core::render::CaptureImage, i32> {
+/// Load the library — after the caller's stamp — and render `name`'s still on
+/// `adapter`, or the exit code of the reason it could not be.
+///
+/// Prints [`ADAPTER_LINE`] once the renderer exists, which is the line the
+/// pass reads to name the child's adapter in its note.
+fn render_still(
+    name: &str,
+    adapter: &AdapterChoice,
+) -> Result<rlx_core::render::CaptureImage, i32> {
     let presets = library();
     if !presets.iter().any(|preset| preset.name == name) {
         eprintln!("--thumb `{name}`: no preset by that name in this library");
@@ -959,13 +1121,17 @@ fn render_still(name: &str) -> Result<rlx_core::render::CaptureImage, i32> {
     };
     // The floor tier, pinned. At 160x90 the rich tier's raised budgets are not
     // visible and the pass is running beside a show that wants the GPU.
-    let mut renderer = match shot::renderer(THUMB_W, THUMB_H, presets, Tier::Floor) {
+    let mut renderer = match shot::renderer_on(THUMB_W, THUMB_H, presets, Tier::Floor, adapter) {
         Ok(renderer) => renderer,
         Err(message) => {
             eprintln!("--thumb `{name}`: {message}");
             return Err(1);
         }
     };
+    eprintln!(
+        "--thumb `{name}`{ADAPTER_LINE}{}",
+        renderer.adapter_description()
+    );
     let frames = match renderer.capture_audio(name, &pcm, format, &[THUMB_HOP]) {
         Ok(frames) => frames,
         Err(err) => {
@@ -1622,6 +1788,109 @@ mod tests {
             [entry_file_name("Gyre")],
             "the cache holds something besides the one entry"
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// **A child is sent the show's roster position when the pass holds one**,
+    /// and no `--gpu` at all when it does not.
+    #[test]
+    fn a_child_carries_the_shows_adapter_index_only_when_there_is_one() {
+        let args = |gpu: Option<usize>| -> Vec<String> {
+            child_command(Path::new("ritmolux"), "Gyre", true, gpu)
+                .get_args()
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect()
+        };
+        assert_eq!(args(Some(1)), ["--thumb", "Gyre", "--gpu", "1"]);
+        assert_eq!(args(None), ["--thumb", "Gyre"]);
+    }
+
+    /// A stub player that names `adapter` the way [`render_still`] does, logs
+    /// the `--gpu` it was given to `log`, and succeeds.
+    #[cfg(unix)]
+    fn naming_stub(dir: &Path, adapter: &str, log: &Path) -> PathBuf {
+        stub(
+            dir,
+            &format!(
+                "echo \"$3 $4\" >> '{log}'\nprintf '%s\\n' \"--thumb $2{ADAPTER_LINE}{adapter}\" >&2\n\
+                 exit 0",
+                log = log.display()
+            ),
+        )
+    }
+
+    /// **The walk names the children's adapter once**, beside the show's: the
+    /// show's adapter is in the roster, so every child is sent its index and
+    /// the one note says the two are the same adapter.
+    #[cfg(unix)]
+    #[test]
+    fn a_walk_names_the_childrens_adapter_once() {
+        let dir = scratch("adapter-same");
+        let log = dir.join("log");
+        let exe = naming_stub(&dir, "Show GPU (Vulkan)", &log);
+        let roster = vec![
+            "Other GPU (Vulkan)".to_owned(),
+            "Show GPU (Vulkan)".to_owned(),
+        ];
+        let events = finish(Pass::start_on(
+            exe,
+            dir.clone(),
+            "Show GPU (Vulkan)",
+            roster,
+            names(&["A", "B", "C"]),
+        ));
+        let notes = notes(&events);
+        let named: Vec<&&str> = notes
+            .iter()
+            .filter(|line| line.starts_with("thumbnail pass: children render on"))
+            .collect();
+        assert_eq!(
+            named,
+            [
+                &"thumbnail pass: children render on Show GPU (Vulkan), the show on Show GPU \
+               (Vulkan) (the same adapter)"
+            ],
+            "{notes:?}"
+        );
+        let sent = std::fs::read_to_string(&log).expect("the stub ran");
+        assert_eq!(
+            sent.lines().collect::<Vec<_>>(),
+            ["--gpu 1", "--gpu 1", "--gpu 1"]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// **A child on another adapter than the show's is named as such**, and
+    /// with no roster match the child is sent no `--gpu` and the note says it
+    /// took the high-performance default.
+    #[cfg(unix)]
+    #[test]
+    fn a_child_on_another_adapter_is_named_as_such() {
+        let dir = scratch("adapter-different");
+        let log = dir.join("log");
+        let exe = naming_stub(&dir, "Other GPU (Vulkan)", &log);
+        let events = finish(Pass::start_on(
+            exe,
+            dir.clone(),
+            "Show GPU (Vulkan)",
+            Vec::new(),
+            names(&["A"]),
+        ));
+        let notes = notes(&events);
+        let named: Vec<&&str> = notes
+            .iter()
+            .filter(|line| line.starts_with("thumbnail pass: children render on"))
+            .collect();
+        assert_eq!(named.len(), 1, "{notes:?}");
+        assert!(named[0].contains("Other GPU (Vulkan)"), "{}", named[0]);
+        assert!(
+            named[0].contains("high-performance default"),
+            "{}",
+            named[0]
+        );
+        assert!(named[0].ends_with("(different adapters)"), "{}", named[0]);
+        let sent = std::fs::read_to_string(&log).expect("the stub ran");
+        assert_eq!(sent.trim(), "", "a child was sent a --gpu: {sent:?}");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

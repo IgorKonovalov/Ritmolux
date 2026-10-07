@@ -358,11 +358,8 @@ live entry citing this one.
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
 | 0219 | A `ctl/preset` datagram on loopback never reached the listener's queue | [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md). **Promoted** |
 | 0220 | A headless walk of the system roster stalls at `emitter` | [Plan 0252](plans/0252-the-lost-preset-ask-is-located-and-answered.md). **Promoted** |
-| 0261 | The thumbnail child picks its own GPU | [Plan 0251](plans/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md). **Promoted** |
 | 0274 | The cellular scene cannot trace a route through the maze it grows | [Plan 0253](plans/0253-the-labyrinth-shows-its-longest-path.md). **Promoted** |
 | 0277 | The owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/` | [Plan 0254](plans/0254-the-studio-judges-a-preset-set.md). **Promoted** |
-| 0285 | A render start that finishes its `--bars` read after a quit leaves `<output>.timeline.json` behind | [Plan 0251](plans/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md). **Promoted** |
-| 0286 | The swarm's `sway_bound` over-allows at small headroom | [Plan 0251](plans/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -688,6 +685,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0282 | A misspelled top-level table is silently ignored, even under --strict | [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 1. A warning with a hint. **Closed 2026-10-07** |
 | 0283 | The shared zoom doc is backwards on fragment_field and reaction_diffusion | [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 1. `field_zoom`. **Closed 2026-10-07** |
 | 0284 | The show window reports an empty Wayland app class | [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 4. Two app ids. **Closed 2026-10-07** |
+| 0261 | The thumbnail child picks its own GPU | [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) Phase 2. The show's adapter; Phase 4 owed. **Closed 2026-10-07** |
+| 0285 | A render start that finishes its `--bars` read after a quit leaves `<output>.timeline.json` behind | [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) Phase 3. **Closed 2026-10-07** |
+| 0286 | The swarm's `sway_bound` over-allows at small headroom | [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) Phase 1. An exact bound. **Closed 2026-10-07** |
 <!-- roster:end -->
 
 ---
@@ -17185,7 +17185,15 @@ designed; the first is the cheaper question to answer.
   **Owner if taken:** `dev`, after `architect` picks the move.
 - **Verified 2026-09-26** — the child command carries no adapter flag:
   `absent: --gpu in: standalone/src/thumbs.rs`
-- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0251](plans/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) was approved.
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) was approved.
+
+**CLOSED 2026-10-07** — [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md)
+Phase 2, the first move. The pass places the show's running adapter in `list_adapters()` once per
+walk and hands each child `--gpu <index>`; with no match the child asks for high performance. The
+child prints its adapter, and one `thumbnail pass: children render on` note per walk names both
+adapters and whether they differ. A settings-menu switch reaches the next walk, not a walk already
+running. Whether 0206's moved tail was two processes on one GPU is Phase 4's reading, owed after
+the merge (ADR-0249).
 
 ## 0274 — the cellular scene cannot trace a route through the maze it grows, so a labyrinth never shows its longest path
 
@@ -17241,7 +17249,13 @@ already holds a transcode open, and the same pattern can hold a `--bars` read op
 - **Verified 2026-10-07** — the timeline is written before the aborted check:
   `present: writeTimeline\(files\.timeline, neural\.timeline\) in: studio/electron/render/service.ts`
 - **Verified 2026-10-07** — `present: if \(abort\.signal\.aborted\) return refuse in: studio/electron/render/service.ts`
-- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0251](plans/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) was approved.
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) was approved.
+
+**CLOSED 2026-10-07** — [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md)
+Phase 3, both fixes. The `finally` removes the timeline beside the grid for a job that never
+launched, and a second aborted check sits ahead of `writeTimeline`. The service test holds a
+`--bars` read open across `abandon()` and finds neither file; against the pre-phase service it
+failed on the timeline.
 
 ## 0286 — the swarm's `sway_bound` over-allows at small headroom, so a swayed camera at a low zoom shows the wrap seam
 
@@ -17260,4 +17274,12 @@ or a safety factor derived from the headroom, and then the swayed case at the sh
 - **Verified 2026-10-07** — the shipped zoom is measured unswayed:
   `present: The shipped zoom is measured at rest only in: core/src/render/scenes/swarm/tests.rs`
 - **Verified 2026-10-07** — `present: fn sway_bound\(fov: f32, zoom: f32 in: core/src/render/scenes/swarm.rs`
-- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0251](plans/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) was approved.
+- **Moved to the archive 2026-10-07 on promotion**, when [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md) was approved.
+
+**CLOSED 2026-10-07** — [Plan 0251](plans/done/0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off.md)
+Phase 1, the exact bound. `sway_bound` bisects one shared turn against the seam's slab corners
+projected through the swayed view. The exact corner bound alone reproduced the first-order sizes and
+still let sprites reach 0.9961 NDC, so the seam is also inset by the largest seeded sprite at the
+default `size` (`SPRITE_SIZE_MAX`). The seam test now sways zoom 0.85 in four diagonals with none
+inside the frame. A bound `size` or `size_spread` can draw sprites the inset does not cover; the
+bound does not see those params.

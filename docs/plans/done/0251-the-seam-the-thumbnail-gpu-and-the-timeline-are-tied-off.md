@@ -1,6 +1,8 @@
 # 0251 — The seam, the thumbnail GPU and the timeline are tied off
 
-> **Status:** approved (2026-10-07)
+> **Status:** done - Phase 4 owed, ADR-0249. Phases 1-3 in b647003b, 5d5c6caa, 8900f044; conductor
+> close review round 1: no blockers, no majors, two minors (fixed in ed7d9447), one nit (open).
+> Version 0.168.1.
 > **Created:** 2026-10-07
 > **Owner skill(s):** dev, studio-builder, human
 > **Closes:** design-backlog 0261, 0285, 0286
@@ -179,25 +181,182 @@ settled here:
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:**
+**Lane:** branch `plan-0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off`, worktree
+`/home/igor/Work/rlx-plan-0251`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The swarm's sway bound is exact at the shipped minimum zoom | dev | not started | |
-| 2 — The thumbnail child renders on the show's adapter and says which | dev | not started | |
-| 3 — A cancelled render leaves no timeline beside the output | studio-builder | not started | |
-| 4 — The thumbnail reading is re-taken with both adapters named | human | not started | |
+| 1 — The swarm's sway bound is exact at the shipped minimum zoom | dev | done | b647003b |
+| 2 — The thumbnail child renders on the show's adapter and says which | dev | done | 5d5c6caa |
+| 3 — A cancelled render leaves no timeline beside the output | studio-builder | done | 8900f044 |
+| 4 — The thumbnail reading is re-taken with both adapters named | human | owed | |
 
 ### Notes
 
+- Phase 1: the exact corner bound alone reproduced the first-order sizes (zoom 0.85 at 1280x800:
+  yaw 0.0146, pitch 0.0158) and still put 238 particle-frames at 0.9961 NDC. Per the plan's
+  sprite-radius risk, the bound now insets the seam by the largest seeded sprite at the default
+  `size` (new `SPRITE_SIZE_MAX = 0.011`, the scatter's existing upper limit) and `SWAY_SHARE`
+  stays 0.8 on top. Resulting bounds: zoom 1 yaw 0.0770 / 0.0724, pitch 0.0833 / 0.0820; zoom 0.85
+  yaw 0.0089 / 0.0083, pitch 0.0096 / 0.0094 (1280x800 / 1920x1080). The `size` and `size_spread`
+  params can draw sprites larger than the inset covers; `sway_bound`'s signature does not see them.
+- Phase 2: `cli.rs` gained no reader; the child reads `--gpu` through the existing
+  `windowed_flag`, and `cli.rs` carries only the companion test. A switch through
+  `AppState::swap_adapter` reaches the next walk (the worker places the adapter once per walk), not
+  a later child of a walk already running.
+- Phase 3: the new test was run against `service.ts` as of 5d5c6caa and failed on the
+  `.timeline.json` assertion. The neural branch keeps the existing aborted check after the branch
+  and adds a second one ahead of `writeTimeline`, rather than moving the one.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none
 - **Plan header `Closes:`** design-backlog 0261, 0285, 0286
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** fix-only (core swarm sway bound, standalone thumbnail child adapter and note,
+  studio render-start cleanup)
+- **Operator docs touched:** `docs/configuration.md` (`[thumbnails]`, Phase 2)
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 43 reductions across 20
+  live entries, 3 unprobeable
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
+- **Outstanding `human` phases:** Phase 4 (blocks merge: no)
+
+## Close review
+
+Conductor close, round 1, 2026-10-07. **Phase 4 is owed** (ADR-0249): the reading on the reference
+laptop has not been taken, so nothing yet says whether Plan 0206's moved frame-time tail was the
+show and the thumbnail child sharing one GPU. Both minors below were repaired at the close in
+`ed7d9447`; the nit is open. No earlier round raised findings.
+
+### Plan 0251 — close review, round 1
+
+Graded at `2638a5c9729fab40a313ee420feffe678ecac059` (tree `99a75a2e`), lane
+`plan-0251-the-seam-the-thumbnail-gpu-and-the-timeline-are-tied-off`.
+
+**Verdict: Plan 0251 landed cleanly. No blockers, no majors, two minors and one nit.** All three
+machine phases do what their contracts say, and every done-when was re-run here. Phase 4 (human,
+`Blocks merge: no`) is correctly `owed`.
+
+### Evidence
+
+- **Full suite (lens 1):** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 99a75a2 is green in the suite ledger, run by
+  gate 0251-pre-review at 2026-10-07T13:03:05.748Z: 2023 tests run: 2023 passed (13 slow), 8 skipped`.
+  `git rev-parse HEAD^{tree}` is `99a75a2e...`, so the record covers exactly this tip.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: clean.
+- `cargo fmt --all -- --check`: clean. `cargo clippy --workspace --all-targets -- -D warnings`: clean.
+- Phase 1: `cargo nextest run -p rlx-core --no-capture the_wrap_seam_stays_outside_the_frame_at_every_depth the_sway_bound_follows_the_lens_and_the_pan`
+  (through the suite wrapper) passed. Printed lines:
+  - `1280x800 at zoom 0.85 (the lowest shipped zoom, from swarm_murmuration.toml, swayed): 313823 particle-frames ..., 0 projected inside the frame; nearest 1.0053 ndc (sway bound yaw 0.0089, pitch 0.0096)`
+  - `1920x1080 at zoom 0.85 (..., swayed): 322503 ..., 0 projected inside the frame; nearest 1.0063 ndc (sway bound yaw 0.0083, pitch 0.0094)`
+  - zoom 1: yaw 0.0770 / 0.0724, pitch 0.0833 / 0.0820, nearest 1.0575 / 1.0551, 0 inside.
+  `git grep -c "measured at rest only" -- core/src/render/scenes/swarm/tests.rs`: no match.
+- Phase 2: `cargo nextest run -p standalone thumbs:: the_thumbnail_child_takes_a_gpu`: 18 passed.
+  `git grep -c "children render on" -- standalone/src/thumbs.rs`: 6.
+- Phase 3: `npm --prefix studio test -- electron/render/service.test.ts`: 12 passed;
+  `npm --prefix studio run typecheck` and `npm --prefix studio run lint`: exit 0.
+- `node scripts/check-comment-hygiene.mjs`, `check-doc-links.mjs`, `check-reader-prose.mjs`: OK.
+  `node scripts/check-backlog-claims.mjs`: OK, 43 reductions across 20 live entries, 3 unprobeable.
+
+### Lens 1 — alignment
+
+- Every phase carries one in-vocabulary `**Owner skill:**`; Phase 4's `Blocks merge: no` sits on a
+  `human` phase whose output nothing later reads. Implementation log present, shorter than the
+  phases, phase-to-commit mapping matches `git log main..HEAD`.
+- **Phase 1.** `sway_bound` keeps its signature, the zero-headroom and non-finite arms, and now
+  bisects one shared scale against `seam_clear`, which projects the eight slab corners through the
+  real `Camera3d::view` at every sign combination of the two turns, either alone included. I checked
+  the corner condition: requiring `a*x/w >= 1 && b*y/w >= 1` at every corner is exactly the union of
+  "the `u = a` face is past `x = a`" and "the `v = b` face is past `y = b`", since each face's four
+  corners are the corners sharing its sign. The inset is world-space and depth-independent as its
+  comment derives, so the inset face stays planar and the convex-quad argument holds. The sprite
+  inset (`SPRITE_SIZE_MAX`) was added under the plan's own sprite-radius risk, which named the bound
+  as where that fix belongs; `SWAY_SHARE` is unchanged, as the plan requires. The test sways the
+  shipped zoom in four diagonals, keeps the 0.02 floor at `zoom = 1` only and asserts `> 0` at 0.85.
+- **Phase 2.** The child reads `--gpu` through `windowed_flag` and `gpu::window_choice`, whose `None`
+  arm is `HighPerformance`; it builds through `shot::renderer_on` and prints
+  ``--thumb `<name>`: adapter: <description>``. The parent places `adapter_description()` in
+  `list_adapters()` by `detail` equality, the same rule `AppState::adapter_index` uses; the child's
+  `AdapterChoice::Index` resolves against the same `new_without_display_handle` instance and
+  `Backends::all()` enumeration (`core/src/render/context.rs:280,343,601`), so the index is stable.
+  Both `Pass::start` sites and `swap_adapter` pass the description. The two stub tests assert one
+  note per walk, the `--gpu 1` each child received, no `--gpu` with no roster match, and
+  `different adapters`. The one deviation (a switch reaches the next walk, not the next child) is
+  disclosed in the log; see minor 1.
+- **Phase 3.** `beside` holds both files and the `finally` removes both on a non-launch; a second
+  aborted check sits ahead of `writeTimeline` (the log discloses keeping the existing one too, which
+  is harmless). The new test holds the `--bars` read, abandons, finishes it, and asserts the refusal,
+  no spawn, and neither file. Against the pre-phase `service.ts` the timeline is written and not
+  removed, so the test's last assertion is the one that would fail, as the log reports.
+
+### Lens 2 — layering and real-time safety
+
+No core layering change: `sway_bound` stays pure scene math. The pass's new `Mutex<String>` is taken
+by the render thread only inside `swap_adapter` (a menu action) and briefly by the worker once per
+walk; no audio-thread involvement. `list_adapters()` runs on the worker thread. No C ABI or control
+protocol change.
+
+### Lens 3 — docs and bookkeeping
+
+`docs/configuration.md` `[thumbnails]` gained the sentence Phase 2 asked for (see minor 1 for its
+precision). No other operator doc names the behaviour. Close owes: status `done - Phase 4 owed,
+ADR-0249`, move to `done/`, `## Close review`, plans README, backlog 0261/0285/0286 to `### Closed`
+in the archive, and a **patch** bump (the log says fix-only, and the three changes are fixes), with
+the studio's two version copies. No ADR is paired. `presets/` untouched, so no curation.
+
+### Lens 4 — correctness and determinism
+
+`sway_bound` is deterministic and finite-guarded; the bisection's invariant (`hi` never clears, `lo`
+clears or is zero) holds, and `clear(SCALE_MAX)` short-circuits the open case. The bound takes its
+aspect from the render target passed into `camera_frame`, not a grid. No new numeric assertion is a
+frozen measurement: the seam test's `inside == 0` is a property and the floors are unchanged.
+
+### Lens 5 — design integrity
+
+No seam widened. `shot::renderer` delegates to `renderer_on`, so its other callers are byte-for-byte
+unchanged.
+
+### Findings
+
+#### minor
+
+1. **`docs/configuration.md:543` says the pass follows "a switch from the settings menu", but a switch
+   reaches only the next walk.** `serve` places the adapter once per walk
+   (`standalone/src/thumbs.rs:703`), so after a switch during the first launch's full-library walk
+   every remaining child of that walk renders on the old adapter, and a parked pass renders nothing
+   until a rescan. The plan's Decision said "the next child follows it"; the log discloses the
+   difference. Repair (prose, close-repairable): make the sentence read "Each render runs on the
+   graphics adapter the show is rendering on, following an `[output] gpu` pin; after a switch from
+   the settings menu, the next walk of the library follows the new adapter, and the pass's ..." A code
+   fix (re-placing the show per child against the walk's cached roster) is the alternative, and is a
+   `dev` change.
+2. **`core/src/render/scenes/swarm.rs:125-128`: the `SWAY_SHARE` doc comment claims its remaining 20 %
+   is room for a sprite a bound `size` or `size_spread` draws larger than `SPRITE_SIZE_MAX`, and
+   nothing derives or probes that.** The seam test runs only the default `size`, which is the one case
+   the exact bound already covers, so the claim is the same unprobed shape 0286 was opened about (a
+   preset not yet written exposes it). Repair (comment text, close-repairable): replace the doc with
+   "The share of [`sway_bound`]'s exact seam-corner bound the sway may take. The bound covers sprites
+   up to [`SPRITE_SIZE_MAX`] at the default `size`; a bound `size` or `size_spread` can draw larger
+   ones, which this share is not derived to cover." A backlog entry for a `size`-aware bound is the
+   architect's call at the close.
+
+#### nit
+
+3. **`core/src/render/scenes/swarm.rs:806`: `sway_bound` now runs up to 25 `seam_clear` calls, each
+   building up to nine view matrices, from `camera_frame` every frame.** Short-circuiting keeps it to
+   microseconds, so it is no budget risk, but its inputs (`fov`, `zoom`, `aspect`, `pan`) rarely
+   change; memoising on them would make the per-frame cost a comparison. Leave unless a profile
+   points here.
+
+### Close notes
+
+- Minor 1: fixed in `ed7d9447` with the review's replacement sentence. Minor 2: fixed in `ed7d9447`
+  with the review's replacement doc comment; no backlog entry is filed for a `size`-aware bound,
+  because no shipped swarm preset binds `yaw`, `pitch`, `size` or `size_spread` with a sway. Nit 3:
+  open.
+- Upstream CI (`check-upstream-ci.mjs`): run 36297464014 on `main` at `4ffed87`, success.
+- Backlog 0261, 0285 and 0286 moved to the archive's `### Closed` with their `CLOSED` markers.
+- No paired ADR. `presets/` untouched, so no curation.
+- Translation advisory: `docs/running.ru.md` trails `docs/running.md` (stamped `fb237a6c`, source at
+  `b25cd8cf`); this plan did not move it.
 
 ## Followups (after this lands)
