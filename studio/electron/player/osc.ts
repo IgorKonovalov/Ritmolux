@@ -77,6 +77,11 @@ export function ctlArgs(action: CtlAction): Arg[] {
       return []
     case 'preset':
       return [{ tag: 's', value: action.name }]
+    case 'preset_req':
+      return [
+        { tag: 's', value: action.name },
+        { tag: 'i', value: action.req },
+      ]
     case 'transport':
       return [{ tag: 's', value: action.verb }]
     case 'mark':

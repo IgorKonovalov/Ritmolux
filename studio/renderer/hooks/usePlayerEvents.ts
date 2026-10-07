@@ -7,7 +7,10 @@
  */
 import { useEffect, useState } from 'react'
 
+import type { LostAsk } from '@shared/preset-ask'
 import type { HealthEvent, HelloEvent, PlayerEvent, StreamEvent } from '@shared/protocol'
+
+import { onPresetAskLost, presetAcked } from './usePlayer'
 
 /**
  * The user's opinion of the library, as the player last reported it.
@@ -142,14 +145,48 @@ function reduce(state: PlayerState, event: PlayerEvent): PlayerState {
         ].slice(0, 32),
       }
     case 'pong':
+    case 'preset_ack':
+      // The asker in `usePlayer` reads the ack; a `refused` one is already in
+      // the list as the `preset_error` the player raised beside it.
       return state
+  }
+}
+
+/**
+ * A selection no `preset_ack` answered, placed where a refused selection's
+ * `preset_error` lands: `file` carries the asked-for name, as that arm's does.
+ */
+function reduceLost(state: PlayerState, lost: LostAsk): PlayerState {
+  return {
+    ...state,
+    problems: [
+      {
+        file: lost.name,
+        message: `the player did not answer (ctl/preset/req ${lost.req}, ${lost.attempts} attempts)`,
+        line: null,
+        col: null,
+        param: null,
+        kind: 'error',
+      } satisfies Problem,
+      ...state.problems,
+    ].slice(0, 32),
   }
 }
 
 export function usePlayerEvents(): PlayerState {
   const [state, setState] = useState<PlayerState>(EMPTY)
-  useEffect(() => window.api.player.onEvent((event) => setState((s) => reduce(s, event))), [])
+  useEffect(() => {
+    const offEvent = window.api.player.onEvent((event) => {
+      if (event.ev === 'preset_ack') presetAcked(event)
+      setState((s) => reduce(s, event))
+    })
+    const offLost = onPresetAskLost((lost) => setState((s) => reduceLost(s, lost)))
+    return () => {
+      offEvent()
+      offLost()
+    }
+  }, [])
   return state
 }
 
-export { reduce as reducePlayerEvent, EMPTY as emptyPlayerState }
+export { reduce as reducePlayerEvent, reduceLost as reduceLostAsk, EMPTY as emptyPlayerState }

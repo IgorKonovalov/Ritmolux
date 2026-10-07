@@ -98,6 +98,7 @@ describe('the ctl vocabulary on the wire', () => {
     { kind: 'param_clear', name: 'warp' },
     { kind: 'params_clear' },
     { kind: 'preset', name: 'aurora' },
+    { kind: 'preset_req', name: 'aurora', req: 42 },
     { kind: 'transport', verb: 'next' },
     { kind: 'mark', name: 'aurora', mark: 'favourite', on: true },
     { kind: 'ping', nonce: 7 },
@@ -119,6 +120,14 @@ describe('the ctl vocabulary on the wire', () => {
     expect(argsOf(buf)).toEqual([
       { tag: 's', value: 'warp' },
       { tag: 'f', value: 0.25 },
+    ])
+  })
+
+  it('sends preset/req as the name then the id, tags exactly si', () => {
+    // The player's decoder refuses `s`, `sf` and `ii` on this address.
+    expect(argsOf(encodeCtl({ kind: 'preset_req', name: 'attractor_fern', req: 42 }))).toEqual([
+      { tag: 's', value: 'attractor_fern' },
+      { tag: 'i', value: 42 },
     ])
   })
 

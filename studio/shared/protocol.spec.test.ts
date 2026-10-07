@@ -18,6 +18,7 @@ import {
   CTL_ADDRESSES,
   PIXEL_FORMATS,
   PLAYER_EVENT_NAMES,
+  PRESET_ACK_OUTCOMES,
   TRANSPORT_VERBS,
   eventFields,
   playerEventSchema,
@@ -195,6 +196,12 @@ describe('the event roster table and the fields each union member carries', () =
     expect(fieldsCell(row[1]).values.format).toEqual([...PIXEL_FORMATS])
   })
 
+  it('carries exactly the outcomes the spec names for a preset ack', () => {
+    const row = rows.find((cs) => code(cs[0]) === 'preset_ack')
+    if (row === undefined) throw new Error('the spec declares no preset_ack row')
+    expect(fieldsCell(row[1]).values.outcome).toEqual([...PRESET_ACK_OUTCOMES])
+  })
+
   it('annotates a closed set on exactly the fields that have one', () => {
     // Guards the parse above: if the group syntax were mis-read, every cell
     // would report no values and the assertion before this would pass vacuously
@@ -202,6 +209,6 @@ describe('the event roster table and the fields each union member carries', () =
     const annotated = rows.flatMap((row) =>
       Object.keys(fieldsCell(row[1]).values).map((field) => `${code(row[0])}.${field}`),
     )
-    expect(annotated).toEqual(['stream.format'])
+    expect(annotated).toEqual(['stream.format', 'preset_ack.outcome'])
   })
 })

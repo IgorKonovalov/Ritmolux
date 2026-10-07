@@ -214,6 +214,23 @@ export const pongSchema = z.object({
 })
 
 /**
+ * What the drain that applied a `ctl/preset/req` did with it (ADR-0265):
+ * `selected` began a dissolve, `current` named the preset the show is already
+ * landing on and changed nothing, `refused` named no preset the roster holds and
+ * is reported again by the `preset_error` beside it.
+ */
+export const PRESET_ACK_OUTCOMES = ['selected', 'current', 'refused'] as const
+export type PresetAckOutcome = (typeof PRESET_ACK_OUTCOMES)[number]
+
+export const presetAckSchema = z.object({
+  ...base,
+  ev: z.literal('preset_ack'),
+  req: z.number().int(),
+  name: z.string(),
+  outcome: z.enum(PRESET_ACK_OUTCOMES),
+})
+
+/**
  * Every event, by name. **The one list**: the roster the spec is diffed
  * against and the field sets that diff are both read off this, so a member
  * added to the union without a row here cannot hide.
@@ -228,6 +245,7 @@ export const PLAYER_EVENT_SCHEMAS = {
   stream: streamSchema,
   marks: marksSchema,
   pong: pongSchema,
+  preset_ack: presetAckSchema,
 } as const
 
 export const playerEventSchema = z.discriminatedUnion('ev', [
@@ -240,6 +258,7 @@ export const playerEventSchema = z.discriminatedUnion('ev', [
   streamSchema,
   marksSchema,
   pongSchema,
+  presetAckSchema,
 ])
 
 export type PlayerEvent = z.infer<typeof playerEventSchema>
@@ -250,6 +269,7 @@ export type PresetErrorEvent = z.infer<typeof presetErrorSchema>
 export type PresetEvent = z.infer<typeof presetSchema>
 export type RosterEvent = z.infer<typeof rosterSchema>
 export type MarksEvent = z.infer<typeof marksSchema>
+export type PresetAckEvent = z.infer<typeof presetAckSchema>
 
 /** Every `ev` name, read off the one list rather than typed a second time. */
 export const PLAYER_EVENT_NAMES = Object.keys(PLAYER_EVENT_SCHEMAS) as PlayerEvent['ev'][]
@@ -290,6 +310,16 @@ export const ctlActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('param_clear'), name: z.string().min(1) }),
   z.object({ kind: z.literal('params_clear') }),
   z.object({ kind: z.literal('preset'), name: z.string().min(1) }),
+  /**
+   * `req` is the sender's id for one ask, and a resend carries the same one;
+   * the player answers it with a `preset_ack` naming it (ADR-0265). An OSC `i`,
+   * so it is held to a signed 32-bit range here rather than wrapped on the wire.
+   */
+  z.object({
+    kind: z.literal('preset_req'),
+    name: z.string().min(1),
+    req: z.number().int().min(-2147483648).max(2147483647),
+  }),
   z.object({ kind: z.literal('transport'), verb: z.enum(TRANSPORT_VERBS) }),
   /**
    * `on` is a **state**, not a press (spec 0003): the sender says what the mark
@@ -320,6 +350,7 @@ export const CTL_ADDRESSES = {
   param_clear: `${ADDRESS_PREFIX}/ctl/param/clear`,
   params_clear: `${ADDRESS_PREFIX}/ctl/params/clear`,
   preset: `${ADDRESS_PREFIX}/ctl/preset`,
+  preset_req: `${ADDRESS_PREFIX}/ctl/preset/req`,
   transport: `${ADDRESS_PREFIX}/ctl/transport`,
   mark: `${ADDRESS_PREFIX}/ctl/mark`,
   ping: `${ADDRESS_PREFIX}/ctl/ping`,

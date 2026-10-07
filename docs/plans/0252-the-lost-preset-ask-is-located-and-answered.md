@@ -259,7 +259,7 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
 | 2 — The player answers a preset ask that carries an id | dev | done | 27efabe2 |
 | 3 — The two control-path tests resend instead of waiting once | dev | done | decbb4f5 |
 | 4 — The full suite | dev | done | committed with this row |
-| 5 — The studio's library click is acknowledged | studio-builder | not started | |
+| 5 — The studio's library click is acknowledged | studio-builder | done | committed with this row |
 | 6 — The loaded reproduction is read | human | not started | |
 
 ### Notes
@@ -289,6 +289,23 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
   Errors unavailable`); the unfaulted test printed `0 RESENT line(s)`. `cargo fmt --all --check`,
   `cargo clippy --workspace --all-targets -- -D warnings` and
   `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` were clean.
+- Phase 5: the resend loop runs in the renderer, not in main. A give-up decided in main would need
+  a way to reach the renderer, and ADR-0178 allows only three domain channels: `player:event`
+  carries only the player's own `PlayerEvent`s, and a fourth channel would widen the protocol. Main
+  therefore forwards `preset_req` and `preset_ack` unchanged, like every other action and event.
+  The policy is a pure class, `studio/shared/preset-ask.ts`, with its fake-timer tests in
+  `studio/shared/preset-ask.test.ts` rather than `control.ts` / `control.test.ts`. Neither
+  `control.ts` nor `events.ts` changed. `renderer/hooks/usePlayer.ts` holds one asker for the
+  window, and `usePlayerEvents.ts` feeds it acks from its one subscription. It reduces a give-up
+  into `problems`, where a refused selection's `preset_error` already appears in `App.tsx`'s banner,
+  so that component needed no change.
+- Phase 5 touched `studio/electron/player/osc.ts` and `osc.test.ts`, outside its file list. The
+  encoder needs the `si` argument case, and its vocabulary test covers every action. The spec test
+  gained a `preset_ack.outcome` assertion, and its closed-set guard now expects that field beside
+  `stream.format`.
+- Phase 5: `npm --prefix studio run typecheck`, `npm --prefix studio run lint` and
+  `npm --prefix studio test` (45 files, 405 tests, `protocol.spec.test.ts` included) passed, and
+  `node scripts/check-comment-hygiene.mjs` was OK.
 
 ### Close triggers
 
