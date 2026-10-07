@@ -684,7 +684,7 @@ impl AppState {
         // the pass is slow enough that starting it on the first `Tab` would
         // leave the pane empty for exactly the visit that wanted it.
         if state.config.thumbnails.enabled {
-            state.thumbnail_pass = Some(thumbs::Pass::start());
+            state.thumbnail_pass = Some(thumbs::Pass::start(state.renderer.adapter_description()));
         }
         // **Which GPU is rendering the show**, once, at startup. Every
         // frame-time figure taken from this run is a property of that choice
@@ -1091,7 +1091,8 @@ impl AppState {
         self.config.thumbnails.enabled = !self.config.thumbnails.enabled;
         if self.config.thumbnails.enabled {
             if self.thumbnail_pass.is_none() {
-                self.thumbnail_pass = Some(thumbs::Pass::start());
+                self.thumbnail_pass =
+                    Some(thumbs::Pass::start(self.renderer.adapter_description()));
             }
         } else if let Some(mut pass) = self.thumbnail_pass.take() {
             pass.stop();
@@ -1566,6 +1567,10 @@ impl AppState {
                 // resource rebuild, whose frames the steady-state statistic
                 // leaves out.
                 self.note_soak_switch();
+                // The thumbnail pass's next walk renders on the new adapter.
+                if let Some(pass) = &self.thumbnail_pass {
+                    pass.follow_adapter(self.renderer.adapter_description());
+                }
                 let msg = format!(
                     "renderer adapter: {} (from the settings menu, written to config.toml \
                      [output] gpu); {}",

@@ -33,7 +33,7 @@ pub mod ui;
 pub mod wav;
 
 use rlx_core::preset::Preset;
-use rlx_core::render::{HeadlessOptions, Renderer, Tier};
+use rlx_core::render::{AdapterChoice, HeadlessOptions, Renderer, Tier};
 
 /// A headless renderer over `presets`, using the real GPU at full quality (the
 /// CLI wants speed and true output, not the tests' software reproducibility).
@@ -47,13 +47,27 @@ pub fn renderer(
     presets: Vec<Preset>,
     tier: Tier,
 ) -> Result<Renderer, String> {
-    let mut r = Renderer::new_headless_tiered(
+    renderer_on(width, height, presets, tier, &AdapterChoice::Default)
+}
+
+/// [`renderer`] on the adapter `adapter` names — the constructor the
+/// thumbnail child reaches, so it renders on the GPU the show it was spawned
+/// by is rendering on. [`AdapterChoice::Default`] is exactly [`renderer`].
+pub fn renderer_on(
+    width: u32,
+    height: u32,
+    presets: Vec<Preset>,
+    tier: Tier,
+    adapter: &AdapterChoice,
+) -> Result<Renderer, String> {
+    let mut r = Renderer::new_headless_on(
         HeadlessOptions {
             width,
             height,
             prefer_software: false,
         },
         tier,
+        adapter,
     )
     .map_err(|e| format!("headless renderer: {e}"))?;
     r.set_presets(presets);

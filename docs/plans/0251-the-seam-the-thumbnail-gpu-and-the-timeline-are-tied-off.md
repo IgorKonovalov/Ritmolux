@@ -184,8 +184,8 @@ settled here:
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The swarm's sway bound is exact at the shipped minimum zoom | dev | done | committed with this row |
-| 2 — The thumbnail child renders on the show's adapter and says which | dev | not started | |
+| 1 — The swarm's sway bound is exact at the shipped minimum zoom | dev | done | b647003b |
+| 2 — The thumbnail child renders on the show's adapter and says which | dev | done | committed with this row |
 | 3 — A cancelled render leaves no timeline beside the output | studio-builder | not started | |
 | 4 — The thumbnail reading is re-taken with both adapters named | human | not started | |
 
@@ -198,6 +198,10 @@ settled here:
   stays 0.8 on top. Resulting bounds: zoom 1 yaw 0.0770 / 0.0724, pitch 0.0833 / 0.0820; zoom 0.85
   yaw 0.0089 / 0.0083, pitch 0.0096 / 0.0094 (1280x800 / 1920x1080). The `size` and `size_spread`
   params can draw sprites larger than the inset covers; `sway_bound`'s signature does not see them.
+- Phase 2: `cli.rs` gained no reader; the child reads `--gpu` through the existing
+  `windowed_flag`, and `cli.rs` carries only the companion test. A switch through
+  `AppState::swap_adapter` reaches the next walk (the worker places the adapter once per walk), not
+  a later child of a walk already running.
 
 ### Close triggers
 
