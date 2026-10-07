@@ -144,6 +144,29 @@ describe('Start', () => {
   })
 })
 
+describe('a source directory changed while the view is hidden', () => {
+  it('is the one listed when the view is shown again', async () => {
+    const view = await open()
+    expect(screen.getByText('/w/presets')).toBeDefined()
+
+    api.getState.mockResolvedValue({ sourceDir: '/b/presets', session: null })
+    api.listSets.mockResolvedValue({
+      ok: true,
+      value: { dir: '/b/presets', families: ['plexus'], proposed: false, files: ['plexus_web.toml'] },
+    })
+    await act(async () => {
+      view.rerender(<Judge marks={undefined} hidden onClose={vi.fn()} />)
+    })
+    await act(async () => {
+      view.rerender(<Judge marks={undefined} onClose={vi.fn()} />)
+    })
+
+    expect(screen.getByText('/b/presets')).toBeDefined()
+    await click(startButton())
+    expect(api.start).toHaveBeenCalledWith({ kind: 'family', prefix: 'plexus' })
+  })
+})
+
 describe('a running session', () => {
   it('moves a row from tune to keep, and to cut, as marks events arrive', async () => {
     // The marks the app held before Start are the owner's real ones, from the

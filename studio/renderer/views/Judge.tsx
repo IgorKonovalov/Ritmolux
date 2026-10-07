@@ -108,7 +108,11 @@ export function Judge({ marks, hidden = false, onClose, onSession }: JudgeProps)
     void window.api.judging.listSessions().then(setSessions)
   }
 
+  // Re-read on every reveal, not once at mount: the view stays mounted while
+  // hidden, and `judging.sourceDir` may have changed in Settings meanwhile —
+  // Start resolves against main's value, so the listing must be the same one.
   useEffect(() => {
+    if (hidden) return
     let live = true
     void window.api.judging.getState().then((state) => {
       if (!live) return
@@ -120,7 +124,7 @@ export function Judge({ marks, hidden = false, onClose, onSession }: JudgeProps)
     return () => {
       live = false
     }
-  }, [])
+  }, [hidden])
 
   useEffect(() => {
     if (sourceDir === undefined || sourceDir === null) {
@@ -132,7 +136,9 @@ export function Judge({ marks, hidden = false, onClose, onSession }: JudgeProps)
       if (!live) return
       if (result.ok) {
         setListing(result.value)
-        setFamily((current) => current || (result.value.families[0] ?? ''))
+        const { families, files: listed } = result.value
+        setFamily((current) => (families.includes(current) ? current : (families[0] ?? '')))
+        setFiles((current) => new Set([...current].filter((file) => listed.includes(file))))
       } else setProblem(result.reason)
     })
     return () => {
