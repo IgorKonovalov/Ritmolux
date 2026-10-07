@@ -282,12 +282,29 @@ fn the_shaders_are_valid_wgsl() {
         }
     }
     let present = format!(
-        "{}{}",
+        "{}{}{}",
         gpu::FULLSCREEN_VS_UV_FLIPPED,
-        shader::PRESENT_SHADER
+        shader::PRESENT_SHADER,
+        shader::PRESENT_MAIN
     );
     if let Err(e) = crate::milk::shader::validate_wgsl(&present) {
         panic!("the present shader does not validate:\n{e}");
+    }
+    for (what, source) in [
+        ("route grid", route::grid_source()),
+        ("route control", route::control_source()),
+        (
+            "route present",
+            format!(
+                "{}{}",
+                gpu::FULLSCREEN_VS_UV_FLIPPED,
+                route::present_source()
+            ),
+        ),
+    ] {
+        if let Err(e) = crate::milk::shader::validate_wgsl(&source) {
+            panic!("the {what} shader does not validate:\n{e}");
+        }
     }
 }
 
@@ -300,9 +317,17 @@ fn the_resources_build_on_the_adapter() {
     };
     let scope = ctx.device.push_error_scope(wgpu::ErrorFilter::Validation);
     let res = Resources::build(&ctx.device, crate::render::COMPOSITE_FORMAT, 64);
+    let route = route::RouteResources::build(
+        &ctx.device,
+        crate::render::COMPOSITE_FORMAT,
+        64,
+        &res.field,
+        &res.present_layout,
+    );
     if let Some(error) = pollster::block_on(scope.pop()) {
         panic!("building the cellular resources raised: {error}");
     }
+    drop(route);
     drop(res);
 }
 
@@ -1618,4 +1643,732 @@ fn the_field_is_identical_after_a_thousand_generations_for_every_family() {
             "{family:?}: a different seed reached the same field"
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// The route (ADR-0266)
+// ---------------------------------------------------------------------------
+
+/// A rule under which no cell changes: no count gives birth, every count
+/// survives. The maze it holds is exactly the one it started with.
+const FROZEN: [(&str, f32); 3] = [("step_rate", ONE_GEN.1), ("birth", 0.0), ("survive", 511.0)];
+
+/// `params` with `route` switched on.
+fn with_route(params: &[(&'static str, f32)]) -> Vec<(&'static str, f32)> {
+    let mut out = params.to_vec();
+    out.push(("route", 1.0));
+    out
+}
+
+/// The route's buffers, built by a frame with `route > 0`.
+fn route_of(scene: &CellularScene) -> &route::RouteResources {
+    scene
+        .res
+        .as_ref()
+        .and_then(|res| res.route.as_ref())
+        .expect("a frame with route on builds the route")
+}
+
+/// Every word of `buffer`, read back.
+fn read_words(ctx: &RenderContext, buffer: &wgpu::Buffer) -> Vec<u32> {
+    let bytes = buffer.size();
+    let read = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("cellular-route-readback"),
+        size: bytes,
+        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let mut encoder = ctx
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("cellular-route-readback"),
+        });
+    encoder.copy_buffer_to_buffer(buffer, 0, &read, 0, bytes);
+    ctx.queue.submit([encoder.finish()]);
+    let slice = read.slice(..);
+    let (tx, rx) = std::sync::mpsc::channel();
+    slice.map_async(wgpu::MapMode::Read, move |res| {
+        let _ = tx.send(res);
+    });
+    ctx.device
+        .poll(wgpu::PollType::Wait {
+            submission_index: None,
+            // Bounded: a hung device fails the test rather than the suite.
+            timeout: Some(std::time::Duration::from_secs(30)),
+        })
+        .expect("poll the route readback");
+    rx.recv()
+        .expect("map callback ran")
+        .expect("map the route readback");
+    let words: Vec<u32> = bytemuck::cast_slice(&slice.get_mapped_range().expect("mapped")).to_vec();
+    read.unmap();
+    words
+}
+
+/// The control words.
+fn control(ctx: &RenderContext, scene: &CellularScene) -> Vec<u32> {
+    read_words(ctx, &route_of(scene).control)
+}
+
+/// Word `at` of `words`.
+fn word(words: &[u32], at: u32) -> u32 {
+    words[at as usize]
+}
+
+/// The distance field the last relax pass wrote: the half of the pair the
+/// control words name.
+fn distance_field(ctx: &RenderContext, scene: &CellularScene) -> Vec<u32> {
+    let cells = read_words(ctx, &route_of(scene).cells);
+    let parity = word(&control(ctx, scene), route::C_PARITY);
+    let n = (scene.config.grid * scene.config.grid) as usize;
+    let at = (route::R_DIST + parity) as usize * n;
+    cells[at..at + n].to_vec()
+}
+
+/// A seeded `life_like` field of `N` cells held frozen with the route on, driven
+/// until its first sweep converges. Returns the scene and the seeded states.
+fn converged_on_seed(
+    ctx: &RenderContext,
+    driver: &mut Driver<'_>,
+    n: u32,
+    wrap: bool,
+    salt: u32,
+) -> (CellularScene, Vec<u8>) {
+    let mut scene = scene_with(ctx, life(n, wrap, salt));
+    driver.frame(&mut scene, ONE_GEN.0, &[("step_rate", 0.0), ("route", 1.0)]);
+    let frozen = with_route(&FROZEN);
+    for _ in 0..40 {
+        driver.frame(&mut scene, ONE_GEN.0, &frozen);
+        if word(&control(ctx, &scene), route::C_CONVERGED) != 0 {
+            break;
+        }
+    }
+    let seeded = mirror::seed_field(n, field_seed(salt), live_threshold(LIFE_DENSITY));
+    assert_same_field(&states(ctx, &scene), &seeded, "the frozen maze");
+    (scene, seeded)
+}
+
+/// The frame rate of the timeline: generations and route passes come out in
+/// time order, a generation first on a tie, each stamped in milliseconds, and
+/// nothing is dropped or invented.
+#[test]
+fn the_timeline_merges_both_clocks_in_time_order() {
+    let generations = route::Ticks {
+        owed_before: 0.0,
+        rate: 4.0,
+        count: 1,
+    };
+    let passes = route::Ticks {
+        owed_before: 0.0,
+        rate: 16.0,
+        count: 4,
+    };
+    let events: Vec<(route::RouteEvent, u32)> =
+        route::Timeline::new(generations, passes, 2.0, 0.25).collect();
+    use route::RouteEvent::{Generation, Pass};
+    assert_eq!(
+        events,
+        vec![
+            (Pass, 2062),
+            (Pass, 2125),
+            (Pass, 2187),
+            (Generation, 2250),
+            (Pass, 2250),
+        ]
+    );
+    // A clock with nothing owed adds nothing; a stall's capped backlog stays
+    // inside the frame.
+    let mut clock = route::RouteClock::default();
+    assert_eq!(clock.advance(0.0, 1.0).count, 0);
+    assert_eq!(clock.advance(f32::NAN, 1.0).count, 0);
+    let stalled = clock.advance(240.0, 2.0);
+    assert_eq!(stalled.count, route::MAX_ROUTE_PASSES_PER_FRAME);
+    assert!(stalled.offset(stalled.count, 2.0) <= 2.0);
+    assert_eq!(
+        clock.advance(240.0, 0.1).count,
+        24,
+        "the backlog is dropped"
+    );
+}
+
+/// **A converged sweep is the breadth-first search, cell for cell**: on a
+/// seeded maze held still, the GPU's distance field from the centre source
+/// equals the CPU's BFS on a torus and inside a dead border, and every wall and
+/// every open cell the source cannot reach holds the sentinel.
+#[test]
+fn a_converged_sweep_is_the_cpu_breadth_first_search() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    const N: u32 = 48;
+    let mut driver = Driver::new(&ctx);
+    for wrap in [true, false] {
+        let (scene, seeded) = converged_on_seed(&ctx, &mut driver, N, wrap, 7);
+        let words = control(&ctx, &scene);
+        let passes = word(&words, route::C_CONVERGED);
+        assert_ne!(passes, 0, "wrap {wrap}: the sweep never converged");
+        let open = mirror::open_mask(&seeded);
+        let source = mirror::centre_source(&open, N).expect("the maze has open cells");
+        assert_eq!(word(&words, route::C_SOURCE), source, "the centre rule");
+        let cpu = mirror::bfs(&open, N, wrap, source);
+        let gpu = distance_field(&ctx, &scene);
+        let differing = gpu.iter().zip(&cpu).filter(|(a, b)| a != b).count();
+        assert_eq!(differing, 0, "wrap {wrap}: {differing} distances differ");
+
+        let walls = open.iter().filter(|o| **o == 0).count();
+        let unreachable = open
+            .iter()
+            .zip(&gpu)
+            .filter(|(o, d)| **o == 1 && **d == route::INF)
+            .count();
+        let reached = gpu.iter().filter(|d| **d != route::INF).count();
+        let far = gpu.iter().filter(|d| **d != route::INF).max().copied();
+        println!(
+            "wrap {wrap}: converged in {passes} passes; {reached} reached, {unreachable} open \
+             cells cut off, {walls} walls, farthest {far:?}"
+        );
+        assert!(
+            gpu.iter()
+                .zip(&open)
+                .all(|(d, o)| *o == 1 || *d == route::INF),
+            "a wall holds a distance"
+        );
+        assert!(unreachable > 0, "no cut-off pocket to hold the sentinel");
+        assert!(
+            reached > (N * N / 3) as usize,
+            "only {reached} cells reached"
+        );
+        assert!(far > Some(N), "the farthest cell is only {far:?} away");
+        drop(scene);
+    }
+}
+
+/// **A converged sweep stays put**: every further pass changes no cell, and the
+/// field after them is the field it converged on.
+#[test]
+fn a_converged_sweep_stays_put() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let mut driver = Driver::new(&ctx);
+    let (mut scene, _) = converged_on_seed(&ctx, &mut driver, 48, true, 7);
+    let field = distance_field(&ctx, &scene);
+    let before = word(&control(&ctx, &scene), route::C_RELAX_PASSES);
+    for _ in 0..3 {
+        driver.frame(&mut scene, ONE_GEN.0, &with_route(&FROZEN));
+    }
+    let words = control(&ctx, &scene);
+    let after = word(&words, route::C_RELAX_PASSES);
+    assert!(after > before + 100, "only {} passes ran", after - before);
+    assert_eq!(
+        word(&words, route::C_LAST_CHANGED),
+        0,
+        "a pass changed a tile"
+    );
+    assert!(
+        distance_field(&ctx, &scene) == field,
+        "the field moved after it converged"
+    );
+}
+
+/// **The compare pass counts exactly the cells whose open bit changed**, against
+/// the CPU's count over the same pair of generations read off the field — and
+/// the open cells too.
+#[test]
+fn the_compare_count_is_the_cpu_change_count() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    const N: u32 = 48;
+    let mut driver = Driver::new(&ctx);
+    let mut scene = scene_with(&ctx, life(N, true, 5));
+    driver.frame(&mut scene, ONE_GEN.0, &[("step_rate", 0.0), ("route", 1.0)]);
+    // The route was built on that frame, with no mask recorded: its first
+    // compare is against all walls.
+    let mut previous = vec![0u8; (N * N) as usize];
+    let mut counts = Vec::new();
+    for generation in 1..=20 {
+        driver.frame(
+            &mut scene,
+            ONE_GEN.0,
+            &[("step_rate", ONE_GEN.1), ("route", 1.0)],
+        );
+        let open = mirror::open_mask(&states(&ctx, &scene));
+        let words = control(&ctx, &scene);
+        let moved = word(&words, route::C_LAST_MOVED);
+        assert_eq!(
+            moved,
+            mirror::changed(&previous, &open),
+            "generation {generation}: the compare count"
+        );
+        assert_eq!(
+            word(&words, route::C_LAST_OPEN),
+            open.iter().filter(|o| **o == 1).count() as u32,
+            "generation {generation}: the open count"
+        );
+        assert_eq!(word(&words, route::C_GENERATIONS), generation);
+        counts.push(moved);
+        previous = open;
+    }
+    println!("changed open bits per generation: {counts:?}");
+    let distinct: std::collections::BTreeSet<u32> = counts.iter().copied().collect();
+    assert!(
+        counts.iter().all(|c| *c > 0) && distinct.len() > 5,
+        "a field that does not move tests nothing: {counts:?}"
+    );
+}
+
+/// **30 and 144 fps reach the identical route state at the same wall time**:
+/// half a second of a moving Life field, re-snapshotted on every generation and
+/// relaxed between them, leaves every word of the route's buffers the same at
+/// both rates — mid-sweep, so the distances are live ones.
+#[test]
+fn thirty_and_one_hundred_forty_four_fps_reach_the_same_distance_field() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let mut driver = Driver::new(&ctx);
+    let mut run = |fps: u32, frames: u32| -> (Vec<u32>, Vec<u32>) {
+        let mut scene = scene_with(&ctx, life(64, true, 11));
+        for _ in 0..frames {
+            driver.frame(
+                &mut scene,
+                1.0 / fps as f32,
+                &[("step_rate", 5.0), ("route", 1.0)],
+            );
+        }
+        let out = (
+            control(&ctx, &scene),
+            read_words(&ctx, &route_of(&scene).cells),
+        );
+        drop(scene);
+        out
+    };
+    let (c30, cells30) = run(30, 15);
+    let (c144, cells144) = run(144, 72);
+    println!(
+        "30 fps: {} generations, {} relax passes; 144 fps: {} and {}",
+        word(&c30, route::C_GENERATIONS),
+        word(&c30, route::C_RELAX_PASSES),
+        word(&c144, route::C_GENERATIONS),
+        word(&c144, route::C_RELAX_PASSES)
+    );
+    assert_eq!(word(&c30, route::C_GENERATIONS), 2);
+    assert_eq!(
+        word(&c30, route::C_SEARCH),
+        1,
+        "the probe ends between sweeps, so it compares no live field"
+    );
+    assert_eq!(word(&c30, route::C_FRESH), 0);
+    assert!(
+        c30 == c144,
+        "the control words differ: {c30:?} against {c144:?}"
+    );
+    let differing = cells30
+        .iter()
+        .zip(&cells144)
+        .filter(|(a, b)| a != b)
+        .count();
+    assert_eq!(differing, 0, "{differing} route words differ");
+    let finite = (64 * 64 * route::R_DIST as usize..64 * 64 * 4)
+        .filter(|i| cells30[*i] != route::INF)
+        .count();
+    assert!(finite > 100, "only {finite} distances are finite");
+}
+
+/// **`route = 0` changes nothing**: a scene that never turns the route on
+/// builds none of it, and a scene that turns it on and off again draws the very
+/// bytes the first one does once it is off — while drawing something else
+/// while it is on, so the equality is the switch's doing.
+#[test]
+fn route_zero_draws_the_frame_unchanged() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let mut driver = Driver::new(&ctx);
+    let mut run = |on: &dyn Fn(u32) -> bool| -> (Vec<Vec<[f32; 4]>>, bool) {
+        let mut scene = scene_with(&ctx, life(TARGET, true, 2));
+        let frames = (0..12)
+            .map(|i| {
+                let route = if on(i) { 1.0 } else { 0.0 };
+                // A generation every other frame, so a sweep runs on the
+                // frames between and the route has something to draw.
+                driver.frame(
+                    &mut scene,
+                    ONE_GEN.0,
+                    &[
+                        ("step_rate", ONE_GEN.1 / 2.0),
+                        ("route", route),
+                        ("route_coord", 0.7),
+                    ],
+                );
+                driver.read_target()
+            })
+            .collect();
+        let built = scene.res.as_ref().is_some_and(|res| res.route.is_some());
+        (frames, built)
+    };
+    let (plain, built) = run(&|_| false);
+    assert!(!built, "route = 0 built the route's resources");
+    let (toggled, _) = run(&|i| (3..8).contains(&i));
+    for i in 0..12 {
+        let same = plain[i] == toggled[i];
+        if (3..8).contains(&i) {
+            continue;
+        }
+        assert!(same, "frame {i}: route = 0 drew a different frame");
+    }
+    assert!(
+        (3..8).any(|i| plain[i] != toggled[i]),
+        "the route never drew, so the equality tests nothing"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The route's readings (Plan 0253 Phase 1). Measurements, not gates.
+// ---------------------------------------------------------------------------
+
+/// `cellular_labyrinth`'s own table and salt.
+fn labyrinth_config() -> CellularConfig {
+    let preset = crate::preset::Preset::from_toml_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../presets/cellular_labyrinth.toml"
+    )))
+    .expect("the labyrinth loads");
+    match preset.config {
+        Some(GeneratorConfig::Cellular(config)) => config,
+        other => panic!("the labyrinth is not a cellular preset: {other:?}"),
+    }
+}
+
+/// `cellular_labyrinth`'s bindings driven by a fixed beat at 120 bpm and every
+/// band at zero, on frame `frame` of `fps`: beat `k` lands on the frame holding
+/// `k / 2` seconds and `beat_index` reads `k` until the next. So `step_rate` is
+/// 14, a disc lands on every fourth beat, and `survive` drops to 30 for beats
+/// 0-5 of every 32.
+fn labyrinth_params(frame: u32, fps: u32) -> (Vec<(&'static str, f32)>, u32, bool) {
+    let per_beat = fps / 2;
+    let beat = frame / per_beat;
+    let on_beat = frame.is_multiple_of(per_beat);
+    let survive = if beat % 32 < 6 { 30.0 } else { 62.0 };
+    let reseed = if on_beat && beat.is_multiple_of(4) {
+        1.0
+    } else {
+        0.0
+    };
+    (
+        vec![
+            ("step_rate", 14.0),
+            ("birth", 8.0),
+            ("survive", survive),
+            ("reseed", reseed),
+        ],
+        beat,
+        on_beat,
+    )
+}
+
+/// **The readings Plan 0253 Phase 1 owes**, printed with the adapter they were
+/// taken on: what one relax pass and one step pass cost at grids 192, 512 and
+/// 1024 on every hardware adapter, how many passes the first sweep takes on the
+/// labyrinth's grown maze, and the labyrinth's per-generation change counts
+/// over a driven run.
+///
+/// ```text
+/// cargo nextest run -p rlx-core --lib --run-ignored only route_readings --no-capture
+/// ```
+#[test]
+#[ignore = "a measurement, not a gate — ADR-0071"]
+fn route_readings() {
+    use crate::render::context::{AdapterChoice, list_adapters};
+    // --- What a pass costs, per hardware adapter ---
+    for (index, adapter) in list_adapters().iter().enumerate() {
+        let Ok(ctx) = RenderContext::new_headless_on(64, 64, &AdapterChoice::Index(index)) else {
+            continue;
+        };
+        if ctx.is_software() {
+            continue;
+        }
+        println!("adapter {index}: {}", ctx.adapter());
+        let _ = adapter;
+        let mut driver = Driver::new(&ctx);
+        for grid in [192u32, 512, 1024] {
+            let mut scene = scene_with(&ctx, life(grid, true, 17));
+            let fps = 60;
+            let dt = 1.0 / fps as f32;
+            driver.frame(&mut scene, dt, &[("step_rate", 0.0)]);
+            const PASSES: u32 = 16;
+            scene.route_rate = (PASSES * fps) as f32;
+            let route = [
+                ("step_rate", 0.0),
+                ("birth", 0.0),
+                ("survive", 511.0),
+                ("route", 1.0),
+            ];
+            // One generation to snapshot, then warm up into the sweep.
+            driver.frame(&mut scene, 0.25, &[("step_rate", 4.0), ("route", 1.0)]);
+            for _ in 0..4 {
+                driver.frame(&mut scene, dt, &route);
+            }
+            let costs = timed_frames(&ctx, &mut driver, &mut scene, dt, &route, 60);
+            let relax = costs.iter().find(|(l, _)| l == "cellular-route-relax");
+            let control = costs.iter().find(|(l, _)| l == "cellular-route-control");
+            let steps = [("step_rate", 8.0 * fps as f32), ("route", 0.0)];
+            let step_costs = timed_frames(&ctx, &mut driver, &mut scene, dt, &steps, 60);
+            let step = step_costs.iter().find(|(l, _)| l == "cellular-step");
+            println!(
+                "  grid {grid}: relax {:.4} ms/pass, its control {:.4} ms/pass, step {:.4} \
+                 ms/generation",
+                relax.map_or(f64::NAN, |r| r.1 / f64::from(PASSES)),
+                control.map_or(f64::NAN, |r| r.1 / f64::from(PASSES)),
+                step.map_or(f64::NAN, |r| r.1 / f64::from(MAX_GENERATIONS_PER_FRAME)),
+            );
+            drop(scene);
+        }
+    }
+
+    let Some(ctx) = context() else {
+        return;
+    };
+    println!("labyrinth readings on {}", ctx.adapter());
+    let config = labyrinth_config();
+    let fps = 30;
+    let dt = 1.0 / fps as f32;
+    let mut driver = Driver::new(&ctx);
+
+    // --- Sweep 1 on the grown maze at generation 600 ---
+    let mut scene = scene_with(&ctx, config);
+    let (mut frame, mut generations) = (0u32, 0u32);
+    while generations < 600 {
+        let (params, ..) = labyrinth_params(frame, fps);
+        generations += driver.frame(&mut scene, dt, &params);
+        frame += 1;
+    }
+    assert_eq!(generations, 600);
+    // Held still from here: the first frozen generation snapshots it.
+    let mut frames = 0;
+    let words = loop {
+        driver.frame(&mut scene, ONE_GEN.0, &with_route(&FROZEN));
+        frames += 1;
+        let words = control(&ctx, &scene);
+        if word(&words, route::C_CONVERGED) != 0 || frames > 2000 {
+            break words;
+        }
+    };
+    let field = distance_field(&ctx, &scene);
+    let open = mirror::open_mask(&states(&ctx, &scene));
+    let reached = field.iter().filter(|d| **d != route::INF).count();
+    println!(
+        "sweep 1 at generation 600: converged in {} passes; source {}, farthest {}, {} of {} \
+         open cells reached ({} cells)",
+        word(&words, route::C_CONVERGED),
+        word(&words, route::C_SOURCE),
+        word(&words, route::C_D_MAX),
+        reached,
+        open.iter().filter(|o| **o == 1).count(),
+        open.len()
+    );
+    // The open cells' four-connected components, and a sweep from inside the
+    // largest: the centre source may fall in a pocket.
+    let n = config.grid;
+    let mut label = vec![u32::MAX; open.len()];
+    let mut sizes: Vec<(usize, u32)> = Vec::new();
+    for start in 0..open.len() {
+        if open[start] != 1 || label[start] != u32::MAX {
+            continue;
+        }
+        let id = sizes.len() as u32;
+        let mut stack = vec![start];
+        label[start] = id;
+        let mut size = 0;
+        while let Some(i) = stack.pop() {
+            size += 1;
+            let (x, y) = ((i as u32 % n) as i64, (i as u32 / n) as i64);
+            for (dx, dy) in [(-1i64, 0i64), (1, 0), (0, -1), (0, 1)] {
+                let j = ((y + dy).rem_euclid(n as i64) * n as i64 + (x + dx).rem_euclid(n as i64))
+                    as usize;
+                if open[j] == 1 && label[j] == u32::MAX {
+                    label[j] = id;
+                    stack.push(j);
+                }
+            }
+        }
+        sizes.push((size, start as u32));
+    }
+    sizes.sort_unstable_by(|a, b| b.cmp(a));
+    let histogram =
+        |lo: usize, hi: usize| sizes.iter().filter(|(s, _)| (lo..hi).contains(s)).count();
+    println!(
+        "{} open components; largest {:?}; sizes 1-9: {}, 10-99: {}, 100-999: {}, 1000+: {}",
+        sizes.len(),
+        sizes.iter().take(6).map(|(s, _)| *s).collect::<Vec<_>>(),
+        histogram(1, 10),
+        histogram(10, 100),
+        histogram(100, 1000),
+        histogram(1000, usize::MAX)
+    );
+    let (largest, cell) = sizes[0];
+    let source = (0..open.len() as u32)
+        .filter(|i| label[*i as usize] == label[cell as usize])
+        .min_by_key(|i| {
+            let m = i64::from(n);
+            let dx = 2 * i64::from(i % n) + 1 - m;
+            let dy = 2 * i64::from(i / n) + 1 - m;
+            (dx * dx + dy * dy, *i)
+        })
+        .expect("the largest component has a cell");
+    force_sweep(&ctx, &scene, source);
+    let mut frames = 0;
+    let words = loop {
+        driver.frame(&mut scene, ONE_GEN.0, &with_route(&FROZEN));
+        frames += 1;
+        let words = control(&ctx, &scene);
+        if word(&words, route::C_CONVERGED) != 0 || frames > 2000 {
+            break words;
+        }
+    };
+    let cpu = mirror::bfs(&open, n, true, source);
+    let ends = cpu.iter().filter(|d| **d != route::INF).max().copied();
+    println!(
+        "sweep 1 from the largest component ({largest} cells, source {source}): converged in \
+         {} passes, farthest {} (CPU BFS {ends:?}); the field matches the CPU: {}",
+        word(&words, route::C_CONVERGED),
+        word(&words, route::C_D_MAX),
+        distance_field(&ctx, &scene) == cpu
+    );
+    drop(scene);
+
+    // --- Change counts over a driven run ---
+    let mut scene = scene_with(&ctx, config);
+    let warm_beats = 32;
+    let beats = 72;
+    let mut last_generations = 0;
+    let mut log: Vec<(f32, u32, u32, u32)> = Vec::new();
+    let mut last_bite = None;
+    for frame in 0..(warm_beats + beats) * fps / 2 {
+        let (mut params, beat, on_beat) = labyrinth_params(frame, fps);
+        if beat >= warm_beats {
+            params.push(("route", 1.0));
+        }
+        if on_beat && beat.is_multiple_of(4) {
+            last_bite = Some(frame);
+        }
+        driver.frame(&mut scene, dt, &params);
+        if beat < warm_beats {
+            continue;
+        }
+        let words = control(&ctx, &scene);
+        let g = word(&words, route::C_GENERATIONS);
+        if g != last_generations {
+            last_generations = g;
+            let since_bite = last_bite.map_or(u32::MAX, |b| frame - b);
+            log.push((
+                frame as f32 * dt,
+                beat,
+                since_bite,
+                word(&words, route::C_LAST_MOVED),
+            ));
+        }
+    }
+    // The first compare after the route turns on is against no mask.
+    log.remove(0);
+    println!("time  beat  frames-since-bite  changed  (rule loosened on beats 0-5 of 32)");
+    for (t, beat, since, moved) in &log {
+        println!(
+            "{t:6.2} {beat:4} {since:4} {moved:6}{}",
+            if beat % 32 < 6 { "  loose" } else { "" }
+        );
+    }
+    let mut runs: Vec<(usize, f32)> = Vec::new();
+    let mut run = 0usize;
+    for (t, _, _, moved) in &log {
+        if *moved == 0 {
+            run += 1;
+        } else if run > 0 {
+            runs.push((run, *t));
+            run = 0;
+        }
+    }
+    println!(
+        "still stretches (generations, ending at s): {runs:?}; at 14 generations/s a \
+         generation is {:.3} s",
+        1.0 / 14.0
+    );
+}
+
+/// Start a fresh sweep from `source` on the snapshot already taken, by writing
+/// the control words a measurement wants rather than the ones the centre rule
+/// would reach.
+fn force_sweep(ctx: &RenderContext, scene: &CellularScene, source: u32) {
+    let route = route_of(scene);
+    let tiles = route::tiles(scene.config.grid);
+    let mut words = control(ctx, scene);
+    for (at, value) in [
+        (route::C_ARGS, tiles),
+        (route::C_ARGS + 1, tiles),
+        (route::C_ARGS + 2, 1),
+        (route::C_ACTION, route::A_RELAX),
+        (route::C_SEARCH, 1),
+        (route::C_FRESH, 1),
+        (route::C_SOURCE, source),
+        (route::C_SWEEP_PASSES, 0),
+        (route::C_CONVERGED, 0),
+    ] {
+        words[at as usize] = value;
+    }
+    ctx.queue
+        .write_buffer(&route.control, 0, bytemuck::cast_slice(&words));
+}
+
+/// Render `frames` frames of `params` with the pass timer armed, and return each
+/// label's mean milliseconds per frame.
+fn timed_frames(
+    ctx: &RenderContext,
+    driver: &mut Driver<'_>,
+    scene: &mut CellularScene,
+    dt: f32,
+    params: &[(&str, f32)],
+    frames: u32,
+) -> Vec<(String, f64)> {
+    let mut timer = gpu::PassTimer::new(&ctx.device, &ctx.queue);
+    if timer.is_none() {
+        println!("  this adapter has no timestamp queries");
+        return Vec::new();
+    }
+    let mut costs = crate::render::capture::PassCosts::default();
+    for _ in 0..frames {
+        scene.set_target_size(TARGET, TARGET);
+        scene.advance(dt);
+        scene.reset_params();
+        for (name, value) in params {
+            scene.set_param(name, *value);
+        }
+        scene.update(&AnalysisFrame::default());
+        gpu::arm_pass_timer(timer.take());
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("cellular-timed"),
+            });
+        scene.render(&ctx.queue, &mut encoder, &driver.view, 1.0);
+        timer = gpu::disarm_pass_timer(&mut encoder);
+        ctx.queue.submit([encoder.finish()]);
+        if let Some(t) = timer.as_mut() {
+            t.map();
+        }
+        ctx.device
+            .poll(wgpu::PollType::Wait {
+                submission_index: None,
+                timeout: Some(std::time::Duration::from_secs(30)),
+            })
+            .expect("poll the timed frame");
+        if let Some(t) = timer.as_mut() {
+            t.collect(&mut costs);
+        }
+    }
+    costs
+        .rows()
+        .into_iter()
+        .map(|(label, ms)| (label.to_owned(), ms))
+        .collect()
 }

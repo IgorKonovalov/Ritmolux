@@ -77,6 +77,7 @@
     clippy::unreachable
 )]
 
+mod route;
 mod shader;
 
 use super::common;
@@ -272,6 +273,9 @@ const DEFAULT_SURVIVE_HI: f32 = default_of(PARAMS, "survive_hi");
 const DEFAULT_STATES: f32 = default_of(PARAMS, "states");
 const DEFAULT_THRESHOLD: f32 = default_of(PARAMS, "threshold");
 const DEFAULT_AGE_TINT: f32 = default_of(PARAMS, "age_tint");
+const DEFAULT_ROUTE: f32 = default_of(PARAMS, "route");
+const DEFAULT_ROUTE_COORD: f32 = default_of(PARAMS, "route_coord");
+const DEFAULT_ROUTE_GRADE: f32 = default_of(PARAMS, "route_grade");
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_ZOOM: f32 = 1.0;
 
@@ -617,6 +621,36 @@ pub const PARAMS: &[ParamSpec] = &[
         group: ParamGroup::Colour,
         main: false,
     },
+    ParamSpec {
+        name: "route",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How strongly the route through the maze is drawn over it: the longest path the \
+              open cells hold, found while the maze stands still. 0 draws none and runs no \
+              search; inert on cyclic, which has no open cells.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
+    },
+    ParamSpec {
+        name: "route_coord",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Where on the palette the route is painted, at its first end.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
+    },
+    ParamSpec {
+        name: "route_grade",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "How far along the palette the route's colour travels from one end to the other; \
+              0 paints it one solid colour.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Colour,
+        main: false,
+    },
     common::brightness(common::DEFAULT_BRIGHTNESS),
     common::hue(DEFAULT_HUE),
     common::zoom(DEFAULT_ZOOM),
@@ -753,9 +787,15 @@ struct Resources {
     step_bg: ReadPair,
     rows_bg: ReadPair,
     present_bg: ReadPair,
+    /// Kept so the route's present pipeline, built later, can bind this group
+    /// beside its own.
+    present_layout: wgpu::BindGroupLayout,
     /// The shared gradient LUT pair (ADR-0021). A fresh pair is dirty, so a
     /// (re)build uploads on its first frame.
     luts: palette::LutPair,
+    /// The route's buffers and passes (ADR-0266), built on the first frame
+    /// `route > 0` and dropped with these textures, which its bind groups read.
+    route: Option<route::RouteResources>,
 }
 
 impl Resources {
@@ -764,7 +804,7 @@ impl Resources {
             device,
             "cellular-present-shader",
             gpu::FULLSCREEN_VS_UV_FLIPPED,
-            shader::PRESENT_SHADER,
+            &format!("{}{}", shader::PRESENT_SHADER, shader::PRESENT_MAIN),
         );
 
         let field = PingPongField::new(device, grid, grid);
@@ -938,7 +978,9 @@ impl Resources {
             step_bg,
             rows_bg,
             present_bg,
+            present_layout,
             luts,
+            route: None,
         }
     }
 
@@ -1156,6 +1198,24 @@ pub struct CellularScene {
     reseed: f32,
     trail: f32,
     age_tint: f32,
+    route: f32,
+    route_coord: f32,
+    route_grade: f32,
+    /// Route passes owed per second of `dt` (ADR-0266).
+    route_rate: f32,
+    route_clock: route::RouteClock,
+    /// This frame's generations and route passes, scheduled by `update` for
+    /// `render` to merge into one timeline.
+    generation_ticks: route::Ticks,
+    pass_ticks: route::Ticks,
+    /// Scene time since configure at this frame's start, and after it, in
+    /// seconds: the sum of injected `dt`, which every route event is stamped
+    /// against.
+    frame_start: f64,
+    scene_time: f64,
+    /// Whether the next render returns the route's control words to idle — set
+    /// by every `configure`, so a preset's route starts from nothing.
+    route_reset: bool,
     colour: common::PaletteParams,
     pan: common::PanParams,
     zoom: f32,
@@ -1210,12 +1270,28 @@ impl CellularScene {
             reseed: 0.0,
             trail: DEFAULT_TRAIL,
             age_tint: DEFAULT_AGE_TINT,
+            route: DEFAULT_ROUTE,
+            route_coord: DEFAULT_ROUTE_COORD,
+            route_grade: DEFAULT_ROUTE_GRADE,
+            route_rate: route::ROUTE_RATE,
+            route_clock: route::RouteClock::default(),
+            generation_ticks: route::Ticks::default(),
+            pass_ticks: route::Ticks::default(),
+            frame_start: 0.0,
+            scene_time: 0.0,
+            route_reset: true,
             colour: common::PaletteParams::new(DEFAULT_HUE, common::DEFAULT_BRIGHTNESS),
             pan: common::PanParams::default(),
             zoom: DEFAULT_ZOOM,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
             palette: Palette::default_spectrum(),
         }
+    }
+
+    /// Whether this frame encodes the route: a bound `route` above zero, on a
+    /// family with open cells. Off, nothing of the route is built or encoded.
+    fn route_on(&self) -> bool {
+        self.route.is_finite() && self.route > 0.0 && self.config.family != CellularFamily::Cyclic
     }
 
     /// This frame's step uniform: the rule, the field's seed, and the disc
@@ -1302,6 +1378,13 @@ impl Scene for CellularScene {
         self.prev_reseed = 0.0;
         // The outgoing preset's radius clamp is not this one's to report.
         self.clamp = None;
+        // The route starts from nothing, on a clock and a scene time of its own.
+        self.route_clock.reset();
+        self.generation_ticks = route::Ticks::default();
+        self.pass_ticks = route::Ticks::default();
+        self.frame_start = 0.0;
+        self.scene_time = 0.0;
+        self.route_reset = true;
         overflow
     }
 
@@ -1323,6 +1406,9 @@ impl Scene for CellularScene {
         self.reseed = 0.0;
         self.trail = DEFAULT_TRAIL;
         self.age_tint = DEFAULT_AGE_TINT;
+        self.route = DEFAULT_ROUTE;
+        self.route_coord = DEFAULT_ROUTE_COORD;
+        self.route_grade = DEFAULT_ROUTE_GRADE;
         self.colour.reset();
         self.pan.reset();
         self.zoom = DEFAULT_ZOOM;
@@ -1348,13 +1434,30 @@ impl Scene for CellularScene {
             "reseed" => self.reseed = value,
             "trail" => self.trail = value,
             "age_tint" => self.age_tint = value,
+            "route" => self.route = value,
+            "route_coord" => self.route_coord = value,
+            "route_grade" => self.route_grade = value,
             "zoom" => self.zoom = value,
             _ => {}
         }
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {
+        let owed_before = self.clock.owed;
         self.pending_generations = self.clock.advance(self.step_rate, self.dt);
+        self.generation_ticks = route::Ticks {
+            owed_before,
+            rate: f64::from(applied_step_rate(self.step_rate)),
+            count: self.pending_generations,
+        };
+        self.pass_ticks = if self.route_on() {
+            self.route_clock.advance(self.route_rate, self.dt)
+        } else {
+            self.route_clock.reset();
+            route::Ticks::default()
+        };
+        self.frame_start = self.scene_time;
+        self.scene_time += f64::from(self.dt);
         // Rising edge only, so a beat flag held for several frames — or a
         // latch's hold — refills one disc rather than one per frame. A NaN
         // compares false both ways and is stored as zero, so it neither fires
@@ -1443,9 +1546,36 @@ impl Scene for CellularScene {
             ],
         };
 
+        let route_on = self.route_on();
+        let route_present = route::RoutePresent {
+            a: [
+                self.route.clamp(0.0, 1.0),
+                finite_or(self.route_coord, DEFAULT_ROUTE_COORD),
+                finite_or(self.route_grade, DEFAULT_ROUTE_GRADE),
+                0.0,
+            ],
+        };
+        // The schedules are this frame's, and a second render without an
+        // update must not run them again.
+        let generation_ticks = route::Ticks {
+            count: generations,
+            ..std::mem::take(&mut self.generation_ticks)
+        };
+        let pass_ticks = std::mem::take(&mut self.pass_ticks);
+
         let Some(res) = self.res.as_mut() else {
             return;
         };
+        if route_on && res.route.as_ref().is_none_or(|route| route.grid != grid) {
+            res.route = Some(route::RouteResources::build(
+                &self.device,
+                self.surface_format,
+                grid,
+                &res.field,
+                &res.present_layout,
+            ));
+            self.route_reset = true;
+        }
         res.luts.flush(queue);
         queue.write_buffer(&res.present_uniform, 0, bytemuck::bytes_of(&present));
 
@@ -1462,20 +1592,73 @@ impl Scene for CellularScene {
             res.encode_step(encoder, StepPass::Stamp);
         }
         let sums_rows = self.config.family.sums_rows();
-        for _ in 0..generations {
-            if sums_rows {
-                res.encode_rows(encoder);
+        // Out of `res` for the frame, so the step passes can borrow it beside
+        // the route; put back below. Only while the route is on: off, it is
+        // neither encoded nor presented.
+        let mut route_res = if route_on { res.route.take() } else { None };
+        if let Some(route) = route_res.as_mut() {
+            if std::mem::take(&mut self.route_reset) {
+                route.reset(queue);
             }
-            res.encode_step(encoder, StepPass::Step);
+            route.begin_frame();
+            let wrap = self.config.wrap;
+            let timeline = route::Timeline::new(
+                generation_ticks,
+                pass_ticks,
+                self.frame_start,
+                f64::from(self.dt),
+            );
+            for (event, ms) in timeline {
+                match event {
+                    route::RouteEvent::Generation => {
+                        if sums_rows {
+                            res.encode_rows(encoder);
+                        }
+                        res.encode_step(encoder, StepPass::Step);
+                        route.encode_generation(encoder, &res.field, wrap, ms);
+                    }
+                    route::RouteEvent::Pass => route.encode_pass(encoder, &res.field, wrap, ms),
+                }
+            }
+            route.finish_frame(queue);
+            queue.write_buffer(
+                &route.present_uniform,
+                0,
+                bytemuck::bytes_of(&route_present),
+            );
+        } else {
+            for _ in 0..generations {
+                if sums_rows {
+                    res.encode_rows(encoder);
+                }
+                res.encode_step(encoder, StepPass::Step);
+            }
+        }
+        if route_res.is_some() {
+            res.route = route_res;
         }
 
         // Load over the engine backdrop (ADR-0018): dead cells write no
         // coverage, so the backdrop survives wherever nothing lives.
         let mut pass = gpu::color_pass(encoder, "cellular-present-pass", view, wgpu::LoadOp::Load);
-        pass.set_pipeline(&res.present_pipeline);
-        pass.set_bind_group(0, res.present_bg.for_field(&res.field), &[]);
+        match res.route.as_ref().filter(|_| route_on) {
+            Some(route) => {
+                pass.set_pipeline(&route.present_pipeline);
+                pass.set_bind_group(0, res.present_bg.for_field(&res.field), &[]);
+                pass.set_bind_group(1, &route.present_bg, &[]);
+            }
+            None => {
+                pass.set_pipeline(&res.present_pipeline);
+                pass.set_bind_group(0, res.present_bg.for_field(&res.field), &[]);
+            }
+        }
         pass.draw(0..3, 0..1);
     }
+}
+
+/// `value` where it is finite, `fallback` where it is not.
+fn finite_or(value: f32, fallback: f32) -> f32 {
+    if value.is_finite() { value } else { fallback }
 }
 
 #[cfg(test)]

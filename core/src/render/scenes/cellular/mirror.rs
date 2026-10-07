@@ -214,6 +214,58 @@ impl Aged {
     }
 }
 
+/// The open mask of a `0`/`1` field: `1` for a dead cell, which the route
+/// walks, `0` for a live one, which is a wall.
+pub(super) fn open_mask(cells: &[u8]) -> Vec<u8> {
+    cells.iter().map(|c| u8::from(*c == 0)).collect()
+}
+
+/// How many cells differ between two masks.
+pub(super) fn changed(a: &[u8], b: &[u8]) -> u32 {
+    a.iter().zip(b).filter(|(x, y)| x != y).count() as u32
+}
+
+/// The route's centre rule: the open cell whose centre lies nearest the grid's,
+/// the lowest index on a tie. `None` on a mask with no open cell.
+pub(super) fn centre_source(open: &[u8], n: u32) -> Option<u32> {
+    let m = i64::from(n);
+    (0..n * n)
+        .filter(|i| open[*i as usize] == 1)
+        .min_by_key(|i| {
+            let dx = 2 * i64::from(i % n) + 1 - m;
+            let dy = 2 * i64::from(i / n) + 1 - m;
+            (dx * dx + dy * dy, *i)
+        })
+}
+
+/// Breadth-first distances from `source` over the open cells, four-connected,
+/// across the seam when `wrap`. A wall, and an open cell the search cannot
+/// reach, holds `u32::MAX`, the GPU's sentinel.
+pub(super) fn bfs(open: &[u8], n: u32, wrap: bool, source: u32) -> Vec<u32> {
+    let mut dist = vec![u32::MAX; (n * n) as usize];
+    if open[source as usize] != 1 {
+        return dist;
+    }
+    dist[source as usize] = 0;
+    let mut queue = std::collections::VecDeque::from([source]);
+    let ni = i64::from(n);
+    while let Some(i) = queue.pop_front() {
+        let (x, y) = (i64::from(i % n), i64::from(i / n));
+        for (dx, dy) in [(-1i64, 0i64), (1, 0), (0, -1), (0, 1)] {
+            let (px, py) = (x + dx, y + dy);
+            if !wrap && (px < 0 || py < 0 || px >= ni || py >= ni) {
+                continue;
+            }
+            let j = (py.rem_euclid(ni) * ni + px.rem_euclid(ni)) as usize;
+            if open[j] == 1 && dist[j] == u32::MAX {
+                dist[j] = dist[i as usize] + 1;
+                queue.push_back(j as u32);
+            }
+        }
+    }
+    dist
+}
+
 /// The field after one reseed disc: every cell within the disc — measured
 /// across the seam on a torus — reseeded under the stamp's own seed.
 pub(super) fn stamp(cells: &[u8], n: u32, wrap: bool, s: Stamp, threshold: u32) -> Vec<u8> {

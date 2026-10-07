@@ -238,8 +238,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 "#;
 
-/// The present pass. [`gpu::FULLSCREEN_VS_UV_FLIPPED`](crate::render::gpu::FULLSCREEN_VS_UV_FLIPPED)
-/// is prepended at construction.
+/// The present pass's declarations and helpers: everything but its entry point.
+/// [`gpu::FULLSCREEN_VS_UV_FLIPPED`](crate::render::gpu::FULLSCREEN_VS_UV_FLIPPED)
+/// is prepended at construction, and [`PRESENT_MAIN`] or
+/// [`ROUTE_PRESENT_MAIN`] follows.
 pub(super) const PRESENT_SHADER: &str = r#"
 struct Present {
     // x: hue, y: brightness, z: saturation, w: palette_mix
@@ -360,7 +362,11 @@ fn paint(texel: vec4<f32>) -> Paint {
     }
     return p;
 }
+"#;
 
+/// The present pass's entry point when no route is drawn: the field through the
+/// palette and nothing else.
+pub(super) const PRESENT_MAIN: &str = r#"
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let grid = pp.b.w;
@@ -397,5 +403,380 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // backdrop untouched. `occlude` (ADR-0085) scales that coverage; the
     // renderer hands 1.0 whenever a post stage owns the seam instead.
     return vec4<f32>(col, light * pp.b.z);
+}
+"#;
+
+/// The present pass's entry point when the route is drawn (ADR-0266): the field
+/// as [`PRESENT_MAIN`] paints it, with the route mixed over it. Follows
+/// [`PRESENT_SHADER`]; the route constants
+/// (`route::wgsl_consts`) come before both.
+///
+/// Group 1 is the route's own: the per-cell regions, the control words the GPU
+/// keeps, and this pass's uniform. A cell's palette coordinate and the route's
+/// both go through one `shade`, so the route reads banding, contour ink and
+/// saturation exactly as the field does.
+pub(super) const ROUTE_PRESENT_MAIN: &str = r#"
+struct RoutePresent {
+    // x: route (the overlay's strength), y: route_coord, z: route_grade,
+    // w: unused
+    a: vec4<f32>,
+}
+@group(1) @binding(0) var<storage, read> route_cells: array<u32>;
+@group(1) @binding(1) var<storage, read> route_control: array<u32>;
+@group(1) @binding(2) var<uniform> rp: RoutePresent;
+
+// The palette colour at `coord` (hue already added), banded, contour-inked
+// and saturated as the plain present colours a cell.
+fn shade(coord: f32) -> vec3<f32> {
+    let steps = pp.b.x;
+    let palette_mix = pp.a.w;
+    let banded = band_coord(coord, steps);
+    let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(banded, 0.5), 0.0).rgb;
+    let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(banded, 0.5), 0.0).rgb;
+    let col = mix(ca, cb, clamp(palette_mix, 0.0, 1.0));
+    return apply_saturation(
+        band_contour_ink(
+            col, coord, steps, pp.b.y, pp.e.x, pp.e.y, lut_a, lut_b, lut_samp, palette_mix
+        ),
+        pp.a.z
+    );
+}
+
+// What the route paints on cell `i`: x the overlay's strength, y its palette
+// coordinate before hue. Zero strength where it paints nothing — a wall now, a
+// cell the sweep has not reached, or no sweep under way.
+fn route_paint(i: u32, nn: u32, open_now: bool) -> vec2<f32> {
+    if (!open_now || route_control[C_SEARCH] != 1u || route_control[C_FRESH] != 0u) {
+        return vec2<f32>(0.0);
+    }
+    let d = route_cells[(R_DIST + route_control[C_PARITY]) * nn + i];
+    if (d == INF) {
+        return vec2<f32>(0.0);
+    }
+    let t = f32(d) / f32(max(route_control[C_D_MAX], 1u));
+    return vec2<f32>(clamp(rp.a.x, 0.0, 1.0), rp.a.y + rp.a.z * t);
+}
+
+@fragment
+fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    let grid = pp.b.w;
+    let zoom = max(pp.c.x, 1e-3);
+    let pan = vec2<f32>(pp.c.y, -pp.c.z);
+    let uv = (in.uv - vec2<f32>(0.5)) / zoom + vec2<f32>(0.5) + pan;
+    let inside = all(uv >= vec2<f32>(0.0)) && all(uv < vec2<f32>(1.0));
+    let n = i32(grid);
+    let cell = clamp(vec2<i32>(floor(fract(uv) * grid)), vec2<i32>(0), vec2<i32>(n - 1));
+    let texel = textureLoad(field, cell, 0);
+    let p = paint(texel);
+    let shown = pp.c.w > 0.5 || inside;
+
+    let i = u32(cell.y) * u32(n) + u32(cell.x);
+    let r = route_paint(i, u32(n * n), texel.x <= 0.5);
+    // The route mixes over the cell's own colour by its strength, and lights
+    // the cell at least that much.
+    let s = select(0.0, r.x, shown);
+    let light = max(select(0.0, p.light, shown), s);
+    let col = mix(shade(p.coord + pp.a.x), shade(r.y + pp.a.x), s);
+    return vec4<f32>(col * (max(pp.a.y, 0.0) * light), light * pp.b.z);
+}
+"#;
+
+/// What every route pass shares: the per-event uniform. The route constants
+/// (`route::wgsl_consts`) precede it.
+pub(super) const ROUTE_COMMON: &str = r#"
+// One slot per event on the frame's timeline, bound at a dynamic offset.
+struct Event {
+    // x: grid (cells per side), y: wrap (1 torus), z: this event's scene time
+    // (ms since configure), w: work tiles per side
+    a: vec4<u32>,
+    // unused
+    b: vec4<u32>,
+}
+"#;
+
+/// The route's grid passes (ADR-0266): `compare`, run after every generation,
+/// and `work`, run on every route pass the clock owes. The route constants
+/// (`route::wgsl_consts`) are prepended at construction.
+///
+/// **One bind group shape for both**, and what each does is its entry point or
+/// the action the control words name — never a field of the uniform, which is
+/// the WARP hazard `StepParams` records.
+///
+/// `work` is dispatched **indirectly**, its workgroup count written by the
+/// control pass, so an idle route dispatches nothing. Its action is read once
+/// through `workgroupUniformLoad`, which is what makes the barriers inside the
+/// relaxation legal under WGSL's uniformity rules.
+///
+/// The relaxation is **Jacobi, never in place**: a pass reads one half of the
+/// distance pair and writes the other, each tile from the read half alone. So
+/// a pass is a pure function of the one before it, whatever order an adapter
+/// runs workgroups in.
+pub(super) const ROUTE_GRID_SHADER: &str = r#"
+@group(0) @binding(0) var field: texture_2d<f32>;
+@group(0) @binding(1) var<storage, read_write> cells: array<u32>;
+@group(0) @binding(2) var<storage, read_write> counts: array<atomic<u32>>;
+@group(0) @binding(3) var<storage, read> control: array<u32>;
+@group(0) @binding(4) var<uniform> ev: Event;
+
+// The tile and its one-cell halo, as distances and as open bits.
+var<workgroup> tile_d: array<u32, SPAN_CELLS>;
+var<workgroup> tile_open: array<u32, SPAN_CELLS>;
+var<workgroup> wg_action: u32;
+// Per-workgroup partials, published by one invocation at the end.
+var<workgroup> wg_count: atomic<u32>;
+var<workgroup> wg_max: atomic<u32>;
+var<workgroup> wg_min: atomic<u32>;
+
+// The index of the cell at `c`: wrapped on a torus, INF past a border.
+fn wrapped(c: vec2<i32>, n: i32, wrap: bool) -> u32 {
+    let inside = all(c >= vec2<i32>(0)) && all(c < vec2<i32>(n));
+    let w = ((c % vec2<i32>(n)) + vec2<i32>(n)) % vec2<i32>(n);
+    return select(INF, u32(w.y * n + w.x), inside || wrap);
+}
+
+// How far cell `i`'s centre lies from the grid's, squared, in half-cells:
+// `(2x + 1 - n)^2 + (2y + 1 - n)^2`. Exact in u32 up to MAX_GRID.
+fn centre_key(i: u32, n: u32) -> u32 {
+    let m = i32(n);
+    let dx = 2 * i32(i % n) + 1 - m;
+    let dy = 2 * i32(i / n) + 1 - m;
+    return u32(dx * dx + dy * dy);
+}
+
+// Counts the cells whose open bit (dead = open) differs from the last
+// generation's, and the open cells, then records this generation's mask.
+@compute @workgroup_size(16, 16)
+fn compare(
+    @builtin(global_invocation_id) gid: vec3<u32>,
+    @builtin(local_invocation_index) li: u32,
+) {
+    if (li == 0u) {
+        atomicStore(&wg_count, 0u);
+        atomicStore(&wg_max, 0u);
+    }
+    workgroupBarrier();
+    let n = ev.a.x;
+    let nn = n * n;
+    if (gid.x < n && gid.y < n) {
+        let i = gid.y * n + gid.x;
+        let open = select(1u, 0u, textureLoad(field, vec2<i32>(gid.xy), 0).x > 0.5);
+        if (open != cells[R_PREV * nn + i]) {
+            atomicAdd(&wg_count, 1u);
+        }
+        atomicAdd(&wg_max, open);
+        cells[R_PREV * nn + i] = open;
+    }
+    workgroupBarrier();
+    if (li == 0u) {
+        atomicAdd(&counts[K_MOVED], atomicLoad(&wg_count));
+        atomicAdd(&counts[K_OPEN], atomicLoad(&wg_max));
+    }
+}
+
+// A_SNAPSHOT: freeze the last compared mask, and find the open cell nearest
+// the centre's key.
+fn snapshot(i: u32, n: u32, nn: u32) {
+    let open = cells[R_PREV * nn + i];
+    cells[R_SNAP * nn + i] = open;
+    if (open == 1u) {
+        atomicMin(&wg_min, centre_key(i, n));
+    }
+}
+
+// A_INDEX: the lowest index whose key equals the one the control pass named —
+// the centre's distance, or the largest finite distance of the field.
+fn find_index(i: u32, n: u32, nn: u32) {
+    if (cells[R_SNAP * nn + i] != 1u) {
+        return;
+    }
+    var key = cells[(R_DIST + control[C_PARITY]) * nn + i];
+    if (control[C_KEY_KIND] == KIND_CENTRE) {
+        key = centre_key(i, n);
+    }
+    if (key == control[C_KEY]) {
+        atomicMin(&wg_min, i);
+    }
+}
+
+// A_RELAX: one pass of `d(x) = min(d(x), 1 + min over open neighbours d(n))`
+// over this tile, LOCAL_ITERATIONS deep in workgroup memory, the halo held at
+// the read half's values.
+fn relax(wg: vec2<u32>, lid: vec2<u32>, li: u32, n: u32, wrap: bool) {
+    let nn = n * n;
+    let parity = control[C_PARITY];
+    let fresh = control[C_FRESH] != 0u;
+    let source = control[C_SOURCE];
+    let read = (R_DIST + parity) * nn;
+    let origin = vec2<i32>(wg * TILE) - vec2<i32>(1);
+    for (var k = li; k < SPAN * SPAN; k = k + TILE * TILE) {
+        let c = origin + vec2<i32>(i32(k % SPAN), i32(k / SPAN));
+        let j = wrapped(c, i32(n), wrap);
+        var open = 0u;
+        var d = INF;
+        if (j != INF) {
+            open = cells[R_SNAP * nn + j];
+            // A fresh sweep starts from the source alone, whatever the pair
+            // holds from the last one.
+            d = select(cells[read + j], select(INF, 0u, j == source), fresh);
+            d = select(INF, d, open == 1u);
+        }
+        tile_open[k] = open;
+        tile_d[k] = d;
+    }
+    workgroupBarrier();
+
+    let me = (lid.y + 1u) * SPAN + lid.x + 1u;
+    let gid = wg * TILE + lid;
+    let mine = gid.x < n && gid.y < n;
+    let moves = mine && tile_open[me] == 1u;
+    let start = tile_d[me];
+    var d = start;
+    for (var it = 0u; it < LOCAL_ITERATIONS; it = it + 1u) {
+        if (moves) {
+            let m = min(
+                min(tile_d[me - 1u], tile_d[me + 1u]),
+                min(tile_d[me - SPAN], tile_d[me + SPAN])
+            );
+            if (m != INF) {
+                d = min(d, m + 1u);
+            }
+        }
+        workgroupBarrier();
+        tile_d[me] = d;
+        workgroupBarrier();
+    }
+    if (mine) {
+        cells[(R_DIST + 1u - parity) * nn + gid.y * n + gid.x] = d;
+        if (d != start) {
+            atomicStore(&wg_count, 1u);
+        }
+        if (d != INF) {
+            atomicMax(&wg_max, d);
+        }
+    }
+}
+
+@compute @workgroup_size(16, 16)
+fn work(
+    @builtin(workgroup_id) wg: vec3<u32>,
+    @builtin(local_invocation_id) lid: vec3<u32>,
+    @builtin(local_invocation_index) li: u32,
+) {
+    if (li == 0u) {
+        wg_action = control[C_ACTION];
+        atomicStore(&wg_count, 0u);
+        atomicStore(&wg_max, 0u);
+        atomicStore(&wg_min, INF);
+    }
+    let action = workgroupUniformLoad(&wg_action);
+    let n = ev.a.x;
+    let nn = n * n;
+    let gid = wg.xy * TILE + lid.xy;
+    let mine = gid.x < n && gid.y < n;
+    let i = gid.y * n + gid.x;
+    if (action == A_RELAX) {
+        relax(wg.xy, lid.xy, li, n, ev.a.y != 0u);
+    } else if (action == A_SNAPSHOT && mine) {
+        snapshot(i, n, nn);
+    } else if (action == A_INDEX && mine) {
+        find_index(i, n, nn);
+    }
+    workgroupBarrier();
+    if (li == 0u) {
+        if (action == A_RELAX) {
+            atomicAdd(&counts[K_CHANGED], atomicLoad(&wg_count));
+            atomicMax(&counts[K_MAX], atomicLoad(&wg_max));
+        } else if (action == A_SNAPSHOT) {
+            atomicMin(&counts[K_KEY], atomicLoad(&wg_min));
+        } else if (action == A_INDEX) {
+            atomicMin(&counts[K_INDEX], atomicLoad(&wg_min));
+        }
+    }
+}
+"#;
+
+/// The route's control pass (ADR-0266): one invocation that reads what the last
+/// grid pass counted and decides what the next one does. `after_generation`
+/// follows a generation's compare pass and `after_work` a work pass; each is
+/// handed its own event's scene time. The route constants are prepended.
+///
+/// It is the only thing that decides the route's state, and nothing reads the
+/// state back to the CPU.
+pub(super) const ROUTE_CONTROL_SHADER: &str = r#"
+@group(0) @binding(0) var<uniform> ev: Event;
+@group(0) @binding(1) var<storage, read> cells: array<u32>;
+@group(0) @binding(2) var<storage, read_write> counts: array<u32>;
+@group(0) @binding(3) var<storage, read_write> control: array<u32>;
+
+// Name the next work pass, and dispatch it over `groups` tiles a side — zero
+// for none.
+fn dispatch(action: u32, groups: u32) {
+    control[C_ACTION] = action;
+    control[C_ARGS] = groups;
+    control[C_ARGS + 1u] = groups;
+    control[C_ARGS + 2u] = 1u;
+}
+
+// Clear the partials a work pass accumulates.
+fn clear_counts() {
+    counts[K_CHANGED] = 0u;
+    counts[K_MAX] = 0u;
+    counts[K_KEY] = INF;
+    counts[K_INDEX] = INF;
+}
+
+@compute @workgroup_size(1)
+fn after_generation() {
+    let moved = counts[K_MOVED];
+    control[C_LAST_MOVED] = moved;
+    control[C_LAST_OPEN] = counts[K_OPEN];
+    control[C_GENERATIONS] = control[C_GENERATIONS] + 1u;
+    counts[K_MOVED] = 0u;
+    counts[K_OPEN] = 0u;
+    // Any change to the open mask starts the sweep again from a new snapshot.
+    if (moved > 0u) {
+        clear_counts();
+        control[C_SEARCH] = 0u;
+        dispatch(A_SNAPSHOT, ev.a.w);
+    }
+}
+
+@compute @workgroup_size(1)
+fn after_work() {
+    let action = control[C_ACTION];
+    if (action == A_SNAPSHOT) {
+        let key = counts[K_KEY];
+        clear_counts();
+        if (key == INF) {
+            // No open cell: nothing to search.
+            dispatch(A_NONE, 0u);
+            return;
+        }
+        control[C_KEY] = key;
+        control[C_KEY_KIND] = KIND_CENTRE;
+        dispatch(A_INDEX, ev.a.w);
+    } else if (action == A_INDEX) {
+        control[C_SOURCE] = counts[K_INDEX];
+        clear_counts();
+        control[C_FRESH] = 1u;
+        control[C_SEARCH] = 1u;
+        control[C_SWEEP_PASSES] = 0u;
+        control[C_CONVERGED] = 0u;
+        dispatch(A_RELAX, ev.a.w);
+    } else if (action == A_RELAX) {
+        let changed = counts[K_CHANGED];
+        control[C_D_MAX] = counts[K_MAX];
+        control[C_LAST_CHANGED] = changed;
+        clear_counts();
+        control[C_FRESH] = 0u;
+        control[C_PARITY] = 1u - control[C_PARITY];
+        control[C_RELAX_PASSES] = control[C_RELAX_PASSES] + 1u;
+        control[C_SWEEP_PASSES] = control[C_SWEEP_PASSES] + 1u;
+        // A pass that changed nothing is the fixed point: the sweep has
+        // converged, and every further pass copies it unchanged.
+        if (changed == 0u && control[C_CONVERGED] == 0u) {
+            control[C_CONVERGED] = control[C_SWEEP_PASSES];
+        }
+    }
 }
 "#;

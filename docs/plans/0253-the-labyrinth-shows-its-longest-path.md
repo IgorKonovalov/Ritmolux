@@ -1,6 +1,6 @@
 # 0253 — The labyrinth shows its longest path
 
-> **Status:** approved (2026-10-07)
+> **Status:** in-progress
 > **Created:** 2026-10-07
 > **Owner skill(s):** dev, human
 > **Closes:** design-backlog 0274
@@ -303,16 +303,65 @@ struct RouteControl {
 
 ## Implementation log
 
-**Lane:** _(not started)_
+**Lane:** branch `plan-0253-the-labyrinth-shows-its-longest-path`, worktree
+`/home/igor/Work/rlx-plan-0253`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — A sweep relaxes on the GPU and the flood is visible | dev | not started | |
+| 1 — A sweep relaxes on the GPU and the flood is visible | dev | committed with this row | |
 | 2 — Quiet stretches find, reveal and fade the route | dev | not started | |
 | 3 — The budget belongs to the tier and the references are regenerated | dev | not started | |
 | 4 — The owner sees the route on the labyrinth | human | not started | |
 
 ### Notes
+
+- **Phase 1, the readings.** All three come from the ignored probe `route_readings` in
+  `core/src/render/scenes/cellular/tests.rs`
+  (`cargo nextest run -p rlx-core --lib --run-ignored only --no-capture route_readings`), taken
+  2026-10-07 on the reference laptop.
+  - **Pass cost**, ADR-0245 per-pass timer, 60 timed frames of 16 relax passes each on a frozen
+    seeded field, and of 8 generations each for the step:
+
+    | adapter | grid | relax pass | its control pass | step pass (one generation) |
+    |---|---|---|---|---|
+    | AMD Radeon Graphics (RADV RENOIR), integrated, Mesa 26.2.2 | 192 | 0.0400 ms | 0.0013 ms | 0.0138 ms |
+    | | 512 | 0.2150 ms | 0.0012 ms | 0.1062 ms |
+    | | 1024 | 0.8154 ms | 0.0012 ms | 0.3268 ms |
+    | NVIDIA GeForce RTX 3080 Laptop GPU, discrete, driver 610.57.04 | 192 | 0.0304 ms | 0.0040 ms | 0.0079 ms |
+    | | 512 | 0.0891 ms | 0.0038 ms | 0.0251 ms |
+    | | 1024 | 0.2691 ms | 0.0037 ms | 0.0979 ms |
+  - **Sweep 1 on the grown maze** (`cellular_labyrinth`'s grid and salt, generation 600, then held
+    by a frozen rule), on llvmpipe (Mesa 26.2.2, LLVM 22.1.8): from the centre rule's source it
+    converged in **3 passes**, reaching 19 of 17 432 open cells, farthest 10. The open cells of that
+    maze are **2 881 four-connected components**: 2 433 of 1-9 cells, 443 of 10-99, 5 of 100-999,
+    none of 1 000 or more; the largest holds 142. A sweep started (by writing the control words) on
+    that component's cell nearest the centre converged in **6 passes**, farthest 53, and matched
+    the CPU BFS.
+  - **Change counts**, same adapter: 32 beats of warm-up, then 72 beats at 120 bpm with the counts
+    read off the compare pass. The maze is **never exactly still between bites**: from about 0.6 s
+    after a bite to the next one, every generation changes 4 to 24 open bits (a steady level per
+    bite interval: 4, 8, 12, 16, 20 or 24, held unchanged generation to generation). The first
+    generation after a bite changes 2 327 to 3 782; the counts then fall over 7-8 generations
+    (e.g. 2 423, 789, 471, 297, 142, 75, 40, 23). The rule's return to S12345 (beats 6 of 32) gives
+    a first count of 68 and 123 in the two windows read, then 26, 19, 14 and 69, 38, 23. The
+    loosened window itself never falls below 84. So there are **no still stretches at a tolerance of
+    zero**; at the flicker's ceiling the standing stretches run from about 0.6 s after a bite to the
+    next bite, about 1.4 s, in the 12 of the 18 bite intervals read that a loosened window does
+    not touch.
+- **Phase 1, the labyrinth's bindings in the probe** were emulated at the scene, not evaluated by
+  the preset engine: every band at zero (so `step_rate` 14), beat `k` on the frame holding `k / 2`
+  seconds with `beat_index` reading `k` until the next, `reseed` on beats `k % 4 == 0`, and
+  `survive` 30 on beats `k % 32 < 6`. The grid, wrap and salt are read from
+  `presets/cellular_labyrinth.toml`.
+- **Phase 1, the passes.** The snapshot is not a pass of its own: one indirect `work` pass carries
+  every grid action the control words name (snapshot, the two-stage index search, relax), and is
+  labelled `cellular-route-relax` whatever it does, so that timer row includes the snapshot and
+  index passes. Its workgroup count is written by the control pass, so an idle route dispatches
+  nothing. In this phase a converged sweep keeps relaxing, each pass changing nothing.
+- **Phase 1, `route = 0` byte-identity** is tested inside the phase
+  (`route_zero_draws_the_frame_unchanged`: a scene that never turns the route on against one that
+  turns it on and off), not against a build from before it; the present's WGSL for `route = 0` is
+  the old text split into two constants and concatenated.
 
 ### Close triggers
 
