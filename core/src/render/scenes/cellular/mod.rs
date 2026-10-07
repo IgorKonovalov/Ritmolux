@@ -276,6 +276,7 @@ const DEFAULT_AGE_TINT: f32 = default_of(PARAMS, "age_tint");
 const DEFAULT_ROUTE: f32 = default_of(PARAMS, "route");
 const DEFAULT_ROUTE_COORD: f32 = default_of(PARAMS, "route_coord");
 const DEFAULT_ROUTE_GRADE: f32 = default_of(PARAMS, "route_grade");
+const DEFAULT_ROUTE_REVEAL: f32 = default_of(PARAMS, "route_reveal");
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_ZOOM: f32 = 1.0;
 
@@ -649,6 +650,16 @@ pub const PARAMS: &[ParamSpec] = &[
               0 paints it one solid colour.",
         kind: ParamKind::Modal,
         group: ParamGroup::Colour,
+        main: false,
+    },
+    ParamSpec {
+        name: "route_reveal",
+        default: 1.0,
+        range: Some([0.0, route::MAX_REVEAL]),
+        doc: "Seconds a found route takes to draw in along its length, end to end; it fades \
+              out over a quarter of this when the maze moves. 0 draws it whole at once.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
         main: false,
     },
     common::brightness(common::DEFAULT_BRIGHTNESS),
@@ -1201,6 +1212,7 @@ pub struct CellularScene {
     route: f32,
     route_coord: f32,
     route_grade: f32,
+    route_reveal: f32,
     /// Route passes owed per second of `dt` (ADR-0266).
     route_rate: f32,
     route_clock: route::RouteClock,
@@ -1273,6 +1285,7 @@ impl CellularScene {
             route: DEFAULT_ROUTE,
             route_coord: DEFAULT_ROUTE_COORD,
             route_grade: DEFAULT_ROUTE_GRADE,
+            route_reveal: DEFAULT_ROUTE_REVEAL,
             route_rate: route::ROUTE_RATE,
             route_clock: route::RouteClock::default(),
             generation_ticks: route::Ticks::default(),
@@ -1409,6 +1422,7 @@ impl Scene for CellularScene {
         self.route = DEFAULT_ROUTE;
         self.route_coord = DEFAULT_ROUTE_COORD;
         self.route_grade = DEFAULT_ROUTE_GRADE;
+        self.route_reveal = DEFAULT_ROUTE_REVEAL;
         self.colour.reset();
         self.pan.reset();
         self.zoom = DEFAULT_ZOOM;
@@ -1437,6 +1451,7 @@ impl Scene for CellularScene {
             "route" => self.route = value,
             "route_coord" => self.route_coord = value,
             "route_grade" => self.route_grade = value,
+            "route_reveal" => self.route_reveal = value,
             "zoom" => self.zoom = value,
             _ => {}
         }
@@ -1547,13 +1562,19 @@ impl Scene for CellularScene {
         };
 
         let route_on = self.route_on();
+        let reveal = route::applied_reveal(self.route_reveal, DEFAULT_ROUTE_REVEAL);
         let route_present = route::RoutePresent {
             a: [
                 self.route.clamp(0.0, 1.0),
                 finite_or(self.route_coord, DEFAULT_ROUTE_COORD),
                 finite_or(self.route_grade, DEFAULT_ROUTE_GRADE),
-                0.0,
+                reveal,
             ],
+            b: [route::scene_ms(self.scene_time), 0, 0, 0],
+        };
+        let route_frame = route::FrameParams {
+            wrap: self.config.wrap,
+            fade_ms: route::fade_ms(reveal),
         };
         // The schedules are this frame's, and a second render without an
         // update must not run them again.
@@ -1601,7 +1622,6 @@ impl Scene for CellularScene {
                 route.reset(queue);
             }
             route.begin_frame();
-            let wrap = self.config.wrap;
             let timeline = route::Timeline::new(
                 generation_ticks,
                 pass_ticks,
@@ -1615,9 +1635,11 @@ impl Scene for CellularScene {
                             res.encode_rows(encoder);
                         }
                         res.encode_step(encoder, StepPass::Step);
-                        route.encode_generation(encoder, &res.field, wrap, ms);
+                        route.encode_generation(encoder, &res.field, route_frame, ms);
                     }
-                    route::RouteEvent::Pass => route.encode_pass(encoder, &res.field, wrap, ms),
+                    route::RouteEvent::Pass => {
+                        route.encode_pass(encoder, &res.field, route_frame, ms)
+                    }
                 }
             }
             route.finish_frame(queue);

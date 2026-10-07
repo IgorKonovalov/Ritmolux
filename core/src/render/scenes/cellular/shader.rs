@@ -418,8 +418,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 pub(super) const ROUTE_PRESENT_MAIN: &str = r#"
 struct RoutePresent {
     // x: route (the overlay's strength), y: route_coord, z: route_grade,
-    // w: unused
+    // w: route_reveal (seconds, >= 0, clamped CPU-side)
     a: vec4<f32>,
+    // x: this frame's scene time (ms since configure), yzw: unused
+    b: vec4<u32>,
 }
 @group(1) @binding(0) var<storage, read> route_cells: array<u32>;
 @group(1) @binding(1) var<storage, read> route_control: array<u32>;
@@ -442,19 +444,41 @@ fn shade(coord: f32) -> vec3<f32> {
     );
 }
 
+// Seconds from the control word `stamp` (ms) to this frame, never negative.
+fn since(stamp: u32) -> f32 {
+    return f32(select(0u, rp.b.x - stamp, rp.b.x >= stamp)) / 1000.0;
+}
+
 // What the route paints on cell `i`: x the overlay's strength, y its palette
-// coordinate before hue. Zero strength where it paints nothing — a wall now, a
-// cell the sweep has not reached, or no sweep under way.
+// coordinate before hue. Zero strength where it paints nothing — a wall now,
+// a cell off the committed route, or no route drawn.
+//
+// `t` runs from 0 at B to 1 at C. The reveal front moves from 0 to
+// `1 + REVEAL_EDGE` over `route_reveal` seconds and a cell eases in across the
+// edge's width behind it; at `route_reveal = 0` every cell is in at once.
+// From the quiet's break the strength eases out over a quarter of the reveal.
 fn route_paint(i: u32, nn: u32, open_now: bool) -> vec2<f32> {
-    if (!open_now || route_control[C_SEARCH] != 1u || route_control[C_FRESH] != 0u) {
+    let shown = route_control[C_SHOWN];
+    if (!open_now || shown == SHOWN_NONE) {
         return vec2<f32>(0.0);
     }
-    let d = route_cells[(R_DIST + route_control[C_PARITY]) * nn + i];
+    let d = route_cells[R_ROUTE * nn + i];
     if (d == INF) {
         return vec2<f32>(0.0);
     }
-    let t = f32(d) / f32(max(route_control[C_D_MAX], 1u));
-    return vec2<f32>(clamp(rp.a.x, 0.0, 1.0), rp.a.y + rp.a.z * t);
+    let t = f32(d) / f32(max(route_control[C_LENGTH], 1u));
+    let reveal = rp.a.w;
+    var appear = 1.0;
+    if (reveal > 0.0) {
+        let front = since(route_control[C_COMMIT_MS]) / reveal * (1.0 + REVEAL_EDGE);
+        appear = smoothstep(0.0, 1.0, (front - t) / REVEAL_EDGE);
+    }
+    var fade = 1.0;
+    if (shown == SHOWN_FADING) {
+        let span = reveal * 0.25;
+        fade = select(0.0, 1.0 - smoothstep(0.0, 1.0, since(route_control[C_BREAK_MS]) / span), span > 0.0);
+    }
+    return vec2<f32>(clamp(rp.a.x, 0.0, 1.0) * appear * fade, rp.a.y + rp.a.z * t);
 }
 
 @fragment
@@ -584,18 +608,35 @@ fn snapshot(i: u32, n: u32, nn: u32) {
 }
 
 // A_INDEX: the lowest index whose key equals the one the control pass named —
-// the centre's distance, or the largest finite distance of the field.
+// the centre's distance, or the largest finite distance of the field. After
+// sweep 2 it also keeps that sweep's field as d_B.
 fn find_index(i: u32, n: u32, nn: u32) {
+    let d = cells[(R_DIST + control[C_PARITY]) * nn + i];
+    if (control[C_SEARCH] == 2u) {
+        cells[R_KEPT * nn + i] = d;
+    }
     if (cells[R_SNAP * nn + i] != 1u) {
         return;
     }
-    var key = cells[(R_DIST + control[C_PARITY]) * nn + i];
+    var key = d;
     if (control[C_KEY_KIND] == KIND_CENTRE) {
         key = centre_key(i, n);
     }
     if (key == control[C_KEY]) {
         atomicMin(&wg_min, i);
     }
+}
+
+// A_COMMIT: an open cell is on the route when it lies on some shortest path
+// from B to C, `d_B + d_C == d_B(C)`, and then holds d_B; every other cell
+// holds the sentinel. Both distances are finite there, and below MAX_GRID^2,
+// so the sum cannot wrap.
+fn commit(i: u32, nn: u32) {
+    let b = cells[R_KEPT * nn + i];
+    let c = cells[(R_DIST + control[C_PARITY]) * nn + i];
+    let on = cells[R_SNAP * nn + i] == 1u && b != INF && c != INF
+        && b + c == control[C_PENDING_LENGTH];
+    cells[R_ROUTE * nn + i] = select(INF, b, on);
 }
 
 // A_RELAX: one pass of `d(x) = min(d(x), 1 + min over open neighbours d(n))`
@@ -680,6 +721,8 @@ fn work(
         snapshot(i, n, nn);
     } else if (action == A_INDEX && mine) {
         find_index(i, n, nn);
+    } else if (action == A_COMMIT && mine) {
+        commit(i, nn);
     }
     workgroupBarrier();
     if (li == 0u) {
@@ -725,25 +768,74 @@ fn clear_counts() {
     counts[K_INDEX] = INF;
 }
 
+// Start sweep `search` (1, 2 or 3) from `source`: the next relax pass reads a
+// field holding 0 there and INF everywhere else.
+fn sweep_from(source: u32, search: u32) {
+    control[C_SOURCE] = source;
+    control[C_FRESH] = 1u;
+    control[C_SEARCH] = search;
+    control[C_SWEEP_PASSES] = 0u;
+    control[C_CONVERGED] = 0u;
+    dispatch(A_RELAX, ev.a.w);
+}
+
+// Drop the epoch in flight, if any, where it stands. Its fields are never
+// committed.
+fn abandon() {
+    if (control[C_SEARCH] != 0u || control[C_ACTION] != A_NONE) {
+        control[C_ABANDONED] = control[C_ABANDONED] + 1u;
+    }
+    control[C_SEARCH] = 0u;
+    clear_counts();
+    dispatch(A_NONE, 0u);
+}
+
+// A fading route is cleared once its fade has run, at this event's time.
+fn settle_fade() {
+    if (control[C_SHOWN] == SHOWN_FADING && ev.a.z - control[C_BREAK_MS] >= ev.b.x) {
+        control[C_SHOWN] = SHOWN_NONE;
+    }
+}
+
 @compute @workgroup_size(1)
 fn after_generation() {
     let moved = counts[K_MOVED];
+    let open = counts[K_OPEN];
     control[C_LAST_MOVED] = moved;
-    control[C_LAST_OPEN] = counts[K_OPEN];
+    control[C_LAST_OPEN] = open;
     control[C_GENERATIONS] = control[C_GENERATIONS] + 1u;
     counts[K_MOVED] = 0u;
     counts[K_OPEN] = 0u;
-    // Any change to the open mask starts the sweep again from a new snapshot.
-    if (moved > 0u) {
-        clear_counts();
-        control[C_SEARCH] = 0u;
-        dispatch(A_SNAPSHOT, ev.a.w);
+    // Still: at most the tolerance's fraction of the open cells changed. Both
+    // products stay below 2^32 up to MAX_GRID.
+    if (moved * QUIET_TOLERANCE_DEN <= open * QUIET_TOLERANCE_NUM) {
+        control[C_STILL_RUN] = min(control[C_STILL_RUN] + 1u, QUIET_HOLD + 1u);
+        // The quiet begins on the generation the run reaches the hold, and
+        // only then: a standing maze starts one epoch, not one a generation.
+        if (control[C_STILL_RUN] == QUIET_HOLD) {
+            clear_counts();
+            control[C_SEARCH] = 0u;
+            control[C_EPOCH_PASSES] = 0u;
+            dispatch(A_SNAPSHOT, ev.a.w);
+        }
+    } else {
+        control[C_STILL_RUN] = 0u;
+        abandon();
+        if (control[C_SHOWN] == SHOWN_ON) {
+            control[C_SHOWN] = SHOWN_FADING;
+            control[C_BREAK_MS] = ev.a.z;
+        }
     }
+    settle_fade();
 }
 
 @compute @workgroup_size(1)
 fn after_work() {
     let action = control[C_ACTION];
+    let nn = ev.a.x * ev.a.x;
+    if (action != A_NONE) {
+        control[C_EPOCH_PASSES] = control[C_EPOCH_PASSES] + 1u;
+    }
     if (action == A_SNAPSHOT) {
         let key = counts[K_KEY];
         clear_counts();
@@ -752,20 +844,35 @@ fn after_work() {
             dispatch(A_NONE, 0u);
             return;
         }
-        control[C_KEY] = key;
-        control[C_KEY_KIND] = KIND_CENTRE;
-        dispatch(A_INDEX, ev.a.w);
+        // The last route's far end, while it is still open, so a maze that
+        // moves a little keeps its route in the same component; the centre
+        // rule otherwise.
+        let end = control[C_END];
+        if (end != 0u && end <= nn && cells[R_SNAP * nn + end - 1u] == 1u) {
+            sweep_from(end - 1u, 1u);
+        } else {
+            control[C_KEY] = key;
+            control[C_KEY_KIND] = KIND_CENTRE;
+            dispatch(A_INDEX, ev.a.w);
+        }
     } else if (action == A_INDEX) {
-        control[C_SOURCE] = counts[K_INDEX];
+        let found = counts[K_INDEX];
         clear_counts();
-        control[C_FRESH] = 1u;
-        control[C_SEARCH] = 1u;
-        control[C_SWEEP_PASSES] = 0u;
-        control[C_CONVERGED] = 0u;
-        dispatch(A_RELAX, ev.a.w);
+        let search = control[C_SEARCH];
+        if (search == 0u) {
+            sweep_from(found, 1u);
+        } else if (search == 1u) {
+            // B: sweep 2 starts there.
+            sweep_from(found, 2u);
+        } else {
+            // C: the index pass kept d_B; sweep 3 starts at C.
+            control[C_PENDING_C] = found;
+            sweep_from(found, 3u);
+        }
     } else if (action == A_RELAX) {
         let changed = counts[K_CHANGED];
-        control[C_D_MAX] = counts[K_MAX];
+        let far = counts[K_MAX];
+        control[C_D_MAX] = far;
         control[C_LAST_CHANGED] = changed;
         clear_counts();
         control[C_FRESH] = 0u;
@@ -773,10 +880,32 @@ fn after_work() {
         control[C_RELAX_PASSES] = control[C_RELAX_PASSES] + 1u;
         control[C_SWEEP_PASSES] = control[C_SWEEP_PASSES] + 1u;
         // A pass that changed nothing is the fixed point: the sweep has
-        // converged, and every further pass copies it unchanged.
-        if (changed == 0u && control[C_CONVERGED] == 0u) {
+        // converged, and the pass's largest finite distance is the field's.
+        if (changed == 0u) {
             control[C_CONVERGED] = control[C_SWEEP_PASSES];
+            let search = control[C_SEARCH];
+            if (search == 3u) {
+                dispatch(A_COMMIT, ev.a.w);
+            } else {
+                if (search == 2u) {
+                    control[C_PENDING_LENGTH] = far;
+                }
+                control[C_KEY] = far;
+                control[C_KEY_KIND] = KIND_FAR;
+                dispatch(A_INDEX, ev.a.w);
+            }
         }
+    } else if (action == A_COMMIT) {
+        control[C_LENGTH] = control[C_PENDING_LENGTH];
+        control[C_END] = control[C_PENDING_C] + 1u;
+        control[C_SHOWN] = SHOWN_ON;
+        control[C_COMMIT_MS] = ev.a.z;
+        control[C_COMMITS] = control[C_COMMITS] + 1u;
+        control[C_LAST_EPOCH] = control[C_EPOCH_PASSES];
+        control[C_SEARCH] = 0u;
+        // Nothing is relaxed again until the quiet breaks and returns.
+        dispatch(A_NONE, 0u);
     }
+    settle_fade();
 }
 "#;

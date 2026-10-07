@@ -1715,19 +1715,141 @@ fn word(words: &[u32], at: u32) -> u32 {
     words[at as usize]
 }
 
-/// The distance field the last relax pass wrote: the half of the pair the
-/// control words name.
-fn distance_field(ctx: &RenderContext, scene: &CellularScene) -> Vec<u32> {
+/// One region of the route's per-cell buffer.
+fn region(ctx: &RenderContext, scene: &CellularScene, region: u32) -> Vec<u32> {
     let cells = read_words(ctx, &route_of(scene).cells);
-    let parity = word(&control(ctx, scene), route::C_PARITY);
     let n = (scene.config.grid * scene.config.grid) as usize;
-    let at = (route::R_DIST + parity) as usize * n;
+    let at = region as usize * n;
     cells[at..at + n].to_vec()
 }
 
-/// A seeded `life_like` field of `N` cells held frozen with the route on, driven
-/// until its first sweep converges. Returns the scene and the seeded states.
-fn converged_on_seed(
+/// The distance field the last relax pass wrote: the half of the pair the
+/// control words name.
+fn distance_field(ctx: &RenderContext, scene: &CellularScene) -> Vec<u32> {
+    let parity = word(&control(ctx, scene), route::C_PARITY);
+    region(ctx, scene, route::R_DIST + parity)
+}
+
+/// The committed route: each cell's distance from B on it, the sentinel off it.
+fn committed(ctx: &RenderContext, scene: &CellularScene) -> Vec<u32> {
+    region(ctx, scene, route::R_ROUTE)
+}
+
+/// Drive `params` until `done` holds of the control words, at most `frames`
+/// frames of `dt`; returns the words it held on.
+#[track_caller]
+fn drive_until(
+    ctx: &RenderContext,
+    driver: &mut Driver<'_>,
+    scene: &mut CellularScene,
+    dt: f32,
+    params: &[(&str, f32)],
+    frames: u32,
+    done: impl Fn(&[u32]) -> bool,
+) -> Vec<u32> {
+    for _ in 0..frames {
+        driver.frame(scene, dt, params);
+        let words = control(ctx, scene);
+        if done(&words) {
+            return words;
+        }
+    }
+    panic!("the route did not get there in {frames} frames");
+}
+
+/// A tree maze on an `n` grid as a `0`/`1` field, walls live: rooms on the odd
+/// coordinates below `n - 1` carved together by a seeded depth-first walk, so
+/// the open cells are one tree, and every cell on the border is a wall.
+fn tree_maze(n: u32, seed: u64) -> Vec<u8> {
+    let rooms = (n - 1) / 2;
+    let mut cells = vec![1u8; (n * n) as usize];
+    let at = |x: u32, y: u32| (y * n + x) as usize;
+    let mut rng = SeededRng::new(seed);
+    let mut visited = vec![false; (rooms * rooms) as usize];
+    let mut stack = vec![(0u32, 0u32)];
+    visited[0] = true;
+    cells[at(1, 1)] = 0;
+    while let Some(&(rx, ry)) = stack.last() {
+        let options: Vec<(u32, u32)> = [(1i64, 0i64), (-1, 0), (0, 1), (0, -1)]
+            .iter()
+            .map(|(dx, dy)| (i64::from(rx) + dx, i64::from(ry) + dy))
+            .filter(|(x, y)| (0..i64::from(rooms)).contains(x) && (0..i64::from(rooms)).contains(y))
+            .map(|(x, y)| (x as u32, y as u32))
+            .filter(|(x, y)| !visited[(y * rooms + x) as usize])
+            .collect();
+        if options.is_empty() {
+            stack.pop();
+            continue;
+        }
+        let (nx, ny) = options[(rng.next_f32() * options.len() as f32) as usize % options.len()];
+        visited[(ny * rooms + nx) as usize] = true;
+        cells[at(2 * nx + 1, 2 * ny + 1)] = 0;
+        cells[at(rx + nx + 1, ry + ny + 1)] = 0;
+        stack.push((nx, ny));
+    }
+    cells
+}
+
+/// A maze whose longest route runs through a loop of two equal branches, on a
+/// 32-cell grid: a corridor along row 16 from column 1 to 30 that splits at
+/// column 12 into an upper branch on row 14 and a lower one on row 18, joining
+/// again at column 20, plus a three-cell dead-end spur up column 5. Walls
+/// live.
+///
+/// From the centre source (15, 14) the double sweep reaches B = (30, 16) at 17
+/// and then C = (1, 16) at 33, the spur's tip lying at 32: the corridor is the
+/// route, and both branches, each 12 long, lie on it.
+fn loop_maze() -> Vec<u8> {
+    const N: u32 = 32;
+    let mut cells = vec![1u8; (N * N) as usize];
+    let mut open = |x: u32, y: u32| cells[(y * N + x) as usize] = 0;
+    for x in (1..=12).chain(20..=30) {
+        open(x, 16);
+    }
+    for y in 14..=18 {
+        open(12, y);
+        open(20, y);
+    }
+    for x in 12..=20 {
+        open(x, 14);
+        open(x, 18);
+    }
+    for y in 13..=15 {
+        open(5, y);
+    }
+    cells
+}
+
+/// A scene on `config` with `walls` planted after a first frame of `first`,
+/// which runs with the route off so nothing is found on the seeded field the
+/// maze replaces.
+fn planted(
+    ctx: &RenderContext,
+    driver: &mut Driver<'_>,
+    config: CellularConfig,
+    walls: &[u8],
+    first: &[(&str, f32)],
+) -> CellularScene {
+    let first: Vec<(&str, f32)> = first
+        .iter()
+        .filter(|(name, _)| *name != "route")
+        .copied()
+        .collect();
+    let mut scene = scene_with(ctx, config);
+    driver.frame(&mut scene, ONE_GEN.0, &first);
+    plant(ctx, &mut scene, &live_cells(walls, config.grid));
+    scene
+}
+
+/// Whether the control words hold at least one committed route.
+fn has_committed(words: &[u32]) -> bool {
+    word(words, route::C_COMMITS) >= 1
+}
+
+/// A seeded `life_like` field of `n` cells held frozen with the route on,
+/// driven until its first route commits. Returns the scene and the seeded
+/// states.
+fn committed_on_seed(
     ctx: &RenderContext,
     driver: &mut Driver<'_>,
     n: u32,
@@ -1736,13 +1858,15 @@ fn converged_on_seed(
 ) -> (CellularScene, Vec<u8>) {
     let mut scene = scene_with(ctx, life(n, wrap, salt));
     driver.frame(&mut scene, ONE_GEN.0, &[("step_rate", 0.0), ("route", 1.0)]);
-    let frozen = with_route(&FROZEN);
-    for _ in 0..40 {
-        driver.frame(&mut scene, ONE_GEN.0, &frozen);
-        if word(&control(ctx, &scene), route::C_CONVERGED) != 0 {
-            break;
-        }
-    }
+    drive_until(
+        ctx,
+        driver,
+        &mut scene,
+        ONE_GEN.0,
+        &with_route(&FROZEN),
+        40,
+        has_committed,
+    );
     let seeded = mirror::seed_field(n, field_seed(salt), live_threshold(LIFE_DENSITY));
     assert_same_field(&states(ctx, &scene), &seeded, "the frozen maze");
     (scene, seeded)
@@ -1791,83 +1915,549 @@ fn the_timeline_merges_both_clocks_in_time_order() {
     );
 }
 
-/// **A converged sweep is the breadth-first search, cell for cell**: on a
-/// seeded maze held still, the GPU's distance field from the centre source
-/// equals the CPU's BFS on a torus and inside a dead border, and every wall and
-/// every open cell the source cannot reach holds the sentinel.
+/// **Converged sweeps are the breadth-first searches, cell for cell**: on a
+/// seeded maze held still, the epoch's kept field is the CPU's BFS from B and
+/// its last field the BFS from C, where B and C are the double sweep's ends
+/// from the centre source — on a torus and inside a dead border — and every
+/// wall and every open cell the search cannot reach holds the sentinel.
 #[test]
-fn a_converged_sweep_is_the_cpu_breadth_first_search() {
+fn converged_sweeps_are_the_cpu_breadth_first_searches() {
     let Some(ctx) = context() else {
         return;
     };
     const N: u32 = 48;
     let mut driver = Driver::new(&ctx);
     for wrap in [true, false] {
-        let (scene, seeded) = converged_on_seed(&ctx, &mut driver, N, wrap, 7);
+        let (scene, seeded) = committed_on_seed(&ctx, &mut driver, N, wrap, 7);
         let words = control(&ctx, &scene);
-        let passes = word(&words, route::C_CONVERGED);
-        assert_ne!(passes, 0, "wrap {wrap}: the sweep never converged");
         let open = mirror::open_mask(&seeded);
         let source = mirror::centre_source(&open, N).expect("the maze has open cells");
-        assert_eq!(word(&words, route::C_SOURCE), source, "the centre rule");
-        let cpu = mirror::bfs(&open, N, wrap, source);
-        let gpu = distance_field(&ctx, &scene);
-        let differing = gpu.iter().zip(&cpu).filter(|(a, b)| a != b).count();
-        assert_eq!(differing, 0, "wrap {wrap}: {differing} distances differ");
-
-        let walls = open.iter().filter(|o| **o == 0).count();
+        let cpu = mirror::double_sweep(&open, N, wrap, source);
+        assert_eq!(word(&words, route::C_END), cpu.c + 1, "wrap {wrap}: C");
+        assert_eq!(word(&words, route::C_LENGTH), cpu.length, "wrap {wrap}");
+        for (what, gpu, cpu) in [
+            ("d_B", region(&ctx, &scene, route::R_KEPT), &cpu.d_b),
+            ("d_C", distance_field(&ctx, &scene), &cpu.d_c),
+        ] {
+            let differing = gpu.iter().zip(cpu).filter(|(a, b)| a != b).count();
+            assert_eq!(differing, 0, "wrap {wrap}: {differing} of {what} differ");
+            assert!(
+                gpu.iter()
+                    .zip(&open)
+                    .all(|(d, o)| *o == 1 || *d == route::INF),
+                "wrap {wrap}: a wall holds a distance in {what}"
+            );
+        }
         let unreachable = open
             .iter()
-            .zip(&gpu)
+            .zip(&cpu.d_c)
             .filter(|(o, d)| **o == 1 && **d == route::INF)
             .count();
-        let reached = gpu.iter().filter(|d| **d != route::INF).count();
-        let far = gpu.iter().filter(|d| **d != route::INF).max().copied();
+        let reached = cpu.d_c.iter().filter(|d| **d != route::INF).count();
         println!(
-            "wrap {wrap}: converged in {passes} passes; {reached} reached, {unreachable} open \
-             cells cut off, {walls} walls, farthest {far:?}"
-        );
-        assert!(
-            gpu.iter()
-                .zip(&open)
-                .all(|(d, o)| *o == 1 || *d == route::INF),
-            "a wall holds a distance"
+            "wrap {wrap}: length {}, epoch {} passes; {reached} reached, {unreachable} open \
+             cells cut off",
+            cpu.length,
+            word(&words, route::C_LAST_EPOCH)
         );
         assert!(unreachable > 0, "no cut-off pocket to hold the sentinel");
         assert!(
             reached > (N * N / 3) as usize,
             "only {reached} cells reached"
         );
-        assert!(far > Some(N), "the farthest cell is only {far:?} away");
+        assert!(cpu.length > N, "the route is only {} long", cpu.length);
         drop(scene);
     }
 }
 
-/// **A converged sweep stays put**: every further pass changes no cell, and the
-/// field after them is the field it converged on.
+/// **A standing maze relaxes nothing after its commit**: the GPU's count of
+/// relax passes run stands still while frames go on owing route passes, the
+/// route stays as committed, and no second epoch starts.
 #[test]
-fn a_converged_sweep_stays_put() {
+fn a_standing_maze_relaxes_nothing_after_its_commit() {
     let Some(ctx) = context() else {
         return;
     };
     let mut driver = Driver::new(&ctx);
-    let (mut scene, _) = converged_on_seed(&ctx, &mut driver, 48, true, 7);
-    let field = distance_field(&ctx, &scene);
-    let before = word(&control(&ctx, &scene), route::C_RELAX_PASSES);
-    for _ in 0..3 {
+    let (mut scene, _) = committed_on_seed(&ctx, &mut driver, 48, true, 7);
+    let route = committed(&ctx, &scene);
+    let before = control(&ctx, &scene);
+    for _ in 0..6 {
         driver.frame(&mut scene, ONE_GEN.0, &with_route(&FROZEN));
     }
-    let words = control(&ctx, &scene);
-    let after = word(&words, route::C_RELAX_PASSES);
-    assert!(after > before + 100, "only {} passes ran", after - before);
+    let after = control(&ctx, &scene);
+    assert!(word(&before, route::C_RELAX_PASSES) > 0);
     assert_eq!(
-        word(&words, route::C_LAST_CHANGED),
+        word(&after, route::C_RELAX_PASSES),
+        word(&before, route::C_RELAX_PASSES),
+        "relax passes ran after the commit"
+    );
+    assert_eq!(
+        word(&after, route::C_COMMITS),
+        1,
+        "a second epoch committed"
+    );
+    assert_eq!(
+        word(&after, route::C_ARGS),
         0,
-        "a pass changed a tile"
+        "the work pass still dispatches"
     );
     assert!(
-        distance_field(&ctx, &scene) == field,
-        "the field moved after it converged"
+        committed(&ctx, &scene) == route,
+        "the route moved after it committed"
+    );
+}
+
+/// **On a tree maze the route is the diameter**: a planted tree held still
+/// commits exactly the CPU's double-sweep path, one cell wide, and its length
+/// is the maze's diameter found by brute force over every pair of open cells.
+#[test]
+fn on_a_tree_maze_the_route_is_the_diameter() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    const N: u32 = 32;
+    let maze = tree_maze(N, 5);
+    let open = mirror::open_mask(&maze);
+    let mut driver = Driver::new(&ctx);
+    let mut scene = planted(
+        &ctx,
+        &mut driver,
+        life(N, false, 1),
+        &maze,
+        &[("step_rate", 0.0), ("route", 1.0)],
+    );
+    let words = drive_until(
+        &ctx,
+        &mut driver,
+        &mut scene,
+        ONE_GEN.0,
+        &with_route(&FROZEN),
+        60,
+        has_committed,
+    );
+    assert_same_field(&states(&ctx, &scene), &maze, "the planted tree");
+    let source = mirror::centre_source(&open, N).expect("open cells");
+    let sweep = mirror::double_sweep(&open, N, false, source);
+    let expected = mirror::commit(&open, &sweep);
+    let gpu = committed(&ctx, &scene);
+    let differing = gpu.iter().zip(&expected).filter(|(a, b)| a != b).count();
+    assert_eq!(
+        differing, 0,
+        "{differing} route cells differ from the mirror"
+    );
+
+    let cells: Vec<u32> = (0..N * N).filter(|i| open[*i as usize] == 1).collect();
+    let diameter = cells
+        .iter()
+        .flat_map(|s| mirror::bfs(&open, N, false, *s))
+        .filter(|d| *d != route::INF)
+        .max()
+        .expect("a distance");
+    let on_route = gpu.iter().filter(|d| **d != route::INF).count() as u32;
+    println!(
+        "{} open cells; diameter {diameter}; route {} long over {on_route} cells; epoch {} passes",
+        cells.len(),
+        word(&words, route::C_LENGTH),
+        word(&words, route::C_LAST_EPOCH)
+    );
+    assert_eq!(word(&words, route::C_LENGTH), diameter);
+    assert_eq!(on_route, diameter + 1, "a tree's route is one path");
+    assert!(diameter > 100, "a diameter of {diameter} tests little");
+}
+
+/// **On a loop of two equal branches the route takes both**: the committed
+/// route equals the CPU's commit cell for cell, holding every cell of both
+/// branches and none of the spur.
+#[test]
+fn on_a_loop_the_route_takes_both_equal_branches() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    const N: u32 = 32;
+    let maze = loop_maze();
+    let open = mirror::open_mask(&maze);
+    let mut driver = Driver::new(&ctx);
+    let mut scene = planted(
+        &ctx,
+        &mut driver,
+        life(N, true, 1),
+        &maze,
+        &[("step_rate", 0.0), ("route", 1.0)],
+    );
+    drive_until(
+        &ctx,
+        &mut driver,
+        &mut scene,
+        ONE_GEN.0,
+        &with_route(&FROZEN),
+        60,
+        has_committed,
+    );
+    let source = mirror::centre_source(&open, N).expect("open cells");
+    let sweep = mirror::double_sweep(&open, N, true, source);
+    let expected = mirror::commit(&open, &sweep);
+    let gpu = committed(&ctx, &scene);
+    assert!(gpu == expected, "the route differs from the mirror's");
+    let on = |x: u32, y: u32| gpu[(y * N + x) as usize] != route::INF;
+    assert_eq!(
+        sweep.length,
+        33,
+        "B {:?}, C {:?}, source {:?}",
+        (sweep.b % N, sweep.b / N),
+        (sweep.c % N, sweep.c / N),
+        (source % N, source / N)
+    );
+    assert!(
+        (12..=20).all(|x| on(x, 14) && on(x, 18)),
+        "a branch is missing"
+    );
+    assert!((13..=15).all(|y| !on(5, y)), "the spur is on the route");
+    assert!(on(1, 16) && on(30, 16), "an end is missing");
+}
+
+/// **A maze that never stands still never commits a route**: a seeded Life
+/// field, every generation of which changes more than the tolerance, runs
+/// sixty generations with the route on and commits nothing.
+#[test]
+fn a_maze_that_never_stands_still_never_commits() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let mut driver = Driver::new(&ctx);
+    let mut scene = scene_with(&ctx, life(64, true, 3));
+    for generation in 0..60 {
+        driver.frame(
+            &mut scene,
+            ONE_GEN.0,
+            &[("step_rate", ONE_GEN.1), ("route", 1.0)],
+        );
+        let words = control(&ctx, &scene);
+        assert!(
+            !mirror::is_still(
+                word(&words, route::C_LAST_MOVED),
+                word(&words, route::C_LAST_OPEN)
+            ),
+            "generation {generation} was still, so this field cannot test the claim"
+        );
+        assert_eq!(word(&words, route::C_COMMITS), 0, "a route committed");
+        assert!(word(&words, route::C_STILL_RUN) < route::QUIET_HOLD);
+    }
+}
+
+/// **A stamp landing mid-epoch abandons the epoch**: nothing commits from the
+/// snapshot it interrupted, and the next quiet stretch commits the route of
+/// the stamped maze, exactly as the CPU finds it.
+#[test]
+fn a_stamp_mid_epoch_abandons_it_and_the_next_quiet_commits_the_new_maze() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    const N: u32 = 32;
+    let maze = tree_maze(N, 9);
+    let mut driver = Driver::new(&ctx);
+    let mut scene = planted(
+        &ctx,
+        &mut driver,
+        life(N, true, 4),
+        &maze,
+        &[("step_rate", 0.0), ("route", 1.0)],
+    );
+    // Slow passes, so the epoch is still in flight a few frames in.
+    scene.route_rate = 8.0;
+    let frozen = with_route(&FROZEN);
+    let words = drive_until(&ctx, &mut driver, &mut scene, ONE_GEN.0, &frozen, 40, |w| {
+        word(w, route::C_SEARCH) >= 2
+    });
+    assert_eq!(
+        word(&words, route::C_COMMITS),
+        0,
+        "it committed before the stamp"
+    );
+
+    let mut stamped = frozen.clone();
+    stamped.push(("reseed", 1.0));
+    driver.frame(&mut scene, ONE_GEN.0, &stamped);
+    let words = control(&ctx, &scene);
+    assert_eq!(
+        word(&words, route::C_ABANDONED),
+        1,
+        "the epoch was not abandoned"
+    );
+    assert_eq!(word(&words, route::C_SEARCH), 0);
+    let new_maze = states(&ctx, &scene);
+    assert!(new_maze != maze, "the stamp changed nothing");
+
+    scene.route_rate = route::ROUTE_RATE;
+    let mut frames = 0;
+    let words = loop {
+        driver.frame(&mut scene, ONE_GEN.0, &frozen);
+        let words = control(&ctx, &scene);
+        frames += 1;
+        if has_committed(&words) || frames > 60 {
+            break words;
+        }
+        assert!(word(&words, route::C_SHOWN) == route::SHOWN_NONE);
+    };
+    assert_eq!(word(&words, route::C_COMMITS), 1);
+    assert_eq!(word(&words, route::C_ABANDONED), 1);
+    let open = mirror::open_mask(&new_maze);
+    let source = mirror::centre_source(&open, N).expect("open cells");
+    let expected = mirror::commit(&open, &mirror::double_sweep(&open, N, true, source));
+    assert!(
+        committed(&ctx, &scene) == expected,
+        "the committed route is not the stamped maze's"
+    );
+}
+
+/// The colour a live cell presents at `trail = 0` and `hue = 0`: the palette's
+/// origin at full light.
+fn live_colour() -> [f32; 3] {
+    let rgb = Palette::default_spectrum().sample(0.0, 0.0);
+    let b = common::DEFAULT_BRIGHTNESS;
+    [rgb[0] * b, rgb[1] * b, rgb[2] * b]
+}
+
+/// Whether `pixel` is the driver's untouched clear: no light, no coverage.
+fn dark(pixel: &[f32; 4]) -> bool {
+    *pixel == [0.0, 0.0, 0.0, 1.0]
+}
+
+/// A tree maze of `TARGET` cells drawn one to a pixel, committed with the route
+/// on at `trail = 0`, one generation a frame of 1/60 s. Returns the scene, the
+/// maze and the parameters it was driven with.
+fn committed_tree(
+    ctx: &RenderContext,
+    driver: &mut Driver<'_>,
+    reveal: f32,
+    extra: &[(&'static str, f32)],
+) -> (CellularScene, Vec<u8>, Vec<(&'static str, f32)>) {
+    let maze = tree_maze(TARGET, 11);
+    let mut params = vec![
+        ("step_rate", 60.0),
+        ("birth", 0.0),
+        ("survive", 511.0),
+        ("route", 1.0),
+        ("trail", 0.0),
+        ("age_tint", 0.0),
+        ("route_reveal", reveal),
+    ];
+    params.extend_from_slice(extra);
+    let mut scene = planted(ctx, driver, life(TARGET, true, 2), &maze, &params);
+    drive_until(
+        ctx,
+        driver,
+        &mut scene,
+        1.0 / 60.0,
+        &params,
+        400,
+        has_committed,
+    );
+    (scene, maze, params)
+}
+
+/// **A broken route fades, and never paints a wall**: after a stamp breaks the
+/// quiet over a drawn route, every live cell in every frame is the live colour
+/// and nothing else, the route still draws on the first frame after the break,
+/// and once `route_reveal / 4` seconds of scene time have passed no frame
+/// paints route colour at all.
+#[test]
+fn a_broken_route_fades_and_never_paints_a_wall() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let mut driver = Driver::new(&ctx);
+    let reveal = 0.4;
+    let (mut scene, _, params) = committed_tree(&ctx, &mut driver, reveal, &[]);
+    // Past the reveal, with no further epoch to start a new route.
+    for _ in 0..30 {
+        driver.frame(&mut scene, 1.0 / 60.0, &params);
+    }
+    scene.route_rate = 0.0;
+    let lit = driver.read_target().iter().filter(|p| !dark(p)).count();
+    let field = states(&ctx, &scene);
+    let walls = field.iter().filter(|s| **s == 1).count();
+    assert!(lit > walls, "the route is not drawn before the break");
+
+    let mut stamped = params.clone();
+    stamped.push(("reseed", 1.0));
+    let live = live_colour();
+    let mut drew_after_break = false;
+    let mut faded_frames = 0;
+    for frame in 0..30 {
+        let p = if frame == 0 { &stamped } else { &params };
+        driver.frame(&mut scene, 1.0 / 60.0, p);
+        let words = control(&ctx, &scene);
+        assert_ne!(
+            word(&words, route::C_SHOWN),
+            route::SHOWN_ON,
+            "frame {frame}"
+        );
+        let image = driver.read_target();
+        let field = states(&ctx, &scene);
+        let mut route_lit = 0;
+        for (pixel, state) in image.iter().zip(&field) {
+            if *state == 1 {
+                for c in 0..3 {
+                    assert!(
+                        (pixel[c] - live[c]).abs() < 0.01,
+                        "frame {frame}: a live cell is {pixel:?}, not the live colour"
+                    );
+                }
+            } else if !dark(pixel) {
+                route_lit += 1;
+            }
+        }
+        let gone = route::scene_ms(scene.scene_time) - word(&words, route::C_BREAK_MS);
+        if gone >= route::fade_ms(reveal) {
+            assert_eq!(
+                route_lit, 0,
+                "frame {frame}: route colour {gone} ms after the break"
+            );
+            faded_frames += 1;
+        } else if route_lit > 0 {
+            drew_after_break = true;
+        }
+    }
+    assert!(
+        drew_after_break,
+        "the route vanished at the break instead of fading"
+    );
+    assert!(
+        faded_frames > 10,
+        "only {faded_frames} frames came after the fade"
+    );
+}
+
+/// **The route reveals along its length**: with `route_reveal = 2`, a frame
+/// one second after the commit paints the cells with `t` up to the leading
+/// edge and none past it, and a frame two seconds after paints all of them.
+#[test]
+fn the_route_reveals_along_its_length() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let mut driver = Driver::new(&ctx);
+    let (mut scene, _, params) = committed_tree(&ctx, &mut driver, 2.0, &[]);
+    let words = control(&ctx, &scene);
+    let commit = f64::from(word(&words, route::C_COMMIT_MS)) / 1000.0;
+    let length = word(&words, route::C_LENGTH) as f32;
+    let route = committed(&ctx, &scene);
+    let to = |driver: &mut Driver<'_>, scene: &mut CellularScene, at: f64| {
+        let dt = (at - scene.scene_time) as f32;
+        assert!(dt > 0.0);
+        driver.frame(scene, dt, &params);
+        driver.read_target()
+    };
+    let half = to(&mut driver, &mut scene, commit + 1.0005);
+    let front = 0.5 * (1.0 + route::REVEAL_EDGE);
+    let (mut inside, mut beyond) = (0, 0);
+    for (pixel, d) in half.iter().zip(&route) {
+        if *d == route::INF {
+            continue;
+        }
+        let t = *d as f32 / length;
+        if t <= front - route::REVEAL_EDGE - 0.01 {
+            assert!(!dark(pixel), "t {t} is behind the front and not drawn");
+            inside += 1;
+        } else if t >= front + 0.01 {
+            assert!(dark(pixel), "t {t} is past the front and drawn");
+            beyond += 1;
+        }
+    }
+    assert!(
+        inside > 10 && beyond > 10,
+        "{inside} behind, {beyond} beyond"
+    );
+    let whole = to(&mut driver, &mut scene, commit + 2.0005);
+    let field = states(&ctx, &scene);
+    for (i, pixel) in whole.iter().enumerate() {
+        if field[i] == 0 {
+            assert_eq!(
+                !dark(pixel),
+                route[i] != route::INF,
+                "cell {i}: drawn and on-route disagree two seconds in"
+            );
+        }
+    }
+}
+
+/// **`route_grade` grades the route along `t`**: at 0 every route cell is one
+/// colour, the palette at `route_coord`; at 0.6 the end at B is the palette at
+/// `route_coord` and the end at C at `route_coord + 0.6`.
+#[test]
+fn route_grade_paints_the_ends_at_their_coordinates() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let mut driver = Driver::new(&ctx);
+    let (mut scene, _, params) = committed_tree(&ctx, &mut driver, 0.0, &[]);
+    let route = committed(&ctx, &scene);
+    let length = word(&control(&ctx, &scene), route::C_LENGTH);
+    let b = route.iter().position(|d| *d == 0).expect("B");
+    let c = route.iter().position(|d| *d == length).expect("C");
+    let spectrum = Palette::default_spectrum();
+    let expect = |coord: f32| {
+        let rgb = spectrum.sample(coord, 0.0);
+        rgb.map(|v| v * common::DEFAULT_BRIGHTNESS)
+    };
+    let close = |pixel: &[f32; 4], rgb: [f32; 3]| (0..3).all(|k| (pixel[k] - rgb[k]).abs() < 0.02);
+
+    let mut solid = params.clone();
+    solid.extend([("route_coord", 0.2), ("route_grade", 0.0)]);
+    driver.frame(&mut scene, 1.0 / 60.0, &solid);
+    let image = driver.read_target();
+    let colours: std::collections::BTreeSet<[u32; 3]> = route
+        .iter()
+        .zip(&image)
+        .filter(|(d, _)| **d != route::INF)
+        .map(|(_, p)| [p[0].to_bits(), p[1].to_bits(), p[2].to_bits()])
+        .collect();
+    let shown: Vec<(usize, [f32; 4])> = route
+        .iter()
+        .zip(&image)
+        .enumerate()
+        .filter(|(_, (d, _))| **d != route::INF)
+        .map(|(i, (_, p))| (i, *p))
+        .collect();
+    assert_eq!(
+        colours.len(),
+        1,
+        "a solid route drew {} colours: {shown:?}",
+        colours.len()
+    );
+    assert!(
+        close(&image[b], expect(0.2)),
+        "the solid route is not the palette at 0.2"
+    );
+
+    let mut graded = params.clone();
+    graded.extend([("route_coord", 0.2), ("route_grade", 0.6)]);
+    driver.frame(&mut scene, 1.0 / 60.0, &graded);
+    let image = driver.read_target();
+    assert!(close(&image[b], expect(0.2)), "B is {:?}", image[b]);
+    assert!(close(&image[c], expect(0.8)), "C is {:?}", image[c]);
+    assert!(!close(&image[b], expect(0.8)), "the ends drew one colour");
+}
+
+/// **A `cyclic` preset runs no route at any `route`**: nothing of it is built.
+#[test]
+fn cyclic_runs_no_route() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let mut driver = Driver::new(&ctx);
+    let mut scene = scene_with(&ctx, cyclic(32, true, 1));
+    for _ in 0..4 {
+        driver.frame(
+            &mut scene,
+            ONE_GEN.0,
+            &[("step_rate", ONE_GEN.1), ("route", 1.0)],
+        );
+    }
+    assert!(
+        scene.res.as_ref().is_some_and(|res| res.route.is_none()),
+        "cyclic built the route"
     );
 }
 
@@ -1918,62 +2508,79 @@ fn the_compare_count_is_the_cpu_change_count() {
     );
 }
 
-/// **30 and 144 fps reach the identical route state at the same wall time**:
-/// half a second of a moving Life field, re-snapshotted on every generation and
-/// relaxed between them, leaves every word of the route's buffers the same at
-/// both rates — mid-sweep, so the distances are live ones.
+/// **30 and 144 fps reach the identical route at the same wall time**: a tree
+/// maze held still commits, reveals, is broken by a stamp landing at 2.25 s and
+/// fades, and at every wall time sampled the two rates draw the same bytes, and
+/// end on the same route words and control words. The first frame, which plants
+/// the maze, is a quarter second at both rates.
 #[test]
-fn thirty_and_one_hundred_forty_four_fps_reach_the_same_distance_field() {
+fn thirty_and_one_hundred_forty_four_fps_reach_the_same_route() {
     let Some(ctx) = context() else {
         return;
     };
+    let maze = tree_maze(TARGET, 13);
     let mut driver = Driver::new(&ctx);
-    let mut run = |fps: u32, frames: u32| -> (Vec<u32>, Vec<u32>) {
-        let mut scene = scene_with(&ctx, life(64, true, 11));
-        for _ in 0..frames {
-            driver.frame(
-                &mut scene,
-                1.0 / fps as f32,
-                &[("step_rate", 5.0), ("route", 1.0)],
-            );
+    // Wall times past the first quarter second, in sixths of a second, at
+    // which both rates end a frame.
+    let samples = [3u32, 6, 9, 12, 13, 15, 18];
+    let mut run = |fps: u32| -> (Vec<Vec<[f32; 4]>>, Vec<u32>, Vec<u32>) {
+        let params = [
+            ("step_rate", 12.0),
+            ("birth", 0.0),
+            ("survive", 511.0),
+            ("route", 1.0),
+            ("trail", 0.0),
+            ("route_reveal", 0.5),
+        ];
+        let mut stamped = params.to_vec();
+        stamped.push(("reseed", 1.0));
+        let mut scene = planted(&ctx, &mut driver, life(TARGET, true, 6), &maze, &params);
+        let mut images = Vec::new();
+        for frame in 1..=fps * 3 {
+            // Frame `f` ends at 0.25 + f / fps s; the one starting at 2.25 s
+            // carries the stamp.
+            let p: &[(&str, f32)] = if frame == fps * 2 + 1 {
+                &stamped
+            } else {
+                &params
+            };
+            driver.frame(&mut scene, 1.0 / fps as f32, p);
+            if samples.iter().any(|s| s * fps / 6 == frame) {
+                images.push(driver.read_target());
+            }
         }
-        let out = (
-            control(&ctx, &scene),
-            read_words(&ctx, &route_of(&scene).cells),
-        );
+        let out = (images, control(&ctx, &scene), committed(&ctx, &scene));
         drop(scene);
         out
     };
-    let (c30, cells30) = run(30, 15);
-    let (c144, cells144) = run(144, 72);
+    let (i30, c30, r30) = run(30);
+    let (i144, c144, r144) = run(144);
     println!(
-        "30 fps: {} generations, {} relax passes; 144 fps: {} and {}",
-        word(&c30, route::C_GENERATIONS),
-        word(&c30, route::C_RELAX_PASSES),
-        word(&c144, route::C_GENERATIONS),
-        word(&c144, route::C_RELAX_PASSES)
+        "commit at {} ms, break at {} ms, {} commits, {} relax passes",
+        word(&c30, route::C_COMMIT_MS),
+        word(&c30, route::C_BREAK_MS),
+        word(&c30, route::C_COMMITS),
+        word(&c30, route::C_RELAX_PASSES)
     );
-    assert_eq!(word(&c30, route::C_GENERATIONS), 2);
-    assert_eq!(
-        word(&c30, route::C_SEARCH),
-        1,
-        "the probe ends between sweeps, so it compares no live field"
-    );
-    assert_eq!(word(&c30, route::C_FRESH), 0);
+    assert!(word(&c30, route::C_COMMITS) >= 1, "no route committed");
     assert!(
-        c30 == c144,
-        "the control words differ: {c30:?} against {c144:?}"
+        (2250..2450).contains(&word(&c30, route::C_BREAK_MS)),
+        "the stamp did not break the quiet"
     );
-    let differing = cells30
-        .iter()
-        .zip(&cells144)
-        .filter(|(a, b)| a != b)
-        .count();
-    assert_eq!(differing, 0, "{differing} route words differ");
-    let finite = (64 * 64 * route::R_DIST as usize..64 * 64 * 4)
-        .filter(|i| cells30[*i] != route::INF)
-        .count();
-    assert!(finite > 100, "only {finite} distances are finite");
+    assert_eq!(c30, c144, "the control words differ");
+    assert!(r30 == r144, "the committed routes differ");
+    assert_eq!(i30.len(), samples.len());
+    for (k, (a, b)) in i30.iter().zip(&i144).enumerate() {
+        assert!(
+            a == b,
+            "at {}/6 s the two rates drew different frames",
+            samples[k]
+        );
+    }
+    assert!(
+        i30.windows(2).filter(|w| w[0] != w[1]).count() >= 3,
+        "the sampled frames barely change, so their equality tests little"
+    );
 }
 
 /// **`route = 0` changes nothing**: a scene that never turns the route on
@@ -1985,23 +2592,31 @@ fn route_zero_draws_the_frame_unchanged() {
     let Some(ctx) = context() else {
         return;
     };
+    let maze = tree_maze(TARGET, 3);
     let mut driver = Driver::new(&ctx);
+    let on = 2..14u32;
     let mut run = |on: &dyn Fn(u32) -> bool| -> (Vec<Vec<[f32; 4]>>, bool) {
-        let mut scene = scene_with(&ctx, life(TARGET, true, 2));
-        let frames = (0..12)
+        let params = |route: f32| {
+            [
+                ("step_rate", ONE_GEN.1),
+                ("birth", 0.0),
+                ("survive", 511.0),
+                ("route", route),
+                ("route_coord", 0.7),
+                ("route_reveal", 0.0),
+            ]
+        };
+        let mut scene = planted(
+            &ctx,
+            &mut driver,
+            life(TARGET, true, 2),
+            &maze,
+            &params(0.0),
+        );
+        let frames = (0..20)
             .map(|i| {
                 let route = if on(i) { 1.0 } else { 0.0 };
-                // A generation every other frame, so a sweep runs on the
-                // frames between and the route has something to draw.
-                driver.frame(
-                    &mut scene,
-                    ONE_GEN.0,
-                    &[
-                        ("step_rate", ONE_GEN.1 / 2.0),
-                        ("route", route),
-                        ("route_coord", 0.7),
-                    ],
-                );
+                driver.frame(&mut scene, ONE_GEN.0, &params(route));
                 driver.read_target()
             })
             .collect();
@@ -2010,16 +2625,17 @@ fn route_zero_draws_the_frame_unchanged() {
     };
     let (plain, built) = run(&|_| false);
     assert!(!built, "route = 0 built the route's resources");
-    let (toggled, _) = run(&|i| (3..8).contains(&i));
-    for i in 0..12 {
-        let same = plain[i] == toggled[i];
-        if (3..8).contains(&i) {
-            continue;
+    let (toggled, _) = run(&|i| on.contains(&i));
+    for i in 0..20 {
+        if !on.contains(&(i as u32)) {
+            assert!(
+                plain[i] == toggled[i],
+                "frame {i}: route = 0 drew a different frame"
+            );
         }
-        assert!(same, "frame {i}: route = 0 drew a different frame");
     }
     assert!(
-        (3..8).any(|i| plain[i] != toggled[i]),
+        on.clone().any(|i| plain[i as usize] != toggled[i as usize]),
         "the route never drew, so the equality tests nothing"
     );
 }
@@ -2070,9 +2686,9 @@ fn labyrinth_params(frame: u32, fps: u32) -> (Vec<(&'static str, f32)>, u32, boo
 
 /// **The readings Plan 0253 Phase 1 owes**, printed with the adapter they were
 /// taken on: what one relax pass and one step pass cost at grids 192, 512 and
-/// 1024 on every hardware adapter, how many passes the first sweep takes on the
-/// labyrinth's grown maze, and the labyrinth's per-generation change counts
-/// over a driven run.
+/// 1024 on every hardware adapter, how many passes an epoch takes on the
+/// labyrinth's grown maze, the labyrinth's per-generation change counts over a
+/// driven run, and how often that run draws a route at three pass rates.
 ///
 /// ```text
 /// cargo nextest run -p rlx-core --lib --run-ignored only route_readings --no-capture
@@ -2097,24 +2713,34 @@ fn route_readings() {
             let fps = 60;
             let dt = 1.0 / fps as f32;
             driver.frame(&mut scene, dt, &[("step_rate", 0.0)]);
-            const PASSES: u32 = 16;
-            scene.route_rate = (PASSES * fps) as f32;
+            // Few enough that a sweep from the centre of the seeded field is
+            // still relaxing at the frame's end on the smallest grid.
+            const PASSES: u32 = 8;
             let route = [
                 ("step_rate", 0.0),
                 ("birth", 0.0),
                 ("survive", 511.0),
                 ("route", 1.0),
             ];
-            // One generation to snapshot, then warm up into the sweep.
-            driver.frame(&mut scene, 0.25, &[("step_rate", 4.0), ("route", 1.0)]);
-            for _ in 0..4 {
-                driver.frame(&mut scene, dt, &route);
+            // Held still until the quiet takes a snapshot.
+            for _ in 0..6 {
+                driver.frame(&mut scene, ONE_GEN.0, &with_route(&FROZEN));
             }
-            let costs = timed_frames(&ctx, &mut driver, &mut scene, dt, &route, 60);
+            scene.route_rate = (PASSES * fps) as f32;
+            let seeded = mirror::seed_field(grid, field_seed(17), live_threshold(LIFE_DENSITY));
+            let source = mirror::centre_source(&mirror::open_mask(&seeded), grid);
+            let before = word(&control(&ctx, &scene), route::C_RELAX_PASSES);
+            let costs = timed_frames(&ctx, &mut driver, &mut scene, dt, &route, 60, source);
+            let relaxed = word(&control(&ctx, &scene), route::C_RELAX_PASSES) - before;
+            assert_eq!(
+                relaxed,
+                PASSES * 60,
+                "grid {grid}: a timed pass did not relax"
+            );
             let relax = costs.iter().find(|(l, _)| l == "cellular-route-relax");
             let control = costs.iter().find(|(l, _)| l == "cellular-route-control");
             let steps = [("step_rate", 8.0 * fps as f32), ("route", 0.0)];
-            let step_costs = timed_frames(&ctx, &mut driver, &mut scene, dt, &steps, 60);
+            let step_costs = timed_frames(&ctx, &mut driver, &mut scene, dt, &steps, 60, None);
             let step = step_costs.iter().find(|(l, _)| l == "cellular-step");
             println!(
                 "  grid {grid}: relax {:.4} ms/pass, its control {:.4} ms/pass, step {:.4} \
@@ -2145,26 +2771,26 @@ fn route_readings() {
         frame += 1;
     }
     assert_eq!(generations, 600);
-    // Held still from here: the first frozen generation snapshots it.
-    let mut frames = 0;
-    let words = loop {
-        driver.frame(&mut scene, ONE_GEN.0, &with_route(&FROZEN));
-        frames += 1;
-        let words = control(&ctx, &scene);
-        if word(&words, route::C_CONVERGED) != 0 || frames > 2000 {
-            break words;
-        }
-    };
-    let field = distance_field(&ctx, &scene);
+    // Held still from here: the quiet starts an epoch from the centre rule.
+    let words = drive_until(
+        &ctx,
+        &mut driver,
+        &mut scene,
+        ONE_GEN.0,
+        &with_route(&FROZEN),
+        2000,
+        has_committed,
+    );
     let open = mirror::open_mask(&states(&ctx, &scene));
-    let reached = field.iter().filter(|d| **d != route::INF).count();
+    let on_route = committed(&ctx, &scene)
+        .iter()
+        .filter(|d| **d != route::INF)
+        .count();
     println!(
-        "sweep 1 at generation 600: converged in {} passes; source {}, farthest {}, {} of {} \
-         open cells reached ({} cells)",
-        word(&words, route::C_CONVERGED),
-        word(&words, route::C_SOURCE),
-        word(&words, route::C_D_MAX),
-        reached,
+        "epoch at generation 600 from the centre rule: {} work passes, route length {} over \
+         {on_route} cells; {} of {} cells open",
+        word(&words, route::C_LAST_EPOCH),
+        word(&words, route::C_LENGTH),
         open.iter().filter(|o| **o == 1).count(),
         open.len()
     );
@@ -2218,25 +2844,52 @@ fn route_readings() {
         })
         .expect("the largest component has a cell");
     force_sweep(&ctx, &scene, source);
-    let mut frames = 0;
-    let words = loop {
-        driver.frame(&mut scene, ONE_GEN.0, &with_route(&FROZEN));
-        frames += 1;
-        let words = control(&ctx, &scene);
-        if word(&words, route::C_CONVERGED) != 0 || frames > 2000 {
-            break words;
-        }
-    };
-    let cpu = mirror::bfs(&open, n, true, source);
-    let ends = cpu.iter().filter(|d| **d != route::INF).max().copied();
+    let words = drive_until(
+        &ctx,
+        &mut driver,
+        &mut scene,
+        ONE_GEN.0,
+        &with_route(&FROZEN),
+        2000,
+        |w| word(w, route::C_COMMITS) >= 2,
+    );
+    let cpu = mirror::double_sweep(&open, n, true, source);
     println!(
-        "sweep 1 from the largest component ({largest} cells, source {source}): converged in \
-         {} passes, farthest {} (CPU BFS {ends:?}); the field matches the CPU: {}",
-        word(&words, route::C_CONVERGED),
-        word(&words, route::C_D_MAX),
-        distance_field(&ctx, &scene) == cpu
+        "epoch from the largest component ({largest} cells, source {source}): {} work passes, \
+         route length {} (CPU {}); the route matches the CPU: {}",
+        word(&words, route::C_LAST_EPOCH),
+        word(&words, route::C_LENGTH),
+        cpu.length,
+        committed(&ctx, &scene) == mirror::commit(&open, &cpu)
     );
     drop(scene);
+
+    // --- How often the route is drawn on a driven run, by pass rate ---
+    for rate in [60.0, 120.0, 240.0] {
+        let mut scene = scene_with(&ctx, config);
+        scene.route_rate = rate;
+        let (mut drawn, mut measured) = (0u32, 0u32);
+        for frame in 0..104 * fps / 2 {
+            let (mut params, beat, _) = labyrinth_params(frame, fps);
+            params.push(("route", 1.0));
+            driver.frame(&mut scene, dt, &params);
+            if beat >= 32 {
+                measured += 1;
+                if word(&control(&ctx, &scene), route::C_SHOWN) == route::SHOWN_ON {
+                    drawn += 1;
+                }
+            }
+        }
+        let words = control(&ctx, &scene);
+        println!(
+            "{rate} passes/s over 72 beats after 32 of warm-up: {} commits, {} abandoned, last \
+             epoch {} passes, a route drawn (not fading) in {drawn} of {measured} frames",
+            word(&words, route::C_COMMITS),
+            word(&words, route::C_ABANDONED),
+            word(&words, route::C_LAST_EPOCH),
+        );
+        drop(scene);
+    }
 
     // --- Change counts over a driven run ---
     let mut scene = scene_with(&ctx, config);
@@ -2313,6 +2966,7 @@ fn force_sweep(ctx: &RenderContext, scene: &CellularScene, source: u32) {
         (route::C_SOURCE, source),
         (route::C_SWEEP_PASSES, 0),
         (route::C_CONVERGED, 0),
+        (route::C_EPOCH_PASSES, 0),
     ] {
         words[at as usize] = value;
     }
@@ -2321,7 +2975,8 @@ fn force_sweep(ctx: &RenderContext, scene: &CellularScene, source: u32) {
 }
 
 /// Render `frames` frames of `params` with the pass timer armed, and return each
-/// label's mean milliseconds per frame.
+/// label's mean milliseconds per frame. With `restart`, every frame first
+/// starts a fresh sweep from that cell, so its route passes all relax.
 fn timed_frames(
     ctx: &RenderContext,
     driver: &mut Driver<'_>,
@@ -2329,6 +2984,7 @@ fn timed_frames(
     dt: f32,
     params: &[(&str, f32)],
     frames: u32,
+    restart: Option<u32>,
 ) -> Vec<(String, f64)> {
     let mut timer = gpu::PassTimer::new(&ctx.device, &ctx.queue);
     if timer.is_none() {
@@ -2337,6 +2993,9 @@ fn timed_frames(
     }
     let mut costs = crate::render::capture::PassCosts::default();
     for _ in 0..frames {
+        if let Some(source) = restart {
+            force_sweep(ctx, scene, source);
+        }
         scene.set_target_size(TARGET, TARGET);
         scene.advance(dt);
         scene.reset_params();

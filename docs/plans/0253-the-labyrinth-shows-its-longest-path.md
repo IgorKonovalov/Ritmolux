@@ -308,8 +308,8 @@ struct RouteControl {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — A sweep relaxes on the GPU and the flood is visible | dev | committed with this row | |
-| 2 — Quiet stretches find, reveal and fade the route | dev | not started | |
+| 1 — A sweep relaxes on the GPU and the flood is visible | dev | done | cca56596 |
+| 2 — Quiet stretches find, reveal and fade the route | dev | committed with this row | |
 | 3 — The budget belongs to the tier and the references are regenerated | dev | not started | |
 | 4 — The owner sees the route on the labyrinth | human | not started | |
 
@@ -362,6 +362,28 @@ struct RouteControl {
   (`route_zero_draws_the_frame_unchanged`: a scene that never turns the route on against one that
   turns it on and off), not against a build from before it; the present's WGSL for `route = 0` is
   the old text split into two constants and concatenated.
+- **Phase 2, the constants.** `QUIET_TOLERANCE` is `1/512` of the open cells (34 at the
+  labyrinth's ~17 400) and `QUIET_HOLD` is 4 generations. `route_reveal` defaults to 1 s, in the
+  Motion group; the plan named its range only. The reveal's leading edge is `REVEAL_EDGE = 0.08`
+  of `t`, the front running to `1 + REVEAL_EDGE` so a cell at `t = 1` is wholly in at
+  `route_reveal` seconds. The fade's length reaches the control pass in each event's uniform slot.
+- **Phase 2, "encodes no relax pass after its commit".** The CPU cannot know the commit without
+  reading the state back, so it still encodes a `work` pass for every route pass owed; after a
+  commit the control pass has written a zero workgroup count, so the indirect dispatch runs
+  nothing. `a_standing_maze_relaxes_nothing_after_its_commit` reads the GPU's own relax-pass
+  counter and the dispatch words, not a CPU counter on the scene.
+- **Phase 2, the Phase 1 tests** were reworked for the quiet stretches: the BFS test now holds
+  the kept `d_B` and the last `d_C` against the CPU after a commit, the 30-against-144 test drives a
+  committed, revealed, stamped and fading route, and the `route = 0` test plants a frozen maze.
+- **Phase 2, the probe** (`route_readings`) now measures epochs. Its pass-cost section restarts a
+  fresh sweep before each timed frame (8 passes a frame, asserted all to relax). Re-run on Phase 2's
+  code the integrated adapter read higher than in Phase 1 — relax 0.0629 / 0.2724 / 0.9047 ms and
+  step 0.0289 / 0.1666 / 0.4440 ms at 192 / 512 / 1024 — while the discrete adapter repeated
+  Phase 1 to within 10 %. The epoch readings, on llvmpipe: at generation 600 the centre rule's epoch
+  took **14 work passes** for a route 16 long; forced into the largest component, **24 passes** for
+  a route 79 long, matching the CPU. Over 72 driven beats with the route on, at 60, 120 and 240
+  passes/s alike: **22 commits, 0 abandoned**, last epoch 18 passes, and a route drawn (not
+  fading) in 455, 498 and 517 of 1 080 frames.
 
 ### Close triggers
 

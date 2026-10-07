@@ -14,12 +14,22 @@
 //! the state, and the one-invocation control pass is the only writer of it:
 //!
 //! - after every generation, a `compare` pass counts the cells whose open bit
-//!   changed and records the mask, and the control pass reads the count;
+//!   changed and records the mask, and the control pass reads the count: a
+//!   generation within [`QUIET_TOLERANCE`] is still, [`QUIET_HOLD`] still ones
+//!   in a row make the maze quiet and start an **epoch**, and one that is not
+//!   still abandons the epoch in flight and starts a drawn route's fade;
 //! - on every route pass the [`RouteClock`] owes, a `work` pass runs whatever
-//!   action the control words name — freeze a snapshot, find a cell by key, or
-//!   relax the distance field once — dispatched **indirectly** over the count
-//!   of tiles the control pass wrote, so an idle route dispatches nothing; and
-//!   the control pass reads what it counted and names the next action.
+//!   action the control words name — freeze a snapshot, find a cell by key,
+//!   relax a distance field once, or commit the route — dispatched
+//!   **indirectly** over the count of tiles the control pass wrote, so an idle
+//!   or committed route dispatches nothing; and the control pass reads what it
+//!   counted and names the next action.
+//!
+//! An epoch is the double sweep: from its source to the farthest cell B, from B
+//! to the farthest cell C keeping `d_B`, from C for `d_C`, then a commit that
+//! marks every open cell with `d_B + d_C == d_B(C)`. Its source is the last
+//! route's C while that cell is open, and the open cell nearest the centre
+//! otherwise.
 //!
 //! # The timeline
 //!
@@ -89,8 +99,62 @@ pub(crate) const C_GENERATIONS: u32 = 14;
 pub(crate) const C_LAST_MOVED: u32 = 15;
 pub(crate) const C_LAST_OPEN: u32 = 16;
 pub(crate) const C_LAST_CHANGED: u32 = 17;
+/// Consecutive still generations, held at [`QUIET_HOLD`] + 1.
+pub(crate) const C_STILL_RUN: u32 = 18;
+/// The in-flight epoch's far end C, and `d_B(C)`, until it commits.
+pub(crate) const C_PENDING_C: u32 = 19;
+pub(crate) const C_PENDING_LENGTH: u32 = 20;
+/// The committed route's end C plus one, so a zeroed buffer reads "none" —
+/// the next epoch's source while it is open.
+pub(crate) const C_END: u32 = 21;
+/// The committed route's `d_B(C)`, the denominator of its `t`.
+pub(crate) const C_LENGTH: u32 = 22;
+/// Whether a route is drawn: [`SHOWN_NONE`], [`SHOWN_ON`] or [`SHOWN_FADING`].
+pub(crate) const C_SHOWN: u32 = 23;
+/// Scene times (ms since configure) of the commit and of the quiet's break.
+pub(crate) const C_COMMIT_MS: u32 = 24;
+pub(crate) const C_BREAK_MS: u32 = 25;
+/// Epochs committed and abandoned since configure.
+pub(crate) const C_COMMITS: u32 = 26;
+pub(crate) const C_ABANDONED: u32 = 27;
+/// Work passes the epoch in flight has run, and the last committed one took.
+pub(crate) const C_EPOCH_PASSES: u32 = 28;
+pub(crate) const C_LAST_EPOCH: u32 = 29;
 /// How many words the control buffer holds.
 pub(crate) const CONTROL_WORDS: u32 = 32;
+
+/// No route is drawn.
+pub(crate) const SHOWN_NONE: u32 = 0;
+/// A committed route is drawn, revealing along its length.
+pub(crate) const SHOWN_ON: u32 = 1;
+/// The quiet has broken over a drawn route, which is fading out.
+pub(crate) const SHOWN_FADING: u32 = 2;
+
+/// A generation is **still** when the open bits it changed are at most this
+/// fraction of the open cells, `(numerator, denominator)`, compared in whole
+/// numbers on the GPU.
+///
+/// It is sized to the labyrinth's flicker, not to zero: between bites its maze
+/// is never exactly still, carrying 4 to 24 changed cells a generation of
+/// about 17 400 open, while the first generation after a bite changes over
+/// 2 300 and the first after its rule returns 68 to 123 (Plan 0253 Phase 1's
+/// reading). `1/512` is 34 cells there: above every flicker read, below every
+/// first generation after an event, and the loosened rule's window, never
+/// below 84, never reads still.
+pub(crate) const QUIET_TOLERANCE: (u32, u32) = (1, 512);
+
+/// Consecutive still generations before the maze is **quiet** and an epoch
+/// starts. A bite's settling falls under the tolerance about 8 generations in
+/// and does not rise again (Plan 0253 Phase 1's reading), so 4 more — 0.29 s at
+/// the labyrinth's 14 generations a second — is a margin against a settling
+/// count dipping under the tolerance once, and leaves about 1.1 s of each
+/// 2 s bite interval to search and show in.
+pub(crate) const QUIET_HOLD: u32 = 4;
+
+/// How much of the route's `t` the reveal's leading edge spans: a cell eases in
+/// as the front crosses this width before it. The front runs to
+/// `1 + REVEAL_EDGE`, so at `route_reveal` seconds every cell is wholly in.
+pub(crate) const REVEAL_EDGE: f32 = 0.08;
 
 /// The counters a grid pass accumulates.
 pub(crate) const K_MOVED: u32 = 0;
@@ -107,6 +171,7 @@ pub(crate) const A_NONE: u32 = 0;
 pub(crate) const A_SNAPSHOT: u32 = 1;
 pub(crate) const A_INDEX: u32 = 2;
 pub(crate) const A_RELAX: u32 = 3;
+pub(crate) const A_COMMIT: u32 = 4;
 
 /// Which key an index pass matches: the distance to the grid's centre.
 pub(crate) const KIND_CENTRE: u32 = 0;
@@ -145,6 +210,24 @@ const WGSL_CONSTS: &[(&str, u32)] = &[
     ("C_LAST_MOVED", C_LAST_MOVED),
     ("C_LAST_OPEN", C_LAST_OPEN),
     ("C_LAST_CHANGED", C_LAST_CHANGED),
+    ("C_STILL_RUN", C_STILL_RUN),
+    ("C_PENDING_C", C_PENDING_C),
+    ("C_PENDING_LENGTH", C_PENDING_LENGTH),
+    ("C_END", C_END),
+    ("C_LENGTH", C_LENGTH),
+    ("C_SHOWN", C_SHOWN),
+    ("C_COMMIT_MS", C_COMMIT_MS),
+    ("C_BREAK_MS", C_BREAK_MS),
+    ("C_COMMITS", C_COMMITS),
+    ("C_ABANDONED", C_ABANDONED),
+    ("C_EPOCH_PASSES", C_EPOCH_PASSES),
+    ("C_LAST_EPOCH", C_LAST_EPOCH),
+    ("SHOWN_NONE", SHOWN_NONE),
+    ("SHOWN_ON", SHOWN_ON),
+    ("SHOWN_FADING", SHOWN_FADING),
+    ("QUIET_TOLERANCE_NUM", QUIET_TOLERANCE.0),
+    ("QUIET_TOLERANCE_DEN", QUIET_TOLERANCE.1),
+    ("QUIET_HOLD", QUIET_HOLD),
     ("K_MOVED", K_MOVED),
     ("K_OPEN", K_OPEN),
     ("K_CHANGED", K_CHANGED),
@@ -155,6 +238,7 @@ const WGSL_CONSTS: &[(&str, u32)] = &[
     ("A_SNAPSHOT", A_SNAPSHOT),
     ("A_INDEX", A_INDEX),
     ("A_RELAX", A_RELAX),
+    ("A_COMMIT", A_COMMIT),
     ("KIND_CENTRE", KIND_CENTRE),
     ("KIND_FAR", KIND_FAR),
     ("R_PREV", R_PREV),
@@ -197,11 +281,38 @@ pub(crate) fn control_source() -> String {
 /// prelude.
 pub(crate) fn present_source() -> String {
     format!(
-        "{}{}{}",
+        "{}const REVEAL_EDGE: f32 = {REVEAL_EDGE:?};\n{}{}",
         wgsl_consts(),
         shader::PRESENT_SHADER,
         shader::ROUTE_PRESENT_MAIN
     )
+}
+
+/// The longest `route_reveal` the present reads, in seconds.
+pub(crate) const MAX_REVEAL: f32 = 10.0;
+
+/// A bound `route_reveal` as the present and the control pass read it:
+/// clamped into `0..=`[`MAX_REVEAL`] seconds, `fallback` where it is not
+/// finite.
+pub(crate) fn applied_reveal(value: f32, fallback: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, MAX_REVEAL)
+    } else {
+        fallback
+    }
+}
+
+/// How long a broken route takes to fade, in whole milliseconds: a quarter of
+/// the reveal.
+pub(crate) fn fade_ms(reveal: f32) -> u32 {
+    (reveal * 250.0).round() as u32
+}
+
+/// Scene time `seconds` as the GPU's milliseconds, rounded to the microsecond
+/// first as [`Timeline`] rounds its events, so two sums of `dt` reaching one
+/// instant name one millisecond.
+pub(crate) fn scene_ms(seconds: f64) -> u32 {
+    millis((seconds * 1.0e6).round().max(0.0) as u64)
 }
 
 /// Work tiles a side for a grid of `grid` cells.
@@ -356,7 +467,7 @@ struct EventParams {
     /// x: grid (cells per side), y: wrap (1 torus), z: scene time (ms since
     /// configure), w: work tiles a side.
     a: [u32; 4],
-    /// Unused.
+    /// x: how long a broken route fades (ms); yzw unused.
     b: [u32; 4],
 }
 
@@ -364,8 +475,18 @@ struct EventParams {
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct RoutePresent {
-    /// x: route, y: route_coord, z: route_grade, w: unused.
+    /// x: route, y: route_coord, z: route_grade, w: route_reveal (s).
     pub(crate) a: [f32; 4],
+    /// x: the frame's scene time (ms since configure); yzw unused.
+    pub(crate) b: [u32; 4],
+}
+
+/// What every event slot of one frame shares besides its time.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct FrameParams {
+    pub(crate) wrap: bool,
+    /// How long a broken route fades, in ms.
+    pub(crate) fade_ms: u32,
 }
 
 /// Event slots a frame can fill: every generation and every route pass.
@@ -798,14 +919,14 @@ impl RouteResources {
 
     /// Fill the next event slot and return its dynamic offset, or `None` once
     /// every slot is spent — which the two per-frame caps keep from happening.
-    fn slot(&mut self, wrap: bool, ms: u32) -> Option<u32> {
+    fn slot(&mut self, frame: FrameParams, ms: u32) -> Option<u32> {
         if self.used >= EVENT_SLOTS {
             return None;
         }
         let offset = self.used * self.stride;
         let params = EventParams {
-            a: [self.grid, u32::from(wrap), ms, self.tiles],
-            b: [0; 4],
+            a: [self.grid, u32::from(frame.wrap), ms, self.tiles],
+            b: [frame.fade_ms, 0, 0, 0],
         };
         let bytes = bytemuck::bytes_of(&params);
         let at = offset as usize;
@@ -822,10 +943,10 @@ impl RouteResources {
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         field: &PingPongField,
-        wrap: bool,
+        frame: FrameParams,
         ms: u32,
     ) {
-        let Some(offset) = self.slot(wrap, ms) else {
+        let Some(offset) = self.slot(frame, ms) else {
             return;
         };
         {
@@ -846,10 +967,10 @@ impl RouteResources {
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         field: &PingPongField,
-        wrap: bool,
+        frame: FrameParams,
         ms: u32,
     ) {
-        let Some(offset) = self.slot(wrap, ms) else {
+        let Some(offset) = self.slot(frame, ms) else {
             return;
         };
         {
