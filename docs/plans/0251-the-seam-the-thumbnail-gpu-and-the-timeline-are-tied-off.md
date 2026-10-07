@@ -186,7 +186,7 @@ settled here:
 |---|---|---|---|
 | 1 — The swarm's sway bound is exact at the shipped minimum zoom | dev | done | b647003b |
 | 2 — The thumbnail child renders on the show's adapter and says which | dev | done | 5d5c6caa |
-| 3 — A cancelled render leaves no timeline beside the output | studio-builder | done | committed with this row |
+| 3 — A cancelled render leaves no timeline beside the output | studio-builder | done | 8900f044 |
 | 4 — The thumbnail reading is re-taken with both adapters named | human | not started | |
 
 ### Notes
@@ -208,12 +208,14 @@ settled here:
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none
 - **Plan header `Closes:`** design-backlog 0261, 0285, 0286
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** fix-only (core swarm sway bound, standalone thumbnail child adapter and note,
+  studio render-start cleanup)
+- **Operator docs touched:** `docs/configuration.md` (`[thumbnails]`, Phase 2)
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 43 reductions across 20
+  live entries, 3 unprobeable
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207)
+- **Outstanding `human` phases:** Phase 4 (blocks merge: no)
 
 ## Followups (after this lands)
