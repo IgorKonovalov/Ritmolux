@@ -104,7 +104,10 @@ pub struct Pending {
     params: Vec<(Name, f32)>,
     clears: Vec<Name>,
     clear_all: bool,
-    preset: Option<Name>,
+    /// The last preset asked for, and the `req` id it carried when it came as a
+    /// `ctl/preset/req`. A plain `ctl/preset` landing after one in the same frame
+    /// replaces the pair, so it leaves no id to answer.
+    preset: Option<(Name, Option<i32>)>,
     transport: Vec<Transport>,
     marks: Vec<(Name, Mark, bool)>,
     pings: Vec<i32>,
@@ -153,8 +156,10 @@ impl Pending {
             }
             // Two of these in one frame mean what one means.
             Action::ClearParams => self.clear_all = true,
-            // Likewise: the last preset asked for is the one to land on.
-            Action::Preset { name } => self.preset = Some(name),
+            // Likewise: the last preset asked for is the one to land on, and only
+            // its id, if it carried one, is answered.
+            Action::Preset { name } => self.preset = Some((name, None)),
+            Action::PresetReq { name, req } => self.preset = Some((name, Some(req))),
             Action::Transport(verb) => {
                 if self.transport.len() == self.transport.capacity() {
                     return false;
@@ -224,7 +229,13 @@ impl Pending {
 
     /// The preset to dissolve to, if one was asked for.
     pub fn preset(&self) -> Option<&Name> {
-        self.preset.as_ref()
+        self.preset.as_ref().map(|(name, _)| name)
+    }
+
+    /// The `req` id the frame's preset ask carried, when it came as a
+    /// `ctl/preset/req` and no plain `ctl/preset` replaced it.
+    pub fn preset_req(&self) -> Option<i32> {
+        self.preset.and_then(|(_, req)| req)
     }
 
     /// Whether every override was asked to be dropped.
@@ -256,6 +267,40 @@ impl Pending {
 /// One frame's worth of drained control input.
 pub type Drained = Pending;
 
+/// What became of a `ctl/preset/req` ask, as its `preset_ack` spells it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PresetOutcome {
+    /// The roster holds the name and a dissolve to it began.
+    Selected,
+    /// The name is the preset the show is already on, or already dissolving
+    /// to, so nothing was called.
+    Current,
+    /// The roster holds no such name. A `preset_error` goes out beside the ack.
+    Refused,
+}
+
+impl PresetOutcome {
+    /// The wire spelling, which is also what spec 0003's table prints.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PresetOutcome::Selected => "selected",
+            PresetOutcome::Current => "current",
+            PresetOutcome::Refused => "refused",
+        }
+    }
+}
+
+/// The answer one `ctl/preset/req` ask is owed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PresetAck {
+    /// The id the ask carried.
+    pub req: i32,
+    /// The name it asked for.
+    pub name: Name,
+    /// What applying it did.
+    pub outcome: PresetOutcome,
+}
+
 /// What applying one frame's parameter and preset traffic did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Applied {
@@ -271,6 +316,9 @@ pub struct Applied {
     /// renderer and not the event stream, and the refusal is a fact about the
     /// request rather than about the picture.
     pub unresolved_preset: Option<Name>,
+    /// The answer a `ctl/preset/req` ask is owed, or `None` when the frame's
+    /// preset ask carried no id or there was none.
+    pub preset_ack: Option<PresetAck>,
     /// Parameter overrides the engine refused because nothing on the active
     /// preset's system claims the name.
     pub refused: u64,
@@ -287,13 +335,33 @@ pub struct Applied {
 /// The order inside is the module's: a switch drops every override, so it has to
 /// precede the values, and a wholesale clear has to precede the values that
 /// survive it.
+///
+/// **A `req` ask for the preset the show is landing on calls nothing.** That is
+/// the dissolve's incoming preset while one runs and the active preset
+/// otherwise; selecting either again would re-cut the picture and drop every
+/// override, which a sender resending a lost ask must never cause. A plain
+/// `ctl/preset` keeps its own behaviour.
 pub fn apply_to_renderer(drained: &Drained, renderer: &mut Renderer) -> Applied {
     let mut applied = Applied::default();
     if let Some(name) = drained.preset() {
-        applied.switched = renderer.select_preset_by_name(name.as_str());
-        if !applied.switched {
+        let req = drained.preset_req();
+        let landing = renderer
+            .incoming_preset_name()
+            .unwrap_or_else(|| renderer.preset_name());
+        let outcome = if req.is_some() && landing == name.as_str() {
+            PresetOutcome::Current
+        } else if renderer.select_preset_by_name(name.as_str()) {
+            applied.switched = true;
+            PresetOutcome::Selected
+        } else {
             applied.unresolved_preset = Some(*name);
-        }
+            PresetOutcome::Refused
+        };
+        applied.preset_ack = req.map(|req| PresetAck {
+            req,
+            name: *name,
+            outcome,
+        });
     }
     if drained.clear_all() {
         renderer.clear_param_overrides();
@@ -955,6 +1023,182 @@ mod tests {
             applied.unresolved_preset, None,
             "a frame carrying no ctl/preset asked for nothing to select"
         );
+    }
+
+    /// A headless renderer holding `names` as `swarm` presets, or `None` (a
+    /// logged skip) on a runner with no adapter (ADR-0016).
+    fn renderer_with(names: &[&str]) -> Option<Renderer> {
+        let Ok(mut renderer) = Renderer::new_headless(rlx_core::render::HeadlessOptions {
+            width: 64,
+            height: 48,
+            prefer_software: true,
+        }) else {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        };
+        renderer.set_presets(
+            names
+                .iter()
+                .map(|name| {
+                    rlx_core::preset::Preset::from_toml_str(&format!(
+                        "system = \"swarm\"\nname = \"{name}\"\n"
+                    ))
+                    .expect("hand-written probe preset is valid")
+                })
+                .collect(),
+        );
+        Some(renderer)
+    }
+
+    /// One frame drawn through a tap, the way a headless run draws.
+    fn draw(renderer: &mut Renderer, tap: &mut rlx_core::render::FrameTap) {
+        renderer
+            .render_tapped(tap, &rlx_core::dsp::AnalysisFrame::default(), 1.0 / 60.0)
+            .expect("render_tapped on a headless renderer");
+    }
+
+    /// A drained frame holding one `ctl/preset/req` ask.
+    fn req_ask(text: &str, req: i32) -> Pending {
+        let mut drained = Pending::default();
+        drained.record(Action::PresetReq {
+            name: name(text),
+            req,
+        });
+        drained
+    }
+
+    /// A `req` ask for a name the roster does not hold is answered `refused`
+    /// and still carries the name out for the `preset_error` beside the ack.
+    #[test]
+    fn a_req_ask_for_an_absent_name_is_refused() {
+        let Some(mut renderer) = renderer_with(&["first", "second"]) else {
+            return;
+        };
+        let applied = apply_to_renderer(&req_ask("no_such_preset", 7), &mut renderer);
+        assert_eq!(
+            applied.preset_ack,
+            Some(PresetAck {
+                req: 7,
+                name: name("no_such_preset"),
+                outcome: PresetOutcome::Refused,
+            })
+        );
+        assert_eq!(
+            applied.unresolved_preset,
+            Some(name("no_such_preset")),
+            "the refusal keeps its preset_error"
+        );
+        assert!(!applied.switched);
+    }
+
+    /// A `req` ask for the active preset is answered `current` and starts no
+    /// transition: after the next render the same preset is active and no
+    /// dissolve is running.
+    #[test]
+    fn a_req_ask_for_the_active_preset_is_current_and_inert() {
+        let Some(mut renderer) = renderer_with(&["first", "second"]) else {
+            return;
+        };
+        let mut tap = renderer.open_tap();
+        draw(&mut renderer, &mut tap);
+        assert_eq!(renderer.preset_name(), "first");
+        assert_eq!(renderer.incoming_preset_name(), None);
+
+        let applied = apply_to_renderer(&req_ask("first", 8), &mut renderer);
+        assert_eq!(
+            applied.preset_ack.map(|ack| (ack.req, ack.outcome)),
+            Some((8, PresetOutcome::Current))
+        );
+        assert!(
+            !applied.switched,
+            "an inert ask must not run post-switch bookkeeping"
+        );
+        assert_eq!(applied.unresolved_preset, None);
+        assert_eq!(renderer.incoming_preset_name(), None, "no dissolve began");
+        draw(&mut renderer, &mut tap);
+        assert_eq!(
+            renderer.preset_name(),
+            "first",
+            "the active preset is unchanged after the next render"
+        );
+        assert_eq!(
+            renderer.incoming_preset_name(),
+            None,
+            "and no transition is running after it"
+        );
+    }
+
+    /// A `req` ask for the preset already dissolving in is answered `current`
+    /// and leaves that dissolve running rather than snap-finishing it.
+    #[test]
+    fn a_req_ask_for_the_incoming_preset_does_not_restart_the_dissolve() {
+        let Some(mut renderer) = renderer_with(&["first", "second"]) else {
+            return;
+        };
+        let mut tap = renderer.open_tap();
+        draw(&mut renderer, &mut tap);
+        let applied = apply_to_renderer(&req_ask("second", 1), &mut renderer);
+        assert_eq!(
+            applied.preset_ack.map(|ack| ack.outcome),
+            Some(PresetOutcome::Selected),
+            "the first ask for `second` starts the dissolve"
+        );
+        assert!(applied.switched);
+        // The opening frame flips the roster to the incoming preset, so both
+        // halves of "landing" are exercised: before it the roster still names
+        // `first`, after it `second`, and the dissolve runs throughout.
+        for frame in 0..2 {
+            assert_eq!(
+                renderer.incoming_preset_name(),
+                Some("second"),
+                "frame {frame}: a dissolve to `second` is running"
+            );
+            let resent = apply_to_renderer(&req_ask("second", 1), &mut renderer);
+            assert_eq!(
+                resent.preset_ack.map(|ack| ack.outcome),
+                Some(PresetOutcome::Current),
+                "frame {frame}: the resent ask names the preset dissolving in"
+            );
+            assert!(!resent.switched);
+            assert_eq!(
+                renderer.incoming_preset_name(),
+                Some("second"),
+                "frame {frame}: the resent ask did not snap-finish the dissolve"
+            );
+            draw(&mut renderer, &mut tap);
+        }
+        let mut landed = false;
+        for _ in 0..600 {
+            if renderer.incoming_preset_name().is_none() {
+                landed = true;
+                break;
+            }
+            draw(&mut renderer, &mut tap);
+        }
+        assert!(landed, "the dissolve still ran to its end");
+        assert_eq!(renderer.preset_name(), "second");
+    }
+
+    /// A plain `ctl/preset` after a `req` ask in one frame replaces it whole, so
+    /// there is no id left to answer; the other order keeps the id.
+    #[test]
+    fn a_plain_preset_ask_after_a_req_ask_leaves_no_req() {
+        let mut pending = req_ask("a", 5);
+        pending.record(Action::Preset { name: name("b") });
+        assert_eq!(pending.preset().map(Name::as_str), Some("b"));
+        assert_eq!(pending.preset_req(), None, "the plain ask carried no id");
+
+        let mut pending = Pending::default();
+        pending.record(Action::Preset { name: name("b") });
+        pending.record(Action::PresetReq {
+            name: name("a"),
+            req: 6,
+        });
+        assert_eq!(pending.preset().map(Name::as_str), Some("a"));
+        assert_eq!(pending.preset_req(), Some(6));
+
+        pending.clear();
+        assert_eq!(pending.preset_req(), None, "clear leaves no id behind");
     }
 
     /// A flood of one name occupies one slot, and the frame sees the last value.

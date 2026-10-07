@@ -36,6 +36,7 @@ changing or removing one moves the version segment.
 | `/rlx/v1/ctl/param/clear` | `s name` | Drop that override; the preset's own binding resumes |
 | `/rlx/v1/ctl/params/clear` | none | Drop every override |
 | `/rlx/v1/ctl/preset` | `s name` | Dissolve to the named preset |
+| `/rlx/v1/ctl/preset/req` | `s name`, `i req` | Dissolve to the named preset, and answer with a `preset_ack` carrying `req` ([ADR-0265](../adrs/0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md)) |
 | `/rlx/v1/ctl/transport` | `s next\|prev\|auto\|hold` | The console's transport, by name |
 | `/rlx/v1/ctl/mark` | `s name`, `s favourite\|hidden`, `i state` | Set (non-zero) or clear (`0`) that mark on the named preset |
 | `/rlx/v1/ctl/ping` | `i nonce` | Answered by a `pong` event carrying the nonce |
@@ -56,6 +57,7 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 | `stream` | `width`, `height`, `fps`, `format` (`rgba8` \| `bgra8`) | Once, before the first frame on a frame pipe |
 | `marks` | `favourite`, `hidden` | On start, after the first `roster`, and whenever either set changes — **including a change the player made itself** ([ADR-0229](../adrs/0229-the-studio-marks-a-preset-over-the-control-protocol.md)) |
 | `pong` | `nonce` | Answering a `ctl/ping` |
+| `preset_ack` | `req`, `name`, `outcome` (`selected` \| `current` \| `refused`) | Answering a `ctl/preset/req`, at the drain that applied it ([ADR-0265](../adrs/0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md)) |
 
 ## Invariants
 
@@ -198,6 +200,19 @@ Adding an event or a field is additive under the same `v`; changing or removing 
   path**: `preset_error` is reused rather than a second event added, because a parent's own fact is
   the same either way — the preset you asked for is not on screen — and `line`, `col` and `param`
   are `null`. (ADR-0221)
+- A `preset_ack` MUST be emitted **at the drain that applied the ask**, never on its arrival at the
+  listener, so `outcome` says what the frame did with it: `selected` when a dissolve to the name
+  began, `current` when the name is the preset the show is already landing on, and `refused` when
+  the roster holds no such name. A `refused` ask also raises the `preset_error` above. A plain
+  `ctl/preset` landing after a `ctl/preset/req` in the same frame replaces it, and leaves no `req`
+  to answer. (ADR-0265)
+- A `ctl/preset/req` naming the preset the show is **already landing on** — the one dissolving in
+  while a dissolve runs, the active one otherwise — MUST be **inert**: no transition starts, the
+  running dissolve is not re-cut, no override is dropped, and the answer is `current`. That is what
+  makes a resend of a lost ask safe. A plain `ctl/preset` keeps its own behaviour. (ADR-0265)
+- A sender of `ctl/preset/req` MUST keep **one ask outstanding**: it resends the same `req` when
+  no `preset_ack` names it within its timeout, a newer ask supersedes the outstanding one, and the
+  number of resends is bounded so a dead player ends in a give-up rather than a loop. (ADR-0265)
 - `health`'s `ctl_received`, `ctl_recv_errors` and `ctl_listening` MUST report the listener's own
   state: datagrams the socket handed it before anything was made of them, receive failures that
   were **not** the ordinary read timeout, and whether the receive loop is still running.
@@ -237,8 +252,11 @@ Adding an event or a field is additive under the same `v`; changing or removing 
   preset the roster does not hold THEN nothing is stored and a `preset_error` naming it goes out.
 - WHEN a mark is made from the player's **own** keyboard THEN a `marks` event goes out just the
   same, so a studio that did not ask still learns about it.
-- WHEN a `ctl/ping` arrives THEN a `pong` carrying the same nonce goes out on the event stream —
-  the one message answered individually, because it exists to tell a dead player from a quiet one.
+- WHEN a `ctl/ping` arrives THEN a `pong` carrying the same nonce goes out on the event stream,
+  because it exists to tell a dead player from a quiet one.
+- WHEN a `ctl/preset/req` arrives THEN the frame that drains it applies it and a `preset_ack`
+  carrying the same `req` goes out; WHEN the same `req` is resent for the preset that ask already
+  selected THEN nothing on screen changes and the answer is `current`.
 - WHEN the player starts without `--events` THEN standard error carries no line beginning with `{`.
 - WHEN the player starts with `--events` THEN the human diagnostics are exactly the lines the same
   run without it produced, and the events are interleaved among them.
@@ -299,3 +317,11 @@ and it is here so a reader who wants the history has it in one place rather than
   render: the stream said which preset was on screen and neither which system it drove nor which
   file it came from, and nothing said where the watcher was looking. Each field is read at a site
   that already held the value, which is why none of them moved the version.
+
+**Added 2026-10-07**, from one plan:
+
+- **[Plan 0252](../plans/0252-the-lost-preset-ask-is-located-and-answered.md) Phase 2** added the
+  `ctl/preset/req` message and the `preset_ack` event, on ADR-0265's decision, after a `ctl/preset`
+  datagram was lost in front of the socket with every counter on the player's side at zero. The
+  plain row is unchanged; the new one is the second message a player answers individually, after
+  `ctl/ping`.

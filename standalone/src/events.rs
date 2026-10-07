@@ -194,6 +194,16 @@ pub enum Event<'a> {
         /// The nonce the ping carried.
         nonce: i32,
     },
+    /// The answer to a `ctl/preset/req`, emitted at the drain that applied it
+    /// (ADR-0265).
+    PresetAck {
+        /// The id the ask carried.
+        req: i32,
+        /// The name it asked for.
+        name: &'a str,
+        /// `selected`, `current` or `refused`.
+        outcome: &'a str,
+    },
 }
 
 impl Event<'_> {
@@ -209,6 +219,7 @@ impl Event<'_> {
             Event::Stream { .. } => "stream",
             Event::Marks { .. } => "marks",
             Event::Pong { .. } => "pong",
+            Event::PresetAck { .. } => "preset_ack",
         }
     }
 
@@ -334,6 +345,12 @@ impl Event<'_> {
                 push_names(&mut out, "hidden", hidden);
             }
             Event::Pong { nonce } => out.push_str(&format!(",\"nonce\":{nonce}")),
+            Event::PresetAck { req, name, outcome } => {
+                out.push_str(&format!(",\"req\":{req},\"name\":"));
+                out.push_str(&json_string(name));
+                out.push_str(",\"outcome\":");
+                out.push_str(&json_string(outcome));
+            }
         }
         out.push_str("}\n");
         out
@@ -583,6 +600,11 @@ mod tests {
                 hidden: &[],
             },
             Event::Pong { nonce: -7 },
+            Event::PresetAck {
+                req: 42,
+                name: "attractor \"fern\"",
+                outcome: "selected",
+            },
         ]
     }
 
@@ -683,6 +705,7 @@ mod tests {
                 "marks",
                 "pong",
                 "preset",
+                "preset_ack",
                 "preset_error",
                 "preset_warning",
                 "stream",

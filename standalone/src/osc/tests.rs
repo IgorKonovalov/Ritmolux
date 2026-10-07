@@ -260,6 +260,10 @@ fn vocabulary() -> Vec<Action> {
         Action::Preset {
             name: name("aurora"),
         },
+        Action::PresetReq {
+            name: name("attractor_fern"),
+            req: 42,
+        },
         Action::Transport(Transport::Next),
         Action::Transport(Transport::Prev),
         Action::Transport(Transport::Auto),
@@ -350,7 +354,44 @@ fn the_control_addresses_are_versioned_and_free_of_collisions() {
     // Two transport verbs share `ctl/transport` by design, as four mark rows
     // share `ctl/mark`; the collision that would matter is two *actions of
     // different kinds* on one address.
-    assert_eq!(seen.len(), 7, "the vocabulary has seven addresses");
+    assert_eq!(seen.len(), 8, "the vocabulary has eight addresses");
+}
+
+/// `ctl/preset/req` accepts exactly a name and an integer id, and refuses any
+/// other argument shape rather than reading a missing id as zero.
+#[test]
+fn a_preset_req_message_accepts_only_a_name_and_an_id() {
+    let mut buf = Vec::new();
+    for args in [
+        vec![Arg::S("attractor_fern")],
+        vec![Arg::S("attractor_fern"), Arg::F(42.0)],
+        vec![Arg::I(1), Arg::I(42)],
+    ] {
+        encode(&mut buf, "/rlx/v1/ctl/preset/req", &args);
+        assert_eq!(
+            decode(&buf),
+            Err(Reject::WrongArguments),
+            "a preset/req with {} arguments of the wrong shape was accepted",
+            args.len()
+        );
+    }
+
+    encode(
+        &mut buf,
+        "/rlx/v1/ctl/preset/req",
+        &[Arg::S("attractor_fern"), Arg::I(-3)],
+    );
+    let decoded = decode(&buf).expect("tags `si` decode");
+    assert_eq!(
+        decoded,
+        Action::PresetReq {
+            name: name("attractor_fern"),
+            req: -3,
+        }
+    );
+    let mut again = Vec::new();
+    decoded.encode(&mut again);
+    assert_eq!(again, buf, "the decoded ask re-encodes to the same bytes");
 }
 
 /// **A mark the vocabulary does not name is refused rather than mapped onto a

@@ -255,14 +255,23 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The tests read the operating system's UDP counters at a failure | dev | done | committed with this row |
-| 2 — The player answers a preset ask that carries an id | dev | not started | |
+| 1 — The tests read the operating system's UDP counters at a failure | dev | done | e2c5c376 |
+| 2 — The player answers a preset ask that carries an id | dev | done | committed with this row |
 | 3 — The two control-path tests resend instead of waiting once | dev | not started | |
 | 4 — The full suite | dev | not started | |
 | 5 — The studio's library click is acknowledged | studio-builder | not started | |
 | 6 — The loaded reproduction is read | human | not started | |
 
 ### Notes
+
+- Phase 2 touched `standalone/src/osc/tests.rs`, outside its file list: the round-trip test and the
+  address count it holds live there.
+- Phase 2: `current` is judged against the preset the show is landing on, which is
+  `Renderer::incoming_preset_name()` while a dissolve runs and `preset_name()` otherwise. A `req`
+  ask naming the outgoing preset before the dissolve's opening frame is therefore `selected`, not
+  `current`.
+- Phase 2 reworded spec 0003's `ctl/ping` scenario, which called it "the one message answered
+  individually", and added a Provenance entry.
 
 ### Close triggers
 

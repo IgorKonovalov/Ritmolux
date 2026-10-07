@@ -741,6 +741,20 @@ impl Renderer {
         true
     }
 
+    /// The name of the preset a dissolve in flight is landing on, or `None` when
+    /// no dissolve is running.
+    ///
+    /// Distinct from [`preset_name`](Self::preset_name), which names the roster's
+    /// active preset: that is still the **outgoing** one until the dissolve's
+    /// opening frame has been drawn, and the incoming one after it. A caller
+    /// deciding whether a selection would be a no-op compares against this first,
+    /// because selecting the incoming preset again would snap-finish the dissolve
+    /// and re-cut it.
+    pub fn incoming_preset_name(&self) -> Option<&str> {
+        let to = self.transition.as_ref()?.incoming_index();
+        self.roster.presets.get(to).map(|p| p.name.as_str())
+    }
+
     /// The instant-cut form of [`select_preset_by_name`](Self::select_preset_by_name),
     /// used by the capture entry points below.
     pub(super) fn select_preset_by_name_now(&mut self, name: &str) -> bool {

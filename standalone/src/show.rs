@@ -17,7 +17,7 @@ use std::time::Instant;
 
 use rlx_core::render::{PixelOrder, Renderer};
 use standalone::config;
-use standalone::control::Control;
+use standalone::control::{Control, PresetAck};
 use standalone::events::{Event, Events};
 use standalone::marks::{Mark, Marks};
 use standalone::osc::decode::Transport;
@@ -56,6 +56,15 @@ const UNRESOLVED_PRESET: &str =
 /// roster does not hold would grow the file forever off a channel nobody sees.
 const UNMARKABLE_PRESET: &str =
     "ctl/mark: no preset of this name is loaded, so the mark was not stored";
+
+/// The `preset_ack` line a `ctl/preset/req` ask is answered with.
+fn preset_ack_event(ack: &PresetAck) -> Event<'_> {
+    Event::PresetAck {
+        req: ack.req,
+        name: ack.name.as_str(),
+        outcome: ack.outcome.as_str(),
+    }
+}
 
 /// Everything a run manages around the renderer, in one owner.
 pub(crate) struct Show {
@@ -608,6 +617,11 @@ impl Show {
     /// that did nothing (ADR-0221). It goes out as a `preset_error` naming the
     /// asked-for name, which is the event a parent already renders for "what
     /// you asked for is not on screen".
+    ///
+    /// **A `ctl/preset/req` ask is answered here, at the drain that applied it**,
+    /// never on arrival: a `preset_ack` says what this frame did with the ask,
+    /// and only this call knows (ADR-0265). A refused one keeps its
+    /// `preset_error` too.
     pub(crate) fn apply_control_rest(&mut self, renderer: &mut Renderer) -> bool {
         // Moved out of `self` for the duration rather than borrowed from it: the
         // drained buffer borrows the listener, and the pongs below need `self`.
@@ -645,6 +659,9 @@ impl Show {
         if let Some(events) = self.events.as_mut() {
             for nonce in &scratch[..count] {
                 events.emit(&Event::Pong { nonce: *nonce });
+            }
+            if let Some(ack) = applied.preset_ack.as_ref() {
+                events.emit(&preset_ack_event(ack));
             }
             if let Some(name) = applied.unresolved_preset.as_ref() {
                 events.emit(&Event::PresetError {
@@ -828,6 +845,33 @@ mod tests {
             Some("delta"),
             "the next rotation after `ctl/preset charlie` must continue from `charlie`"
         );
+    }
+
+    /// **A `preset_ack` line carries `req`, `name` and `outcome` exactly as spec
+    /// 0003 spells them**, for each of the three outcomes — the line
+    /// `apply_control_rest` writes for an applied `ctl/preset/req` ask.
+    #[test]
+    fn a_preset_ack_line_carries_req_name_and_outcome_as_the_spec_spells_them() {
+        use standalone::control::PresetOutcome;
+        use standalone::osc::decode::Name;
+        for (outcome, spelled) in [
+            (PresetOutcome::Selected, "selected"),
+            (PresetOutcome::Current, "current"),
+            (PresetOutcome::Refused, "refused"),
+        ] {
+            let ack = PresetAck {
+                req: 42,
+                name: Name::new("attractor_fern").expect("a short name"),
+                outcome,
+            };
+            assert_eq!(
+                preset_ack_event(&ack).line(),
+                format!(
+                    "{{\"v\":1,\"ev\":\"preset_ack\",\"req\":42,\
+                     \"name\":\"attractor_fern\",\"outcome\":\"{spelled}\"}}\n"
+                ),
+            );
+        }
     }
 
     /// **With no `[rotate] seed`, the walk is a function of a number that moves

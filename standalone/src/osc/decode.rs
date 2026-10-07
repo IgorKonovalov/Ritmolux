@@ -142,6 +142,10 @@ pub enum Action {
     ClearParams,
     /// Dissolve to the named preset.
     Preset { name: Name },
+    /// Dissolve to the named preset and answer with a `preset_ack` carrying
+    /// `req`, at the drain that applied it (ADR-0265). A `req` ask naming the
+    /// preset the show is already on, or already dissolving to, is inert.
+    PresetReq { name: Name, req: i32 },
     /// The console's transport, by name.
     Transport(Transport),
     /// Set or clear a mark on a preset, by name (ADR-0229).
@@ -163,6 +167,7 @@ impl Action {
             Action::ClearParam { .. } => "/rlx/v1/ctl/param/clear",
             Action::ClearParams => "/rlx/v1/ctl/params/clear",
             Action::Preset { .. } => "/rlx/v1/ctl/preset",
+            Action::PresetReq { .. } => "/rlx/v1/ctl/preset/req",
             Action::Transport(_) => "/rlx/v1/ctl/transport",
             Action::Mark { .. } => "/rlx/v1/ctl/mark",
             Action::Ping(_) => "/rlx/v1/ctl/ping",
@@ -184,6 +189,9 @@ impl Action {
             }
             Action::ClearParam { name } | Action::Preset { name } => {
                 super::encode(buf, address, &[Arg::S(name.as_str())]);
+            }
+            Action::PresetReq { name, req } => {
+                super::encode(buf, address, &[Arg::S(name.as_str()), Arg::I(*req)]);
             }
             Action::ClearParams => super::encode(buf, address, &[]),
             Action::Transport(verb) => super::encode(buf, address, &[Arg::S(verb.as_str())]),
@@ -293,6 +301,15 @@ pub fn decode(datagram: &[u8]) -> Result<Action, Reject> {
             } else {
                 Action::ClearParam { name }
             }
+        }
+        "/rlx/v1/ctl/preset/req" => {
+            if tags != "si" {
+                return Err(Reject::WrongArguments);
+            }
+            let raw = read_string(datagram, &mut pos).ok_or(Reject::Malformed)?;
+            let name = Name::new(raw).ok_or(Reject::Unusable)?;
+            let req = i32::from_be_bytes(read_word(datagram, &mut pos).ok_or(Reject::Malformed)?);
+            Action::PresetReq { name, req }
         }
         "/rlx/v1/ctl/params/clear" => {
             if !tags.is_empty() {
