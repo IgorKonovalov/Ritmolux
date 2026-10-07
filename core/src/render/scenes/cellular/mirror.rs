@@ -214,6 +214,118 @@ impl Aged {
     }
 }
 
+/// The open mask of a `0`/`1` field: `1` for a dead cell, which the route
+/// walks, `0` for a live one, which is a wall.
+pub(super) fn open_mask(cells: &[u8]) -> Vec<u8> {
+    cells.iter().map(|c| u8::from(*c == 0)).collect()
+}
+
+/// How many cells differ between two masks.
+pub(super) fn changed(a: &[u8], b: &[u8]) -> u32 {
+    a.iter().zip(b).filter(|(x, y)| x != y).count() as u32
+}
+
+/// The route's centre rule: the open cell whose centre lies nearest the grid's,
+/// the lowest index on a tie. `None` on a mask with no open cell.
+pub(super) fn centre_source(open: &[u8], n: u32) -> Option<u32> {
+    let m = i64::from(n);
+    (0..n * n)
+        .filter(|i| open[*i as usize] == 1)
+        .min_by_key(|i| {
+            let dx = 2 * i64::from(i % n) + 1 - m;
+            let dy = 2 * i64::from(i / n) + 1 - m;
+            (dx * dx + dy * dy, *i)
+        })
+}
+
+/// Breadth-first distances from `source` over the open cells, four-connected,
+/// across the seam when `wrap`. A wall, and an open cell the search cannot
+/// reach, holds `u32::MAX`, the GPU's sentinel.
+pub(super) fn bfs(open: &[u8], n: u32, wrap: bool, source: u32) -> Vec<u32> {
+    let mut dist = vec![u32::MAX; (n * n) as usize];
+    if open[source as usize] != 1 {
+        return dist;
+    }
+    dist[source as usize] = 0;
+    let mut queue = std::collections::VecDeque::from([source]);
+    let ni = i64::from(n);
+    while let Some(i) = queue.pop_front() {
+        let (x, y) = (i64::from(i % n), i64::from(i / n));
+        for (dx, dy) in [(-1i64, 0i64), (1, 0), (0, -1), (0, 1)] {
+            let (px, py) = (x + dx, y + dy);
+            if !wrap && (px < 0 || py < 0 || px >= ni || py >= ni) {
+                continue;
+            }
+            let j = (py.rem_euclid(ni) * ni + px.rem_euclid(ni)) as usize;
+            if open[j] == 1 && dist[j] == u32::MAX {
+                dist[j] = dist[i as usize] + 1;
+                queue.push_back(j as u32);
+            }
+        }
+    }
+    dist
+}
+
+/// The route's quiet test: a generation that changed `moved` open bits of
+/// `open` open cells is still when `moved` is at most the tolerance's fraction
+/// of `open`, compared in whole numbers as the control pass compares it.
+pub(super) fn is_still(moved: u32, open: u32) -> bool {
+    let (num, den) = super::route::QUIET_TOLERANCE;
+    u64::from(moved) * u64::from(den) <= u64::from(open) * u64::from(num)
+}
+
+/// The cell a sweep ends at: the largest finite distance, the lowest index
+/// holding it. `None` when nothing is finite.
+pub(super) fn farthest(dist: &[u32]) -> Option<u32> {
+    let far = dist.iter().copied().filter(|d| *d != u32::MAX).max()?;
+    dist.iter().position(|d| *d == far).map(|i| i as u32)
+}
+
+/// One epoch's double sweep: sweep 1 from `source` ends at `b`, sweep 2 from `b`
+/// keeps `d_b` and ends at `c`, sweep 3 from `c` gives `d_c`, and `length` is
+/// `d_b(c)`.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct Sweep {
+    pub(super) b: u32,
+    pub(super) c: u32,
+    pub(super) d_b: Vec<u32>,
+    pub(super) d_c: Vec<u32>,
+    pub(super) length: u32,
+}
+
+/// The double sweep from `source` over the open cells.
+pub(super) fn double_sweep(open: &[u8], n: u32, wrap: bool, source: u32) -> Sweep {
+    let first = bfs(open, n, wrap, source);
+    let b = farthest(&first).unwrap_or(source);
+    let d_b = bfs(open, n, wrap, b);
+    let c = farthest(&d_b).unwrap_or(b);
+    let d_c = bfs(open, n, wrap, c);
+    let length = d_b[c as usize];
+    Sweep {
+        b,
+        c,
+        d_b,
+        d_c,
+        length,
+    }
+}
+
+/// The committed route: every open cell on some shortest path from `b` to `c`
+/// (`d_b + d_c == length`) holds its distance from `b`, every other cell the
+/// sentinel.
+pub(super) fn commit(open: &[u8], sweep: &Sweep) -> Vec<u32> {
+    open.iter()
+        .zip(sweep.d_b.iter().zip(&sweep.d_c))
+        .map(|(o, (b, c))| {
+            let on = *o == 1
+                && *b != u32::MAX
+                && *c != u32::MAX
+                && u64::from(*b) + u64::from(*c) == u64::from(sweep.length);
+            if on { *b } else { u32::MAX }
+        })
+        .collect()
+}
+
 /// The field after one reseed disc: every cell within the disc — measured
 /// across the seam on a torus — reseeded under the stamp's own seed.
 pub(super) fn stamp(cells: &[u8], n: u32, wrap: bool, s: Stamp, threshold: u32) -> Vec<u8> {

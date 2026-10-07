@@ -1260,6 +1260,10 @@
             "reseed": { "$ref": "#/definitions/param.reseed.cellular" },
             "trail": { "$ref": "#/definitions/param.trail" },
             "age_tint": { "$ref": "#/definitions/param.age_tint" },
+            "route": { "$ref": "#/definitions/param.route" },
+            "route_coord": { "$ref": "#/definitions/param.route_coord" },
+            "route_grade": { "$ref": "#/definitions/param.route_grade" },
+            "route_reveal": { "$ref": "#/definitions/param.route_reveal" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "hue": { "$ref": "#/definitions/param.hue.fragment_field" },
             "zoom": { "$ref": "#/definitions/param.zoom.swarm" },
@@ -1988,6 +1992,10 @@
             "reseed": { "$ref": "#/definitions/param.reseed.cellular" },
             "trail": { "$ref": "#/definitions/param.trail" },
             "age_tint": { "$ref": "#/definitions/param.age_tint" },
+            "route": { "$ref": "#/definitions/param.route" },
+            "route_coord": { "$ref": "#/definitions/param.route_coord" },
+            "route_grade": { "$ref": "#/definitions/param.route_grade" },
+            "route_reveal": { "$ref": "#/definitions/param.route_reveal" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "hue": { "$ref": "#/definitions/param.hue.fragment_field" },
             "zoom": { "$ref": "#/definitions/param.zoom.swarm" },
@@ -3988,6 +3996,26 @@
       "type": "string",
       "description": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.",
       "markdownDescription": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.\n\n- default `0.35`\n- typical range depends on the family: `life_like` `0.0` to `1.0`, `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.route": {
+      "type": "string",
+      "description": "How strongly the route through the maze is drawn over it: the longest path the open cells hold, found while the maze stands still. 0 draws none and runs no search; inert on cyclic, which has no open cells.",
+      "markdownDescription": "How strongly the route through the maze is drawn over it: the longest path the open cells hold, found while the maze stands still. 0 draws none and runs no search; inert on cyclic, which has no open cells.\n\n- default `0.0`\n- typical range depends on the family: `life_like` `0.0` to `1.0`, `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.route_coord": {
+      "type": "string",
+      "description": "Where on the palette the route is painted, at its first end.",
+      "markdownDescription": "Where on the palette the route is painted, at its first end.\n\n- default `0.5`\n- typical range depends on the family: `life_like` `0.0` to `1.0`, `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.route_grade": {
+      "type": "string",
+      "description": "How far along the palette the route's colour travels from one end to the other; 0 paints it one solid colour.",
+      "markdownDescription": "How far along the palette the route's colour travels from one end to the other; 0 paints it one solid colour.\n\n- default `0.0`\n- typical range depends on the family: `life_like` `-1.0` to `1.0`, `larger_than_life` `-1.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.route_reveal": {
+      "type": "string",
+      "description": "Seconds a found route takes to draw in along its length, end to end; it fades out over a quarter of this when the maze moves. 0 draws it whole at once.",
+      "markdownDescription": "Seconds a found route takes to draw in along its length, end to end; it fades out over a quarter of this when the maze moves. 0 draws it whole at once.\n\n- default `1.0`\n- typical range depends on the family: `life_like` `0.0` to `10.0`, `larger_than_life` `0.0` to `10.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.link_distance": {
       "type": "string",

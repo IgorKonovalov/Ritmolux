@@ -1,8 +1,8 @@
 # ADR-0266 — The maze route is found in the quiet stretches by a double sweep on the GPU against a frozen snapshot
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-07 (Plan 0253), with an Outcome
 > **Date:** 2026-10-07
-> **Related plan(s):** [0253](../plans/0253-the-labyrinth-shows-its-longest-path.md); design-backlog 0274
+> **Related plan(s):** [0253](../plans/done/0253-the-labyrinth-shows-its-longest-path.md); design-backlog 0274
 
 ## Context
 
@@ -219,3 +219,18 @@ fresh search with a unique fixed point.
 - A coarse-to-fine search (relax a downsampled maze first to seed the fine field) would shorten an
   epoch, and so let a shorter quiet stretch or a larger grid show a route. It is not taken until
   Plan 0253's readings say a shipped preset's quiet stretches are shorter than its epochs.
+
+## Outcome (2026-10-07, Plan 0253)
+
+The sizing premise in the Context table and in the first Negative bullet does not describe the
+labyrinth. Plan 0253 Phase 1 read `cellular_labyrinth`'s grown maze at generation 600 (llvmpipe):
+its 17 432 open cells form **2 881 separate four-connected pockets**, the largest holding **142
+cells**. The centre rule's route is **16** long, and the longest route forced into the largest
+pocket is **79**. Phase 2 measured the epochs at **14 to 24 work passes**, about **0.1 s** at the
+`Floor` rate of 237 passes per second, against a standing stretch of about 1.4 s between bites.
+
+So the labyrinth draws a **short route inside one pocket**, not a path across the maze. The Notes'
+"the route lives in one component" predicted the kind of this; the reading shows it is the common
+case rather than the exception. Whether that route reads as "the longest path" is what Plan 0253
+Phase 4, the owner's look, judges. The ~18 000-step figure stays as the worst case on a connected
+maze at the 192 grid, and the per-tier figures above stand as worst cases in the same sense.
