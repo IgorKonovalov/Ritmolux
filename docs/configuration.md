@@ -676,6 +676,7 @@ rather than a habit.
 | `render.outputDir` | a directory | the user's Videos directory | Where a clip render's MP4 is suggested. Read at each render |
 | `render.diffusion.python` | a path | none | The interpreter the diffusion sidecar runs under, such as a venv's `python` with torch installed. While it is absent the Render view's neural switch stays off |
 | `render.diffusion.script` | a path | none | `tools/sd-filter/sd_filter.py` in a source checkout. While it is absent the neural switch stays off |
+| `judging.sourceDir` | a directory | none | The preset directory a judging session draws its sets from, typically a checkout's `presets/`. Read at each session; while it is absent the Judge view asks for one |
 
 The studio's Settings view shows `playerPath` and edits every other key. A `settings.json` written by
 hand before the first launch is read the same way.

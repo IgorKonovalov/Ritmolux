@@ -34,6 +34,10 @@ window is a window in the way.
 The mode is read when the player is spawned, so changing it takes effect on the
 next launch rather than restarting a running show.
 
+A judging session respawns the player on the windowed vector whatever
+`playerMode` says, with `RLX_PRESET_DIR` and `--marks` pointing at the session
+(ADR-0267), and restarts it on its normal vector when the session ends.
+
 Two more things worth knowing before the first launch:
 
 - **The preview has a fixed shape.** It is a scaled, letterboxed copy at 640x360
@@ -119,6 +123,32 @@ machine from suspending. A crash loses the render, because nothing reattaches to
 **open job…** reads a `.render.json` and restores the whole view from it. If the track has moved,
 the view asks for it again and keeps the prompts and every other field. A job file written by
 another version of the studio is refused with a message that names both versions.
+
+## Judging a set
+
+**judge** in the header opens the Judge view, which walks a set of presets in the show window and
+records a verdict for each (ADR-0267).
+
+1. **The source directory.** `judging.sourceDir` names the preset directory a set is drawn from,
+   typically a checkout's `presets/`. While it is unset the view asks for one.
+2. **The set.** A family (the prefix before the first `_` of each file's stem), `proposed/`, or a
+   ticked list of files. A set in which two files share a display name is refused at Start.
+3. **Start.** The studio copies the set into a session directory under
+   `<userData>/judging/sessions/<run>/`, records each source's hash, and restarts the player there,
+   with rotation held.
+4. **Judge in the show window.** F1 marks a preset keep, F2 marks it cut, and anything left unmarked
+   is tune; `F` fullscreens the window. A cut preset leaves rotation at once, and the Library's mark
+   buttons are a second route. The view shows the live counts and each preset's current verdict.
+5. **Retune.** The editor writes a session copy in place, with no copy prompt, so an edit lands in
+   the file End compares against its source.
+6. **End.** One line per preset is appended to `<userData>/judging/ledger.jsonl`, and the view lists
+   the files edited during the session. **Write back** copies the ticked ones to their sources,
+   re-hashing each source first and refusing, by name, any that changed after the copy.
+
+The ledger panel shows each preset's latest verdict for the current source directory, and **Copy
+as Markdown** puts it on the clipboard as a table. The studio never deletes a session directory on
+its own, so one a crash left behind can be inspected; outside a session the Sessions list shows
+them by date, and **Delete** removes the ticked ones.
 
 ## Which configuration covers which directory
 
