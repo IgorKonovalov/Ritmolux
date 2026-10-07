@@ -355,10 +355,9 @@ fn each_stimulus_lands_in_the_band_it_is_named_for() {
 }
 
 /// **The waterfall fixture reacts to the bands** (Plan 0238 Phase 2): the
-/// system ships no preset yet, so the shipped-set sweep above does not reach
-/// it, and this holds its golden fixture to the same floor through the same
-/// stimuli. The fixture binds no band at all — the band array is what the
-/// system draws.
+/// shipped-set sweep above reaches the system's shipped presets, and this holds
+/// its golden fixture to the same floor through the same stimuli. The fixture
+/// binds no band at all — the band array is what the system draws.
 #[test]
 fn the_waterfall_fixture_reacts_to_at_least_one_band() {
     let Some(mut renderer) = common::headless(SIZE, SIZE) else {

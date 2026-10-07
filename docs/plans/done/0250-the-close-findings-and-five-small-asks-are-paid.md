@@ -1,6 +1,6 @@
 # 0250 — The close findings and five small asks are paid
 
-> **Status:** in-progress
+> **Status:** done - closed 2026-10-07 by a human-started close in the lane. Phases 1-5 in `5c53d893`, `449a9b17`, `f595d155`, `b25cd8cf`, `894b8948`. Review: no blockers, no majors, two minors (filed as backlog 0285, 0286), three nits (two fixed). Full suite, clippy, fmt and `cargo doc` re-run green at the close. Version 0.168.0.
 > **Created:** 2026-10-06
 > **Owner skill(s):** dev, studio-builder
 > **Closes:** design-backlog 0260, 0275, 0282, 0283, 0284
@@ -259,6 +259,85 @@ had already judged the length warranted.
 - **Full suite:** `cargo nextest run --workspace --no-fail-fast` at `894b8948`, exit 0, 2019 passed,
   8 skipped. The `golden` and `sanity` suites also ran at Phases 2 and 3.
 - **Outstanding `human` phases:** none in this plan
+
+## Close review
+
+Run 2026-10-07 by `architect` in a fresh, human-started session in the lane
+`/home/igor/Work/rlx-plan-0250`, after the conductor had parked the plan for the owner. `main` was
+already an ancestor of the lane (`9137f9dc`), so the merge was a no-op.
+
+**Verdict: no blockers, no majors, two minors, three nits.** Every phase did what it set out to do.
+The three deviations the log records (no `serde(flatten)`, no waterfall fixture, the shipped zoom
+measured at rest only) were each the owner's call in-session and each is argued in the log. Each
+is the better shape: the first keeps the descriptor-roster probe able to see the raw fields, and
+the second derives the floor from two shipped presets rather than a fixture.
+
+**Gate at the close, on the lane tip:** `cargo fmt --all --check`, `cargo clippy --workspace
+--all-targets -- -D warnings` and `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`
+exit 0. FULLSUITE
+
+**What was checked against the tree, not the log:**
+
+- Phase 1. `warn_unknown_keys` in `load.rs` reads `raw::PRESET` and `raw::LAYER`, so a new raw
+  field cannot be forgotten by the check. Both tests (`preset.rs`) assert exactly one warning,
+  the misspelled name and the suggested one, for a table, a scalar and a `[layer.*]` table, and
+  silence for the correct spelling. `field_zoom` is declared in `common.rs` and used only by
+  `fragment_field` and `reaction_diffusion`. The generated reference shows the new doc on exactly
+  those two rows.
+- Phase 2. Lorenz Knot's `distance` bass term is `0.24`, so its nearest is `1.515`. The README
+  camera row's new minimum is right: Plexus Cyanotype's `1.5 + noise(...) * 0.15` bottoms at `1.5`
+  because `noise` is in `[0, 1]`. The depth test now reads the chords `space_chords` emits, which
+  is the seam `render_space` calls, and it adds a near-clipped chord whose depth differs from the
+  unclipped one by more than `0.05`. The lazy `lines3d` is built in `configure` before either
+  growth branch, so endless space presets get it too. The endless ramp divisor is a running
+  maximum seeded at `0` and floored at `1`. No shipped preset runs `growth = "endless"`, so the hue
+  change moves only the two named baselines.
+- Phase 3. The waterfall floor `0.015` is half Ridgeline's `0.0312`. The seam test reads every
+  `presets/swarm_*.toml`, fails on an expression `zoom`, and prints the zoom it measured.
+- Phase 4. Both windows go through `with_app_id`. winit 0.30.13 is built with its default features,
+  so the Wayland trait is present on every Linux build. The thumbnail layout is `FORMAT = 2` and
+  `is_current` compares the build string. The test covers both another build and the current one.
+  `thumb_cli.rs` reads the new offset. The conductor test asserts the printed advisory line.
+- Phase 5. `abandon()` aborts `preparing`. The abort reaches both the transcode (`wavFor`) and
+  `readBars` through the wrapped `run`. A tool that resolves despite the abort is refused before
+  `launch`. `finally` removes the grid on any start that did not launch.
+
+**Findings:**
+
+- **minor**, `studio/electron/render/service.ts:185`. In the neural branch, a `--bars` read that
+  resolves after `abandon()` goes on to `writeTimeline` and only then reaches the aborted refusal.
+  `finally` removes the grid but not the timeline, so `<output>.timeline.json` is left behind.
+  The window is one event-loop turn wide. This is code, so it is left open and filed as
+  **backlog 0285**.
+- **minor**, `core/src/render/scenes/swarm/tests.rs`. The `sway_bound` overshoot at the shipped
+  minimum zoom (0.9961 NDC at zoom 0.85, 1280x800) was recorded only as "a followup" in the log,
+  with no carrier. It is true of today's set, because no swarm preset binds `yaw` or `pitch`. It is
+  filed as **backlog 0286**.
+- **nit, fixed at the close**, `core/tests/reactivity.rs:357`. The waterfall-fixture doc still said
+  the system ships no preset, which the log itself noted. It now says the shipped sweep reaches the
+  shipped presets.
+- **nit, fixed at the close**, `core/src/render/scenes/lines/parametric.rs:1729`. The depth test's
+  doc credited the clipped case to "a camera close enough to cut chords", but the test uses the same
+  camera with an axial two-point walk. A two-line comment inside the test was also duplicated by the
+  one after it. Both are corrected.
+- **nit, open**, `core/src/render/scenes/lines/parametric.rs:1757`. The `frame_at` closure is called
+  once, at `3.2`, and is left from a version of the test that tried two distances. This is test code.
+- **Plan defect, not an implementation one.** Phase 1's done-when spells `--check --strict presets`,
+  which exits 2. The implementer ran `--strict --check presets` (93 files, 0 warnings), and the close
+  re-ran it.
+- **No ADR owed for 0284's second id.** The backlog entry said an ADR is owed "unless the console
+  takes its own id". The plan took that id and recorded the rejected single id in its Decision. The
+  choice is reversible and crosses no seam, so the plan is the record.
+- **Unverified, owner's.** The app ids were not read off a running window. One `hyprctl clients`
+  with the show and the console open confirms `ritmolux` and `ritmolux-console`. The X11 half has no
+  reader on the box.
+
+**Bookkeeping.** Backlog 0260, 0275, 0282, 0283 and 0284 are marked closed in the archive.
+Curation: `presets/` was touched only for Lorenz Knot's clamp. It adds no content, and the look is
+already owed to 0240 Phase 6. No shipped preset runs endless growth, so the ramp change made no
+preset's workaround stale. The full `shot --report` sweep was not run.
+Translations: `docs/running.ru.md` is behind `docs/running.md` since `b25cd8cf`, which is the
+app-id paragraph. Correcting the Russian is content work, so it is routed and not done here.
 
 ## Followups (after this lands)
 

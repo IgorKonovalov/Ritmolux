@@ -349,11 +349,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0260 | A thumbnail stamp carries no build identity, so an upgrade never re-renders | [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 4. **Promoted** |
-| 0275 | The swarm seam test measures zoom 1 only, not the shipped minimum | [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 3. **Promoted** |
-| 0282 | A misspelled top-level table is silently ignored, even under --strict | [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 1. **Promoted** |
-| 0283 | The shared zoom doc is backwards on fragment_field and reaction_diffusion | [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 1. **Promoted** |
-| 0284 | The show window reports an empty Wayland app class | [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 4. **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -674,6 +669,11 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0279 | A 3-D stroke is additive light with no depth test, so a near strand never hides a far one | [Plan 0248](plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) Phases 3-4 + ADR-0263. Per-preset `solid`. **Closed 2026-10-05** |
 | 0280 | A space curve does not fade or shift with distance, so nothing atmospheric says "far" | [Plan 0248](plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) Phase 2. `fog` and `hue_axis`. **Closed 2026-10-05** |
 | 0281 | A heavily blurred 3-D stroke breaks into a comb of segment streaks | [Plan 0248](plans/done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) Phase 1. Mitred 3D joins. **Closed 2026-10-05** |
+| 0260 | A thumbnail stamp carries no build identity, so an upgrade never re-renders | [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 4. The entry carries the build. **Closed 2026-10-07** |
+| 0275 | The swarm seam test measures zoom 1 only, not the shipped minimum | [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 3. At rest only; see 0286. **Closed 2026-10-07** |
+| 0282 | A misspelled top-level table is silently ignored, even under --strict | [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 1. A warning with a hint. **Closed 2026-10-07** |
+| 0283 | The shared zoom doc is backwards on fragment_field and reaction_diffusion | [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 1. `field_zoom`. **Closed 2026-10-07** |
+| 0284 | The show window reports an empty Wayland app class | [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) Phase 4. Two app ids. **Closed 2026-10-07** |
 <!-- roster:end -->
 
 ---
@@ -16864,7 +16864,12 @@ the implementation follows it, which is why this is an entry and not a finding a
   `present: const EMBEDDED: Stamp in: standalone/src/thumbs.rs`
 - **Verified 2026-09-26** — the cache names no build:
   `absent: CARGO_PKG_VERSION in: standalone/src/thumbs.rs`
-- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+
+**CLOSED 2026-10-07** — [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md)
+Phase 4. Every cache entry carries the `CARGO_PKG_VERSION` of the build that wrote it, under a
+layout bumped to `FORMAT = 2`. `is_current` compares it, so an entry from another build, or one
+with no build field, re-renders.
 
 ## 0275 — the swarm's seam test measures zoom 1 only, so nothing gates the shipped minimum zoom against the seam
 
@@ -16893,7 +16898,12 @@ should `SHIPPED_ZOOMS` be derived from the shipped set rather than written down?
   `present: ^zoom = "0\.85" in: presets/swarm_murmuration.toml`
 - **Verified 2026-10-06** — the seam test takes no shipped zoom range:
   `absent: SHIPPED_ZOOMS in: core/src/render/scenes/swarm/tests.rs`
-- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+
+**CLOSED 2026-10-07** — [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md)
+Phase 3. The seam test reads every `presets/swarm_*.toml`, measures the lowest bound `zoom`
+(`0.85`, Murmuration) as well as `1`, and fails on a `zoom` written as an expression. The shipped
+zoom is measured at rest only, because `sway_bound` over-allows there: that half is backlog 0286.
 
 ## 0282 — a misspelled top-level table is silently ignored, so `[smothing]` passes `--check --strict` and its easing never runs
 
@@ -16918,7 +16928,13 @@ and ADR-0020 chose a warning for exactly that reason.
 - **Verified 2026-10-05** — the loader has no unknown-table message:
   `absent: [Uu]nknown (top-level )?(table|key) in: core/src/preset/schema/load.rs`
 - **Verified 2026-10-05** — `unprobeable: the silent pass is a runtime outcome of ritmolux --check on a scratch file, which the probe grammar cannot run; the absent probe above is the reduction`
-- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+
+**CLOSED 2026-10-07** — [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md)
+Phase 1, not in the shape this entry guessed. There is no `serde(flatten)`: the loader reads the
+source as a TOML table and warns on any top-level or `[layer]` key that no `raw::PRESET` or
+`raw::LAYER` row names. It suggests the nearest known name within two edits. `--strict` fails on
+it, and the shipped set passes.
 
 ## 0283 — the shared `zoom` declaration says "above 1 fills more of the frame", which is backwards on `fragment_field` and `reaction_diffusion`
 
@@ -16943,7 +16959,12 @@ scenes, and the generated files regenerated. Unifying the direction would retune
   `present: above 1 fills more of the frame in: core/src/render/scenes/common.rs`
 - **Verified 2026-10-05** — the field scene multiplies:
   `present: var p = uv \* zoom \+ pan; in: core/src/render/scenes/fragment_field.rs`
-- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+
+**CLOSED 2026-10-07** — [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md)
+Phase 1. `common.rs` declares `field_zoom`, and `fragment_field` and `reaction_diffusion`
+use it. The shared `zoom` doc no longer claims one meaning everywhere, and the reference and
+schemas are regenerated.
 
 ## 0284 — the show window reports an empty Wayland app class, so a Hyprland window rule cannot target it
 
@@ -16965,4 +16986,9 @@ exist.
 - **Verified 2026-10-06** — neither window builder sets a name or app id:
   `absent: with_name|app_id in: standalone/src/run.rs`
 - **Verified 2026-10-06** — `absent: with_name|app_id in: standalone/src/app_state.rs`
-- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+- **Moved to the archive 2026-10-06 on promotion**, when [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md) was approved.
+
+**CLOSED 2026-10-07** — [Plan 0250](plans/done/0250-the-close-findings-and-five-small-asks-are-paid.md)
+Phase 4. The show is `ritmolux` and the console `ritmolux-console`, set through winit's
+`with_name` on Linux, which both backends read. `docs/running.md` names both ids and gives a Hyprland
+rule. Neither has been read off a running window yet.

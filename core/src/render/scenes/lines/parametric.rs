@@ -1726,10 +1726,9 @@ mod tests {
     /// from an oblique camera, the palette coordinate is the depth of the chord
     /// it actually emits, so two chords at one depth share a coordinate however
     /// far apart they sit on the walk, and two at different depths do not. At
-    /// `0` the coordinate is the walk position, bit for bit. A camera close
-    /// enough to cut chords at the near plane holds the coordinate to the
-    /// **clipped** chord's depth, so a swapped or unclipped depth inside the
-    /// seam reads differently here.
+    /// `0` the coordinate is the walk position, bit for bit. A chord the near
+    /// plane cuts holds the coordinate to the **clipped** chord's depth, so a
+    /// swapped or unclipped depth inside the seam reads differently here.
     #[test]
     fn a_full_hue_axis_colours_a_knot_by_depth_alone() {
         let arm = curves::arm3d(CurveFamily::TorusKnot).unwrap_or_else(|| panic!("a space family"));
@@ -1864,8 +1863,6 @@ mod tests {
             "the path axis colours them apart"
         );
 
-        // A camera inside the knot's reach cuts chords at the near plane; the
-        // coordinate is still the emitted, clipped chord's depth.
         // A chord the near plane cuts: a two-point walk from the volume's far
         // side straight through the eye along the view axis, so the cut end
         // stays at the centre of the frame instead of being culled off it. The

@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0250 - The close findings and five small asks are paid](#0250---the-close-findings-and-five-small-asks-are-paid)
   - [0218 - The reference machine becomes Arch](#0218---the-reference-machine-becomes-arch)
   - [0239 - The swarm moves into a real camera](#0239---the-swarm-moves-into-a-real-camera)
   - [0249 - A dispatched CI job blesses the named WARP baselines](#0249---a-dispatched-ci-job-blesses-the-named-warp-baselines)
@@ -292,6 +293,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0232 - The library is walked, cut and refilled](done/0232-the-library-is-walked-cut-and-refilled.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (one fixed), two nits (fixed).** Version: **0.158.0**. ADR-0253 accepted. Closed 0038. [Write-up](README-archive.md).
 - [0241 - The conductor parks only on what the owner must settle](done/0241-the-conductor-parks-only-on-what-the-owner-must-settle.md) - closed 2026-10-01. Review: **no blockers, no majors, three minors (two fixed), one nit (fixed).** Version: **0.157.0**. ADR-0261 accepted. [Write-up](README-archive.md).
 - [0235 - The plexus system, and a shared camera with depth of field](done/0235-the-plexus-system-and-a-shared-camera-with-depth-of-field.md) - closed 2026-10-01. Review: **three rounds; 3 majors, 3 minors (all fixed), two nits.** Version: **0.156.0**. ADR-0257 accepted. [Write-up](README-archive.md).
 - [0230 - The Russian slice becomes findable](done/0230-the-russian-slice-becomes-findable.md) - closed 2026-09-30, Phase 4 read 2026-10-01. Review: **no blockers, no majors, no minors, two nits.** Version: **0.155.0**. ADR-0213 accepted, Outcome. [Write-up](README-archive.md).
@@ -502,6 +504,31 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0250 - The close findings and five small asks are paid](done/0250-the-close-findings-and-five-small-asks-are-paid.md)
+
+- closed 2026-10-07 by a human-started close in the lane
+`plan-0250-the-close-findings-and-five-small-asks-are-paid`. The conductor's implement session had
+died, and the owner ran the phases by hand with the plan parked. The phases landed in `5c53d893`
+(Phase 1), `449a9b17` (2), `f595d155` (3), `b25cd8cf` (4) and `894b8948` (5, `studio-builder`).
+Review: **no blockers, no majors, two minors, three nits.** The two minors are filed as backlog
+0285 (a neural start whose `--bars` read resolves after a quit leaves `<output>.timeline.json`) and
+0286 (`sway_bound` over-allows at the shipped minimum swarm zoom). The close fixed two stale test
+comments. Version **0.168.0** (minor: unknown-key warnings, Linux app ids, a build-stamped
+thumbnail cache). No ADR paired. The full review is the plan's own `## Close review`.
+- **What landed.** The loader warns on an unknown top-level or `[layer]` key and suggests the
+  nearest known one, so `--strict` fails a misspelled `[smothing]`. `field_zoom` gives
+  `fragment_field` and `reaction_diffusion` a doc that matches their direction. Lorenz Knot's
+  nearest distance is 1.515. The depth-colour test reads what the draw is handed. A flat L-system
+  builds no `seg3d` renderer, and the endless ramp divides by the deepest generation reached. The
+  waterfall coverage floor is derived from shipped presets, and the swarm seam test reads the
+  shipped minimum zoom. The show and the console carry Linux app ids, and a thumbnail entry carries
+  its build. The conductor's readiness advisories are tested, and two gallery cards are re-rendered.
+  The studio's render service stops a start that is still preparing when the studio quits.
+- **Open.** The app ids have not been read off a running window. The nine conductor findings this
+  plan fixed are still listed in the digest until the owner marks them with `finding ... --done`.
+- **Curation.** Only Lorenz Knot's clamp changed, and its look is owed to 0240 Phase 6. No shipped
+  preset runs endless growth.
 
 ### [0218 - The reference machine becomes Arch](done/0218-the-reference-machine-becomes-arch.md)
 

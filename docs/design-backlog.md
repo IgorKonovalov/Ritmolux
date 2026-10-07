@@ -45,6 +45,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen](#0276--a-collage-elements-own-drift-and-spin-are-too-slow-for-the-animation-gate-to-see-so-a-sparse-canvas-reads-as-frozen)
 - [0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`](#0277--the-owners-hotkey-walk-and-the-live-retune-loop-exist-only-as-scratch-scripts-under-target)
 - [0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated](#0278--plexus-lays-its-points-in-a-cube-or-on-a-plane-so-a-turning-wire-sphere-is-only-approximated)
+- [0285 — a render start that finishes its `--bars` read after a quit leaves `<output>.timeline.json` behind](#0285--a-render-start-that-finishes-its---bars-read-after-a-quit-leaves-outputtimelinejson-behind)
+- [0286 — the swarm's `sway_bound` over-allows at small headroom, so a swayed camera at a low zoom shows the wrap seam](#0286--the-swarms-sway_bound-over-allows-at-small-headroom-so-a-swayed-camera-at-a-low-zoom-shows-the-wrap-seam)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1686,3 +1688,39 @@ entry up then, or when a second look asks for a closed 3-D surface.
 - **Verified 2026-10-01** — the two layouts, and no third:
   `present: ALL: \[PlexusLayout; 2\] in: core/src/render/scenes/plexus/mod.rs`
 - **Verified 2026-10-01** — `absent: Sphere|Shell in: core/src/render/scenes/plexus/mod.rs`
+
+## 0285 — a render start that finishes its `--bars` read after a quit leaves `<output>.timeline.json` behind
+
+Plan 0250 Phase 5 made `abandon()` reach a start still in its preparation window and made a start
+that never launches remove the `<output>.bars.json` it wrote. One path still leaks. `abandon()`
+aborts the signal, but a `--bars` read that has already finished resolves anyway. The neural branch
+of `RenderService.start` then checks the grid, calls `writeTimeline`, and only after that reaches
+the `abort.signal.aborted` refusal. The `finally` removes the grid and not the timeline, so
+`<output>.timeline.json` stays beside an MP4 that was never rendered. The window is one event-loop
+turn wide, so it is rare, and the file is small. The fix is to move the aborted check ahead of
+`writeTimeline`, or to remove the timeline in the same `finally` as the grid. The service test
+already holds a transcode open, and the same pattern can hold a `--bars` read open.
+
+- **Raised:** 2026-10-07 by `architect`, at Plan 0250's close review (minor, left open: code).
+  **Owner if taken:** `studio-builder` (a reordered check and one test; no ADR).
+- **Verified 2026-10-07** — the timeline is written before the aborted check:
+  `present: writeTimeline\(files\.timeline, neural\.timeline\) in: studio/electron/render/service.ts`
+- **Verified 2026-10-07** — `present: if \(abort\.signal\.aborted\) return refuse in: studio/electron/render/service.ts`
+
+## 0286 — the swarm's `sway_bound` over-allows at small headroom, so a swayed camera at a low zoom shows the wrap seam
+
+Plan 0250 Phase 3 extended `the_wrap_seam_stays_outside_the_frame_at_every_depth` to the lowest
+`zoom` a shipped swarm preset binds (`0.85`, Murmuration). At that zoom, with the camera swayed to
+`sway_bound`, 233 particle-frames at 1280x800 reached 0.9961 NDC, just inside the frame. The bound's
+first-order model of how far a yaw or pitch moves the seam is loose when the headroom between the
+seam and the frame edge is small. The test therefore measures the shipped zoom at rest only. That is
+true of what ships today, because no shipped swarm preset binds `yaw` or `pitch`. The first one
+that sways at a zoom below about `0.9` can show the seam, and no test will see it. The fix is
+either an exact bound (project the seam's corner through the swayed view rather than linearising)
+or a safety factor derived from the headroom, and then the swayed case at the shipped minimum zoom.
+
+- **Raised:** 2026-10-07 by `architect`, filing the followup Plan 0250 Phase 3's implementation log
+  named. **Owner if taken:** `dev` (the bound's arithmetic and the swayed case; no ADR).
+- **Verified 2026-10-07** — the shipped zoom is measured unswayed:
+  `present: The shipped zoom is measured at rest only in: core/src/render/scenes/swarm/tests.rs`
+- **Verified 2026-10-07** — `present: fn sway_bound\(fov: f32, zoom: f32 in: core/src/render/scenes/swarm.rs`
