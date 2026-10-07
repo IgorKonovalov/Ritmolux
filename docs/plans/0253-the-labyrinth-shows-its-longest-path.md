@@ -310,7 +310,7 @@ struct RouteControl {
 |---|---|---|---|
 | 1 — A sweep relaxes on the GPU and the flood is visible | dev | done | cca56596 |
 | 2 — Quiet stretches find, reveal and fade the route | dev | done | 1c41e058 |
-| 3 — The budget belongs to the tier and the references are regenerated | dev | committed with this row | |
+| 3 — The budget belongs to the tier and the references are regenerated | dev | done | 4f466a6a |
 | 4 — The owner sees the route on the labyrinth | human | not started | |
 
 ### Notes
@@ -419,5 +419,18 @@ struct RouteControl {
   value, so the plan's `--check --strict presets` reads `--strict` as the path and exits 2.
 
 ### Close triggers
+
+- **`presets/` touched:** yes, generated files only — `presets/README.md` (the parameter reference
+  block), `presets/preset.schema.json`, `presets/schema/cellular.schema.json`. No preset `.toml`.
+- **Plan header `Closes:`** design-backlog 0274.
+- **What shipped:** feature.
+- **Operator docs touched:** `presets/README.md` params block, `presets/schema/cellular.schema.json`
+  and `presets/preset.schema.json` (regenerated; `.taplo.toml` unchanged on regeneration),
+  `docs/specs/player-schema.json` (regenerated), `docs/nfr.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0; no entry named (31
+  advisory moved-path notices).
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Run at Phase 3 under its own
+  done-when: `cargo nextest run -p rlx-core --test golden` (exit 0, 5 passed, 0 skipped).
+- **Outstanding `human` phases:** Phase 4 (`Blocks merge: no`).
 
 ## Followups (after this lands)
