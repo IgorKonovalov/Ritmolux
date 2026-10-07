@@ -230,9 +230,9 @@ studio keeps one player); the ledger leaves the studio as a clipboard table, nev
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The player takes its marks file from a flag | dev | done | committed with this row |
-| 2 — The session: copy, isolate, fold, ledger, write-back | studio-builder | done | committed with this row |
-| 3 — The Judge view | studio-builder | not started | |
+| 1 — The player takes its marks file from a flag | dev | done | 994c9464 |
+| 2 — The session: copy, isolate, fold, ledger, write-back | studio-builder | done | 239e6652 |
+| 3 — The Judge view | studio-builder | done | committed with this row |
 | 4 — The owner walks a real family | human | not started | |
 
 ### Notes
@@ -250,6 +250,11 @@ studio keeps one player); the ledger leaves the studio as a clipboard table, nev
   player, forgets its control address and preset scope, drops a late event from it, and reattaches
   the frame port, so a restart keeps the preview. The bridge is `preload/api/judging.ts` plus its
   line in `preload/index.ts`. Ten OS channels, `judging:*`; no domain channel and no protocol row.
+- Phase 3 touched `studio/renderer/App.module.css`, outside its file list, for the header's
+  `judge` button. The Judge view mounts on first open and then stays mounted while hidden, so an
+  ended session's edit list outlives closing the panel. The Settings row is a `JudgingGroup` that
+  reads `judging.sourceDir` from `judging:get-state` itself, since `AppInfo` does not carry it.
+  No hook was added; the view holds its own state.
 
 ### Close triggers
 

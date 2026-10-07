@@ -1,0 +1,184 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--scanlines), var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  animation: rlx-enter var(--motion-long) var(--ease);
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+.bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.heading {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.button,
+.primary {
+  background: none;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--control-radius);
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 2px var(--space-1);
+  cursor: pointer;
+}
+
+.primary {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.button:hover:not(:disabled),
+.primary:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.button:disabled,
+.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
+}
+
+.legend {
+  padding: 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: 11px;
+}
+
+.path {
+  flex: 1;
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.problem {
+  margin: 0;
+  color: var(--warn);
+  font-size: 11px;
+}
+
+.dim {
+  color: var(--text-dim);
+}
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.indent {
+  display: flex;
+  gap: var(--space-1);
+  margin-left: 20px;
+}
+
+.tick {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+
+.tick input {
+  accent-color: var(--accent);
+}
+
+.counts {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.item[data-verdict='keep'] .verdict {
+  color: var(--accent);
+}
+
+.item[data-verdict='cut'] .verdict {
+  color: var(--warn);
+}
+
+.stem {
+  font-family: var(--mono);
+}
+
+.verdict {
+  color: var(--text-dim);
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.table th {
+  color: var(--text-dim);
+  font-weight: normal;
+  text-align: left;
+}
+
+.table th,
+.table td {
+  padding: 1px 12px 1px 0;
+}

@@ -26,6 +26,7 @@
   font-size: 11px;
 }
 
+.judge,
 .render,
 .settings {
   /* Pushed to the far end, so the preset name stays beside the title. */
@@ -39,10 +40,13 @@
   cursor: pointer;
 }
 
+.judge + .render,
 .render + .settings {
   margin-left: 0;
 }
 
+.judge:hover,
+.judge[aria-expanded='true'],
 .render:hover,
 .render[aria-expanded='true'],
 .settings:hover,

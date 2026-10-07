@@ -16,14 +16,20 @@ import { Settings } from './Settings'
 const setPlayerMode = vi.fn(() => Promise.resolve({ ok: true as const }))
 const setReducedMotion = vi.fn(() => Promise.resolve({ ok: true as const }))
 const onReducedMotion = vi.fn()
+const judging = {
+  getState: vi.fn(() => Promise.resolve({ sourceDir: '/w/presets' as string | null, session: null })),
+  setSourceDir: vi.fn((path: string | null) => Promise.resolve({ ok: true as const, value: path })),
+  pickSourceDir: vi.fn(() => Promise.resolve(null)),
+}
 
 beforeEach(() => {
   setPlayerMode.mockClear()
   setReducedMotion.mockClear()
   onReducedMotion.mockClear()
+  judging.setSourceDir.mockClear()
   // The one bridge, stood in: the panel reaches main through `window.api` and
   // through nothing else, which is what makes a stub this small enough.
-  Object.assign(window, { api: { app: { setPlayerMode, setReducedMotion } } })
+  Object.assign(window, { api: { app: { setPlayerMode, setReducedMotion }, judging } })
 })
 
 afterEach(cleanup)
@@ -150,7 +156,9 @@ describe('reduced motion', () => {
 describe('the render paths', () => {
   it('shows the file values, writes an edit, and clears a key with an empty field', async () => {
     const setSettings = vi.fn(() => Promise.resolve({ ok: true as const, value: null }))
-    Object.assign(window, { api: { app: { setPlayerMode, setReducedMotion }, render: { setSettings } } })
+    Object.assign(window, {
+      api: { app: { setPlayerMode, setReducedMotion }, render: { setSettings }, judging },
+    })
     render(
       <Settings
         running="windowed"
@@ -191,6 +199,31 @@ describe('the render paths', () => {
       fireEvent.click(screen.getAllByRole('button', { name: 'save' })[2])
     })
     expect(setSettings).toHaveBeenLastCalledWith({ 'diffusion.python': '/venv/bin/python' })
+  })
+})
+
+describe('the judging source directory', () => {
+  it('shows the value the file holds, writes an edit, and clears it with an empty field', async () => {
+    await act(async () => {
+      panel()
+    })
+    const field = screen.getByLabelText('source directory') as HTMLInputElement
+    expect(field.value).toBe('/w/presets')
+
+    fireEvent.change(field, { target: { value: '/x/presets' } })
+    const saves = screen.getAllByRole('button', { name: 'save' })
+    await act(async () => {
+      fireEvent.click(saves[saves.length - 1])
+    })
+    expect(judging.setSourceDir).toHaveBeenLastCalledWith('/x/presets')
+    expect(field.value).toBe('/x/presets')
+
+    fireEvent.change(field, { target: { value: ' ' } })
+    await act(async () => {
+      fireEvent.click(saves[saves.length - 1])
+    })
+    expect(judging.setSourceDir).toHaveBeenLastCalledWith(null)
+    expect(field.placeholder).toMatch(/not set/)
   })
 })
 
