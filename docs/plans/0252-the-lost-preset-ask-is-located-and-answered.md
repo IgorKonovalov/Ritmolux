@@ -318,6 +318,9 @@ Action::PresetReq { name: Name, req: i32 }   // Copy, inline name, as Action::Pr
   walk printed no `RESENT` line. No `selected` ack without a `preset`, no give-up. The loss did not
   reproduce on Linux under this load; per Risks, that is a no-reproduction row.
 - Phase 6, Windows: not taken (the rig was not available in this session).
+- Review round 1, finding 0 (major): job 5's `retries = 1` block and its backlog 0219 line left
+  `.config/nextest.toml`, job 4's 0219/0220 comment reads as history, and `docs/testing.md` says the
+  retry list is empty; 3431f395.
 
 ### Close triggers
 
