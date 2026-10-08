@@ -299,7 +299,7 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 | 2 — The rules and the music | dev | done | 627473a3 |
 | 3 — Cost: bricks, the march target and the tier caps | dev | done | e39942ab |
 | 4 — The golden and the gates | dev | done | 54a9ba57 |
-| 5 — Documentation and the references | dev | done | committed with this row |
+| 5 — Documentation and the references | dev | done | bb991d91 |
 | 6 — The look, judged | human | not started | |
 | 7 — The preset-author reference | human | not started | |
 
@@ -406,5 +406,21 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
   >   fewer `states` (`clouds` and `crystal` have 2) drops every decaying cell at the bar line.
 
 ### Close triggers
+
+- **`presets/` touched:** yes, generated files only: `presets/README.md` (the params block and its
+  contents row), `presets/preset.schema.json` and `presets/schema/*.schema.json` (`voxel.schema.json`
+  new). No preset `.toml` added or changed.
+- **Plan header `Closes:`** none.
+- **What shipped:** feature (a new system, `voxel`).
+- **Operator docs touched:** `docs/presets.md`, `docs/preset-guide.md`,
+  `docs/on-device-validation.md`; generated: the `presets/README.md` params block, `presets/schema/`,
+  `presets/preset.schema.json`, `.taplo.toml`, `docs/specs/player-schema.json`. Also
+  `docs/examples/voxel/clouds.toml` and `docs/images/gallery/voxel.png`. `docs/configuration.md`
+  untouched.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0; no entry named, 31 advisory
+  moved-path lines.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** Phase 6 (the look, judged) and Phase 7 (the preset-author
+  reference), both `Blocks merge: no`.
 
 ## Followups (after this lands)
