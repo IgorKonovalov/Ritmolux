@@ -16,7 +16,7 @@
 //! # Generations, not frames
 //!
 //! `step_rate` is in generations per second, integrated over the injected `dt`
-//! by the shared [`GenerationClock`](common::GenerationClock), so the automaton
+//! by the shared `common::GenerationClock`, so the automaton
 //! advances by the same count in the same wall time at any refresh rate.
 //!
 //! # Every cell is drawn from the seed
