@@ -205,7 +205,10 @@ fn draws_segments(system: SystemKind) -> bool {
         | SystemKind::Plexus
         // The waterfall's rows are the plexus's case: 3D segments through its
         // own `seg3d` pipeline, culled against the camera's frustum.
-        | SystemKind::Waterfall => false,
+        | SystemKind::Waterfall
+        // The voxel march walks a ray per pixel through a 3D texture; there is
+        // no segment list at all.
+        | SystemKind::Voxel => false,
     }
 }
 

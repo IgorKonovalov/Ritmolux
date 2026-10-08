@@ -30,6 +30,7 @@ pub mod reaction_diffusion;
 pub mod shape_collage;
 pub mod shape_field;
 pub mod swarm;
+pub mod voxel;
 pub mod warp_mesh;
 
 use std::cell::RefCell;
@@ -550,6 +551,11 @@ pub enum GeneratorConfig {
     /// for that system, so `configure` runs on every preset switch and the
     /// incoming preset starts from an empty ring.
     Waterfall(lines::waterfall::WaterfallConfig),
+    /// The voxel system's `[voxel]` table (ADR-0268): the grid, the rule list,
+    /// the seed ball and the edge rule, with the salt its seeding draws from.
+    /// Always `Some` for that system, so `configure` runs on every preset
+    /// switch and the incoming preset starts from its own seed.
+    Voxel(voxel::VoxelConfig),
 }
 
 impl GeneratorConfig {
@@ -572,7 +578,8 @@ impl GeneratorConfig {
             | GeneratorConfig::Field(_)
             | GeneratorConfig::Cellular(_)
             | GeneratorConfig::Plexus(_)
-            | GeneratorConfig::Waterfall(_) => 0,
+            | GeneratorConfig::Waterfall(_)
+            | GeneratorConfig::Voxel(_) => 0,
         }
     }
 }
@@ -1343,7 +1350,8 @@ pub(crate) fn kind_info(kind: SystemKind) -> SceneKindInfo {
         | SystemKind::AnalyticField
         | SystemKind::Cellular
         | SystemKind::Plexus
-        | SystemKind::Waterfall => false,
+        | SystemKind::Waterfall
+        | SystemKind::Voxel => false,
     };
     SceneKindInfo {
         shares_line_renderer,
@@ -1451,6 +1459,11 @@ fn create(
             surface_format,
             tier.seg3d_segments as usize,
             tier.max_coc_px as f32,
+        )),
+        SystemKind::Voxel => Box::new(voxel::VoxelScene::new(
+            device,
+            surface_format,
+            voxel::MAX_GRID,
         )),
     }
 }
@@ -1725,6 +1738,7 @@ mod tests {
             SystemKind::Cellular => "cellular",
             SystemKind::Plexus => "plexus",
             SystemKind::Waterfall => "waterfall",
+            SystemKind::Voxel => "voxel",
         }
     }
 

@@ -1465,7 +1465,8 @@ impl Renderer {
             | GeneratorConfig::Spectrum { .. }
             | GeneratorConfig::WarpMesh { .. }
             | GeneratorConfig::Path { .. }
-            | GeneratorConfig::Waterfall(_) => None,
+            | GeneratorConfig::Waterfall(_)
+            | GeneratorConfig::Voxel(_) => None,
         }
     }
 

@@ -193,4 +193,5 @@ family_tests! {
     distinctness_cellular => Cellular,
     distinctness_plexus => Plexus,
     distinctness_waterfall => Waterfall,
+    distinctness_voxel => Voxel,
 }

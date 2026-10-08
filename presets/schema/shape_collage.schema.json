@@ -29,7 +29,7 @@
         "size_hierarchy": { "$ref": "#/definitions/param.size_hierarchy" },
         "angle_bias": { "$ref": "#/definitions/param.angle_bias" },
         "roster": { "$ref": "#/definitions/param.roster" },
-        "density": { "$ref": "#/definitions/param.density" },
+        "density": { "$ref": "#/definitions/param.density.shape_collage" },
         "drift": { "$ref": "#/definitions/param.drift.shape_collage" },
         "spin": { "$ref": "#/definitions/param.spin.shape_collage" },
         "recompose": { "$ref": "#/definitions/param.recompose" },
@@ -172,6 +172,10 @@
       "$ref": "#/definitions/waterfall",
       "description": "How many bands and rows the waterfall landscape holds, and how often a row is pushed."
     },
+    "voxel": {
+      "$ref": "#/definitions/voxel",
+      "description": "The voxel automaton's grid, rules, seed and edges."
+    },
     "milk": {
       "$ref": "#/definitions/milk",
       "description": "A converted MilkDrop preset's compiled programs and shaders."
@@ -205,7 +209,7 @@
       "properties": {
         "system": {
           "type": "string",
-          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus", "waterfall"],
+          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus", "waterfall", "voxel"],
           "description": "Which built-in scene the layer draws. Required."
         },
         "join": {
@@ -297,6 +301,10 @@
         "waterfall": {
           "$ref": "#/definitions/waterfall",
           "description": "The layer's waterfall bands, rows and push period."
+        },
+        "voxel": {
+          "$ref": "#/definitions/voxel",
+          "description": "The layer's voxel grid, rules, seed and edges."
         }
       }
     },
@@ -630,6 +638,40 @@
         }
       }
     },
+    "voxel": {
+      "description": "The voxel automaton's grid, the rules it runs, the ball it is seeded with, and whether its faces wrap.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "grid": {
+          "type": "integer",
+          "description": "Cells per side of the cube. A content value, not a resolution: doubling it halves how large every structure looks. The quality tier may run fewer, and says so.",
+          "markdownDescription": "Cells per side of the cube. A content value, not a resolution: doubling it halves how large every structure looks. The quality tier may run fewer, and says so.\n\nDefault `64`."
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["445", "clouds"]
+          },
+          "description": "The rules the structural rule parameter picks among, by index.",
+          "markdownDescription": "The rules the structural rule parameter picks among, by index.\n\nDefault `[\"clouds\"]`."
+        },
+        "seed_radius": {
+          "type": "number",
+          "description": "The radius of the ball of cells the volume is seeded with, as a fraction of the cube's half-side; absent, the first rule's own."
+        },
+        "seed_fill": {
+          "type": "number",
+          "description": "The chance each cell inside the seeded ball starts live; absent, the first rule's own."
+        },
+        "wrap": {
+          "type": "boolean",
+          "description": "Whether the cube is a torus; false makes every cell past a face dead.",
+          "markdownDescription": "Whether the cube is a torus; false makes every cell past a face dead.\n\nDefault `false`."
+        }
+      }
+    },
     "milk": {
       "description": "A converted MilkDrop preset's compiled programs, its two shaders, and the frame-level choices that ride with them. Produced by the converter, not hand-authored.",
       "type": "object",
@@ -845,7 +887,7 @@
       "description": "Picks which set of shapes the elements are drawn from.",
       "markdownDescription": "Picks which set of shapes the elements are drawn from.\n\n- default `0.0`\n- typical range `0.0` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
     },
-    "param.density": {
+    "param.density.shape_collage": {
       "type": "string",
       "description": "How much of the frame the arrangement fills.",
       "markdownDescription": "How much of the frame the arrangement fills.\n\n- default `1.0`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."

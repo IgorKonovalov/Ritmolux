@@ -1,6 +1,6 @@
 # 0255 — The voxel automaton glows
 
-> **Status:** approved 2026-10-08
+> **Status:** in-progress 2026-10-08
 > **Created:** 2026-10-08
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0268](../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md) (proposed), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md), [ADR-0201](../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md)
@@ -283,11 +283,11 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 
 ## Implementation log
 
-**Lane:**
+**Lane:** branch `plan-0255-the-voxel-automaton-glows`, worktree `/home/igor/Work/rlx-plan-0255`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: one rule grows in a turning cube | dev | not started | |
+| 1 — Walking skeleton: one rule grows in a turning cube | dev | done | committed with this row |
 | 2 — The rules and the music | dev | not started | |
 | 3 — Cost: bricks, the march target and the tier caps | dev | not started | |
 | 4 — The golden and the gates | dev | not started | |
@@ -295,6 +295,27 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 | 6 — The look, judged | human | not started | |
 
 ### Notes
+
+- Phase 1 touched files outside its list, each forced by the compiler or by a guard that fails
+  without it: `core/tests/golden.rs` and `core/tests/golden/voxel.png` (the exhaustive fixture
+  roster; the baseline was blessed in this phase, with `RLX_BLESS=1` on
+  `scenes_match_golden_baselines` and the two re-encoded backdrop baselines restored),
+  `core/tests/{sanity,animation,reactivity,distinctness}.rs` and
+  `core/tests/suite/{geometry_extent,preset}.rs` (exhaustive `SystemKind` matches, the param drift
+  scan, the `STRUCTURAL` roster), `core/src/render/tonemap/tests.rs` (a `StorageTexture` marker for
+  the layout scan) and `core/src/render/palette.rs` (`SCENE_SOURCES`).
+- `445` dies from every seed tried on a CPU mirror of the step at 32³ (radius 0.08-2, fill
+  0.1-1.0). The default rule is `clouds`, and a roster entry carries its own default seed
+  (`RosterRule::seed`), which an absent `seed_radius` / `seed_fill` takes. The fixture and the
+  teaching preset run `clouds`.
+- The seed ball is scheduled at `configure` and encoded by the next `render`; `configure` has no
+  encoder.
+- `common::GenerationClock::advance` takes the system's applied rate; `cellular` keeps a wrapper of
+  the same name that applies its own clamp, so its tests are unchanged.
+- The camera block is spliced without `solid`; `focus` and `aperture` are declared inert in their
+  doc lines. `wrap` defaults to `false`.
+- Golden run after the move: every baseline mean 0.0000 / outlier 0, `backdrop_ramp` and
+  `backdrop_band` 0.0005 / 20-21.
 
 ### Close triggers
 

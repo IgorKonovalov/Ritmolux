@@ -69,6 +69,7 @@ impl Preset {
             raw.cellular,
             raw.plexus,
             raw.waterfall,
+            raw.voxel,
             raw.milk,
             pinned_salt,
         )?;
@@ -720,6 +721,7 @@ pub(super) fn build_layer(
         raw.cellular,
         raw.plexus,
         raw.waterfall,
+        raw.voxel,
         // A `[layer]` carries no `[milk]` table: a converted preset is a whole
         // preset, and layering one under another is a composition nothing in the
         // corpus asks for. A layer warp mesh drives its mesh from `[layer.params]`
@@ -779,6 +781,7 @@ pub(super) fn build_config(
     cellular: Option<RawCellular>,
     plexus: Option<RawPlexus>,
     waterfall: Option<RawWaterfall>,
+    voxel: Option<RawVoxel>,
     milk: Option<RawMilk>,
     salt: u32,
 ) -> Result<Option<GeneratorConfig>, PresetError> {
@@ -890,6 +893,13 @@ pub(super) fn build_config(
         // the ring — the outgoing preset's landscape never scrolls on under the
         // incoming one.
         SystemKind::Waterfall => Ok(Some(waterfall.unwrap_or_default().into_config()?)),
+        // The grid sizes the state textures and the rules select code paths, so
+        // both are structural. Config is always `Some` so `configure` runs on
+        // every preset switch and reseeds the volume — never stale. The salt is
+        // the pinned one, as the cellular system's is.
+        SystemKind::Voxel => Ok(Some(GeneratorConfig::Voxel(
+            voxel.unwrap_or_default().into_config(salt)?,
+        ))),
         // Reaction-diffusion drives its regime through named params (feed/kill/
         // flow), not a declarative structural table. `shape_collage`'s structure
         // is an authored element list compiled into the scene, and its seeded

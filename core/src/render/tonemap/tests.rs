@@ -687,6 +687,8 @@ fn the_dither_dissolves_a_dark_ramps_plateaus() {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Kind {
     Texture,
+    /// A texture a compute pass writes through `textureStore`.
+    StorageTexture,
     Sampler,
     Uniform,
     Storage,
@@ -720,6 +722,11 @@ enum Vis {
 const MARKERS: &[(&str, Kind, Vis)] = &[
     ("BufferBindingType::Uniform", Kind::Uniform, Vis::Preceding),
     ("BufferBindingType::Storage", Kind::Storage, Vis::Preceding),
+    (
+        "BindingType::StorageTexture",
+        Kind::StorageTexture,
+        Vis::Preceding,
+    ),
     ("BindingType::Sampler", Kind::Sampler, Vis::Preceding),
     ("BindingType::Texture", Kind::Texture, Vis::Preceding),
     ("lut_vertex_texture(", Kind::Texture, Vis::Fixed("VERTEX")),

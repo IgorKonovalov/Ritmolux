@@ -1122,6 +1122,7 @@ fn band_contour_ink(
     const WARP_MESH_SRC: &str = include_str!("scenes/warp_mesh/shaders.rs");
     const ANALYTIC_FIELD_SRC: &str = include_str!("scenes/analytic_field/shader.rs");
     const CELLULAR_SRC: &str = include_str!("scenes/cellular/shader.rs");
+    const VOXEL_SRC: &str = include_str!("scenes/voxel/shader.rs");
 
     /// Every scene source that carries a copy of one of the two shared WGSL
     /// functions, as `(path under `core/src/render/scenes/`, its text)`.
@@ -1139,6 +1140,7 @@ fn band_contour_ink(
         ("particles/shaders.rs", PARTICLE_SHADERS_SRC),
         ("reaction_diffusion.rs", REACTION_DIFFUSION_SRC),
         ("shape_field.rs", SHAPE_FIELD_SRC),
+        ("voxel/shader.rs", VOXEL_SRC),
         ("warp_mesh/shaders.rs", WARP_MESH_SRC),
     ];
 

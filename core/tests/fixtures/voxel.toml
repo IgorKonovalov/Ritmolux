@@ -1,0 +1,38 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `voxel` scene's drift baseline: the `clouds` rule settling from its
+# seeded field for the suite's 60 frames on a 32-cell cube, seen from a fixed
+# off-axis camera.
+#
+#  - `[generator] seed` pinned, so the seeded field is this file's own.
+#  - The seed written out although it equals the rule's own, so a change of
+#    default cannot move this baseline.
+#  - Every camera param bound although some equal the defaults, for the same
+#    reason.
+#  - `density` above zero, so the march's absorption reaches the pixels as well
+#    as its emission.
+system = "voxel"
+name   = "fixture_voxel"
+
+[generator]
+seed = 7
+
+[voxel]
+grid        = 32
+rules       = ["clouds"]
+seed_radius = 1.0
+seed_fill   = 0.6
+wrap        = false
+
+[params]
+step_rate  = "8"
+density    = "1.5"
+trail      = "0.6"
+age_tint   = "0.3"
+hue        = "0.1"
+hue_spread = "0.4"
+brightness = "1.2"
+yaw        = "0.6"
+pitch      = "0.4"
+distance   = "3.5"
+fov        = "0.8"

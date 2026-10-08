@@ -1,0 +1,27 @@
+# The `voxel` system, for the illustrated guide's picture of it. Teaching
+# material, not a shipped preset: the `clouds` rule settling from a dense seeded
+# field into rounded masses that fill a 64-cell cube, marched as a glowing
+# volume that absorbs some of the light behind it, the camera orbiting slowly.
+system = "voxel"
+name = "Voxel Clouds"
+
+[voxel]
+grid        = 64
+rules       = ["clouds"]
+seed_radius = 2.0
+seed_fill   = 0.55
+
+[palette]
+name = "ember"
+
+[params]
+step_rate  = "6"
+density    = "0.6"
+trail      = "0.6"
+age_tint   = "0.6"
+hue        = "0.1"
+hue_spread = "0.8"
+brightness = "0.8"
+yaw        = "0.6 + time * 0.1"
+pitch      = "0.35"
+distance   = "4.2"

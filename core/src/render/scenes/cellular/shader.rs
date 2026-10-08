@@ -82,7 +82,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 
 /// The step pass. [`gpu::FULLSCREEN_VS_UV_FLIPPED`](crate::render::gpu::FULLSCREEN_VS_UV_FLIPPED),
 /// a `const MODE: u32` naming the pass (0 step, 1 seed, 2 stamp), `const
-/// AGE_CAP: f32`, `const MAX_RADIUS: i32`, [`gpu::HASH_WGSL`](crate::render::gpu::HASH_WGSL)
+/// AGE_CAP: f32`, `const MAX_RADIUS: i32`, [`gpu::HASH_WGSL`](crate::render::gpu::HASH_WGSL),
+/// the shared [`CELL_HASH_WGSL`](crate::render::scenes::common::CELL_HASH_WGSL)
 /// and [`STEP_COMMON`] are prepended at construction. The render target is the
 /// grid itself, so a fragment's position is its cell.
 ///
@@ -105,7 +106,7 @@ pub(super) const STEP_SHADER: &str = r#"
 // colours, uniformly. Every input is a u32, so the field is the same bit for
 // bit on every adapter.
 fn seeded(c: vec2<i32>, seed: u32) -> f32 {
-    let h = mix32(u32(c.x) ^ mix32(u32(c.y) ^ mix32(seed)));
+    let h = cell_hash(c, seed);
     let binary = select(0.0, 1.0, (h >> 8u) < params.a.w);
     let colour = f32((h >> 8u) % max(params.b.w, 1u));
     return select(binary, colour, params.a.x == 2u);

@@ -1,4 +1,5 @@
-//! The parameter blocks the scenes share.
+//! The parameter blocks the scenes share, and the two automata's shared
+//! generation clock and cell hash.
 //!
 //! Every system implements [`Scene`](super::Scene) and most of them accept the
 //! same colour and framing names — `palette_mix`, `palette_steps`,
@@ -54,6 +55,75 @@ pub(crate) const DEFAULT_PAN: f32 = 0.0;
 /// this is only the value eleven of the twelve pass — including the three whose
 /// roster has no `brightness` at all, where it is inert.
 pub(crate) const DEFAULT_BRIGHTNESS: f32 = 1.0;
+// ---------------------------------------------------------------------------
+// The automata's shared clock and cell hash (`cellular`, `voxel`)
+// ---------------------------------------------------------------------------
+
+/// The most generations one frame encodes. A stall would otherwise queue
+/// unbounded passes (the accumulator spiral ADR-0012 names); past this the
+/// backlog is dropped and the automaton briefly slows rather than racing. At
+/// 30 fps it still carries 240 generations a second.
+pub const MAX_GENERATIONS_PER_FRAME: u32 = 8;
+
+/// How far below a whole generation the clock still counts one. `dt` arrives as
+/// an `f32`, and `1/144` summed 144 times lands a few ulps either side of 1;
+/// without this slack a rate that should run 12 generations in a second runs
+/// 11 at one refresh rate and 12 at another.
+pub(crate) const WHOLE_SLACK: f64 = 1e-6;
+
+/// Integrates a generation rate over injected `dt` into whole generations.
+///
+/// **No clock**: `dt` is handed in, as every accumulator in this engine takes
+/// it, so a capture stepping a fixed `dt` sequence is reproducible. The sum is
+/// `f64`, because a rate times an `f32` `dt` summed over minutes loses the
+/// fraction that decides whether a generation is owed.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub(crate) struct GenerationClock {
+    /// Generations owed and not yet run, in `[0, 1)` between calls.
+    pub(crate) owed: f64,
+}
+
+impl GenerationClock {
+    /// Add `dt` seconds at `rate` generations per second and return how many
+    /// whole generations to run now, at most [`MAX_GENERATIONS_PER_FRAME`].
+    /// The fraction carries; a backlog past the cap is dropped rather than
+    /// carried, so the automaton slows instead of racing to catch up.
+    ///
+    /// `rate` is the system's own applied rate — finite, non-negative and held
+    /// to its ceiling by the caller, which owns the default a non-finite
+    /// binding falls back to. `dt` is trusted: the renderer entry that took the
+    /// frame has already replaced a degenerate delta with one nominal step
+    /// (ADR-0191).
+    pub(crate) fn advance(&mut self, rate: f32, dt: f32) -> u32 {
+        self.owed += f64::from(rate) * f64::from(dt);
+        let whole = (self.owed + WHOLE_SLACK).floor();
+        let cap = f64::from(MAX_GENERATIONS_PER_FRAME);
+        if whole > cap {
+            self.owed = 0.0;
+            return MAX_GENERATIONS_PER_FRAME;
+        }
+        self.owed = (self.owed - whole).max(0.0);
+        whole as u32
+    }
+}
+
+/// The automata's cell hash, as WGSL text: a cell's `u32` from its integer
+/// coordinates and a seed, through [`gpu::HASH_WGSL`](crate::render::gpu::HASH_WGSL)'s
+/// `mix32`, which must be prepended ahead of it. Every input is a `u32`, so a
+/// seeded field is the same bit for bit on every adapter.
+///
+/// `cell_hash` is the plane's and `cell_hash3` the volume's; the volume's folds
+/// `z` in over the plane's, so the two never need to agree.
+pub(crate) const CELL_HASH_WGSL: &str = r#"
+fn cell_hash(c: vec2<i32>, seed: u32) -> u32 {
+    return mix32(u32(c.x) ^ mix32(u32(c.y) ^ mix32(seed)));
+}
+
+fn cell_hash3(c: vec3<i32>, seed: u32) -> u32 {
+    return mix32(u32(c.z) ^ cell_hash(c.xy, seed));
+}
+"#;
+
 /// The colour and framing parameters every palette-coloured scene delegates to
 /// this module, declared **once** (ADR-0170).
 ///

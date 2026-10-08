@@ -64,6 +64,10 @@ pub(in crate::preset::schema) struct RawPreset {
     /// waterfall landscape.
     #[serde(default)]
     pub(in crate::preset::schema) waterfall: Option<RawWaterfall>,
+    /// The optional `[voxel]` structural-config table (ADR-0268): the voxel
+    /// system's grid, rule list, seed ball and edge rule.
+    #[serde(default)]
+    pub(in crate::preset::schema) voxel: Option<RawVoxel>,
     /// The optional `[per_vertex]` table (Plan 0100): bindings evaluated once
     /// per mesh vertex, with `x`/`y`/`rad`/`ang` in scope.
     #[serde(default)]
@@ -164,6 +168,8 @@ pub(in crate::preset::schema) struct RawLayer {
     pub(in crate::preset::schema) plexus: Option<RawPlexus>,
     #[serde(default)]
     pub(in crate::preset::schema) waterfall: Option<RawWaterfall>,
+    #[serde(default)]
+    pub(in crate::preset::schema) voxel: Option<RawVoxel>,
     /// `[layer.per_vertex]` — the same per-vertex surface as the top level, for
     /// a layer whose system is the warp mesh (Plan 0100 Phase 1).
     #[serde(default)]
@@ -375,6 +381,12 @@ pub(in crate::preset::schema) const PRESET: TableDesc = TableDesc {
                   is pushed.",
         },
         KeyDesc {
+            name: "voxel",
+            kind: KeyKind::Table("voxel"),
+            default: "",
+            doc: "The voxel automaton's grid, rules, seed and edges.",
+        },
+        KeyDesc {
             name: "milk",
             kind: KeyKind::Table("milk"),
             default: "",
@@ -528,6 +540,12 @@ pub(in crate::preset::schema) const LAYER: TableDesc = TableDesc {
             kind: KeyKind::Table("waterfall"),
             default: "",
             doc: "The layer's waterfall bands, rows and push period.",
+        },
+        KeyDesc {
+            name: "voxel",
+            kind: KeyKind::Table("voxel"),
+            default: "",
+            doc: "The layer's voxel grid, rules, seed and edges.",
         },
     ],
 };

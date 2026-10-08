@@ -1094,6 +1094,38 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
 
+### System: `voxel`
+
+**Structural**
+
+| Parameter | Default | Range | What it does | Group |
+|---|---|---|---|---|
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. | colour |
+
+**Modal**
+
+| Parameter | Default | Range | What it does | Group |
+|---|---|---|---|---|
+| `step_rate` | `8` | `0` – `30` | How many generations the automaton runs per second, whatever the frame rate; 0 freezes it. | motion, main |
+| `density` | `1` | `0` – `8` | How strongly the volume absorbs the light behind it, per unit of the cube's width; 0 is pure additive glow with no front or back. | light, main |
+| `trail` | `0.6` | `0` – `1` | How much of its light a decaying cell keeps at each stage of its decay; 0 draws only the live cells. | light |
+| `age_tint` | `0.3` | `0` – `1` | How far along the palette a cell's colour travels as it ages; a decaying cell takes the far end. | colour |
+| `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. | colour, main |
+| `hue_spread` | `0.3` | `0` – `1` | How far along the palette the colour travels from the cube's centre to its corners. | colour |
+| `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
+| `yaw` | `0` | `-3.1415927` – `3.1415927` | Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit. | motion |
+| `pitch` | `0.25` | `-1.55` – `1.55` | Raises the camera above the scene's volume, in radians; negative looks up from below. | motion |
+| `distance` | `3.5` | `1.5` – `8` | How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective. | motion |
+| `fov` | `0.8` | `0.2` – `2` | The camera's vertical field of view in radians; zoom divides it. | motion |
+| `focus` | `0.5` | `0` – `1` | Inert on voxel: depth of field blurs each drawn primitive, and the march draws none. | light, main |
+| `aperture` | `0` | `0` – `24` | Inert on voxel: depth of field blurs each drawn primitive, and the march draws none. | light, main |
+| `fog` | `0` | `0` – `1` | Fades the volume toward black with depth: at 1 the cube's farthest point is black and its nearest keeps its light. 0 is off. | light |
+| `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. | colour |
+| `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. | colour |
+| `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. | shape |
+| `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. | shape |
+| `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. | shape |
+
 ### Engine stage: `background`
 
 **Structural**

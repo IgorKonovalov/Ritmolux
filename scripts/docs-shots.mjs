@@ -682,6 +682,17 @@ const IMAGES = [
     size: "1280x720",
     tier: "rich",
   },
+  {
+    // voxel — UNJUDGED, and not a choice: the system ships no preset yet, so
+    // its slot renders the teaching preset under docs/examples/. Swap it for a
+    // shipped world when the content lane lands one.
+    out: "docs/images/gallery/voxel.png",
+    presetFile: "docs/examples/voxel/clouds.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
 
   // --- the gallery: one card per shipped preset ---------------------------
   //

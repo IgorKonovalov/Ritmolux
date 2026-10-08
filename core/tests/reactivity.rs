@@ -137,6 +137,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::Cellular => "cellular",
         SystemKind::Plexus => "plexus",
         SystemKind::Waterfall => "waterfall",
+        SystemKind::Voxel => "voxel",
     }
 }
 

@@ -7,7 +7,7 @@
   "properties": {
     "system": {
       "type": "string",
-      "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus", "waterfall"],
+      "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus", "waterfall", "voxel"],
       "description": "Which built-in scene this preset drives. Required."
     },
     "name": {
@@ -99,6 +99,10 @@
     "waterfall": {
       "$ref": "#/definitions/waterfall",
       "description": "How many bands and rows the waterfall landscape holds, and how often a row is pushed."
+    },
+    "voxel": {
+      "$ref": "#/definitions/voxel",
+      "description": "The voxel automaton's grid, rules, seed and edges."
     },
     "milk": {
       "$ref": "#/definitions/milk",
@@ -1091,7 +1095,7 @@
             "size_hierarchy": { "$ref": "#/definitions/param.size_hierarchy" },
             "angle_bias": { "$ref": "#/definitions/param.angle_bias" },
             "roster": { "$ref": "#/definitions/param.roster" },
-            "density": { "$ref": "#/definitions/param.density" },
+            "density": { "$ref": "#/definitions/param.density.shape_collage" },
             "drift": { "$ref": "#/definitions/param.drift.shape_collage" },
             "spin": { "$ref": "#/definitions/param.spin.shape_collage" },
             "recompose": { "$ref": "#/definitions/param.recompose" },
@@ -1256,10 +1260,10 @@
             "survive_hi": { "$ref": "#/definitions/param.survive_hi" },
             "states": { "$ref": "#/definitions/param.states" },
             "threshold": { "$ref": "#/definitions/param.threshold" },
-            "step_rate": { "$ref": "#/definitions/param.step_rate" },
+            "step_rate": { "$ref": "#/definitions/param.step_rate.cellular" },
             "reseed": { "$ref": "#/definitions/param.reseed.cellular" },
-            "trail": { "$ref": "#/definitions/param.trail" },
-            "age_tint": { "$ref": "#/definitions/param.age_tint" },
+            "trail": { "$ref": "#/definitions/param.trail.cellular" },
+            "age_tint": { "$ref": "#/definitions/param.age_tint.cellular" },
             "route": { "$ref": "#/definitions/param.route" },
             "route_coord": { "$ref": "#/definitions/param.route_coord" },
             "route_grade": { "$ref": "#/definitions/param.route_grade" },
@@ -1434,6 +1438,83 @@
             "aperture": { "$ref": "#/definitions/param.aperture.swarm" },
             "fog": { "$ref": "#/definitions/param.fog.plexus" },
             "solid": { "$ref": "#/definitions/param.solid.plexus" },
+            "zoom": { "$ref": "#/definitions/param.zoom.swarm" },
+            "pan_x": { "$ref": "#/definitions/param.pan_x" },
+            "pan_y": { "$ref": "#/definitions/param.pan_y" },
+            "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
+            "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
+            "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
+            "bg_angle": { "$ref": "#/definitions/param.bg_angle" },
+            "bg_hue_span": { "$ref": "#/definitions/param.bg_hue_span" },
+            "bg_coord_mode": { "$ref": "#/definitions/param.bg_coord_mode" },
+            "bg_center_x": { "$ref": "#/definitions/param.bg_center_x" },
+            "bg_center_y": { "$ref": "#/definitions/param.bg_center_y" },
+            "bg_shade": { "$ref": "#/definitions/param.bg_shade" },
+            "bg_shade_end": { "$ref": "#/definitions/param.bg_shade_end" },
+            "bg_ramp_gamma": { "$ref": "#/definitions/param.bg_ramp_gamma" },
+            "bg_band_amount": { "$ref": "#/definitions/param.bg_band_amount" },
+            "bg_band_angle": { "$ref": "#/definitions/param.bg_band_angle" },
+            "bg_band_pos": { "$ref": "#/definitions/param.bg_band_pos" },
+            "bg_band_width": { "$ref": "#/definitions/param.bg_band_width" },
+            "bg_band_curve": { "$ref": "#/definitions/param.bg_band_curve" },
+            "bg_band_hue": { "$ref": "#/definitions/param.bg_band_hue" },
+            "bg_band_hue_span": { "$ref": "#/definitions/param.bg_band_hue_span" },
+            "trails": { "$ref": "#/definitions/param.trails" },
+            "fb_zoom": { "$ref": "#/definitions/param.fb_zoom.trails" },
+            "fb_rotate": { "$ref": "#/definitions/param.fb_rotate.trails" },
+            "fb_dx": { "$ref": "#/definitions/param.fb_dx.trails" },
+            "fb_dy": { "$ref": "#/definitions/param.fb_dy.trails" },
+            "fb_center_x": { "$ref": "#/definitions/param.fb_center_x.trails" },
+            "fb_center_y": { "$ref": "#/definitions/param.fb_center_y.trails" },
+            "fb_warp": { "$ref": "#/definitions/param.fb_warp.trails" },
+            "kaleido_order": { "$ref": "#/definitions/param.kaleido_order" },
+            "kaleido_angle": { "$ref": "#/definitions/param.kaleido_angle" },
+            "kaleido_center_x": { "$ref": "#/definitions/param.kaleido_center_x" },
+            "kaleido_center_y": { "$ref": "#/definitions/param.kaleido_center_y" },
+            "kaleido_edge": { "$ref": "#/definitions/param.kaleido_edge" },
+            "kaleido_tile": { "$ref": "#/definitions/param.kaleido_tile" },
+            "kaleido_radial": { "$ref": "#/definitions/param.kaleido_radial" },
+            "kaleido_spiral": { "$ref": "#/definitions/param.kaleido_spiral" },
+            "kaleido_zoom": { "$ref": "#/definitions/param.kaleido_zoom" },
+            "kaleido_inner": { "$ref": "#/definitions/param.kaleido_inner" },
+            "bloom_amount": { "$ref": "#/definitions/param.bloom_amount" },
+            "bloom_threshold": { "$ref": "#/definitions/param.bloom_threshold" },
+            "bloom_radius": { "$ref": "#/definitions/param.bloom_radius" },
+            "occlude": { "$ref": "#/definitions/param.occlude" },
+            "exposure": { "$ref": "#/definitions/param.exposure" },
+            "ink_amount": { "$ref": "#/definitions/param.ink_amount" },
+            "paper_hue": { "$ref": "#/definitions/param.paper_hue" },
+            "paper_sat": { "$ref": "#/definitions/param.paper_sat" },
+            "paper_bright": { "$ref": "#/definitions/param.paper_bright" },
+            "ink_hue": { "$ref": "#/definitions/param.ink_hue" },
+            "ink_sat": { "$ref": "#/definitions/param.ink_sat" },
+            "ink_bright": { "$ref": "#/definitions/param.ink_bright" },
+            "ink_gamma": { "$ref": "#/definitions/param.ink_gamma" }
+          } } } }
+    },
+    {
+      "if": { "required": ["system"], "properties": { "system": { "const": "voxel" } } },
+      "then": { "properties": { "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "step_rate": { "$ref": "#/definitions/param.step_rate.voxel" },
+            "density": { "$ref": "#/definitions/param.density.voxel" },
+            "trail": { "$ref": "#/definitions/param.trail.voxel" },
+            "age_tint": { "$ref": "#/definitions/param.age_tint.voxel" },
+            "hue": { "$ref": "#/definitions/param.hue.fragment_field" },
+            "hue_spread": { "$ref": "#/definitions/param.hue_spread.voxel" },
+            "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
+            "yaw": { "$ref": "#/definitions/param.yaw.plexus" },
+            "pitch": { "$ref": "#/definitions/param.pitch.plexus" },
+            "distance": { "$ref": "#/definitions/param.distance.plexus" },
+            "fov": { "$ref": "#/definitions/param.fov.plexus" },
+            "focus": { "$ref": "#/definitions/param.focus.voxel" },
+            "aperture": { "$ref": "#/definitions/param.aperture.voxel" },
+            "fog": { "$ref": "#/definitions/param.fog.voxel" },
+            "saturation": { "$ref": "#/definitions/param.saturation" },
+            "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
+            "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
             "zoom": { "$ref": "#/definitions/param.zoom.swarm" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
@@ -1921,7 +2002,7 @@
             "size_hierarchy": { "$ref": "#/definitions/param.size_hierarchy" },
             "angle_bias": { "$ref": "#/definitions/param.angle_bias" },
             "roster": { "$ref": "#/definitions/param.roster" },
-            "density": { "$ref": "#/definitions/param.density" },
+            "density": { "$ref": "#/definitions/param.density.shape_collage" },
             "drift": { "$ref": "#/definitions/param.drift.shape_collage" },
             "spin": { "$ref": "#/definitions/param.spin.shape_collage" },
             "recompose": { "$ref": "#/definitions/param.recompose" },
@@ -1988,10 +2069,10 @@
             "survive_hi": { "$ref": "#/definitions/param.survive_hi" },
             "states": { "$ref": "#/definitions/param.states" },
             "threshold": { "$ref": "#/definitions/param.threshold" },
-            "step_rate": { "$ref": "#/definitions/param.step_rate" },
+            "step_rate": { "$ref": "#/definitions/param.step_rate.cellular" },
             "reseed": { "$ref": "#/definitions/param.reseed.cellular" },
-            "trail": { "$ref": "#/definitions/param.trail" },
-            "age_tint": { "$ref": "#/definitions/param.age_tint" },
+            "trail": { "$ref": "#/definitions/param.trail.cellular" },
+            "age_tint": { "$ref": "#/definitions/param.age_tint.cellular" },
             "route": { "$ref": "#/definitions/param.route" },
             "route_coord": { "$ref": "#/definitions/param.route_coord" },
             "route_grade": { "$ref": "#/definitions/param.route_grade" },
@@ -2072,6 +2153,34 @@
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" }
           } } } } } }
+    },
+    {
+      "if": { "required": ["layer"], "properties": { "layer": { "required": ["system"], "properties": { "system": { "const": "voxel" } } } } },
+      "then": { "properties": { "layer": { "properties": { "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "step_rate": { "$ref": "#/definitions/param.step_rate.voxel" },
+            "density": { "$ref": "#/definitions/param.density.voxel" },
+            "trail": { "$ref": "#/definitions/param.trail.voxel" },
+            "age_tint": { "$ref": "#/definitions/param.age_tint.voxel" },
+            "hue": { "$ref": "#/definitions/param.hue.fragment_field" },
+            "hue_spread": { "$ref": "#/definitions/param.hue_spread.voxel" },
+            "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
+            "yaw": { "$ref": "#/definitions/param.yaw.plexus" },
+            "pitch": { "$ref": "#/definitions/param.pitch.plexus" },
+            "distance": { "$ref": "#/definitions/param.distance.plexus" },
+            "fov": { "$ref": "#/definitions/param.fov.plexus" },
+            "focus": { "$ref": "#/definitions/param.focus.voxel" },
+            "aperture": { "$ref": "#/definitions/param.aperture.voxel" },
+            "fog": { "$ref": "#/definitions/param.fog.voxel" },
+            "saturation": { "$ref": "#/definitions/param.saturation" },
+            "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
+            "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
+            "zoom": { "$ref": "#/definitions/param.zoom.swarm" },
+            "pan_x": { "$ref": "#/definitions/param.pan_x" },
+            "pan_y": { "$ref": "#/definitions/param.pan_y" }
+          } } } } } }
     }
   ],
   "definitions": {
@@ -2082,7 +2191,7 @@
       "properties": {
         "system": {
           "type": "string",
-          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus", "waterfall"],
+          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus", "waterfall", "voxel"],
           "description": "Which built-in scene the layer draws. Required."
         },
         "join": {
@@ -2174,6 +2283,10 @@
         "waterfall": {
           "$ref": "#/definitions/waterfall",
           "description": "The layer's waterfall bands, rows and push period."
+        },
+        "voxel": {
+          "$ref": "#/definitions/voxel",
+          "description": "The layer's voxel grid, rules, seed and edges."
         }
       }
     },
@@ -2504,6 +2617,40 @@
           ],
           "description": "Per-band easing in seconds, in the [smoothing] table's own vocabulary.",
           "markdownDescription": "Per-band easing in seconds, in the [smoothing] table's own vocabulary.\n\nDefault `0`."
+        }
+      }
+    },
+    "voxel": {
+      "description": "The voxel automaton's grid, the rules it runs, the ball it is seeded with, and whether its faces wrap.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "grid": {
+          "type": "integer",
+          "description": "Cells per side of the cube. A content value, not a resolution: doubling it halves how large every structure looks. The quality tier may run fewer, and says so.",
+          "markdownDescription": "Cells per side of the cube. A content value, not a resolution: doubling it halves how large every structure looks. The quality tier may run fewer, and says so.\n\nDefault `64`."
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["445", "clouds"]
+          },
+          "description": "The rules the structural rule parameter picks among, by index.",
+          "markdownDescription": "The rules the structural rule parameter picks among, by index.\n\nDefault `[\"clouds\"]`."
+        },
+        "seed_radius": {
+          "type": "number",
+          "description": "The radius of the ball of cells the volume is seeded with, as a fraction of the cube's half-side; absent, the first rule's own."
+        },
+        "seed_fill": {
+          "type": "number",
+          "description": "The chance each cell inside the seeded ball starts live; absent, the first rule's own."
+        },
+        "wrap": {
+          "type": "boolean",
+          "description": "Whether the cube is a torus; false makes every cell past a face dead.",
+          "markdownDescription": "Whether the cube is a torus; false makes every cell past a face dead.\n\nDefault `false`."
         }
       }
     },
@@ -3797,7 +3944,7 @@
       "description": "Picks which set of shapes the elements are drawn from.",
       "markdownDescription": "Picks which set of shapes the elements are drawn from.\n\n- default `0.0`\n- typical range `0.0` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
     },
-    "param.density": {
+    "param.density.shape_collage": {
       "type": "string",
       "description": "How much of the frame the arrangement fills.",
       "markdownDescription": "How much of the frame the arrangement fills.\n\n- default `1.0`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
@@ -3977,7 +4124,7 @@
       "description": "How many of its eight neighbours must already hold the next colour before a cell advances to it.",
       "markdownDescription": "How many of its eight neighbours must already hold the next colour before a cell advances to it.\n\n- default `3.0`\n- typical range depends on the family: `cyclic` `1.0` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `larger_than_life` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
-    "param.step_rate": {
+    "param.step_rate.cellular": {
       "type": "string",
       "description": "How many generations the automaton runs per second, whatever the frame rate; 0 freezes it.",
       "markdownDescription": "How many generations the automaton runs per second, whatever the frame rate; 0 freezes it.\n\n- default `10.0`\n- typical range `0.0` to `60.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
@@ -3987,12 +4134,12 @@
       "description": "A rise past 0.5 refills one disc of the grid with fresh seeded cells, once per rise; bind a beat or a latch to it.",
       "markdownDescription": "A rise past 0.5 refills one disc of the grid with fresh seeded cells, once per rise; bind a beat or a latch to it.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.trail": {
+    "param.trail.cellular": {
       "type": "string",
       "description": "How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells.",
       "markdownDescription": "How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells.\n\n- default `12.0`\n- typical range depends on the family: `life_like` `0.0` to `64.0`, `larger_than_life` `0.0` to `64.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.age_tint": {
+    "param.age_tint.cellular": {
       "type": "string",
       "description": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.",
       "markdownDescription": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.\n\n- default `0.35`\n- typical range depends on the family: `life_like` `0.0` to `1.0`, `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
@@ -4126,6 +4273,46 @@
       "type": "string",
       "description": "Raises the camera above the scene's volume, in radians; negative looks up from below.",
       "markdownDescription": "Raises the camera above the scene's volume, in radians; negative looks up from below.\n\n- default `0.35`\n- typical range `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.step_rate.voxel": {
+      "type": "string",
+      "description": "How many generations the automaton runs per second, whatever the frame rate; 0 freezes it.",
+      "markdownDescription": "How many generations the automaton runs per second, whatever the frame rate; 0 freezes it.\n\n- default `8.0`\n- typical range `0.0` to `30.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.density.voxel": {
+      "type": "string",
+      "description": "How strongly the volume absorbs the light behind it, per unit of the cube's width; 0 is pure additive glow with no front or back.",
+      "markdownDescription": "How strongly the volume absorbs the light behind it, per unit of the cube's width; 0 is pure additive glow with no front or back.\n\n- default `1.0`\n- typical range `0.0` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.trail.voxel": {
+      "type": "string",
+      "description": "How much of its light a decaying cell keeps at each stage of its decay; 0 draws only the live cells.",
+      "markdownDescription": "How much of its light a decaying cell keeps at each stage of its decay; 0 draws only the live cells.\n\n- default `0.6`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.age_tint.voxel": {
+      "type": "string",
+      "description": "How far along the palette a cell's colour travels as it ages; a decaying cell takes the far end.",
+      "markdownDescription": "How far along the palette a cell's colour travels as it ages; a decaying cell takes the far end.\n\n- default `0.3`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.hue_spread.voxel": {
+      "type": "string",
+      "description": "How far along the palette the colour travels from the cube's centre to its corners.",
+      "markdownDescription": "How far along the palette the colour travels from the cube's centre to its corners.\n\n- default `0.3`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.focus.voxel": {
+      "type": "string",
+      "description": "Inert on voxel: depth of field blurs each drawn primitive, and the march draws none.",
+      "markdownDescription": "Inert on voxel: depth of field blurs each drawn primitive, and the march draws none.\n\n- default `0.5`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.aperture.voxel": {
+      "type": "string",
+      "description": "Inert on voxel: depth of field blurs each drawn primitive, and the march draws none.",
+      "markdownDescription": "Inert on voxel: depth of field blurs each drawn primitive, and the march draws none.\n\n- default `0.0`\n- typical range `0.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.fog.voxel": {
+      "type": "string",
+      "description": "Fades the volume toward black with depth: at 1 the cube's farthest point is black and its nearest keeps its light. 0 is off.",
+      "markdownDescription": "Fades the volume toward black with depth: at 1 the cube's farthest point is black and its nearest keeps its light. 0 is off.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.bg_hue": {
       "type": "string",

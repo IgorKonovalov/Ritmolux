@@ -319,6 +319,12 @@ fn hot_path_modules_carry_the_panic_pragma() {
             .any(|f| f.ends_with(Path::new("scenes").join("lines").join("waterfall.rs"))),
         "the scan no longer reaches `render/scenes/lines/waterfall.rs`"
     );
+    assert!(
+        files
+            .iter()
+            .any(|f| f.ends_with(Path::new("scenes").join("voxel").join("mod.rs"))),
+        "the scan no longer reaches `render/scenes/voxel/`"
+    );
 
     for file in &files {
         let text = std::fs::read_to_string(file)

@@ -103,6 +103,8 @@ pub enum Roster {
     Turtle,
     /// `[generator] growth`.
     Growth,
+    /// `[voxel] rules` — the named rules.
+    VoxelRule,
 }
 
 impl Roster {
@@ -143,6 +145,10 @@ impl Roster {
             Roster::Growth => crate::render::scenes::lines::lsystem::Growth::ALL
                 .iter()
                 .map(|g| g.as_str())
+                .collect(),
+            Roster::VoxelRule => crate::render::scenes::voxel::RosterRule::ALL
+                .iter()
+                .map(|r| r.as_str())
                 .collect(),
         }
     }
@@ -262,6 +268,7 @@ pub const TABLES: &[&TableDesc] = &[
     &super::raw::CELLULAR,
     &super::raw::PLEXUS,
     &super::raw::WATERFALL,
+    &super::raw::VOXEL,
     &super::raw::MILK,
     &super::raw::MILK_ELEMENT,
     &super::raw::FEEDBACK,

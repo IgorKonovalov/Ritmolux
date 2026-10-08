@@ -204,17 +204,8 @@ pub const MAX_RULE: f32 = 511.0;
 /// than an author.
 pub const MAX_STEP_RATE: f32 = 240.0;
 
-/// The most generations one frame encodes. A stall would otherwise queue
-/// unbounded passes (the accumulator spiral ADR-0012 names); past this the
-/// backlog is dropped and the automaton briefly slows rather than racing. At
-/// 30 fps it still carries 240 generations a second.
-pub const MAX_GENERATIONS_PER_FRAME: u32 = 8;
-
-/// How far below a whole generation the clock still counts one. `dt` arrives as
-/// an `f32`, and `1/144` summed 144 times lands a few ulps either side of 1;
-/// without this slack a rate that should run 12 generations in a second runs
-/// 11 at one refresh rate and 12 at another.
-const WHOLE_SLACK: f64 = 1e-6;
+pub use common::MAX_GENERATIONS_PER_FRAME;
+use common::WHOLE_SLACK;
 
 /// `reseed` rises past this to refill one disc — edge-triggered, so a value held
 /// high refills once, not once per frame.
@@ -430,36 +421,22 @@ pub(crate) fn interval_counts(lo: f32, hi: f32, radius: u32, fallback: [f32; 2])
     [first as u32, last as u32]
 }
 
-/// Integrates a generation rate over injected `dt` into whole generations.
-///
-/// **No clock**: `dt` is handed in, as every accumulator in this engine takes
-/// it, so a capture stepping a fixed `dt` sequence is reproducible. The sum is
-/// `f64`, because a rate times an `f32` `dt` summed over minutes loses the
-/// fraction that decides whether a generation is owed.
+/// The shared [`common::GenerationClock`], fed this system's applied
+/// `step_rate`: a bound value is clamped into `0..=`[`MAX_STEP_RATE`], and a
+/// non-finite one runs the declared default.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub(crate) struct GenerationClock {
-    /// Generations owed and not yet run, in `[0, 1)` between calls.
-    owed: f64,
-}
+pub(crate) struct GenerationClock(common::GenerationClock);
 
 impl GenerationClock {
-    /// Add `dt` seconds at `rate` generations per second and return how many
-    /// whole generations to run now, at most [`MAX_GENERATIONS_PER_FRAME`].
-    /// The fraction carries; a backlog past the cap is dropped rather than
-    /// carried, so the automaton slows instead of racing to catch up.
-    ///
-    /// `dt` is trusted: the renderer entry that took the frame has already
-    /// replaced a degenerate delta with one nominal step (ADR-0191).
+    /// Add `dt` seconds at the bound `rate` and return how many whole
+    /// generations to run now — see [`common::GenerationClock::advance`].
     pub(crate) fn advance(&mut self, rate: f32, dt: f32) -> u32 {
-        self.owed += f64::from(applied_step_rate(rate)) * f64::from(dt);
-        let whole = (self.owed + WHOLE_SLACK).floor();
-        let cap = f64::from(MAX_GENERATIONS_PER_FRAME);
-        if whole > cap {
-            self.owed = 0.0;
-            return MAX_GENERATIONS_PER_FRAME;
-        }
-        self.owed = (self.owed - whole).max(0.0);
-        whole as u32
+        self.0.advance(applied_step_rate(rate), dt)
+    }
+
+    /// Generations owed and not yet run, in `[0, 1)` between calls.
+    fn owed(&self) -> f64 {
+        self.0.owed
     }
 }
 
@@ -1082,11 +1059,12 @@ impl StepPass {
     /// hash, the shared block and the body. Built at construction only.
     fn source(self) -> String {
         format!(
-            "const MODE: u32 = {}u;\nconst AGE_CAP: f32 = {:?};\n{}{}{}{}",
+            "const MODE: u32 = {}u;\nconst AGE_CAP: f32 = {:?};\n{}{}{}{}{}",
             self.mode(),
             AGE_CAP,
             radius_const(),
             gpu::HASH_WGSL,
+            common::CELL_HASH_WGSL,
             shader::STEP_COMMON,
             shader::STEP_SHADER
         )
@@ -1471,7 +1449,7 @@ impl Scene for CellularScene {
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {
-        let owed_before = self.clock.owed;
+        let owed_before = self.clock.owed();
         self.pending_generations = self.clock.advance(self.step_rate, self.dt);
         self.generation_ticks = route::Ticks {
             owed_before,

@@ -191,6 +191,15 @@ include = [
 schema.path = "presets/schema/waterfall.schema.json"
 
 [[rule]]
+name = "ritmolux-voxel"
+include = [
+  "/**/presets/voxel_*.toml",
+  "/**/presets/proposed/voxel_*.toml",
+  "/**/presets/pending/voxel_*.toml",
+]
+schema.path = "presets/schema/voxel.schema.json"
+
+[[rule]]
 name = "ritmolux-preset"
 include = [
   "/**/presets/*.toml",
@@ -247,5 +256,8 @@ exclude = [
   "/**/presets/waterfall_*.toml",
   "/**/presets/proposed/waterfall_*.toml",
   "/**/presets/pending/waterfall_*.toml",
+  "/**/presets/voxel_*.toml",
+  "/**/presets/proposed/voxel_*.toml",
+  "/**/presets/pending/voxel_*.toml",
 ]
 schema.path = "presets/preset.schema.json"

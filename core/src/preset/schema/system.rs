@@ -61,6 +61,11 @@ pub enum SystemKind {
     /// keeps a history of rows and draws through a renderer of its own
     /// (ADR-0180 rule 1).
     Waterfall,
+    /// A 3D cellular automaton in a cube of cells, marched as an emitting,
+    /// absorbing volume through the shared perspective camera (ADR-0268). Its
+    /// own system rather than a `cellular` family, because its state, its pass
+    /// and half its parameters are its own (ADR-0180 rule 1).
+    Voxel,
 }
 
 /// **The** roster of built-in systems: every variant, its canonical name, its
@@ -176,6 +181,7 @@ const TABLE: [(SystemKind, &str, &str, &[ParamSpec]); SystemKind::VARIANT_COUNT]
             "waterfall",
             scenes::lines::waterfall::PARAMS,
         ),
+        (SystemKind::Voxel, "voxel", "voxel", scenes::voxel::PARAMS),
     ]
 };
 
@@ -263,7 +269,7 @@ impl SystemKind {
     /// typed off this count, so bumping the count without adding a row does not
     /// compile either. Both are module-private, so this names them rather than
     /// linking them.
-    pub const VARIANT_COUNT: usize = 16;
+    pub const VARIANT_COUNT: usize = 17;
 
     /// This variant's index into [`TABLE`].
     ///
@@ -289,6 +295,7 @@ impl SystemKind {
             SystemKind::Cellular => 13,
             SystemKind::Plexus => 14,
             SystemKind::Waterfall => 15,
+            SystemKind::Voxel => 16,
         }
     }
 

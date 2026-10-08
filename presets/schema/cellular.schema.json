@@ -32,10 +32,10 @@
         "survive_hi": { "$ref": "#/definitions/param.survive_hi" },
         "states": { "$ref": "#/definitions/param.states" },
         "threshold": { "$ref": "#/definitions/param.threshold" },
-        "step_rate": { "$ref": "#/definitions/param.step_rate" },
+        "step_rate": { "$ref": "#/definitions/param.step_rate.cellular" },
         "reseed": { "$ref": "#/definitions/param.reseed.cellular" },
-        "trail": { "$ref": "#/definitions/param.trail" },
-        "age_tint": { "$ref": "#/definitions/param.age_tint" },
+        "trail": { "$ref": "#/definitions/param.trail.cellular" },
+        "age_tint": { "$ref": "#/definitions/param.age_tint.cellular" },
         "route": { "$ref": "#/definitions/param.route" },
         "route_coord": { "$ref": "#/definitions/param.route_coord" },
         "route_grade": { "$ref": "#/definitions/param.route_grade" },
@@ -177,6 +177,10 @@
       "$ref": "#/definitions/waterfall",
       "description": "How many bands and rows the waterfall landscape holds, and how often a row is pushed."
     },
+    "voxel": {
+      "$ref": "#/definitions/voxel",
+      "description": "The voxel automaton's grid, rules, seed and edges."
+    },
     "milk": {
       "$ref": "#/definitions/milk",
       "description": "A converted MilkDrop preset's compiled programs and shaders."
@@ -210,7 +214,7 @@
       "properties": {
         "system": {
           "type": "string",
-          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus", "waterfall"],
+          "enum": ["fragment_field", "swarm", "parametric_curve", "lsystem", "star_pattern", "reaction_diffusion", "attractor", "spectrum", "emitter", "shape_field", "warp_mesh", "shape_collage", "analytic_field", "cellular", "plexus", "waterfall", "voxel"],
           "description": "Which built-in scene the layer draws. Required."
         },
         "join": {
@@ -302,6 +306,10 @@
         "waterfall": {
           "$ref": "#/definitions/waterfall",
           "description": "The layer's waterfall bands, rows and push period."
+        },
+        "voxel": {
+          "$ref": "#/definitions/voxel",
+          "description": "The layer's voxel grid, rules, seed and edges."
         }
       }
     },
@@ -635,6 +643,40 @@
         }
       }
     },
+    "voxel": {
+      "description": "The voxel automaton's grid, the rules it runs, the ball it is seeded with, and whether its faces wrap.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "grid": {
+          "type": "integer",
+          "description": "Cells per side of the cube. A content value, not a resolution: doubling it halves how large every structure looks. The quality tier may run fewer, and says so.",
+          "markdownDescription": "Cells per side of the cube. A content value, not a resolution: doubling it halves how large every structure looks. The quality tier may run fewer, and says so.\n\nDefault `64`."
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["445", "clouds"]
+          },
+          "description": "The rules the structural rule parameter picks among, by index.",
+          "markdownDescription": "The rules the structural rule parameter picks among, by index.\n\nDefault `[\"clouds\"]`."
+        },
+        "seed_radius": {
+          "type": "number",
+          "description": "The radius of the ball of cells the volume is seeded with, as a fraction of the cube's half-side; absent, the first rule's own."
+        },
+        "seed_fill": {
+          "type": "number",
+          "description": "The chance each cell inside the seeded ball starts live; absent, the first rule's own."
+        },
+        "wrap": {
+          "type": "boolean",
+          "description": "Whether the cube is a torus; false makes every cell past a face dead.",
+          "markdownDescription": "Whether the cube is a torus; false makes every cell past a face dead.\n\nDefault `false`."
+        }
+      }
+    },
     "milk": {
       "description": "A converted MilkDrop preset's compiled programs, its two shaders, and the frame-level choices that ride with them. Produced by the converter, not hand-authored.",
       "type": "object",
@@ -900,7 +942,7 @@
       "description": "How many of its eight neighbours must already hold the next colour before a cell advances to it.",
       "markdownDescription": "How many of its eight neighbours must already hold the next colour before a cell advances to it.\n\n- default `3.0`\n- typical range depends on the family: `cyclic` `1.0` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `larger_than_life` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
-    "param.step_rate": {
+    "param.step_rate.cellular": {
       "type": "string",
       "description": "How many generations the automaton runs per second, whatever the frame rate; 0 freezes it.",
       "markdownDescription": "How many generations the automaton runs per second, whatever the frame rate; 0 freezes it.\n\n- default `10.0`\n- typical range `0.0` to `60.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
@@ -910,12 +952,12 @@
       "description": "A rise past 0.5 refills one disc of the grid with fresh seeded cells, once per rise; bind a beat or a latch to it.",
       "markdownDescription": "A rise past 0.5 refills one disc of the grid with fresh seeded cells, once per rise; bind a beat or a latch to it.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.trail": {
+    "param.trail.cellular": {
       "type": "string",
       "description": "How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells.",
       "markdownDescription": "How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells.\n\n- default `12.0`\n- typical range depends on the family: `life_like` `0.0` to `64.0`, `larger_than_life` `0.0` to `64.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
-    "param.age_tint": {
+    "param.age_tint.cellular": {
       "type": "string",
       "description": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.",
       "markdownDescription": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.\n\n- default `0.35`\n- typical range depends on the family: `life_like` `0.0` to `1.0`, `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
