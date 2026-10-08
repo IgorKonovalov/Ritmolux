@@ -1,0 +1,34 @@
+# GATE FIXTURE - the voxel system's stand-in in the sanity, animation and
+# reactivity gates while the system ships no preset; do not tune to pass.
+#
+# Every lever the music reaches, through a fixed camera:
+#
+#  - `coral`, a slowly churning reef, with `pyroclastic` on alternate bars, so
+#    the automaton moves under constant input and the rule moves with the bar.
+#  - An onset refills a ball.
+#  - Eight shells lit by the spectrum, bass at the centre.
+#  - No camera binding reads `time`, so whatever the silent reading of the
+#    animation gate sees is the automaton's own motion.
+system = "voxel"
+name   = "fixture_voxel_gates"
+
+[generator]
+seed = 5
+
+[voxel]
+grid   = 32
+rules  = ["coral", "pyroclastic"]
+shells = 8
+
+[params]
+rule       = "mod(bar_index, 2)"
+step_rate  = "12"
+reseed     = "onset"
+shell_gain = "1.5"
+density    = "1.0"
+brightness = "1.0"
+yaw        = "0.6"
+pitch      = "0.4"
+
+[hold]
+rule = "bar"

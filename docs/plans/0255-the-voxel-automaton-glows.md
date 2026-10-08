@@ -289,8 +289,8 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 |---|---|---|---|
 | 1 — Walking skeleton: one rule grows in a turning cube | dev | done | 9269dd99 |
 | 2 — The rules and the music | dev | done | 627473a3 |
-| 3 — Cost: bricks, the march target and the tier caps | dev | done | committed with this row |
-| 4 — The golden and the gates | dev | not started | |
+| 3 — Cost: bricks, the march target and the tier caps | dev | done | e39942ab |
+| 4 — The golden and the gates | dev | done | committed with this row |
 | 5 — Documentation and the references | dev | not started | |
 | 6 — The look, judged | human | not started | |
 
@@ -349,6 +349,18 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 - The march target goes through `grid::grid_size`, whose 256-texel axis floor makes the golden's
   128x128 capture march at 256x256. The `voxel` baseline moved to mean 0.0008 / outlier 41, inside
   tolerance, and was not re-blessed in Phase 3.
+- Phase 4 re-blessed `voxel.png` (`RLX_BLESS=voxel`) on the march as it now stands; its fixture
+  changed only by writing `shells = 0` out and describing its 8 generations.
+- Phase 4 gates: the system ships no preset, the teaching preset binds no band and the golden keeps
+  its shells off, so a new gate fixture, `core/tests/fixtures/voxel_gates.toml`, stands in through
+  one dedicated test in each of `sanity`, `animation` and `reactivity`. `distinctness_voxel`, in its
+  roster since Phase 1, reports that the family ships no preset.
+- `animation` passes the gate fixture on the **silent** branch: silent 0.1611, driven 0.1719
+  (fixed camera, so the motion is the automaton's). `reactivity`: bass 0.0473, mid 0.0074, treb
+  0.0000, onset 0.0127. `sanity`: coverage 0.1557 against the 0.02 guessed floor, 4 quadrants,
+  flatness 0.3164, boundary 0.0962.
+- The 600-frame determinism test reads every frame, not the state textures, as the cellular suite
+  does.
 
 ### Close triggers
 

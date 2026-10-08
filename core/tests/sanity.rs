@@ -952,6 +952,53 @@ fn draws_a_real_shape(family: &str) {
 // `core/build.rs` (ADR-0157).
 include!(concat!(env!("OUT_DIR"), "/sanity_shape_tests.rs"));
 
+/// **The voxel system draws a real shape** (Plan 0255 Phase 4). The system
+/// ships no preset yet, so the family sweep above has nothing of it to
+/// render; its gate fixture is held here to the checks a shipped preset is —
+/// coverage over the system's floor or structurally present, spread over the
+/// quadrants, and not a blot — under the same loud frame.
+#[test]
+fn the_voxel_gate_fixture_draws_a_real_shape() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let preset = without_backdrop(
+        Preset::from_toml_str(include_str!("fixtures/voxel_gates.toml"))
+            .unwrap_or_else(|e| panic!("the voxel gate fixture parses: {e}")),
+    );
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+    let img = renderer
+        .capture_preset(&name, &loud(), FRAMES)
+        .expect("capture the voxel gate fixture");
+    let bg = ground(&img);
+    let cov = coverage(&img, bg, EPS);
+    let spread = quadrant_spread(&img, bg, EPS);
+    let flat = tonal_flatness(&img, bg, EPS);
+    let boundary = assigned_boundary_density(&img, EPS, MODAL_FIGURE_CUT);
+    let shells = radial_shell_occupancy(&img, bg, EPS);
+    let floor = coverage_floor(SystemKind::Voxel);
+    let b_floor = boundary_floor(SystemKind::Voxel);
+    println!(
+        "[voxel] {name} coverage={cov:.4} (floor {floor:.2}) quadrants={spread} \
+         flatness={flat:.4} (max {MAX_TONAL_FLATNESS:.2}) boundary={boundary:.4} \
+         (floor {b_floor:.2}) shells={shells}/{RADIAL_SHELLS}"
+    );
+    assert!(
+        cov >= floor || shells >= MIN_STRUCTURAL_SHELLS,
+        "the voxel gate fixture is blank: coverage {cov:.4} < {floor:.2} and only \
+         {shells}/{RADIAL_SHELLS} radial shells occupied"
+    );
+    assert!(
+        spread >= MIN_QUADRANTS,
+        "the voxel gate fixture is a dot: {spread} quadrant(s) < {MIN_QUADRANTS}"
+    );
+    assert!(
+        !(flat > MAX_TONAL_FLATNESS && boundary < b_floor),
+        "the voxel gate fixture is a blot: flatness {flat:.4} and boundary {boundary:.4}"
+    );
+}
+
 /// Print each system's coverage distribution against its floor, lowest first,
 /// with the factor between the floor and that system's lowest preset — and
 /// return a failure for every floor that factor has left behind.

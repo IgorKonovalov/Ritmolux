@@ -1,6 +1,6 @@
 //! The voxel system through the whole renderer: the rule list a preset loads,
-//! the rule index held on the bar, and the shells as an exact identity at zero
-//! gain.
+//! the rule index held on the bar, a long run's determinism, and the shells as
+//! an exact identity at zero gain.
 //!
 //! # Why the pictures stand for the volume
 //!
@@ -125,6 +125,81 @@ fn a_rule_held_on_the_bar_changes_only_at_bar_edges() {
     assert_eq!(
         first_divergence, None,
         "two runs from one seed and one stimulus diverged"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Determinism
+// ---------------------------------------------------------------------------
+
+/// Frames the determinism run drives: ten seconds at the capture's 1/60 s.
+const LONG_RUN: usize = 600;
+
+/// A stimulus that moves every lever the gate fixture reads: an onset every 37
+/// frames, which refills a ball; a bar every 120, which shifts the rule; and a
+/// spectrum that walks, which lights the shells.
+fn stimulus() -> Vec<AnalysisFrame> {
+    (0..LONG_RUN)
+        .map(|i| {
+            let mut frame = AnalysisFrame {
+                onset: if i % 37 == 0 { 1.0 } else { 0.0 },
+                bar_index: (i / 120) as u32,
+                ..AnalysisFrame::default()
+            };
+            for (k, bin) in frame.spectrum.iter_mut().enumerate() {
+                *bin = ((i * 7 + k * 13) % 100) as f32 / 100.0;
+            }
+            frame
+        })
+        .collect()
+}
+
+/// **The same seed and analysis frames give the same volume after 600
+/// frames**: every frame of two runs of the gate fixture on two renderers is
+/// byte-identical, reseeds, rule shifts and shells included. The controls: a
+/// different seed diverges, and so does the same seed with one onset moved, so
+/// the equality is the inputs' and not a volume that went blank.
+#[test]
+fn identical_inputs_yield_an_identical_volume_after_600_frames() {
+    let fixture = include_str!("../fixtures/voxel_gates.toml");
+    let frames = stimulus();
+    let Some(one) = run(fixture, &frames) else {
+        return;
+    };
+    let Some(two) = run(fixture, &frames) else {
+        return;
+    };
+    let first_divergence = one.iter().zip(&two).position(|(a, b)| a.rgba != b.rgba);
+    assert_eq!(
+        first_divergence, None,
+        "two runs from one seed and one stimulus diverged"
+    );
+    let last = one.last().expect("frames were captured");
+    let lit = last
+        .rgba
+        .chunks_exact(4)
+        .filter(|p| p[..3] != [0, 0, 0])
+        .count();
+    println!("{lit} of 4096 pixels lit at frame {LONG_RUN}");
+    assert!(lit > 40, "the volume is nearly blank ({lit} lit)");
+
+    let reseeded = fixture.replace("seed = 5", "seed = 6");
+    assert_ne!(reseeded, fixture, "the fixture's seed line was not found");
+    let Some(other_seed) = run(&reseeded, &frames) else {
+        return;
+    };
+    assert!(
+        other_seed.last().map(|i| &i.rgba) != Some(&last.rgba),
+        "a different seed reached the same volume"
+    );
+    let mut nudged = frames.clone();
+    nudged[300].onset = 1.0;
+    let Some(moved_onset) = run(fixture, &nudged) else {
+        return;
+    };
+    assert!(
+        moved_onset.last().map(|i| &i.rgba) != Some(&last.rgba),
+        "one more onset changed nothing, so the stimulus is not reaching the volume"
     );
 }
 

@@ -616,6 +616,40 @@ fn the_waterfall_passes_on_the_driven_branch_once_its_ring_is_full() {
     );
 }
 
+/// **The voxel system moves on its own clock** (Plan 0255 Phase 4). The system
+/// ships no preset yet, so its gate fixture stands in for it here, held to both
+/// floors as a shipped preset is. An automaton evolves under constant input,
+/// and the fixture's camera reads no clock, so the silent branch is the
+/// automaton's own motion — and it is the branch that carries the pass.
+#[test]
+fn the_voxel_gate_fixture_moves_on_the_silent_branch() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let preset = without_backdrop(
+        Preset::from_toml_str(include_str!("fixtures/voxel_gates.toml"))
+            .unwrap_or_else(|e| panic!("the voxel gate fixture parses: {e}")),
+    );
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+    let m = motions(&mut renderer, &name);
+    println!(
+        "{name:<24} silent {:.4}  driven {:.4}  -> {:<6} (whole-frame {:.4})",
+        m.silent,
+        m.driven,
+        m.branch().unwrap_or("FROZEN"),
+        m.whole,
+    );
+    assert_eq!(
+        m.branch(),
+        Some("silent"),
+        "the voxel gate fixture does not pass on its own motion (silent {:.4} against \
+         {ANIM_FLOOR}, driven {:.4} against {DRIVEN_FLOOR})",
+        m.silent,
+        m.driven,
+    );
+}
+
 // ---------------------------------------------------------------------------
 // The resolution ladder (Plan 0067 Phase 1d) — a measurement, not a gate
 // ---------------------------------------------------------------------------
