@@ -204,12 +204,12 @@ flowchart LR
   - `docs/preset-guide.md` gets one picture.
   - `docs/configuration.md` names no new key, because no user setting is added.
   - `docs/on-device-validation.md` gains the system.
-  - The preset-author reference gains a `## voxel` section (ADR-0234) with working ranges for
-    `density`, `step_rate`, `shell_gain` and `reseed_radius`, and which roster rules suit a
-    rule-shift on the bar.
+  - The log carries the text for a new `## voxel` section of the preset-author reference (ADR-0234),
+    for the owner to apply in Phase 7: working ranges for `density`, `step_rate`, `shell_gain` and
+    `reseed_radius`, and which roster rules suit a rule-shift on the bar. A headless session cannot
+    edit `.claude/` (ADR-0210).
 - **Files touched:** `docs/presets.md`, `presets/README.md`, `presets/schema/`, `.taplo.toml`,
-  `docs/preset-guide.md`, `docs/images/`, `docs/on-device-validation.md`,
-  `.claude/skills/preset-author/references/systems.md`.
+  `docs/preset-guide.md`, `docs/images/`, `docs/on-device-validation.md`.
 - **Done when:**
   - `cargo nextest run -p rlx-core --test suite preset_schema::` passes with no update variable set.
   - `cargo nextest run -p rlx-core --test suite the_parameter_reference_block_is_current` passes.
@@ -227,6 +227,14 @@ flowchart LR
   Then they hand a brief to `preset-author`.
 - **Files touched:** none.
 - **Done when:** the owner records a keep, or a list of what is off, in this plan's log.
+
+### Phase 7 — The preset-author reference
+- **Owner skill:** human
+- **Blocks merge:** no
+- **What:** the owner applies, in an interactive session, the text Phase 5 left in the log to
+  `.claude/skills/preset-author/references/systems.md`'s `## voxel` section.
+- **Files touched:** `.claude/skills/preset-author/references/systems.md`.
+- **Done when:** the edit is committed on `main` and `node scripts/check-doc-links.mjs` exits 0.
 
 ## Data shapes
 
@@ -293,6 +301,7 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 | 4 — The golden and the gates | dev | done | committed with this row |
 | 5 — Documentation and the references | dev | not started | |
 | 6 — The look, judged | human | not started | |
+| 7 — The preset-author reference | human | not started | |
 
 ### Notes
 

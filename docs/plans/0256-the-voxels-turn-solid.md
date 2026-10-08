@@ -125,13 +125,13 @@ flowchart LR
     Negative).
   - The generated files are regenerated.
   - `docs/preset-guide.md` gets the solid picture.
-  - The preset-author `## voxel` section gains working ranges for `key`, `ambient` and `ao`, and the
-    note that bloom on a solid preset is a choice made through `brightness`.
+  - The log carries the text the preset-author `## voxel` section gains, for the owner to apply in
+    Phase 6: working ranges for `key`, `ambient` and `ao`, and the note that bloom on a solid preset
+    is a choice made through `brightness`. A headless session cannot edit `.claude/` (ADR-0210).
   - Backlog 0092 gains a dated bullet: ADR-0269 answers its bloom question for `voxel`, and its own
     ask (a matcap on the shape field) stays open.
 - **Files touched:** `docs/presets.md`, `presets/README.md`, `presets/schema/`, `.taplo.toml`,
-  `docs/preset-guide.md`, `docs/images/`, `docs/design-backlog.md`,
-  `.claude/skills/preset-author/references/systems.md`.
+  `docs/preset-guide.md`, `docs/images/`, `docs/design-backlog.md`.
 - **Done when:**
   - `cargo nextest run -p rlx-core --test suite preset_schema::` passes with no update variable set.
   - `cargo nextest run -p rlx-core --test suite the_parameter_reference_block_is_current` passes.
@@ -149,6 +149,14 @@ flowchart LR
   Then they hand a brief to `preset-author`.
 - **Files touched:** none.
 - **Done when:** the owner records a keep, or a list of what is off, in this plan's log.
+
+### Phase 6 — The preset-author reference
+- **Owner skill:** human
+- **Blocks merge:** no
+- **What:** the owner applies, in an interactive session, the text Phase 4 left in the log to
+  `.claude/skills/preset-author/references/systems.md`'s `## voxel` section.
+- **Files touched:** `.claude/skills/preset-author/references/systems.md`.
+- **Done when:** the edit is committed on `main` and `node scripts/check-doc-links.mjs` exits 0.
 
 ## Data shapes
 
@@ -192,6 +200,7 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
 | 3 — Cost, the golden and the gates | dev | not started | |
 | 4 — Documentation and the references | dev | not started | |
 | 5 — The look, judged | human | not started | |
+| 6 — The preset-author reference | human | not started | |
 
 ### Notes
 
