@@ -1,0 +1,24 @@
+# COST FIXTURE - a probe, not a baseline: `shot --report` reads its frame time.
+#
+# The cloudy middle of the voxel march's cost: `clouds` settling from a field
+# filling the cube to about 40 % live, at `density = 0.3`, so a ray crosses
+# many occupied cells before its transmittance runs out. `grid = 128`, so
+# `Floor` runs it at its own cap and says so, and `Rich` at 128³.
+system = "voxel"
+name   = "cost_cloudy"
+
+[generator]
+seed = 11
+
+[voxel]
+grid        = 128
+rules       = ["clouds"]
+seed_radius = 2.0
+seed_fill   = 0.55
+
+[params]
+step_rate = "8"
+density   = "0.3"
+yaw       = "0.6 + time * 0.1"
+pitch     = "0.4"
+distance  = "3.5"

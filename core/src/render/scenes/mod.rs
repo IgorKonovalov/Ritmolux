@@ -663,6 +663,12 @@ pub enum OverflowContext {
         /// Whether the figure walks in space, which names the cap that bit.
         space: bool,
     },
+    /// A `[voxel] grid` asked for past the tier's
+    /// [`voxel_grid`](crate::render::TierConfig::voxel_grid) — once, at preset
+    /// load, since the grid is structural. Carries what was asked. A clamp of
+    /// content: a structure is a fixed number of cells, so a smaller cube draws
+    /// every structure larger.
+    Voxels(u32),
 }
 
 impl std::fmt::Display for OverflowContext {
@@ -682,6 +688,7 @@ impl std::fmt::Display for OverflowContext {
             OverflowContext::Samples(asked) => write!(f, "samples {asked}"),
             OverflowContext::Rows(asked, _) => write!(f, "rows {asked}"),
             OverflowContext::Trail { asked, .. } => write!(f, "trail {asked}"),
+            OverflowContext::Voxels(asked) => write!(f, "grid {asked}"),
         }
     }
 }
@@ -783,6 +790,13 @@ impl std::fmt::Display for CapOverflow {
                  (ask for {} or fewer{pin})",
                 self.context, self.cap, self.cap, self.cap
             ),
+            OverflowContext::Voxels(_) => write!(
+                f,
+                "{} is past this quality tier's cap of {}; the automaton runs in a {}-cell \
+                 cube instead, so every structure draws larger than the preset asked \
+                 (ask for {} or fewer{pin})",
+                self.context, self.cap, self.cap, self.cap
+            ),
             OverflowContext::Mirror(_) | OverflowContext::Depth(_) => write!(
                 f,
                 "geometry exceeded the {}-segment cap at {} (dropped {} segment(s)); \
@@ -814,6 +828,7 @@ impl CapOverflow {
             OverflowContext::Samples(_) | OverflowContext::Rows(..) => rich.seg3d_segments as usize,
             OverflowContext::Trail { space: true, .. } => rich.seg3d_segments as usize,
             OverflowContext::Trail { space: false, .. } => rich.max_segments,
+            OverflowContext::Voxels(_) => rich.voxel_grid as usize,
         };
         self.cap < top
     }
@@ -882,6 +897,9 @@ impl std::fmt::Display for Recovered<'_> {
             }
             OverflowContext::Trail { .. } => {
                 write!(f, "the trail is back within this tier's cap of {cap}")
+            }
+            OverflowContext::Voxels(_) => {
+                write!(f, "the grid is back within this tier's cap of {cap}")
             }
         }
     }
@@ -1463,7 +1481,9 @@ fn create(
         SystemKind::Voxel => Box::new(voxel::VoxelScene::new(
             device,
             surface_format,
-            voxel::MAX_GRID,
+            tier.voxel_grid,
+            tier.voxel_march_scale,
+            tier.voxel_march_cap,
         )),
     }
 }
@@ -1568,6 +1588,7 @@ mod tests {
                 },
                 rich.max_segments,
             ),
+            (OverflowContext::Voxels(512), rich.voxel_grid as usize),
         ] {
             let below = CapOverflow {
                 dropped: 1,
@@ -1616,6 +1637,7 @@ mod tests {
                 },
                 "trail",
             ),
+            (OverflowContext::Voxels(512), "grid"),
         ] {
             let overflow = CapOverflow {
                 dropped: 0,
@@ -1642,6 +1664,7 @@ mod tests {
                     | OverflowContext::Samples(_)
                     | OverflowContext::Rows(..)
                     | OverflowContext::Trail { .. }
+                    | OverflowContext::Voxels(_)
             );
             if structural {
                 assert!(

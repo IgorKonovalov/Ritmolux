@@ -288,8 +288,8 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Walking skeleton: one rule grows in a turning cube | dev | done | 9269dd99 |
-| 2 — The rules and the music | dev | done | committed with this row |
-| 3 — Cost: bricks, the march target and the tier caps | dev | not started | |
+| 2 — The rules and the music | dev | done | 627473a3 |
+| 3 — Cost: bricks, the march target and the tier caps | dev | done | committed with this row |
 | 4 — The golden and the gates | dev | not started | |
 | 5 — Documentation and the references | dev | not started | |
 | 6 — The look, judged | human | not started | |
@@ -332,6 +332,23 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
   `shells` key. `reseed_radius` and `shell_gain` are bound parameters.
 - The bar-edge test reads frames, not the state textures, which the integration suite cannot
   reach: the camera is fixed and `age_tint = 0`, so a frame moves only when a visible cell does.
+- Phase 3 neighbour count: a workgroup tile with a one-cell halo (a 6³ tile per 4³ workgroup).
+  Reading, one generation at 128³ with the cube panned off-screen so the march costs nothing
+  (`shot --report`, 1920x1080, `step_rate` 60 against 0): 13.0 ms counting from the texture,
+  4.9 ms from the tile.
+- Phase 3 probes, `shot --report`, release, 1920x1080, AMD Radeon Graphics (RADV RENOIR), ms a
+  frame, sparse / cloudy / worst: before the phase (128³ on either tier, full-resolution march,
+  no bricks, no early stop, `Floor`) 8.11 / 18.80 / 19.83; `Floor` (64³, march scale 1.0, cap
+  1920x1080) 6.23 / 11.68 / 12.70; `Rich` 128³ 13.59 / 24.01 / 24.95. The ladder stopped before
+  its first rung: `Floor`'s `voxel_march_scale` stays 1.0.
+- The bricks are marked once a frame, after the frame's last state change, rather than after
+  every generation; the march reads only the last.
+- The sparse fixture's 5 % scatter leaves few empty bricks inside its ball, so the jump saves only
+  the rays' path outside it.
+- `OverflowContext::Voxels` is new: `Grid`'s top-tier remedy reads `cellular_grid`.
+- The march target goes through `grid::grid_size`, whose 256-texel axis floor makes the golden's
+  128x128 capture march at 256x256. The `voxel` baseline moved to mean 0.0008 / outlier 41, inside
+  tolerance, and was not re-blessed in Phase 3.
 
 ### Close triggers
 

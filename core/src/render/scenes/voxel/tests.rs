@@ -36,7 +36,14 @@ fn context() -> Option<RenderContext> {
 fn scene_with(ctx: &RenderContext, config: VoxelConfig) -> VoxelScene {
     // `COMPOSITE_FORMAT`, not the surface format: a scene draws into the
     // composite chain's linear target (`scenes::create_all`).
-    let mut scene = VoxelScene::new(&ctx.device, crate::render::COMPOSITE_FORMAT, MAX_GRID);
+    // Every grid the loader takes, and a march at the target's own resolution.
+    let mut scene = VoxelScene::new(
+        &ctx.device,
+        crate::render::COMPOSITE_FORMAT,
+        MAX_GRID,
+        GridScale::FULL,
+        (4096, 4096),
+    );
     scene.configure(&GeneratorConfig::Voxel(config));
     scene
 }
@@ -476,6 +483,127 @@ fn the_spectrum_is_laid_across_the_shells_bass_first() {
         0.0,
         "a NaN bin lights nothing"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Cost: the cap, the bricks and the march target
+// ---------------------------------------------------------------------------
+
+/// **A grid past the cap is clamped with a notice**: `configure` runs the cube
+/// at the cap and returns the clamp, naming what was asked and what it runs
+/// at; a grid at the cap is no clamp.
+#[test]
+fn a_grid_past_the_cap_is_clamped_with_a_notice() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let floor = crate::render::TierConfig::FLOOR;
+    let mut scene = VoxelScene::new(
+        &ctx.device,
+        crate::render::COMPOSITE_FORMAT,
+        floor.voxel_grid,
+        floor.voxel_march_scale,
+        floor.voxel_march_cap,
+    );
+    let notice = scene
+        .configure(&GeneratorConfig::Voxel(config(128, RosterRule::Clouds, 1)))
+        .expect("a grid past the cap must be announced, not silent");
+    println!("{notice}");
+    assert_eq!(
+        scene.config.grid, floor.voxel_grid,
+        "the cube does not run at the cap"
+    );
+    assert_eq!(
+        notice.context,
+        crate::render::scenes::OverflowContext::Voxels(128)
+    );
+    let text = notice.to_string();
+    assert!(text.contains("grid 128") && text.contains("64"), "{text}");
+    assert!(
+        text.contains("pin --tier rich"),
+        "Rich runs 128, so it is the remedy: {text}"
+    );
+    assert_eq!(
+        scene.configure(&GeneratorConfig::Voxel(config(64, RosterRule::Clouds, 1))),
+        None,
+        "asking for exactly the cap is not a clamp"
+    );
+}
+
+/// **Jumping empty bricks moves no pixel**: the sparse cost fixture's volume
+/// — a thin scatter through a ball, so most of every ray crosses empty bricks
+/// — marched with the jump and without it, through several orbits, draws
+/// byte-identical frames.
+#[test]
+fn jumping_empty_bricks_moves_no_pixel() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let sparse = VoxelConfig {
+        grid: 64,
+        rules: RuleList::one(RosterRule::Crystal.rule()),
+        seed_radius: 0.9,
+        seed_fill: 0.05,
+        salt: 11,
+        ..VoxelConfig::default()
+    };
+    for (yaw, pitch) in [(0.6, 0.4), (0.0, 0.0), (2.3, -0.7), (-1.1, 1.2)] {
+        let mut frames = Vec::new();
+        for skip in [true, false] {
+            let mut scene = scene_with(&ctx, sparse);
+            scene.skip_bricks = skip;
+            let mut driver = Driver::new(&ctx);
+            driver.frame(
+                &mut scene,
+                1.0 / 60.0,
+                &[
+                    ("step_rate", 0.0),
+                    ("yaw", yaw),
+                    ("pitch", pitch),
+                    ("density", 1.0),
+                ],
+            );
+            frames.push(driver.read_target());
+        }
+        let lit = frames[0]
+            .iter()
+            .filter(|p| p[0] + p[1] + p[2] > 0.0)
+            .count();
+        let differing = frames[0]
+            .iter()
+            .zip(&frames[1])
+            .filter(|(a, b)| a != b)
+            .count();
+        println!("yaw {yaw}, pitch {pitch}: {lit} pixels lit, {differing} differ");
+        assert!(
+            lit > 0,
+            "the sparse volume drew nothing, so the comparison is empty"
+        );
+        assert_eq!(
+            differing, 0,
+            "jumping empty bricks moved {differing} pixels"
+        );
+    }
+}
+
+/// **The march target is the tier's fraction of the render target, held to its
+/// cap by one factor**, so its aspect follows the target's (ADR-0037) and a
+/// scale below 1 draws fewer pixels.
+#[test]
+fn the_march_target_is_a_fraction_of_the_render_target_held_to_its_cap() {
+    assert_eq!(march_size((1920, 1080), 1.0, (1920, 1080)), (1920, 1080));
+    // 540 rounds to the nearest step of 8.
+    assert_eq!(march_size((1920, 1080), 0.5, (1920, 1080)), (960, 544));
+    // A 4K target held to a 1080p cap keeps its 16:9.
+    assert_eq!(march_size((3840, 2160), 1.0, (1920, 1080)), (1920, 1080));
+    // The renderer's own scale composes with the tier's.
+    assert_eq!(
+        march_size((1920, 1080), 0.5 * 0.75, (1920, 1080)),
+        march_size((1920, 1080), 0.375, (1920, 1080))
+    );
+    // A product under the smallest grid scale is held there, never zero.
+    let (w, h) = march_size((1920, 1080), 0.01, (1920, 1080));
+    assert!(w > 0 && h > 0);
 }
 
 // ---------------------------------------------------------------------------

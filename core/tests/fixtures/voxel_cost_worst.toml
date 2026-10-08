@@ -1,0 +1,27 @@
+# COST FIXTURE - a probe, not a baseline: `shot --report` reads its frame time.
+#
+# The worst case of the voxel march's cost: `pyroclastic` churning through the
+# whole cube, its ten states leaving a haze of decaying cells everywhere, at
+# `density = 0` — so no ray's transmittance ever falls and no ray stops early,
+# and no brick is empty to skip. `grid = 128`, so `Floor` runs it at its own cap
+# and says so, and `Rich` at 128³.
+system = "voxel"
+name   = "cost_worst"
+
+[generator]
+seed = 11
+
+[voxel]
+grid        = 128
+rules       = ["pyroclastic"]
+seed_radius = 2.0
+seed_fill   = 0.3
+
+[params]
+step_rate = "8"
+density   = "0"
+trail     = "0.9"
+brightness = "0.3"
+yaw       = "0.6 + time * 0.1"
+pitch     = "0.4"
+distance  = "3.5"

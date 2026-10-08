@@ -40,10 +40,26 @@
 //! # The present
 //!
 //! A fullscreen march: each pixel's ray is walked cell by cell through the cube
-//! `[-1, 1]^3` under emission-absorption (`shader::MARCH_SHADER`). The ray is
-//! recovered from the camera's world-to-clip rows, whose aspect is the render
-//! target's (ADR-0037). `focus` and `aperture` are inert here: the circle of
-//! confusion is per primitive (ADR-0257), and a march has no primitives.
+//! `[-1, 1]^3` under emission-absorption (`shader::MARCH_SHADER`), and stops
+//! once its transmittance is under one 8-bit step. The ray is recovered from the
+//! camera's world-to-clip rows, whose aspect is the render target's (ADR-0037).
+//! `focus` and `aperture` are inert here: the circle of confusion is per
+//! primitive (ADR-0257), and a march has no primitives.
+//!
+//! The march draws into a target of its own — the tier's
+//! [`voxel_march_scale`](crate::render::TierConfig::voxel_march_scale) of the
+//! render target, held to its
+//! [`voxel_march_cap`](crate::render::TierConfig::voxel_march_cap) — and a
+//! plain stretch presents it. The target is a resolution, not a shape: the
+//! march's aspect stays the render target's whatever the target's own is.
+//!
+//! # Bricks
+//!
+//! After every frame that changed the state, a pass marks each 8³ brick of
+//! cells that holds any non-dead cell. The march jumps a whole empty brick at
+//! once, landing on exactly the cell, crossing parameters and position stepping
+//! through it would have (the crossings are computed from the boundary index,
+//! never accumulated), so skipping bricks moves no pixel.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). Encodes its passes every displayed frame.
@@ -65,6 +81,7 @@ use crate::dsp::AnalysisFrame;
 use crate::render::camera::{self, CameraParams};
 use crate::render::gpu;
 use crate::render::palette::{self, Palette};
+use crate::render::tier::GridScale;
 pub use rules::{DEFAULT_RULE, Neighbourhood, RosterRule, Rule, RuleList};
 
 /// The grid an absent `[voxel] grid` means.
@@ -95,6 +112,13 @@ const STATE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Uint;
 /// Each side of the step pass's workgroup, in cells — `@workgroup_size(4, 4,
 /// 4)` in `shader::STEP_SHADER`.
 const WORKGROUP: u32 = 4;
+
+/// Each side of a brick, in cells — `BRICK` in `shader::MARCH_SHADER` and the
+/// brick pass's workgroup, which scans one brick.
+const BRICK: u32 = 8;
+
+/// The step the march target's axes are rounded to (`grid::grid_size`).
+const MARCH_STEP: u32 = 8;
 
 /// The radius of the sphere bounding the cube `[-1, 1]^3`: the volume the
 /// camera's `fog` is measured across.
@@ -401,7 +425,7 @@ pub(crate) fn grid_clamp(
     }
     let overflow = super::CapOverflow {
         dropped: (config.grid - cap) as usize,
-        context: super::OverflowContext::Grid(config.grid),
+        context: super::OverflowContext::Voxels(config.grid),
         cap: cap as usize,
     };
     (
@@ -501,11 +525,21 @@ struct MarchParams {
     b: [f32; 4],
     /// x: age_tint, y: hue_spread, z: fog, w: shell_gain.
     c: [f32; 4],
-    /// x: the cube's nearest view depth, y: its depth span, z: shells; w
-    /// unused.
+    /// x: the cube's nearest view depth, y: its depth span, z: shells, w: 1 to
+    /// jump empty bricks.
     d: [f32; 4],
     /// The shells' levels, four to a `vec4`, bass first.
     shells: [[f32; 4]; (MAX_SHELLS / 4) as usize],
+}
+
+/// The march target for a render target of `target` pixels: `scale` of it on
+/// each axis, held to `cap` by one factor and rounded to [`MARCH_STEP`]
+/// (`grid::grid_size`, ADR-0037). `scale` is the tier's march scale times the
+/// renderer's own grid scale, floored at the smallest scale a grid takes.
+pub(crate) fn march_size(target: (u32, u32), scale: f32, cap: (u32, u32)) -> (u32, u32) {
+    let scale =
+        GridScale::new(scale.clamp(GridScale::MIN, GridScale::MAX)).unwrap_or(GridScale::FULL);
+    crate::render::grid::grid_size(target, scale, cap, MARCH_STEP)
 }
 
 /// What one pass of the step shader does: its `MODE` constant, compiled in.
@@ -590,6 +624,16 @@ impl StateTexture {
     }
 }
 
+/// The march's own target and the bind group that presents it, rebuilt when
+/// the size the frame asks for changes.
+struct MarchTarget {
+    size: (u32, u32),
+    /// Held beside its view.
+    _texture: wgpu::Texture,
+    view: wgpu::TextureView,
+    present_bg: wgpu::BindGroup,
+}
+
 /// The GPU-side state, built when a preset is configured and rebuilt when one
 /// asks for a different grid.
 struct Resources {
@@ -609,10 +653,22 @@ struct Resources {
     /// Read A write B, and read B write A.
     step_from_a: wgpu::BindGroup,
     step_from_b: wgpu::BindGroup,
+    /// One texel a brick: non-zero where the brick holds a non-dead cell.
+    /// Held beside the views the passes take of it.
+    _bricks: wgpu::Texture,
+    brick_pipeline: wgpu::ComputePipeline,
+    /// Mark the bricks of A, and of B.
+    brick_from_a: wgpu::BindGroup,
+    brick_from_b: wgpu::BindGroup,
     march_pipeline: wgpu::RenderPipeline,
     march_uniform: wgpu::Buffer,
     march_from_a: wgpu::BindGroup,
     march_from_b: wgpu::BindGroup,
+    present_layout: wgpu::BindGroupLayout,
+    present_pipeline: wgpu::RenderPipeline,
+    present_sampler: wgpu::Sampler,
+    /// Built by the first `render`, at the size that frame asks for.
+    target: Option<MarchTarget>,
     /// The shared gradient LUT pair (ADR-0021). A fresh pair is dirty, so a
     /// (re)build uploads on its first frame.
     luts: palette::LutPair,
@@ -622,6 +678,23 @@ impl Resources {
     fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat, grid: u32) -> Self {
         let a = StateTexture::new(device, grid, "voxel-state-a");
         let b = StateTexture::new(device, grid, "voxel-state-b");
+        let side = grid.div_ceil(BRICK);
+        let bricks = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("voxel-bricks"),
+            size: wgpu::Extent3d {
+                width: side,
+                height: side,
+                depth_or_array_layers: side,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D3,
+            format: STATE_FORMAT,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
+            view_formats: &[],
+        });
+        let bricks_read = bricks.create_view(&wgpu::TextureViewDescriptor::default());
+        let bricks_write = bricks.create_view(&wgpu::TextureViewDescriptor::default());
         let step_uniform = gpu::uniform_buffer(
             device,
             "voxel-step-params",
@@ -706,9 +779,76 @@ impl Resources {
         let stamp_pipeline = compute(StepPass::Stamp);
         let step_pipeline = compute(StepPass::Step);
 
+        // `[Texture, StorageTexture]`, compute-visible: the generation to mark,
+        // and the bricks. Its size comes from the texture, so it takes no
+        // uniform.
+        let brick_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("voxel-brick-layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Uint,
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::WriteOnly,
+                        format: STATE_FORMAT,
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                    },
+                    count: None,
+                },
+            ],
+        });
+        let brick_bind = |src: &StateTexture| {
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("voxel-brick-bg"),
+                layout: &brick_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&src.read),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&bricks_write),
+                    },
+                ],
+            })
+        };
+        let brick_from_a = brick_bind(&a);
+        let brick_from_b = brick_bind(&b);
+        let brick_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("voxel-bricks"),
+            source: wgpu::ShaderSource::Wgsl(
+                format!("const BRICK: u32 = {BRICK}u;\n{}", shader::BRICK_SHADER).into(),
+            ),
+        });
+        let brick_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("voxel-brick-pipeline-layout"),
+                bind_group_layouts: &[Some(&brick_layout)],
+                immediate_size: 0,
+            });
+        let brick_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("voxel-bricks"),
+            layout: Some(&brick_pipeline_layout),
+            module: &brick_module,
+            entry_point: Some("main"),
+            compilation_options: Default::default(),
+            cache: None,
+        });
+
         let luts = palette::LutPair::new(device, "voxel");
-        // `[Uniform+size, Texture, Texture, Texture, Sampler]`: the uniform
-        // first and sized, so the shape is not `cellular-present-layout`'s
+        // `[Uniform+size, Texture, Texture, Texture, Texture, Sampler]`: the
+        // uniform first and sized, so the shape is not `cellular-present-layout`'s
         // field-LUTs-sampler-uniform (ADR-0058).
         let march_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("voxel-march-layout"),
@@ -735,13 +875,23 @@ impl Resources {
                     },
                     count: None,
                 },
-                gpu::texture(2, true),
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Uint,
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
                 gpu::texture(3, true),
-                gpu::sampler(4),
+                gpu::texture(4, true),
+                gpu::sampler(5),
             ],
         });
         let march_bind = |field: &StateTexture| {
-            let [lut_a, lut_b, lut_sampler] = luts.bind_entries(2, 3, 4);
+            let [lut_a, lut_b, lut_sampler] = luts.bind_entries(3, 4, 5);
             device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("voxel-march-bg"),
                 layout: &march_layout,
@@ -753,6 +903,10 @@ impl Resources {
                     wgpu::BindGroupEntry {
                         binding: 1,
                         resource: wgpu::BindingResource::TextureView(&field.read),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(&bricks_read),
                     },
                     lut_a,
                     lut_b,
@@ -767,22 +921,61 @@ impl Resources {
             "voxel-march",
             gpu::FULLSCREEN_VS_NDC,
             &format!(
-                "const MAX_MARCH: i32 = {};\nconst AGE_SPAN: f32 = {:?};\n{}",
+                "const MAX_MARCH: i32 = {};\nconst AGE_SPAN: f32 = {:?};\nconst BRICK: i32 = {};\n{}",
                 3 * MAX_GRID,
                 AGE_SPAN,
+                BRICK,
                 shader::MARCH_SHADER
             ),
         );
+        // Into the march's own target, which is cleared every frame, so the
+        // march writes its premultiplied colour and coverage as they are.
         let march_pipeline = gpu::fullscreen_pipeline(
             device,
             &march_shader,
             &[&march_layout],
             surface_format,
-            // Premultiplied OVER the backdrop (ADR-0201): the march writes its
-            // light and the coverage its absorption computed.
-            wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
+            wgpu::BlendState::REPLACE,
             "voxel-march",
         );
+
+        // `[Sampler:VERTEX_FRAGMENT, Texture]`: the sampler is declared to both
+        // stages only so the shape is not `bloom-blur-layout`'s
+        // `[Sampler, Texture]` (ADR-0058).
+        let present_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("voxel-present-layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                gpu::texture(1, true),
+            ],
+        });
+        let present_shader = gpu::fullscreen_shader(
+            device,
+            "voxel-present",
+            gpu::FULLSCREEN_VS_UV_FLIPPED,
+            shader::PRESENT_SHADER,
+        );
+        let present_pipeline = gpu::fullscreen_pipeline(
+            device,
+            &present_shader,
+            &[&present_layout],
+            surface_format,
+            // Premultiplied OVER the backdrop (ADR-0201): the march's light and
+            // the coverage its absorption computed.
+            wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
+            "voxel-present",
+        );
+        let present_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("voxel-present-sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
 
         Self {
             grid,
@@ -795,11 +988,84 @@ impl Resources {
             step_uniform,
             step_from_a,
             step_from_b,
+            _bricks: bricks,
+            brick_pipeline,
+            brick_from_a,
+            brick_from_b,
             march_pipeline,
             march_uniform,
             march_from_a,
             march_from_b,
+            present_layout,
+            present_pipeline,
+            present_sampler,
+            target: None,
             luts,
+        }
+    }
+
+    /// Mark every brick of the current generation that holds a non-dead cell.
+    fn encode_bricks(&self, encoder: &mut wgpu::CommandEncoder) {
+        let side = self.grid.div_ceil(BRICK);
+        let mut cpass = gpu::compute_pass(encoder, "voxel-bricks");
+        cpass.set_pipeline(&self.brick_pipeline);
+        cpass.set_bind_group(
+            0,
+            if self.reading_a {
+                &self.brick_from_a
+            } else {
+                &self.brick_from_b
+            },
+            &[],
+        );
+        cpass.dispatch_workgroups(side, side, side);
+    }
+
+    /// Hold the march's target at `size`, rebuilding it only when the size
+    /// moved.
+    fn ensure_target(
+        &mut self,
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        size: (u32, u32),
+    ) {
+        if self.target.as_ref().is_none_or(|t| t.size != size) {
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("voxel-march-target"),
+                size: wgpu::Extent3d {
+                    width: size.0,
+                    height: size.1,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            });
+            let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let present_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("voxel-present-bg"),
+                layout: &self.present_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Sampler(&self.present_sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&view),
+                    },
+                ],
+            });
+            self.target = Some(MarchTarget {
+                size,
+                _texture: texture,
+                view,
+                present_bg,
+            });
         }
     }
 
@@ -849,8 +1115,21 @@ pub struct VoxelScene {
     res: Option<Resources>,
     /// The `[voxel]` table of the preset last configured.
     config: VoxelConfig,
-    /// The largest grid a preset runs on.
+    /// The tier's [`voxel_grid`](crate::render::TierConfig::voxel_grid): the
+    /// largest grid a preset runs on.
     grid_cap: u32,
+    /// The tier's [`voxel_march_scale`](crate::render::TierConfig::voxel_march_scale).
+    march_scale: GridScale,
+    /// The tier's [`voxel_march_cap`](crate::render::TierConfig::voxel_march_cap).
+    march_cap: (u32, u32),
+    /// The render target's size, handed in every frame.
+    target: (u32, u32),
+    /// The share of the renderer's grid scale the target does not already
+    /// carry, handed in every frame (ADR-0245).
+    field_scale: GridScale,
+    /// Whether the march jumps empty bricks. Always on; a probe turns it off to
+    /// hold the jump to the step it replaces.
+    skip_bricks: bool,
     /// Whether the next `render` seeds the field before stepping it — set by
     /// every `configure`.
     needs_seed: bool,
@@ -891,15 +1170,27 @@ pub struct VoxelScene {
 }
 
 impl VoxelScene {
-    /// The CPU-side state, holding a preset's grid to `grid_cap`. GPU resources
-    /// are built at the first `configure`.
-    pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat, grid_cap: u32) -> Self {
+    /// The CPU-side state, holding a preset's grid to `grid_cap` and marching at
+    /// `march_scale` of the render target held to `march_cap` — the tier's
+    /// three voxel values. GPU resources are built at the first `configure`.
+    pub fn new(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        grid_cap: u32,
+        march_scale: GridScale,
+        march_cap: (u32, u32),
+    ) -> Self {
         Self {
             device: device.clone(),
             surface_format,
             res: None,
             config: VoxelConfig::default(),
             grid_cap: grid_cap.clamp(MIN_GRID, MAX_GRID),
+            march_scale,
+            march_cap,
+            target: (1, 1),
+            field_scale: GridScale::FULL,
+            skip_bricks: true,
             needs_seed: true,
             clock: common::GenerationClock::default(),
             dt: 0.0,
@@ -1004,7 +1295,7 @@ impl VoxelScene {
                 view.distance - CUBE_RADIUS,
                 2.0 * CUBE_RADIUS,
                 self.config.shells.min(MAX_SHELLS) as f32,
-                0.0,
+                if self.skip_bricks { 1.0 } else { 0.0 },
             ],
             shells: {
                 let mut out = [[0.0; 4]; (MAX_SHELLS / 4) as usize];
@@ -1024,6 +1315,16 @@ impl Scene for VoxelScene {
 
     fn advance(&mut self, dt: f32) {
         self.dt = dt;
+    }
+
+    fn set_target_size(&mut self, width: u32, height: u32) {
+        // Recorded, never built here (ADR-0030): `render` compares the size it
+        // asks for with the target it holds.
+        self.target = (width.max(1), height.max(1));
+    }
+
+    fn set_grid_scale(&mut self, scale: GridScale) {
+        self.field_scale = scale;
     }
 
     fn set_occlude(&mut self, occlude: f32) {
@@ -1148,6 +1449,11 @@ impl Scene for VoxelScene {
         // The rule `rule` picks this frame runs every generation below, so a
         // change lands at the next generation boundary.
         let step = self.step_params(stamp);
+        let size = march_size(
+            self.target,
+            self.march_scale.get() * self.field_scale.get(),
+            self.march_cap,
+        );
         let Some(res) = self.res.as_mut() else {
             return;
         };
@@ -1156,7 +1462,8 @@ impl Scene for VoxelScene {
         // One write serves every pass below: the seed, then the ball, then the
         // generations, in that order, so a ball scheduled on a preset's first
         // frame lands on its seeded field rather than under it.
-        if seed || stamp.is_some() || generations > 0 {
+        let changed = seed || stamp.is_some() || generations > 0;
+        if changed {
             queue.write_buffer(&res.step_uniform, 0, bytemuck::bytes_of(&step));
         }
         if seed {
@@ -1168,20 +1475,42 @@ impl Scene for VoxelScene {
         for _ in 0..generations {
             res.encode_step(encoder, StepPass::Step);
         }
+        // The march reads only the frame's last generation, so the bricks are
+        // marked once, after it.
+        if changed {
+            res.encode_bricks(encoder);
+        }
 
-        // Load over the engine backdrop (ADR-0018): a ray through empty cells
-        // writes no light and no coverage.
-        let mut pass = gpu::color_pass(encoder, "voxel-march-pass", view, wgpu::LoadOp::Load);
-        pass.set_pipeline(&res.march_pipeline);
-        pass.set_bind_group(
-            0,
-            if res.reading_a {
-                &res.march_from_a
-            } else {
-                &res.march_from_b
-            },
-            &[],
-        );
+        res.ensure_target(&self.device, self.surface_format, size);
+        let Some(target) = res.target.as_ref() else {
+            return;
+        };
+        {
+            // The march writes every pixel of its own target, which starts each
+            // frame empty.
+            let mut pass = gpu::color_pass(
+                encoder,
+                "voxel-march-pass",
+                &target.view,
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            );
+            pass.set_pipeline(&res.march_pipeline);
+            pass.set_bind_group(
+                0,
+                if res.reading_a {
+                    &res.march_from_a
+                } else {
+                    &res.march_from_b
+                },
+                &[],
+            );
+            pass.draw(0..3, 0..1);
+        }
+        // A plain stretch over the engine backdrop (ADR-0018): a ray through
+        // empty cells wrote no light and no coverage.
+        let mut pass = gpu::color_pass(encoder, "voxel-present-pass", view, wgpu::LoadOp::Load);
+        pass.set_pipeline(&res.present_pipeline);
+        pass.set_bind_group(0, &target.present_bg, &[]);
         pass.draw(0..3, 0..1);
     }
 }

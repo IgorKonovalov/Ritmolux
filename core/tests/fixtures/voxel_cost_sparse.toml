@@ -1,0 +1,24 @@
+# COST FIXTURE - a probe, not a baseline: `shot --report` reads its frame time.
+#
+# The sparse end of the voxel march's cost: `crystal` frozen at its seed, a
+# thin scatter of live cells (under 5 % of the cube) spread through a ball, so
+# most of every ray crosses empty cells. `grid = 128`, so `Floor` runs it at its
+# own cap and says so, and `Rich` at 128³.
+system = "voxel"
+name   = "cost_sparse"
+
+[generator]
+seed = 11
+
+[voxel]
+grid        = 128
+rules       = ["crystal"]
+seed_radius = 0.9
+seed_fill   = 0.05
+
+[params]
+step_rate = "0"
+density   = "1.0"
+yaw       = "0.6 + time * 0.1"
+pitch     = "0.4"
+distance  = "3.5"

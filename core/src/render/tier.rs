@@ -763,6 +763,33 @@ pub struct TierConfig {
     /// frame budget (Plan 0239 Phase 3). A clamp to this cap is announced as
     /// the shared one is ([`OverflowContext::Blur`](super::scenes::OverflowContext::Blur)).
     pub swarm_max_coc_px: u32,
+
+    /// The largest `[voxel] grid` a preset may run on, in cells a side
+    /// (ADR-0268).
+    ///
+    /// **A cap on content, like [`cellular_grid`](Self::cellular_grid), clamped
+    /// and announced at load** ([`OverflowContext::Voxels`](super::scenes::OverflowContext::Voxels)):
+    /// a structure is a fixed number of cells, so a cube clamped from 128 to 64
+    /// draws every structure twice as large. A preset asking within the `Floor`
+    /// value runs the same automaton on both tiers.
+    ///
+    /// The step costs in proportion to the cells, and the march in proportion
+    /// to the cells a ray crosses: `Floor`'s 64³ is an eighth of `Rich`'s 128³
+    /// to step and half of it to cross.
+    pub voxel_grid: u32,
+
+    /// The fraction of the render target the voxel march resolves (ADR-0268),
+    /// before [`voxel_march_cap`](Self::voxel_march_cap) bounds it and on top of
+    /// the renderer's own [`grid_scale`](Self::grid_scale).
+    ///
+    /// **A resolution, not content** (ADR-0037): the march's target is a plain
+    /// stretch onto the render target, so a smaller one draws the same volume
+    /// softer and nothing is announced.
+    pub voxel_march_scale: GridScale,
+
+    /// The largest target the voxel march draws into, in pixels; one past it
+    /// is scaled down on both axes by one factor (`grid::grid_size`).
+    pub voxel_march_cap: (u32, u32),
 }
 
 impl TierConfig {
@@ -790,6 +817,9 @@ impl TierConfig {
         max_coc_px: 12,
         seg3d_segments: 8_000,
         swarm_max_coc_px: 12,
+        voxel_grid: 64,
+        voxel_march_scale: GridScale::FULL,
+        voxel_march_cap: (1920, 1080),
     };
 
     /// The midrange-discrete tier.
@@ -823,6 +853,9 @@ impl TierConfig {
         max_coc_px: 24,
         seg3d_segments: 20_000,
         swarm_max_coc_px: 24,
+        voxel_grid: 128,
+        voxel_march_scale: GridScale::FULL,
+        voxel_march_cap: (2560, 1440),
     };
 
     /// The config for `tier`.
