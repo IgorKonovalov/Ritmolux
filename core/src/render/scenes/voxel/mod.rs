@@ -24,7 +24,18 @@
 //! The field is seeded from an integer hash of each cell's coordinates and a
 //! seed derived from the preset's pinned salt (ADR-0051) — never from a clock —
 //! and each step is integer counting, so a volume is a pure function of its
-//! config and the sequence of bound values and `dt`s it was driven with.
+//! config and the sequence of bound values and `dt`s it was driven with. Each
+//! `reseed` rise refills a ball whose centre and cells are hashed from the rise
+//! count and the salt.
+//!
+//! # The rule list and the music
+//!
+//! `[voxel] rules` is a list of one to eight rules, and the structural `rule`
+//! parameter indexes it, so a preset moves the rule on the bar through `[hold]`
+//! without a mask ever passing through an `f32` (ADR-0268). The rule a frame
+//! picks runs every generation that frame encodes. The spectrum lights the
+//! cube's radial shells, bass at the centre, by `1 + shell_gain * level`: an
+//! exact identity at zero gain, and the simulation never reads it.
 //!
 //! # The present
 //!
@@ -93,6 +104,21 @@ const CUBE_RADIUS: f32 = 1.732_050_8;
 /// still hashes to a field rather than to the hash's fixed point. The ASCII
 /// bytes of "VOXL"; opaque, since changing it moves every seeded field.
 const FIELD_SEED_MIX: u32 = 0x564F_584C;
+/// Mixed into the salt for the stream of reseed balls, so a ball is not drawn
+/// from the field's own sequence. The ASCII bytes of "RSVX".
+const STAMP_SEED_MIX: u32 = 0x5253_5658;
+
+/// `reseed` rises past this to refill one ball — edge-triggered, so a value
+/// held high refills once, not once per frame.
+const RESEED_THRESHOLD: f32 = 0.5;
+
+/// The most radial shells the spectrum can be laid across: four `vec4`s of the
+/// march's uniform.
+pub const MAX_SHELLS: u32 = 16;
+
+/// The largest `shell_gain` the march reads: well past the declared range, so
+/// it bounds a runaway binding rather than an author.
+const MAX_SHELL_GAIN: f32 = 16.0;
 
 /// `[voxel]` — the structural configuration, fixed while the preset is loaded
 /// and delivered through `Scene::configure`.
@@ -109,6 +135,9 @@ pub struct VoxelConfig {
     pub seed_fill: f32,
     /// `true`: the cube is a 3-torus. `false`: every cell past a face is dead.
     pub wrap: bool,
+    /// How many radial shells the spectrum lights, `0..=`[`MAX_SHELLS`]; `0`
+    /// lights none.
+    pub shells: u32,
     /// The preset's pinned salt (ADR-0051), which every seeded cell is drawn
     /// from.
     pub salt: u32,
@@ -125,6 +154,7 @@ impl Default for VoxelConfig {
             // Dead outside: a structure crossing a face of a torus reappears on
             // the opposite one, which an orbiting camera reads as a cut.
             wrap: false,
+            shells: 0,
             salt: 0,
         }
     }
@@ -138,6 +168,8 @@ const DEFAULT_HUE: f32 = default_of(PARAMS, "hue");
 const DEFAULT_HUE_SPREAD: f32 = default_of(PARAMS, "hue_spread");
 const DEFAULT_BRIGHTNESS: f32 = default_of(PARAMS, "brightness");
 const DEFAULT_ZOOM: f32 = default_of(PARAMS, "zoom");
+const DEFAULT_RESEED_RADIUS: f32 = default_of(PARAMS, "reseed_radius");
+const DEFAULT_SHELL_GAIN: f32 = default_of(PARAMS, "shell_gain");
 
 // The shared camera block (ADR-0258), re-declared with this system's own doc
 // lines where they differ: the editor schema keys a row by the whole
@@ -161,6 +193,16 @@ const FOG: ParamSpec = ParamSpec {
 /// two drift.
 pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
+        name: "rule",
+        default: 0.0,
+        range: Some([0.0, (rules::MAX_RULES - 1) as f32]),
+        doc: "Which of the [voxel] rules runs, counting from 0; past the list's end it runs \
+              the last. A change takes effect at the next generation.",
+        kind: ParamKind::Structural,
+        group: ParamGroup::Shape,
+        main: true,
+    },
+    ParamSpec {
         name: "step_rate",
         default: 8.0,
         range: Some([0.0, 30.0]),
@@ -169,6 +211,35 @@ pub const PARAMS: &[ParamSpec] = &[
         kind: ParamKind::Modal,
         group: ParamGroup::Motion,
         main: true,
+    },
+    ParamSpec {
+        name: "reseed",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "A rise past 0.5 fills one ball of the cube with fresh seeded cells, once per \
+              rise; bind an onset or a beat to it.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Motion,
+        main: false,
+    },
+    ParamSpec {
+        name: "reseed_radius",
+        default: 0.25,
+        range: Some([0.05, 1.0]),
+        doc: "The radius of the ball a reseed fills, as a fraction of the cube's half-side.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
+    },
+    ParamSpec {
+        name: "shell_gain",
+        default: 0.0,
+        range: Some([0.0, 4.0]),
+        doc: "How strongly the spectrum lights the cube's radial shells, bass at the centre \
+              and treble at the faces; 0 leaves the light as the cells give it.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
     },
     ParamSpec {
         name: "density",
@@ -244,6 +315,64 @@ pub(crate) fn live_threshold(fill: f32) -> u32 {
 pub(crate) fn seed_radius_sq(seed_radius: f32, grid: u32) -> u32 {
     let r = seed_radius.clamp(0.0, 2.0) * grid as f32;
     (r * r) as u32
+}
+
+/// One round of the lowbias32 mixer `gpu::HASH_WGSL` defines, on the CPU, for
+/// the few values a reseed draws per rise.
+fn mix32(v: u32) -> u32 {
+    let mut h = v;
+    h ^= h >> 16;
+    h = h.wrapping_mul(0x7FEB_352D);
+    h ^= h >> 15;
+    h = h.wrapping_mul(0x846C_A68B);
+    h ^= h >> 16;
+    h
+}
+
+/// One scheduled `reseed`: the ball's centre in cells, its radius squared in
+/// cells², and the seed its cells are hashed from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Stamp {
+    pub(crate) centre: [u32; 3],
+    pub(crate) radius_sq: u32,
+    pub(crate) seed: u32,
+}
+
+/// The ball the `rise`-th reseed of a preset salted `salt` fills on a grid of
+/// `grid`, at `radius` of the half-side. Hashed from the rise count and the
+/// salt, never from a clock, so a preset replays its balls identically.
+pub(crate) fn stamp(salt: u32, rise: u32, grid: u32, radius: f32) -> Stamp {
+    let base = mix32(rise ^ mix32(salt ^ STAMP_SEED_MIX));
+    let side = grid.max(1);
+    let r = radius.clamp(0.0, 2.0) * side as f32 * 0.5;
+    Stamp {
+        centre: [
+            mix32(base ^ 1) % side,
+            mix32(base ^ 2) % side,
+            mix32(base ^ 3) % side,
+        ],
+        radius_sq: (r * r) as u32,
+        seed: mix32(base ^ 4),
+    }
+}
+
+/// `spectrum` laid across `shells` radial bands, bass at the centre: band `i`
+/// is the mean of its share of the bins, held finite and non-negative. Bands
+/// past `shells` stay zero.
+pub(crate) fn shell_levels(spectrum: &[f32], shells: u32) -> [f32; MAX_SHELLS as usize] {
+    let mut out = [0.0; MAX_SHELLS as usize];
+    let s = (shells.min(MAX_SHELLS) as usize).min(spectrum.len());
+    if s == 0 {
+        return out;
+    }
+    for (i, level) in out.iter_mut().take(s).enumerate() {
+        let lo = i * spectrum.len() / s;
+        let hi = ((i + 1) * spectrum.len() / s).max(lo + 1);
+        let band = spectrum.get(lo..hi).unwrap_or(&[]);
+        let mean = band.iter().sum::<f32>() / band.len().max(1) as f32;
+        *level = if mean.is_finite() { mean.max(0.0) } else { 0.0 };
+    }
+    out
 }
 
 /// A bound `step_rate` as the clock integrates it: clamped into
@@ -350,8 +479,11 @@ struct StepParams {
     a: [u32; 4],
     /// x: birth mask, y: survive mask, z: states, w: neighbourhood.
     b: [u32; 4],
-    /// x: the seed ball's radius squared in half-cells²; yzw unused.
+    /// x: the seed ball's radius squared in half-cells², y: the reseed ball's
+    /// seed; zw unused.
     c: [u32; 4],
+    /// xyz: the reseed ball's centre (cells), w: its radius squared (cells²).
+    d: [u32; 4],
 }
 
 /// The march's uniform, written once a frame.
@@ -367,10 +499,13 @@ struct MarchParams {
     a: [f32; 4],
     /// x: palette_steps, y: occlude, z: density, w: trail.
     b: [f32; 4],
-    /// x: age_tint, y: hue_spread, z: fog, w: unused.
+    /// x: age_tint, y: hue_spread, z: fog, w: shell_gain.
     c: [f32; 4],
-    /// x: the cube's nearest view depth, y: its depth span; zw unused.
+    /// x: the cube's nearest view depth, y: its depth span, z: shells; w
+    /// unused.
     d: [f32; 4],
+    /// The shells' levels, four to a `vec4`, bass first.
+    shells: [[f32; 4]; (MAX_SHELLS / 4) as usize],
 }
 
 /// What one pass of the step shader does: its `MODE` constant, compiled in.
@@ -380,6 +515,8 @@ enum StepPass {
     Step,
     /// Hash every cell from the field's seed.
     Seed,
+    /// Hash the cells inside the scheduled reseed ball from its own seed.
+    Stamp,
 }
 
 impl StepPass {
@@ -387,6 +524,7 @@ impl StepPass {
         match self {
             StepPass::Step => 0,
             StepPass::Seed => 1,
+            StepPass::Stamp => 2,
         }
     }
 
@@ -394,6 +532,7 @@ impl StepPass {
         match self {
             StepPass::Step => "voxel-step",
             StepPass::Seed => "voxel-seed",
+            StepPass::Stamp => "voxel-stamp",
         }
     }
 
@@ -464,6 +603,7 @@ struct Resources {
     /// Whether `a` holds the current generation.
     reading_a: bool,
     seed_pipeline: wgpu::ComputePipeline,
+    stamp_pipeline: wgpu::ComputePipeline,
     step_pipeline: wgpu::ComputePipeline,
     step_uniform: wgpu::Buffer,
     /// Read A write B, and read B write A.
@@ -563,6 +703,7 @@ impl Resources {
             })
         };
         let seed_pipeline = compute(StepPass::Seed);
+        let stamp_pipeline = compute(StepPass::Stamp);
         let step_pipeline = compute(StepPass::Step);
 
         let luts = palette::LutPair::new(device, "voxel");
@@ -649,6 +790,7 @@ impl Resources {
             b,
             reading_a: true,
             seed_pipeline,
+            stamp_pipeline,
             step_pipeline,
             step_uniform,
             step_from_a,
@@ -678,6 +820,7 @@ impl Resources {
         let pipeline = match pass {
             StepPass::Step => &self.step_pipeline,
             StepPass::Seed => &self.seed_pipeline,
+            StepPass::Stamp => &self.stamp_pipeline,
         };
         let groups = self.grid.div_ceil(WORKGROUP);
         {
@@ -717,7 +860,20 @@ pub struct VoxelScene {
     dt: f32,
     /// Generations `update` scheduled for the next `render` to encode.
     pending_generations: u32,
+    /// How many reseeds have risen since `configure`: the count the next ball
+    /// is hashed from.
+    rises: u32,
+    /// A ball scheduled by a `reseed` rising edge for the next `render`.
+    pending_stamp: Option<Stamp>,
+    /// Last frame's `reseed`, for the rising edge.
+    prev_reseed: f32,
+    /// This frame's spectrum laid across the shells, written by `update`.
+    levels: [f32; MAX_SHELLS as usize],
+    rule: f32,
     step_rate: f32,
+    reseed: f32,
+    reseed_radius: f32,
+    shell_gain: f32,
     density: f32,
     trail: f32,
     age_tint: f32,
@@ -748,7 +904,15 @@ impl VoxelScene {
             clock: common::GenerationClock::default(),
             dt: 0.0,
             pending_generations: 0,
+            rises: 0,
+            pending_stamp: None,
+            prev_reseed: 0.0,
+            levels: [0.0; MAX_SHELLS as usize],
+            rule: 0.0,
             step_rate: DEFAULT_STEP_RATE,
+            reseed: 0.0,
+            reseed_radius: DEFAULT_RESEED_RADIUS,
+            shell_gain: DEFAULT_SHELL_GAIN,
             density: DEFAULT_DENSITY,
             trail: DEFAULT_TRAIL,
             age_tint: DEFAULT_AGE_TINT,
@@ -762,9 +926,15 @@ impl VoxelScene {
         }
     }
 
-    /// This frame's step uniform.
-    fn step_params(&self) -> StepParams {
-        let rule = self.config.rules.first();
+    /// This frame's step uniform: the rule `rule` picks, the field's seed, and
+    /// the ball `stamp` refills if one is scheduled.
+    fn step_params(&self, stamp: Option<Stamp>) -> StepParams {
+        let rule = self.config.rules.pick(self.rule);
+        let stamp = stamp.unwrap_or(Stamp {
+            centre: [0, 0, 0],
+            radius_sq: 0,
+            seed: 0,
+        });
         StepParams {
             a: [
                 self.config.grid,
@@ -780,9 +950,15 @@ impl VoxelScene {
             ],
             c: [
                 seed_radius_sq(self.config.seed_radius, self.config.grid),
+                stamp.seed,
                 0,
                 0,
-                0,
+            ],
+            d: [
+                stamp.centre[0],
+                stamp.centre[1],
+                stamp.centre[2],
+                stamp.radius_sq,
             ],
         }
     }
@@ -822,9 +998,21 @@ impl VoxelScene {
                 finite_or(self.age_tint, DEFAULT_AGE_TINT),
                 finite_or(self.hue_spread, DEFAULT_HUE_SPREAD),
                 finite_or(self.camera.fog, 0.0).clamp(0.0, 1.0),
+                finite_or(self.shell_gain, DEFAULT_SHELL_GAIN).clamp(0.0, MAX_SHELL_GAIN),
+            ],
+            d: [
+                view.distance - CUBE_RADIUS,
+                2.0 * CUBE_RADIUS,
+                self.config.shells.min(MAX_SHELLS) as f32,
                 0.0,
             ],
-            d: [view.distance - CUBE_RADIUS, 2.0 * CUBE_RADIUS, 0.0, 0.0],
+            shells: {
+                let mut out = [[0.0; 4]; (MAX_SHELLS / 4) as usize];
+                for (slot, level) in out.iter_mut().flatten().zip(self.levels) {
+                    *slot = level;
+                }
+                out
+            },
         }
     }
 }
@@ -867,11 +1055,19 @@ impl Scene for VoxelScene {
         self.needs_seed = true;
         self.clock = common::GenerationClock::default();
         self.pending_generations = 0;
+        // The incoming preset's balls are its own stream, from its first.
+        self.rises = 0;
+        self.pending_stamp = None;
+        self.prev_reseed = 0.0;
         overflow
     }
 
     fn reset_params(&mut self) {
+        self.rule = 0.0;
         self.step_rate = DEFAULT_STEP_RATE;
+        self.reseed = 0.0;
+        self.reseed_radius = DEFAULT_RESEED_RADIUS;
+        self.shell_gain = DEFAULT_SHELL_GAIN;
         self.density = DEFAULT_DENSITY;
         self.trail = DEFAULT_TRAIL;
         self.age_tint = DEFAULT_AGE_TINT;
@@ -901,7 +1097,11 @@ impl Scene for VoxelScene {
             "focus" => self.camera.focus = value,
             "aperture" => self.camera.aperture = value,
             "fog" => self.camera.fog = value,
+            "rule" => self.rule = value,
             "step_rate" => self.step_rate = value,
+            "reseed" => self.reseed = value,
+            "reseed_radius" => self.reseed_radius = value,
+            "shell_gain" => self.shell_gain = value,
             "density" => self.density = value,
             "trail" => self.trail = value,
             "age_tint" => self.age_tint = value,
@@ -911,10 +1111,26 @@ impl Scene for VoxelScene {
         }
     }
 
-    fn update(&mut self, _frame: &AnalysisFrame) {
+    fn update(&mut self, frame: &AnalysisFrame) {
         self.pending_generations = self
             .clock
             .advance(applied_step_rate(self.step_rate), self.dt);
+        self.levels = shell_levels(&frame.spectrum, self.config.shells);
+        // Rising edge only, so a beat flag held for several frames — or a
+        // latch's hold — refills one ball rather than one per frame. A NaN
+        // compares false both ways and is stored as zero, so it neither fires
+        // nor arms a spurious edge on the next finite value.
+        let reseed = finite_or(self.reseed, 0.0);
+        if reseed >= RESEED_THRESHOLD && self.prev_reseed < RESEED_THRESHOLD {
+            self.pending_stamp = Some(stamp(
+                self.config.salt,
+                self.rises,
+                self.config.grid,
+                finite_or(self.reseed_radius, DEFAULT_RESEED_RADIUS),
+            ));
+            self.rises = self.rises.wrapping_add(1);
+        }
+        self.prev_reseed = reseed;
     }
 
     fn render(
@@ -926,20 +1142,28 @@ impl Scene for VoxelScene {
     ) {
         // The aspect is the render target's, handed in here (ADR-0037).
         let march = self.march_params(aspect);
-        let step = self.step_params();
         let seed = std::mem::replace(&mut self.needs_seed, false);
+        let stamp = self.pending_stamp.take();
         let generations = std::mem::take(&mut self.pending_generations);
+        // The rule `rule` picks this frame runs every generation below, so a
+        // change lands at the next generation boundary.
+        let step = self.step_params(stamp);
         let Some(res) = self.res.as_mut() else {
             return;
         };
         res.luts.flush(queue);
         queue.write_buffer(&res.march_uniform, 0, bytemuck::bytes_of(&march));
-        // One write serves every pass below: the seed, then the generations.
-        if seed || generations > 0 {
+        // One write serves every pass below: the seed, then the ball, then the
+        // generations, in that order, so a ball scheduled on a preset's first
+        // frame lands on its seeded field rather than under it.
+        if seed || stamp.is_some() || generations > 0 {
             queue.write_buffer(&res.step_uniform, 0, bytemuck::bytes_of(&step));
         }
         if seed {
             res.encode_step(encoder, StepPass::Seed);
+        }
+        if stamp.is_some() {
+            res.encode_step(encoder, StepPass::Stamp);
         }
         for _ in 0..generations {
             res.encode_step(encoder, StepPass::Step);

@@ -287,8 +287,8 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: one rule grows in a turning cube | dev | done | committed with this row |
-| 2 — The rules and the music | dev | not started | |
+| 1 — Walking skeleton: one rule grows in a turning cube | dev | done | 9269dd99 |
+| 2 — The rules and the music | dev | done | committed with this row |
 | 3 — Cost: bricks, the march target and the tier caps | dev | not started | |
 | 4 — The golden and the gates | dev | not started | |
 | 5 — Documentation and the references | dev | not started | |
@@ -316,6 +316,22 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
   doc lines. `wrap` defaults to `false`.
 - Golden run after the move: every baseline mean 0.0000 / outlier 0, `backdrop_ramp` and
   `backdrop_band` 0.0005 / 20-21.
+- Phase 2 survival readings, `every_roster_rule_lives_from_its_own_seed` (32³, salt 7, live
+  fraction at generation 100 / 400, seed as radius, fill): `445` 0.0002 / 0.0002 (0.35, 0.2),
+  `amoeba` 0.7901 / 0.7901 (2.0, 0.5), `builder` 0.0066 / 0.0015 (0.5, 0.5), `clouds` 0.2686 /
+  0.2686 (1.0, 0.6), `coral` 0.2745 / 0.2796 (0.5, 0.5), `crystal` 0.7832 / 0.7832 (0.2, 0.3),
+  `pyroclastic` 0.0544 / 0.0845 (0.5, 0.3), `slow_decay` 0.2880 / 0.2880 (1.0, 0.5). No candidate
+  was cut: all eight pass. `445` and `builder` pass as still residues of a few cells, and
+  `445` read 0 from every other seed swept. The CPU mirror's readings matched the GPU's exactly.
+- Phase 2 touched files outside its list: `core/src/preset/schema/export.rs` (a
+  `KeyKind::RosterOrTable` for a `rules` entry that is a name or an inline table, the
+  `voxel_rule` table, two rosters), `core/src/preset/schema/tests.rs`,
+  `core/tests/suite/preset_schema.rs`, `core/tests/suite/preset.rs` (`STRUCTURAL` gains
+  `rule`), and the regenerated schema files, reference block and `docs/specs/player-schema.json`.
+- `shells` is a `[voxel]` key, default 0 (none); "shells absent" in the done-when is read as no
+  `shells` key. `reseed_radius` and `shell_gain` are bound parameters.
+- The bar-edge test reads frames, not the state textures, which the integration suite cannot
+  reach: the camera is fixed and `age_tint = 0`, so a frame moves only when a visible cell does.
 
 ### Close triggers
 

@@ -770,6 +770,13 @@ fn check_value(value: &Spanned<DeValue<'_>>, kind: &KeyKind, at: &str, out: &mut
                 None => out.push(format!("`{at}` refers to an undeclared table `{name}`")),
             },
         },
+        // A name is held to the roster and a table to its declaration, exactly
+        // as the two kinds it unites are.
+        KeyKind::RosterOrTable(roster, name) => match value.get_ref() {
+            DeValue::String(_) => check_value(value, &KeyKind::Roster(*roster), at, out),
+            DeValue::Table(_) => check_value(value, &KeyKind::Table(name), at, out),
+            _ => refuse(out, "a name from a closed set, or a table"),
+        },
     }
 }
 

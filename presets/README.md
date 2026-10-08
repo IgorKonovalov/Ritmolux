@@ -1100,6 +1100,7 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 
 | Parameter | Default | Range | What it does | Group |
 |---|---|---|---|---|
+| `rule` | `0` | `0` – `7` | Which of the [voxel] rules runs, counting from 0; past the list's end it runs the last. A change takes effect at the next generation. | shape, main |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. | colour |
 
 **Modal**
@@ -1107,6 +1108,9 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | Parameter | Default | Range | What it does | Group |
 |---|---|---|---|---|
 | `step_rate` | `8` | `0` – `30` | How many generations the automaton runs per second, whatever the frame rate; 0 freezes it. | motion, main |
+| `reseed` | `0` | `0` – `1` | A rise past 0.5 fills one ball of the cube with fresh seeded cells, once per rise; bind an onset or a beat to it. | motion |
+| `reseed_radius` | `0.25` | `0.05` – `1` | The radius of the ball a reseed fills, as a fraction of the cube's half-side. | shape |
+| `shell_gain` | `0` | `0` – `4` | How strongly the spectrum lights the cube's radial shells, bass at the centre and treble at the faces; 0 leaves the light as the cells give it. | light |
 | `density` | `1` | `0` – `8` | How strongly the volume absorbs the light behind it, per unit of the cube's width; 0 is pure additive glow with no front or back. | light, main |
 | `trail` | `0.6` | `0` – `1` | How much of its light a decaying cell keeps at each stage of its decay; 0 draws only the live cells. | light |
 | `age_tint` | `0.3` | `0` – `1` | How far along the palette a cell's colour travels as it ages; a decaying cell takes the far end. | colour |

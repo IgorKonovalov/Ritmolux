@@ -1498,7 +1498,11 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "rule": { "$ref": "#/definitions/param.rule" },
             "step_rate": { "$ref": "#/definitions/param.step_rate.voxel" },
+            "reseed": { "$ref": "#/definitions/param.reseed.voxel" },
+            "reseed_radius": { "$ref": "#/definitions/param.reseed_radius" },
+            "shell_gain": { "$ref": "#/definitions/param.shell_gain" },
             "density": { "$ref": "#/definitions/param.density.voxel" },
             "trail": { "$ref": "#/definitions/param.trail.voxel" },
             "age_tint": { "$ref": "#/definitions/param.age_tint.voxel" },
@@ -2160,7 +2164,11 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "rule": { "$ref": "#/definitions/param.rule" },
             "step_rate": { "$ref": "#/definitions/param.step_rate.voxel" },
+            "reseed": { "$ref": "#/definitions/param.reseed.voxel" },
+            "reseed_radius": { "$ref": "#/definitions/param.reseed_radius" },
+            "shell_gain": { "$ref": "#/definitions/param.shell_gain" },
             "density": { "$ref": "#/definitions/param.density.voxel" },
             "trail": { "$ref": "#/definitions/param.trail.voxel" },
             "age_tint": { "$ref": "#/definitions/param.age_tint.voxel" },
@@ -2621,7 +2629,7 @@
       }
     },
     "voxel": {
-      "description": "The voxel automaton's grid, the rules it runs, the ball it is seeded with, and whether its faces wrap.",
+      "description": "The voxel automaton's grid, the rules it runs, the ball it is seeded with, whether its faces wrap, and how many shells the spectrum lights.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -2633,11 +2641,13 @@
         "rules": {
           "type": "array",
           "items": {
-            "type": "string",
-            "enum": ["445", "clouds"]
+            "anyOf": [
+              { "type": "string", "enum": ["445", "amoeba", "builder", "clouds", "coral", "crystal", "pyroclastic", "slow_decay"] },
+              { "$ref": "#/definitions/voxel_rule" }
+            ]
           },
-          "description": "The rules the structural rule parameter picks among, by index.",
-          "markdownDescription": "The rules the structural rule parameter picks among, by index.\n\nDefault `[\"clouds\"]`."
+          "description": "The rules the structural rule parameter picks among, by index: roster names, or inline rules.",
+          "markdownDescription": "The rules the structural rule parameter picks among, by index: roster names, or inline rules.\n\nDefault `[\"clouds\"]`."
         },
         "seed_radius": {
           "type": "number",
@@ -2651,6 +2661,43 @@
           "type": "boolean",
           "description": "Whether the cube is a torus; false makes every cell past a face dead.",
           "markdownDescription": "Whether the cube is a torus; false makes every cell past a face dead.\n\nDefault `false`."
+        },
+        "shells": {
+          "type": "integer",
+          "description": "How many radial shells the spectrum lights, bass at the centre; 0 lights none.",
+          "markdownDescription": "How many radial shells the spectrum lights, bass at the centre; 0 lights none.\n\nDefault `0`."
+        }
+      }
+    },
+    "voxel_rule": {
+      "description": "An inline 3D rule: which live-neighbour counts give birth and survival, how many states a cell passes through, and which neighbours count.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "birth": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "The live-neighbour counts at which a dead cell is born, 0-26 (0-6 for von_neumann). Required."
+        },
+        "survive": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "The live-neighbour counts at which a live cell stays live. Required."
+        },
+        "states": {
+          "type": "integer",
+          "description": "Dead, live and the decay stages a dying cell passes through; 2 has none.",
+          "markdownDescription": "Dead, live and the decay stages a dying cell passes through; 2 has none.\n\nDefault `2`."
+        },
+        "neighbourhood": {
+          "type": "string",
+          "enum": ["moore", "von_neumann"],
+          "description": "Which cells count: the 26 around a cell, or the 6 sharing its faces.",
+          "markdownDescription": "Which cells count: the 26 around a cell, or the 6 sharing its faces.\n\nDefault `moore`."
         }
       }
     },
@@ -4274,10 +4321,30 @@
       "description": "Raises the camera above the scene's volume, in radians; negative looks up from below.",
       "markdownDescription": "Raises the camera above the scene's volume, in radians; negative looks up from below.\n\n- default `0.35`\n- typical range `-1.55` to `1.55` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
+    "param.rule": {
+      "type": "string",
+      "description": "Which of the [voxel] rules runs, counting from 0; past the list's end it runs the last. A change takes effect at the next generation.",
+      "markdownDescription": "Which of the [voxel] rules runs, counting from 0; past the list's end it runs the last. A change takes effect at the next generation.\n\n- default `0.0`\n- typical range `0.0` to `7.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+    },
     "param.step_rate.voxel": {
       "type": "string",
       "description": "How many generations the automaton runs per second, whatever the frame rate; 0 freezes it.",
       "markdownDescription": "How many generations the automaton runs per second, whatever the frame rate; 0 freezes it.\n\n- default `8.0`\n- typical range `0.0` to `30.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.reseed.voxel": {
+      "type": "string",
+      "description": "A rise past 0.5 fills one ball of the cube with fresh seeded cells, once per rise; bind an onset or a beat to it.",
+      "markdownDescription": "A rise past 0.5 fills one ball of the cube with fresh seeded cells, once per rise; bind an onset or a beat to it.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.reseed_radius": {
+      "type": "string",
+      "description": "The radius of the ball a reseed fills, as a fraction of the cube's half-side.",
+      "markdownDescription": "The radius of the ball a reseed fills, as a fraction of the cube's half-side.\n\n- default `0.25`\n- typical range `0.05` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.shell_gain": {
+      "type": "string",
+      "description": "How strongly the spectrum lights the cube's radial shells, bass at the centre and treble at the faces; 0 leaves the light as the cells give it.",
+      "markdownDescription": "How strongly the spectrum lights the cube's radial shells, bass at the centre and treble at the faces; 0 leaves the light as the cells give it.\n\n- default `0.0`\n- typical range `0.0` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.density.voxel": {
       "type": "string",

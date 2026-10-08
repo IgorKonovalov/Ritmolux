@@ -12,7 +12,8 @@
     clippy::unreachable
 )]
 
-/// The step pass. A `const MODE: u32` naming the pass (0 step, 1 seed), `const
+/// The step pass. A `const MODE: u32` naming the pass (0 step, 1 seed, 2
+/// stamp), `const
 /// AGE_CAP: u32`, [`gpu::HASH_WGSL`](crate::render::gpu::HASH_WGSL) and the
 /// shared [`CELL_HASH_WGSL`](crate::render::scenes::common::CELL_HASH_WGSL) are
 /// prepended at construction.
@@ -29,8 +30,11 @@ struct Step {
     // x: birth mask, y: survive mask (bit k: k live neighbours),
     // z: states (>= 2), w: neighbourhood (0 Moore, 1 von Neumann)
     b: vec4<u32>,
-    // x: the seed ball's radius squared, in half-cells^2; yzw unused
+    // x: the seed ball's radius squared, in half-cells^2, y: the reseed ball's
+    // seed; zw unused
     c: vec4<u32>,
+    // xyz: the reseed ball's centre (cells), w: its radius squared (cells^2)
+    d: vec4<u32>,
 }
 @group(0) @binding(0) var src: texture_3d<u32>;
 @group(0) @binding(1) var dst: texture_storage_3d<r32uint, write>;
@@ -107,6 +111,21 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             next = seeded(c, n);
             age = select(AGE_CAP, 0u, next == 1u);
         }
+        case 2u: {
+            // A ball of fresh seeded cells, measured across the seam on a torus
+            // so a ball near a face wraps rather than being cut. A ball is not a
+            // generation: a cell it leaves alone keeps its state and its age.
+            var d = abs(c - vec3<i32>(params.d.xyz));
+            if (wrap) {
+                d = min(d, vec3<i32>(n) - d);
+            }
+            age = here >> 8u;
+            if (u32(d.x * d.x + d.y * d.y + d.z * d.z) <= params.d.w) {
+                let h = cell_hash3(c, params.c.y);
+                next = select(0u, 1u, (h >> 8u) < params.a.w);
+            }
+            age = select(age, 0u, next != s);
+        }
         default: {
             let states = max(params.b.z, 2u);
             let count = select(
@@ -120,7 +139,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 let stays = ((params.b.y >> count) & 1u) == 1u;
                 next = select(select(0u, 2u, states > 2u), 1u, stays);
             } else {
-                // A decay stage advances, and falls to dead past the last.
+                // A decay stage advances, and falls to dead past the last —
+                // which is also where a stage left by a rule with more states
+                // goes when the rule changes.
                 next = select(s + 1u, 0u, s + 1u >= states);
             }
             age = select(age, 0u, next != s);
@@ -162,10 +183,13 @@ struct March {
     // x: palette_steps (integral, quantized CPU-side), y: occlude (ADR-0085),
     // z: density (per world unit, >= 0), w: trail (0..1)
     b: vec4<f32>,
-    // x: age_tint, y: hue_spread, z: fog (0..1), w: unused
+    // x: age_tint, y: hue_spread, z: fog (0..1), w: shell_gain (>= 0)
     c: vec4<f32>,
-    // x: the cube's nearest view depth, y: its depth span; zw unused
+    // x: the cube's nearest view depth, y: its depth span, z: shells (0 for
+    // none); w unused
     d: vec4<f32>,
+    // The shells' levels, four to a vec4, bass first
+    shells: array<vec4<f32>, 4>,
 }
 @group(0) @binding(0) var<uniform> mp: March;
 @group(0) @binding(1) var field: texture_3d<u32>;
@@ -275,7 +299,15 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             let depth = 0.5 * (t + t_end) * dot(dir, forward);
             let depth01 = select(0.0, clamp((depth - mp.d.x) / mp.d.y, 0.0, 1.0), mp.d.y > 0.0);
             let fog = clamp(1.0 - mp.c.z * depth01, 0.0, 1.0);
-            light = light + transmit * shade(coord) * (max(mp.a.y, 0.0) * glow * EMISSION * fog * len);
+            // The shell this cell lies in lights it by its band's level: bass
+            // at the centre, treble at the faces, a corner in the last shell.
+            // `1 + gain * level` is exactly 1 at gain 0.
+            var shell = 1.0;
+            if (mp.d.z > 0.5) {
+                let i = min(u32(min(length(centre), 1.0) * mp.d.z), u32(mp.d.z) - 1u);
+                shell = 1.0 + mp.c.w * mp.shells[i / 4u][i % 4u];
+            }
+            light = light + transmit * shade(coord) * (max(mp.a.y, 0.0) * glow * EMISSION * fog * shell * len);
             transmit = transmit * exp(-mp.b.z * glow * len);
         }
 

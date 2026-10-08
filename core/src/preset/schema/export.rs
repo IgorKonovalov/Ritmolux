@@ -105,6 +105,8 @@ pub enum Roster {
     Growth,
     /// `[voxel] rules` — the named rules.
     VoxelRule,
+    /// An inline `[voxel]` rule's `neighbourhood`.
+    VoxelNeighbourhood,
 }
 
 impl Roster {
@@ -149,6 +151,10 @@ impl Roster {
             Roster::VoxelRule => crate::render::scenes::voxel::RosterRule::ALL
                 .iter()
                 .map(|r| r.as_str())
+                .collect(),
+            Roster::VoxelNeighbourhood => crate::render::scenes::voxel::Neighbourhood::ALL
+                .iter()
+                .map(|n| n.as_str())
                 .collect(),
         }
     }
@@ -197,6 +203,9 @@ pub enum KeyKind {
     List(&'static KeyKind),
     /// A nested table, named in [`TABLES`].
     Table(&'static str),
+    /// One of a closed set of names, or a nested table named in [`TABLES`] —
+    /// a `[voxel] rules` entry, which is a roster name or an inline rule.
+    RosterOrTable(Roster, &'static str),
 }
 
 impl KeyKind {
@@ -216,6 +225,7 @@ impl KeyKind {
             KeyKind::Map(_) => "map",
             KeyKind::List(_) => "list",
             KeyKind::Table(_) => "table",
+            KeyKind::RosterOrTable(..) => "enum_or_table",
         }
     }
 }
@@ -269,6 +279,7 @@ pub const TABLES: &[&TableDesc] = &[
     &super::raw::PLEXUS,
     &super::raw::WATERFALL,
     &super::raw::VOXEL,
+    &super::raw::VOXEL_RULE,
     &super::raw::MILK,
     &super::raw::MILK_ELEMENT,
     &super::raw::FEEDBACK,
@@ -536,16 +547,22 @@ fn push_table(out: &mut String, table: &TableDesc) {
 fn push_kind(out: &mut String, kind: &KeyKind) {
     out.push_str("\"kind\":");
     push_string(out, kind.tag());
-    match kind {
-        KeyKind::Roster(roster) => {
-            out.push_str(",\"values\":[");
-            for (i, value) in roster.values().iter().enumerate() {
-                if i > 0 {
-                    out.push(',');
-                }
-                push_string(out, value);
+    let push_values = |out: &mut String, roster: &Roster| {
+        out.push_str(",\"values\":[");
+        for (i, value) in roster.values().iter().enumerate() {
+            if i > 0 {
+                out.push(',');
             }
-            out.push(']');
+            push_string(out, value);
+        }
+        out.push(']');
+    };
+    match kind {
+        KeyKind::Roster(roster) => push_values(out, roster),
+        KeyKind::RosterOrTable(roster, name) => {
+            push_values(out, roster);
+            out.push_str(",\"table\":");
+            push_string(out, name);
         }
         KeyKind::Map(of) | KeyKind::List(of) => {
             out.push_str(",\"of\":{");
@@ -836,7 +853,7 @@ pub fn system_json_schema(kind: SystemKind) -> String {
 fn reachable_tables(root: &TableDesc) -> Vec<&'static str> {
     fn visit(kind: &KeyKind, seen: &mut Vec<&'static str>) {
         match kind {
-            KeyKind::Table(name) => {
+            KeyKind::Table(name) | KeyKind::RosterOrTable(_, name) => {
                 if !seen.contains(name) {
                     seen.push(*name);
                     for key in table(name).map_or(&[][..], |t| t.keys) {
@@ -1387,16 +1404,14 @@ fn push_kind_body(out: &mut String, depth: usize, kind: &KeyKind) {
         KeyKind::Text | KeyKind::Expr => out.push_str(&format!("{pad}\"type\": \"string\"")),
         KeyKind::Roster(roster) => {
             out.push_str(&format!("{pad}\"type\": \"string\",\n{pad}\"enum\": ["));
-            let mut first = true;
-            for value in roster.values() {
-                if !first {
-                    out.push_str(", ");
-                }
-                first = false;
-                out.push_str(&json_string(value));
-            }
+            out.push_str(&enum_values(*roster));
             out.push(']');
         }
+        // A name from the roster, or the inline table.
+        KeyKind::RosterOrTable(roster, name) => out.push_str(&format!(
+            "{pad}\"anyOf\": [\n{pad}  {{ \"type\": \"string\", \"enum\": [{}] }},\n{pad}  {{ \"$ref\": \"#/definitions/{name}\" }}\n{pad}]",
+            enum_values(*roster)
+        )),
         // Seconds, or the `{ attack, release }` pair ADR-0035 widened it to.
         KeyKind::Easing => out.push_str(&format!(
             "{pad}\"anyOf\": [\n{pad}  {{ \"type\": \"number\" }},\n{pad}  {{ \"type\": \"object\", \"additionalProperties\": false, \"properties\": {{ \"attack\": {{ \"type\": \"number\" }}, \"release\": {{ \"type\": \"number\" }} }} }}\n{pad}]"
@@ -1438,6 +1453,16 @@ fn push_kind_body(out: &mut String, depth: usize, kind: &KeyKind) {
             out.push_str(&format!("{pad}\"$ref\": \"#/definitions/{name}\""));
         }
     }
+}
+
+/// A roster's values as the comma-separated JSON strings an `enum` lists.
+fn enum_values(roster: Roster) -> String {
+    roster
+        .values()
+        .iter()
+        .map(|value| json_string(value))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Write `",\n"` before every element but the first.

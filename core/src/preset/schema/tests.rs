@@ -593,6 +593,7 @@ fn descriptor_pairs() -> Vec<DescriptorPair> {
         (&raw::PLEXUS, serde_fields::<raw::RawPlexus>()),
         (&raw::WATERFALL, serde_fields::<raw::RawWaterfall>()),
         (&raw::VOXEL, serde_fields::<raw::RawVoxel>()),
+        (&raw::VOXEL_RULE, serde_fields::<raw::RawInlineRule>()),
         (&raw::MILK, serde_fields::<raw::RawMilk>()),
         (&raw::MILK_ELEMENT, serde_fields::<raw::RawMilkElement>()),
         (&raw::FEEDBACK, serde_fields::<raw::RawFeedback>()),
@@ -657,7 +658,7 @@ fn every_descriptor_is_reachable_from_the_root_and_every_reference_resolves() {
             while let KeyKind::Map(of) | KeyKind::List(of) = kind {
                 kind = of;
             }
-            let KeyKind::Table(name) = kind else {
+            let (KeyKind::Table(name) | KeyKind::RosterOrTable(_, name)) = kind else {
                 continue;
             };
             let target = export::table(name).unwrap_or_else(|| {
@@ -704,7 +705,7 @@ fn every_roster_value_parses_through_its_owners_parser() {
     /// A roster beside the parser that owns it.
     type RosterCheck = (Roster, fn(&str) -> bool);
 
-    let checks: [RosterCheck; 20] = [
+    let checks: [RosterCheck; 21] = [
         (Roster::System, |n| SystemKind::from_name(n).is_some()),
         (Roster::CurveFamily, |n| CurveFamily::from_name(n).is_some()),
         (Roster::AttractorFamily, |n| {
@@ -743,6 +744,9 @@ fn every_roster_value_parses_through_its_owners_parser() {
         }),
         (Roster::VoxelRule, |n| {
             crate::render::scenes::voxel::RosterRule::from_name(n).is_some()
+        }),
+        (Roster::VoxelNeighbourhood, |n| {
+            crate::render::scenes::voxel::Neighbourhood::from_name(n).is_some()
         }),
     ];
 
@@ -848,7 +852,9 @@ fn check_table(
                 }
             }
             KeyKind::List(of) => {
-                if let KeyKind::Table(name) = of
+                // A roster-or-table entry that is a table is checked as one; a
+                // name has no keys to check.
+                if let KeyKind::Table(name) | KeyKind::RosterOrTable(_, name) = of
                     && let Some(target) = export::table(name)
                     && let Some(items) = child.as_array()
                 {

@@ -2547,6 +2547,9 @@ const STRUCTURAL: &[(&str, &str)] = &[
     ("plexus", "palette_steps"),
     ("waterfall", "palette_steps"),
     ("voxel", "palette_steps"),
+    // `RuleList::pick`: rounds and holds inside the list, because a rule is an
+    // index into the preset's own list and half of one names no rule.
+    ("voxel", "rule"),
     // `fold_order` / `fold_edge`: the kaleidoscope's two stepped params.
     ("kaleidoscope", "kaleido_order"),
     ("kaleidoscope", "kaleido_edge"),

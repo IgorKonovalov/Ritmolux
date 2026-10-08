@@ -252,6 +252,233 @@ fn the_applied_step_rate_freezes_falls_back_and_caps() {
 }
 
 // ---------------------------------------------------------------------------
+// The roster and the rule index
+// ---------------------------------------------------------------------------
+
+/// The live fraction of `rule` at generations 100 and 400 from `seed` on a
+/// 32-cell cube, run 4 generations a frame.
+fn live_fractions(ctx: &RenderContext, rule: Rule, seed: (f32, f32), salt: u32) -> [f64; 2] {
+    let mut scene = scene_with(
+        ctx,
+        VoxelConfig {
+            grid: 32,
+            rules: RuleList::one(rule),
+            seed_radius: seed.0,
+            seed_fill: seed.1,
+            salt,
+            ..VoxelConfig::default()
+        },
+    );
+    let mut driver = Driver::new(ctx);
+    let mut out = [0.0; 2];
+    let mut generations = 0;
+    for (slot, at) in out.iter_mut().zip([100, 400]) {
+        while generations < at {
+            // 120 generations a second for 1/30 s: exactly 4 a frame.
+            generations += driver.frame(&mut scene, 1.0 / 30.0, &[("step_rate", MAX_STEP_RATE)]);
+        }
+        assert_eq!(generations, at, "the run overshot generation {at}");
+        let cells = read_cells(ctx, &scene);
+        *slot = live(&cells) as f64 / cells.len() as f64;
+    }
+    out
+}
+
+/// **Every roster rule lives from its own seed**: at 32³, from the standard
+/// seed (the rule's own ball, the preset salt 7), its live fraction is
+/// strictly between 0 and 0.9 at generations 100 and 400 — neither dead nor
+/// saturated. A structural statistic, not a pixel comparison (ADR-0180 rule 3).
+#[test]
+fn every_roster_rule_lives_from_its_own_seed() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    for rule in RosterRule::ALL {
+        let [at_100, at_400] = live_fractions(&ctx, rule.rule(), rule.seed(), 7);
+        println!(
+            "{:<12} seed {:?}: live {at_100:.4} at 100, {at_400:.4} at 400",
+            rule.as_str(),
+            rule.seed()
+        );
+        for (at, fraction) in [(100, at_100), (400, at_400)] {
+            assert!(
+                fraction > 0.0 && fraction < 0.9,
+                "{} is at live fraction {fraction:.4} at generation {at}, outside (0, 0.9)",
+                rule.as_str()
+            );
+        }
+    }
+}
+
+/// **The bound `rule` index picks from the list**: rounded, held inside it, and
+/// the first rule where it is not finite.
+#[test]
+fn the_rule_index_picks_from_the_list_and_holds_inside_it() {
+    let rules: Vec<Rule> = [RosterRule::Clouds, RosterRule::Coral, RosterRule::Crystal]
+        .iter()
+        .map(|r| r.rule())
+        .collect();
+    let list = RuleList::new(&rules).expect("three rules make a list");
+    assert_eq!(list.pick(0.0), rules[0]);
+    assert_eq!(list.pick(1.0), rules[1]);
+    assert_eq!(list.pick(2.0), rules[2]);
+    assert_eq!(list.pick(7.0), rules[2], "past the end runs the last");
+    assert_eq!(list.pick(-3.0), rules[0]);
+    assert_eq!(list.pick(1.4), rules[1]);
+    assert_eq!(list.pick(f32::NAN), rules[0]);
+    assert!(RuleList::new(&[]).is_none());
+    assert!(RuleList::new(&[rules[0]; rules::MAX_RULES + 1]).is_none());
+}
+
+/// **A cell in a decay stage past the new rule's states falls to dead** at the
+/// first generation of the new rule: a long-decaying rule switched to a
+/// two-state one leaves no decaying cell behind.
+#[test]
+fn a_rule_change_drops_decay_stages_the_new_rule_does_not_have() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let rules = [RosterRule::Pyroclastic.rule(), RosterRule::Clouds.rule()];
+    let (seed_radius, seed_fill) = RosterRule::Pyroclastic.seed();
+    let mut scene = scene_with(
+        &ctx,
+        VoxelConfig {
+            grid: 32,
+            rules: RuleList::new(&rules).expect("a list"),
+            seed_radius,
+            seed_fill,
+            salt: 7,
+            ..VoxelConfig::default()
+        },
+    );
+    let mut driver = Driver::new(&ctx);
+    for _ in 0..10 {
+        driver.frame(&mut scene, 1.0 / 30.0, &[("step_rate", MAX_STEP_RATE)]);
+    }
+    let decaying = |cells: &[u32]| cells.iter().filter(|c| **c & 0xFF >= 2).count();
+    let before = decaying(&read_cells(&ctx, &scene));
+    // One generation under the two-state rule.
+    driver.frame(
+        &mut scene,
+        1.0 / 30.0,
+        &[("step_rate", 30.0), ("rule", 1.0)],
+    );
+    let after = decaying(&read_cells(&ctx, &scene));
+    println!("{before} decaying cells under pyroclastic, {after} after one clouds generation");
+    assert!(before > 0, "pyroclastic left no decay to drop");
+    assert_eq!(
+        after, 0,
+        "a decay stage outlived the switch to a two-state rule"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The reseed ball
+// ---------------------------------------------------------------------------
+
+/// **A `reseed` rise changes cells only inside the ball**: with the clock
+/// frozen, the frame a rise lands on changes some cells, and every cell it
+/// changes lies inside the ball the rise count and the salt hash to.
+#[test]
+fn a_reseed_rise_changes_cells_only_inside_its_ball() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let salt = 5;
+    let mut scene = scene_with(&ctx, config(32, RosterRule::Crystal, salt));
+    let mut driver = Driver::new(&ctx);
+    let frozen = [("step_rate", 0.0), ("reseed_radius", 0.5)];
+    driver.frame(&mut scene, 1.0 / 60.0, &frozen);
+    let before = read_cells(&ctx, &scene);
+    driver.frame(
+        &mut scene,
+        1.0 / 60.0,
+        &[("step_rate", 0.0), ("reseed_radius", 0.5), ("reseed", 1.0)],
+    );
+    let after = read_cells(&ctx, &scene);
+    let ball = stamp(salt, 0, 32, 0.5);
+    let mut changed = 0;
+    for (i, (a, b)) in before.iter().zip(&after).enumerate() {
+        if a == b {
+            continue;
+        }
+        changed += 1;
+        let c = [i % 32, (i / 32) % 32, i / (32 * 32)];
+        let d2: u32 = c
+            .iter()
+            .zip(ball.centre)
+            .map(|(&c, centre)| {
+                let d = (c as i64 - i64::from(centre)).unsigned_abs() as u32;
+                d * d
+            })
+            .sum();
+        assert!(
+            d2 <= ball.radius_sq,
+            "cell {c:?} changed {d2} cells² from the ball's centre {:?}, past its radius² {}",
+            ball.centre,
+            ball.radius_sq
+        );
+    }
+    println!(
+        "the reseed changed {changed} cells inside a ball at {:?}, radius² {}",
+        ball.centre, ball.radius_sq
+    );
+    assert!(changed > 0, "the reseed changed nothing");
+
+    // Held high, it does not fire again.
+    driver.frame(
+        &mut scene,
+        1.0 / 60.0,
+        &[("step_rate", 0.0), ("reseed_radius", 0.5), ("reseed", 1.0)],
+    );
+    assert_eq!(
+        read_cells(&ctx, &scene),
+        after,
+        "a held reseed refilled again"
+    );
+}
+
+/// The balls are a pure function of the salt and the rise count, and differ
+/// from one rise to the next.
+#[test]
+fn reseed_balls_are_hashed_from_the_rise_count_and_the_salt() {
+    assert_eq!(stamp(3, 0, 64, 0.25), stamp(3, 0, 64, 0.25));
+    assert_ne!(stamp(3, 0, 64, 0.25).centre, stamp(3, 1, 64, 0.25).centre);
+    assert_ne!(stamp(3, 0, 64, 0.25).centre, stamp(4, 0, 64, 0.25).centre);
+    let ball = stamp(3, 0, 64, 0.25);
+    assert!(ball.centre.iter().all(|&c| c < 64));
+    assert_eq!(
+        ball.radius_sq, 64,
+        "a quarter of the half-side of 64 is 8 cells"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The shells
+// ---------------------------------------------------------------------------
+
+/// **The spectrum is laid across the shells bass first**, each shell the mean of
+/// its share of the bins, and a shell count of zero lights none.
+#[test]
+fn the_spectrum_is_laid_across_the_shells_bass_first() {
+    let mut spectrum = [0.0_f32; crate::dsp::SPECTRUM_BINS];
+    for (i, bin) in spectrum.iter_mut().enumerate() {
+        *bin = i as f32;
+    }
+    let levels = shell_levels(&spectrum, 4);
+    // 64 bins over 4 shells: 0..16, 16..32, ...
+    assert_eq!(&levels[..4], &[7.5, 23.5, 39.5, 55.5]);
+    assert!(levels[4..].iter().all(|l| *l == 0.0));
+    assert!(shell_levels(&spectrum, 0).iter().all(|l| *l == 0.0));
+    spectrum[0] = f32::NAN;
+    assert_eq!(
+        shell_levels(&spectrum, 64)[0],
+        0.0,
+        "a NaN bin lights nothing"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // The march's ray
 // ---------------------------------------------------------------------------
 
