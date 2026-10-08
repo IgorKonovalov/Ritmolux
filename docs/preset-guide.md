@@ -66,7 +66,8 @@ Four things are worth naming, because they are the whole model:
 
 Some systems also take a **structural table** — `[curve]` here, `[generator]` for the two generator
 systems, `[particles]` for the attractor, `[spectrum]` for the readout, `[field]` for the analytic
-field, `[cellular]` for the automaton, `[plexus]` for the network. Those are declarative
+field, `[cellular]` for the automaton, `[plexus]` for the network, `[voxel]` for the 3D automaton.
+Those are declarative
 configuration read once when the preset loads, **not** expressions: they choose *which figure*, and
 the params then animate it.
 
@@ -489,6 +490,30 @@ along it from low down, or put the focal plane on the front row and let the past
 **Reach for this when** the look is the music's shape over the last few seconds rather than this
 instant. `rows` and `row_period` set how much history there is, in the
 [`[waterfall]` table](presets.md#the-waterfall-table).
+
+### `voxel`
+
+![A soft-edged cube of glowing orange on black, seen a little from above and turned off square: the
+volume reads as one dense amber mass, darker where it is thickest at the centre and fraying into
+grainy single cells along its edges](images/gallery/voxel.png)
+
+*`rules = ["clouds"]` — the teaching preset
+[`docs/examples/voxel/clouds.toml`](examples/voxel/clouds.toml); the shipped set has none yet*
+
+A **cellular automaton in three dimensions**: a cube of cells, every generation each cell deciding
+its next state from how many of the cells around it are live, drawn as a glowing volume through the
+same camera as `plexus`. `density` decides how much the volume absorbs: at `0` every cell's light
+adds up and the far side shows through the near one, and higher gives the cube a front surface that
+hides its inside.
+
+A preset lists up to eight rules, from a named roster or written inline as two lists of neighbour
+counts, and the `rule` parameter picks one. Held on the bar, the automaton changes its mind at every
+bar line. Most 3D rules settle into a shape and hold it, so `reseed` on an onset is how the cube
+stays alive: each rise drops a ball of fresh cells that grows again.
+
+**Reach for this when** the look is growth with depth to it: colonies, crystals, foam or clouds that
+build up inside a turning cube. The roster, the inline rule syntax and the tier caps are in the
+[`[voxel]` table](presets.md#the-voxel-table).
 
 ---
 

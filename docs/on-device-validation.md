@@ -311,6 +311,26 @@ says what is expected, not what has been run. Each section's own record says tha
       `docs/examples/waterfall/landscape.toml` and say whether a sustained note reads as a ridge
       running away from the camera and a hit as a crest that recedes, whether rows arrive and leave
       without popping, and whether the landscape reads as depth or as flat stacked lines.
+- [ ] **The voxel system at the Floor cap, on the low-end box, 1080p.** Plan 0255 added `voxel`,
+      a 3D automaton marched as an emitting, absorbing volume, whose cost is the march: every pixel
+      of a target at `voxel_march_scale` of the window, capped at `voxel_march_cap`, crosses up to
+      the grid's side in cells. `TierConfig::FLOOR` holds `voxel_grid` **64**, march scale **1.0**
+      and a **1920x1080** cap. Measured on the development box's integrated GPU (`shot --report`,
+      release build, 1920x1080, Floor): sparse **6.23** ms, cloudy **11.68**, worst case **12.70**.
+      No shipped preset draws the system yet, so point `RLX_PRESET_DIR` at `docs/examples/voxel/`
+      and load **`clouds.toml`**; then write the worst frame beside it, the same file with
+      `density = "0"`, `trail = "1"`, `distance = "2"` and `rules = ["pyroclastic"]`, so the cube
+      fills the window and no ray stops early. Overlay on (`F3`), report **(a)** whether fps holds
+      ≥ 60 @ 1080p on both, and **(b)** the p99. **If the worst frame misses, the levers are
+      `voxel_march_scale` (not below 0.5) and then `voxel_march_cap`**, which make the picture
+      coarser without changing what it is; lowering `voxel_grid` changes the content, so it routes
+      to `architect` with the numbers.
+- [ ] **The voxel system's look, any box, with music.** Load `docs/examples/voxel/clouds.toml`, then
+      the same file with `rules = ["coral", "pyroclastic"]`, `rule = "mod(bar_index, 2)"` under
+      `[hold] rule = "bar"`, `reseed = "onset"` and `shells = 8` with `shell_gain = "1.5"`. Say whether
+      the volume reads as a 3D structure rather than a haze as it turns, whether `density` gives it a
+      front and a back, and whether an onset ball and the rule change at a bar line read as the
+      music's doing.
 - [ ] **The solid 3D stroke's sort at the Floor cap, on the low-end box, 1080p.** Plan 0248 gave
       the camera block `solid`, which orders a frame's lines far to near on the CPU every frame
       before they are drawn. Measured on the development box's integrated GPU (headless, release
@@ -546,6 +566,16 @@ not run at the plan's close, so the rich tier currently ships numbers nobody has
       scene at the Floor caps, so the grid halves and the radius drops to 6 — **content, not
       density**. Report what the standalone prints at the demotion and after it, and say whether
       the change reads as a defect on screen. **If it does, that is an `architect` call.**
+- [ ] **The voxel system at `Rich`'s caps, on the discrete GPU, native fullscreen.**
+      `TierConfig::RICH.voxel_grid` = **128**, the top of what the loader accepts, with march scale
+      **1.0** and a **2560x1440** cap. The development box's integrated GPU read 13.59 / 24.01 /
+      24.95 ms (sparse / cloudy / worst) at 128³ and 1920x1080, over budget there, which is why the
+      iGPU runs Floor. Load the worst frame from the low-end item above with `grid = 128` and
+      `--tier rich`, and report **(a)** whether it holds the display's refresh rate and **(b)** the
+      p99. Then let it run **unpinned** on a frame that misses: a demotion to Floor rebuilds the
+      scene at 64³, which halves every structure's cell count — **content, not density**. Report
+      what the standalone prints, and say whether the change reads as a defect on screen. **If it
+      does, that is an `architect` call.**
 
 ## Runnable now — the foobar2000 component's clean-profile install (Plan 0102 Phase 5)
 

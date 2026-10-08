@@ -298,8 +298,8 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 | 1 — Walking skeleton: one rule grows in a turning cube | dev | done | 9269dd99 |
 | 2 — The rules and the music | dev | done | 627473a3 |
 | 3 — Cost: bricks, the march target and the tier caps | dev | done | e39942ab |
-| 4 — The golden and the gates | dev | done | committed with this row |
-| 5 — Documentation and the references | dev | not started | |
+| 4 — The golden and the gates | dev | done | 54a9ba57 |
+| 5 — Documentation and the references | dev | done | committed with this row |
 | 6 — The look, judged | human | not started | |
 | 7 — The preset-author reference | human | not started | |
 
@@ -370,6 +370,40 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
   flatness 0.3164, boundary 0.0962.
 - The 600-frame determinism test reads every frame, not the state textures, as the cellular suite
   does.
+- Phase 5: the generated params block, `presets/schema/` and `.taplo.toml` were already current
+  (the two tests pass with no update variable set), so nothing was regenerated; the only generated
+  change is `presets/README.md`'s contents block, which `node scripts/toc.mjs --check` found one row
+  short (the `voxel` heading Phase 1 added). The guide's picture is the existing
+  `docs/images/gallery/voxel.png`; nothing under `docs/images/` changed. `docs/configuration.md` is
+  untouched.
+- The `rlx-core` lib builds with one `dead_code` warning, `PreviewService::target` in
+  `core/src/render/preview.rs`, a file no phase of this plan touched.
+- **For Phase 7**, the text for `.claude/skills/preset-author/references/systems.md`'s new
+  `## voxel` section. The ranges come from the fixtures and readings in this log, not from a judged
+  look; Phase 6 may move them.
+
+  > ## voxel
+  >
+  > A 3D automaton in a cube of cells, marched as a glowing, absorbing volume through the shared
+  > camera. Structure in `[voxel]` (`grid`, `rules`, `seed_radius`, `seed_fill`, `wrap`, `shells`);
+  > the rule list and roster are in `docs/presets.md`, "The `[voxel]` table". Author against
+  > `grid = 64`, the Floor cap; 128 runs on Rich only.
+  >
+  > - **`density`** 0.4-1.5 reads as a volume with a front. 0 is pure additive haze with no front or
+  >   back, and higher hides more of the inside. The teaching preset uses 0.6, the gate fixture 1.0.
+  > - **`step_rate`** 4-12 generations a second. Most rules settle within a few hundred
+  >   generations, so a faster rate only reaches the still shape sooner; the cap is 30.
+  > - **`shell_gain`** 0.5-2 with `shells = 8`. It multiplies a cell's light by
+  >   `1 + shell_gain x level`; the gate fixture uses 1.5. It is inert while `shells` is 0.
+  > - **`reseed_radius`** 0.15-0.4 of the half-side. The default 0.25 drops a visible ball without
+  >   refilling the cube; bind `reseed` to `onset`, or the cube settles and stays still.
+  > - **A rule shift on the bar** (`rule = "mod(bar_index, N)"`, `[hold] rule = "bar"`) reads best
+  >   between rules of a similar mass. At 32 cells, `clouds` (0.27 live), `coral` (0.28) and
+  >   `slow_decay` (0.29) hold about the same volume, so a shift among them changes the texture, not
+  >   the amount. `coral` with `pyroclastic` (0.05-0.08, restless) keeps it moving, which is the gate
+  >   fixture's pair. `amoeba` and `crystal` (0.78) fill the cube, and `445` and `builder` burn out to
+  >   a few cells, so a shift to either end empties or floods the volume. A shift to a rule with
+  >   fewer `states` (`clouds` and `crystal` have 2) drops every decaying cell at the bar line.
 
 ### Close triggers
 

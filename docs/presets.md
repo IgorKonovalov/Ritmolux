@@ -28,7 +28,7 @@ the one place it is maintained; this document does not duplicate it.
 
 > **Accurate as of 2026-09-11**, against the curated set in
 > [`presets/`](../presets/) and the v2 expression grammar. Most built-in systems ship
-> at least one preset; `analytic_field`, `cellular` and `plexus` are the newest and ship none
+> at least one preset; `analytic_field`, `cellular`, `plexus` and `voxel` are the newest and ship none
 > yet, so their pictures come from the teaching presets under
 > [`docs/examples/`](examples/). The number of presets is deliberately not written
 > down here: it moves constantly, and a count in this line is a line that goes
@@ -160,6 +160,8 @@ its map and orbit trap — [below](#the-field-table)),
 whether its edges wrap — [below](#the-cellular-table)),
 `[plexus]` (how the plexus system's points are arranged, how many there are and what
 they are seeded from — [below](#the-plexus-table)),
+`[voxel]` (which 3D rules the voxel system runs, in how large a cube, and the ball it starts
+from — [below](#the-voxel-table)),
 `[spectrum]` (the readout's element count, layout and per-element easing —
 summarised [below](#the-spectrum-table)), `[feedback]` (how an accumulation reads
 its own past — [below](#the-feedback-table)), `[smoothing]` (per-parameter
@@ -215,6 +217,7 @@ that table is maintained alongside the presets and is the authoritative list.
 | `cellular` | A discrete cellular automaton on a grid of cells, from one of three families — Conway's Life and every birth/survival rule, Larger than Life's wide neighbourhoods, or the cyclic automaton's spirals — painted with the history of each cell ([below](#the-cellular-table)). |
 | `plexus` | A few hundred points in 3D, joined by a line wherever two come close, seen through a perspective camera with a real focal plane: lines and dots blur with their distance from focus. The points drift through a cube or ripple on a sheet ([below](#the-plexus-table)). |
 | `waterfall` | The spectrum's recent past as a landscape in 3D: each row is the band array at one moment, the newest at the front and older rows receding behind it, seen through the same perspective camera as `plexus` ([below](#the-waterfall-table)). |
+| `voxel` | A 3D cellular automaton in a cube of cells, drawn as a glowing volume that absorbs the light behind it and seen through the same perspective camera as `plexus`. Its rules come from a list the preset can switch among on the bar ([below](#the-voxel-table)). |
 
 **There is deliberately no per-system preset count here.** A count re-drifts every time
 a preset is added and nothing fails when it does. `presets/` is the list; `ls presets/*.toml`
@@ -783,6 +786,139 @@ that bites.
 dims anything by its distance from the camera. Seen from the front, the oldest rows are also the
 farthest, so the two look alike. From the side they are not: fog darkens the far end of every row,
 new ones included.
+
+### The `[voxel]` table
+
+A `voxel` preset runs a cellular automaton in three dimensions: a cube of cells, each generation
+every cell deciding its next state from how many of its neighbours are live. The cube is drawn as a
+glowing volume: a ray from the camera gathers the light of every cell it crosses, and each cell also
+absorbs some of the light from behind it. `[voxel]` picks the rules, the cube and how it starts:
+
+```toml
+system = "voxel"
+
+[voxel]
+grid        = 64                    # cells per side, 16..=128; the default is 64
+rules       = ["clouds", "coral"]   # 1..=8 rules, picked by the `rule` param; default ["clouds"]
+seed_radius = 1.0                   # the seeded ball's radius, in half-sides, 0..=2
+seed_fill   = 0.6                   # the chance a cell in that ball starts live, 0..=1
+wrap        = false                 # false (the default): every cell past a face is dead
+shells      = 8                     # radial shells the spectrum lights, 0..=16; default 0
+```
+
+| Key | Values | Notes |
+|-----|--------|-------|
+| `grid` | integer `16..=128` | Cells per side. Like `[cellular] grid` it is content, not resolution: doubling it halves how large every structure looks. The tier caps it, and the app says so. |
+| `rules` | a list of 1 to 8 entries | Each entry is a roster name (below) or an inline rule. The `rule` parameter picks one by its place in the list, counting from 0. |
+| `seed_radius` | `0..=2` | The radius of the ball of cells the cube starts with, as a fraction of its half-side; 2 covers the whole cube. Absent, the first rule's own. |
+| `seed_fill` | `0..=1` | The chance each cell inside that ball starts live. Absent, the first rule's own. |
+| `wrap` | `true` / `false` | `true` makes the cube a torus, so a structure crossing a face comes back on the opposite one. Default `false`. |
+| `shells` | integer `0..=16` | How many radial shells the spectrum lights, bass at the centre and treble at the faces. `0` lights none, and `shell_gain` is then inert. |
+
+Every key is optional and so is the table: `system = "voxel"` alone runs `clouds` in a 64-cell cube.
+Every key is read once, at load, and none is bindable. A grid, a seed or a shell count out of range,
+an empty or over-long list, an unknown roster name, and an inline rule out of range are **load
+errors**, and a rule's error names its entry.
+
+**Every cell is drawn from the seed.** The starting ball, and every ball a `reseed` refills, is
+hashed from the preset's `[generator] seed`, never from a clock, so the same preset driven by the
+same music runs the same history.
+
+#### A rule is two lists of counts
+
+A cell is dead, live, or decaying. A dead cell with a count of live neighbours in `birth` is born;
+a live cell with a count in `survive` stays live; a live cell that does not survive starts to
+decay, steps one stage further each generation, and is dead again after its last stage. Only a
+live cell counts as a neighbour. An inline rule writes this out:
+
+```toml
+[voxel]
+rules = [
+  "clouds",
+  { birth = [4], survive = [4], states = 5, neighbourhood = "moore" },
+]
+```
+
+| Key | Values | Notes |
+|-----|--------|-------|
+| `birth` | integers | Required. The live-neighbour counts at which a dead cell is born. |
+| `survive` | integers | Required. The counts at which a live cell stays live. |
+| `states` | integer `2..=255` | Dead, live and the decay stages. `2`, the default, has no decay stages. |
+| `neighbourhood` | `"moore"` or `"von_neumann"` | `moore` (the default) counts the 26 cells sharing a face, an edge or a corner; a count runs `0..=26`. `von_neumann` counts the 6 sharing a face; a count runs `0..=6`. |
+
+The 3D catalogues write a rule as survive/birth/states/neighbourhood, `4/4/5/M`, which is the
+reverse of the `B…/S…` order 2D Life uses. The roster below gives both lists by name, so nothing
+needs translating.
+
+#### The roster
+
+Every roster rule is held by the test suite to a live fraction strictly between 0 and 0.9 of a
+32-cell cube at generations 100 and 400, grown from its own seed. A list that opens with a roster
+rule takes that rule's seed when `seed_radius` and `seed_fill` are absent.
+
+| Name | `birth` | `survive` | `states` | Neighbours | Seed (radius, fill) | What it does |
+|---|---|---|---|---|---|---|
+| `445` | 4 | 4 | 5 | Moore | 0.35, 0.2 | A sparse ball that burns out to a few still cells. |
+| `amoeba` | 5-7, 12-13, 15 | 9-26 | 5 | Moore | 2.0, 0.5 | A sparse field that swells into a mass filling most of the cube. |
+| `builder` | 4, 6, 8-9 | 2, 6, 9 | 10 | Moore | 0.5, 0.5 | A burst of long-decaying growth that leaves a still scatter of cells behind. |
+| `clouds` | 13-14, 17-19 | 13-26 | 2 | Moore | 1.0, 0.6 | A dense field that settles into rounded clouds. The default. |
+| `coral` | 6-7, 9, 12 | 5-8 | 4 | Moore | 0.5, 0.5 | A slowly churning reef with a skin of decaying cells. |
+| `crystal` | 1, 3 | 0-6 | 2 | von Neumann | 0.2, 0.3 | A small seed growing into a lattice that fills most of the cube. |
+| `pyroclastic` | 6-8 | 4-7 | 10 | Moore | 0.5, 0.3 | A restless, never-settling foam of cells and long decay. |
+| `slow_decay` | 13-26 | 1, 4, 8, 11, 13-26 | 5 | Moore | 1.0, 0.5 | A dense field that freezes almost at once. |
+
+**Most 3D rules settle.** `445` and `builder` burn out to a still residue of a few cells, and
+`clouds`, `amoeba`, `crystal` and `slow_decay` reach a shape and hold it. Only `pyroclastic` and
+`coral` keep moving. `reseed` is how a cube stays alive, as on `cellular`: bind it to an onset or a
+beat and every ball of fresh cells it drops grows again.
+
+#### Switching rules on the bar
+
+`rule` is a structural parameter: it is rounded, it picks an entry of `rules` by its place, and
+past the end of the list it runs the last. A new rule takes effect at the next generation. Bound to
+audio it would re-pick every frame, so hold it on a musical edge:
+
+```toml
+[voxel]
+rules = ["coral", "pyroclastic", "clouds"]
+
+[params]
+rule = "mod(bar_index, 3)"
+
+[hold]
+rule = "bar"
+```
+
+A cell in a decay stage past the new rule's `states` falls dead on the switch, so changing from a
+rule with long decay to one with less can drop the volume's haze at the bar line.
+
+#### The music and the light
+
+- **`step_rate`** is generations per second, not per frame, so the automaton runs at the same
+  speed at 30 fps and at 144.
+- **`reseed`** fills **one ball** of `reseed_radius` with fresh cells, once per rise past 0.5, at a
+  centre drawn from the seed and the count of rises so far.
+- **`shell_gain`** lights the cube by the spectrum: with `shells` set, the band array is folded into
+  that many concentric shells, bass at the centre, and each cell's light is multiplied by
+  `1 + shell_gain × level` of its shell.
+- **`density`** is how strongly the volume absorbs the light behind it. At `0` it is pure additive
+  glow, with no front or back: the far side shows through the near one. Higher gives the volume a
+  surface and hides its inside.
+- **`trail`** and **`age_tint`** paint history. A decaying cell keeps `trail` of its light at each
+  stage, so `trail` is inert on a rule with `states = 2`. `age_tint` slides a live cell along the
+  palette as it stays live, and puts a decaying one at the far end.
+
+The camera is the shared one: `yaw`, `pitch`, `distance`, `fov` and `fog` behave as on
+[`plexus`](#the-plexus-table). `focus` and `aperture` are inert, because the volume has no drawn
+primitive to blur, and there is no `solid`.
+
+**`grid` is capped by the quality tier**: the Floor tier allows 64, the Rich tier 128. A preset
+asking within 64 runs identically on both; one asking for more runs at the cap and **says so**.
+Author against 64. The volume is also drawn at a resolution the tier caps, then stretched to the
+window, which changes only how fine the picture is, never its shape.
+
+The range that reads for each parameter is printed in the `voxel` table of
+[`presets/README.md`](../presets/README.md).
 
 ### The `[feedback]` table
 
@@ -1886,10 +2022,11 @@ that merely waste a line. Neither ever crashes a running visual (NFR 10).
 - An expression that fails to compile — an unknown identifier, a bad number, a
   wrong argument count, an unbalanced parenthesis, a stray character.
 - An invalid structural table (`[curve]`, `[generator]`, `[particles]`, `[path]`,
-  `[spectrum]`, `[field]`, `[cellular]`, `[plexus]`, `[palette]`, `[smoothing]`, `[latch]`) -
-  including a `[path] d` the parser refuses, which names the character offset it stopped at, a
-  `[field] map` or `trap` on a family that has no orbit, a `[cellular] grid` outside `16..=1024`,
-  and a `[plexus] points` outside `16..=4096`.
+  `[spectrum]`, `[field]`, `[cellular]`, `[plexus]`, `[voxel]`, `[palette]`, `[smoothing]`,
+  `[latch]`) - including a `[path] d` the parser refuses, which names the character offset it
+  stopped at, a `[field] map` or `trap` on a family that has no orbit, a `[cellular] grid` outside
+  `16..=1024`, a `[plexus] points` outside `16..=4096`, and a `[voxel] rules` entry naming no
+  roster rule or counting past its neighbourhood, which names the entry.
 
 **Warnings — the preset still loads and renders:**
 
