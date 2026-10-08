@@ -1,10 +1,10 @@
 # 0256 — The voxels turn solid
 
-> **Status:** draft
+> **Status:** approved 2026-10-08
 > **Created:** 2026-10-08
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0269](../adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md) (proposed), [ADR-0268](../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md) (proposed), [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md), [ADR-0201](../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md)
-> **Depends on:** [Plan 0255](0255-the-voxel-automaton-glows.md) closed. This plan extends its march and is not approved before 0255 closes.
+> **Depends on:** [Plan 0255](0255-the-voxel-automaton-glows.md) closed. This plan extends its march, so it runs only after 0255 closes.
 
 ## TL;DR
 

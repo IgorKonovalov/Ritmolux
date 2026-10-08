@@ -1,6 +1,6 @@
 # 0255 — The voxel automaton glows
 
-> **Status:** draft
+> **Status:** approved 2026-10-08
 > **Created:** 2026-10-08
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0268](../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md) (proposed), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md), [ADR-0201](../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md)
