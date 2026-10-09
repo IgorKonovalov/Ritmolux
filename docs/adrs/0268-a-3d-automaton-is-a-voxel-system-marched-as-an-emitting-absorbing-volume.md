@@ -85,6 +85,26 @@ every roster entry to that.
 so `shell_gain = 0` is an exact identity and the music lights the volume without touching the
 simulation.
 
+## Outcome (2026-10-09, Plan 0255)
+
+Plan 0255 built the decision as stated, and settled four of its details otherwise. The body above
+is left as accepted; these are the record:
+
+- **The faces do not wrap by default.** `[voxel] wrap` is optional and defaults to `false`, dead
+  outside the cube, the alternative Plan 0255's Risks named for a structure that crosses a face and
+  reads as a cut-off in an orbit. `wrap = true` gives the torus the Decision describes.
+- **Each roster rule survives its own seed, not one fixed seed.** Several rules grow only from a
+  dense small core and others only from a sparse field, so a roster entry carries its own default
+  seed (`RosterRule::seed`), which an absent `seed_radius` / `seed_fill` takes. The survival test
+  runs each rule from that seed.
+- **Absorption is weighted by the cell's glow, not by occupancy.** The march applies
+  `T *= exp(-density * glow(cell) * len)`, where a live cell's glow is 1 and a decay stage's is
+  `trail^(state - 1)`, so a fading cell absorbs as it emits rather than as a full cell, and a stage
+  faded from sight no longer occludes.
+- **The bricks are marked once a frame, not once a generation.** They are rebuilt after the frame's
+  last generation, which is the only state the march reads, so the two are equivalent for the
+  picture.
+
 ## Consequences
 
 ### Positive
