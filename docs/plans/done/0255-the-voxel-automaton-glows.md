@@ -1,10 +1,13 @@
 # 0255 — The voxel automaton glows
 
-> **Status:** in-progress 2026-10-08
+> **Status:** done 2026-10-09 - Phases 6-7 owed, ADR-0249. Phases 1-5 landed in `9269dd99`,
+> `627473a3`, `e39942ab`, `54a9ba57` and `bb991d91`; conductor review round 1: no blockers, no majors,
+> three minors (one fixed at the close, two open). Full suite green at the graded tip `79cd4489`
+> (the suite ledger, ADR-0207) and re-run on the closed tip. Version 0.172.0.
 > **Created:** 2026-10-08
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0268](../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md) (proposed), [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0258](../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md), [ADR-0201](../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md)
-> **Followed by:** [Plan 0256](0256-the-voxels-turn-solid.md) (the solid, lit present)
+> **Related ADRs:** [ADR-0268](../../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md) (accepted, Outcome), [ADR-0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0258](../../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md), [ADR-0201](../../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md), [ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0045](../../adrs/0045-quality-tiers-floor-and-rich.md)
+> **Followed by:** [Plan 0256](../0256-the-voxels-turn-solid.md) (the solid, lit present)
 
 ## TL;DR
 
@@ -282,7 +285,7 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 
 ## What this plan does NOT do
 
-- Draw solid, lit cubes. That is [Plan 0256](0256-the-voxels-turn-solid.md) under ADR-0269.
+- Draw solid, lit cubes. That is [Plan 0256](../0256-the-voxels-turn-solid.md) under ADR-0269.
 - Drive the step rate from the bands (the owner declined it in the interview), or add depth of
   field to the march.
 - Add a shadow, a light or a depth buffer.
@@ -422,5 +425,186 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
 - **Outstanding `human` phases:** Phase 6 (the look, judged) and Phase 7 (the preset-author
   reference), both `Blocks merge: no`.
+
+## Close review
+
+Closed 2026-10-09 by a conductor close, round 1, in the lane above. **Owed (ADR-0249):** Phase 6 has
+not yet judged whether the volume reads as a 3D structure, whether `density` gives it a front and a
+back, or whether an onset ball and a bar-edge rule shift read as the music's doing; Phase 7 has not
+yet applied the `## voxel` section above to the preset-author reference, so that lane has no working
+ranges for the system. Both rows stay `owed`.
+
+Close notes:
+
+- **Repaired at the close:** minor 3, ADR-0268's Outcome section (`b7a8edf6`); ADR-0268 accepted.
+  Minors 1 (the near-dead `445` and `builder` roster entries) and 2 (no frame-filling cost probe)
+  are code and a measurement, and stay open.
+- **Upstream CI** (`check-upstream-ci.mjs`): success, run 37821124090 at `78b7096`.
+- **Backlog probes:** exit 0, 43 reductions across 20 live entries; no entry falsified by this plan.
+- **Translations:** one stale row, `docs/running.ru.md` (stamped `fb237a6c`, source at `b25cd8cf10`),
+  which this plan did not move.
+- **Curation:** no preset `.toml` added or changed; only generated files under `presets/`. Nothing to
+  curate.
+- **Version:** minor, 0.171.0 to 0.172.0, a feature plan that adds a system.
+
+The round-1 review, in full:
+
+### Plan 0255 — The voxel automaton glows: Mode 4 review, round 1
+
+**Graded at:** `79cd4489a7b0c96ec894af300283e8bed1e94301` (tree `a7e78d6d`), lane
+`plan-0255-the-voxel-automaton-glows`, which already carries `main` (merge `bce2a139`).
+
+**Verdict: Plan 0255 landed cleanly. There are no blockers and no majors, and three minors.**
+Phases 1-5 match the plan. Phases 6 and 7 are `human` phases marked `Blocks merge: no`, so they are
+correctly `owed` (ADR-0249). The `cellular` move is byte-identical, and the march is exact under
+brick skipping. Every done-when the plan names has a test whose assertion matches its wording.
+
+#### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree a7e78d6 is green in the suite ledger, run
+  by gate 0255-pre-review-after-repair-1 at 2026-10-09T19:36:54.717Z: 2076 tests run: 2076 passed
+  (12 slow), 9 skipped`. `git rev-parse HEAD^{tree}` is `a7e78d6d…`, so that record is this tip's
+  full-suite evidence (ADR-0207). The log's `Full suite:` bullet defers to the pre-review gate, which
+  is correct in conductor mode.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: clean.
+- `cargo clippy --workspace --all-targets -- -D warnings`: clean. `cargo fmt --all --check`: clean.
+- `node scripts/check-system-counts.mjs`, `check-doc-links.mjs`, `check-reader-prose.mjs`,
+  `toc.mjs --check` and `check-comment-hygiene.mjs` all exit 0. Each ran as one command, with no
+  pipes.
+
+#### Lens 1: alignment with the plan and ADR-0268
+
+- Every phase carries exactly one in-vocabulary `**Owner skill:**` tag. Only the two `human`
+  phases carry `Blocks merge: no`, and no machine phase reads their output.
+- The log is shorter than the phases section, and it maps each phase to its commit
+  (`9269dd99`, `627473a3`, `e39942ab`, `54a9ba57`, `bb991d91`). It also names every file each phase
+  touched outside its list. Each of those was forced by an exhaustive match or by a guard.
+- I read each done-when against its test body:
+  - **P1 clock.** `two_seconds_at_60_and_144_hz_run_the_same_generations_and_volume` runs 120
+    frames at 1/60 and 288 at 1/144. It asserts 20 generations both times and an equal FNV hash of
+    the read-back state texture, and a `live > 0` control guards against a vacuous hash. This
+    matches the done-when exactly.
+  - **P1 golden byte-identity.** `cell_hash` reproduces the old inline
+    `mix32(u32(c.x) ^ mix32(u32(c.y) ^ mix32(seed)))` verbatim. `GenerationClock::advance` is the
+    old body, with the rate clamp left in `cellular`'s wrapper. The golden suite is green in the
+    ledger run.
+  - **P1 visible volume.** `a_seeded_volume_draws_a_lit_non_uniform_frame` drives the scene
+    directly rather than through `shot`. The gallery image is rendered through `shot`
+    (`scripts/docs-shots.mjs`), which covers the letter.
+  - **P2 survival.** `every_roster_rule_lives_from_its_own_seed` asserts `(0, 0.9)` at generations
+    100 and 400, using per-rule seeds, which the plan's Risks section allows. See minor 1.
+  - **P2 bar edges.** `a_rule_held_on_the_bar_changes_only_at_bar_edges` asserts motion in every
+    frame of each odd bar and stillness after the first frame of each even bar, and it runs twice
+    to check determinism. The still rule (`birth=[]`, survive all) makes frame equality stand for
+    state equality, which the module doc argues soundly.
+  - **P2 reseed.** `a_reseed_rise_changes_cells_only_inside_its_ball` checks every changed cell
+    against the hashed ball, with a `changed > 0` control and a held-high no-refire check.
+  - **P2 shells.** `zero_shell_gain_draws_the_frame_with_no_shells` asserts byte equality, with a
+    gain-2 control that differs.
+  - **P2 load errors.** There are four tests, and each asserts that the entry index and the
+    offending value appear in the message.
+  - **P3.** `a_grid_past_the_cap_is_clamped_with_a_notice` covers the cap.
+    `jumping_empty_bricks_moves_no_pixel` checks byte equality across four orbits, with a `lit > 0`
+    control. The probe readings are in the log: Floor 6.23 / 11.68 / 12.70 ms, and the ladder
+    stopped before its first rung. See minor 2.
+  - **P4.** The golden `voxel.png` is 32³, with a fixed camera and seed, 8 generations and
+    `shells = 0`. `identical_inputs_yield_an_identical_volume_after_600_frames` uses two controls,
+    a different seed and a moved onset. The sanity, animation and reactivity gates each get a
+    dedicated test on `voxel_gates.toml`. The animation test asserts the `silent` branch, and the
+    log records the readings. `distinctness_voxel` is in the roster but passes vacuously, because
+    no preset ships, and the plan's "or a fixture" allows that.
+  - **P5.** The generated blocks are current. `docs/presets.md`, `docs/preset-guide.md` and
+    `docs/on-device-validation.md` are swept. The log carries the Phase 7 text for the
+    preset-author `## voxel` section.
+- No ADR is silently reversed. ADR-0268's body is now partly out of date; see minor 3.
+
+#### Lens 2: layering, coupling and real-time safety
+
+- `core/` gains no platform or audio-source type. The march is pure wgpu and WGSL.
+- `voxel/mod.rs`, `shader.rs` and `rules.rs` all carry the panic-denial pragma, and `hygiene.rs`
+  asserts that the scan reaches `scenes/voxel/mod.rs`.
+- No per-frame allocation. Shader text is built only in `Resources::build`. The march target is
+  rebuilt only when its size changes. `shell_levels` writes into a fixed array.
+- The C ABI and the control protocol are untouched. The `Scene` trait gains nothing.
+
+#### Lens 3: docs and bookkeeping
+
+- The operator docs are swept (the presets reference, the guide, on-device validation), and
+  `docs/configuration.md` correctly gains no key, because no user setting was added.
+- **Owed at the close:**
+  - `Status: done - Phases 6-7 owed, ADR-0249`, the `done/` move and the index refresh.
+  - ADR-0268 goes `proposed -> accepted`, with an Outcome section (minor 3).
+  - A **minor** version bump, because this is a feature plan that adds a system.
+  - The studio's two version copies.
+  - The preset-set curation verdict. Only generated files under `presets/` changed, and no `.toml`.
+
+#### Lens 4: correctness and determinism
+
+- The march takes its aspect from the `render` argument (the target's) and never from the march
+  target. `march_size` holds both axes to the cap by one factor (ADR-0037), and its test checks
+  that 4K held to 1080p keeps 16:9.
+- Seeding, reseed balls and the step are integer hashes of the salt and the rise count. No clock
+  is read.
+- The roster masks match the plan's survive/birth notation entry by entry. I checked all eight.
+- A rule change drops stages at or past the new `states` (`select(s + 1u, 0u, s + 1u >= states)`),
+  and `a_rule_change_drops_decay_stages_the_new_rule_does_not_have` holds that.
+
+#### Lens 5: design integrity
+
+- `SystemKind::Voxel` joins through the table row, the `create` arm and `GeneratorConfig::Voxel`.
+  These are the usual seams, and no engine logic was bent to fit the system.
+- The shared clock and hash moved to `common.rs` with `cellular` as a thin wrapper, which is the
+  sharing ADR-0268 asked for.
+
+#### Findings
+
+##### Minor
+
+1. **`core/src/render/scenes/voxel/rules.rs:151` — the roster ships `445`, and arguably
+   `builder`, as near-dead residues.**
+   - **What.** `445` reads 0.0002 live, about 7 cells of 32,768, at both generations. It reaches
+     that only from a seed found by sweeping (0.35, 0.2), and the log says it reads 0 from every
+     other seed tried. `builder` reads 0.0015.
+   - **Why it matters.** Both pass the letter of `(0, 0.9)`. They do not meet the plan's Risks
+     section ("a dead or saturated rule gets cut, not shipped") or ADR-0268 ("survive … without
+     dying"). A strict `> 0` floor lets a still handful of cells count as living.
+   - **Suggested fix.** In a fix or follow-up session, cut `445` (the roster keeps seven, above
+     the five the plan requires). Alternatively, raise the survival test's lower bound to a stated
+     property, for example a live fraction of at least 0.001, and cut whatever then fails. The
+     docs already describe both rules honestly, so this is a roster-quality call rather than a
+     defect.
+
+2. **`core/tests/fixtures/voxel_cost_worst.toml:26` — the cost probes hold the default framing.**
+   - **What.** All three Phase 3 fixtures sit at `distance = 3.5`, the default, where the cube
+     covers only part of a 1920x1080 frame. A frame-filling camera (`distance` 1.5-2, or
+     `zoom > 1`) marches roughly twice the pixels.
+   - **Why it matters.** Floor's worst case reads 12.70 ms, so "all three fixtures on Floor inside
+     16.67 ms" is shown only for the default camera. That is the configuration-coincidence lens:
+     the probe and the default agree, and no probe measures the case where they part.
+   - **What already covers it.** `docs/on-device-validation.md` already routes a `distance = "2"`
+     worst frame to the owner, so this is not unguarded.
+   - **Suggested fix.** Add a frame-filling reading to the log, or a fourth cost fixture. If that
+     reading misses 16.67 ms, Floor's `voxel_march_scale` takes the ladder's first rung.
+
+3. **`docs/adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md:46`
+   — ADR-0268's body states things the implementation settled otherwise.** Four claims differ:
+   - "The volume wraps at its faces, as `cellular`'s torus does": `wrap` is optional and defaults
+     to `false`.
+   - The roster "survive[s] a fixed seed": each roster rule carries its own seed (`RosterRule::seed`).
+   - `T *= exp(-density * occupied(cell) * len)`: absorption is weighted by the cell's glow,
+     `trail^(stage-1)` for a decay stage.
+   - The bricks are "rebuilt each generation": they are marked once a frame, after the frame's last
+     generation, which is equivalent for the march.
+
+   **Fix.** The close accepts ADR-0268 with a dated `## Outcome` section recording those four
+   points (the ADR-0054/0074 precedent), not with a plain status flip. This is Markdown under
+   `docs/`, so it is close-repairable.
+
+##### Nits
+
+None.
+
+No earlier round raised a finding: round 1 is this plan's only review.
 
 ## Followups (after this lands)

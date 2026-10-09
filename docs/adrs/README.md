@@ -289,6 +289,6 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0265](0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md) | A preset ask carries a request id and the player answers it at the drain | accepted 2026-10-07, Plan 0252 |
 | [0266](0266-the-maze-route-is-a-double-sweep-relaxed-on-the-gpu-against-a-frozen-snapshot.md) | The maze route is found in the quiet stretches by a double sweep on the GPU against a frozen snapshot | accepted 2026-10-07, Plan 0253, Outcome |
 | [0267](0267-judging-a-preset-set-is-a-studio-session-over-an-isolated-player.md) | Judging a preset set is a studio session over an isolated player | accepted 2026-10-07, Plan 0254 |
-| [0268](0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md) | A 3D automaton is a voxel system marched as an emitting, absorbing volume, and its rules are a roster indexed by one held parameter | proposed 2026-10-08, Plan 0255 |
+| [0268](0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md) | A 3D automaton is a voxel system marched as an emitting, absorbing volume, and its rules are a roster indexed by one held parameter | accepted 2026-10-09, Plan 0255, Outcome |
 | [0269](0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md) | A solid voxel is lit by one key light and its own occlusion, and its light blooms like any other | proposed 2026-10-08, Plan 0256 |
 <!-- roster:end -->

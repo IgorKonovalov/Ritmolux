@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0255 - The voxel automaton glows](#0255---the-voxel-automaton-glows)
   - [0252 - The lost preset ask is located and answered](#0252---the-lost-preset-ask-is-located-and-answered)
   - [0254 - The studio judges a preset set](#0254---the-studio-judges-a-preset-set)
   - [0253 - The labyrinth shows its longest path](#0253---the-labyrinth-shows-its-longest-path)
@@ -297,6 +298,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0244 - Sessions start lighter](done/0244-sessions-start-lighter.md) - closed 2026-10-02, Phase 3 done the same day. Review: **no blockers, no majors, one minor, one nit (both fixed).** Version: none. [Write-up](README-archive.md).
 - [0202 - The three mechanisms get their gate](done/0202-the-three-mechanisms-get-their-gate.md) - closed 2026-10-02 at Phase 3. Review: **no blockers, no majors, five minors (four fixed).** Version: **0.160.2**. [Write-up](README-archive.md).
 - [0245 - A gate that runs a built binary checks it is current](done/0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) - closed 2026-10-01. Review: **two rounds; 1 major, 3 minors (all fixed).** Version: **0.160.1**. [Write-up](README-archive.md).
 - [0242 - Readiness is read when the plan is approved](done/0242-readiness-is-read-when-the-plan-is-approved.md) - closed 2026-10-01, Phase 3 done 2026-10-02. Review: **no blockers, no majors, one minor (fixed), one nit (open).** Version: **0.160.0**. [Write-up](README-archive.md).
@@ -512,6 +514,25 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0255 - The voxel automaton glows](done/0255-the-voxel-automaton-glows.md)
+
+- closed 2026-10-09 by a conductor close in the lane `plan-0255-the-voxel-automaton-glows`, round 1.
+The phases landed in `9269dd99` (Phase 1), `627473a3` (2), `e39942ab` (3), `54a9ba57` (4) and
+`bb991d91` (5). Phases 6 (the look, judged) and 7 (the preset-author reference) are `human` phases
+marked `Blocks merge: no` and are owed (ADR-0249). Round 1: **no blockers, no majors, three minors.**
+Minor 3, ADR-0268's body out of date in four details, was fixed at the close with an Outcome section
+(`b7a8edf6`). Minors 1 (`445` and `builder` ship as near-dead residues) and 2 (the cost probes hold
+the default framing, so no frame-filling camera is measured) stay open. Version **0.172.0** (minor:
+a feature). ADR-0268 accepted, Outcome. The full review is the plan's own `## Close review`.
+- **What landed.** A new system, `voxel`: a 3D automaton in a cube of up to 128³ cells, marched as an
+  emitting, absorbing volume through the shared camera, with bricks skipping empty space and a march
+  target capped per tier. Rules are a list of roster names or inline birth/survive counts, indexed by
+  the held `rule` parameter; an onset reseeds a hashed ball and the spectrum lights radial shells.
+  `GenerationClock` and the cell hash moved to `scenes/common.rs`, `cellular` byte-identical.
+- **Measured.** RADV RENOIR, 1920x1080, `Floor` 64³ at march scale 1.0: 6.23 / 11.68 / 12.70 ms
+  (sparse / cloudy / worst); the ladder stopped before its first rung.
+- **Curation.** No preset `.toml` added or changed; nothing to curate.
 
 ### [0252 - The lost preset ask is located and answered](done/0252-the-lost-preset-ask-is-located-and-answered.md)
 
