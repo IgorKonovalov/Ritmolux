@@ -1120,6 +1120,7 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
 | `key` | `1` | `solid` `0` – `4`; inert on `glow` | How strongly the key light lights a solid face turned toward it; 0 leaves only the ambient light. | light, main |
 | `ambient` | `0.3` | `solid` `0` – `1`; inert on `glow` | The light every solid face gets whichever way it turns; 1 with no key light draws each face in its own colour. | light |
+| `ao` | `1` | `solid` `0` – `1`; inert on `glow` | How far the cells around a solid face darken its ambient light toward the creases and inner corners; 0 is none. | light |
 | `light_yaw` | `-0.6` | `solid` `-3.1415927` – `3.1415927`; inert on `glow` | Where the key light stands around the viewer, in radians: 0 behind the camera, positive to its right. It turns with the camera. | light |
 | `light_pitch` | `0.6` | `solid` `-1.5` – `1.5`; inert on `glow` | How far above the viewer the key light stands, in radians; negative lights from below. It turns with the camera. | light |
 | `yaw` | `0` | `-3.1415927` – `3.1415927` | Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit. | motion |

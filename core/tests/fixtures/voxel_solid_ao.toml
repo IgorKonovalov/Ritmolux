@@ -1,0 +1,41 @@
+# The `voxel` scene drawn `solid` with its ambient occlusion on: a structure
+# full of inner corners, each darkened where its faces meet.
+#
+# `[voxel]` seeds a ball and nothing else, so the structure is a ball of cells
+# filled solid on a 32-cell grid: its surface is a stack of terraces, and every
+# step between two terraces is an inner edge, every notch an inner corner.
+# `step_rate = 0` freezes it there.
+#
+#  - The key light low and the ambient high, so the occlusion, which darkens
+#    the ambient term alone, is most of what the faces show.
+#  - `hue_spread` and `age_tint` at 0, so every cell is one colour and a face's
+#    brightness is its light alone.
+#  - Every light and camera param bound, so a change of default cannot move a
+#    baseline drawn from this file.
+system = "voxel"
+name   = "fixture_voxel_solid_ao"
+
+[generator]
+seed = 7
+
+[voxel]
+grid        = 32
+rules       = ["clouds"]
+seed_radius = 0.8
+seed_fill   = 1.0
+present     = "solid"
+
+[params]
+step_rate   = "0"
+hue         = "0.3"
+hue_spread  = "0"
+age_tint    = "0"
+key         = "0.4"
+ambient     = "0.8"
+ao          = "1"
+light_yaw   = "-0.6"
+light_pitch = "0.6"
+yaw         = "0.6"
+pitch       = "0.4"
+distance    = "3.5"
+fov         = "0.8"

@@ -36,6 +36,7 @@
         "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
         "key": { "$ref": "#/definitions/param.key" },
         "ambient": { "$ref": "#/definitions/param.ambient" },
+        "ao": { "$ref": "#/definitions/param.ao" },
         "light_yaw": { "$ref": "#/definitions/param.light_yaw" },
         "light_pitch": { "$ref": "#/definitions/param.light_pitch" },
         "yaw": { "$ref": "#/definitions/param.yaw.plexus" },
@@ -1001,6 +1002,11 @@
       "type": "string",
       "description": "The light every solid face gets whichever way it turns; 1 with no key light draws each face in its own colour.",
       "markdownDescription": "The light every solid face gets whichever way it turns; 1 with no key light draws each face in its own colour.\n\n- default `0.3`\n- typical range depends on the family: `solid` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `glow` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.ao": {
+      "type": "string",
+      "description": "How far the cells around a solid face darken its ambient light toward the creases and inner corners; 0 is none.",
+      "markdownDescription": "How far the cells around a solid face darken its ambient light toward the creases and inner corners; 0 is none.\n\n- default `1.0`\n- typical range depends on the family: `solid` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `glow` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.light_yaw": {
       "type": "string",

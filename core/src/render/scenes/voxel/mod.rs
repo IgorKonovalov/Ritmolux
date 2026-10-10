@@ -63,11 +63,16 @@
 //! directional key light and an ambient term:
 //!
 //! ```text
-//! shade = palette(age) * brightness * shell * (ambient + key * max(0, n . l))
+//! shade = palette(age) * brightness * shell * (ambient * occ + key * max(0, n . l))
 //! ```
 //!
 //! composited under the light gathered so far, at full coverage. The light is
 //! given in camera space ([`light_dir`]), so the lit side turns with an orbit.
+//! `occ` is the face's voxel ambient occlusion: each of its four corners is
+//! closed by the live cells beside it in the layer in front of the face — two
+//! sides close it fully, otherwise each of the two sides and the diagonal a
+//! third — and the four are interpolated across the face at the hit point and
+//! mixed in by `ao`.
 //!
 //! # Bricks
 //!
@@ -246,6 +251,7 @@ const DEFAULT_RESEED_RADIUS: f32 = default_of(PARAMS, "reseed_radius");
 const DEFAULT_SHELL_GAIN: f32 = default_of(PARAMS, "shell_gain");
 const DEFAULT_KEY: f32 = default_of(PARAMS, "key");
 const DEFAULT_AMBIENT: f32 = default_of(PARAMS, "ambient");
+const DEFAULT_AO: f32 = default_of(PARAMS, "ao");
 const DEFAULT_LIGHT_YAW: f32 = default_of(PARAMS, "light_yaw");
 const DEFAULT_LIGHT_PITCH: f32 = default_of(PARAMS, "light_pitch");
 
@@ -382,6 +388,16 @@ pub const PARAMS: &[ParamSpec] = &[
         main: false,
     },
     ParamSpec {
+        name: "ao",
+        default: 1.0,
+        range: Some([0.0, 1.0]),
+        doc: "How far the cells around a solid face darken its ambient light toward the \
+              creases and inner corners; 0 is none.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
+    },
+    ParamSpec {
         name: "light_yaw",
         default: -0.6,
         range: Some([-PI, PI]),
@@ -442,6 +458,7 @@ macro_rules! solid_only {
 pub const FAMILY_PARAMS: &[FamilyParam] = &[
     solid_only!("key": Some([0.0, 4.0])),
     solid_only!("ambient": Some([0.0, 1.0])),
+    solid_only!("ao": Some([0.0, 1.0])),
     solid_only!("light_yaw": Some([-PI, PI])),
     solid_only!("light_pitch": Some([-1.5, 1.5])),
 ];
@@ -693,7 +710,7 @@ struct MarchParams {
     /// xyz: the unit world direction toward the key light; w: 1 under
     /// `solid`.
     light: [f32; 4],
-    /// x: key, y: ambient; zw unused.
+    /// x: key, y: ambient, z: ao (0..1); w unused.
     lit: [f32; 4],
     /// The shells' levels, four to a `vec4`, bass first.
     shells: [[f32; 4]; (MAX_SHELLS / 4) as usize],
@@ -1329,6 +1346,7 @@ pub struct VoxelScene {
     hue_spread: f32,
     key: f32,
     ambient: f32,
+    ao: f32,
     light_yaw: f32,
     light_pitch: f32,
     zoom: f32,
@@ -1384,6 +1402,7 @@ impl VoxelScene {
             hue_spread: DEFAULT_HUE_SPREAD,
             key: DEFAULT_KEY,
             ambient: DEFAULT_AMBIENT,
+            ao: DEFAULT_AO,
             light_yaw: DEFAULT_LIGHT_YAW,
             light_pitch: DEFAULT_LIGHT_PITCH,
             zoom: DEFAULT_ZOOM,
@@ -1486,7 +1505,7 @@ impl VoxelScene {
             lit: [
                 finite_or(self.key, DEFAULT_KEY).max(0.0),
                 finite_or(self.ambient, DEFAULT_AMBIENT).max(0.0),
-                0.0,
+                finite_or(self.ao, DEFAULT_AO).clamp(0.0, 1.0),
                 0.0,
             ],
             shells: {
@@ -1567,6 +1586,7 @@ impl Scene for VoxelScene {
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.key = DEFAULT_KEY;
         self.ambient = DEFAULT_AMBIENT;
+        self.ao = DEFAULT_AO;
         self.light_yaw = DEFAULT_LIGHT_YAW;
         self.light_pitch = DEFAULT_LIGHT_PITCH;
         self.zoom = DEFAULT_ZOOM;
@@ -1605,6 +1625,7 @@ impl Scene for VoxelScene {
             "hue_spread" => self.hue_spread = value,
             "key" => self.key = value,
             "ambient" => self.ambient = value,
+            "ao" => self.ao = value,
             "light_yaw" => self.light_yaw = value,
             "light_pitch" => self.light_pitch = value,
             "zoom" => self.zoom = value,

@@ -251,8 +251,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 ///
 /// Under `solid` (`light.w`), the first live cell ends the walk: its entry
 /// face — the axis of the last crossing, facing against the step — is shaded
-/// `albedo * (ambient + key * max(0, n . l))`, added under the light in front
-/// of it, and `T` drops to 0, so the pixel's coverage is `occlude`.
+/// `albedo * (ambient * occ + key * max(0, n . l))`, added under the light in
+/// front of it, and `T` drops to 0, so the pixel's coverage is `occlude`.
+/// `occ` is the face's voxel ambient occlusion at the hit point, mixed in by
+/// `ao`; at `ao = 0` it is not evaluated.
 ///
 /// **A crossing is computed from its boundary's index, never accumulated.** The
 /// parameter at which the ray crosses an axis's next boundary is
@@ -284,7 +286,7 @@ struct March {
     d: vec4<f32>,
     // xyz: the unit world direction toward the key light, w: 1 under solid
     light: vec4<f32>,
-    // x: key, y: ambient; zw unused
+    // x: key, y: ambient, z: ao (0..1); w unused
     lit: vec4<f32>,
     // The shells' levels, four to a vec4, bass first
     shells: array<vec4<f32>, 4>,
@@ -337,6 +339,50 @@ fn glow_of(state: u32) -> f32 {
         return exp2(f32(state - 1u) * log2(max(mp.b.w, 1e-6)));
     }
     return 0.0;
+}
+
+// 1 when the cell at `c` is live, 0 for any other state and off the grid.
+fn solid_at(c: vec3<i32>, ni: i32) -> f32 {
+    if (any(c < vec3<i32>(0)) || any(c >= vec3<i32>(ni))) {
+        return 0.0;
+    }
+    return select(0.0, 1.0, (textureLoad(field, c, 0).x & 0xFFu) == 1u);
+}
+
+// How closed one corner of a face is, 0 open to 1 shut, from the two cells
+// beside it and the one diagonal to it in the layer in front of the face: two
+// sides shut it whatever the diagonal, otherwise each closes a third.
+fn corner_closed(side_a: f32, side_b: f32, diagonal: f32) -> f32 {
+    if (side_a > 0.5 && side_b > 0.5) {
+        return 1.0;
+    }
+    return (side_a + side_b + diagonal) / 3.0;
+}
+
+// The open fraction of the ambient light reaching point `p` (cell units) on
+// the face of `cell` whose outward normal is `facing` (+1 or -1) along `axis`:
+// the four corners' closure, interpolated bilinearly across the face.
+fn face_open(cell: vec3<i32>, axis: i32, facing: i32, p: vec3<f32>, ni: i32) -> f32 {
+    var outward = vec3<i32>(0);
+    outward[axis] = facing;
+    let front = cell + outward;
+    let ua = (axis + 1) % 3;
+    let va = (axis + 2) % 3;
+    var eu = vec3<i32>(0);
+    eu[ua] = 1;
+    var ev = vec3<i32>(0);
+    ev[va] = 1;
+    let u_lo = solid_at(front - eu, ni);
+    let u_hi = solid_at(front + eu, ni);
+    let v_lo = solid_at(front - ev, ni);
+    let v_hi = solid_at(front + ev, ni);
+    let c00 = corner_closed(u_lo, v_lo, solid_at(front - eu - ev, ni));
+    let c10 = corner_closed(u_hi, v_lo, solid_at(front + eu - ev, ni));
+    let c01 = corner_closed(u_lo, v_hi, solid_at(front - eu + ev, ni));
+    let c11 = corner_closed(u_hi, v_hi, solid_at(front + eu + ev, ni));
+    let fu = clamp(p[ua] - f32(cell[ua]), 0.0, 1.0);
+    let fv = clamp(p[va] - f32(cell[va]), 0.0, 1.0);
+    return 1.0 - mix(mix(c00, c10, fu), mix(c01, c11, fu), fv);
 }
 
 @fragment
@@ -481,7 +527,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                 var normal = vec3<f32>(0.0);
                 normal[axis] = -f32(stride[axis]);
                 let lambert = max(dot(normal, mp.light.xyz), 0.0);
-                let lighting = mp.lit.y + mp.lit.x * lambert;
+                // At `ao = 0` the ambient term is left exactly as it is.
+                var ambient = mp.lit.y;
+                if (mp.lit.z > 0.0) {
+                    let open = face_open(cell, axis, -stride[axis], o + dg * t, ni);
+                    ambient = ambient * mix(1.0, open, mp.lit.z);
+                }
+                let lighting = ambient + mp.lit.x * lambert;
                 light = light + transmit * shade(coord) * (max(mp.a.y, 0.0) * fog * shell * lighting);
                 transmit = 0.0;
                 break;

@@ -195,8 +195,8 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: the march stops and lights the face | dev | done | committed with this row |
-| 2 — Voxel ambient occlusion | dev | not started | |
+| 1 — Walking skeleton: the march stops and lights the face | dev | done | 13569903 |
+| 2 — Voxel ambient occlusion | dev | done | committed with this row |
 | 3 — Cost, the golden and the gates | dev | not started | |
 | 4 — Documentation and the references | dev | not started | |
 | 5 — The look, judged | human | not started | |
@@ -215,6 +215,17 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
   `core/src/preset/schema/load.rs` and `.taplo.toml` did not change.
 - Phase 1: the shade is also multiplied by the camera's `fog`, as a glowing cell's light is; the
   ADR's formula does not name it.
+- Phase 2: the `ao` param (default 1) is declared here, so this phase also regenerated
+  `presets/README.md`, `presets/schema/`, `presets/preset.schema.json` and
+  `docs/specs/player-schema.json`, outside its file list.
+- Phase 2: the L of two blocks is written into the state texture by
+  `ambient_occlusion_darkens_the_inner_edge_of_an_l`, as Phase 1's block is; the TOML fixture
+  `core/tests/fixtures/voxel_solid_ao.toml` is a solid ball on a 32³ grid, whose terraces carry the
+  inner edges, because `[voxel]` cannot seed an L.
+- Phase 2: "with `ao = 0` the Phase 1 fixtures render byte-identical to Phase 1" was checked with
+  `shot` (640x360) of `voxel_solid_block.toml` and `docs/examples/voxel/solid.toml`, captured at
+  Phase 1's commit and again here with `ao = "0"` added to a scratch copy: `cmp` found both pairs
+  identical. No test holds it.
 
 ### Close triggers
 

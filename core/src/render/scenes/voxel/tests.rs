@@ -68,21 +68,33 @@ const TARGET: u32 = 48;
 /// target.
 struct Driver<'a> {
     ctx: &'a RenderContext,
+    /// Pixels a side.
+    size: u32,
     target: wgpu::Texture,
     view: wgpu::TextureView,
 }
 
 impl<'a> Driver<'a> {
     fn new(ctx: &'a RenderContext) -> Self {
+        Self::sized(ctx, TARGET)
+    }
+
+    /// A driver into a square target `size` pixels a side.
+    fn sized(ctx: &'a RenderContext, size: u32) -> Self {
         let (target, view) =
-            capture::create_target(&ctx.device, crate::render::COMPOSITE_FORMAT, TARGET, TARGET);
-        Self { ctx, target, view }
+            capture::create_target(&ctx.device, crate::render::COMPOSITE_FORMAT, size, size);
+        Self {
+            ctx,
+            size,
+            target,
+            view,
+        }
     }
 
     /// One frame of `dt` seconds with `params` bound; returns how many
     /// generations it ran.
     fn frame(&mut self, scene: &mut VoxelScene, dt: f32, params: &[(&str, f32)]) -> u32 {
-        scene.set_target_size(TARGET, TARGET);
+        scene.set_target_size(self.size, self.size);
         scene.advance(dt);
         scene.reset_params();
         for (name, value) in params {
@@ -106,26 +118,19 @@ impl<'a> Driver<'a> {
         generations
     }
 
-    /// The last frame's present, `TARGET` pixels a side, as linear RGBA.
+    /// The last frame's present, `size` pixels a side, as linear RGBA.
     fn read_target(&self) -> Vec<[f32; 4]> {
-        let (buffer, padded_bpr) =
-            capture::create_linear_readback(&self.ctx.device, TARGET, TARGET);
+        let n = self.size;
+        let (buffer, padded_bpr) = capture::create_linear_readback(&self.ctx.device, n, n);
         let mut encoder = self
             .ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("voxel-target-readback"),
             });
-        capture::record_copy(
-            &mut encoder,
-            &self.target,
-            &buffer,
-            padded_bpr,
-            TARGET,
-            TARGET,
-        );
+        capture::record_copy(&mut encoder, &self.target, &buffer, padded_bpr, n, n);
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
-        capture::read_back_linear(&self.ctx.device, &buffer, TARGET, TARGET, padded_bpr)
+        capture::read_back_linear(&self.ctx.device, &buffer, n, n, padded_bpr)
             .expect("the target reads back")
             .chunks_exact(4)
             .map(|p| [p[0], p[1], p[2], p[3]])
@@ -245,9 +250,11 @@ fn write_cells(ctx: &RenderContext, scene: &mut VoxelScene, live: impl Fn([u32; 
 }
 
 /// A scene drawing `present` on a grid of `grid` whose cells are exactly
-/// `live`, the clock frozen so nothing steps them.
+/// `live`, the clock frozen so nothing steps them, and a driver into a target
+/// `size` pixels a side.
 fn scene_holding(
     ctx: &RenderContext,
+    size: u32,
     grid: u32,
     present: Present,
     live: impl Fn([u32; 3]) -> bool,
@@ -259,17 +266,17 @@ fn scene_holding(
             ..config(grid, RosterRule::Clouds, 1)
         },
     );
-    let mut driver = Driver::new(ctx);
+    let mut driver = Driver::sized(ctx, size);
     // The first frame seeds the field; the structure replaces it after.
     driver.frame(&mut scene, 1.0 / 60.0, &[("step_rate", 0.0)]);
     write_cells(ctx, &mut scene, live);
     (scene, driver)
 }
 
-/// The pixel of the `TARGET`-square frame that world point `p` lands on, under
-/// the camera a frame with `yaw` and `pitch` bound and every other camera
-/// param at rest looks through.
-fn pixel_of(yaw: f32, pitch: f32, p: [f32; 3]) -> usize {
+/// The pixel of a `size`-square frame that world point `p` lands on, under the
+/// camera a frame with `yaw` and `pitch` bound and every other camera param at
+/// rest looks through.
+fn pixel_of(size: u32, yaw: f32, pitch: f32, p: [f32; 3]) -> usize {
     let view = CameraParams {
         yaw,
         pitch,
@@ -279,9 +286,10 @@ fn pixel_of(yaw: f32, pitch: f32, p: [f32; 3]) -> usize {
     .view(1.0, DEFAULT_ZOOM, [0.0, 0.0]);
     let c = view.clip(p);
     let (x, y) = (c[0] / c[3], c[1] / c[3]);
-    let col = (((x + 1.0) * 0.5 * TARGET as f32) as usize).min(TARGET as usize - 1);
-    let row = (((1.0 - y) * 0.5 * TARGET as f32) as usize).min(TARGET as usize - 1);
-    row * TARGET as usize + col
+    let n = size as usize;
+    let col = (((x + 1.0) * 0.5 * size as f32) as usize).min(n - 1);
+    let row = (((1.0 - y) * 0.5 * size as f32) as usize).min(n - 1);
+    row * n + col
 }
 
 /// The camera every solid probe looks through.
@@ -302,7 +310,7 @@ fn block(c: [u32; 3]) -> bool {
 /// The colour of each [`VISIBLE_FACES`] face's centre, on the 8³ [`block`]
 /// drawn solid with `params` bound over the probe camera.
 fn face_centres(ctx: &RenderContext, params: &[(&str, f32)]) -> [[f32; 4]; 3] {
-    let (mut scene, mut driver) = scene_holding(ctx, 16, Present::Solid, block);
+    let (mut scene, mut driver) = scene_holding(ctx, TARGET, 16, Present::Solid, block);
     let mut bound = vec![
         ("step_rate", 0.0),
         ("yaw", SOLID_YAW),
@@ -314,7 +322,7 @@ fn face_centres(ctx: &RenderContext, params: &[(&str, f32)]) -> [[f32; 4]; 3] {
     bound.extend_from_slice(params);
     driver.frame(&mut scene, 1.0 / 60.0, &bound);
     let pixels = driver.read_target();
-    VISIBLE_FACES.map(|n| pixels[pixel_of(SOLID_YAW, SOLID_PITCH, n.map(|v| v * 0.5))])
+    VISIBLE_FACES.map(|n| pixels[pixel_of(TARGET, SOLID_YAW, SOLID_PITCH, n.map(|v| v * 0.5))])
 }
 
 fn luminance(p: [f32; 4]) -> f32 {
@@ -395,15 +403,15 @@ fn with_key_0_and_ambient_1_every_face_reads_the_albedo() {
     }
 }
 
-/// **`glow` ignores the light**: a frame drawn under `glow` with the four
-/// light params far from rest is byte-identical to one with them at rest.
+/// **`glow` ignores the light**: a frame drawn under `glow` with the light
+/// params far from rest is byte-identical to one with them at rest.
 #[test]
 fn glow_ignores_the_light_params() {
     let Some(ctx) = context() else {
         return;
     };
     let frame = |params: &[(&str, f32)]| {
-        let (mut scene, mut driver) = scene_holding(&ctx, 16, Present::Glow, block);
+        let (mut scene, mut driver) = scene_holding(&ctx, TARGET, 16, Present::Glow, block);
         let mut bound = vec![
             ("step_rate", 0.0),
             ("yaw", SOLID_YAW),
@@ -417,11 +425,106 @@ fn glow_ignores_the_light_params() {
     let moved = frame(&[
         ("key", 3.0),
         ("ambient", 0.9),
+        ("ao", 0.0),
         ("light_yaw", 2.0),
         ("light_pitch", -1.0),
     ]);
     assert!(rest.iter().any(|p| p[3] > 0.0), "the block drew nothing");
     assert!(rest == moved, "a light param moved a glow frame");
+}
+
+/// The AO probes' target, pixels a side: fine enough that a point a few
+/// tenths of a cell from an edge lands on a pixel of its own.
+const AO_TARGET: u32 = 384;
+
+/// An L of two blocks on a 16³ grid, extruded along z over cells 4 to 11: a
+/// base, cells x 2-11 and y 2-5, and an upright on its `-x` end, cells x 2-5
+/// and y 6-13. The inner edge runs along z at `x = y = 6` cells.
+fn l_shape(c: [u32; 3]) -> bool {
+    let [x, y, z] = c;
+    let depth = (4..12).contains(&z);
+    let base = (2..12).contains(&x) && (2..6).contains(&y);
+    let upright = (2..6).contains(&x) && (6..14).contains(&y);
+    depth && (base || upright)
+}
+
+/// A point `(x, y, z)` in cells of the 16³ grid, in world units.
+fn cells_to_world(c: [f32; 3]) -> [f32; 3] {
+    c.map(|v| v / 8.0 - 1.0)
+}
+
+/// The luminance at each of `points` (in cells) on the [`l_shape`] drawn solid
+/// with `ao` bound, every point required to be covered.
+fn l_luminance(ctx: &RenderContext, ao: f32, points: &[[f32; 3]]) -> Vec<f32> {
+    let (mut scene, mut driver) = scene_holding(ctx, AO_TARGET, 16, Present::Solid, l_shape);
+    driver.frame(
+        &mut scene,
+        1.0 / 60.0,
+        &[
+            ("step_rate", 0.0),
+            ("yaw", SOLID_YAW),
+            ("pitch", SOLID_PITCH),
+            ("hue_spread", 0.0),
+            ("age_tint", 0.0),
+            ("ao", ao),
+        ],
+    );
+    let pixels = driver.read_target();
+    points
+        .iter()
+        .map(|&c| {
+            let p = pixels[pixel_of(AO_TARGET, SOLID_YAW, SOLID_PITCH, cells_to_world(c))];
+            assert!(p[3] > 0.0, "the point {c:?} is not on the L");
+            luminance(p)
+        })
+        .collect()
+}
+
+/// **The ambient occlusion darkens the crease and nothing else**: at `ao = 1`
+/// the two faces meeting at the L's inner edge — the base's top and the
+/// upright's `+x` face — each read strictly darker 0.4 cells from that edge
+/// than at their own centres, while the upright's top, which has no
+/// neighbours, reads the same near its edge as at its centre. The control: at
+/// `ao = 0` the crease reads as its centre does.
+#[test]
+fn ambient_occlusion_darkens_the_inner_edge_of_an_l() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let points = [
+        // The base's top, at y = 6: near the inner edge, then its centre.
+        [6.4, 6.0, 8.0],
+        [9.0, 6.0, 8.0],
+        // The upright's +x face, at x = 6: near the inner edge, then its centre.
+        [6.0, 6.4, 8.0],
+        [6.0, 10.0, 8.0],
+        // The upright's top, at y = 14: near its +x edge, then its centre.
+        [5.6, 14.0, 8.0],
+        [4.0, 14.0, 8.0],
+    ];
+    let on = l_luminance(&ctx, 1.0, &points);
+    let off = l_luminance(&ctx, 0.0, &points);
+    println!("ao 1: {on:?}\nao 0: {off:?}");
+    for (face, pair) in [(0, "the base's top"), (2, "the upright's +x face")] {
+        assert!(
+            on[face] < on[face + 1] * 0.98,
+            "{pair} reads {} at the crease, no darker than {} at its centre",
+            on[face],
+            on[face + 1]
+        );
+        assert!(
+            (off[face] - off[face + 1]).abs() < 1e-3,
+            "with ao 0, {pair} still darkens at the crease: {} against {}",
+            off[face],
+            off[face + 1]
+        );
+    }
+    assert!(
+        (on[4] - on[5]).abs() < 1e-3,
+        "the upright's open top reads {} at its edge and {} at its centre",
+        on[4],
+        on[5]
+    );
 }
 
 /// The camera-space light: at `(0, 0)` it shines from the eye along the view
