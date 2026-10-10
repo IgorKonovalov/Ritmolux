@@ -1458,6 +1458,7 @@ impl Renderer {
             GeneratorConfig::Field(config) => Some(config.family.as_str()),
             GeneratorConfig::Cellular(config) => Some(config.family.as_str()),
             GeneratorConfig::Plexus(config) => Some(config.layout.as_str()),
+            GeneratorConfig::Voxel(config) => Some(config.present.as_str()),
             // Exhaustive rather than a wildcard, so a system that grows a family
             // has to answer here as well as in `family_params`.
             GeneratorConfig::LSystem { .. }
@@ -1465,8 +1466,7 @@ impl Renderer {
             | GeneratorConfig::Spectrum { .. }
             | GeneratorConfig::WarpMesh { .. }
             | GeneratorConfig::Path { .. }
-            | GeneratorConfig::Waterfall(_)
-            | GeneratorConfig::Voxel(_) => None,
+            | GeneratorConfig::Waterfall(_) => None,
         }
     }
 

@@ -490,6 +490,20 @@ const IMAGES = [
     tier: "rich",
   },
 
+  // --- the voxel system's solid present -----------------------------------
+  //
+  // UNJUDGED: the system ships no preset yet, so the solid present is drawn
+  // from the teaching preset the guide prints for it. Filed outside the
+  // gallery for the curves' reason.
+  {
+    out: "docs/images/voxel/solid.png",
+    presetFile: "docs/examples/voxel/solid.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+
   // --- the gallery: one per SystemKind ------------------------------------
 
   {

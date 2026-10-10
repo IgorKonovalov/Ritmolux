@@ -1,6 +1,6 @@
 # 0256 — The voxels turn solid
 
-> **Status:** approved 2026-10-08
+> **Status:** in-progress
 > **Created:** 2026-10-08
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0269](../adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md) (proposed), [ADR-0268](../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md) (proposed), [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md), [ADR-0201](../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md)
@@ -191,11 +191,11 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
 
 ## Implementation log
 
-**Lane:**
+**Lane:** branch `plan-0256-the-voxels-turn-solid`, worktree `/home/igor/Work/rlx-plan-0256`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: the march stops and lights the face | dev | not started | |
+| 1 — Walking skeleton: the march stops and lights the face | dev | done | committed with this row |
 | 2 — Voxel ambient occlusion | dev | not started | |
 | 3 — Cost, the golden and the gates | dev | not started | |
 | 4 — Documentation and the references | dev | not started | |
@@ -203,6 +203,18 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
 | 6 — The preset-author reference | human | not started | |
 
 ### Notes
+
+- Phase 1: `[voxel]` cannot express an 8³ block (the seed is a ball). The done-when tests in
+  `voxel/tests.rs` write the 8³ block into the state texture directly, which adds `COPY_DST` to the
+  state textures' usage. The `shot` fixture `core/tests/fixtures/voxel_solid_block.toml` is the whole
+  16³ grid filled, a 16³ block.
+- Phase 1: files outside the phase's list, needed to declare `present` as a roster key and the light
+  params as inert under `glow`: `core/src/preset/schema/export.rs` (`Roster::VoxelPresent`),
+  `core/src/preset/schema/tests.rs` (its roster check), `core/src/render/scenes/mod.rs`
+  (`family_params("voxel")`), `core/src/render/mod.rs` (`active_family_key` answers the present).
+  `core/src/preset/schema/load.rs` and `.taplo.toml` did not change.
+- Phase 1: the shade is also multiplied by the camera's `fog`, as a glowing cell's light is; the
+  ADR's formula does not name it.
 
 ### Close triggers
 

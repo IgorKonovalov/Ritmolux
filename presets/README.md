@@ -1118,6 +1118,10 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. | colour, main |
 | `hue_spread` | `0.3` | `0` – `1` | How far along the palette the colour travels from the cube's centre to its corners. | colour |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. | light, main |
+| `key` | `1` | `solid` `0` – `4`; inert on `glow` | How strongly the key light lights a solid face turned toward it; 0 leaves only the ambient light. | light, main |
+| `ambient` | `0.3` | `solid` `0` – `1`; inert on `glow` | The light every solid face gets whichever way it turns; 1 with no key light draws each face in its own colour. | light |
+| `light_yaw` | `-0.6` | `solid` `-3.1415927` – `3.1415927`; inert on `glow` | Where the key light stands around the viewer, in radians: 0 behind the camera, positive to its right. It turns with the camera. | light |
+| `light_pitch` | `0.6` | `solid` `-1.5` – `1.5`; inert on `glow` | How far above the viewer the key light stands, in radians; negative lights from below. It turns with the camera. | light |
 | `yaw` | `0` | `-3.1415927` – `3.1415927` | Turns the camera around the scene's volume, in radians; bind it to a slow clock to orbit. | motion |
 | `pitch` | `0.25` | `-1.55` – `1.55` | Raises the camera above the scene's volume, in radians; negative looks up from below. | motion |
 | `distance` | `3.5` | `1.5` – `8` | How far the camera sits from the centre of the scene's volume; nearer exaggerates the perspective. | motion |

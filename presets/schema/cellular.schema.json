@@ -644,7 +644,7 @@
       }
     },
     "voxel": {
-      "description": "The voxel automaton's grid, the rules it runs, the ball it is seeded with, whether its faces wrap, and how many shells the spectrum lights.",
+      "description": "The voxel automaton's grid, the rules it runs, the ball it is seeded with, whether its faces wrap, how many shells the spectrum lights, and whether it glows or is drawn solid.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -681,6 +681,12 @@
           "type": "integer",
           "description": "How many radial shells the spectrum lights, bass at the centre; 0 lights none.",
           "markdownDescription": "How many radial shells the spectrum lights, bass at the centre; 0 lights none.\n\nDefault `0`."
+        },
+        "present": {
+          "type": "string",
+          "enum": ["glow", "solid"],
+          "description": "How a live cell is drawn: glow emits and absorbs through the whole volume; solid stops at the first live cell and lights its face, with the decay in front of it still glowing.",
+          "markdownDescription": "How a live cell is drawn: glow emits and absorbs through the whole volume; solid stops at the first live cell and lights its face, with the decay in front of it still glowing.\n\nDefault `glow`."
         }
       }
     },

@@ -299,6 +299,7 @@ pub fn family_params(label: &str) -> &'static [FamilyParam] {
         "cellular" => cellular::FAMILY_PARAMS,
         "plexus" => plexus::FAMILY_PARAMS,
         "attractor" => particles::FAMILY_PARAMS,
+        "voxel" => voxel::FAMILY_PARAMS,
         _ => &[],
     }
 }

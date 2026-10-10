@@ -1,5 +1,6 @@
 //! The voxel system (ADR-0268): a 3D cellular automaton in a cube of cells,
-//! drawn as a glowing, absorbing volume seen through the shared orbit camera.
+//! drawn as a glowing, absorbing volume — or as lit solid cells (ADR-0269) —
+//! seen through the shared orbit camera.
 //!
 //! # The state
 //!
@@ -53,6 +54,21 @@
 //! plain stretch presents it. The target is a resolution, not a shape: the
 //! march's aspect stays the render target's whatever the target's own is.
 //!
+//! # Solid
+//!
+//! Under `[voxel] present = "solid"` (ADR-0269) the same march stops at the
+//! first live cell. The decay stages in front of it glow and absorb as they do
+//! under `glow`; the live cell is shaded as a face — its normal the face the
+//! ray entered through, exact from the traversal's last step — under one
+//! directional key light and an ambient term:
+//!
+//! ```text
+//! shade = palette(age) * brightness * shell * (ambient + key * max(0, n . l))
+//! ```
+//!
+//! composited under the light gathered so far, at full coverage. The light is
+//! given in camera space ([`light_dir`]), so the lit side turns with an orbit.
+//!
 //! # Bricks
 //!
 //! After every frame that changed the state, a pass marks each 8³ brick of
@@ -76,13 +92,14 @@ mod shader;
 
 use super::common::{self, PaletteParams, PanParams};
 use super::lines::GeneratorConfig;
-use super::{ParamGroup, ParamKind, ParamSpec, Scene, default_of};
+use super::{FamilyParam, FamilyRange, ParamGroup, ParamKind, ParamSpec, Scene, default_of};
 use crate::dsp::AnalysisFrame;
 use crate::render::camera::{self, CameraParams};
 use crate::render::gpu;
 use crate::render::palette::{self, Palette};
 use crate::render::tier::GridScale;
 pub use rules::{DEFAULT_RULE, Neighbourhood, RosterRule, Rule, RuleList};
+use std::f32::consts::{FRAC_PI_2, PI};
 
 /// The grid an absent `[voxel] grid` means.
 pub const DEFAULT_GRID: u32 = 64;
@@ -144,6 +161,36 @@ pub const MAX_SHELLS: u32 = 16;
 /// it bounds a runaway binding rather than an author.
 const MAX_SHELL_GAIN: f32 = 16.0;
 
+/// `[voxel] present` — how the march draws a live cell (ADR-0269).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Present {
+    /// Every cell emits and absorbs; the ray runs on through the volume.
+    #[default]
+    Glow,
+    /// The ray stops at the first live cell and shades its face under one
+    /// camera-space key light and an ambient term. The decay stages in front
+    /// of it still glow.
+    Solid,
+}
+
+impl Present {
+    /// Every present, in the order the reference lists them.
+    pub const ALL: [Present; 2] = [Present::Glow, Present::Solid];
+
+    /// The name a preset writes.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Present::Glow => "glow",
+            Present::Solid => "solid",
+        }
+    }
+
+    /// The present `name` spells, or `None` for a name outside the roster.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|p| p.as_str() == name)
+    }
+}
+
 /// `[voxel]` — the structural configuration, fixed while the preset is loaded
 /// and delivered through `Scene::configure`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -162,6 +209,8 @@ pub struct VoxelConfig {
     /// How many radial shells the spectrum lights, `0..=`[`MAX_SHELLS`]; `0`
     /// lights none.
     pub shells: u32,
+    /// How a live cell is drawn: as glowing light, or as a lit solid face.
+    pub present: Present,
     /// The preset's pinned salt (ADR-0051), which every seeded cell is drawn
     /// from.
     pub salt: u32,
@@ -179,6 +228,7 @@ impl Default for VoxelConfig {
             // the opposite one, which an orbiting camera reads as a cut.
             wrap: false,
             shells: 0,
+            present: Present::Glow,
             salt: 0,
         }
     }
@@ -194,6 +244,10 @@ const DEFAULT_BRIGHTNESS: f32 = default_of(PARAMS, "brightness");
 const DEFAULT_ZOOM: f32 = default_of(PARAMS, "zoom");
 const DEFAULT_RESEED_RADIUS: f32 = default_of(PARAMS, "reseed_radius");
 const DEFAULT_SHELL_GAIN: f32 = default_of(PARAMS, "shell_gain");
+const DEFAULT_KEY: f32 = default_of(PARAMS, "key");
+const DEFAULT_AMBIENT: f32 = default_of(PARAMS, "ambient");
+const DEFAULT_LIGHT_YAW: f32 = default_of(PARAMS, "light_yaw");
+const DEFAULT_LIGHT_PITCH: f32 = default_of(PARAMS, "light_pitch");
 
 // The shared camera block (ADR-0258), re-declared with this system's own doc
 // lines where they differ: the editor schema keys a row by the whole
@@ -307,6 +361,46 @@ pub const PARAMS: &[ParamSpec] = &[
         main: false,
     },
     common::brightness(1.0),
+    ParamSpec {
+        name: "key",
+        default: 1.0,
+        range: Some([0.0, 4.0]),
+        doc: "How strongly the key light lights a solid face turned toward it; 0 leaves only \
+              the ambient light.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: true,
+    },
+    ParamSpec {
+        name: "ambient",
+        default: 0.3,
+        range: Some([0.0, 1.0]),
+        doc: "The light every solid face gets whichever way it turns; 1 with no key light \
+              draws each face in its own colour.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
+    },
+    ParamSpec {
+        name: "light_yaw",
+        default: -0.6,
+        range: Some([-PI, PI]),
+        doc: "Where the key light stands around the viewer, in radians: 0 behind the camera, \
+              positive to its right. It turns with the camera.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
+    },
+    ParamSpec {
+        name: "light_pitch",
+        default: 0.6,
+        range: Some([-1.5, 1.5]),
+        doc: "How far above the viewer the key light stands, in radians; negative lights from \
+              below. It turns with the camera.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
+    },
     camera::YAW,
     camera::PITCH,
     camera::DISTANCE,
@@ -320,6 +414,36 @@ pub const PARAMS: &[ParamSpec] = &[
     common::zoom(1.0),
     common::PAN_X,
     common::PAN_Y,
+];
+
+/// One row of [`FAMILY_PARAMS`]: a parameter only `solid` reads, with its
+/// range there, in [`Present::ALL`]'s order.
+macro_rules! solid_only {
+    ($name:literal: $range:expr) => {
+        FamilyParam {
+            name: $name,
+            ranges: &[
+                FamilyRange {
+                    family: "glow",
+                    range: None,
+                },
+                FamilyRange {
+                    family: "solid",
+                    range: $range,
+                },
+            ],
+        }
+    };
+}
+
+/// Every parameter only one present reads (ADR-0180 rule 4): the light, which
+/// a glowing volume has no surface to take. A parameter missing from here
+/// reads the same on both.
+pub const FAMILY_PARAMS: &[FamilyParam] = &[
+    solid_only!("key": Some([0.0, 4.0])),
+    solid_only!("ambient": Some([0.0, 1.0])),
+    solid_only!("light_yaw": Some([-PI, PI])),
+    solid_only!("light_pitch": Some([-1.5, 1.5])),
 ];
 
 /// The seed the whole field is hashed from, for a preset whose salt is `salt`.
@@ -474,6 +598,44 @@ fn eye(view: &camera::CameraView) -> [f32; 3] {
     [solve(0), solve(1), solve(2)]
 }
 
+/// The unit world direction toward a key light standing at `light_yaw` around
+/// the viewer and `light_pitch` above them, in `view`'s camera space: at `(0,
+/// 0)` it shines from the eye along the view axis. The camera's basis is taken
+/// from the rows, so the light turns with every orbit, and the lens's scale and
+/// the pan's shear are removed from them first.
+pub(crate) fn light_dir(view: &camera::CameraView, light_yaw: f32, light_pitch: f32) -> [f32; 3] {
+    let [r0, _, r3] = rows(view);
+    let normalize = |v: [f32; 3]| {
+        let len = dot(v, v).sqrt();
+        if len > 1e-12 {
+            [v[0] / len, v[1] / len, v[2] / len]
+        } else {
+            v
+        }
+    };
+    let forward = normalize(xyz(r3));
+    // Screen x is `right * sx + forward * pan`: drop the forward share.
+    let r = xyz(r0);
+    let along = dot(r, forward);
+    let right = normalize([
+        r[0] - along * forward[0],
+        r[1] - along * forward[1],
+        r[2] - along * forward[2],
+    ]);
+    let up = cross(right, forward);
+    let (sy, cy) = finite_or(light_yaw, DEFAULT_LIGHT_YAW).sin_cos();
+    let (sp, cp) = finite_or(light_pitch, DEFAULT_LIGHT_PITCH)
+        .clamp(-FRAC_PI_2, FRAC_PI_2)
+        .sin_cos();
+    let (x, y, z) = (sy * cp, sp, cy * cp);
+    // `z` points back at the eye, against the view axis.
+    normalize([
+        right[0] * x + up[0] * y - forward[0] * z,
+        right[1] * x + up[1] * y - forward[1] * z,
+        right[2] * x + up[2] * y - forward[2] * z,
+    ])
+}
+
 fn xyz(v: [f32; 4]) -> [f32; 3] {
     [v[0], v[1], v[2]]
 }
@@ -528,6 +690,11 @@ struct MarchParams {
     /// x: the cube's nearest view depth, y: its depth span, z: shells, w: 1 to
     /// jump empty bricks.
     d: [f32; 4],
+    /// xyz: the unit world direction toward the key light; w: 1 under
+    /// `solid`.
+    light: [f32; 4],
+    /// x: key, y: ambient; zw unused.
+    lit: [f32; 4],
     /// The shells' levels, four to a `vec4`, bass first.
     shells: [[f32; 4]; (MAX_SHELLS / 4) as usize],
 }
@@ -608,10 +775,12 @@ impl StateTexture {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D3,
             format: STATE_FORMAT,
-            // `COPY_SRC` only so a probe can read the cells back.
+            // The copies only so a probe can read the cells back and write a
+            // structure in.
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::STORAGE_BINDING
-                | wgpu::TextureUsages::COPY_SRC,
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
         let read = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -1107,7 +1276,8 @@ impl Resources {
     }
 }
 
-/// A 3D automaton in a cube, marched as an emitting, absorbing volume.
+/// A 3D automaton in a cube, marched as an emitting, absorbing volume, or as
+/// lit solid cells inside the glow of their own decay.
 pub struct VoxelScene {
     /// Cloned device handle that builds [`Resources`] at `configure`.
     device: wgpu::Device,
@@ -1157,6 +1327,10 @@ pub struct VoxelScene {
     trail: f32,
     age_tint: f32,
     hue_spread: f32,
+    key: f32,
+    ambient: f32,
+    light_yaw: f32,
+    light_pitch: f32,
     zoom: f32,
     colour: PaletteParams,
     pan: PanParams,
@@ -1208,6 +1382,10 @@ impl VoxelScene {
             trail: DEFAULT_TRAIL,
             age_tint: DEFAULT_AGE_TINT,
             hue_spread: DEFAULT_HUE_SPREAD,
+            key: DEFAULT_KEY,
+            ambient: DEFAULT_AMBIENT,
+            light_yaw: DEFAULT_LIGHT_YAW,
+            light_pitch: DEFAULT_LIGHT_PITCH,
             zoom: DEFAULT_ZOOM,
             colour: PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
             pan: PanParams::default(),
@@ -1297,6 +1475,20 @@ impl VoxelScene {
                 self.config.shells.min(MAX_SHELLS) as f32,
                 if self.skip_bricks { 1.0 } else { 0.0 },
             ],
+            light: {
+                let [lx, ly, lz] = light_dir(&view, self.light_yaw, self.light_pitch);
+                let solid = match self.config.present {
+                    Present::Glow => 0.0,
+                    Present::Solid => 1.0,
+                };
+                [lx, ly, lz, solid]
+            },
+            lit: [
+                finite_or(self.key, DEFAULT_KEY).max(0.0),
+                finite_or(self.ambient, DEFAULT_AMBIENT).max(0.0),
+                0.0,
+                0.0,
+            ],
             shells: {
                 let mut out = [[0.0; 4]; (MAX_SHELLS / 4) as usize];
                 for (slot, level) in out.iter_mut().flatten().zip(self.levels) {
@@ -1373,6 +1565,10 @@ impl Scene for VoxelScene {
         self.trail = DEFAULT_TRAIL;
         self.age_tint = DEFAULT_AGE_TINT;
         self.hue_spread = DEFAULT_HUE_SPREAD;
+        self.key = DEFAULT_KEY;
+        self.ambient = DEFAULT_AMBIENT;
+        self.light_yaw = DEFAULT_LIGHT_YAW;
+        self.light_pitch = DEFAULT_LIGHT_PITCH;
         self.zoom = DEFAULT_ZOOM;
         self.colour.reset();
         self.pan.reset();
@@ -1407,6 +1603,10 @@ impl Scene for VoxelScene {
             "trail" => self.trail = value,
             "age_tint" => self.age_tint = value,
             "hue_spread" => self.hue_spread = value,
+            "key" => self.key = value,
+            "ambient" => self.ambient = value,
+            "light_yaw" => self.light_yaw = value,
+            "light_pitch" => self.light_pitch = value,
             "zoom" => self.zoom = value,
             _ => {}
         }

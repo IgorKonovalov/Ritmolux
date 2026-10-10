@@ -202,6 +202,257 @@ fn read_cells(ctx: &RenderContext, scene: &VoxelScene) -> Vec<u32> {
     cells
 }
 
+/// Overwrite the current generation: every cell `live` names is live at age
+/// 0, every other dead. The bricks are re-marked, so the march jumps exactly
+/// the bricks this structure leaves empty.
+fn write_cells(ctx: &RenderContext, scene: &mut VoxelScene, live: impl Fn([u32; 3]) -> bool) {
+    let res = scene.res.as_mut().expect("configure builds the resources");
+    let n = res.grid;
+    let mut bytes = Vec::with_capacity((n * n * n * 4) as usize);
+    for z in 0..n {
+        for y in 0..n {
+            for x in 0..n {
+                bytes.extend_from_slice(&u32::from(live([x, y, z])).to_le_bytes());
+            }
+        }
+    }
+    ctx.queue.write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: res.current(),
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        &bytes,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(n * 4),
+            rows_per_image: Some(n),
+        },
+        wgpu::Extent3d {
+            width: n,
+            height: n,
+            depth_or_array_layers: n,
+        },
+    );
+    let mut encoder = ctx
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("voxel-write-cells"),
+        });
+    res.encode_bricks(&mut encoder);
+    ctx.queue.submit([encoder.finish()]);
+}
+
+/// A scene drawing `present` on a grid of `grid` whose cells are exactly
+/// `live`, the clock frozen so nothing steps them.
+fn scene_holding(
+    ctx: &RenderContext,
+    grid: u32,
+    present: Present,
+    live: impl Fn([u32; 3]) -> bool,
+) -> (VoxelScene, Driver<'_>) {
+    let mut scene = scene_with(
+        ctx,
+        VoxelConfig {
+            present,
+            ..config(grid, RosterRule::Clouds, 1)
+        },
+    );
+    let mut driver = Driver::new(ctx);
+    // The first frame seeds the field; the structure replaces it after.
+    driver.frame(&mut scene, 1.0 / 60.0, &[("step_rate", 0.0)]);
+    write_cells(ctx, &mut scene, live);
+    (scene, driver)
+}
+
+/// The pixel of the `TARGET`-square frame that world point `p` lands on, under
+/// the camera a frame with `yaw` and `pitch` bound and every other camera
+/// param at rest looks through.
+fn pixel_of(yaw: f32, pitch: f32, p: [f32; 3]) -> usize {
+    let view = CameraParams {
+        yaw,
+        pitch,
+        ..CameraParams::default()
+    }
+    .camera()
+    .view(1.0, DEFAULT_ZOOM, [0.0, 0.0]);
+    let c = view.clip(p);
+    let (x, y) = (c[0] / c[3], c[1] / c[3]);
+    let col = (((x + 1.0) * 0.5 * TARGET as f32) as usize).min(TARGET as usize - 1);
+    let row = (((1.0 - y) * 0.5 * TARGET as f32) as usize).min(TARGET as usize - 1);
+    row * TARGET as usize + col
+}
+
+/// The camera every solid probe looks through.
+const SOLID_YAW: f32 = 0.6;
+const SOLID_PITCH: f32 = 0.4;
+
+/// The three faces of a cube centred on the origin that a camera at
+/// [`SOLID_YAW`], [`SOLID_PITCH`] sees — `+x`, `+y`, `+z` — each as its
+/// outward normal.
+const VISIBLE_FACES: [[f32; 3]; 3] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+
+/// An 8³ block in the middle of a 16³ grid: cells 4 to 11 on every axis, the
+/// world cube `[-0.5, 0.5]^3`.
+fn block(c: [u32; 3]) -> bool {
+    c.iter().all(|&v| (4..12).contains(&v))
+}
+
+/// The colour of each [`VISIBLE_FACES`] face's centre, on the 8³ [`block`]
+/// drawn solid with `params` bound over the probe camera.
+fn face_centres(ctx: &RenderContext, params: &[(&str, f32)]) -> [[f32; 4]; 3] {
+    let (mut scene, mut driver) = scene_holding(ctx, 16, Present::Solid, block);
+    let mut bound = vec![
+        ("step_rate", 0.0),
+        ("yaw", SOLID_YAW),
+        ("pitch", SOLID_PITCH),
+        // One colour over the whole block, so a face's brightness is its light.
+        ("hue_spread", 0.0),
+        ("age_tint", 0.0),
+    ];
+    bound.extend_from_slice(params);
+    driver.frame(&mut scene, 1.0 / 60.0, &bound);
+    let pixels = driver.read_target();
+    VISIBLE_FACES.map(|n| pixels[pixel_of(SOLID_YAW, SOLID_PITCH, n.map(|v| v * 0.5))])
+}
+
+fn luminance(p: [f32; 4]) -> f32 {
+    0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]
+}
+
+// ---------------------------------------------------------------------------
+// Solid
+// ---------------------------------------------------------------------------
+
+/// **Three faces of a solid block read at three brightnesses, ordered by
+/// `n . l`**: an 8³ block seen from `yaw = 0.6, pitch = 0.4` under the
+/// default key light shows its `+x`, `+y` and `+z` faces, each covering its
+/// centre pixel, and their luminances sort exactly as their normals' dot
+/// products with the light do.
+#[test]
+fn a_solid_blocks_three_faces_are_ordered_by_n_dot_l() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let view = CameraParams {
+        yaw: SOLID_YAW,
+        pitch: SOLID_PITCH,
+        ..CameraParams::default()
+    }
+    .camera()
+    .view(1.0, DEFAULT_ZOOM, [0.0, 0.0]);
+    let l = light_dir(&view, DEFAULT_LIGHT_YAW, DEFAULT_LIGHT_PITCH);
+    let n_dot_l = VISIBLE_FACES.map(|n| dot(n, l).max(0.0));
+    let faces = face_centres(&ctx, &[]);
+    let lum = faces.map(luminance);
+    println!("n . l {n_dot_l:?}, luminance {lum:?}, faces {faces:?}");
+    for (i, face) in faces.iter().enumerate() {
+        assert!(
+            face[3] > 0.99 * crate::render::post::DEFAULT_OCCLUDE,
+            "face {i}'s centre is not covered: {face:?}"
+        );
+    }
+    let mut by_light = [0, 1, 2];
+    by_light.sort_by(|&a, &b| n_dot_l[a].total_cmp(&n_dot_l[b]));
+    for pair in by_light.windows(2) {
+        let (lo, hi) = (pair[0], pair[1]);
+        assert!(
+            n_dot_l[hi] - n_dot_l[lo] > 0.05,
+            "the probe's light does not separate faces {lo} and {hi}: {n_dot_l:?}"
+        );
+        assert!(
+            lum[hi] > lum[lo] * 1.02,
+            "face {hi} faces the light more than face {lo} but reads no brighter: \
+             n . l {n_dot_l:?}, luminance {lum:?}"
+        );
+    }
+}
+
+/// **With no key light and full ambient, every face reads the albedo**: the
+/// three face centres are one colour, the palette's at `hue` times
+/// `brightness`.
+#[test]
+fn with_key_0_and_ambient_1_every_face_reads_the_albedo() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let hue = 0.3;
+    let faces = face_centres(&ctx, &[("key", 0.0), ("ambient", 1.0), ("hue", hue)]);
+    let albedo = Palette::default_spectrum().sample(hue, 0.0);
+    println!("faces {faces:?}, albedo {albedo:?}");
+    for face in &faces {
+        for c in 0..3 {
+            assert!(
+                (face[c] - faces[0][c]).abs() < 1e-3,
+                "two faces differ with no key light: {faces:?}"
+            );
+            assert!(
+                (face[c] - albedo[c]).abs() < 0.02 + 0.02 * albedo[c],
+                "a face reads {face:?}, not the albedo {albedo:?}"
+            );
+        }
+    }
+}
+
+/// **`glow` ignores the light**: a frame drawn under `glow` with the four
+/// light params far from rest is byte-identical to one with them at rest.
+#[test]
+fn glow_ignores_the_light_params() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let frame = |params: &[(&str, f32)]| {
+        let (mut scene, mut driver) = scene_holding(&ctx, 16, Present::Glow, block);
+        let mut bound = vec![
+            ("step_rate", 0.0),
+            ("yaw", SOLID_YAW),
+            ("pitch", SOLID_PITCH),
+        ];
+        bound.extend_from_slice(params);
+        driver.frame(&mut scene, 1.0 / 60.0, &bound);
+        driver.read_target()
+    };
+    let rest = frame(&[]);
+    let moved = frame(&[
+        ("key", 3.0),
+        ("ambient", 0.9),
+        ("light_yaw", 2.0),
+        ("light_pitch", -1.0),
+    ]);
+    assert!(rest.iter().any(|p| p[3] > 0.0), "the block drew nothing");
+    assert!(rest == moved, "a light param moved a glow frame");
+}
+
+/// The camera-space light: at `(0, 0)` it shines from the eye along the view
+/// axis whatever the orbit, a quarter turn of `light_yaw` puts it on screen
+/// right, and a positive `light_pitch` puts it above.
+#[test]
+fn the_key_light_is_given_in_camera_space() {
+    for (yaw, pitch) in [(0.0, 0.0), (0.6, 0.4), (-2.0, -1.0)] {
+        let view = CameraParams {
+            yaw,
+            pitch,
+            ..CameraParams::default()
+        }
+        .camera()
+        .view(16.0 / 9.0, 1.3, [0.2, -0.1]);
+        let [r0, _, r3] = rows(&view);
+        let forward = xyz(r3);
+        let l = light_dir(&view, 0.0, 0.0);
+        assert!(
+            (dot(l, forward) + 1.0).abs() < 1e-5,
+            "at (0, 0) the light shines along the view axis: {l:?} against {forward:?}"
+        );
+        // A quarter turn right puts it on screen right.
+        let right = light_dir(&view, FRAC_PI_2, 0.0);
+        assert!(dot(right, xyz(r0)) > 0.0 && dot(right, forward).abs() < 1e-5);
+        // A pitch up puts it above.
+        let up = light_dir(&view, 0.0, 1.0);
+        assert!(dot(up, cross(xyz(r0), forward)) > 0.0);
+    }
+}
+
 /// FNV-1a over the cells: one number that moves when any cell's state or age
 /// does.
 fn hash(cells: &[u32]) -> u64 {

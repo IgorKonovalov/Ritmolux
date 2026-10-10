@@ -6,8 +6,8 @@
 // into.
 use super::super::*;
 use crate::render::scenes::voxel::{
-    DEFAULT_GRID, DEFAULT_RULE, MAX_GRID, MAX_SHELLS, MIN_GRID, Neighbourhood, RosterRule, Rule,
-    RuleList, VoxelConfig, rules::MAX_RULES,
+    DEFAULT_GRID, DEFAULT_RULE, MAX_GRID, MAX_SHELLS, MIN_GRID, Neighbourhood, Present, RosterRule,
+    Rule, RuleList, VoxelConfig, rules::MAX_RULES,
 };
 
 /// The raw `[voxel]` table (ADR-0268). An absent table is [`DEFAULT_RULE`] on
@@ -37,6 +37,9 @@ pub(in crate::preset::schema) struct RawVoxel {
     /// How many radial shells the spectrum lights. Absent means `0`: none.
     #[serde(default)]
     pub(in crate::preset::schema) shells: Option<u32>,
+    /// `"glow"` or `"solid"`. Absent means `"glow"`.
+    #[serde(default)]
+    pub(in crate::preset::schema) present: Option<String>,
 }
 
 /// One `[voxel] rules` entry: a roster name, or an inline rule.
@@ -176,6 +179,19 @@ impl RawVoxel {
                 "[voxel] shells must be in 0..={MAX_SHELLS}, got {shells}"
             )));
         }
+        let present = match self.present {
+            None => Present::default(),
+            Some(name) => Present::from_name(&name).ok_or_else(|| {
+                PresetError::Config(format!(
+                    "[voxel] unknown present '{name}' (expected one of: {})",
+                    Present::ALL
+                        .iter()
+                        .map(|p| p.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ))
+            })?,
+        };
         Ok(VoxelConfig {
             grid,
             rules,
@@ -183,6 +199,7 @@ impl RawVoxel {
             seed_fill,
             wrap: self.wrap.unwrap_or(false),
             shells,
+            present,
             salt,
         })
     }
@@ -197,7 +214,8 @@ impl RawVoxel {
 pub(in crate::preset::schema) const VOXEL: TableDesc = TableDesc {
     name: "voxel",
     doc: "The voxel automaton's grid, the rules it runs, the ball it is seeded with, whether \
-          its faces wrap, and how many shells the spectrum lights.",
+          its faces wrap, how many shells the spectrum lights, and whether it glows or is \
+          drawn solid.",
     keys: &[
         KeyDesc {
             name: "grid",
@@ -239,6 +257,14 @@ pub(in crate::preset::schema) const VOXEL: TableDesc = TableDesc {
             kind: KeyKind::Int,
             default: "0",
             doc: "How many radial shells the spectrum lights, bass at the centre; 0 lights none.",
+        },
+        KeyDesc {
+            name: "present",
+            kind: KeyKind::Roster(Roster::VoxelPresent),
+            default: "glow",
+            doc: "How a live cell is drawn: glow emits and absorbs through the whole volume; \
+                  solid stops at the first live cell and lights its face, with the decay in \
+                  front of it still glowing.",
         },
     ],
 };

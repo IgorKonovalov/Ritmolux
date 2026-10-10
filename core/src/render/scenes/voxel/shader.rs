@@ -1,6 +1,7 @@
 //! The voxel system's two stages: the step pass, a compute dispatch that seeds
 //! or advances the 3D state one generation, and the march, a fullscreen pass
-//! that walks each pixel's ray through the cube under emission-absorption.
+//! that walks each pixel's ray through the cube under emission-absorption, and
+//! under `solid` stops at the first live cell and lights its face.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard). Only constants live here, compiled once at construction.
@@ -248,6 +249,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// `(C, (1 - T) * occlude)` (ADR-0201): at `density = 0`, `T` stays 1 and the
 /// volume adds to the backdrop without covering it.
 ///
+/// Under `solid` (`light.w`), the first live cell ends the walk: its entry
+/// face — the axis of the last crossing, facing against the step — is shaded
+/// `albedo * (ambient + key * max(0, n . l))`, added under the light in front
+/// of it, and `T` drops to 0, so the pixel's coverage is `occlude`.
+///
 /// **A crossing is computed from its boundary's index, never accumulated.** The
 /// parameter at which the ray crosses an axis's next boundary is
 /// `(boundary - o) * inv_dg`, evaluated afresh each step. That is what lets the walk
@@ -276,6 +282,10 @@ struct March {
     // x: the cube's nearest view depth, y: its depth span, z: shells (0 for
     // none), w: 1 to jump empty bricks
     d: vec4<f32>,
+    // xyz: the unit world direction toward the key light, w: 1 under solid
+    light: vec4<f32>,
+    // x: key, y: ambient; zw unused
+    lit: vec4<f32>,
     // The shells' levels, four to a vec4, bass first
     shells: array<vec4<f32>, 4>,
 }
@@ -355,6 +365,15 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     if (t_exit <= t) {
         return vec4<f32>(0.0);
     }
+    // The axis of the face the ray last crossed into a cell through: first
+    // the cube's own entry face, then each step's. A solid hit's normal.
+    var axis = 2;
+    if (t_near.x >= t_near.y && t_near.x >= t_near.z) {
+        axis = 0;
+    } else if (t_near.y >= t_near.z) {
+        axis = 1;
+    }
+    let solid = mp.light.w > 0.5;
 
     // The same ray in cell units: the cube's corner at 0, its far corner at n.
     let n = mp.eye.w;
@@ -423,6 +442,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                     }
                 }
                 t = t_e;
+                axis = e;
                 if (any(cell < vec3<i32>(0)) || any(cell >= vec3<i32>(ni))) {
                     break;
                 }
@@ -455,6 +475,17 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                 let i = min(u32(min(length(centre), 1.0) * mp.d.z), u32(mp.d.z) - 1u);
                 shell = 1.0 + mp.c.w * mp.shells[i / 4u][i % 4u];
             }
+            if (solid && state == 1u) {
+                // The first live cell ends the ray: its entry face, lit, under
+                // the light gathered in front of it, covering the pixel.
+                var normal = vec3<f32>(0.0);
+                normal[axis] = -f32(stride[axis]);
+                let lambert = max(dot(normal, mp.light.xyz), 0.0);
+                let lighting = mp.lit.y + mp.lit.x * lambert;
+                light = light + transmit * shade(coord) * (max(mp.a.y, 0.0) * fog * shell * lighting);
+                transmit = 0.0;
+                break;
+            }
             light = light + transmit * shade(coord) * (max(mp.a.y, 0.0) * glow * EMISSION * fog * shell * len);
             transmit = transmit * exp(-mp.b.z * glow * len);
             if (transmit < OPAQUE) {
@@ -468,10 +499,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         }
         if (t_cross.x <= t_cross.y && t_cross.x <= t_cross.z) {
             cell.x = cell.x + stride.x;
+            axis = 0;
         } else if (t_cross.y <= t_cross.z) {
             cell.y = cell.y + stride.y;
+            axis = 1;
         } else {
             cell.z = cell.z + stride.z;
+            axis = 2;
         }
         if (any(cell < vec3<i32>(0)) || any(cell >= vec3<i32>(ni))) {
             break;

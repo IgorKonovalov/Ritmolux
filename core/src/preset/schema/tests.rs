@@ -705,7 +705,7 @@ fn every_roster_value_parses_through_its_owners_parser() {
     /// A roster beside the parser that owns it.
     type RosterCheck = (Roster, fn(&str) -> bool);
 
-    let checks: [RosterCheck; 21] = [
+    let checks: [RosterCheck; 22] = [
         (Roster::System, |n| SystemKind::from_name(n).is_some()),
         (Roster::CurveFamily, |n| CurveFamily::from_name(n).is_some()),
         (Roster::AttractorFamily, |n| {
@@ -747,6 +747,9 @@ fn every_roster_value_parses_through_its_owners_parser() {
         }),
         (Roster::VoxelNeighbourhood, |n| {
             crate::render::scenes::voxel::Neighbourhood::from_name(n).is_some()
+        }),
+        (Roster::VoxelPresent, |n| {
+            crate::render::scenes::voxel::Present::from_name(n).is_some()
         }),
     ];
 

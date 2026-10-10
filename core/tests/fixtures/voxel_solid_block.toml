@@ -1,0 +1,33 @@
+# The `voxel` scene drawn `solid`: one block of cells, lit.
+#
+# The seeded ball's radius is past the cube's corner and its fill is 1, so
+# every cell of the 16-cell grid starts live and the structure is the whole
+# cube, a single solid block. `step_rate = 0` freezes it there. Seen from
+# `yaw = 0.6, pitch = 0.4`, three faces show, and the default key light puts
+# each at its own brightness.
+#
+#  - `hue_spread` and `age_tint` at 0, so every cell is one colour and a
+#    face's brightness is its light alone.
+#  - `[generator] seed` pinned, though at fill 1 the seed draws nothing.
+system = "voxel"
+name   = "fixture_voxel_solid_block"
+
+[generator]
+seed = 7
+
+[voxel]
+grid        = 16
+rules       = ["clouds"]
+seed_radius = 2.0
+seed_fill   = 1.0
+present     = "solid"
+
+[params]
+step_rate  = "0"
+hue        = "0.3"
+hue_spread = "0"
+age_tint   = "0"
+yaw        = "0.6"
+pitch      = "0.4"
+distance   = "4"
+fov        = "0.8"

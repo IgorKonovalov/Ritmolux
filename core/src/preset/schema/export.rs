@@ -107,6 +107,8 @@ pub enum Roster {
     VoxelRule,
     /// An inline `[voxel]` rule's `neighbourhood`.
     VoxelNeighbourhood,
+    /// `[voxel] present`.
+    VoxelPresent,
 }
 
 impl Roster {
@@ -155,6 +157,10 @@ impl Roster {
             Roster::VoxelNeighbourhood => crate::render::scenes::voxel::Neighbourhood::ALL
                 .iter()
                 .map(|n| n.as_str())
+                .collect(),
+            Roster::VoxelPresent => crate::render::scenes::voxel::Present::ALL
+                .iter()
+                .map(|p| p.as_str())
                 .collect(),
         }
     }
