@@ -217,7 +217,7 @@ that table is maintained alongside the presets and is the authoritative list.
 | `cellular` | A discrete cellular automaton on a grid of cells, from one of three families — Conway's Life and every birth/survival rule, Larger than Life's wide neighbourhoods, or the cyclic automaton's spirals — painted with the history of each cell ([below](#the-cellular-table)). |
 | `plexus` | A few hundred points in 3D, joined by a line wherever two come close, seen through a perspective camera with a real focal plane: lines and dots blur with their distance from focus. The points drift through a cube or ripple on a sheet ([below](#the-plexus-table)). |
 | `waterfall` | The spectrum's recent past as a landscape in 3D: each row is the band array at one moment, the newest at the front and older rows receding behind it, seen through the same perspective camera as `plexus` ([below](#the-waterfall-table)). |
-| `voxel` | A 3D cellular automaton in a cube of cells, drawn as a glowing volume that absorbs the light behind it and seen through the same perspective camera as `plexus`. Its rules come from a list the preset can switch among on the bar ([below](#the-voxel-table)). |
+| `voxel` | A 3D cellular automaton in a cube of cells, drawn as a glowing volume that absorbs the light behind it, or as lit solid cubes, and seen through the same perspective camera as `plexus`. Its rules come from a list the preset can switch among on the bar ([below](#the-voxel-table)). |
 
 **There is deliberately no per-system preset count here.** A count re-drifts every time
 a preset is added and nothing fails when it does. `presets/` is the list; `ls presets/*.toml`
@@ -804,6 +804,7 @@ seed_radius = 1.0                   # the seeded ball's radius, in half-sides, 0
 seed_fill   = 0.6                   # the chance a cell in that ball starts live, 0..=1
 wrap        = false                 # false (the default): every cell past a face is dead
 shells      = 8                     # radial shells the spectrum lights, 0..=16; default 0
+present     = "glow"                # "glow" (the default) or "solid"
 ```
 
 | Key | Values | Notes |
@@ -814,6 +815,7 @@ shells      = 8                     # radial shells the spectrum lights, 0..=16;
 | `seed_fill` | `0..=1` | The chance each cell inside that ball starts live. Absent, the first rule's own. |
 | `wrap` | `true` / `false` | `true` makes the cube a torus, so a structure crossing a face comes back on the opposite one. Default `false`. |
 | `shells` | integer `0..=16` | How many radial shells the spectrum lights, bass at the centre and treble at the faces. `0` lights none, and `shell_gain` is then inert. |
+| `present` | `"glow"` or `"solid"` | How a live cell is drawn: as glowing light (the default), or as a lit solid cube ([below](#solid-cells)). |
 
 Every key is optional and so is the table: `system = "voxel"` alone runs `clouds` in a 64-cell cube.
 Every key is read once, at load, and none is bindable. A grid, a seed or a shell count out of range,
@@ -907,6 +909,52 @@ rule with long decay to one with less can drop the volume's haze at the bar line
 - **`trail`** and **`age_tint`** paint history. A decaying cell keeps `trail` of its light at each
   stage, so `trail` is inert on a rule with `states = 2`. `age_tint` slides a live cell along the
   palette as it stays live, and puts a decaying one at the far end.
+
+#### Solid cells
+
+`present = "solid"` draws every live cell as a cube with a lit surface instead of as light. A ray
+from the camera stops at the first live cell it meets and takes the colour of the face it entered
+through. The decay stages in front of that cell still glow and absorb as they do under `glow`, so a
+solid structure can sit inside a haze of its own debris; `trail` and `density` set how much of it
+there is.
+
+```toml
+[voxel]
+present = "solid"
+
+[params]
+key         = "0.4 + 1.6 * bass"   # the key light's strength
+ambient     = "0.3"                # the light every face gets
+ao          = "1"                  # how far the creases darken
+light_yaw   = "-0.6"               # the light stands to the viewer's left...
+light_pitch = "0.6"                # ...and above
+```
+
+A face is shaded as its palette colour, times `brightness` and its shell's light, times
+`ambient × occlusion + key × (how squarely the face turns toward the light)`.
+
+- **`key`** is one directional light. A face turned straight at it takes all of `key`, one edge-on
+  or turned away takes none.
+- **`ambient`** is the light every face gets whichever way it turns. With `key = 0` and
+  `ambient = 1` every face reads its own palette colour.
+- **`ao`** is the ambient occlusion: a face darkens toward the creases and inner corners where it
+  meets other cells, which is what makes a cluster of cubes read as a structure. It darkens the
+  ambient term only. `0` is none.
+- **`light_yaw`** and **`light_pitch`** place the light **relative to the camera**, in radians:
+  `(0, 0)` shines from the eye, a positive `light_yaw` moves it to the viewer's right and a
+  positive `light_pitch` above. The light turns with an orbit, so the lit side stays lit. It is not
+  fixed on the world.
+
+These four are inert under `glow`, and the reference marks them so.
+
+**A lit face blooms like any other light.** Nothing marks it as reflected light, so a face brighter
+than the bloom threshold blooms, and a bright enough solid preset can glow until it reads emissive
+again. Whether the faces bloom is a choice made through `brightness` and `key`: keep them under the
+threshold for crisp cubes.
+
+**Trails smear shading as if it were light.** The `trails` stage reads a dark face as dim light,
+not as a surface, so on a turning camera it drags the shaded sides behind the lit ones. Leave
+`trails` off a solid preset unless that smear is the look.
 
 The camera is the shared one: `yaw`, `pitch`, `distance`, `fov` and `fog` behave as on
 [`plexus`](#the-plexus-table). `focus` and `aperture` are inert, because the volume has no drawn

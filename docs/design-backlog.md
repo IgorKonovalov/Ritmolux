@@ -722,6 +722,13 @@ One cohort's demonstrated want. The ADR-0080 shape is the named route when the s
   spelled that way could never fail, and a probe that cannot fail reads as verification while
   checking nothing (ADR-0108, Negative). `matcap` is the name this entry's own proposed fix
   carries, so the probe goes red exactly when the entry is delivered.
+- **2026-10-10 — the bloom question is answered for `voxel`, and this entry's own ask stays open.**
+  [ADR-0269](adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md)
+  gives `voxel` a `present = "solid"` that computes a face normal and evaluates a key light, the
+  engine's first lit register, and answers the open question below: a lit surface enters the
+  composite as linear light and blooms like any other, brightness being the author's lever. That
+  answer covers `voxel` alone. The matcap on the shape field is not delivered, and the probe above
+  still reads it absent.
 
 Two of the six star references are chrome — a four-pointed sparkle with concave edges, rendered as
 polished metal with specular highlights, a horizon reflection and self-shadowing. They read as

@@ -197,8 +197,8 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
 |---|---|---|---|
 | 1 — Walking skeleton: the march stops and lights the face | dev | done | 13569903 |
 | 2 — Voxel ambient occlusion | dev | done | 1ae668d1 |
-| 3 — Cost, the golden and the gates | dev | done | committed with this row |
-| 4 — Documentation and the references | dev | not started | |
+| 3 — Cost, the golden and the gates | dev | done | d7165bbd |
+| 4 — Documentation and the references | dev | done | committed with this row |
 | 5 — The look, judged | human | not started | |
 | 6 — The preset-author reference | human | not started | |
 
@@ -245,6 +245,23 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
   coverage 0.2016, 4 quadrants, flatness 0.3089, boundary 0.0753; animation silent 0.0314, driven
   0.0903, silent branch; reactivity bass 0.0275, onset 0.0200; distinctness against `clouds` shape
   0.232, pixel 0.126. Only these voxel tests of the four gates were run here.
+- Phase 4: the generated files were already current from Phases 1 and 2 (both tests pass with no
+  update variable set), so nothing was regenerated. The guide's picture is
+  `docs/images/voxel/solid.png`, rendered by the `scripts/docs-shots.mjs` entry Phase 1 added.
+- **For Phase 6**, the text for `.claude/skills/preset-author/references/systems.md`. That file has
+  no `## voxel` section yet (Plan 0255's Phase 7 is still owed), so this goes at the end of the one
+  that phase adds:
+
+  > **Solid.** `[voxel] present = "solid"` draws each live cell as a lit cube; the decay stages in
+  > front still glow. Four params, inert under `glow`: `key` (the key light, working range 0.4-1.6;
+  > bind the bass here for a pulse), `ambient` (0.15-0.4; 1 with `key = 0` shows the palette flat),
+  > `ao` (0.6-1; it darkens the creases where cubes meet, which is what makes a cluster read as
+  > structure, and at 0 the faces go flat), and `light_yaw` / `light_pitch`, given relative to the
+  > camera, so the lit side stays lit through an orbit (`-0.6, 0.6` lights from the upper left).
+  > **Bloom on a solid preset is a choice made through `brightness`:** a lit face blooms like any
+  > light, so keep `brightness × (ambient + key)` under the bloom threshold for crisp cubes and push
+  > past it only for a glowing core. Keep `trails` off: it smears the dark faces as if they were dim
+  > light. Low `trail` (0.1-0.3) keeps the decay haze from washing out the faces.
 
 ### Close triggers
 

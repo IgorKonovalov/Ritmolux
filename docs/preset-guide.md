@@ -511,6 +511,17 @@ counts, and the `rule` parameter picks one. Held on the bar, the automaton chang
 bar line. Most 3D rules settle into a shape and hold it, so `reseed` on an onset is how the cube
 stays alive: each rise drops a ball of fresh cells that grows again.
 
+![A rounded mass of small orange cubes on black, with three smaller clumps beside it: each terrace
+of cubes is lit from the upper left, its sides a shade darker, and the creases between terraces
+darkest](images/voxel/solid.png)
+
+*`present = "solid"` — the teaching preset
+[`docs/examples/voxel/solid.toml`](examples/voxel/solid.toml)*
+
+`present = "solid"` draws every live cell as a **lit cube** instead of as light: one key light
+that turns with the camera, an ambient term, and an occlusion that darkens the creases where cubes
+meet, so the faces and corners of a structure read. The decaying cells in front of it still glow.
+
 **Reach for this when** the look is growth with depth to it: colonies, crystals, foam or clouds that
 build up inside a turning cube. The roster, the inline rule syntax and the tier caps are in the
 [`[voxel]` table](presets.md#the-voxel-table).
