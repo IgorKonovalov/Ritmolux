@@ -196,8 +196,8 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Walking skeleton: the march stops and lights the face | dev | done | 13569903 |
-| 2 — Voxel ambient occlusion | dev | done | committed with this row |
-| 3 — Cost, the golden and the gates | dev | not started | |
+| 2 — Voxel ambient occlusion | dev | done | 1ae668d1 |
+| 3 — Cost, the golden and the gates | dev | done | committed with this row |
 | 4 — Documentation and the references | dev | not started | |
 | 5 — The look, judged | human | not started | |
 | 6 — The preset-author reference | human | not started | |
@@ -226,6 +226,25 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
   `shot` (640x360) of `voxel_solid_block.toml` and `docs/examples/voxel/solid.toml`, captured at
   Phase 1's commit and again here with `ao = "0"` added to a scratch copy: `cmp` found both pairs
   identical. No test holds it.
+- Phase 3 probes, `shot --presets <scratch dir> --report`, release, 1920x1080, tier `Floor`, AMD
+  Radeon Graphics (RADV RENOIR), Mesa 26.2.2; Plan 0255's three cost fixtures copied into one
+  directory as a `glow` and a `present = "solid"` twin each, all six in one run. ms a frame,
+  `glow` / `solid`: sparse 10.591 / 8.228; cloudy 15.293 / 4.781; worst 16.813 / 11.199. Every
+  `solid` reading is under 16.67 ms and none is slower than its `glow` twin. The `glow` readings
+  are higher than Plan 0255 Phase 3's 6.23 / 11.68 / 12.70 on the same adapter; the worst `glow`
+  twin reads past 16.67 ms in this run. The solid twins were not committed as fixtures.
+- Phase 3 golden: `voxel_solid_ao` is `core/tests/fixtures/voxel_solid_ao.toml` (the 32³ solid
+  ball, AO on), not an L. It was first written with `RLX_BLESS=1`, the harness refusing a stem with
+  no PNG; the two baselines that run re-encoded, `backdrop_band.png` and `backdrop_ramp.png`, were
+  restored with `git restore`.
+- Phase 3 gates: `voxel` ships no preset, so the four rosters hold the solid teaching preset
+  `docs/examples/voxel/solid.toml` through one dedicated test each in `sanity`, `animation`,
+  `reactivity`, and a `distinctness` test printing it against `docs/examples/voxel/clouds.toml`.
+  The teaching preset gained `reseed = "onset"` and `key = "0.4 + 1.6 * bass"` to clear the
+  reactivity floor: a first `0.8 + 0.6 * bass` read bass 0.0160 against 0.02. Readings: sanity
+  coverage 0.2016, 4 quadrants, flatness 0.3089, boundary 0.0753; animation silent 0.0314, driven
+  0.0903, silent branch; reactivity bass 0.0275, onset 0.0200; distinctness against `clouds` shape
+  0.232, pixel 0.126. Only these voxel tests of the four gates were run here.
 
 ### Close triggers
 

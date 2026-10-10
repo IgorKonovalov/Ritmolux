@@ -1,7 +1,8 @@
 # The `voxel` system drawn solid, for the illustrated guide's picture of it.
 # Teaching material, not a shipped preset: the `clouds` rule settling from a
 # seeded ball into rounded masses, each live cell a lit cube under one key light
-# that turns with the camera, the decaying cells a faint glow around it.
+# that turns with the camera, the decaying cells a faint glow around it. The
+# bass brightens the key light and an onset refills a ball of cells.
 system = "voxel"
 name = "Voxel Solid"
 
@@ -17,13 +18,14 @@ name = "ember"
 
 [params]
 step_rate   = "6"
+reseed      = "onset"
 density     = "0.6"
 trail       = "0.2"
 age_tint    = "0.5"
 hue         = "0.1"
 hue_spread  = "0.6"
 brightness  = "0.9"
-key         = "1.0"
+key         = "0.4 + 1.6 * bass"
 ambient     = "0.3"
 light_yaw   = "-0.6"
 light_pitch = "0.6"

@@ -156,6 +156,10 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 ///   fixture is a fixed figure, so the stream, the ring and its fade, the
 ///   follow spring and the layout relative to it are unreached. One per
 ///   turtle, each captured after the ring has overrun its trail.
+/// - `voxel_solid_ao` — the rostered `voxel.toml` draws `glow`, so the march
+///   never stops at a live cell and the face normal, the key light and the
+///   ambient occlusion are unreached. A solid ball at 32³, its terraces' inner
+///   edges darkened by the occlusion.
 ///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
@@ -163,7 +167,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to (a WARP reading, unverified on lavapipe as of
 /// 2026-10-06). For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 20] = [
+const EXTRA_FIXTURES: [(&str, &str); 21] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -219,6 +223,10 @@ const EXTRA_FIXTURES: [(&str, &str); 20] = [
     (
         "lsystem_endless_space",
         include_str!("fixtures/lsystem_endless_space.toml"),
+    ),
+    (
+        "voxel_solid_ao",
+        include_str!("fixtures/voxel_solid_ao.toml"),
     ),
 ];
 

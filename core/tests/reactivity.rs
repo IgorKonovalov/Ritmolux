@@ -402,6 +402,32 @@ fn the_voxel_gate_fixture_reacts_to_at_least_one_band() {
     );
 }
 
+/// **The voxel system's solid teaching preset reacts to the bands** (Plan 0256
+/// Phase 3): `docs/examples/voxel/solid.toml`, the one `present = "solid"`
+/// preset, held to the shipped floor through the same stimuli. The bass drives
+/// its key light and an onset refills a ball.
+#[test]
+fn the_voxel_solid_teaching_preset_reacts_to_at_least_one_band() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let preset = Preset::from_toml_str(include_str!("../../docs/examples/voxel/solid.toml"))
+        .unwrap_or_else(|e| panic!("the voxel solid teaching preset parses: {e}"));
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+
+    let vector = measure(&mut renderer, &name);
+    println!(
+        "[voxel] {name} bass={:.4} mid={:.4} treb={:.4} onset={:.4}",
+        vector[0].1, vector[1].1, vector[2].1, vector[3].1,
+    );
+    assert!(
+        max_of(&vector) >= REACTIVITY_FLOOR,
+        "the voxel solid teaching preset reacts to no band above {REACTIVITY_FLOOR}: \
+         {vector:?}"
+    );
+}
+
 /// Twins that differ in exactly one character of one binding: `glow` reads the
 /// bass level in one and is the constant it rests at in the other. Nothing else
 /// in either reads audio — `fragment_field::update` ignores its `AnalysisFrame`

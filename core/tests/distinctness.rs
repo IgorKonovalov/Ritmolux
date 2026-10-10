@@ -154,6 +154,52 @@ fn report_distinctness_within(system: SystemKind) {
     );
 }
 
+/// **The voxel system's two presents, side by side** (Plan 0256 Phase 3). The
+/// system ships no preset yet, so its family report above has no pair; its two
+/// teaching presets, `clouds` drawn `glow` and `solid` drawn solid, are the
+/// pair printed here, in the family report's shape.
+#[test]
+fn distinctness_voxel_teaching_presets() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let presets = [
+        include_str!("../../docs/examples/voxel/clouds.toml"),
+        include_str!("../../docs/examples/voxel/solid.toml"),
+    ]
+    .map(|toml| {
+        rlx_core::preset::Preset::from_toml_str(toml)
+            .unwrap_or_else(|e| panic!("a voxel teaching preset parses: {e}"))
+    });
+    let names: Vec<String> = presets.iter().map(|p| p.name.clone()).collect();
+    renderer.set_presets(presets.into_iter().collect());
+    let frame = common::fixed_frame_spectrum();
+    let caps: Vec<(String, CaptureImage)> = names
+        .iter()
+        .map(|name| {
+            let img = renderer
+                .capture_preset(name, &frame, FRAMES)
+                .expect("capture a voxel teaching preset");
+            (name.clone(), img)
+        })
+        .collect();
+    assert_eq!(caps.len(), 2, "both teaching presets are captured");
+
+    println!("\n=== voxel teaching presets: glow and solid ===");
+    print_matrix("pixel (frame_diff)", &caps, frame_diff);
+    print_matrix("shape (struct_diff)", &caps, struct_diff);
+    let sd = struct_diff(&caps[0].1, &caps[1].1);
+    let pd = frame_diff(&caps[0].1, &caps[1].1);
+    if sd < NEAR_DUP_STRUCT {
+        println!(
+            "  NEAR-DUP: {} ~ {}  (shape {sd:.3}, pixel {pd:.3})",
+            caps[0].0, caps[1].0
+        );
+    } else {
+        println!("  (no near-duplicate geometry below shape {NEAR_DUP_STRUCT})");
+    }
+}
+
 /// One `#[test]` per family, and an exhaustive match over the same list.
 ///
 /// The roster is every [`SystemKind`] — ADR-0234. nextest needs a named test per
