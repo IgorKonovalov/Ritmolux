@@ -199,8 +199,8 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
 | 2 — Voxel ambient occlusion | dev | done | 1ae668d1 |
 | 3 — Cost, the golden and the gates | dev | done | d7165bbd |
 | 4 — Documentation and the references | dev | done | 3b7f4d6c |
-| 5 — The look, judged | human | not started | |
-| 6 — The preset-author reference | human | not started | |
+| 5 — The look, judged | human | owed | |
+| 6 — The preset-author reference | human | owed | |
 
 ### Notes
 
