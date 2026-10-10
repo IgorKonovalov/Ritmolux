@@ -198,7 +198,7 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
 | 1 — Walking skeleton: the march stops and lights the face | dev | done | 13569903 |
 | 2 — Voxel ambient occlusion | dev | done | 1ae668d1 |
 | 3 — Cost, the golden and the gates | dev | done | d7165bbd |
-| 4 — Documentation and the references | dev | done | committed with this row |
+| 4 — Documentation and the references | dev | done | 3b7f4d6c |
 | 5 — The look, judged | human | not started | |
 | 6 — The preset-author reference | human | not started | |
 
@@ -264,5 +264,20 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
   > light. Low `trail` (0.1-0.3) keeps the decay haze from washing out the faces.
 
 ### Close triggers
+
+- **`presets/` touched:** generated files only: `presets/README.md` (the params block),
+  `presets/preset.schema.json` and `presets/schema/*.schema.json`. No `.toml` preset.
+- **`Closes:`** the plan header names none.
+- **What shipped:** a feature (`[voxel] present = "solid"`, five new `voxel` params).
+- **Operator docs moved:** `docs/presets.md`, `docs/preset-guide.md` (and `docs/images/voxel/solid.png`),
+  `docs/design-backlog.md` (0092), `docs/specs/player-schema.json` (generated), new teaching preset
+  `docs/examples/voxel/solid.toml`.
+- **`node scripts/check-backlog-claims.mjs`:** exit 0; no entry named; 31 advisory moved paths.
+- **`human` phases remaining:** 5 (the look, judged) and 6 (the preset-author reference), both
+  `Blocks merge: no`.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Per phase: `cargo nextest run
+  --workspace -P fast` exit 0 at Phases 1, 2 and 3 (1990, 1991 and 1991 passed); `-p rlx-core
+  --test golden` exit 0 at Phases 1, 2 and 3; the voxel tests of `sanity`, `animation`,
+  `reactivity` and `distinctness` exit 0 at Phase 3.
 
 ## Followups (after this lands)
