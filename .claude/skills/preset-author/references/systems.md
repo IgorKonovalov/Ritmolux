@@ -695,6 +695,17 @@ the rule list and roster are in `docs/presets.md`, "The `[voxel]` table". Author
   a few cells, so a shift to either end empties or floods the volume. A shift to a rule with
   fewer `states` (`clouds` and `crystal` have 2) drops every decaying cell at the bar line.
 
+**Solid.** `[voxel] present = "solid"` draws each live cell as a lit cube; the decay stages in
+front still glow. Five params, inert under `glow`: `key` (the key light, working range 0.4-1.6;
+bind the bass here for a pulse), `ambient` (0.15-0.4; 1 with `key = 0` shows the palette flat),
+`ao` (0.6-1; it darkens the creases where cubes meet, which is what makes a cluster read as
+structure, and at 0 the faces go flat), and `light_yaw` / `light_pitch`, given relative to the
+camera, so the lit side stays lit through an orbit (`-0.6, 0.6` lights from the upper left).
+**Bloom on a solid preset is a choice made through `brightness`:** a lit face blooms like any
+light, so keep `brightness × (ambient + key)` under the bloom threshold for crisp cubes and push
+past it only for a glowing core. Keep `trails` off: it smears the dark faces as if they were dim
+light. Low `trail` (0.1-0.3) keeps the decay haze from washing out the faces.
+
 ## Engine-wide stages (any system)
 
 | Param | Default | Note |
