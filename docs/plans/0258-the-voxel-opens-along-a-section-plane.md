@@ -150,8 +150,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Walking skeleton: one plane through the march | dev | done | 2ae1af1c |
-| 2 — The section is lit as a surface | dev | done | committed with this row |
-| 3 — Cost, the golden, the teaching preset and the docs | dev | not started | |
+| 2 — The section is lit as a surface | dev | done | 7b0c6a12 |
+| 3 — Cost, the golden, the teaching preset and the docs | dev | done | committed with this row |
 | 4 — The owner's look and the skill text | human | not started | |
 
 ### Notes
@@ -166,6 +166,39 @@ flowchart LR
   where a cut neighbour wrongly read as solid would close the corners unevenly; with
   `|| cut_away(c)` removed from `solid_at` it fails (edge 0.238 against centre 0.194).
   `shader.rs` was not changed.
+- Phase 3 cost probe: `shot --report family=voxel`, release, 1920x1080, AMD Radeon Graphics
+  (RADV RENOIR), the three cost fixtures and a `cut = 0.5` twin of each (`cut_yaw = cut_pitch =
+  0`) loaded as one library, so all six are timed in one run. ms a frame, uncut / cut:
+  - `Floor` (64³): sparse 6.462 / 6.390, cloudy 12.321 / 9.778, worst 13.110 / 10.112.
+  - `Rich` (128³), as information: sparse 13.632 / 13.233, cloudy 26.388 / 21.126, worst
+    27.640 / 21.864.
+  - No fixture is slower cut than uncut on either tier.
+- Phase 3 golden: `RLX_BLESS=voxel_section_lit` is refused for a baseline with no PNG yet, so
+  it was blessed with `RLX_BLESS=1` filtered to `scenes_match_golden_baselines`. That
+  re-encoded `backdrop_band.png` and `backdrop_ramp.png`, which were restored; only
+  `voxel_section_lit.png` is new.
+- Phase 3 teaching preset: `crystal` runs from `seed_radius = 0.8`, not the rule's own 0.2, at
+  `distance = 3.4` with `key = 0.2 + 2.2 * bass`. At 0.2 / 4.2 / `0.6 + 1.4 * bass` the
+  reactivity gate read bass 0.0097 against its 0.02 floor; as committed it reads bass 0.0391,
+  onset 0.0279. Sanity coverage 0.2814; animation passes on the silent branch (0.1202).
+- Phase 3 distinctness: the voxel teaching-preset report now prints every pair of three. The
+  section preset is no near-duplicate (shape 0.159 against clouds, 0.166 against solid); the
+  report still prints the existing `Voxel Clouds ~ Voxel Solid` near-dup (shape 0.077).
+- Phase 3: `docs/presets.md` embeds `docs/images/voxel/section.png` in the new subsection, the
+  first image in that page. `presets/README.md` was not touched in Phase 3; its generated rows
+  moved in Phase 1.
+- Phase 4 skill text, for the end of the **Solid.** paragraph of `## voxel` in
+  `.claude/skills/preset-author/references/systems.md` (ADR-0210):
+
+  > **The section plane.** `cut` (0-1) hides every cell beyond one plane so a dense rule shows
+  > its inside: 0.5 cuts through the centre, 0 is off, 1 hides all. `cut_yaw` / `cut_pitch` turn
+  > the plane in the **cube's** frame (at `0, 0` the hidden side is `+z`), so it turns with the
+  > structure, not the camera, and an orbit swings the cut face past the viewer once a turn.
+  > Sweep it slowly (`0.5 + 0.12 * sin(time * 0.4)`) at a rate unlike the orbit's, or the two can
+  > line up into a section that seems still. The section is stepped at cell size, so author at
+  > `grid = 64`. It pays off on a dense rule (`crystal`, `clouds`, `amoeba`); on an open one like
+  > `pyroclastic` the holes already show. Only the view is cut: the automaton keeps growing
+  > across the plane. The teaching preset is `docs/examples/voxel/section.toml`.
 
 ### Close triggers
 

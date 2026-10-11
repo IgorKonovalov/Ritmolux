@@ -154,10 +154,11 @@ fn report_distinctness_within(system: SystemKind) {
     );
 }
 
-/// **The voxel system's two presents, side by side** (Plan 0256 Phase 3). The
-/// system ships no preset yet, so its family report above has no pair; its two
-/// teaching presets, `clouds` drawn `glow` and `solid` drawn solid, are the
-/// pair printed here, in the family report's shape.
+/// **The voxel system's teaching presets, side by side** (Plan 0256 Phase 3).
+/// The system ships no preset yet, so its family report above has no pair; its
+/// three teaching presets, `clouds` drawn `glow`, `solid` drawn solid and
+/// `section` drawn solid and cut open, are the pairs printed here, in the
+/// family report's shape.
 #[test]
 fn distinctness_voxel_teaching_presets() {
     let Some(mut renderer) = common::headless(SIZE, SIZE) else {
@@ -166,6 +167,7 @@ fn distinctness_voxel_teaching_presets() {
     let presets = [
         include_str!("../../docs/examples/voxel/clouds.toml"),
         include_str!("../../docs/examples/voxel/solid.toml"),
+        include_str!("../../docs/examples/voxel/section.toml"),
     ]
     .map(|toml| {
         rlx_core::preset::Preset::from_toml_str(toml)
@@ -183,19 +185,23 @@ fn distinctness_voxel_teaching_presets() {
             (name.clone(), img)
         })
         .collect();
-    assert_eq!(caps.len(), 2, "both teaching presets are captured");
+    assert_eq!(caps.len(), 3, "every teaching preset is captured");
 
-    println!("\n=== voxel teaching presets: glow and solid ===");
+    println!("\n=== voxel teaching presets: glow, solid and section ===");
     print_matrix("pixel (frame_diff)", &caps, frame_diff);
     print_matrix("shape (struct_diff)", &caps, struct_diff);
-    let sd = struct_diff(&caps[0].1, &caps[1].1);
-    let pd = frame_diff(&caps[0].1, &caps[1].1);
-    if sd < NEAR_DUP_STRUCT {
-        println!(
-            "  NEAR-DUP: {} ~ {}  (shape {sd:.3}, pixel {pd:.3})",
-            caps[0].0, caps[1].0
-        );
-    } else {
+    let mut near_dups = 0;
+    for (i, (a_name, a)) in caps.iter().enumerate() {
+        for (b_name, b) in caps.iter().skip(i + 1) {
+            let sd = struct_diff(a, b);
+            if sd < NEAR_DUP_STRUCT {
+                near_dups += 1;
+                let pd = frame_diff(a, b);
+                println!("  NEAR-DUP: {a_name} ~ {b_name}  (shape {sd:.3}, pixel {pd:.3})");
+            }
+        }
+    }
+    if near_dups == 0 {
         println!("  (no near-duplicate geometry below shape {NEAR_DUP_STRUCT})");
     }
 }

@@ -1,0 +1,51 @@
+# The `voxel` system drawn solid and cut open, for the illustrated guide's
+# picture of the section plane. Teaching material, not a shipped preset: the
+# `crystal` rule grows from a seeded ball into a dense lattice that never dies,
+# whose skin alone would hide everything inside it. `cut` near 0.5 hides the
+# half of the cube beyond a plane through its centre, so the lattice shows its
+# inside as a stepped section of cubes, the hollows lit by the key light. The
+# plane is held in the cube's frame, tilted by `cut_yaw` and `cut_pitch`, so it
+# turns with the structure as the camera orbits; `cut` sweeps it slowly back
+# and forth through the mass. The palette runs amber to gold for the cubes and
+# ends in a near-black navy, which `bg_hue` 0.97 takes for the backdrop (1 would
+# wrap to the amber end). The bass brightens the key light and an onset refills
+# a ball of cells.
+system = "voxel"
+name = "Voxel Section"
+
+[voxel]
+grid        = 64
+rules       = ["crystal"]
+seed_radius = 0.8
+seed_fill   = 0.3
+present     = "solid"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#d9822b" },
+  { at = 0.5, color = "#f2c14e" },
+  { at = 1.0, color = "#10131c" },
+]
+
+[params]
+step_rate    = "8"
+reseed       = "onset"
+density      = "0.6"
+age_tint     = "0.3"
+hue          = "0"
+hue_spread   = "0.2"
+brightness   = "1"
+key          = "0.2 + 2.2 * bass"
+ambient      = "0.3"
+light_yaw    = "-0.6"
+light_pitch  = "0.6"
+cut          = "0.5 + 0.12 * sin(time * 0.4)"
+cut_yaw      = "0.8"
+cut_pitch    = "0.4"
+yaw          = "0.6 + time * 0.1"
+pitch        = "0.35"
+distance     = "3.4"
+bg_bright    = "0.5"
+bg_hue       = "0.97"
+bg_shade     = "1"
+bg_shade_end = "1"
