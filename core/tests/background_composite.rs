@@ -14,8 +14,12 @@
 //! boxes, macOS Metal CI) and via the `shot` CLI, and left unasserted where the
 //! adapter can't render it.
 //!
-//! One `#[test]` per file (its own test binary → its own process) so the single
-//! hardware renderer never coexists with the other suites' software devices.
+//! One renderer per `#[test]`, and nextest runs each test in its own process, so
+//! the hardware renderer never coexists with a software device.
+//!
+//! The **paper** backdrop (ADR-0270) is checked here too, on the software
+//! adapter: it is a byte-equality claim about the tonemap's write, which holds
+//! on any adapter that renders the scene at all.
 
 /// The shared ADR-0016 skip and headless constructors.
 mod common;
@@ -113,6 +117,113 @@ fn assert_backdrop_reveal(r: &mut Renderer, scene: &str, field: &str, frames: u3
     assert!(
         cg > cr + 20.0 && cb > cr + 20.0,
         "{scene}: hue-0.5 void reveal is not green/blue-dominant: rgb ({cr:.1}, {cg:.1}, {cb:.1})"
+    );
+}
+
+/// The paper fixture: a solid voxel block over `bg_paper = 1`, `bg_bright = 1`
+/// on a palette that is white at `bg_hue = 1`.
+const PAPER: &str = include_str!("fixtures/backdrop_paper.toml");
+
+/// How many frames a paper capture renders. The block is frozen
+/// (`step_rate = 0`), so any count draws the same picture.
+const PAPER_FRAMES: u32 = 4;
+
+/// [`PAPER`] with `bg_paper` and `bg_bright` rebound, as one parsed preset.
+/// Panics if either line is not in the fixture, so a reworded fixture cannot
+/// turn this into a capture of the fixture unchanged.
+fn paper_variant(paper: &str, bright: &str) -> Preset {
+    let toml = PAPER
+        .replacen(
+            "bg_paper     = \"1\"",
+            &format!("bg_paper     = \"{paper}\""),
+            1,
+        )
+        .replacen(
+            "bg_bright    = \"1\"",
+            &format!("bg_bright    = \"{bright}\""),
+            1,
+        );
+    assert_eq!(
+        toml.matches(&format!("bg_paper     = \"{paper}\"")).count()
+            + toml
+                .matches(&format!("bg_bright    = \"{bright}\""))
+                .count(),
+        2,
+        "the paper fixture's bg_paper / bg_bright lines moved"
+    );
+    Preset::from_toml_str(&toml).expect("the paper fixture parses")
+}
+
+/// Capture one preset alone, at [`SIZE`], on the software adapter's renderer.
+fn capture(r: &mut Renderer, preset: Preset) -> CaptureImage {
+    let name = preset.name.clone();
+    r.set_presets(vec![preset]);
+    r.capture_preset(&name, &common::fixed_frame(), PAPER_FRAMES)
+        .expect("capture the paper fixture")
+}
+
+/// **A paper reaches display white, and the scene's covered pixels do not
+/// move** (ADR-0270).
+///
+/// 1. With `bg_paper = 1`, `bg_bright = 1` over a white stop, every corner —
+///    where the block draws nothing — reads exactly `(255, 255, 255)`. Through
+///    the linear backdrop the tonemap's shoulder caps the same ground at 0.8.
+/// 2. Every pixel the block **fully covers** is byte-identical to the same scene
+///    with `bg_paper = 0` over a black ground. Coverage is found from the two
+///    paper renders rather than assumed: a pixel identical under a white paper
+///    and a mid-grey one is one no paper shows through. The mask must be a real
+///    part of the frame and must exclude the corners, or the comparison would be
+///    vacuous.
+#[test]
+fn a_paper_reaches_white_and_leaves_covered_pixels_unchanged() {
+    let Some(mut r) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let white = capture(&mut r, paper_variant("1", "1"));
+    let grey = capture(&mut r, paper_variant("1", "0.4"));
+    let black = capture(&mut r, paper_variant("0", "0"));
+
+    let at = |img: &CaptureImage, x: u32, y: u32| {
+        let i = ((y * SIZE + x) * 4) as usize;
+        [img.rgba[i], img.rgba[i + 1], img.rgba[i + 2]]
+    };
+    for (x, y) in [(0, 0), (SIZE - 1, 0), (0, SIZE - 1), (SIZE - 1, SIZE - 1)] {
+        assert_eq!(
+            at(&white, x, y),
+            [255, 255, 255],
+            "the paper corner ({x}, {y}) is not display white"
+        );
+    }
+
+    let covered: Vec<bool> = white
+        .rgba
+        .chunks_exact(4)
+        .zip(grey.rgba.chunks_exact(4))
+        .map(|(w, g)| w[..3] == g[..3])
+        .collect();
+    let n_covered = covered.iter().filter(|&&c| c).count();
+    let total = covered.len();
+    assert!(
+        n_covered * 100 > total * 10 && n_covered * 100 < total * 90,
+        "the block covers {n_covered}/{total} pixels; the fixture must cover the middle only"
+    );
+    for (x, y) in [(0, 0), (SIZE - 1, SIZE - 1)] {
+        assert!(
+            !covered[(y * SIZE + x) as usize],
+            "the coverage mask claims the corner ({x}, {y})"
+        );
+    }
+    let moved: Vec<usize> = covered
+        .iter()
+        .enumerate()
+        .filter(|&(i, &c)| c && white.rgba[i * 4..i * 4 + 3] != black.rgba[i * 4..i * 4 + 3])
+        .map(|(i, _)| i)
+        .collect();
+    assert!(
+        moved.is_empty(),
+        "{} covered pixels differ between paper and a black ground, first at index {:?}",
+        moved.len(),
+        moved.first()
     );
 }
 

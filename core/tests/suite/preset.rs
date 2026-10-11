@@ -2270,6 +2270,9 @@ fn declared_params_match_set_param() {
                 "bg_band_curve",
                 "bg_band_hue",
                 "bg_band_hue_span",
+                // The route (ADR-0270): the same ground painted as paper,
+                // display-referred, under the finished picture.
+                "bg_paper",
             ],
         ),
         (
@@ -2478,6 +2481,9 @@ const STRUCTURAL: &[(&str, &str)] = &[
     // position and the shader reads its fraction, so they are `Modal`.
     ("shape_field", "coord_mode"),
     ("background", "bg_coord_mode"),
+    // `Background::paper`: a switch read at `>= 0.5`, choosing whether the
+    // backdrop is light under the chain or paper under the tonemap (ADR-0270).
+    ("background", "bg_paper"),
     // `family::roster_index`: rounds into the tuple roster.
     ("attractor", "tuple"),
     // `Grammar::from_param` / `Roster::from_param`: round into a closed set.

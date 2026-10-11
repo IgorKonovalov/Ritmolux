@@ -426,8 +426,22 @@ pub(super) fn encode_active_side(
         // has ever been rendered into.
         draw_calls += blend.resolve(&ctx.queue, encoder, terminal, tr.progress(), tr.kind());
     }
+    // A paper backdrop (ADR-0270) is painted display-referred into the
+    // tonemap's output, and the tonemap lies over it by the scene's coverage.
+    // Its side cleared the linear composite transparent for exactly this.
+    let paper = tonemap_input.is_some() && live_side.background.paper();
+    if paper {
+        live_side.background.render_paper(
+            &ctx.queue,
+            encoder,
+            display,
+            surface,
+            tonemap.target_format(),
+        );
+        draw_calls += 1;
+    }
     if tonemap_input.is_some() {
-        draw_calls += tonemap.resolve(&ctx.queue, encoder, display);
+        draw_calls += tonemap.resolve(&ctx.queue, encoder, display, paper);
     }
     if ink_input.is_some() {
         draw_calls += ink.resolve(&ctx.queue, encoder, view);

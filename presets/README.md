@@ -1143,6 +1143,7 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | Parameter | Default | Range | What it does | Group |
 |---|---|---|---|---|
 | `bg_coord_mode` | `0` | `0` – `1` | Which way the backdrop ramp is measured: 0 straight across the frame, 1 around a point, which turns its bands into a fan converging on that point. | post |
+| `bg_paper` | `0` | `0` – `1` | Paints the backdrop as paper rather than light: at 1 it is laid under the finished picture, so a white palette stop is display white and the scene covers it without being lifted. Paper does not bloom, fold, trail or follow exposure. | post |
 
 **Modal**
 

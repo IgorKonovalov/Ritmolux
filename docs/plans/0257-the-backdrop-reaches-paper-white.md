@@ -1,6 +1,6 @@
 # 0257 — The backdrop reaches paper white
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0270](../adrs/0270-a-paper-backdrop-is-painted-after-the-tonemap-and-the-scene-lies-over-it-by-coverage.md) (proposed), [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md), [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md), [ADR-0201](../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md), [ADR-0096](../adrs/0096-the-display-write-dithers.md)
@@ -160,16 +160,35 @@ flowchart LR
 
 ## Implementation log
 
-**Lane:** _(not started)_
+**Lane:** branch `plan-0257-the-backdrop-reaches-paper-white`, worktree `/home/igor/Work/rlx-plan-0257`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: one preset on true white | dev | not started | |
+| 1 — Walking skeleton: one preset on true white | dev | done | committed with this row |
 | 2 — The dissolve and ink | dev | not started | |
 | 3 — Cost, the golden and the documentation | dev | not started | |
 | 4 — The owner's look and the skill text | human | not started | |
 
 ### Notes
+
+- Phase 1: `bg_hue = 1` does not sample the last palette stop. The LUT sampler repeat-addresses
+  `u`, so at exactly 1 it blends the last texel with the first, and a palette ending at `#ffffff`
+  and starting at `#1e1e1e` gives a mid grey there (`Palette::sample` mirrors this). The fixture
+  `core/tests/fixtures/backdrop_paper.toml` keeps `bg_hue = 1` and makes its palette flat white at
+  both ends. `docs/examples/voxel/solid.toml` gains a `{ at = 0.98, #ffffff }` stop and moves
+  `bg_hue` to `0.99`, inside the flat white segment, besides setting `bg_paper` and dropping
+  `exposure` as the phase states.
+- Phase 1: two files outside the phase's list were edited. `core/tests/suite/preset.rs` gains
+  `bg_paper` in `declared_params_match_set_param`'s background roster and in its `Structural`
+  roster; the test fails without both.
+- Phase 1: the "covers only the frame's middle" fixture is the frozen solid voxel block. Fully
+  covered pixels are found as those identical under a white and a 0.4 paper; the test asserts that
+  mask is 10-90 % of the frame and excludes the corners.
+- Phase 1: the golden suite passes with `RLX_BLESS` unset, but `backdrop_ramp` and `backdrop_band`
+  read mean 0.0005, max outlier 20 and 21 (tolerance 48), not 0. Every other baseline reads 0.
+  Building the linear backdrop pipeline before the queue writes, as the shipping code did, gives
+  the same readings. A HEAD-only golden run was not possible in this session (no second worktree,
+  no `git apply`), so whether the two readings predate this phase is not established.
 
 ### Close triggers
 
