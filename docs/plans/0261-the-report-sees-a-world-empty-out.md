@@ -152,7 +152,7 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The capture primitive and the column | dev | done | 0d04da40 |
-| 2 — The documentation and the skill text | dev | done | committed with this row |
+| 2 — The documentation and the skill text | dev | done | 439411ec |
 | 3 — The skill text | human | not started | |
 
 ### Notes
@@ -215,5 +215,16 @@ flowchart LR
   > collapse that keeps its `cover` reads fine here, which is the horizon's `peak/mean`. |
 
 ### Close triggers
+
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** design-backlog 0294.
+- **What shipped:** feature (`Renderer::capture_preset_over_at`, the `shot --report` `late`
+  reading and its `EMPTIED` notes).
+- **Operator docs touched:** `docs/capturing.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, no entry named.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Narrowed runs this session:
+  `cargo nextest run -p rlx-core --test suite capture_advance` (7 passed) and
+  `cargo nextest run -p standalone --lib shot::` (105 passed, 204 skipped), both exit 0.
+- **Outstanding `human` phases:** Phase 3 (`Blocks merge: no`).
 
 ## Followups (after this lands)
