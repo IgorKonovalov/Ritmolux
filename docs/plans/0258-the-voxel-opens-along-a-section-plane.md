@@ -1,6 +1,6 @@
 # 0258 — The voxel opens along a section plane
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0271](../adrs/0271-a-voxel-is-opened-by-one-section-plane-held-in-the-cubes-own-frame.md) (proposed), [ADR-0268](../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md), [ADR-0269](../adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md), [ADR-0256](../adrs/0256-a-parameter-declares-its-group-and-whether-it-is-main.md)
@@ -145,16 +145,22 @@ flowchart LR
 
 ## Implementation log
 
-**Lane:** _(not started)_
+**Lane:** branch `plan-0258-the-voxel-opens-along-a-section-plane`, worktree `/home/igor/Work/rlx-plan-0258`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: one plane through the march | dev | not started | |
+| 1 — Walking skeleton: one plane through the march | dev | done | committed with this row |
 | 2 — The section is lit as a surface | dev | not started | |
 | 3 — Cost, the golden, the teaching preset and the docs | dev | not started | |
 | 4 — The owner's look and the skill text | human | not started | |
 
 ### Notes
+
+- Phase 1: the plane's on/off flag rides in the unused `lit.w`, beside the new `cut` vec4.
+  The fixture is `core/tests/fixtures/voxel_section.toml` (camera `yaw = pi/2`, so the eye
+  lies in the plane). The probe's target is cleared transparent for this test, so "alpha
+  0" reads the volume's own coverage; the existing probes still clear opaque black.
+  `.taplo.toml` did not change on regeneration.
 
 ### Close triggers
 

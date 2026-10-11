@@ -72,6 +72,9 @@ struct Driver<'a> {
     size: u32,
     target: wgpu::Texture,
     view: wgpu::TextureView,
+    /// What each frame starts from: opaque black, as a capture does, or
+    /// transparent, so the frame's alpha is the volume's own coverage.
+    clear: wgpu::Color,
 }
 
 impl<'a> Driver<'a> {
@@ -88,6 +91,7 @@ impl<'a> Driver<'a> {
             size,
             target,
             view,
+            clear: wgpu::Color::BLACK,
         }
     }
 
@@ -112,7 +116,12 @@ impl<'a> Driver<'a> {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("voxel-probe"),
             });
-        capture::record_clear(&mut encoder, &self.view);
+        gpu::color_pass(
+            &mut encoder,
+            "voxel-probe-clear",
+            &self.view,
+            wgpu::LoadOp::Clear(self.clear),
+        );
         scene.render(&self.ctx.queue, &mut encoder, &self.view, 1.0);
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
         generations
@@ -525,6 +534,141 @@ fn ambient_occlusion_darkens_the_inner_edge_of_an_l() {
         on[4],
         on[5]
     );
+}
+
+// ---------------------------------------------------------------------------
+// The section plane
+// ---------------------------------------------------------------------------
+
+/// `core/tests/fixtures/voxel_section.toml`: a solid 16³ block cut through its
+/// centre, seen from an eye inside the cut plane.
+const SECTION_FIXTURE: &str = include_str!("../../../../tests/fixtures/voxel_section.toml");
+
+/// A voxel fixture's `[voxel]` table, and its `[params]` each evaluated once at
+/// rest: every binding a fixture here writes is a constant.
+fn fixture(src: &str) -> (VoxelConfig, Vec<(String, f32)>) {
+    let preset = crate::preset::Preset::from_toml_str(src).expect("the fixture parses");
+    let Some(GeneratorConfig::Voxel(config)) = preset.config else {
+        panic!("the fixture carries no [voxel] table");
+    };
+    let vars = crate::preset::expr::Variables::default();
+    let params = preset
+        .params
+        .iter()
+        .map(|b| (b.name.clone(), b.expr.eval(&vars)))
+        .collect();
+    (config, params)
+}
+
+/// One frame of the fixture `src` into a `size`-square target cleared
+/// transparent, with `overrides` replacing (or adding to) its params; the frame
+/// as linear RGBA, its alpha the volume's coverage.
+fn render_fixture(
+    ctx: &RenderContext,
+    src: &str,
+    size: u32,
+    overrides: &[(&str, f32)],
+) -> Vec<[f32; 4]> {
+    let (config, params) = fixture(src);
+    let mut bound: Vec<(&str, f32)> = params.iter().map(|(n, v)| (n.as_str(), *v)).collect();
+    for &(name, value) in overrides {
+        match bound.iter_mut().find(|(n, _)| *n == name) {
+            Some(slot) => slot.1 = value,
+            None => bound.push((name, value)),
+        }
+    }
+    let mut scene = scene_with(ctx, config);
+    let mut driver = Driver::sized(ctx, size);
+    driver.clear = wgpu::Color::TRANSPARENT;
+    driver.frame(&mut scene, 1.0 / 60.0, &bound);
+    driver.read_target()
+}
+
+/// The value the fixture `src` binds `name` to.
+fn fixture_param(src: &str, name: &str) -> f32 {
+    fixture(src)
+        .1
+        .into_iter()
+        .find(|(n, _)| n == name)
+        .map(|(_, v)| v)
+        .unwrap_or_else(|| panic!("the fixture binds no `{name}`"))
+}
+
+/// **The section plane hides the side its normal points to and leaves the
+/// other untouched**: the fixture's eye lies in the plane `z = 0`, which
+/// projects to the frame's vertical centre line. At `cut = 0.5` every pixel on
+/// the `+z` side has alpha 0, and every pixel on the other side is
+/// byte-identical to the `cut = 0` frame, since no ray there enters a cut cell.
+/// At `cut = 1` the whole frame is the backdrop.
+#[test]
+fn the_section_plane_hides_one_side_and_leaves_the_other() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let size = 64;
+    assert_eq!(
+        fixture_param(SECTION_FIXTURE, "cut"),
+        0.5,
+        "the fixture no longer cuts through the centre"
+    );
+    let yaw = fixture_param(SECTION_FIXTURE, "yaw");
+    let pitch = fixture_param(SECTION_FIXTURE, "pitch");
+    let side = size as usize;
+    let half = side / 2;
+    // The column a point on the normal's side lands in names that side.
+    let normal_left = pixel_of(size, yaw, pitch, [0.0, 0.0, 0.5]) % side < half;
+    let on_normal_side = |i: usize| (i % side < half) == normal_left;
+
+    let uncut = render_fixture(&ctx, SECTION_FIXTURE, size, &[("cut", 0.0)]);
+    let cut = render_fixture(&ctx, SECTION_FIXTURE, size, &[]);
+    let gone = render_fixture(&ctx, SECTION_FIXTURE, size, &[("cut", 1.0)]);
+
+    let covered = |side: bool| {
+        (0..uncut.len())
+            .filter(|&i| on_normal_side(i) == side && uncut[i][3] > 0.0)
+            .count()
+    };
+    let (near, far) = (covered(true), covered(false));
+    println!("uncut: {near} covered pixels on the normal's side, {far} on the other");
+    assert!(
+        near > 100 && far > 100,
+        "the uncut block does not cover both halves, so the comparison is empty"
+    );
+    for (i, (c, u)) in cut.iter().zip(&uncut).enumerate() {
+        if on_normal_side(i) {
+            assert_eq!(c[3], 0.0, "pixel {i} on the cut side is covered: {c:?}");
+        } else {
+            assert!(
+                c.map(f32::to_bits) == u.map(f32::to_bits),
+                "pixel {i} on the kept side moved: {c:?} against {u:?}"
+            );
+        }
+    }
+    assert!(
+        gone.iter().all(|p| p[3] == 0.0),
+        "at cut = 1 something is still drawn"
+    );
+}
+
+/// The plane's offset runs from past the cube's farthest corner at `cut` just
+/// above 0 to the far corner's opposite at 1, through the centre at 0.5, and
+/// `cut = 0` packs no plane.
+#[test]
+fn the_cut_plane_spans_the_cube_and_is_off_at_zero() {
+    assert_eq!(cut_plane(0.0, 1.0, 0.3), None);
+    assert_eq!(cut_plane(-0.2, 0.0, 0.0), None);
+    let [nx, ny, nz, d] = cut_plane(0.5, 0.0, 0.0).expect("a plane");
+    assert_eq!([nx, ny, nz, d], [0.0, 0.0, 1.0, 0.0]);
+    let d1 = cut_plane(1.0, 0.0, 0.0).expect("a plane")[3];
+    assert!((d1 + CUBE_RADIUS).abs() < 1e-6);
+    assert_eq!(cut_plane(4.0, 0.0, 0.0), cut_plane(1.0, 0.0, 0.0));
+    let [x, y, z, _] = cut_plane(0.3, 2.0, -0.7).expect("a plane");
+    assert!(
+        (x * x + y * y + z * z - 1.0).abs() < 1e-6,
+        "the normal is unit"
+    );
+    let up = cut_plane(0.3, 0.0, FRAC_PI_2).expect("a plane");
+    assert!((up[1] - 1.0).abs() < 1e-6, "a quarter-turn pitch faces up");
 }
 
 /// The camera-space light: at `(0, 0)` it shines from the eye along the view

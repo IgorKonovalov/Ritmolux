@@ -1111,6 +1111,9 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `step_rate` | `8` | `0` – `30` | How many generations the automaton runs per second, whatever the frame rate; 0 freezes it. | motion, main |
 | `reseed` | `0` | `0` – `1` | A rise past 0.5 fills one ball of the cube with fresh seeded cells, once per rise; bind an onset or a beat to it. | motion |
 | `reseed_radius` | `0.25` | `0.05` – `1` | The radius of the ball a reseed fills, as a fraction of the cube's half-side. | shape |
+| `cut` | `0` | `0` – `1` | How much of the cube a section plane hides, so the inside shows: 0.5 cuts it through the centre, 1 hides it all, 0 is off. Only the view is cut; the automaton runs on. | shape, main |
+| `cut_yaw` | `0` | `0` – `6.2831855` | Which way the section plane faces around the cube's vertical axis, in radians: the side it hides. It turns with the cube, not the camera. | shape |
+| `cut_pitch` | `0` | `-1.5707964` – `1.5707964` | How far the section plane's hidden side tilts up toward the cube's top, in radians; negative tilts it down. | shape |
 | `shell_gain` | `0` | `0` – `4` | How strongly the spectrum lights the cube's radial shells, bass at the centre and treble at the faces; 0 leaves the light as the cells give it. | light |
 | `density` | `1` | `0` – `8` | How strongly the volume absorbs the light behind it, per unit of the cube's width; 0 is pure additive glow with no front or back. | light, main |
 | `trail` | `0.6` | `0` – `1` | How much of its light a decaying cell keeps at each stage of its decay; 0 draws only the live cells. | light |

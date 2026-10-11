@@ -256,6 +256,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// `occ` is the face's voxel ambient occlusion at the hit point, mixed in by
 /// `ao`; at `ao = 0` it is not evaluated.
 ///
+/// A cell the section plane hides (`cut_away`) is dead to the walk and to
+/// `solid_at`, so the occlusion reads it as open. The brick jump does not know
+/// the plane: a brick is jumped only on its own empty flag, and a cut brick is
+/// walked cell by cell.
+///
 /// **A crossing is computed from its boundary's index, never accumulated.** The
 /// parameter at which the ray crosses an axis's next boundary is
 /// `(boundary - o) * inv_dg`, evaluated afresh each step. That is what lets the walk
@@ -286,8 +291,11 @@ struct March {
     d: vec4<f32>,
     // xyz: the unit world direction toward the key light, w: 1 under solid
     light: vec4<f32>,
-    // x: key, y: ambient, z: ao (0..1); w unused
+    // x: key, y: ambient, z: ao (0..1); w: 1 when the section plane is on
     lit: vec4<f32>,
+    // The section plane: xyz its unit normal toward the hidden side, in the
+    // cube's frame; w its offset. Read only while lit.w is 1
+    cut: vec4<f32>,
     // The shells' levels, four to a vec4, bass first
     shells: array<vec4<f32>, 4>,
 }
@@ -341,9 +349,17 @@ fn glow_of(state: u32) -> f32 {
     return 0.0;
 }
 
-// 1 when the cell at `c` is live, 0 for any other state and off the grid.
+// True when the section plane hides the cell at `c`: its centre, in the cube's
+// [-1, 1]^3 frame, lies beyond the plane. Always false while the plane is off.
+fn cut_away(c: vec3<i32>) -> bool {
+    let centre = (vec3<f32>(c) + vec3<f32>(0.5)) / mp.eye.w * 2.0 - vec3<f32>(1.0);
+    return mp.lit.w > 0.5 && dot(centre, mp.cut.xyz) > mp.cut.w;
+}
+
+// 1 when the cell at `c` is live, 0 for any other state, off the grid, and
+// for a cell the section plane hides.
 fn solid_at(c: vec3<i32>, ni: i32) -> f32 {
-    if (any(c < vec3<i32>(0)) || any(c >= vec3<i32>(ni))) {
+    if (any(c < vec3<i32>(0)) || any(c >= vec3<i32>(ni)) || cut_away(c)) {
         return 0.0;
     }
     return select(0.0, 1.0, (textureLoad(field, c, 0).x & 0xFFu) == 1u);
@@ -526,7 +542,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let len = max(t_end - t, 0.0);
 
         let texel = textureLoad(field, cell, 0).x;
-        let state = texel & 0xFFu;
+        // A cell the section plane hides reads as dead, under either present.
+        let state = select(texel & 0xFFu, 0u, cut_away(cell));
         let glow = glow_of(state);
         if (glow > 0.0) {
             let centre = (vec3<f32>(cell) + vec3<f32>(0.5)) / n * 2.0 - vec3<f32>(1.0);
