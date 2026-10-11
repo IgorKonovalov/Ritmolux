@@ -46,7 +46,6 @@ place. The plan file carries the real link.
 | [0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) | The rig session measures the wave modes and judges the fourth gate | approved | human, dev | 0202's Phases 4-7. Not queued until the owner has the Windows rig; commit Phase 1's eight rows on main, then queue. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
 | [0259](0259-the-contact-sheet-hears-the-clip.md) | The contact sheet hears the clip | approved | dev, human | `shot --all` with `--signal`/`--audio` captures every preset at one hop; silent pairs become usage errors. Closes backlog 0289. |
-| [0260](0260-the-studio-tests-leave-tmp-as-they-found-it.md) | The studio tests leave /tmp as they found it | approved | studio-builder | One phase: trace and stop the `/tmp/<id>/ssr` leak from vitest. Closes backlog 0291. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -1040,6 +1039,7 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 [Closed earlier (index bullets)](README-archive.md#closed-earlier-index-bullets).
 
 <!-- roster:begin cap=320 -->
+- [0260 - The studio tests leave /tmp as they found it](done/0260-the-studio-tests-leave-tmp-as-they-found-it.md) - closed 2026-10-11. Review: **no blockers, no majors, two minors (one fixed, filed 0293).** Version: **0.175.1**. Closed 0291. [Write-up](README-archive.md).
 - [0257 - The backdrop reaches paper white](done/0257-the-backdrop-reaches-paper-white.md) - closed 2026-10-11, Phase 4 owed. Review: **no blockers, no majors, one minor (open), one nit (fixed).** Version: **0.175.0**. ADR-0270 accepted. Closed 0287. [Write-up](README-archive.md).
 - [0258 - The voxel opens along a section plane](done/0258-the-voxel-opens-along-a-section-plane.md) - closed 2026-10-11, Phase 4 owed. Review: **no blockers, no majors, one minor (open).** Version: **0.174.0**. ADR-0271 accepted. Closed 0288. [Write-up](README-archive.md).
 - [0256 - The voxels turn solid](done/0256-the-voxels-turn-solid.md) - closed 2026-10-11, Phases 5-6 owed. Review: **no blockers, no majors, four minors (three fixed), one nit (fixed).** Version: **0.173.0**. ADR-0269 accepted. [Write-up](README-archive.md).
@@ -1054,7 +1054,6 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 - [0249 - A dispatched CI job blesses the named WARP baselines](done/0249-a-dispatched-ci-job-blesses-the-named-warp-baselines.md) - closed 2026-10-06, Phase 3 owed. Review: **no blockers, no majors, two minors (one fixed), one nit (fixed).** Version: none. ADR-0264 accepted. [Write-up](README-archive.md).
 - [0240 - The attractor projects through the shared camera](done/0240-the-attractor-projects-through-the-shared-camera.md) - closed 2026-10-06, Phases 6-8 owed. Review: **no blockers, no majors, five minors (four fixed).** Version: **0.166.0**. ADR-0260 accepted, Outcome. [Write-up](README-archive.md).
 - [0237 - The L-system turtle turns in space, and can grow without end](done/0237-the-l-system-turtle-turns-in-space.md) - closed 2026-10-06, Phases 8-9 owed. Review: **no blockers, no majors, five minors (three fixed).** Version: **0.165.0**. [Write-up](README-archive.md).
-- [0248 - 3D strokes gain joins, depth cues and a solid mode](done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) - closed 2026-10-05, Phases 6-8 owed. Review: **no blockers, no majors, three minors (one fixed), one nit (fixed).** Version: **0.164.0**. ADR-0263 accepted. [Write-up](README-archive.md).
 
 <!-- roster:end -->
 

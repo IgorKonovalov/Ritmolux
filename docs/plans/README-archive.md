@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0260 - The studio tests leave /tmp as they found it](#0260---the-studio-tests-leave-tmp-as-they-found-it)
   - [0257 - The backdrop reaches paper white](#0257---the-backdrop-reaches-paper-white)
   - [0258 - The voxel opens along a section plane](#0258---the-voxel-opens-along-a-section-plane)
   - [0256 - The voxels turn solid](#0256---the-voxels-turn-solid)
@@ -301,6 +302,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0248 - 3D strokes gain joins, depth cues and a solid mode](done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) - closed 2026-10-05, Phases 6-8 owed. Review: **no blockers, no majors, three minors (one fixed), one nit (fixed).** Version: **0.164.0**. ADR-0263 accepted. [Write-up](README-archive.md).
 - [0238 - The waterfall system](done/0238-the-waterfall-system.md) - closed 2026-10-02, Phase 4 judged: rows show through. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.163.0**. [Write-up](README-archive.md).
 - [0247 - The studio renders a neural clip](done/0247-the-studio-renders-a-neural-clip.md) - closed 2026-10-02, Phase 6 owed. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.162.0**. ADR-0262 accepted. [Write-up](README-archive.md).
 - [0236 - Space curves, and the camera becomes a shared block](done/0236-space-curves-and-the-camera-becomes-a-shared-block.md) - closed 2026-10-02, Phase 6 judged: three engine findings. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.161.0**. ADR-0258 accepted. [Write-up](README-archive.md).
@@ -520,6 +522,22 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0260 - The studio tests leave /tmp as they found it](done/0260-the-studio-tests-leave-tmp-as-they-found-it.md)
+
+- closed 2026-10-11 by a conductor close in the lane
+`plan-0260-the-studio-tests-leave-tmp-as-they-found-it`, round 1. The single phase landed in
+`400860c5`. Round 1: **no blockers, no majors, two minors.** The first (`studio/test/global-teardown.ts`
+is read by neither `typecheck` nor `lint`) is config and stays open; the second (the `rlx-*` fixture
+leak had no carrier) was fixed at the close by filing backlog 0293 (`6650680c`). Version **0.175.1**
+(patch: a fix to the studio's test harness). Closes backlog 0291. The full review is the plan's own
+`## Close review`.
+- **What landed.** The `/tmp/<id>/ssr/` directory is vitest's own `Vitest._tmpDir`, which no option
+  places; a `globalSetup` returns a teardown that removes it when it is a direct child of
+  `os.tmpdir()`. The `/tmp/*/ssr` count read 78 before and 78 after a test run.
+- **Curation.** `presets/` not touched.
+- **Close readings.** Upstream CI green (run 38132564345 on `da03dfa`). Translation advisory: two
+  rows, neither moved by this plan: `docs/how-it-works.ru.md` (since 0257) and `docs/running.ru.md`.
 
 ### [0257 - The backdrop reaches paper white](done/0257-the-backdrop-reaches-paper-white.md)
 
