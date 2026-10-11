@@ -139,7 +139,7 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Walking skeleton: one face lit by its neighbours | dev | done | 88a42bca |
-| 2 — Cost, the golden and the documentation | dev | done | committed with this row |
+| 2 — Cost, the golden and the documentation | dev | done | 9b33af60 |
 | 3 — The owner's look and the skill text | human | not started | |
 
 ### Notes
@@ -176,5 +176,18 @@ flowchart LR
   > at 0, and on is refilled per generation, not per frame.
 
 ### Close triggers
+
+- `presets/` touched: `presets/README.md`, `presets/preset.schema.json`,
+  `presets/schema/voxel.schema.json` (generated, the `bounce` row). No preset `.toml`.
+- Closes: design-backlog 0295.
+- Shipped: feature (a new voxel param, `bounce`).
+- Operator docs moved: `docs/presets.md` (a `bounce` section under the `[voxel]` table),
+  `presets/README.md` (generated reference row), `docs/specs/player-schema.json` (generated).
+- `node scripts/check-backlog-claims.mjs`: exit 0, 48 reductions hold across 23 live entries.
+- `human` phases remaining: Phase 3 (`Blocks merge: no`).
+- Full suite: owed to the conductor's pre-review gate (ADR-0207). Run at the phases:
+  `cargo nextest run -p rlx-core --test golden --test suite` at Phase 1, exit 0, 333 passed and 1
+  skipped; `cargo nextest run -p rlx-core --test golden` at Phase 2, exit 0, 5 passed; the voxel
+  unit tests (`--lib scenes::voxel`) at Phase 1, exit 0, 25 passed.
 
 ## Followups (after this lands)
