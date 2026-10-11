@@ -682,6 +682,38 @@ fn the_voxel_solid_teaching_preset_moves() {
     );
 }
 
+/// **The voxel system's section teaching preset moves**:
+/// `docs/examples/voxel/section.toml`, held to both floors as a shipped preset
+/// is. Its camera orbits on `time`, its section plane sweeps on `time` and its
+/// automaton grows, so either branch may carry the pass; the line says which.
+#[test]
+fn the_voxel_section_teaching_preset_moves() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let preset = without_backdrop(
+        Preset::from_toml_str(include_str!("../../docs/examples/voxel/section.toml"))
+            .unwrap_or_else(|e| panic!("the voxel section teaching preset parses: {e}")),
+    );
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+    let m = motions(&mut renderer, &name);
+    println!(
+        "{name:<24} silent {:.4}  driven {:.4}  -> {:<6} (whole-frame {:.4})",
+        m.silent,
+        m.driven,
+        m.branch().unwrap_or("FROZEN"),
+        m.whole,
+    );
+    assert!(
+        m.branch().is_some(),
+        "the voxel section teaching preset is frozen in both readings (silent {:.4} against \
+         {ANIM_FLOOR}, driven {:.4} against {DRIVEN_FLOOR})",
+        m.silent,
+        m.driven,
+    );
+}
+
 // ---------------------------------------------------------------------------
 // The resolution ladder (Plan 0067 Phase 1d) — a measurement, not a gate
 // ---------------------------------------------------------------------------

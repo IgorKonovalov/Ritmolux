@@ -503,6 +503,15 @@ const IMAGES = [
     size: "1280x720",
     tier: "rich",
   },
+  {
+    // The section plane, from its teaching preset: a dense rule cut open.
+    out: "docs/images/voxel/section.png",
+    presetFile: "docs/examples/voxel/section.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
 
   // --- the gallery: one per SystemKind ------------------------------------
 
