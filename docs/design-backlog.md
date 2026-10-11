@@ -42,6 +42,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated](#0278--plexus-lays-its-points-in-a-cube-or-on-a-plane-so-a-turning-wire-sphere-is-only-approximated)
 - [0290 — the voxel scene fell to about 5 fps live on `Rich`, where headless `shot` reads 8 ms a frame](#0290--the-voxel-scene-fell-to-about-5-fps-live-on-rich-where-headless-shot-reads-8-ms-a-frame)
 - [0292 — the Windows CI arm flaked once on the lost-preset-ask resend test](#0292--the-windows-ci-arm-flaked-once-on-the-lost-preset-ask-resend-test)
+- [0293 — the studio tests' own `rlx-*` fixture directories stay in `/tmp` after every run](#0293--the-studio-tests-own-rlx--fixture-directories-stay-in-tmp-after-every-run)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1510,3 +1511,20 @@ the run, `success-output = "final"`) before the assertion is loosened or the tim
 - **Verified 2026-10-11** — the test, and its exactly-one assertion:
   `present: fn a_lost_first_preset_ask_is_resent_and_lands_on_attempt_two in: standalone/tests/control_loopback.rs`
 - **Verified 2026-10-11** — `present: exactly one .RESENT. line in: standalone/tests/control_loopback.rs`
+
+## 0293 — the studio tests' own `rlx-*` fixture directories stay in `/tmp` after every run
+
+Plan 0260 stopped vitest's `/tmp/<id>/ssr/` cache from leaking, and measured a second leak of the
+same class beside it. Each `npm --prefix studio test` run also leaves about 68 `rlx-*` directories
+in `/tmp`: `rlx-studio-` +28, `rlx-render-` +11, `rlx-service-` +10, `rlx-judging-` +9 and others,
+measured across one run. They are the tests' own fixtures, made with `mkdtempSync` and never
+removed. On the Arch box `/tmp` is a tmpfs, so each run costs RAM until a reboot, and the pre-push
+hook and every conductor session that runs the studio suite add another batch. The fix is a
+per-test cleanup (an `afterEach` or `onTestFinished` that removes what the test made), or one helper
+every test takes its directory from.
+
+- **Raised:** 2026-10-11 by `architect`, filing Plan 0260's close review finding 1 (minor).
+  **Owner if taken:** `studio-builder`.
+- **Verified 2026-10-11** — a fixture made in the system temp directory:
+  `present: mkdtempSync\(join\(tmpdir\(\), 'rlx-render-'\)\) in: studio/electron/render/pipeline.test.ts`
+- **Verified 2026-10-11** — `present: mkdtempSync\(join\(tmpdir\(\), 'rlx-studio-'\)\) in: studio/electron/settings.test.ts`

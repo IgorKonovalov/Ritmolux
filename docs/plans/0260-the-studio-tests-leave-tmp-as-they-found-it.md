@@ -99,3 +99,7 @@ ADR: there is no tradeoff a later reader would need, and the fix is a config lin
 - `human` phases remaining: none.
 
 ## Followups (after this lands)
+
+- The studio tests' own `rlx-*` fixture directories (about 68 a run, measured in the Notes above)
+  stay in `/tmp`. Filed as backlog 0293 in
+  [`design-backlog.md`](../design-backlog.md).
