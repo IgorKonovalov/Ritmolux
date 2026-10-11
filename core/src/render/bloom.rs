@@ -885,7 +885,7 @@ pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
         name: "bloom_amount",
         default: 0.0,
-        range: Some([0.0, 1.0]),
+        range: Some([0.0, 2.0]),
         doc: "How much of the blurred bright pass is added back; 0 turns the stage off entirely.",
         kind: ParamKind::Modal,
         group: ParamGroup::Post,
