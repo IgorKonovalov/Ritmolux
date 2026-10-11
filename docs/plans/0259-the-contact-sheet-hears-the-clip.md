@@ -102,7 +102,7 @@ error because it fixes the silence without giving the set-wide read the entry as
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The audio sheet and the refusals | dev | done | 301c1d91 |
-| 2 — The operator docs | dev | done | committed with this row |
+| 2 — The operator docs | dev | done | 8cb3ae2d |
 | 3 — The skill text | human | not started | |
 
 ### Notes
@@ -137,5 +137,16 @@ error because it fixes the silence without giving the set-wide read the entry as
   ````
 
 ### Close triggers
+
+- `presets/` touched: none.
+- Closes: design-backlog 0289.
+- Shipped: feature (`shot` dev tooling: the audio contact sheet and three new parse-time refusals).
+- Operator docs moved: `docs/capturing.md` (flag table row and one example). The
+  `render-loop.md` text waits on Phase 3.
+- `node scripts/check-backlog-claims.mjs`: exit 0, "46 stated reductions still hold across all 22
+  live entries (3 unprobeable)".
+- Human phases remaining: Phase 3 (`Blocks merge: no`).
+- Full suite: owed to the conductor's pre-review gate (ADR-0207). `cargo nextest run --workspace -P fast`
+  at Phase 1 ran 1994 tests: 1994 passed, 103 skipped.
 
 ## Followups (after this lands)
