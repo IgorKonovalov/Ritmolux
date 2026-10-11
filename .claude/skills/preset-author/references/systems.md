@@ -705,6 +705,15 @@ camera, so the lit side stays lit through an orbit (`-0.6, 0.6` lights from the 
 light, so keep `brightness × (ambient + key)` under the bloom threshold for crisp cubes and push
 past it only for a glowing core. Keep `trails` off: it smears the dark faces as if they were dim
 light. Low `trail` (0.1-0.3) keeps the decay haze from washing out the faces.
+**The section plane.** `cut` (0-1) hides every cell beyond one plane so a dense rule shows
+its inside: 0.5 cuts through the centre, 0 is off, 1 hides all. `cut_yaw` / `cut_pitch` turn
+the plane in the **cube's** frame (at `0, 0` the hidden side is `+z`), so it turns with the
+structure, not the camera, and an orbit swings the cut face past the viewer once a turn.
+Sweep it slowly (`0.5 + 0.12 * sin(time * 0.4)`) at a rate unlike the orbit's, or the two can
+line up into a section that seems still. The section is stepped at cell size, so author at
+`grid = 64`. It pays off on a dense rule (`crystal`, `clouds`, `amoeba`); on an open one like
+`pyroclastic` the holes already show. Only the view is cut: the automaton keeps growing
+across the plane. The teaching preset is `docs/examples/voxel/section.toml`.
 
 ## Engine-wide stages (any system)
 
@@ -721,6 +730,7 @@ light. Low `trail` (0.1-0.3) keeps the decay haze from washing out the faces.
 | `bg_band_width` | `0.15` | the **`1/e` half-width**, not a full width and not an edge: the envelope has fallen to ~37 % exactly this far either side of the centreline and is still faintly visible for two or three times that, so the **visible band is several times wider than the number**. Clamped `0.001 .. 100`. |
 | `bg_band_curve` | `0.0` | the **arc** — how far the centreline bows, in across-axis units, at the middle of the band. `0` is exactly straight. This is the silhouette that reads as a galaxy rather than a streak; move `bg_band_pos` to ride the arc up or down the frame and raise this to bow it further. |
 | `bg_band_hue` / `bg_band_hue_span` | `0` / `0` | the band's **own** segment of the same `[palette]`, swept **along** the band so one end can brighten toward a core. `bg_band_hue` is an **absolute** coordinate, not an offset from the ground's, so the arc keeps its colour whatever the ramp underneath is doing. Repeat-addressed, so a span leaving `[0, 1]` wraps. **One palette now serves the ground, the band, the figure and the `[layer]`** — a dusk gradient fully spent on a horizon has no stops left for a pale arc, and that is the one real authoring constraint here. |
+| `bg_paper` | `0` | **paper instead of light** (Plan 0257/ADR-0270). At `1` the frame starts transparent, the scene's light is tonemapped, and the same `bg_*` backdrop is painted *under* that picture at display values, laid over by the scene's coverage. A `#ffffff` stop at `bg_bright = 1` is display white (the light route stops at a light grey) and a fully covered pixel is exactly what it is over black, so **never lift the ground with `exposure`** — that lifts the figure too. Paper does not bloom, fold, trail or follow `exposure`; additive light over it reads as a coloured mark, not a brighter spot, so it suits an opaque figure (`present = "solid"`) far better than a glow; a paper gradient is not dithered; `multiply` and `ink` do not spare it. **`bg_hue = 1` is the palette's wrap seam** and blends the last stop with the first: end the palette on a flat white run (`0.98` and `1.0`) and aim `bg_hue` inside it (`0.99`), with `bg_shade` = `bg_shade_end` = `1`. Two paper presets cut their grounds at a dissolve. |
 | `trails` | `0` | per-frame decay; `0` off, higher = longer. Needs real motion to read. |
 | `fb_zoom` / `fb_rotate` / `fb_dx` / `fb_dy` / `fb_center_x` / `fb_center_y` / `fb_warp` | `1` / `0` / `0` / `0` / `0.5` / `0.5` / `0` | the **feedback transform**: per second, the accumulation is scaled, turned, drifted and swirled about the feedback centre, so a trail tunnels or curls instead of fading in place. Inert at `trails = 0`. |
 | `kaleido_order` / `kaleido_angle` | `1` / `0` | `< 2` is passthrough. **The order is rounded to a whole number** (a fractional wedge count tears the frame), so it snaps at each half-integer even when smoothed. **Never rotate `kaleido_angle`** (a standing owner rule): set it once and put the motion in what the fold reflects. |

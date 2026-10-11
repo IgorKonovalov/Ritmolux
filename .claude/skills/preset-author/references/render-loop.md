@@ -99,7 +99,7 @@ The app **never seeds** into an override folder — it is yours.
 
 | Flag | Effect |
 |------|--------|
-| `--all --out sheet.png` | **contact sheet** — every preset in the loaded library as a labeled thumbnail grid. The fastest way to compare a draft against the shipped set and to offer the user side-by-side directions. **Honours `--set`** — see the audit pair below. |
+| `--all --out sheet.png` | **contact sheet** — every preset in the loaded library as a labeled thumbnail grid. The fastest way to compare a draft against the shipped set and to offer the user side-by-side directions. **Honours `--set`** — see the audit pair below. **Beside `--signal` or `--audio`** it is an *audio* sheet instead: every preset driven by that one clip through the real analyzer and captured at one hop — `--frame-at <hop>` if given, else the clip's peak-onset hop, which the `wrote` line names. `--strip` and `--at` are refused there. |
 | `--report` / `--report --json` | a **metrics table** (reactivity / animation / coverage / near-duplicate), no image. `family=<system>` filters it to one system. See "Reading the report" below. |
 | `--frames <N>` | frames advanced before capture (default 120). More frames = later in any `time`-driven animation. |
 | `--size <WxH>` | render size (default 1280x720). Render near 1080p when judging the real look — the attractor's detail in particular follows the target size. |
@@ -227,6 +227,19 @@ cargo run -p standalone --example shot -- --presets presets --all \
 cargo run -p standalone --example shot -- --presets presets --all \
   --set bass=0.1,mid=0.1,treb=0.05 --out audit/quiet.png
 ```
+
+A third sheet hears real dynamics. `--all` beside a clip captures every preset at the same hop of
+it, by default the onset peak the level table names, so the grid shows how each preset answers one
+beat of real music rather than a held level:
+
+```sh
+cargo run -p standalone --example shot -- --presets presets --all \
+  --signal dynamic:110 --out audit/beat.png
+```
+
+Read it against the loud sheet. A preset that moves under the loud `--set` and sits still here is
+calibrated to `--set` magnitudes rather than to what the analyzer delivers. Each preset re-renders
+every hop up to the chosen one, so a late `--frame-at` costs that many frames per preset.
 
 What the pair exposes that neither sheet alone does:
 
