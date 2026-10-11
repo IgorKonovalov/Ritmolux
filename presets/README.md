@@ -3962,7 +3962,7 @@ all: a preset that does not bind it pays nothing and renders exactly as before.
 
 | Param | Default | Meaning |
 |---|---|---|
-| `bloom_amount` | `0` | Strength of the halo added back. `0` = off. `0`–`2` reads; most glows sit under `1`, and the shipped heavy halos sit at `1.3`–`1.5`. The engine clamps at `4`, but past `2` the frame is mostly halo. Bindable — this is the one to put a beat on. |
+| `bloom_amount` | `0` | Strength of the halo added back. `0` = off. `0`–`2` reads; most glows sit under `1`, and the shipped heavy halos sit at `1.3`–`1.5`. The engine clamps at `4`, and past `2` the frame is mostly halo: Tidepool runs `2.2`–`3.1` on a low `bloom_threshold` as a deliberate full-frame wash. Bindable — this is the one to put a beat on. |
 | `bloom_threshold` | `1.0` | Where "bright" starts, in linear light **after `exposure`** — so it means the same thing at any stop. At the default only light that is genuinely over range blooms — see below. Lower it to bloom mid-tones too; `0` blooms everything. |
 | `bloom_radius` | `1.0` | How far the halo scatters, `0..4`. Low is a tight rim around the figure; high is a wide wash. It does not change how much light there is, only where it goes. |
 

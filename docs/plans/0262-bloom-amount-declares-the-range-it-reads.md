@@ -11,7 +11,7 @@
 Widen `bloom_amount`'s declared `ParamSpec::range` from `[0, 1]` to `[0, 2]`. Then regenerate the
 parameter reference, the editor schemas and the player schema, and bring the hand-written bloom
 prose in line with them. The clamp stays at 4. The visible result is the generated table, the
-`.taplo.toml` editor hint and the studio's slider all reaching the `1.3`–`1.5` that five shipped
+editor schemas `.taplo.toml` routes to, and the studio's slider all reaching the `1.3`–`1.5` that five shipped
 presets use.
 
 ## Context & problem
