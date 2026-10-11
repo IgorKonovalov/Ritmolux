@@ -68,7 +68,7 @@ error because it fixes the silence without giving the set-wide read the entry as
 - **What:**
   - `docs/capturing.md`'s flag table gains the audio-sheet row and names the default hop.
   - The log carries the replacement text for `.claude/skills/preset-author/references/render-loop.md`'s
-    `--all` row and the audit-pair section, for the owner to apply in Phase 3 (ADR-0210).
+    `--all` row and the audit-pair section, for the owner to apply in Phase 3 (ADR-0210). <!-- claude-allow: Phase 2 only logs replacement text and writes no file under .claude/; Phase 3 declares the path and applies it -->
 - **Files touched:** `docs/capturing.md`.
 - **Done when:** `node scripts/check-doc-links.mjs` and `node scripts/toc.mjs --check` pass.
 
