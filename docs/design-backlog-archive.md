@@ -361,7 +361,6 @@ live entry citing this one.
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
 | 0289 | `shot --signal` beside `--all` silently draws a filmstrip of the first preset | [Plan 0259](plans/0259-the-contact-sheet-hears-the-clip.md). **Promoted** |
-| 0291 | a studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it | [Plan 0260](plans/0260-the-studio-tests-leave-tmp-as-they-found-it.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -696,6 +695,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0220 | A headless walk of the system roster stalls at `emitter` | [ADR-0265](adrs/0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md) + [Plan 0252](plans/done/0252-the-lost-preset-ask-is-located-and-answered.md). Acked and resent. **Closed 2026-10-07** |
 | 0288 | A solid voxel mass has no cut-away, so seeing inside it depends on choosing a porous rule | [ADR-0271](adrs/0271-a-voxel-is-opened-by-one-section-plane-held-in-the-cubes-own-frame.md) + [Plan 0258](plans/done/0258-the-voxel-opens-along-a-section-plane.md). A section plane; Phase 4 owed. **Closed 2026-10-11** |
 | 0287 | The backdrop cannot reach white, so black-on-white needs `exposure`, which also lifts the scene | ADR-0270 + [Plan 0257](plans/done/0257-the-backdrop-reaches-paper-white.md). `bg_paper`; Phase 4 owed. **Closed 2026-10-11** |
+| 0291 | A studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it | [Plan 0260](plans/done/0260-the-studio-tests-leave-tmp-as-they-found-it.md). A teardown removes it. **Closed 2026-10-11** |
 <!-- roster:end -->
 
 ---
@@ -17411,4 +17411,12 @@ The `rlx-judging-sets-*` fixtures seen beside them on 2026-10-07 were not presen
   `present: "vitest": "5.0.1" in: studio/package.json`
 - **Verified 2026-10-11** — and nothing in the studio's vitest config places its cache:
   `absent: cacheDir in: studio/vitest.config.ts`
-- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0260](plans/0260-the-studio-tests-leave-tmp-as-they-found-it.md) was approved.
+- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0260](plans/done/0260-the-studio-tests-leave-tmp-as-they-found-it.md) was approved.
+
+**CLOSED 2026-10-11** — [Plan 0260](plans/done/0260-the-studio-tests-leave-tmp-as-they-found-it.md).
+The directory is vitest's own `Vitest._tmpDir` (`join(os.tmpdir(), nanoid())`), read in a class
+field initializer before any config resolves, so no option places it, and close removes only the
+per-project `tmpDir` nothing writes. `studio/test/global-teardown.ts`, registered as a `globalSetup`,
+returns a teardown that removes `_tmpDir` when it is a direct child of `os.tmpdir()`. Measured: the
+`/tmp/*/ssr` count was 78 before and 78 after a test run. The tests' own `rlx-*` fixtures, a second
+leak of the same class, are live as backlog 0293.
