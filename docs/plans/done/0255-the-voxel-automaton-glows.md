@@ -304,7 +304,7 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 | 4 — The golden and the gates | dev | done | 54a9ba57 |
 | 5 — Documentation and the references | dev | done | bb991d91 |
 | 6 — The look, judged | human | owed | |
-| 7 — The preset-author reference | human | owed | |
+| 7 — The preset-author reference | human | done | committed with this row |
 
 ### Notes
 

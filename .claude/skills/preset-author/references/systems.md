@@ -672,6 +672,29 @@ and `solid`; `docs/examples/waterfall/landscape_solid.toml` shows the latter.
 
 ---
 
+## `voxel` — a 3D automaton in a cube, marched as a volume
+
+A 3D automaton in a cube of cells, marched as a glowing, absorbing volume through the shared
+camera. Structure in `[voxel]` (`grid`, `rules`, `seed_radius`, `seed_fill`, `wrap`, `shells`);
+the rule list and roster are in `docs/presets.md`, "The `[voxel]` table". Author against
+`grid = 64`, the Floor cap; 128 runs on Rich only.
+
+- **`density`** 0.4-1.5 reads as a volume with a front. 0 is pure additive haze with no front or
+  back, and higher hides more of the inside. The teaching preset uses 0.6, the gate fixture 1.0.
+- **`step_rate`** 4-12 generations a second. Most rules settle within a few hundred
+  generations, so a faster rate only reaches the still shape sooner; the cap is 30.
+- **`shell_gain`** 0.5-2 with `shells = 8`. It multiplies a cell's light by
+  `1 + shell_gain x level`; the gate fixture uses 1.5. It is inert while `shells` is 0.
+- **`reseed_radius`** 0.15-0.4 of the half-side. The default 0.25 drops a visible ball without
+  refilling the cube; bind `reseed` to `onset`, or the cube settles and stays still.
+- **A rule shift on the bar** (`rule = "mod(bar_index, N)"`, `[hold] rule = "bar"`) reads best
+  between rules of a similar mass. At 32 cells, `clouds` (0.27 live), `coral` (0.28) and
+  `slow_decay` (0.29) hold about the same volume, so a shift among them changes the texture, not
+  the amount. `coral` with `pyroclastic` (0.05-0.08, restless) keeps it moving, which is the gate
+  fixture's pair. `amoeba` and `crystal` (0.78) fill the cube, and `445` and `builder` burn out to
+  a few cells, so a shift to either end empties or floods the volume. A shift to a rule with
+  fewer `states` (`clouds` and `crystal` have 2) drops every decaying cell at the bar line.
+
 ## Engine-wide stages (any system)
 
 | Param | Default | Note |
