@@ -103,7 +103,7 @@ error because it fixes the silence without giving the set-wide read the entry as
 |---|---|---|---|
 | 1 — The audio sheet and the refusals | dev | done | 301c1d91 |
 | 2 — The operator docs | dev | done | 8cb3ae2d |
-| 3 — The skill text | human | not started | |
+| 3 — The skill text | human | owed | |
 
 ### Notes
 
