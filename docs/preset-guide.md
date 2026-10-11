@@ -473,13 +473,13 @@ so the quality tier caps it. The layouts and every structural key are in the
 
 ### `waterfall`
 
-![A landscape of thin coloured lines seen from a little above: row after row of the music's spectrum
-laid out front to back, low frequencies in green on the left rising into tall yellow and orange
-peaks in the middle and settling into low magenta ridges on the right, the rows receding toward a
-horizon on black](images/gallery/waterfall.png)
+![White ridge lines on black seen almost edge-on: row after row of the music's spectrum stacked
+front to back, tall jagged peaks crowded at the low end on the left settling into a low, calm plain
+on the right](images/gallery/waterfall.png)
 
-*The teaching preset [`docs/examples/waterfall/landscape.toml`](examples/waterfall/landscape.toml);
-the shipped set has `waterfall_*.toml`*
+*The shipped preset [`presets/waterfall_ridgeline.toml`](../presets/waterfall_ridgeline.toml); the
+teaching preset [`docs/examples/waterfall/landscape.toml`](examples/waterfall/landscape.toml) is
+the coloured version, seen from a little above*
 
 The **spectrum's recent past as terrain**. Every fraction of a second the current band levels become
 a new row at the front, and the rows before it step back into the distance, so a sustained note

@@ -486,9 +486,8 @@ const IMAGES = [
 
   // --- the plexus system's layouts beyond cloud ---------------------------
   //
-  // UNJUDGED: the system ships no preset yet, so the sheet is drawn from the
-  // teaching preset the guide prints for it. Filed outside the gallery for the
-  // curves' reason.
+  // UNJUDGED: the sheet is drawn from the teaching preset the guide prints for
+  // it. Filed outside the gallery for the curves' reason.
   {
     out: "docs/images/plexus/sheet.png",
     presetFile: "docs/examples/plexus/sheet.toml",
@@ -500,8 +499,8 @@ const IMAGES = [
 
   // --- the voxel system's solid present -----------------------------------
   //
-  // UNJUDGED: the system ships no preset yet, so the solid present is drawn
-  // from the teaching preset the guide prints for it. Filed outside the
+  // UNJUDGED: the solid present is drawn from the teaching preset the guide
+  // prints for it, which also ships as `voxel_solid`. Filed outside the
   // gallery for the curves' reason.
   {
     out: "docs/images/voxel/solid.png",
@@ -703,19 +702,18 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // waterfall — UNJUDGED, and not a choice: the system ships no preset yet,
-    // so its slot renders the teaching preset under docs/examples/. Swap it for
-    // a shipped world when the content lane lands one.
+    // waterfall — Ridgeline, the owner's pick over Tidepool: white ridges on
+    // black seen almost edge-on, the pulsar-plot look the system is named for.
     out: "docs/images/gallery/waterfall.png",
-    presetFile: "docs/examples/waterfall/landscape.toml",
+    presetFile: "presets/waterfall_ridgeline.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
     tier: "rich",
   },
   {
-    // voxel — UNJUDGED: Nebula is the one shipped world drawn in the glow
-    // present, the volume the guide's first voxel paragraph describes; the
+    // voxel — Nebula, the owner's pick: the one shipped world drawn in the
+    // glow present, the volume the guide's first voxel paragraph describes; the
     // solid present has its own picture further down that section.
     out: "docs/images/gallery/voxel.png",
     presetFile: "presets/voxel_nebula.toml",
