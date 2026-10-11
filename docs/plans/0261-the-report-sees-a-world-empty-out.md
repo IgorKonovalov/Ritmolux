@@ -1,6 +1,6 @@
 # 0261 — The report sees a world empty out
 
-> **Status:** draft
+> **Status:** approved (2026-10-11)
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md), [ADR-0196](../adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md)

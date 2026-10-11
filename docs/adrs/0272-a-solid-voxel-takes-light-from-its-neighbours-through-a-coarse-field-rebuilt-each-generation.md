@@ -1,6 +1,6 @@
 # ADR-0272 — A solid voxel takes light from its neighbours through a coarse field rebuilt each generation
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-10-11
 > **Related plan(s):** [0263](../plans/0263-solid-voxels-light-each-other.md); builds on [ADR-0269](0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md), [ADR-0268](0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md)
 

@@ -293,5 +293,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0269](0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md) | A solid voxel is lit by one key light and its own occlusion, and its light blooms like any other | accepted 2026-10-11, Plan 0256 |
 | [0270](0270-a-paper-backdrop-is-painted-after-the-tonemap-and-the-scene-lies-over-it-by-coverage.md) | A paper backdrop is painted after the tonemap, and the scene lies over it by coverage | accepted 2026-10-11, Plan 0257 |
 | [0271](0271-a-voxel-is-opened-by-one-section-plane-held-in-the-cubes-own-frame.md) | A voxel is opened by one section plane, held in the cube's own frame | accepted 2026-10-11, Plan 0258 |
-| [0272](0272-a-solid-voxel-takes-light-from-its-neighbours-through-a-coarse-field-rebuilt-each-generation.md) | A solid voxel takes light from its neighbours through a coarse field rebuilt each generation | proposed 2026-10-11, Plan 0263 |
+| [0272](0272-a-solid-voxel-takes-light-from-its-neighbours-through-a-coarse-field-rebuilt-each-generation.md) | A solid voxel takes light from its neighbours through a coarse field rebuilt each generation | accepted 2026-10-11, Plan 0263 |
 <!-- roster:end -->

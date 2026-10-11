@@ -45,10 +45,10 @@ place. The plan file carries the real link.
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) | The rig session measures the wave modes and judges the fourth gate | approved | human, dev | 0202's Phases 4-7. Not queued until the owner has the Windows rig; commit Phase 1's eight rows on main, then queue. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
-| [0261](0261-the-report-sees-a-world-empty-out.md) | The report sees a world empty out | draft | dev, human | Backlog 0294. `--report` gains `late`: coverage after 15 s of pulses over coverage at 0.5 s, `EMPTIED` at a tenth. Advisory, every system. |
-| [0262](0262-bloom-amount-declares-the-range-it-reads.md) | `bloom_amount` declares the range it reads | draft | dev | Backlog 0296. One `ParamSpec` range, 0-1 to 0-2, plus regeneration. No pixel moves. Shares generated files with 0263, so run them in one lane. |
-| [0263](0263-solid-voxels-light-each-other.md) | Solid voxels light each other | draft | dev, human | Backlog 0295, ADR-0272 (proposed). `bounce` reads a grid/4 light field rebuilt per generation. Default 0 builds nothing. |
-| [0264](0264-voxel-neon-and-ice-become-their-own-worlds.md) | Voxel Neon and Ice become their own worlds | draft | human | Backlog 0297. Content only, all phases `human`: the owner starts `/preset-author` with the brief. Not for the conductor. |
+| [0261](0261-the-report-sees-a-world-empty-out.md) | The report sees a world empty out | approved | dev, human | Backlog 0294. `--report` gains `late`: coverage after 15 s of pulses over coverage at 0.5 s, `EMPTIED` at a tenth. Advisory, every system. |
+| [0262](0262-bloom-amount-declares-the-range-it-reads.md) | `bloom_amount` declares the range it reads | approved | dev | Backlog 0296. One `ParamSpec` range, 0-1 to 0-2, plus regeneration. No pixel moves. Shares generated files with 0263, so run them in one lane. |
+| [0263](0263-solid-voxels-light-each-other.md) | Solid voxels light each other | approved | dev, human | Backlog 0295, ADR-0272. `bounce` reads a grid/4 light field rebuilt per generation. Default 0 builds nothing. |
+| [0264](0264-voxel-neon-and-ice-become-their-own-worlds.md) | Voxel Neon and Ice become their own worlds | approved | human | Backlog 0297. Content only, all phases `human`: the owner starts `/preset-author` with the brief. Not for the conductor. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two

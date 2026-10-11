@@ -1,6 +1,6 @@
 # 0264 — Voxel Neon and Ice become their own worlds
 
-> **Status:** draft
+> **Status:** approved (2026-10-11). **Run human-started, not under the conductor:** every phase is `human`.
 > **Created:** 2026-10-11
 > **Owner skill(s):** human
 > **Related ADRs:** [ADR-0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)

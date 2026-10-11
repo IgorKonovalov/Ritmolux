@@ -1,9 +1,9 @@
 # 0263 — Solid voxels light each other
 
-> **Status:** draft
+> **Status:** approved (2026-10-11)
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0272](../adrs/0272-a-solid-voxel-takes-light-from-its-neighbours-through-a-coarse-field-rebuilt-each-generation.md) (proposed), [ADR-0269](../adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md), [ADR-0268](../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md)
+> **Related ADRs:** [ADR-0272](../adrs/0272-a-solid-voxel-takes-light-from-its-neighbours-through-a-coarse-field-rebuilt-each-generation.md) (accepted), [ADR-0269](../adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md), [ADR-0268](../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md)
 > **Closes:** design-backlog 0295
 
 ## TL;DR

@@ -1,6 +1,6 @@
 # 0262 — `bloom_amount` declares the range it reads
 
-> **Status:** draft
+> **Status:** approved (2026-10-11)
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0170](../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
