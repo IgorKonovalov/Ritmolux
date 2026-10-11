@@ -1518,6 +1518,9 @@
             "step_rate": { "$ref": "#/definitions/param.step_rate.voxel" },
             "reseed": { "$ref": "#/definitions/param.reseed.voxel" },
             "reseed_radius": { "$ref": "#/definitions/param.reseed_radius" },
+            "cut": { "$ref": "#/definitions/param.cut" },
+            "cut_yaw": { "$ref": "#/definitions/param.cut_yaw" },
+            "cut_pitch": { "$ref": "#/definitions/param.cut_pitch" },
             "shell_gain": { "$ref": "#/definitions/param.shell_gain" },
             "density": { "$ref": "#/definitions/param.density.voxel" },
             "trail": { "$ref": "#/definitions/param.trail.voxel" },
@@ -2190,6 +2193,9 @@
             "step_rate": { "$ref": "#/definitions/param.step_rate.voxel" },
             "reseed": { "$ref": "#/definitions/param.reseed.voxel" },
             "reseed_radius": { "$ref": "#/definitions/param.reseed_radius" },
+            "cut": { "$ref": "#/definitions/param.cut" },
+            "cut_yaw": { "$ref": "#/definitions/param.cut_yaw" },
+            "cut_pitch": { "$ref": "#/definitions/param.cut_pitch" },
             "shell_gain": { "$ref": "#/definitions/param.shell_gain" },
             "density": { "$ref": "#/definitions/param.density.voxel" },
             "trail": { "$ref": "#/definitions/param.trail.voxel" },
@@ -4373,6 +4379,21 @@
       "type": "string",
       "description": "The radius of the ball a reseed fills, as a fraction of the cube's half-side.",
       "markdownDescription": "The radius of the ball a reseed fills, as a fraction of the cube's half-side.\n\n- default `0.25`\n- typical range `0.05` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.cut": {
+      "type": "string",
+      "description": "How much of the cube a section plane hides, so the inside shows: 0.5 cuts it through the centre, 1 hides it all, 0 is off. Only the view is cut; the automaton runs on.",
+      "markdownDescription": "How much of the cube a section plane hides, so the inside shows: 0.5 cuts it through the centre, 1 hides it all, 0 is off. Only the view is cut; the automaton runs on.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.cut_yaw": {
+      "type": "string",
+      "description": "Which way the section plane faces around the cube's vertical axis, in radians: the side it hides. It turns with the cube, not the camera.",
+      "markdownDescription": "Which way the section plane faces around the cube's vertical axis, in radians: the side it hides. It turns with the cube, not the camera.\n\n- default `0.0`\n- typical range `0.0` to `6.2831855` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.cut_pitch": {
+      "type": "string",
+      "description": "How far the section plane's hidden side tilts up toward the cube's top, in radians; negative tilts it down.",
+      "markdownDescription": "How far the section plane's hidden side tilts up toward the cube's top, in radians; negative tilts it down.\n\n- default `0.0`\n- typical range `-1.5707964` to `1.5707964` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.shell_gain": {
       "type": "string",

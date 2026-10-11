@@ -72,6 +72,9 @@ struct Driver<'a> {
     size: u32,
     target: wgpu::Texture,
     view: wgpu::TextureView,
+    /// What each frame starts from: opaque black, as a capture does, or
+    /// transparent, so the frame's alpha is the volume's own coverage.
+    clear: wgpu::Color,
 }
 
 impl<'a> Driver<'a> {
@@ -88,6 +91,7 @@ impl<'a> Driver<'a> {
             size,
             target,
             view,
+            clear: wgpu::Color::BLACK,
         }
     }
 
@@ -112,7 +116,12 @@ impl<'a> Driver<'a> {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("voxel-probe"),
             });
-        capture::record_clear(&mut encoder, &self.view);
+        gpu::color_pass(
+            &mut encoder,
+            "voxel-probe-clear",
+            &self.view,
+            wgpu::LoadOp::Clear(self.clear),
+        );
         scene.render(&self.ctx.queue, &mut encoder, &self.view, 1.0);
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
         generations
@@ -277,13 +286,18 @@ fn scene_holding(
 /// camera a frame with `yaw` and `pitch` bound and every other camera param at
 /// rest looks through.
 fn pixel_of(size: u32, yaw: f32, pitch: f32, p: [f32; 3]) -> usize {
-    let view = CameraParams {
+    let camera = CameraParams {
         yaw,
         pitch,
         ..CameraParams::default()
-    }
-    .camera()
-    .view(1.0, DEFAULT_ZOOM, [0.0, 0.0]);
+    };
+    pixel_through(size, camera, p)
+}
+
+/// The pixel of a `size`-square frame that world point `p` lands on, under
+/// `camera` at rest zoom and pan.
+fn pixel_through(size: u32, camera: CameraParams, p: [f32; 3]) -> usize {
+    let view = camera.camera().view(1.0, DEFAULT_ZOOM, [0.0, 0.0]);
     let c = view.clip(p);
     let (x, y) = (c[0] / c[3], c[1] / c[3]);
     let n = size as usize;
@@ -524,6 +538,253 @@ fn ambient_occlusion_darkens_the_inner_edge_of_an_l() {
         "the upright's open top reads {} at its edge and {} at its centre",
         on[4],
         on[5]
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The section plane
+// ---------------------------------------------------------------------------
+
+/// `core/tests/fixtures/voxel_section.toml`: a solid 16³ block cut through its
+/// centre, seen from an eye inside the cut plane.
+const SECTION_FIXTURE: &str = include_str!("../../../../tests/fixtures/voxel_section.toml");
+
+/// A voxel fixture's `[voxel]` table, and its `[params]` each evaluated once at
+/// rest: every binding a fixture here writes is a constant.
+fn fixture(src: &str) -> (VoxelConfig, Vec<(String, f32)>) {
+    let preset = crate::preset::Preset::from_toml_str(src).expect("the fixture parses");
+    let Some(GeneratorConfig::Voxel(config)) = preset.config else {
+        panic!("the fixture carries no [voxel] table");
+    };
+    let vars = crate::preset::expr::Variables::default();
+    let params = preset
+        .params
+        .iter()
+        .map(|b| (b.name.clone(), b.expr.eval(&vars)))
+        .collect();
+    (config, params)
+}
+
+/// One frame of the fixture `src` into a `size`-square target cleared
+/// transparent, with `overrides` replacing (or adding to) its params; the frame
+/// as linear RGBA, its alpha the volume's coverage.
+fn render_fixture(
+    ctx: &RenderContext,
+    src: &str,
+    size: u32,
+    overrides: &[(&str, f32)],
+) -> Vec<[f32; 4]> {
+    let (config, params) = fixture(src);
+    let mut bound: Vec<(&str, f32)> = params.iter().map(|(n, v)| (n.as_str(), *v)).collect();
+    for &(name, value) in overrides {
+        match bound.iter_mut().find(|(n, _)| *n == name) {
+            Some(slot) => slot.1 = value,
+            None => bound.push((name, value)),
+        }
+    }
+    let mut scene = scene_with(ctx, config);
+    let mut driver = Driver::sized(ctx, size);
+    driver.clear = wgpu::Color::TRANSPARENT;
+    driver.frame(&mut scene, 1.0 / 60.0, &bound);
+    driver.read_target()
+}
+
+/// The value the fixture `src` binds `name` to.
+fn fixture_param(src: &str, name: &str) -> f32 {
+    fixture(src)
+        .1
+        .into_iter()
+        .find(|(n, _)| n == name)
+        .map(|(_, v)| v)
+        .unwrap_or_else(|| panic!("the fixture binds no `{name}`"))
+}
+
+/// **The section plane hides the side its normal points to and leaves the
+/// other untouched**: the fixture's eye lies in the plane `z = 0`, which
+/// projects to the frame's vertical centre line. At `cut = 0.5` every pixel on
+/// the `+z` side has alpha 0, and every pixel on the other side is
+/// byte-identical to the `cut = 0` frame, since no ray there enters a cut cell.
+/// At `cut = 1` the whole frame is the backdrop.
+#[test]
+fn the_section_plane_hides_one_side_and_leaves_the_other() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let size = 64;
+    assert_eq!(
+        fixture_param(SECTION_FIXTURE, "cut"),
+        0.5,
+        "the fixture no longer cuts through the centre"
+    );
+    let yaw = fixture_param(SECTION_FIXTURE, "yaw");
+    let pitch = fixture_param(SECTION_FIXTURE, "pitch");
+    let side = size as usize;
+    let half = side / 2;
+    // The column a point on the normal's side lands in names that side.
+    let normal_left = pixel_of(size, yaw, pitch, [0.0, 0.0, 0.5]) % side < half;
+    let on_normal_side = |i: usize| (i % side < half) == normal_left;
+
+    let uncut = render_fixture(&ctx, SECTION_FIXTURE, size, &[("cut", 0.0)]);
+    let cut = render_fixture(&ctx, SECTION_FIXTURE, size, &[]);
+    let gone = render_fixture(&ctx, SECTION_FIXTURE, size, &[("cut", 1.0)]);
+
+    let covered = |side: bool| {
+        (0..uncut.len())
+            .filter(|&i| on_normal_side(i) == side && uncut[i][3] > 0.0)
+            .count()
+    };
+    let (near, far) = (covered(true), covered(false));
+    println!("uncut: {near} covered pixels on the normal's side, {far} on the other");
+    assert!(
+        near > 100 && far > 100,
+        "the uncut block does not cover both halves, so the comparison is empty"
+    );
+    for (i, (c, u)) in cut.iter().zip(&uncut).enumerate() {
+        if on_normal_side(i) {
+            assert_eq!(c[3], 0.0, "pixel {i} on the cut side is covered: {c:?}");
+        } else {
+            assert!(
+                c.map(f32::to_bits) == u.map(f32::to_bits),
+                "pixel {i} on the kept side moved: {c:?} against {u:?}"
+            );
+        }
+    }
+    assert!(
+        gone.iter().all(|p| p[3] == 0.0),
+        "at cut = 1 something is still drawn"
+    );
+}
+
+/// The plane's offset runs from past the cube's farthest corner at `cut` just
+/// above 0 to the far corner's opposite at 1, through the centre at 0.5, and
+/// `cut = 0` packs no plane.
+#[test]
+fn the_cut_plane_spans_the_cube_and_is_off_at_zero() {
+    assert_eq!(cut_plane(0.0, 1.0, 0.3), None);
+    assert_eq!(cut_plane(-0.2, 0.0, 0.0), None);
+    let [nx, ny, nz, d] = cut_plane(0.5, 0.0, 0.0).expect("a plane");
+    assert_eq!([nx, ny, nz, d], [0.0, 0.0, 1.0, 0.0]);
+    let d1 = cut_plane(1.0, 0.0, 0.0).expect("a plane")[3];
+    assert!((d1 + CUBE_RADIUS).abs() < 1e-6);
+    assert_eq!(cut_plane(4.0, 0.0, 0.0), cut_plane(1.0, 0.0, 0.0));
+    let [x, y, z, _] = cut_plane(0.3, 2.0, -0.7).expect("a plane");
+    assert!(
+        (x * x + y * y + z * z - 1.0).abs() < 1e-6,
+        "the normal is unit"
+    );
+    let up = cut_plane(0.3, 0.0, FRAC_PI_2).expect("a plane");
+    assert!((up[1] - 1.0).abs() < 1e-6, "a quarter-turn pitch faces up");
+}
+
+/// `core/tests/fixtures/voxel_section_lit.toml`: a solid 32³ block cut through
+/// its centre on a plane tilted toward `+y`, with occlusion on.
+const SECTION_LIT_FIXTURE: &str = include_str!("../../../../tests/fixtures/voxel_section_lit.toml");
+
+/// Whether `plane` ([`cut_plane`]) hides cell `c` of a grid of `n`: the CPU
+/// mirror of `cut_away` in `shader::MARCH_SHADER`.
+fn is_cut(plane: [f32; 4], n: u32, c: [i32; 3]) -> bool {
+    let centre = c.map(|v| (v as f32 + 0.5) / n as f32 * 2.0 - 1.0);
+    dot(centre, xyz(plane)) > plane[3]
+}
+
+/// **A tilted section is lit as a surface, and no cut cell darkens it**: on
+/// the fixture's stepped section, a tread — the `+z` face of a live cell on
+/// the block's `+x` side, every cell in front of it cut or off the grid —
+/// reads the same 0.3 cells from its edge as at its centre with `ao = 1`, the
+/// same as with `ao = 0`, and the colour a `+z` face takes under the key light
+/// and the full ambient. The section is interior: at the tread's centre the
+/// uncut block shows its outer `+x` face instead, and reads differently.
+#[test]
+fn a_tilted_section_is_lit_as_a_surface_and_occluded_by_no_cut_cell() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let size = 768;
+    let src = SECTION_LIT_FIXTURE;
+    let p = |name| fixture_param(src, name);
+    let (config, _) = fixture(src);
+    let n = config.grid as i32;
+    assert_eq!(p("ao"), 1.0, "the fixture no longer turns the occlusion on");
+    let plane = cut_plane(p("cut"), p("cut_yaw"), p("cut_pitch")).expect("the fixture cuts");
+    // What `solid_at` reads as open: off the grid, or cut.
+    let open = |c: [i32; 3]| c.iter().any(|&v| v < 0 || v >= n) || is_cut(plane, config.grid, c);
+    let x = n - 1;
+    let (j, k) = (0..n)
+        .flat_map(|j| (0..n).map(move |k| (j, k)))
+        .filter(|&(j, k)| {
+            let front_open = (-1..=1)
+                .flat_map(|du| (-1..=1).map(move |dv| (du, dv)))
+                .all(|(du, dv)| open([x + du, j + dv, k + 1]));
+            // Live, flat toward -y, and nothing in front of it.
+            !open([x, j, k]) && !open([x, j - 1, k]) && front_open
+        })
+        .min_by_key(|&(j, k)| (j - n / 2).abs() + (k - n / 2).abs())
+        .expect("the section has a tread on the block's +x side");
+    let world = |c: [f32; 3]| c.map(|v| v * 2.0 / n as f32 - 1.0);
+    let (xf, jf, kf) = (x as f32, j as f32, k as f32);
+    let centre_point = world([xf + 0.5, jf + 0.5, kf + 1.0]);
+    let edge_point = world([xf + 0.7, jf + 0.5, kf + 1.0]);
+
+    let camera = CameraParams {
+        yaw: p("yaw"),
+        pitch: p("pitch"),
+        distance: p("distance"),
+        fov: p("fov"),
+        ..CameraParams::default()
+    };
+    let centre = pixel_through(size, camera, centre_point);
+    let edge = pixel_through(size, camera, edge_point);
+    assert_ne!(centre, edge, "the edge probe landed on the centre's pixel");
+
+    let lit = render_fixture(&ctx, src, size, &[]);
+    let flat = render_fixture(&ctx, src, size, &[("ao", 0.0)]);
+    let uncut = render_fixture(&ctx, src, size, &[("cut", 0.0)]);
+    let view = camera.camera().view(1.0, DEFAULT_ZOOM, [0.0, 0.0]);
+    let l = light_dir(&view, p("light_yaw"), p("light_pitch"));
+    let albedo = Palette::default_spectrum().sample(p("hue"), 0.0);
+    let lighting = p("ambient") + p("key") * l[2].max(0.0);
+    println!(
+        "tread at cell ({x}, {j}, {k}): centre {:?}, edge {:?}, ao 0 {:?}, uncut {:?}, \
+         expected {:?}",
+        lit[centre],
+        lit[edge],
+        flat[centre],
+        uncut[centre],
+        albedo.map(|c| c * lighting)
+    );
+    for (name, px) in [("centre", lit[centre]), ("edge", lit[edge])] {
+        assert!(px[3] > 0.0, "the tread's {name} is not covered: {px:?}");
+    }
+    assert!(
+        (luminance(lit[edge]) - luminance(lit[centre])).abs() < 1e-3,
+        "the tread reads {} near its edge and {} at its centre: a cut cell closed a corner",
+        luminance(lit[edge]),
+        luminance(lit[centre])
+    );
+    for c in 0..3 {
+        assert!(
+            (lit[centre][c] - flat[centre][c]).abs() < 1e-3,
+            "ao darkens the tread: {:?} against {:?} at ao 0",
+            lit[centre],
+            flat[centre]
+        );
+        let want = albedo[c] * lighting;
+        assert!(
+            (lit[centre][c] - want).abs() < 0.02 + 0.02 * want,
+            "the tread reads {:?}, not a +z face's {want} in channel {c}",
+            lit[centre]
+        );
+    }
+    assert!(
+        uncut[centre][3] > 0.0,
+        "the uncut block does not cover the tread's pixel"
+    );
+    assert!(
+        (0..3).any(|c| (uncut[centre][c] - lit[centre][c]).abs() > 1e-3),
+        "the uncut block reads the tread's colour at its pixel, so the section is not interior: \
+         {:?} against {:?}",
+        uncut[centre],
+        lit[centre]
     );
 }
 

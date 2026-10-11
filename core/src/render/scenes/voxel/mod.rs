@@ -74,13 +74,33 @@
 //! third — and the four are interpolated across the face at the hit point and
 //! mixed in by `ao`.
 //!
+//! # The section plane
+//!
+//! `cut`, `cut_yaw` and `cut_pitch` (ADR-0271) hide every cell whose centre `c`,
+//! in the cube's `[-1, 1]^3` frame, lies beyond one plane:
+//!
+//! ```text
+//! dot(c, n) > sqrt(3) * (1 - 2 * cut)
+//! n = (cos(cut_pitch) * sin(cut_yaw), sin(cut_pitch), cos(cut_pitch) * cos(cut_yaw))
+//! ```
+//!
+//! so at `cut = 0.5` the plane passes through the centre and at 1 it removes
+//! every cell. The normal is in the cube's frame, not the camera's, so the
+//! section turns with the structure. A cut cell is dead to the march, under
+//! either present, and to the solid present's occlusion, which reads it as
+//! open. The automaton still runs it: only the view is cut. At `cut = 0` the
+//! test is switched off by a flag, so every pixel is as it is without the
+//! params.
+//!
 //! # Bricks
 //!
 //! After every frame that changed the state, a pass marks each 8³ brick of
 //! cells that holds any non-dead cell. The march jumps a whole empty brick at
 //! once, landing on exactly the cell, crossing parameters and position stepping
 //! through it would have (the crossings are computed from the boundary index,
-//! never accumulated), so skipping bricks moves no pixel.
+//! never accumulated), so skipping bricks moves no pixel. A brick is skipped
+//! on its own empty flag alone: one holding cut cells is marched cell by cell,
+//! and the cut is applied there.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). Encodes its passes every displayed frame.
@@ -104,7 +124,7 @@ use crate::render::gpu;
 use crate::render::palette::{self, Palette};
 use crate::render::tier::GridScale;
 pub use rules::{DEFAULT_RULE, Neighbourhood, RosterRule, Rule, RuleList};
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 /// The grid an absent `[voxel] grid` means.
 pub const DEFAULT_GRID: u32 = 64;
@@ -266,6 +286,9 @@ const DEFAULT_AMBIENT: f32 = default_of(PARAMS, "ambient");
 const DEFAULT_AO: f32 = default_of(PARAMS, "ao");
 const DEFAULT_LIGHT_YAW: f32 = default_of(PARAMS, "light_yaw");
 const DEFAULT_LIGHT_PITCH: f32 = default_of(PARAMS, "light_pitch");
+const DEFAULT_CUT: f32 = default_of(PARAMS, "cut");
+const DEFAULT_CUT_YAW: f32 = default_of(PARAMS, "cut_yaw");
+const DEFAULT_CUT_PITCH: f32 = default_of(PARAMS, "cut_pitch");
 
 // The shared camera block (ADR-0258), re-declared with this system's own doc
 // lines where they differ: the editor schema keys a row by the whole
@@ -323,6 +346,37 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 0.25,
         range: Some([0.05, 1.0]),
         doc: "The radius of the ball a reseed fills, as a fraction of the cube's half-side.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
+    },
+    ParamSpec {
+        name: "cut",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How much of the cube a section plane hides, so the inside shows: 0.5 cuts it \
+              through the centre, 1 hides it all, 0 is off. Only the view is cut; the \
+              automaton runs on.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: true,
+    },
+    ParamSpec {
+        name: "cut_yaw",
+        default: 0.0,
+        range: Some([0.0, TAU]),
+        doc: "Which way the section plane faces around the cube's vertical axis, in radians: \
+              the side it hides. It turns with the cube, not the camera.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Shape,
+        main: false,
+    },
+    ParamSpec {
+        name: "cut_pitch",
+        default: 0.0,
+        range: Some([-FRAC_PI_2, FRAC_PI_2]),
+        doc: "How far the section plane's hidden side tilts up toward the cube's top, in \
+              radians; negative tilts it down.",
         kind: ParamKind::Modal,
         group: ParamGroup::Shape,
         main: false,
@@ -665,6 +719,22 @@ pub(crate) fn light_dir(view: &camera::CameraView, light_yaw: f32, light_pitch: 
     ])
 }
 
+/// The section plane as the march reads it: `n.xyz` the unit normal toward
+/// the hidden side in the cube's frame, and `w` the plane's offset `d`, so a
+/// cell whose centre `c` has `dot(c, n) > d` is cut. `None` at `cut <= 0`,
+/// which the march takes as no plane at all. A `cut` past 1 is held there.
+pub(crate) fn cut_plane(cut: f32, cut_yaw: f32, cut_pitch: f32) -> Option<[f32; 4]> {
+    let cut = finite_or(cut, DEFAULT_CUT).min(1.0);
+    if cut <= 0.0 {
+        return None;
+    }
+    let (sy, cy) = finite_or(cut_yaw, DEFAULT_CUT_YAW).sin_cos();
+    let (sp, cp) = finite_or(cut_pitch, DEFAULT_CUT_PITCH)
+        .clamp(-FRAC_PI_2, FRAC_PI_2)
+        .sin_cos();
+    Some([cp * sy, sp, cp * cy, CUBE_RADIUS * (1.0 - 2.0 * cut)])
+}
+
 fn xyz(v: [f32; 4]) -> [f32; 3] {
     [v[0], v[1], v[2]]
 }
@@ -722,8 +792,11 @@ struct MarchParams {
     /// xyz: the unit world direction toward the key light; w: 1 under
     /// `solid`.
     light: [f32; 4],
-    /// x: key, y: ambient, z: ao (0..1); w unused.
+    /// x: key, y: ambient, z: ao (0..1); w: 1 when the section plane is on.
     lit: [f32; 4],
+    /// The section plane ([`cut_plane`]): xyz its unit normal, w its offset.
+    /// Zero, and never read, while `lit.w` is 0.
+    cut: [f32; 4],
     /// The shells' levels, four to a `vec4`, bass first.
     shells: [[f32; 4]; (MAX_SHELLS / 4) as usize],
 }
@@ -1351,6 +1424,9 @@ pub struct VoxelScene {
     ao: f32,
     light_yaw: f32,
     light_pitch: f32,
+    cut: f32,
+    cut_yaw: f32,
+    cut_pitch: f32,
     zoom: f32,
     colour: PaletteParams,
     pan: PanParams,
@@ -1407,6 +1483,9 @@ impl VoxelScene {
             ao: DEFAULT_AO,
             light_yaw: DEFAULT_LIGHT_YAW,
             light_pitch: DEFAULT_LIGHT_PITCH,
+            cut: DEFAULT_CUT,
+            cut_yaw: DEFAULT_CUT_YAW,
+            cut_pitch: DEFAULT_CUT_PITCH,
             zoom: DEFAULT_ZOOM,
             colour: PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
             pan: PanParams::default(),
@@ -1467,6 +1546,7 @@ impl VoxelScene {
         );
         let [r0, r1, r3] = rows(&view);
         let [ex, ey, ez] = eye(&view);
+        let cut = cut_plane(self.cut, self.cut_yaw, self.cut_pitch);
         MarchParams {
             r0,
             r1,
@@ -1508,8 +1588,9 @@ impl VoxelScene {
                 finite_or(self.key, DEFAULT_KEY).max(0.0),
                 finite_or(self.ambient, DEFAULT_AMBIENT).max(0.0),
                 finite_or(self.ao, DEFAULT_AO).clamp(0.0, 1.0),
-                0.0,
+                if cut.is_some() { 1.0 } else { 0.0 },
             ],
+            cut: cut.unwrap_or([0.0; 4]),
             shells: {
                 let mut out = [[0.0; 4]; (MAX_SHELLS / 4) as usize];
                 for (slot, level) in out.iter_mut().flatten().zip(self.levels) {
@@ -1591,6 +1672,9 @@ impl Scene for VoxelScene {
         self.ao = DEFAULT_AO;
         self.light_yaw = DEFAULT_LIGHT_YAW;
         self.light_pitch = DEFAULT_LIGHT_PITCH;
+        self.cut = DEFAULT_CUT;
+        self.cut_yaw = DEFAULT_CUT_YAW;
+        self.cut_pitch = DEFAULT_CUT_PITCH;
         self.zoom = DEFAULT_ZOOM;
         self.colour.reset();
         self.pan.reset();
@@ -1630,6 +1714,9 @@ impl Scene for VoxelScene {
             "ao" => self.ao = value,
             "light_yaw" => self.light_yaw = value,
             "light_pitch" => self.light_pitch = value,
+            "cut" => self.cut = value,
+            "cut_yaw" => self.cut_yaw = value,
+            "cut_pitch" => self.cut_pitch = value,
             "zoom" => self.zoom = value,
             _ => {}
         }

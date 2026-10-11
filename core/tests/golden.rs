@@ -160,6 +160,9 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 ///   never stops at a live cell and the face normal, the key light and the
 ///   ambient occlusion are unreached. A solid ball at 32³, its terraces' inner
 ///   edges darkened by the occlusion.
+/// - `voxel_section_lit` — every other voxel fixture leaves `cut` at 0, so the
+///   section plane is unreached. A solid block at 32³ cut through its centre on
+///   a tilted plane, its stepped section lit with the occlusion on.
 /// - `backdrop_paper` — every other fixture runs `bg_paper = 0`, so the
 ///   transparent backdrop clear, the paper pipeline at the surface format and
 ///   the tonemap's OVER write are unreached (ADR-0270). A solid voxel block on
@@ -171,7 +174,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to (a WARP reading, unverified on lavapipe as of
 /// 2026-10-06). For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 22] = [
+const EXTRA_FIXTURES: [(&str, &str); 23] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -231,6 +234,10 @@ const EXTRA_FIXTURES: [(&str, &str); 22] = [
     (
         "voxel_solid_ao",
         include_str!("fixtures/voxel_solid_ao.toml"),
+    ),
+    (
+        "voxel_section_lit",
+        include_str!("fixtures/voxel_section_lit.toml"),
     ),
     (
         "backdrop_paper",

@@ -968,6 +968,48 @@ threshold for crisp cubes.
 not as a surface, so on a turning camera it drags the shaded sides behind the lit ones. Leave
 `trails` off a solid preset unless that smear is the look.
 
+#### Cutting the cube open
+
+A dense rule drawn solid shows only its skin: the ray stops at the first live cell, so whatever the
+structure holds inside is hidden. **`cut`** hides every cell beyond one flat plane, so the inside
+shows as a section:
+
+```toml
+[params]
+cut       = "0.5 + 0.12 * sin(time * 0.4)"   # sweep the plane through the middle
+cut_yaw   = "0.8"                            # which way the hidden side faces...
+cut_pitch = "0.4"                            # ...and how far it tilts up
+```
+
+![A dense lattice of small amber cubes on a dark ground, cut flat across by a tilted plane: the cut
+face is a fine staircase of lit cube tops and sides, with the lattice's gaps showing as dark
+pits](images/voxel/section.png)
+
+*`present = "solid"`, `rules = ["crystal"]`, `cut` sweeping about 0.5 — the teaching preset
+[`docs/examples/voxel/section.toml`](examples/voxel/section.toml)*
+
+- **`cut`** is how much of the cube the plane hides, measured along its facing: `0` hides nothing,
+  `0.5` cuts through the centre, `1` hides everything. It is a parameter like any other, so it can
+  sweep on `time` or open on the bass.
+- **`cut_yaw`** and **`cut_pitch`** turn the plane, in radians. At `(0, 0)` the hidden side is the
+  cube's `+z` half. `cut_yaw` turns it around the cube's vertical axis, `cut_pitch` tilts it toward
+  the top (negative toward the bottom).
+
+**The plane turns with the structure, not with the camera.** It is held in the cube's own frame, so
+an orbiting camera sees the same section from every side, and the cut side swings past the viewer
+once a turn. A sweep bound to `time` and an orbit bound to `time` can line up into a section that
+seems to stand still; give them different rates.
+
+**The section is stepped, at the size of a cell.** A cell is cut whole or not at all, and a face
+behind the plane is lit as every face is, so a tilted section reads as a staircase of cubes, fine
+at `grid = 64` and coarse at 16. Nothing caps the cut: a hollow structure shows its hollows. The
+occlusion treats a cut cell as empty, so a section face is not darkened by cells the viewer cannot
+see.
+
+**Only the view is cut.** The automaton keeps running the hidden cells, and they still seed their
+neighbours, so a structure keeps growing across the plane as if nothing were there. `cut` works
+under `glow` too, where it opens a volume whose absorption hides its core.
+
 The camera is the shared one: `yaw`, `pitch`, `distance`, `fov` and `fog` behave as on
 [`plexus`](#the-plexus-table). `focus` and `aperture` are inert, because the volume has no drawn
 primitive to blur, and the line systems' `solid` parameter is not read here: a voxel is drawn
