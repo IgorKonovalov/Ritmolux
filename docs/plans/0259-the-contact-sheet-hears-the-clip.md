@@ -101,8 +101,8 @@ error because it fixes the silence without giving the set-wide read the entry as
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The audio sheet and the refusals | dev | done | committed with this row |
-| 2 — The operator docs | dev | not started | |
+| 1 — The audio sheet and the refusals | dev | done | 301c1d91 |
+| 2 — The operator docs | dev | done | committed with this row |
 | 3 — The skill text | human | not started | |
 
 ### Notes
@@ -111,9 +111,30 @@ error because it fixes the silence without giving the set-wide read the entry as
   `--frame-at 40` chose hop 40. That run took about 14 s of wall time on the Arch box, debug
   build, already compiled. This was read from `date` before and after, because the allowlist refused
   `/usr/bin/time`, so the figure includes the tool-call overhead.
-- Phase 1: `--strip` became `Option<u32>` in `Args` so that passing it is detectable, with the 8 kept as
-  `DEFAULT_STRIP`. The `--report` refusal is checked in the parser beside the existing `--signal`
-  checks, and `args.rs` changed only in the `onset_peak_hop` doc comment.
+- Phase 2: the replacement text for `.claude/skills/preset-author/references/render-loop.md`, for
+  Phase 3. In the flags table, replace the `--all --out sheet.png` row with:
+
+  ````markdown
+  | `--all --out sheet.png` | **contact sheet** — every preset in the loaded library as a labeled thumbnail grid. The fastest way to compare a draft against the shipped set and to offer the user side-by-side directions. **Honours `--set`** — see the audit pair below. **Beside `--signal` or `--audio`** it is an *audio* sheet instead: every preset driven by that one clip through the real analyzer and captured at one hop — `--frame-at <hop>` if given, else the clip's peak-onset hop, which the `wrote` line names. `--strip` and `--at` are refused there. |
+  ````
+
+  In `## The audit pair — one library, two excitations`, insert after the two-command `sh` block,
+  before "What the pair exposes":
+
+  ````markdown
+  A third sheet hears real dynamics. `--all` beside a clip captures every preset at the same hop of
+  it, by default the onset peak the level table names, so the grid shows how each preset answers one
+  beat of real music rather than a held level:
+
+  ```sh
+  cargo run -p standalone --example shot -- --presets presets --all \
+    --signal dynamic:110 --out audit/beat.png
+  ```
+
+  Read it against the loud sheet. A preset that moves under the loud `--set` and sits still here is
+  calibrated to `--set` magnitudes rather than to what the analyzer delivers. Each preset re-renders
+  every hop up to the chosen one, so a late `--frame-at` costs that many frames per preset.
+  ````
 
 ### Close triggers
 

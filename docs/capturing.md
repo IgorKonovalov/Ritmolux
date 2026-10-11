@@ -130,6 +130,7 @@ Flags:
 | `--size <WxH>` | render size (default 1280x720) |
 | `--out <path>` | output PNG (single shot) or dir/file (`--all`) |
 | `--all` | contact sheet of every preset, labeled (needs `--out`) |
+| `--all` with `--signal`/`--audio` | **audio contact sheet**: every preset driven through the real analyzer by that one clip and captured at the **same hop**. The hop is `--frame-at` if given, else the clip's **peak-onset hop**, the one the level table names on its `onset peaks at ... on hop H` line. The `wrote` line names the hop and the clip. Each preset re-renders every hop up to that one, so a late hop costs that many frames per preset. Not combinable with `--strip` or `--at`. `--report` takes neither `--signal` nor `--audio` |
 | `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage, the [transient probe](#the-transient-columns) and an advisory [frame cost](#the-frame-cost-block); `family=` takes any `system` name — every one the scene registry carries: `analytic_field`, `attractor`, `cellular`, `emitter`, `fragment_field`, `lsystem`, `parametric_curve`, `plexus`, `reaction_diffusion`, `shape_collage`, `shape_field`, `spectrum`, `star_pattern`, `swarm`, `warp_mesh` |
 | `--json` | emit the report as JSON instead of a text table |
 | `--signal <kind:param>` | synth-audio filmstrip (see below) |
@@ -1458,6 +1459,9 @@ cargo run -p standalone --example shot -- \
 
 # Labeled contact sheet of the whole library
 cargo run -p standalone --example shot -- --all --out gallery/
+
+# The whole library reacting to one beat of the same groove (the peak-onset hop)
+cargo run -p standalone --example shot -- --all --signal dynamic:110 --out gallery/
 
 # Metrics report as a text table, or JSON for parsing
 cargo run -p standalone --example shot -- --report
