@@ -77,10 +77,22 @@ None. The change is one declaration plus the files generated from it.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The declaration, the regeneration and the prose | dev | done | committed with this row |
+| 1 — The declaration, the regeneration and the prose | dev | done | 4c9e215f |
 
 ### Notes
 
+- `.taplo.toml` did not change on regeneration: it carries no per-param range, so the phase's
+  file list held one file the regeneration did not touch.
+
 ### Close triggers
+
+- **`presets/` touched:** yes — `presets/README.md` (generated block + hand-written bloom row),
+  `presets/preset.schema.json`, all 17 files under `presets/schema/`. No `.toml` preset.
+- **Closes:** design-backlog 0296 (already archived at approval).
+- **Shipped:** fix-only (a declared range; no behaviour or pixel change).
+- **Operator docs moved:** `presets/README.md`, `docs/specs/player-schema.json`.
+- **`node scripts/check-backlog-claims.mjs`:** exit 0 — 48 reductions hold across 23 live entries.
+- **`human` phases remaining:** none.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
 
 ## Followups (after this lands)
