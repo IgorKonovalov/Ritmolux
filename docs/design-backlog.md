@@ -43,6 +43,10 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0290 — the voxel scene fell to about 5 fps live on `Rich`, where headless `shot` reads 8 ms a frame](#0290--the-voxel-scene-fell-to-about-5-fps-live-on-rich-where-headless-shot-reads-8-ms-a-frame)
 - [0292 — the Windows CI arm flaked once on the lost-preset-ask resend test](#0292--the-windows-ci-arm-flaked-once-on-the-lost-preset-ask-resend-test)
 - [0293 — the studio tests' own `rlx-*` fixture directories stay in `/tmp` after every run](#0293--the-studio-tests-own-rlx--fixture-directories-stay-in-tmp-after-every-run)
+- [0294 — a voxel preset's own seed can die out, and no gate, report or check looks past frame 30](#0294--a-voxel-presets-own-seed-can-die-out-and-no-gate-report-or-check-looks-past-frame-30)
+- [0295 — a solid voxel lights only itself, so a glowing structure fakes its light with ambient and bloom](#0295--a-solid-voxel-lights-only-itself-so-a-glowing-structure-fakes-its-light-with-ambient-and-bloom)
+- [0296 — `bloom_amount` declares `0..1` as the range that reads, and five shipped presets sit past it](#0296--bloom_amount-declares-01-as-the-range-that-reads-and-five-shipped-presets-sit-past-it)
+- [0297 — Voxel Neon and Voxel Ice are Voxel Ember recoloured, and the owner wants three worlds](#0297--voxel-neon-and-voxel-ice-are-voxel-ember-recoloured-and-the-owner-wants-three-worlds)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1528,3 +1532,89 @@ every test takes its directory from.
 - **Verified 2026-10-11** — a fixture made in the system temp directory:
   `present: mkdtempSync\(join\(tmpdir\(\), 'rlx-render-'\)\) in: studio/electron/render/pipeline.test.ts`
 - **Verified 2026-10-11** — `present: mkdtempSync\(join\(tmpdir\(\), 'rlx-studio-'\)\) in: studio/electron/settings.test.ts`
+
+## 0294 — a voxel preset's own seed can die out, and no gate, report or check looks past frame 30
+
+A preset sets its own seed (`seed_radius`, `seed_fill`), and a sparse one under a fragile rule can
+empty the cube. Authoring the voxel set, a sparse seed under `clouds` and `slow_decay` was black by
+frame 300. The author found it only by looking. `voxel/tests.rs` proves that every roster rule lives
+from **its own standard seed** at generations 100 and 400, but a preset's seed is not that seed. The
+sanity suite captures 30 frames, `shot --report` has no voxel line, and `--check` reads the file
+without running it. A held `--set` makes it worse: `reseed` is edge-triggered, so a still made with
+`--set onset=1` refills once and then shows the same dying cube as a silent one. On real music an
+onset-bound `reseed` refills the cube, so the shipped seven survive live; a preset that binds no
+`reseed`, or binds it to something rare, has no such rescue. The candidate is a `--report` line
+giving the live fraction at a few generations (and a warning when it reaches 0), or a suite gate
+that steps every shipped voxel preset's own seed a few hundred generations and fails on an empty
+volume. The report line is the cheaper of the two and serves the author at the moment it matters.
+
+- **Raised:** 2026-10-11 by `preset-author`, at the voxel ship (e2aed1da), routed by `architect`
+  the same day. **Owner if taken:** `architect` (report line or gate), then `dev`.
+- **Verified 2026-10-11** — the roster test seeds the rule's own ball, not a preset's:
+  `present: fn every_roster_rule_lives_from_its_own_seed in: core/src/render/scenes/voxel/tests.rs`
+- **Verified 2026-10-11** — the suite's capture length:
+  `present: const FRAMES: u32 = 30; in: core/tests/sanity.rs`
+- **Verified 2026-10-11** — the report has no voxel arm:
+  `absent: [Vv]oxel in: standalone/src/shot`
+- **Verified 2026-10-11** — the reseed is edge-triggered:
+  `present: edge-triggered, so a value in: core/src/render/scenes/voxel/mod.rs`
+
+## 0295 — a solid voxel lights only itself, so a glowing structure fakes its light with ambient and bloom
+
+ADR-0269 lights a solid cell with one key light, an ambient term and its own corner occlusion. It
+names shadows and specular as followups it does not preclude. A third followup is missing from that
+list: **light that one cell gives to the cells around it**. Ember, Neon and Ice want cubes lit from
+within that spill colour onto their neighbours. They fake it with `ambient = 0.75`, a weak key, and
+`bloom_threshold = 0.55` with a heavy `bloom_amount`, so that every face crosses the bright-pass and
+the halo does the spilling. The result reads well, but the halo spills in screen space: it lights
+empty space and the background as much as the neighbouring faces. It also cannot tell an inner face
+from an outer one. Building it would mean gathering emission from neighbouring cells at the hit
+point, a short secondary walk or a precomputed light field over the grid. Either one is a real cost
+on the march, which already has an open frame-rate question (0290). **This is a possible future
+capability, not a bug.** The shipped look is accepted as it is.
+
+- **Raised:** 2026-10-11 by `preset-author`, at the voxel ship (e2aed1da), routed by `architect`
+  the same day. **Owner if taken:** `architect` (an ADR beside ADR-0269), then `dev`.
+- **Verified 2026-10-11** — the shade is key, ambient and occlusion only:
+  `present: albedo \* \(ambient \* occ \+ key \* max\(0, n \. l\)\) in: core/src/render/scenes/voxel/shader.rs`
+- **Verified 2026-10-11** — the workaround as shipped:
+  `present: bloom_threshold = "0\.55" in: presets/voxel_ember.toml`
+
+## 0296 — `bloom_amount` declares `0..1` as the range that reads, and five shipped presets sit past it
+
+`ParamSpec::range` is "the range that reads", not a clamp. For `bloom_amount` it is `[0.0, 1.0]`,
+and the generated table in `presets/README.md` and the editor schema print that. The stage clamps at
+`MAX_AMOUNT = 4.0`. Five shipped presets sit above the declared range: Clifford and Nebula (the
+`fragment_field` one, not Voxel Nebula) at `1.5`, Leviathan at `1.4`, Sumi at `1.35` and Dragon at
+`1.3`. Their authors saw a difference past `1`, so the declared range understates what reads. The hand-written prose said
+"around `0.5–1.5` is a glow". It was corrected on 2026-10-11 to describe both numbers rather than
+contradict the table, which leaves the table itself to fix. The fix is one declaration: widen the
+range to `[0.0, 2.0]` (prose has always called past `2` "mostly halo"), then regenerate the table and
+the schema. A studio slider bounded by the schema currently cannot reach five shipped values.
+
+- **Raised:** 2026-10-11 by `architect`, routing the preset lane's doc-drift note from the voxel
+  ship. The note had it the other way round (code caps at 1). The code clamps at 4.
+  **Owner if taken:** `dev` (one declaration plus the regeneration).
+- **Verified 2026-10-11** — the declared range, the only `[0.0, 1.0]` among bloom's three:
+  `present: range: Some\(\[0\.0, 1\.0\]\) in: core/src/render/bloom.rs`
+- **Verified 2026-10-11** — the clamp:
+  `present: const MAX_AMOUNT: f32 = 4\.0; in: core/src/render/bloom.rs`
+- **Verified 2026-10-11** — a shipped value past the declared range:
+  `present: bloom_amount\s+= "1\.5" in: presets/attractor_clifford.toml`
+
+## 0297 — Voxel Neon and Voxel Ice are Voxel Ember recoloured, and the owner wants three worlds
+
+Neon and Ice match Ember line for line apart from the `[palette]`: the same rules, seed, step rate,
+reseed, camera, light and bloom. The distinctness gate passes them, because a palette is enough to
+separate three captures. At the curation of the voxel ship (it landed outside a plan, so no close
+had curated it), the owner chose **differentiate** over keeping them as palette variants or cutting
+them. Each should become its own world: a different rule pair, seed shape, reseed cadence or camera,
+so that the three differ in behaviour as well as colour. The shared look (cubes lit from within
+under heavy bloom) can stay. Ember keeps `representative = true` and its exact parameters. This is
+content work only. Nothing here asks for the engine.
+
+- **Raised:** 2026-10-11 by `architect` at the owner's curation of e2aed1da.
+  **Owner if taken:** `preset-author`.
+- **Verified 2026-10-11** — Neon carries Ember's rule pair:
+  `present: rules\s+= \["pyroclastic", "coral"\] in: presets/voxel_neon.toml`
+- **Verified 2026-10-11** — `present: rules\s+= \["pyroclastic", "coral"\] in: presets/voxel_ice.toml`

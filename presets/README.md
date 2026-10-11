@@ -3962,7 +3962,7 @@ all: a preset that does not bind it pays nothing and renders exactly as before.
 
 | Param | Default | Meaning |
 |---|---|---|
-| `bloom_amount` | `0` | Strength of the halo added back. `0` = off. Around `0.5–1.5` is a glow; past `2` the frame is mostly halo (clamped at `4`). Bindable — this is the one to put a beat on. |
+| `bloom_amount` | `0` | Strength of the halo added back. `0` = off. The generated table gives `0`–`1` as the range that reads, and most glows sit there; a few shipped presets run a heavy halo at `1.3`–`1.5`. The engine accepts values above `1` and clamps at `4`, but past `2` the frame is mostly halo. Bindable — this is the one to put a beat on. |
 | `bloom_threshold` | `1.0` | Where "bright" starts, in linear light **after `exposure`** — so it means the same thing at any stop. At the default only light that is genuinely over range blooms — see below. Lower it to bloom mid-tones too; `0` blooms everything. |
 | `bloom_radius` | `1.0` | How far the halo scatters, `0..4`. Low is a tight rim around the figure; high is a wide wash. It does not change how much light there is, only where it goes. |
 

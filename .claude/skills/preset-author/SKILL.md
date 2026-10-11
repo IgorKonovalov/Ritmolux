@@ -448,6 +448,21 @@ hygiene gates read the shipped set, and each one fails the suite:
   under its system's group, then render it with `node scripts/docs-shots.mjs <name>`. That writes
   `docs/images/gallery/presets/<name>.png`, which is committed with the preset.
 
+**When a system ships its first presets**, the same commit may carry two edits outside `presets/`,
+because each one only states that the system now ships. You may do these yourself:
+
+- **Re-derive the system's coverage floor** in `core/tests/sanity.rs` (`coverage_floor`), but only
+  where the arm's own comment prescribes the derivation. Take half the family minimum from the
+  suite's printed distribution, and replace the "not derived" comment with the derivation, the way
+  the arms above it read. Any other change to a test, a threshold or a gate is `dev`'s.
+- **Correct a "ships no preset yet" statement** in `docs/` (the guide's caption, `docs/presets.md`,
+  the on-device checklist), changing only the sentence that has gone false.
+
+Two things stay out of that commit. **The family slot** in `scripts/docs-shots.mjs` (the
+`gallery/<system>.png` entry) is curation: point it at a shipped preset if you like, but leave it
+marked UNJUDGED and name it in your handoff so `architect` puts it to the owner. **Any other doc
+prose** goes to `architect` as a note.
+
 Know what that green actually covers, because it is weaker than it reads and
 [`docs/testing.md`](../../../docs/testing.md) now spells it out: **`reactivity` is the only one
 of the five that drives PCM through the real analyzer** (Plan 0067 Phase 1). The other four
