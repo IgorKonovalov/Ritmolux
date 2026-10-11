@@ -1,9 +1,9 @@
 # 0261 — The report sees a world empty out
 
-> **Status:** in-progress (2026-10-11)
+> **Status:** done - Phase 3 owed, ADR-0249 (2026-10-11). Phases 1-2 in `0d04da40`, `439411ec`; conductor close review round 1: no blockers, no majors, three minors (two fixed in `f1c8c50c`), one nit. Version 0.177.0.
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md), [ADR-0196](../adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md)
+> **Related ADRs:** [ADR-0099](../../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md), [ADR-0196](../../adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md)
 > **Closes:** design-backlog 0294
 
 ## TL;DR
@@ -226,5 +226,156 @@ flowchart LR
   `cargo nextest run -p rlx-core --test suite capture_advance` (7 passed) and
   `cargo nextest run -p standalone --lib shot::` (105 passed, 204 skipped), both exit 0.
 - **Outstanding `human` phases:** Phase 3 (`Blocks merge: no`).
+
+## Close review
+
+Conductor close, 2026-10-11. Round 1 is the only round, so no earlier finding was resolved by a fix
+round. Repaired at the close: minors 1 and 2 in `f1c8c50c`. Open: minor 3 (no repair asked) and nit 4
+(code). **Phase 3 is owed** (ADR-0249): the preset-author skill's `render-loop.md` does not yet name
+the cellular automata as horizon candidates, does not warn that a held stimulus never re-fires
+`reseed`, and does not list `late` or `EMPTIED` in its report-reading table. The replacement text is
+in the log above. The round's review follows in full.
+
+### Plan 0261 — close review, round 1
+
+Graded at `6de699bea287e245e565555867d832364f0a0c0c` on `plan-0261-the-report-sees-a-world-empty-out`.
+
+**Verdict: Plan 0261 landed cleanly. No blockers, no majors, three minors, one nit.** Phases 1 and 2
+are built as planned. Phase 3 is a `human` phase marked `Blocks merge: no`, and its row correctly
+reads `owed`. All three minors are prose: two can be repaired at the close (a doc paragraph and a test
+doc comment), and one is a log-length note.
+
+#### Evidence
+
+- **Full suite.** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 2bffd8a is green in the suite ledger, run by
+  gate 0261-pre-review at 2026-10-11T17:59:38.253Z: 2110 tests run: 2110 passed (14 slow), 9 skipped`.
+  That ledger record is the full-suite evidence (ADR-0207).
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: clean.
+- `node scripts/check-doc-links.mjs`: OK. `node scripts/toc.mjs --check`: OK.
+  `node scripts/check-comment-hygiene.mjs`: OK. `node scripts/check-backlog-claims.mjs`: exit 0 (the
+  advisory lists moved paths, none of them this plan's).
+- Phase 2 done-whens, each run as one command:
+  - `git grep -c "EMPTIED" -- docs/capturing.md` gives a count of at least 1.
+  - `git grep -n "family=<sys>" -- docs/capturing.md` gives line 134, which names both `voxel` and
+    `waterfall`.
+- **The lane is behind `main` by six commits** (the Plan 0262 close, `v0.176.1`) that landed after the
+  pre-review merge. They are not part of this grade. The close's `git merge main` takes them in.
+
+#### Lens 1 — alignment
+
+- **Phase 1.** `Renderer::capture_preset_over_at` (`core/src/render/capture_api.rs:364`) follows the
+  plan exactly. It shares the `reset_for_capture` seed, renders through the largest requested index,
+  builds the readback buffer once at the first requested frame, and returns the frames in
+  `at_frames` order. An index past the stimulus is `CaptureReadback`.
+  - **The core test** `a_sampled_sequence_frame_is_the_frame_the_full_sequence_returns`
+    (`core/tests/suite/capture_advance.rs`) asserts byte-equality with `capture_preset_over` at
+    indices 2, 9 and the last. It requests each index alone, so the readback buffer is built at a
+    different point each time. It also has a non-vacuity check and checks order and the
+    out-of-range error. This matches the done-when.
+  - **The report test** `a_sparse_voxel_seed_empties_unless_an_onset_reseed_refills_it` runs the
+    two inline fixtures through the real `late_reading` and `text_report`. It asserts that the bare
+    fixture is listed `EMPTIED` and its `reseed = "onset"` twin is not. This matches the done-when.
+  - **The other new tests** (the stimulus shape, the ratio and the tenth inclusive, the block, the
+    notes and the JSON key omission) assert the behaviour, not existence.
+  - **The logged readings.** The voxel `late` readings and the before/after whole-library wall times
+    are in the log, as the done-whens require.
+- **Two deviations, both logged with reasons, both accepted.**
+  - `late` prints as a one-column block under the frame-cost block, not in the main table, which
+    sits at 99 of the 100 columns the width test holds.
+  - The voxel command needed `--presets presets`.
+- **The plan's premise was not reproduced, and the log says so honestly.** A *sparse* `slow_decay`
+  seed does not empty: fills from 0.05 to 0.4 read `late` from 0.124 to 0.734. Only fill 0.45
+  (radius 0.5) fell under a tenth, at 0.070. The fixture is therefore near-dense, not sparse. Two
+  prose sites still state the falsified claim (minors 1 and 2). The close should also record this
+  on backlog 0294's archived body when it appends the `CLOSED` marker. That entry's
+  "a sparse seed under `clouds` and `slow_decay` was black by frame 300" holds only for a seed
+  near the rule's own fill.
+- **Owner tags.** All three phases carry one in-vocabulary tag. `Blocks merge: no` is on the
+  `human` phase only, and no later phase reads Phase 3's output.
+- **Close triggers.** The `Full suite:` bullet defers to the pre-review gate, which is correct in
+  conductor mode, and the ledger record above confirms it.
+
+#### Lens 2 — layering and real-time safety
+
+- **Layering.** Nothing in `core/` names an audio source or a platform. The new primitive is an
+  rlib method, off the hot path, and documented as blocking. There is no C ABI change and no
+  control-protocol change.
+- **Hot path.** The capture never runs on the audio or render loop, so it adds no hot-path
+  `unwrap`.
+
+#### Lens 3 — docs and bookkeeping
+
+- **Operator docs.** `docs/capturing.md` carries:
+  - the `late` row in the columns table and a `#### The late column` section with both
+    limitations;
+  - the horizon's held-stimulus caveat;
+  - the complete `family=` roster;
+  - corrected counts ("Four more labeled blocks", the settled-measurement exceptions, the
+    most-expensive pass).
+- **Owed after the merge.** The preset-author skill's `render-loop.md` is Phase 3's, and its
+  replacement text is in the log.
+- **Version bump owed.** The level is **minor**: this is a feature plan (a new `shot --report`
+  reading and a new public `Renderer` method).
+- **Backlog 0294.** The close moves its row from `### Promoted` to `### Closed` and appends the
+  `CLOSED` marker, with the falsified-premise note above.
+- **Translations.** None of the five `.ru.md` sources were touched.
+- **`presets/`** was not touched, so there is no curation sweep.
+
+#### Lens 4 — correctness and determinism
+
+- **Determinism.** The stimulus is a pure function of constants. Both read frames sit 29 frames
+  after a pulse. Both coverages are taken against frame 29's modal ground.
+- **The fixture threshold.** The `EMPTIED` fixture asserts a reading of 0.070 against a threshold of
+  0.1, measured on the software adapter and on RADV.
+  - **Why it is acceptable.** The voxel state is an integer cellular automaton, seeded from an
+    integer hash on the GPU. The reading is therefore close to adapter-independent: a
+    rasterization difference moves `cover` by pixels, not by 30 %.
+  - **The risk that remains.** Fill 0.4 reads 0.124, so the fixture sits between two fills that
+    straddle the threshold. That knife edge is what minor 2's comment should state, instead of the
+    mechanism it currently claims.
+
+#### Lens 5 — design integrity
+
+- **Duplication.** `capture_preset_over_at` repeats `capture_preset_at`'s body almost line for line,
+  about 45 lines, differing only in whether the frame is indexed or held (nit 4).
+- **No seam widened.** `json_late` follows `json_transient`'s shape.
+
+#### Findings
+
+##### Minor
+
+1. **`docs/capturing.md:1047`.** The section repeats the premise the log falsified. It says "A
+   sparse voxel seed under `slow_decay` can lose almost all of its light inside 15 s", and at line
+   1054 it calls the fixture "a sparse `slow_decay` seed".
+   - **The log's evidence.** Fills from 0.05 to 0.4 held 0.12 to 0.73. Only fill 0.45, near the
+     rule's own 0.5, emptied.
+   - **Repair (prose; a close may do it).** Use "A `slow_decay` seed filled just under the rule's own
+     density can lose almost all of its light inside 15 s", and "a near-dense `slow_decay` seed
+     (fill 0.45) with no `reseed`".
+   - **Fixed at the close in `f1c8c50c`.**
+2. **`standalone/src/shot/report/tests.rs:1356`.** `SPARSE_DECAY`'s doc comment claims "a sparse
+   voxel seed ... a few stable pairs at best, so it keeps well under a tenth". The log contradicts
+   all of it:
+   - the fill is 0.45, which is not sparse;
+   - a sparse fill leaves pairs and reads well **above** a tenth;
+   - the fixture reads 0.070, while fill 0.4 reads 0.124.
+
+   **Repair (doc-comment text; a close may do it).** "A `slow_decay` seed at fill 0.45, just under
+   the rule's own 0.5, at half its radius, binding no `reseed`. It reads `late` near 0.07, while
+   fill 0.4 reads near 0.12 and sparser fills hold their pairs above a tenth, so the fixture's
+   margin under the tenth is narrow." **Fixed at the close in `f1c8c50c`.**
+3. **`docs/plans/0261-the-report-sees-a-world-empty-out.md:148`.** The `## Implementation log`
+   (about 82 lines) is longer than the plan's own `## Implementation phases` (about 63 lines). The
+   bulk is Phase 3's replacement skill text, which has nowhere else to live under ADR-0210. No
+   repair is needed beyond noting it. **Open.**
+
+##### Nit
+
+4. **`core/src/render/capture_api.rs:364`.** `capture_preset_over_at` duplicates
+   `capture_preset_at`'s loop, its readback-on-first-request rule and its reorder.
+   `capture_preset_at` could delegate through a per-index frame accessor, so the
+   "built at the first requested frame" invariant lives in one place. This is code, so it stays
+   open.
 
 ## Followups (after this lands)
