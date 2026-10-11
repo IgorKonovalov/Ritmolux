@@ -3,7 +3,7 @@
 > **Status:** draft
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0099](../adrs/0099-a-long-run-drift-check-is-a-capture-mode-not-a-gate.md), [ADR-0196](../adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md)
+> **Related ADRs:** [ADR-0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md), [ADR-0196](../adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md)
 > **Closes:** design-backlog 0294
 
 ## TL;DR
