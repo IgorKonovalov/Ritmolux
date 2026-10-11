@@ -118,7 +118,7 @@ flowchart LR
   - Regenerate `docs/images/voxel/solid.png` through `scripts/docs-shots.mjs`, which already shoots
     the teaching preset.
   - The log carries the text the preset-author skill's backdrop notes should gain, for the owner to
-    apply in Phase 4: a headless session cannot edit `.claude/` (ADR-0210).
+    apply in Phase 4: a headless session cannot edit `.claude/` (ADR-0210). <!-- claude-allow: Phase 3 only logs replacement text for the preset-author skill and writes no file under .claude/; Phase 4 applies it -->
 - **Files touched:** `core/tests/golden.rs`, `core/tests/golden/`, `docs/presets.md`,
   `docs/how-it-works.md`, `docs/images/voxel/solid.png`, `presets/README.md`.
 - **Done when:**

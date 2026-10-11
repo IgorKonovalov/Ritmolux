@@ -103,7 +103,7 @@ flowchart LR
     `distinctness` rosters the way the solid teaching preset did in Plan 0256 Phase 3.
   - `docs/presets.md`'s `voxel` section documents the three params, that the cut turns with the
     structure and not the camera, and that the section is stepped at cell size.
-  - The log carries the text for the preset-author skill's `## voxel` section, for Phase 4 (ADR-0210).
+  - The log carries the text for the preset-author skill's `## voxel` section, for Phase 4 (ADR-0210). <!-- claude-allow: Phase 3 only logs replacement text for the preset-author skill and writes no file under .claude/; Phase 4 applies it -->
 - **Files touched:** `core/tests/golden.rs`, `core/tests/golden/`, `core/tests/fixtures/`,
   `core/tests/sanity.rs`, `core/tests/animation.rs`, `core/tests/reactivity.rs`,
   `core/tests/distinctness.rs`, `docs/examples/voxel/section.toml`, `scripts/docs-shots.mjs`,
