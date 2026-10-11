@@ -366,7 +366,6 @@ live entry citing this one.
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
 | 0294 | A voxel preset's own seed can die out, and no gate, report or check looks past frame 30 | [Plan 0261](plans/0261-the-report-sees-a-world-empty-out.md). **Promoted** |
 | 0295 | A solid voxel lights only itself, so a glowing structure fakes its light with ambient and bloom | [Plan 0263](plans/0263-solid-voxels-light-each-other.md). **Promoted** |
-| 0296 | `bloom_amount` declares `0..1` as the range that reads, and five shipped presets sit past it | [Plan 0262](plans/0262-bloom-amount-declares-the-range-it-reads.md). **Promoted** |
 | 0297 | Voxel Neon and Voxel Ice are Voxel Ember recoloured, and the owner wants three worlds | [Plan 0264](plans/0264-voxel-neon-and-ice-become-their-own-worlds.md). **Promoted** |
 <!-- roster:end -->
 
@@ -704,6 +703,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0287 | The backdrop cannot reach white, so black-on-white needs `exposure`, which also lifts the scene | ADR-0270 + [Plan 0257](plans/done/0257-the-backdrop-reaches-paper-white.md). `bg_paper`; Phase 4 owed. **Closed 2026-10-11** |
 | 0291 | A studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it | [Plan 0260](plans/done/0260-the-studio-tests-leave-tmp-as-they-found-it.md). A teardown removes it. **Closed 2026-10-11** |
 | 0289 | `shot --signal` beside `--all` silently draws a filmstrip of the first preset | [Plan 0259](plans/done/0259-the-contact-sheet-hears-the-clip.md). An audio contact sheet; Phase 3 owed. **Closed 2026-10-11** |
+| 0296 | `bloom_amount` declares `0..1` as the range that reads, and five shipped presets sit past it | [Plan 0262](plans/done/0262-bloom-amount-declares-the-range-it-reads.md). Declared `0..2`; Tidepool stays past it. **Closed 2026-10-11** |
 <!-- roster:end -->
 
 ---
@@ -17507,7 +17507,14 @@ the schema. A studio slider bounded by the schema currently cannot reach five sh
   `present: const MAX_AMOUNT: f32 = 4\.0; in: core/src/render/bloom.rs`
 - **Verified 2026-10-11** — a shipped value past the declared range:
   `present: bloom_amount\s+= "1\.5" in: presets/attractor_clifford.toml`
-- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0262](plans/0262-bloom-amount-declares-the-range-it-reads.md) was approved.
+- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0262](plans/done/0262-bloom-amount-declares-the-range-it-reads.md) was approved.
+
+**CLOSED 2026-10-11** — [Plan 0262](plans/done/0262-bloom-amount-declares-the-range-it-reads.md).
+`bloom_amount` declares `[0.0, 2.0]`, and the generated table, the editor schemas and the player
+schema follow it. The entry's inventory of shipped values was incomplete: it counted constant
+assignments only, and `waterfall_tidepool.toml` binds `2.2 + clamp(onset * 1.5, 0, 0.9)`, which
+stays past the new range. The hand-written row names Tidepool as the deliberate outlier; whether to
+widen further is the owner's call, recorded in the plan's `## Close review`.
 
 ## 0297 — Voxel Neon and Voxel Ice are Voxel Ember recoloured, and the owner wants three worlds
 

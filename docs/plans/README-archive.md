@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0262 - bloom_amount declares the range it reads](#0262---bloom_amount-declares-the-range-it-reads)
   - [0259 - The contact sheet hears the clip](#0259---the-contact-sheet-hears-the-clip)
   - [0260 - The studio tests leave /tmp as they found it](#0260---the-studio-tests-leave-tmp-as-they-found-it)
   - [0257 - The backdrop reaches paper white](#0257---the-backdrop-reaches-paper-white)
@@ -303,6 +304,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0240 - The attractor projects through the shared camera](done/0240-the-attractor-projects-through-the-shared-camera.md) - closed 2026-10-06, Phases 6-8 owed. Review: **no blockers, no majors, five minors (four fixed).** Version: **0.166.0**. ADR-0260 accepted, Outcome. [Write-up](README-archive.md).
 - [0237 - The L-system turtle turns in space, and can grow without end](done/0237-the-l-system-turtle-turns-in-space.md) - closed 2026-10-06, Phases 8-9 owed. Review: **no blockers, no majors, five minors (three fixed).** Version: **0.165.0**. [Write-up](README-archive.md).
 - [0248 - 3D strokes gain joins, depth cues and a solid mode](done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) - closed 2026-10-05, Phases 6-8 owed. Review: **no blockers, no majors, three minors (one fixed), one nit (fixed).** Version: **0.164.0**. ADR-0263 accepted. [Write-up](README-archive.md).
 - [0238 - The waterfall system](done/0238-the-waterfall-system.md) - closed 2026-10-02, Phase 4 judged: rows show through. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.163.0**. [Write-up](README-archive.md).
@@ -524,6 +526,23 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0262 - bloom_amount declares the range it reads](done/0262-bloom-amount-declares-the-range-it-reads.md)
+
+- closed 2026-10-11 by a conductor close in the lane
+`plan-0262-bloom-amount-declares-the-range-it-reads`, round 1. The single phase landed in
+`4c9e215f`. Round 1: **no blockers, no majors, two minors, one nit.** Minor 1 (the hand-written
+bloom row omitted Tidepool) and the nit (the TL;DR named `.taplo.toml` as carrying a range) were
+fixed at the close in `ca927b43`. Minor 2 (`[0, 2]` still excludes Tidepool's `2.2`-`3.1`) is a
+constant and stays open as the owner's call: the Decision's premise, that `[0, 2]` covers every
+shipped value, was false when the plan was approved. Version **0.176.1** (patch: a declared range,
+no behaviour change). Closes backlog 0296. The full review is the plan's own `## Close review`.
+- **What landed.** `bloom_amount`'s `ParamSpec::range` is `[0.0, 2.0]`; the parameter reference,
+  the editor schemas and the player schema are regenerated from it. No pixel moved.
+- **Curation.** No `.toml` changed. Tidepool is the one shipped preset outside the declared range,
+  and the bloom row now names it as a deliberate full-frame wash.
+- **Close readings.** Upstream CI green (run 38146692208 on `eaaa027`). Translation advisory: two
+  rows, neither moved by this plan: `docs/how-it-works.ru.md` and `docs/running.ru.md`.
 
 ### [0259 - The contact sheet hears the clip](done/0259-the-contact-sheet-hears-the-clip.md)
 
