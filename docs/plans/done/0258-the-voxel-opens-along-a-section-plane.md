@@ -153,7 +153,7 @@ flowchart LR
 | 1 — Walking skeleton: one plane through the march | dev | done | 2ae1af1c |
 | 2 — The section is lit as a surface | dev | done | 7b0c6a12 |
 | 3 — Cost, the golden, the teaching preset and the docs | dev | done | 26e9e0b1 |
-| 4 — The owner's look and the skill text | human | owed | |
+| 4 — The owner's look and the skill text | human | owed | skill text c71f9780; live look owed |
 
 ### Notes
 

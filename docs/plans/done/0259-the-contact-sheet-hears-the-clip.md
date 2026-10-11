@@ -1,6 +1,6 @@
 # 0259 — The contact sheet hears the clip
 
-> **Status:** done - Phase 3 owed, ADR-0249. Phases 1-2 landed in 301c1d91 and 8cb3ae2d; conductor close review round 1: no blockers, no majors, one minor and one nit, both open; version 0.176.0.
+> **Status:** done. Phases 1-2 landed in 301c1d91 and 8cb3ae2d; conductor close review round 1: no blockers, no majors, one minor and one nit, both open; version 0.176.0. Phase 3 (the skill text) applied in c71f9780.
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0100](../../adrs/0100-documentation-images-are-committed-headless-renders.md)
@@ -103,7 +103,7 @@ error because it fixes the silence without giving the set-wide read the entry as
 |---|---|---|---|
 | 1 — The audio sheet and the refusals | dev | done | 301c1d91 |
 | 2 — The operator docs | dev | done | 8cb3ae2d |
-| 3 — The skill text | human | owed | |
+| 3 — The skill text | human | done | c71f9780 |
 
 ### Notes
 

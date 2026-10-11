@@ -169,7 +169,7 @@ flowchart LR
 | 1 — Walking skeleton: one preset on true white | dev | done | 9e026bb7 |
 | 2 — The dissolve and ink | dev | done | acf290cb |
 | 3 — Cost, the golden and the documentation | dev | done | 2dc4be87 |
-| 4 — The owner's look and the skill text | human | owed | |
+| 4 — The owner's look and the skill text | human | owed | skill text c71f9780; live look owed |
 
 ### Notes
 
