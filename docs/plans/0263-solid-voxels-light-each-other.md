@@ -163,7 +163,9 @@ flowchart LR
   directory holding both presets (`docs/examples/voxel/solid.toml` with and without `bounce = "1"`).
   ms/frame: Floor, off 5.981 and on 4.834. Rich, off 4.186 and on 4.032. In both pairs the frame
   with `bounce` on read cheaper, which is inside the harness's noise. The harness cannot separate
-  the two per-generation dispatches from the frame.
+  the two per-generation dispatches from the frame. These figures therefore leave the per-frame
+  cost of `bounce` unresolved, rather than showing it within one extra fetch per lit pixel; a live
+  reading belongs to backlog 0290's repro, as the Risks section says.
 - Phase 2, the text for Phase 3: insert this into `.claude/skills/preset-author/references/systems.md`
   after the **Solid** paragraph's last sentence ("Low `trail` (0.1-0.3) keeps the decay haze from
   washing out the faces."), before **The section plane.**:

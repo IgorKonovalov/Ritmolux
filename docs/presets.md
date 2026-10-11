@@ -999,6 +999,9 @@ how much light there is, and its age, wait for the next generation.
 - **It composes with bloom.** Bounced light is light like any other: a face it lifts past the bloom
   threshold blooms. With `bounce` doing the work inside the structure, a preset can lower its
   `bloom_amount` and keep the glow off the background.
+- **It ignores the section plane.** The field is built from every live cell, cut or not, so with
+  `cut` bound a section face takes the light of the hidden cells behind it and glows. Following the
+  plane would refill the field every frame a swept `cut` moves.
 
 The field costs nothing until a frame binds `bounce` above 0. It is then built once and refilled
 each time the automaton steps or a reseed lands, so its cost follows `step_rate` rather than the
