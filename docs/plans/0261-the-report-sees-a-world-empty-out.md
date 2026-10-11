@@ -151,8 +151,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The capture primitive and the column | dev | done | committed with this row |
-| 2 — The documentation and the skill text | dev | not started | |
+| 1 — The capture primitive and the column | dev | done | 0d04da40 |
+| 2 — The documentation and the skill text | dev | done | committed with this row |
 | 3 — The skill text | human | not started | |
 
 ### Notes
@@ -184,6 +184,35 @@ flowchart LR
   --report` (101 presets), timed by a scratch Node wrapper, same box, same sitting: **234.2 s**
   before, **441.8 s** after. Other lanes' suite runs shared the machine during this session and
   were not controlled for.
+- **Phase 2, beyond the listed bullets** in `docs/capturing.md`: the "Three more labeled blocks"
+  paragraph now counts four and names `late`; "Every one of those but `count`" now also excepts
+  `late`; the frame-cost section's "This pass is the report's most expensive" now names `late` as
+  the other. The `#### The late column` section carries the Phase 1 wall times.
+- **Phase 2, the skill text** for Phase 3, for the preset-author skill's
+  `references/render-loop.md`. (1) In "The horizon", replace the paragraph that opens **Run it when
+  the mechanism has an accumulation axis** with:
+
+  > **Run it when the mechanism has an accumulation axis** — trails / `fade`, a `[feedback]` table,
+  > particles in a flow field, reaction-diffusion, a cellular automaton (`cellular`, `voxel`).
+  > Anything where this frame's output is next frame's input. A look with none of those has nothing
+  > for the horizon to find, and it costs minutes.
+
+  and after the paragraph that opens **The stimulus is `--set`, held for the whole run**, add:
+
+  > **A held stimulus never re-fires an edge-triggered binding.** `reseed = "onset"` under
+  > `--set onset=1` refills once, on the first frame, and never again, so a horizon shows an
+  > onset-reseeded world emptying even where music would keep it alive. The report's `late` column
+  > asks that question under a pulse that keeps firing.
+
+  (2) In "Reading the report", in "(the line families' `geom`, then the cost, lit-footprint, ...)"
+  insert `late` after the cost, and add this row, joined into one line, to the column table above
+  the `NEAR-DUP` row:
+
+  > | `late` | `cover` at frame 899 of a 15 s pulse (`onset` and `beat` every 30 frames) over `cover`
+  > at frame 29, at 96x96, in a block of its own | at or under `0.1` the notes print
+  > `EMPTIED <preset> late=<value>`: the world kept a tenth or less of its early light under
+  > music-like input. Advisory — a fade by design reads the same, so look before retuning; and a
+  > collapse that keeps its `cover` reads fine here, which is the horizon's `peak/mean`. |
 
 ### Close triggers
 
