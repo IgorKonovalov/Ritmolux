@@ -1,6 +1,6 @@
 # 0262 — `bloom_amount` declares the range it reads
 
-> **Status:** approved (2026-10-11)
+> **Status:** in-progress
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0170](../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
@@ -73,11 +73,11 @@ None. The change is one declaration plus the files generated from it.
 
 ## Implementation log
 
-**Lane:**
+**Lane:** `plan-0262-bloom-amount-declares-the-range-it-reads`, worktree `/home/igor/Work/rlx-plan-0262`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The declaration, the regeneration and the prose | dev | not started | |
+| 1 — The declaration, the regeneration and the prose | dev | done | committed with this row |
 
 ### Notes
 
