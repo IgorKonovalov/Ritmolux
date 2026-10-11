@@ -1,9 +1,11 @@
 # The `voxel` system drawn solid, for the illustrated guide's picture of it.
 # Teaching material, not a shipped preset: the `pyroclastic` rule, a restless
-# porous foam that never settles, each live cell a lit cube under one key light
-# that turns with the camera, the decaying cells a faint glow inside the gaps,
-# so the structure can be seen into. The bass brightens the key light and an
-# onset refills a ball of cells.
+# porous foam that never settles, each live cell a near-black cube under one
+# key light that turns with the camera, on a white backdrop, so the structure
+# reads as ink on paper and can be seen into. The palette's dark end is the
+# cubes (`hue` 0, no spread); its white end is the backdrop (`bg_hue` 1), and
+# `exposure` 3 lifts that backdrop from the tonemap's grey to white. The bass
+# brightens the key light and an onset refills a ball of cells.
 system = "voxel"
 name = "Voxel Solid"
 
@@ -15,21 +17,30 @@ seed_fill   = 0.3
 present     = "solid"
 
 [palette]
-name = "ember"
+stops = [
+  { at = 0.0, color = "#1e1e1e" },
+  { at = 0.6, color = "#4a4a4a" },
+  { at = 1.0, color = "#ffffff" },
+]
 
 [params]
-step_rate   = "6"
-reseed      = "onset"
-density     = "0.6"
-trail       = "0.2"
-age_tint    = "0.5"
-hue         = "0.1"
-hue_spread  = "0.6"
-brightness  = "0.9"
-key         = "0.4 + 1.6 * bass"
-ambient     = "0.3"
-light_yaw   = "-0.6"
-light_pitch = "0.6"
-yaw         = "0.6 + time * 0.1"
-pitch       = "0.35"
-distance    = "4.2"
+step_rate    = "6"
+reseed       = "onset"
+density      = "0.6"
+trail        = "0.2"
+age_tint     = "0.5"
+hue          = "0"
+hue_spread   = "0"
+brightness   = "0.9"
+key          = "0.4 + 1.6 * bass"
+ambient      = "0.3"
+light_yaw    = "-0.6"
+light_pitch  = "0.6"
+yaw          = "0.6 + time * 0.1"
+pitch        = "0.35"
+distance     = "4.2"
+bg_bright    = "1"
+bg_hue       = "1"
+bg_shade     = "1"
+bg_shade_end = "1"
+exposure     = "3"

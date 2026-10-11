@@ -493,11 +493,10 @@ instant. `rows` and `row_period` set how much history there is, in the
 
 ### `voxel`
 
-![A soft-edged ball of glowing orange on black with two small lobes budding off its rim: the volume
-reads as one dense amber mass, darker where it is thickest at the centre and grainy along its
-edges](images/gallery/voxel.png)
+![A faint, ragged cube of blue glow on black, full of dark gaps: the far side shows through the near
+one, and a paler knot of cells glows at its centre](images/gallery/voxel.png)
 
-*`rules = ["clouds"]` — the teaching preset
+*`rules = ["pyroclastic"]`, `density = "0.05"` — the teaching preset
 [`docs/examples/voxel/clouds.toml`](examples/voxel/clouds.toml); the shipped set has none yet*
 
 A **cellular automaton in three dimensions**: a cube of cells, every generation each cell deciding
@@ -511,12 +510,13 @@ counts, and the `rule` parameter picks one. Held on the bar, the automaton chang
 bar line. Most 3D rules settle into a shape and hold it, so `reseed` on an onset is how the cube
 stays alive: each rise drops a ball of fresh cells that grows again.
 
-![A porous block of small orange cubes on black, full of holes that show into it: each cube is lit
-from the upper left, its sides a shade darker, the creases between them darkest, and pale decaying
-cells glow in the gaps inside](images/voxel/solid.png)
+![A porous block of small near-black cubes on a white page, full of holes that show into it: each
+cube is lit from the upper left, its sides a shade darker, and pale decaying cells sit in the gaps
+inside](images/voxel/solid.png)
 
 *`present = "solid"`, `rules = ["pyroclastic"]` — the teaching preset
-[`docs/examples/voxel/solid.toml`](examples/voxel/solid.toml)*
+[`docs/examples/voxel/solid.toml`](examples/voxel/solid.toml), black on white; white on black is
+[`solid_dark.toml`](examples/voxel/solid_dark.toml)*
 
 `present = "solid"` draws every live cell as a **lit cube** instead of as light: one key light
 that turns with the camera, an ambient term, and an occlusion that darkens the creases where cubes

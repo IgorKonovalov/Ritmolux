@@ -1,7 +1,8 @@
 # The `voxel` system, for the illustrated guide's picture of it. Teaching
-# material, not a shipped preset: the `clouds` rule settling from a seeded ball
-# into rounded masses, marched as a glowing volume that absorbs some of the
-# light behind it, the camera orbiting slowly. An onset refills a ball of
+# material, not a shipped preset: the `pyroclastic` rule, a restless foam that
+# never settles, marched as a faint glowing volume that barely absorbs
+# (`density` 0.05), so the far side and the inside show through the near one,
+# in the `ice` palette, the camera orbiting slowly. An onset refills a ball of
 # cells, the spectrum lights eight radial shells (bass at the centre, treble at
 # the faces), and the bass lifts the brightness.
 system = "voxel"
@@ -9,25 +10,25 @@ name = "Voxel Clouds"
 
 [voxel]
 grid        = 64
-rules       = ["clouds"]
-seed_radius = 1.0
-seed_fill   = 0.55
+rules       = ["pyroclastic"]
+seed_radius = 0.9
+seed_fill   = 0.3
 shells      = 8
 
 [palette]
-name = "ember"
+name = "ice"
 
 [params]
 step_rate     = "6"
 reseed        = "onset"
 reseed_radius = "0.3"
-shell_gain    = "1.5"
-density       = "0.6"
-trail         = "0.6"
+shell_gain    = "3"
+density       = "0.05"
+trail         = "0.3"
 age_tint      = "0.6"
 hue           = "0.1"
 hue_spread    = "0.8"
-brightness    = "0.6 + clamp(bass * 0.35, 0, 0.3)"
+brightness    = "0.3 + clamp(bass * 0.21, 0, 0.18)"
 yaw           = "0.6 + time * 0.15"
 pitch         = "0.35"
 distance      = "4.2"
