@@ -1,6 +1,6 @@
 # 0260 — The studio tests leave /tmp as they found it
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-10-11
 > **Owner skill(s):** studio-builder
 > **Related ADRs:** none
@@ -64,13 +64,27 @@ ADR: there is no tradeoff a later reader would need, and the fix is a config lin
 
 ## Implementation log
 
-**Lane:** _(not started)_
+**Lane:** `/home/igor/Work/rlx-plan-0260` on branch `plan-0260-the-studio-tests-leave-tmp-as-they-found-it`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Trace and stop the leak | studio-builder | not started | |
+| 1 — Trace and stop the leak | studio-builder | done | committed with this row |
 
 ### Notes
+
+- What wrote it: `Vitest._tmpDir = join(os.tmpdir(), nanoid())` (vitest 5.0.1,
+  `dist/chunks/index.DzobfTyw.js`); the shared `ModuleFetcher` writes `<that>/<environment>/`
+  (`ssr/` and `client/`). A single-project run uses the shared fetcher, and close removes only the
+  project's own `TestProject.tmpDir`, which nothing writes. No option places it, so the teardown route
+  was taken: `studio/test/global-teardown.ts` is a `globalSetup` whose returned teardown removes
+  `_tmpDir` (an internal field) when it is a direct child of `os.tmpdir()`.
+- `studio/test/global-teardown.ts` falls under no tsconfig `include` and outside the `lint` script's
+  globs, so neither `typecheck` nor `lint` reads it; `vitest.config.ts` is in the same position.
+- Done-when one-liner run as `node -e` over `fs.readdirSync('/tmp')` counting entries with an `ssr`
+  subdirectory: 77 before the unfixed run, 78 after it; 78 before and after each of two fixed runs.
+- Followup: each studio test run also leaves about 68 `rlx-*` directories in `/tmp`
+  (`rlx-studio-` +28, `rlx-render-` +11, `rlx-service-` +10, `rlx-judging-` +9 and others, measured
+  across one run on a box with other lanes idle-or-unknown), which are the tests' own fixtures.
 
 ### Close triggers
 

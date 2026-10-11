@@ -12,6 +12,9 @@ export default defineConfig({
     environment: 'node',
     include: ['**/*.test.ts', '**/*.test.tsx'],
     exclude: ['node_modules/**', 'dist/**', 'release/**'],
+    // Vitest writes its transformed modules to `<os.tmpdir()>/<random id>/ssr/`
+    // and never removes that directory; the teardown does (the module says why).
+    globalSetup: ['./test/global-teardown.ts'],
   },
   resolve: {
     alias: {
