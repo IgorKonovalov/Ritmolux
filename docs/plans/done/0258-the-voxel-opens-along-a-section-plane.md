@@ -1,6 +1,6 @@
 # 0258 — The voxel opens along a section plane
 
-> **Status:** done - Phase 4 owed, ADR-0249. Phases 1-3 in `2ae1af1c`, `7b0c6a12`, `26e9e0b1`;
+> **Status:** done. Phase 4: the owner judged the look live on 2026-10-11 and kept it; skill text in `c71f9780`. Phases 1-3 in `2ae1af1c`, `7b0c6a12`, `26e9e0b1`;
 > conductor close round 1: no blockers, no majors, one minor (open). Version 0.174.0.
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
@@ -153,7 +153,7 @@ flowchart LR
 | 1 — Walking skeleton: one plane through the march | dev | done | 2ae1af1c |
 | 2 — The section is lit as a surface | dev | done | 7b0c6a12 |
 | 3 — Cost, the golden, the teaching preset and the docs | dev | done | 26e9e0b1 |
-| 4 — The owner's look and the skill text | human | owed | skill text c71f9780; live look owed |
+| 4 — The owner's look and the skill text | human | done | c71f9780 |
 
 ### Notes
 

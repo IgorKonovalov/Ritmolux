@@ -1,6 +1,6 @@
 # 0257 — The backdrop reaches paper white
 
-> **Status:** done - Phase 4 owed, ADR-0249. Phases 1-3 landed in `9e026bb7`, `acf290cb` and
+> **Status:** done. Phase 4: the owner judged the look live on 2026-10-11 and kept it; skill text in `c71f9780`. Phases 1-3 landed in `9e026bb7`, `acf290cb` and
 > `2dc4be87`; conductor close round 1: no blockers, no majors, one minor (open), one nit (fixed in
 > `a0e4eefe`). Version 0.175.0.
 > **Created:** 2026-10-11
@@ -169,7 +169,7 @@ flowchart LR
 | 1 — Walking skeleton: one preset on true white | dev | done | 9e026bb7 |
 | 2 — The dissolve and ink | dev | done | acf290cb |
 | 3 — Cost, the golden and the documentation | dev | done | 2dc4be87 |
-| 4 — The owner's look and the skill text | human | owed | skill text c71f9780; live look owed |
+| 4 — The owner's look and the skill text | human | done | c71f9780 |
 
 ### Notes
 
