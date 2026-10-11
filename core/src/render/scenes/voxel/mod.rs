@@ -67,7 +67,7 @@
 //! ```
 //!
 //! composited under the light gathered so far, at full coverage. The light is
-//! given in camera space ([`light_dir`]), so the lit side turns with an orbit.
+//! given in camera space (`light_dir`), so the lit side turns with an orbit.
 //! `occ` is the face's voxel ambient occlusion: each of its four corners is
 //! closed by the live cells beside it in the layer in front of the face — two
 //! sides close it fully, otherwise each of the two sides and the diagonal a
