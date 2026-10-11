@@ -303,7 +303,7 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 | 3 — Cost: bricks, the march target and the tier caps | dev | done | e39942ab |
 | 4 — The golden and the gates | dev | done | 54a9ba57 |
 | 5 — Documentation and the references | dev | done | bb991d91 |
-| 6 — The look, judged | human | owed | |
+| 6 — The look, judged | human | done | committed with this row |
 | 7 — The preset-author reference | human | done | e13b11f7 |
 
 ### Notes
@@ -407,6 +407,16 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
   >   fixture's pair. `amoeba` and `crystal` (0.78) fill the cube, and `445` and `builder` burn out to
   >   a few cells, so a shift to either end empties or floods the volume. A shift to a rule with
   >   fewer `states` (`clouds` and `crystal` have 2) drops every decaying cell at the bar line.
+
+- **Phase 6, the owner's verdict** (2026-10-11, live on the Arch box, `docs/examples/voxel/clouds.toml`
+  as `Voxel Clouds`, the owner's own music): **off**, two things.
+  - **Nothing moves.** `shot --report` (1920x1080, RADV RENOIR) reads 0.000 for bass, mid, treble
+    and onset on both tiers: the preset binds no band and no `reseed`, the `clouds` rule settles in
+    seconds, and the only motion is a 0.1 rad/s yaw. A preset-author brief, not an engine gap.
+  - **Laggy** while watched on screen; the player's diagnostics log fell to about 5 fps after the
+    tier was switched to `Rich` at 11:11. Headless `shot` frame cost is 8.4 ms (`Floor`) and 8.3 ms
+    (`Rich`) on the same adapter, so the live reading is not reproduced: a `--thumb` render ran on
+    the box beside it. Not yet diagnosed.
 
 ### Close triggers
 

@@ -201,7 +201,7 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
 | 2 — Voxel ambient occlusion | dev | done | 1ae668d1 |
 | 3 — Cost, the golden and the gates | dev | done | d7165bbd |
 | 4 — Documentation and the references | dev | done | 3b7f4d6c |
-| 5 — The look, judged | human | owed | |
+| 5 — The look, judged | human | done | committed with this row |
 | 6 — The preset-author reference | human | done | committed with this row |
 
 ### Notes
@@ -264,6 +264,11 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
   > light, so keep `brightness × (ambient + key)` under the bloom threshold for crisp cubes and push
   > past it only for a glowing core. Keep `trails` off: it smears the dark faces as if they were dim
   > light. Low `trail` (0.1-0.3) keeps the decay haze from washing out the faces.
+
+- **Phase 5, the owner's verdict** (2026-10-11, live on the Arch box, `docs/examples/voxel/solid.toml`
+  as `Voxel Solid`, `Floor` and `Rich`): **keep.** One wish for `preset-author`: holes inside the
+  structure, so the inside can be seen. `shot` frame cost 2.8 ms (`Floor`) and 2.9 ms (`Rich`),
+  1920x1080, RADV RENOIR.
 
 ### Close triggers
 
