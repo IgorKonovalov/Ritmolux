@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0259 - The contact sheet hears the clip](#0259---the-contact-sheet-hears-the-clip)
   - [0260 - The studio tests leave /tmp as they found it](#0260---the-studio-tests-leave-tmp-as-they-found-it)
   - [0257 - The backdrop reaches paper white](#0257---the-backdrop-reaches-paper-white)
   - [0258 - The voxel opens along a section plane](#0258---the-voxel-opens-along-a-section-plane)
@@ -302,6 +303,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0237 - The L-system turtle turns in space, and can grow without end](done/0237-the-l-system-turtle-turns-in-space.md) - closed 2026-10-06, Phases 8-9 owed. Review: **no blockers, no majors, five minors (three fixed).** Version: **0.165.0**. [Write-up](README-archive.md).
 - [0248 - 3D strokes gain joins, depth cues and a solid mode](done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) - closed 2026-10-05, Phases 6-8 owed. Review: **no blockers, no majors, three minors (one fixed), one nit (fixed).** Version: **0.164.0**. ADR-0263 accepted. [Write-up](README-archive.md).
 - [0238 - The waterfall system](done/0238-the-waterfall-system.md) - closed 2026-10-02, Phase 4 judged: rows show through. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.163.0**. [Write-up](README-archive.md).
 - [0247 - The studio renders a neural clip](done/0247-the-studio-renders-a-neural-clip.md) - closed 2026-10-02, Phase 6 owed. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.162.0**. ADR-0262 accepted. [Write-up](README-archive.md).
@@ -522,6 +524,24 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0259 - The contact sheet hears the clip](done/0259-the-contact-sheet-hears-the-clip.md)
+
+- closed 2026-10-11 by a conductor close in the lane `plan-0259-the-contact-sheet-hears-the-clip`,
+round 1. The phases landed in `301c1d91` (Phase 1) and `8cb3ae2d` (2). Phase 3 (the preset-author
+skill text) is a `human` phase marked `Blocks merge: no` and is owed (ADR-0249). Round 1: **no
+blockers, no majors, one minor, one nit.** The minor (`--set` and `--frames` beside an audio source
+are still accepted and ignored) is code and stays open; the nit (`render-loop.md` line 41 still says
+a clip always renders a filmstrip) sits under `.claude/` and joins Phase 3 with its replacement text.
+Version **0.176.0** (minor: new `shot` behaviour). Closes backlog 0289. The full review is the
+plan's own `## Close review`.
+- **What landed.** `shot --all` beside `--signal` or `--audio` writes an audio contact sheet: every
+  preset captured through the real analyzer at one hop, `--frame-at` if given, else the clip's
+  onset-peak hop, named on the `wrote` line. `--report` beside an audio source, and `--strip` or
+  `--at` beside the audio sheet, are parse-time usage errors.
+- **Curation.** `presets/` not touched.
+- **Close readings.** Upstream CI green (run 38132564345 on `da03dfa`). Translation advisory: two
+  rows, neither moved by this plan: `docs/how-it-works.ru.md` and `docs/running.ru.md`.
 
 ### [0260 - The studio tests leave /tmp as they found it](done/0260-the-studio-tests-leave-tmp-as-they-found-it.md)
 

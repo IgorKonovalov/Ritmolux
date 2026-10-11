@@ -360,7 +360,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0289 | `shot --signal` beside `--all` silently draws a filmstrip of the first preset | [Plan 0259](plans/0259-the-contact-sheet-hears-the-clip.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -696,6 +695,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0288 | A solid voxel mass has no cut-away, so seeing inside it depends on choosing a porous rule | [ADR-0271](adrs/0271-a-voxel-is-opened-by-one-section-plane-held-in-the-cubes-own-frame.md) + [Plan 0258](plans/done/0258-the-voxel-opens-along-a-section-plane.md). A section plane; Phase 4 owed. **Closed 2026-10-11** |
 | 0287 | The backdrop cannot reach white, so black-on-white needs `exposure`, which also lifts the scene | ADR-0270 + [Plan 0257](plans/done/0257-the-backdrop-reaches-paper-white.md). `bg_paper`; Phase 4 owed. **Closed 2026-10-11** |
 | 0291 | A studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it | [Plan 0260](plans/done/0260-the-studio-tests-leave-tmp-as-they-found-it.md). A teardown removes it. **Closed 2026-10-11** |
+| 0289 | `shot --signal` beside `--all` silently draws a filmstrip of the first preset | [Plan 0259](plans/done/0259-the-contact-sheet-hears-the-clip.md). An audio contact sheet; Phase 3 owed. **Closed 2026-10-11** |
 <!-- roster:end -->
 
 ---
@@ -17391,7 +17391,15 @@ tool: a sheet under real audio is the honest set-wide read the `--set` sheets on
   feature), then `dev`.
 - **Verified 2026-10-11** — the audio source wins before the mode is read:
   `present: if args.signal.is_some\(\) \|\| args.audio.is_some\(\) in: standalone/examples/shot.rs`
-- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0259](plans/0259-the-contact-sheet-hears-the-clip.md) was approved.
+- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0259](plans/done/0259-the-contact-sheet-hears-the-clip.md) was approved.
+
+**CLOSED 2026-10-11** — [Plan 0259](plans/done/0259-the-contact-sheet-hears-the-clip.md).
+`shot --all` beside `--signal` or `--audio` writes an audio contact sheet: every preset driven by
+the one clip through the real analyzer and captured at one hop, `--frame-at` if given, else the
+clip's onset-peak hop, which the `wrote` line names. `--report` beside an audio source, and `--strip`
+or `--at` beside the audio sheet, are parse-time usage errors. `--set` and `--frames` beside an audio
+source are still accepted and ignored (the close review's M1, left open). Phase 3 (the preset-author
+skill text) is owed (ADR-0249).
 
 ## 0291 — a studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it
 
