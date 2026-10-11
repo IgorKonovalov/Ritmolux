@@ -364,7 +364,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0294 | A voxel preset's own seed can die out, and no gate, report or check looks past frame 30 | [Plan 0261](plans/0261-the-report-sees-a-world-empty-out.md). **Promoted** |
 | 0295 | A solid voxel lights only itself, so a glowing structure fakes its light with ambient and bloom | [Plan 0263](plans/0263-solid-voxels-light-each-other.md). **Promoted** |
 | 0297 | Voxel Neon and Voxel Ice are Voxel Ember recoloured, and the owner wants three worlds | [Plan 0264](plans/0264-voxel-neon-and-ice-become-their-own-worlds.md). **Promoted** |
 <!-- roster:end -->
@@ -704,6 +703,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0291 | A studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it | [Plan 0260](plans/done/0260-the-studio-tests-leave-tmp-as-they-found-it.md). A teardown removes it. **Closed 2026-10-11** |
 | 0289 | `shot --signal` beside `--all` silently draws a filmstrip of the first preset | [Plan 0259](plans/done/0259-the-contact-sheet-hears-the-clip.md). An audio contact sheet; Phase 3 owed. **Closed 2026-10-11** |
 | 0296 | `bloom_amount` declares `0..1` as the range that reads, and five shipped presets sit past it | [Plan 0262](plans/done/0262-bloom-amount-declares-the-range-it-reads.md). Declared `0..2`; Tidepool stays past it. **Closed 2026-10-11** |
+| 0294 | A voxel preset's own seed can die out, and no gate, report or check looks past frame 30 | [Plan 0261](plans/done/0261-the-report-sees-a-world-empty-out.md). A `late` reading; Phase 3 owed. **Closed 2026-10-11** |
 <!-- roster:end -->
 
 ---
@@ -17462,7 +17462,17 @@ volume. The report line is the cheaper of the two and serves the author at the m
   `absent: [Vv]oxel in: standalone/src/shot`
 - **Verified 2026-10-11** — the reseed is edge-triggered:
   `present: edge-triggered, so a value in: core/src/render/scenes/voxel/mod.rs`
-- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0261](plans/0261-the-report-sees-a-world-empty-out.md) was approved.
+- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0261](plans/done/0261-the-report-sees-a-world-empty-out.md) was approved.
+
+**CLOSED 2026-10-11** — [Plan 0261](plans/done/0261-the-report-sees-a-world-empty-out.md).
+`shot --report` gains a `late` reading for every system: coverage at frame 899 of a 15 s pulse over
+coverage at frame 29, with `EMPTIED` in the notes at a tenth or less. It is image-domain, not the
+live-cell count this entry proposed, and advisory. The entry's premise held only in part: a
+**sparse** `slow_decay` seed did not empty under the pulse (fills 0.05 to 0.4 read `late` 0.12 to
+0.73, keeping isolated stable pairs). Only a fill of 0.45, just under the rule's own 0.5, fell under
+a tenth (0.070). So "a sparse seed ... was black by frame 300" holds for a seed near the rule's own
+fill, not for a sparse one. No shipped voxel preset is flagged. The preset-author skill's text is
+Phase 3, owed after the merge (ADR-0249).
 
 ## 0295 — a solid voxel lights only itself, so a glowing structure fakes its light with ambient and bloom
 

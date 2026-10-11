@@ -52,6 +52,26 @@ pub fn json_transient(
     )
 }
 
+/// The `late` reading as a JSON object: the ratio, the two frames it compares,
+/// the pulse period and the size it was taken at, and whether the text report
+/// lists it `EMPTIED`. The frame indices stay integers, as counted frames do in
+/// [`json_transient`].
+pub fn json_late(
+    ratio: f32,
+    early_frame: usize,
+    late_frame: usize,
+    frames_per_beat: usize,
+    measured_at_px: u32,
+    emptied: bool,
+) -> String {
+    format!(
+        "{{\"ratio\":{},\"early_frame\":{early_frame},\"late_frame\":{late_frame},\
+         \"frames_per_beat\":{frames_per_beat},\"measured_at_px\":{measured_at_px},\
+         \"emptied\":{emptied}}}",
+        num(ratio)
+    )
+}
+
 /// Minimal JSON string escaping (quotes, backslash, control chars), including the
 /// surrounding quotes.
 pub fn json_string(s: &str) -> String {
@@ -139,6 +159,15 @@ mod tests {
             json_transient(0, 0, 0.0, true, true),
             r#"{"rise_frames":0,"fall_frames":0,"ratio":0.0000,"rise_settled":true,"fall_settled":true}"#
         );
+    }
+
+    #[test]
+    fn json_late_carries_its_schedule_and_its_flag() {
+        assert_eq!(
+            json_late(0.0625, 29, 899, 30, 96, true),
+            r#"{"ratio":0.0625,"early_frame":29,"late_frame":899,"frames_per_beat":30,"measured_at_px":96,"emptied":true}"#
+        );
+        assert!(json_late(1.5, 29, 899, 30, 96, false).ends_with("\"emptied\":false}"));
     }
 
     #[test]

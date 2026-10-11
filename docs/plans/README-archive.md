@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0261 - The report sees a world empty out](#0261---the-report-sees-a-world-empty-out)
   - [0262 - bloom_amount declares the range it reads](#0262---bloom_amount-declares-the-range-it-reads)
   - [0259 - The contact sheet hears the clip](#0259---the-contact-sheet-hears-the-clip)
   - [0260 - The studio tests leave /tmp as they found it](#0260---the-studio-tests-leave-tmp-as-they-found-it)
@@ -304,6 +305,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0249 - A dispatched CI job blesses the named WARP baselines](done/0249-a-dispatched-ci-job-blesses-the-named-warp-baselines.md) - closed 2026-10-06, Phase 3 owed. Review: **no blockers, no majors, two minors (one fixed), one nit (fixed).** Version: none. ADR-0264 accepted. [Write-up](README-archive.md).
 - [0240 - The attractor projects through the shared camera](done/0240-the-attractor-projects-through-the-shared-camera.md) - closed 2026-10-06, Phases 6-8 owed. Review: **no blockers, no majors, five minors (four fixed).** Version: **0.166.0**. ADR-0260 accepted, Outcome. [Write-up](README-archive.md).
 - [0237 - The L-system turtle turns in space, and can grow without end](done/0237-the-l-system-turtle-turns-in-space.md) - closed 2026-10-06, Phases 8-9 owed. Review: **no blockers, no majors, five minors (three fixed).** Version: **0.165.0**. [Write-up](README-archive.md).
 - [0248 - 3D strokes gain joins, depth cues and a solid mode](done/0248-3d-strokes-gain-joins-depth-cues-and-a-solid-mode.md) - closed 2026-10-05, Phases 6-8 owed. Review: **no blockers, no majors, three minors (one fixed), one nit (fixed).** Version: **0.164.0**. ADR-0263 accepted. [Write-up](README-archive.md).
@@ -526,6 +528,27 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0261 - The report sees a world empty out](done/0261-the-report-sees-a-world-empty-out.md)
+
+- closed 2026-10-11 by a conductor close in the lane
+`plan-0261-the-report-sees-a-world-empty-out`, round 1. Phase 1 landed in `0d04da40`, Phase 2 in
+`439411ec`; Phase 3 (the preset-author skill text, `human`, `Blocks merge: no`) is owed after the
+merge (ADR-0249). Round 1: **no blockers, no majors, three minors, one nit.** Minors 1 and 2 (the
+`late` section and the fixture's doc comment called the fixture a sparse seed) were fixed at the
+close in `f1c8c50c`. Minor 3 (the log outweighs the phases, carrying Phase 3's replacement text) and
+the nit (`capture_preset_over_at` duplicates `capture_preset_at`'s loop) stay open. Version
+**0.177.0** (minor: a new `shot --report` reading and a new public `Renderer` method). Closes
+backlog 0294. The full review is the plan's own `## Close review`.
+- **What landed.** `Renderer::capture_preset_over_at` reads back chosen frames of a stimulus
+  sequence; `shot --report` prints `late` (coverage at frame 899 of a 15 s pulse over frame 29) in a
+  block of its own and lists `EMPTIED` at a tenth or less, in text and JSON.
+- **Falsified.** The premise that a sparse `slow_decay` seed goes black: fills 0.05 to 0.4 held
+  `late` 0.12 to 0.73; only fill 0.45 emptied (0.070). The test fixture's margin is narrow.
+- **Cost.** A whole-library `--report` went from 234 s to 442 s on RADV Renoir, uncontrolled.
+- **Curation.** `presets/` untouched; no shipped preset is flagged `EMPTIED`.
+- **Close readings.** Upstream CI green (run 38157955490 on `3ec9699`). Translation advisory: two
+  rows, neither moved by this plan: `docs/how-it-works.ru.md` and `docs/running.ru.md`.
 
 ### [0262 - bloom_amount declares the range it reads](done/0262-bloom-amount-declares-the-range-it-reads.md)
 

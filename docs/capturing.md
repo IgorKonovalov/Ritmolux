@@ -131,7 +131,7 @@ Flags:
 | `--out <path>` | output PNG (single shot) or dir/file (`--all`) |
 | `--all` | contact sheet of every preset, labeled (needs `--out`) |
 | `--all` with `--signal`/`--audio` | **audio contact sheet**: every preset driven through the real analyzer by that one clip and captured at the **same hop**. The hop is `--frame-at` if given, else the clip's **peak-onset hop**, the one the level table names on its `onset peaks at ... on hop H` line. The `wrote` line names the hop and the clip. Each preset re-renders every hop up to that one, so a late hop costs that many frames per preset. Not combinable with `--strip` or `--at`. `--report` takes neither `--signal` nor `--audio` |
-| `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage, the [transient probe](#the-transient-columns) and an advisory [frame cost](#the-frame-cost-block); `family=` takes any `system` name — every one the scene registry carries: `analytic_field`, `attractor`, `cellular`, `emitter`, `fragment_field`, `lsystem`, `parametric_curve`, `plexus`, `reaction_diffusion`, `shape_collage`, `shape_field`, `spectrum`, `star_pattern`, `swarm`, `warp_mesh` |
+| `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage, the [transient probe](#the-transient-columns), the [`late` reading](#the-late-column) and an advisory [frame cost](#the-frame-cost-block); `family=` takes any `system` name — every one the scene registry carries: `analytic_field`, `attractor`, `cellular`, `emitter`, `fragment_field`, `lsystem`, `parametric_curve`, `plexus`, `reaction_diffusion`, `shape_collage`, `shape_field`, `spectrum`, `star_pattern`, `swarm`, `voxel`, `warp_mesh`, `waterfall` |
 | `--json` | emit the report as JSON instead of a text table |
 | `--signal <kind:param>` | synth-audio filmstrip (see below) |
 | `--signal-secs <s>` | how long to synthesize that signal for (default `4`). The clip's length is what decides **which hops exist**, so a late `--frame-at` needs a longer one — [photographing a world that is still assembling](#a-late-hop-photographs-a-world-that-is-still-assembling). Needs `--signal`: `--audio` and `--render` take their length from the file |
@@ -281,6 +281,14 @@ the world's own header, the way the fold-edge verdicts were recorded.
 The stimulus is `--set`, held for the whole run, which is what makes a row at
 minute nine comparable with a row at minute one — so `--horizon` and
 `--signal`/`--audio` are mutually exclusive rather than one silently winning.
+
+**A held `--set` never re-fires an edge-triggered binding.** Voxel's `reseed`
+refills a ball of cells when its value *rises* past the threshold, so under
+`--set onset=1` it rises once, on the first frame, and never again: a horizon of
+an onset-reseeded voxel world shows the same emptying cube a silent one does,
+even where music would keep it alive. The horizon cannot tell "needs music" from
+"dies under music". The report's [`late` column](#the-late-column) asks that
+question under a pulse that keeps firing.
 
 Reading the trend block: `delta` is how far a statistic travelled end to end, and
 `monotone` is what share of the steps went that way. A world grinding into a
@@ -899,6 +907,7 @@ measurement
 | `rate` | how far the frame moves **frame to frame** — the only column that walks consecutive frames, and the only one measured at 96x96 ([the two motion readings](#the-two-motion-readings)) |
 | `cover` | fraction of the frame that differs from the frame's own ground — [a low value is often correct](#a-low-cover-is-not-a-defect) |
 | `level` | how much **light** the picture carries: mean linear light over the pixels `cover` counts as lit ([what the level column measures](#what-the-level-column-measures)) |
+| `late` | **does the world empty out** — `cover` at frame 899 of a 15 s pulse over `cover` at frame 29, at 96x96, in a block of its own under the table; a row at a tenth or less is listed `EMPTIED` in the notes ([the late column](#the-late-column)) |
 | `rise` `fall` | the **transient probe** (below) — frames to settle after a step up, and after the matching step down; a **`+` suffix** means the value is a *lower bound*, not a measurement (below); [read them as evidence, not a verdict](#what-the-transient-columns-cannot-see) |
 
 #### What the `level` column measures
@@ -957,9 +966,10 @@ under 100 characters. A preset in such a family that drew no line prints `-`, an
   Curve Mono     0.9602
 ```
 
-Three more labeled blocks print under the table (new readings go beside the table
+Four more labeled blocks print under the table (new readings go beside the table
 rather than into it, so every historical number keeps its place): the
-**[frame cost](#the-frame-cost-block)** described above, the **realistic-levels** reading
+**[frame cost](#the-frame-cost-block)** described above, the
+**[`late`](#the-late-column)** reading, the **realistic-levels** reading
 (`reactivity_low` — the same bands at the levels real music reaches, [ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md)) and,
 since [Plan 0077](plans/done/0077-the-quiet-sky.md), the **footprint** reading (`reactivity_footprint`) — the same
 differentials divided by the **union of lit pixels** instead of the whole frame
@@ -971,7 +981,7 @@ something to see. On a backdrop-heavy preset the union mask approaches the whole
 frame and the reading degrades toward the mean column — it never sits meaningfully
 below it, so it fails toward the old behaviour rather than inventing reactivity.
 
-Every one of those but `count` and the last two is a **settled** measurement: the capture
+Every one of those but `count`, `late` and the last two is a **settled** measurement: the capture
 holds one stimulus for every frame it renders, so each smoother has converged
 long before the pixels are read. That is the right question for "does it
 respond", and it is exactly why those columns are **identical for any
@@ -1023,11 +1033,75 @@ rasterizer no reading is taken and the cells print `-`: a frame time on
 lavapipe or WARP is a fact about the rasterizer, and CI has no GPU contract to
 take one on ([ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)).
 
-This pass is the report's most expensive: 120 frames at 1080p per preset, on
-top of the few hundred small frames every other column shares. On the
+This pass is one of the report's two most expensive, with
+[`late`](#the-late-column): 120 frames at 1080p per preset, on top of the few
+hundred small frames most other columns share. On the
 development box's integrated GPU a debug-profile family of five costs a few
 seconds; a full-library report on a machine near the baseline should be run
 with that in mind, and `family=` narrows it.
+
+#### The late column
+
+Every other column measures a preset's first half second, and so do the suites:
+the sanity gate captures 30 frames and the report's longest settled capture is
+48. A world that empties out over seconds passes all of them. A `slow_decay`
+seed filled just under the rule's own density can lose almost all of its light
+inside 15 s with every gate green, and the only instrument that looked further, the
+[horizon](#the-horizon-does-a-world-still-look-like-itself-after-minutes), holds
+one stimulus and so never re-fires the `reseed` that would rescue it under music.
+
+`late` looks 15 s in, for every system, in a one-column block under the
+frame-cost block. `Sparse Decay` below is the report test's fixture, a
+near-dense `slow_decay` seed (fill 0.45) with no `reseed`; the two voxel rows
+are shipped presets:
+
+```
+  preset           late
+  Voxel Ember     3.166
+  Voxel Nebula    1.494
+  Sparse Decay    0.070
+  ...
+  EMPTIED Sparse Decay late=0.070
+```
+
+**The stimulus** is 900 frames, 15 s at the capture step. Bass, mid and treble
+hold the [realistic levels](#the-second-reading-the-same-columns-at-realistic-levels)
+throughout, each with its slice of the band array. Every 30 frames from frame 0
+(120 BPM), `onset` goes to full scale and `beat` fires, for that one frame, and
+the clock fields step with the beat as they do in `count`'s clock. It is the
+cheapest sequence that keeps firing every edge a preset can bind, so a world
+that empties out under it would empty out under music. Only two frames are read
+back, so the run costs 900 renders and 2 readbacks per preset at 96x96.
+
+**The ratio** is `cover` at frame 899 over `cover` at frame 29, both taken
+against frame 29's own ground with the threshold `cover` uses. The two frames sit
+at the same phase, 29 frames after a pulse. Above 1 the world grew; near 1 it
+held. A frame 29 that lit nothing has no ratio, and the cell prints `-`.
+`--json` carries the same reading as `late`, with the two frame indices, the
+pulse period, the size and the flag beside it, and omits the key where the text
+prints `-`.
+
+**The tenth.** A row at `0.1` or below is listed `EMPTIED <preset>
+late=<value>` in the notes under the family's tables. The flag is advisory: it
+never changes the exit code, and the tenth is a choice rather than a
+derivation. It marks a world that has kept a tenth or less of the light it had
+at half a second, which is what dying out looks like in this domain.
+
+**Two things it cannot see.**
+
+- **A collapse that keeps its cover.** A world can fall into one bright blob, or
+  freeze into a static residue, and hold its `cover` while it does. `late`
+  answers "did it empty", not "is it alive". The horizon's concentration
+  (`peak/mean`) reading sees the collapse, and `anim` and `rate` see a residue
+  that has stopped moving.
+- **A fade by design.** A world that is meant to dim reads low here without
+  being broken. Look at the preset before retuning it.
+
+It is the report's longest capture. A whole-library report on the Arch box's
+integrated GPU (RADV Renoir, release profile, 101 presets) took 234 s before the
+column and 442 s with it, about 2 s a preset. `family=` narrows the run; a
+shorter stimulus would give back the half-second blind spot the column exists
+to close.
 
 #### The two motion readings
 

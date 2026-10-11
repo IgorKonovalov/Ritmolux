@@ -45,7 +45,6 @@ place. The plan file carries the real link.
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) | The rig session measures the wave modes and judges the fourth gate | approved | human, dev | 0202's Phases 4-7. Not queued until the owner has the Windows rig; commit Phase 1's eight rows on main, then queue. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
-| [0261](0261-the-report-sees-a-world-empty-out.md) | The report sees a world empty out | approved | dev, human | Backlog 0294. `--report` gains `late`: coverage after 15 s of pulses over coverage at 0.5 s, `EMPTIED` at a tenth. Advisory, every system. |
 | [0263](0263-solid-voxels-light-each-other.md) | Solid voxels light each other | approved | dev, human | Backlog 0295, ADR-0272. `bounce` reads a grid/4 light field rebuilt per generation. Default 0 builds nothing. |
 | [0264](0264-voxel-neon-and-ice-become-their-own-worlds.md) | Voxel Neon and Ice become their own worlds | approved | human | Backlog 0297. Content only, all phases `human`: the owner starts `/preset-author` with the brief. Not for the conductor. |
 <!-- roster:end -->
@@ -1041,6 +1040,7 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 [Closed earlier (index bullets)](README-archive.md#closed-earlier-index-bullets).
 
 <!-- roster:begin cap=320 -->
+- [0261 - The report sees a world empty out](done/0261-the-report-sees-a-world-empty-out.md) - closed 2026-10-11, Phase 3 owed. Review: **no blockers, no majors, three minors (two fixed), one nit.** Version: **0.177.0**. Closed 0294. [Write-up](README-archive.md).
 - [0262 - bloom_amount declares the range it reads](done/0262-bloom-amount-declares-the-range-it-reads.md) - closed 2026-10-11. Review: **no blockers, no majors, two minors (one fixed), one nit (fixed).** Version: **0.176.1**. Closed 0296. [Write-up](README-archive.md).
 - [0259 - The contact sheet hears the clip](done/0259-the-contact-sheet-hears-the-clip.md) - closed 2026-10-11; Phase 3 done in c71f9780. Review: **no blockers, no majors, one minor (open), one nit (open).** Version: **0.176.0**. Closed 0289. [Write-up](README-archive.md).
 - [0260 - The studio tests leave /tmp as they found it](done/0260-the-studio-tests-leave-tmp-as-they-found-it.md) - closed 2026-10-11. Review: **no blockers, no majors, two minors (one fixed, filed 0293).** Version: **0.175.1**. Closed 0291. [Write-up](README-archive.md).
@@ -1055,7 +1055,6 @@ archive first. The list keeps the 15 newest bullets; every older one moved verba
 - [0250 - The close findings and five small asks are paid](done/0250-the-close-findings-and-five-small-asks-are-paid.md) - closed 2026-10-07. Review: **no blockers, no majors, two minors (filed 0285, 0286), three nits (two fixed).** Version: **0.168.0**. Closed 0260, 0275, 0282-0284. [Write-up](README-archive.md).
 - [0218 - The reference machine becomes Arch](done/0218-the-reference-machine-becomes-arch.md) - closed 2026-10-06, Phase 6 owed. Review: **two rounds; 1 major (fixed), 4 minors (three fixed), 1 nit (fixed).** Version: none. ADR-0243 accepted, Outcome. Filed 0284. [Write-up](README-archive.md).
 - [0239 - The swarm moves into a real camera](done/0239-the-swarm-moves-into-a-real-camera.md) - closed 2026-10-06, Phases 7-8 owed. Review: **no blockers, no majors, four minors (three fixed), one nit.** Version: **0.167.0**. ADR-0259 accepted, Outcome. [Write-up](README-archive.md).
-- [0249 - A dispatched CI job blesses the named WARP baselines](done/0249-a-dispatched-ci-job-blesses-the-named-warp-baselines.md) - closed 2026-10-06, Phase 3 owed. Review: **no blockers, no majors, two minors (one fixed), one nit (fixed).** Version: none. ADR-0264 accepted. [Write-up](README-archive.md).
 
 <!-- roster:end -->
 
