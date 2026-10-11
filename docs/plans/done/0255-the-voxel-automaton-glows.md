@@ -7,7 +7,7 @@
 > **Created:** 2026-10-08
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0268](../../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md) (accepted, Outcome), [ADR-0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md), [ADR-0258](../../adrs/0258-a-system-takes-depth-through-one-shared-camera-block-and-its-3d-mode-forgoes-what-seg3d-does-not-draw.md), [ADR-0201](../../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md), [ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0045](../../adrs/0045-quality-tiers-floor-and-rich.md)
-> **Followed by:** [Plan 0256](../0256-the-voxels-turn-solid.md) (the solid, lit present)
+> **Followed by:** [Plan 0256](0256-the-voxels-turn-solid.md) (the solid, lit present)
 
 ## TL;DR
 
@@ -285,7 +285,7 @@ The memory arithmetic: a 4-byte texel at 128³ is 8.4 MB, and the pair is 16.8 M
 
 ## What this plan does NOT do
 
-- Draw solid, lit cubes. That is [Plan 0256](../0256-the-voxels-turn-solid.md) under ADR-0269.
+- Draw solid, lit cubes. That is [Plan 0256](0256-the-voxels-turn-solid.md) under ADR-0269.
 - Drive the step rate from the bands (the owner declined it in the interview), or add depth of
   field to the march.
 - Add a shadow, a light or a depth buffer.

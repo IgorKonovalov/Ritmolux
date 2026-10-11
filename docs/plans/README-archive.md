@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0256 - The voxels turn solid](#0256---the-voxels-turn-solid)
   - [0255 - The voxel automaton glows](#0255---the-voxel-automaton-glows)
   - [0252 - The lost preset ask is located and answered](#0252---the-lost-preset-ask-is-located-and-answered)
   - [0254 - The studio judges a preset set](#0254---the-studio-judges-a-preset-set)
@@ -298,6 +299,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0236 - Space curves, and the camera becomes a shared block](done/0236-space-curves-and-the-camera-becomes-a-shared-block.md) - closed 2026-10-02, Phase 6 judged: three engine findings. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.161.0**. ADR-0258 accepted. [Write-up](README-archive.md).
 - [0244 - Sessions start lighter](done/0244-sessions-start-lighter.md) - closed 2026-10-02, Phase 3 done the same day. Review: **no blockers, no majors, one minor, one nit (both fixed).** Version: none. [Write-up](README-archive.md).
 - [0202 - The three mechanisms get their gate](done/0202-the-three-mechanisms-get-their-gate.md) - closed 2026-10-02 at Phase 3. Review: **no blockers, no majors, five minors (four fixed).** Version: **0.160.2**. [Write-up](README-archive.md).
 - [0245 - A gate that runs a built binary checks it is current](done/0245-a-gate-that-runs-a-built-binary-checks-it-is-current.md) - closed 2026-10-01. Review: **two rounds; 1 major, 3 minors (all fixed).** Version: **0.160.1**. [Write-up](README-archive.md).
@@ -514,6 +516,26 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0256 - The voxels turn solid](done/0256-the-voxels-turn-solid.md)
+
+- closed 2026-10-11 by a conductor close in the lane `plan-0256-the-voxels-turn-solid`, round 1.
+The phases landed in `13569903` (Phase 1), `1ae668d1` (2), `d7165bbd` (3) and `3b7f4d6c` (4).
+Phases 5 (the look, judged) and 6 (the preset-author reference) are `human` phases marked
+`Blocks merge: no` and are owed (ADR-0249). Round 1: **no blockers, no majors, four minors, one
+nit.** Minors 1-3 (the `docs/presets.md` solid section: a param count, a stray `solid`, the missing
+`fog`) and the nit (the Phase 6 text's param count) were fixed at the close (`dde1cce0`). Minor 4
+(the `glow` cost readings sit 35-70% above Plan 0255's on the same adapter, unexplained) needs a
+measurement and stays open. Version **0.173.0** (minor: a feature). ADR-0269 accepted. The full
+review is the plan's own `## Close review`.
+- **What landed.** `[voxel] present = "solid"`: the march stops at the first live cell and lights its
+  entry face with one camera-space key light, an ambient term and per-corner voxel AO, the decay
+  stages in front still glowing. Five modal params, `key`, `ambient`, `ao`, `light_yaw`,
+  `light_pitch`, inert under `glow`, which stays byte-identical. A golden `voxel_solid_ao` and a
+  teaching preset `docs/examples/voxel/solid.toml`.
+- **Measured.** RADV RENOIR, 1920x1080, `Floor`, `glow` / `solid`: sparse 10.591 / 8.228, cloudy
+  15.293 / 4.781, worst 16.813 / 11.199 ms.
+- **Curation.** No preset `.toml` added or changed; nothing to curate.
 
 ### [0255 - The voxel automaton glows](done/0255-the-voxel-automaton-glows.md)
 

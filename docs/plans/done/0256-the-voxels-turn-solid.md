@@ -1,10 +1,12 @@
 # 0256 — The voxels turn solid
 
-> **Status:** in-progress
+> **Status:** done - Phases 5 and 6 owed, ADR-0249. Closed 2026-10-11 by a conductor close, round 1:
+> Phases 1-4 in 13569903, 1ae668d1, d7165bbd and 3b7f4d6c; review **no blockers, no majors, four
+> minors (three fixed), one nit (fixed)**; full suite green on the reviewed tree; v0.173.0.
 > **Created:** 2026-10-08
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0269](../adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md) (proposed), [ADR-0268](../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md) (proposed), [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md), [ADR-0201](../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md)
-> **Depends on:** [Plan 0255](done/0255-the-voxel-automaton-glows.md) closed. This plan extends its march, so it runs only after 0255 closes.
+> **Related ADRs:** [ADR-0269](../../adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md) (accepted), [ADR-0268](../../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md) (accepted), [ADR-0046](../../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md), [ADR-0201](../../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md)
+> **Depends on:** [Plan 0255](0255-the-voxel-automaton-glows.md) closed. This plan extends its march, so it runs only after 0255 closes.
 
 ## TL;DR
 
@@ -279,5 +281,211 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
   --workspace -P fast` exit 0 at Phases 1, 2 and 3 (1990, 1991 and 1991 passed); `-p rlx-core
   --test golden` exit 0 at Phases 1, 2 and 3; the voxel tests of `sanity`, `animation`,
   `reactivity` and `distinctness` exit 0 at Phase 3.
+
+## Close review
+
+Closed 2026-10-11 by a conductor close, round 1, in the lane above. **Owed (ADR-0249):** Phase 5 has
+not yet judged whether the structure reads as solid cubes with creases, whether the camera-space light
+reads well through an orbit, or whether the decay haze in front of a lit face helps or muddies it;
+Phase 6 has not yet applied the solid text in the log above to the preset-author reference, so that
+lane has no working ranges for `key`, `ambient` and `ao`. Both rows stay `owed`.
+
+Close notes:
+
+- **Repaired at the close** (`dde1cce0`): minors 1, 2 and 3, the `docs/presets.md` solid section
+  (five params, the stray `solid`, the camera's `fog`), and the nit, "Five params" in the Phase 6
+  text above. Minor 4, the `glow` cost readings above Plan 0255's, needs a measurement and stays open.
+- **ADR-0269** accepted.
+- **Upstream CI** (`check-upstream-ci.mjs`): **red**, run 38121534672 at `ed8916a`, failing jobs
+  `coverage` and `check (windows-latest)`. Not caused by this plan; a close does not block on it.
+- **Backlog probes:** exit 0, 43 reductions across 20 live entries, 3 unprobeable; no entry
+  falsified by this plan.
+- **Translations:** one stale row, `docs/running.ru.md` (stamped `fb237a6c`, source at
+  `b25cd8cf10`), which this plan did not move.
+- **Curation:** no preset `.toml` added or changed; only generated files under `presets/`. Nothing to
+  curate.
+- **Version:** minor, 0.172.0 to 0.173.0, a feature plan.
+- **Earlier rounds:** none; round 1 was the first and only review.
+
+The round-1 review, in full:
+
+### Plan 0256 — The voxels turn solid — close review, round 1
+
+Graded at tip `50f6e324e7547106e9dccd403c881321b5ed74e4` (tree `13f0ff10`), lane
+`/home/igor/Work/rlx-plan-0256` on `plan-0256-the-voxels-turn-solid`, `main` already merged in
+(`ca086712`).
+
+**Verdict: Plan 0256 landed cleanly. No blockers, no majors, four minors and one nit.** Every minor
+but one is reader-doc prose a close may repair; the remaining minor is an unexplained cost reading
+that needs a measurement and stays open for the owner.
+
+#### Evidence
+
+- **Full suite**, run as `node .../with-lock.mjs suite -- cargo nextest run --workspace`. The wrapper
+  did not re-run it and printed the ledger record:
+  `with-lock: skipped cargo nextest run --workspace: tree 13f0ff1 is green in the suite ledger, run
+  by gate 0256-pre-review-after-repair-1 at 2026-10-11T07:52:53.537Z: 2085 tests run: 2085 passed
+  (11 slow), 9 skipped`. `git rev-parse HEAD^{tree}` is `13f0ff10`, the same tree. That record is
+  the lens-1 full-suite evidence. The log's `Full suite:` bullet, which defers the suite to the
+  conductor's pre-review gate, is correct in conductor mode.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: clean.
+- `node scripts/check-doc-links.mjs` OK. `node scripts/toc.mjs --check` OK.
+  `node scripts/check-reader-prose.mjs` OK. `node scripts/check-comment-hygiene.mjs` OK.
+  `node scripts/check-backlog-claims.mjs` OK: 43 reductions across 20 live entries, 3 unprobeable,
+  31 advisory moved paths. That matches the log's close-trigger bullet.
+
+#### Lens 1 — Alignment with the plan and the ADR
+
+Every phase carries one owner tag from the vocabulary: four `dev`, then two `human` phases marked
+`Blocks merge: no`. No later phase reads either human phase, so the ADR-0249 deferral is sound. The
+log maps phases to commits: 13569903, 1ae668d1, d7165bbd and 3b7f4d6c, with 5 and 6 `owed`. At 90
+lines it is shorter than the phase section.
+
+- **Phase 1.** `Present { Glow, Solid }` is a roster key (`raw/voxel.rs`, `Roster::VoxelPresent`),
+  and absent means `glow`. Under `solid`, the march in `shader.rs` ends at the first `state == 1`
+  cell. The normal is the last-crossed axis, tracked through the cube's entry face, each DDA step
+  and each brick jump (`axis = e`). The five light params are `ParamKind::Modal`,
+  `ParamGroup::Light`, and `key` is `main` (ADR-0256). `FAMILY_PARAMS` declares them inert under
+  `glow`, with `range: None` (ADR-0180 rule 4), and `active_family_key` answers the present.
+  - `a_solid_blocks_three_faces_are_ordered_by_n_dot_l` covers the three-faces done-when. It writes
+    an 8³ block into the state texture and asserts each face centre is covered. It then sorts the
+    faces by CPU-computed `n . l` and requires strictly rising luminance, with a 2% margin and a
+    0.05 separation guard on the light. That is the plan's behavioural claim. It is not a `shot`
+    reading, and the log says why: `[voxel]` cannot seed a block.
+  - `with_key_0_and_ambient_1_every_face_reads_the_albedo` covers the albedo done-when. It asserts
+    the three faces are equal within 1e-3 and match the palette sample.
+  - `glow_ignores_the_light_params` holds byte-identity of `glow` under far-from-rest light params.
+    The golden suite holds every `glow` baseline, and it is green.
+- **Phase 2.** `face_open` and `corner_closed` implement the three-neighbour rule. Two sides close
+  a corner fully, and otherwise each side and the diagonal adds a third. The layer read is the one in
+  front of the hit face (`cell + outward`, where `outward = -stride[axis]`). The four corners are
+  interpolated bilinearly at the hit point and mixed in by `ao`, and the term is skipped at `ao = 0`.
+  - `ambient_occlusion_darkens_the_inner_edge_of_an_l` writes an L into the state texture. It
+    asserts that both faces at the inner edge read darker by more than 2% at 0.4 cells from the
+    edge than at their centres. The open top reads the same at its edge and centre within 1e-3, and
+    with `ao = 0` the crease matches the centre. That is the done-when.
+  - The `ao = 0` byte-identity against Phase 1 was checked by hand with `cmp` and no test holds it.
+    The log says so. The shader skips the AO term entirely at `ao = 0`, so the claim follows from
+    the code.
+- **Phase 3.** The six cost readings are in the log, from one run on one adapter (ADR-0074). Every
+  `solid` reading is under 16.67 ms and none is slower than its `glow` twin, so the done-when holds.
+  - **Deviation, logged:** the golden is `voxel_solid_ao`, a solid ball at 32³ whose terraces carry
+    the inner edges, not the L the plan names. `[voxel]` cannot seed an L, and the unit test above
+    holds the L. I accept this.
+  - The golden is appended at the end of `EXTRA_FIXTURES`, per the file's ordering rule. It is
+    lavapipe-only (ADR-0242), and the harness panics on `RLX_BLESS` off lavapipe, so it was blessed
+    on the software adapter.
+  - The four gate tests in `sanity`, `animation` and `reactivity` assert the shipped floors.
+    `distinctness` prints and does not assert, as that whole file does: it is advisory by design
+    (line 1).
+- **Phase 4.** `docs/presets.md` gains a `present` row and a `#### Solid cells` section. The section
+  covers the four light controls and states both ADR-0269 Negatives: bloom like any light, and
+  trails smear shading. `docs/preset-guide.md` has the picture. Backlog 0092 has its dated bullet.
+  The generated files are current: the preset-schema and parameter-reference tests are green in the
+  full suite. The Phase 6 text is in the log.
+
+No ADR was reversed silently. The shader multiplies the shade by the camera's `fog`, which
+ADR-0269's formula does not name. The log records this, it matches how a glowing cell is lit, and it
+is not a reversal. The reader doc should still say it (minor 3).
+
+#### Lens 2 — Layering, coupling, real-time safety
+
+There is no platform or audio-source type in `core/`, and no raw GPU call outside wgpu. The C ABI
+and the control protocol are untouched. `light_dir` runs once a frame on the CPU, does not allocate,
+and hands over to the GPU through the existing `MarchParams` uniform. The extra state-texture usage
+`COPY_DST` exists only so the probes can write a structure in. `voxel/mod.rs`, `shader.rs` and
+`rules.rs` all keep the hot-path `#![deny(clippy::unwrap_used, ...)]` pragma.
+
+#### Lens 3 — Docs and bookkeeping
+
+The operator-doc sweep covers `docs/presets.md`, `docs/preset-guide.md`, the generated
+`presets/README.md` and schemas, and `docs/specs/player-schema.json`. The preset-author `## voxel`
+text is owed to Phase 6, per ADR-0210. Three prose defects are listed below.
+
+What the close owes:
+
+- the **minor** version bump, for a feature plan;
+- ADR-0269 flipped `proposed → accepted`;
+- the plan moved to `done/`, with `Status: done - Phases 5 and 6 owed, ADR-0249`;
+- the plans index, whose recently-closed bullet names the owed phases;
+- the `## Close review` section.
+
+No `.toml` under `presets/` changed, so step 3b's curation has nothing to curate. The plan header
+names no `Closes:`, so step 3c does not apply.
+
+#### Lens 4 — Correctness and determinism
+
+- **Aspect.** The march takes its aspect from the render target, as in Plan 0255, and nothing in
+  this plan derives one from a grid. The face and AO probes use square targets, where grid and
+  target agree. `the_key_light_is_given_in_camera_space` uses a 16:9 view with a non-zero pan, which
+  is the configuration where the lens's scale and the pan's shear would corrupt the light basis.
+  It holds the basis there.
+- **Numeric assertions.** All are properties. The orderings are relative (`> 1.02x`, `< 0.98x`). The
+  equalities sit at 1e-3 in linear light between pixels of one frame. The albedo tolerance is 2%
+  plus 0.02. None is a frozen measurement asserted universally.
+- **Hot path.** No `unwrap` or `expect` on the per-frame path. Every light param goes through
+  `finite_or` and is clamped before it reaches the uniform.
+
+#### Lens 5 — Design integrity
+
+The present is a structural key on the system's own table, and it follows the family-param pattern
+`cellular`, `plexus` and `attractor` already use. The `Scene` trait does not widen. Both presents
+share one march loop and one uniform, so the shader stays a single program, which matches ADR-0269.
+
+#### Findings
+
+##### Blockers
+
+None.
+
+##### Majors
+
+None.
+
+##### Minors
+
+1. **`docs/presets.md:948`: the solid section says "These four are inert under `glow`", but the
+   section introduces five params.** The five are `key`, `ambient`, `ao`, `light_yaw` and
+   `light_pitch`, and `FAMILY_PARAMS` marks all five inert. A reader counting the bullets gets four,
+   because the last bullet carries two params. **Fix:** replace that sentence with "These five are
+   inert under `glow`, and the reference marks them so." *Fixed at the close, `dde1cce0`.*
+2. **`docs/presets.md:961`: the camera paragraph still ends "and there is no `solid`".** It now sits
+   directly under the new `#### Solid cells` section, so it reads as a contradiction of the section
+   above it. The sentence means the shared camera's line-combine `solid` param, which `voxel` does
+   not read. **Fix:** end the sentence "...because the volume has no drawn primitive to blur, and
+   the line systems' `solid` parameter is not read here: a voxel is drawn solid by
+   `present = "solid"` above." *Fixed at the close, `dde1cce0`.*
+3. **`docs/presets.md:933`: the shading paragraph omits the camera's `fog`.** The shader applies fog
+   (`shader.rs`, the `solid && state == 1u` branch: `... * fog * shell * lighting`), so a far face
+   reads darker than the formula a reader is given. **Fix:** replace "times `brightness` and its
+   shell's light, times" with "times `brightness`, its shell's light and the camera's `fog`, times".
+   *Fixed at the close, `dde1cce0`.*
+4. **`docs/plans/0256-the-voxels-turn-solid.md:229-235`: the Phase 3 `glow` readings are 35-70%
+   above Plan 0255 Phase 3's on the same adapter, and no reading explains why.** The figures are
+   10.591 against 6.23, 15.293 against 11.68, and 16.813 against 12.70. The worst `glow` twin now
+   reads past 16.67 ms, outside NFR section 1 on `Floor`. This plan adds per-step work to the shared
+   march, both presents pay for it (an `axis` write each crossing, and a branch each cell), and
+   `glow` is the default. The log reports the numbers honestly. Nothing separates this plan's cost
+   from run-to-run drift on the iGPU, though, and the done-when only compares `solid` against `glow`
+   in the same run. **Fix, owner-side and not a close repair:** probe the `worst` cost fixture
+   under `glow` built from `main` and from this lane in one sitting, on the same adapter. If the
+   lane is slower, raise a backlog entry against the shared march. *Open.*
+
+##### Nits
+
+1. **`docs/plans/0256-the-voxels-turn-solid.md:256`: the Phase 6 text says "Four params, inert under
+   `glow`" and then names five.** The owner will paste this text into
+   `.claude/skills/preset-author/references/systems.md`, so the miscount would reach the content
+   lane. **Fix:** replace "Four params" with "Five params" in the quoted block. *Fixed at the
+   close, `dde1cce0`.*
+
+#### Bookkeeping for the close
+
+- Version: **minor** (feature: `[voxel] present = "solid"` and five params).
+- ADR-0269: `proposed → accepted`. ADR-0268 belongs to Plan 0255, so leave it as that plan left it.
+- Phases 5 and 6 stay `owed` (ADR-0249). Phase 5 has not judged whether the haze muddies the faces,
+  or how the light reads through an orbit. Phase 6 has not put the solid text into the preset-author
+  reference.
+- Translations, step 1e: no `.ru.md` source was touched by this plan's diff.
 
 ## Followups (after this lands)

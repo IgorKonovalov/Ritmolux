@@ -2,7 +2,7 @@
 
 > **Status:** accepted 2026-10-09, Outcome (proposed 2026-10-08)
 > **Date:** 2026-10-08
-> **Related plan(s):** [0255](../plans/done/0255-the-voxel-automaton-glows.md), [0256](../plans/0256-the-voxels-turn-solid.md)
+> **Related plan(s):** [0255](../plans/done/0255-the-voxel-automaton-glows.md), [0256](../plans/done/0256-the-voxels-turn-solid.md)
 
 ## Context
 

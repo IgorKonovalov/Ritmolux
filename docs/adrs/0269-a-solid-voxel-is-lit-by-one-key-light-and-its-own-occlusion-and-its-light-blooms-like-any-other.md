@@ -1,8 +1,8 @@
 # ADR-0269 — A solid voxel is lit by one key light and its own occlusion, and its light blooms like any other
 
-> **Status:** proposed 2026-10-08
+> **Status:** accepted 2026-10-11 (Plan 0256)
 > **Date:** 2026-10-08
-> **Related plan(s):** [0256](../plans/0256-the-voxels-turn-solid.md); builds on [ADR-0268](0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md)
+> **Related plan(s):** [0256](../plans/done/0256-the-voxels-turn-solid.md); builds on [ADR-0268](0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md)
 
 ## Context
 
