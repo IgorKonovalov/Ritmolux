@@ -160,6 +160,10 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 ///   never stops at a live cell and the face normal, the key light and the
 ///   ambient occlusion are unreached. A solid ball at 32³, its terraces' inner
 ///   edges darkened by the occlusion.
+/// - `backdrop_paper` — every other fixture runs `bg_paper = 0`, so the
+///   transparent backdrop clear, the paper pipeline at the surface format and
+///   the tonemap's OVER write are unreached (ADR-0270). A solid voxel block on
+///   a white paper.
 ///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
@@ -167,7 +171,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to (a WARP reading, unverified on lavapipe as of
 /// 2026-10-06). For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 21] = [
+const EXTRA_FIXTURES: [(&str, &str); 22] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -227,6 +231,10 @@ const EXTRA_FIXTURES: [(&str, &str); 21] = [
     (
         "voxel_solid_ao",
         include_str!("fixtures/voxel_solid_ao.toml"),
+    ),
+    (
+        "backdrop_paper",
+        include_str!("fixtures/backdrop_paper.toml"),
     ),
 ];
 

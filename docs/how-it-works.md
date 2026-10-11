@@ -156,6 +156,12 @@ frames, a screen-space kaleidoscope fold, a two-input dissolve that crossfades b
 preset and the incoming one, and a terminal ink tone-remap. A new rendering system inherits all of
 it — including dissolving into and out of every other preset — for free.
 
+The background can take a second route. As **paper** (`bg_paper = 1`) it leaves the chain: the
+frame starts transparent, the ground is painted after the scene's light has been turned into a
+picture, and the picture is laid over it by how much of each pixel the scene covers. A white ground
+is then true display white and the scene is not brightened to get there
+([ADR-0270](adrs/0270-a-paper-backdrop-is-painted-after-the-tonemap-and-the-scene-lies-over-it-by-coverage.md)).
+
 A system that draws in three dimensions does it through one shared camera. Its points and lines are
 projected through a real perspective lens, and a line's blur is worked out separately at each of its
 ends, so one line can run sharp through the focal plane and soften toward both ends. A blur applied

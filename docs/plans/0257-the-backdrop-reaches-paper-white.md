@@ -165,8 +165,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Walking skeleton: one preset on true white | dev | done | 9e026bb7 |
-| 2 — The dissolve and ink | dev | done | committed with this row |
-| 3 — Cost, the golden and the documentation | dev | not started | |
+| 2 — The dissolve and ink | dev | done | acf290cb |
+| 3 — Cost, the golden and the documentation | dev | done | committed with this row |
 | 4 — The owner's look and the skill text | human | not started | |
 
 ### Notes
@@ -200,6 +200,26 @@ flowchart LR
   `core/tests/background_composite.rs`. A dissolve finalizes without drawing its `t = 1` frame, so
   the test sets `t` (and the kind, to `Crossfade`) on the running `Transition`, which only a test
   inside `render/` can reach.
+- Phase 3 golden: `backdrop_paper` is `core/tests/fixtures/backdrop_paper.toml`, appended last to
+  `EXTRA_FIXTURES`. The harness refuses `RLX_BLESS=<stem>` for a stem with no PNG, so it was
+  written with `RLX_BLESS=1`; that run rewrote only `backdrop_ramp.png` and `backdrop_band.png`
+  (the two drifting readings above), and both were put back with `git restore`. The unblessed
+  re-run reads `backdrop_paper` mean 0.0000, max outlier 0.
+- Phase 3 probe: `shot --presets <scratch dir> --report --size 1920x1080 --tier floor`, release,
+  AMD Radeon Graphics (RADV RENOIR), Mesa 26.2.2, both twins of `docs/examples/voxel/solid.toml` in
+  one run, differing only in `bg_paper`. ms a frame: `bg_paper = 1` **4.296**, `bg_paper = 0`
+  **5.032**. The twins were not committed.
+- Phase 3 docs: the `bg_*` params are documented in `presets/README.md`'s "Background pass", not in
+  `docs/presets.md`, which names them only as a family. The full text is a new
+  `#### Paper — bg_paper` there (after the band, before `occlude`). It covers the not-light list,
+  coverage over additive light, no dither, `multiply`, ink, the dissolve cut, and the `bg_hue = 1`
+  wrap seam. `docs/presets.md` gains one paragraph after its pass-order diagram that points to it.
+- `docs/how-it-works.ru.md` translates `docs/how-it-works.md`, which gained a paragraph. Its
+  stamp now lags; `node scripts/check-translations.mjs` reports that as advisory only.
+- **For Phase 4**, the row `.claude/skills/preset-author/references/systems.md`'s
+  `## Engine-wide stages (any system)` table should gain after the `bg_band_hue` row:
+
+  > | `bg_paper` | `0` | **paper instead of light** (Plan 0257/ADR-0270). At `1` the frame starts transparent, the scene's light is tonemapped, and the same `bg_*` backdrop is painted *under* that picture at display values, laid over by the scene's coverage. A `#ffffff` stop at `bg_bright = 1` is display white (the light route stops at a light grey) and a fully covered pixel is exactly what it is over black, so **never lift the ground with `exposure`** — that lifts the figure too. Paper does not bloom, fold, trail or follow `exposure`; additive light over it reads as a coloured mark, not a brighter spot, so it suits an opaque figure (`present = "solid"`) far better than a glow; a paper gradient is not dithered; `multiply` and `ink` do not spare it. **`bg_hue = 1` is the palette's wrap seam** and blends the last stop with the first: end the palette on a flat white run (`0.98` and `1.0`) and aim `bg_hue` inside it (`0.99`), with `bg_shade` = `bg_shade_end` = `1`. Two paper presets cut their grounds at a dissolve. |
 
 ### Close triggers
 
