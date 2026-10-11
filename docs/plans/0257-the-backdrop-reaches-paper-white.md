@@ -166,7 +166,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — Walking skeleton: one preset on true white | dev | done | 9e026bb7 |
 | 2 — The dissolve and ink | dev | done | acf290cb |
-| 3 — Cost, the golden and the documentation | dev | done | committed with this row |
+| 3 — Cost, the golden and the documentation | dev | done | 2dc4be87 |
 | 4 — The owner's look and the skill text | human | not started | |
 
 ### Notes
@@ -222,5 +222,20 @@ flowchart LR
   > | `bg_paper` | `0` | **paper instead of light** (Plan 0257/ADR-0270). At `1` the frame starts transparent, the scene's light is tonemapped, and the same `bg_*` backdrop is painted *under* that picture at display values, laid over by the scene's coverage. A `#ffffff` stop at `bg_bright = 1` is display white (the light route stops at a light grey) and a fully covered pixel is exactly what it is over black, so **never lift the ground with `exposure`** — that lifts the figure too. Paper does not bloom, fold, trail or follow `exposure`; additive light over it reads as a coloured mark, not a brighter spot, so it suits an opaque figure (`present = "solid"`) far better than a glow; a paper gradient is not dithered; `multiply` and `ink` do not spare it. **`bg_hue = 1` is the palette's wrap seam** and blends the last stop with the first: end the palette on a flat white run (`0.98` and `1.0`) and aim `bg_hue` inside it (`0.99`), with `bg_shade` = `bg_shade_end` = `1`. Two paper presets cut their grounds at a dissolve. |
 
 ### Close triggers
+
+- **`presets/` touched:** yes, no `.toml` in it. `presets/README.md` (the generated parameter block
+  gains `bg_paper`; a hand-written `#### Paper — bg_paper` section), and the generated
+  `presets/preset.schema.json` and every `presets/schema/*.schema.json`.
+- **`Closes:`** design-backlog 0287.
+- **What shipped:** a feature: the structural backdrop param `bg_paper`, its paper pipeline, the
+  tonemap's OVER write and the dissolve's coverage blend.
+- **Operator docs moved:** `docs/presets.md`, `docs/how-it-works.md`, `presets/README.md`,
+  `docs/specs/player-schema.json` (generated), `docs/examples/voxel/solid.toml`,
+  `docs/images/voxel/solid.png`.
+- **`node scripts/check-backlog-claims.mjs`:** exit 0; 46 reductions across 22 live entries, 3
+  unprobeable; 31 advisory moved paths, none naming 0287.
+- **`human` phases remaining:** Phase 4 (`Blocks merge: no`): the owner's live look and the skill
+  text quoted in the notes above.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
 
 ## Followups (after this lands)
