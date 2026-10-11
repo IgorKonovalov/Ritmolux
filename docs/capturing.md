@@ -1044,15 +1044,16 @@ with that in mind, and `family=` narrows it.
 
 Every other column measures a preset's first half second, and so do the suites:
 the sanity gate captures 30 frames and the report's longest settled capture is
-48. A world that empties out over seconds passes all of them. A sparse voxel
-seed under `slow_decay` can lose almost all of its light inside 15 s with every
-gate green, and the only instrument that looked further, the
+48. A world that empties out over seconds passes all of them. A `slow_decay`
+seed filled just under the rule's own density can lose almost all of its light
+inside 15 s with every gate green, and the only instrument that looked further, the
 [horizon](#the-horizon-does-a-world-still-look-like-itself-after-minutes), holds
 one stimulus and so never re-fires the `reseed` that would rescue it under music.
 
 `late` looks 15 s in, for every system, in a one-column block under the
-frame-cost block. `Sparse Decay` below is the report test's fixture, a sparse
-`slow_decay` seed with no `reseed`; the two voxel rows are shipped presets:
+frame-cost block. `Sparse Decay` below is the report test's fixture, a
+near-dense `slow_decay` seed (fill 0.45) with no `reseed`; the two voxel rows
+are shipped presets:
 
 ```
   preset           late

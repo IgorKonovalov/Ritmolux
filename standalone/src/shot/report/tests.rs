@@ -1353,9 +1353,10 @@ fn the_late_column_prints_per_preset_and_the_notes_list_what_emptied() {
     );
 }
 
-/// A sparse voxel seed under `slow_decay`, half the rule's own seed radius,
-/// binding no `reseed`. The rule's survival counts leave it a few stable pairs
-/// at best, so it keeps well under a tenth of its early light by frame 899.
+/// A `slow_decay` seed at fill 0.45, just under the rule's own 0.5, at half its
+/// radius, binding no `reseed`. It reads `late` near 0.07, while fill 0.4 reads
+/// near 0.12 and sparser fills hold their pairs above a tenth, so the fixture's
+/// margin under the tenth is narrow.
 const SPARSE_DECAY: &str = "system = \"voxel\"\n\
      name = \"Sparse Decay\"\n\
      [voxel]\ngrid = 32\nrules = [\"slow_decay\"]\nseed_radius = 0.5\n\
@@ -1363,7 +1364,7 @@ const SPARSE_DECAY: &str = "system = \"voxel\"\n\
      [params]\nstep_rate = \"8\"\n";
 
 /// The `late` reading tells a world that dies under music from one music keeps
-/// alive. The same sparse `slow_decay` seed is run twice under the pulse: bare,
+/// alive. The same near-dense `slow_decay` seed is run twice under the pulse: bare,
 /// it is listed `EMPTIED`, and with `reseed = "onset"` — refilled on every
 /// pulse — it is not.
 #[test]
