@@ -997,59 +997,93 @@ impl LightField {
         let blurred_write = blurred.create_view(&wgpu::TextureViewDescriptor::default());
         let blurred_view = blurred.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let storage = wgpu::BindGroupLayoutEntry {
-            binding: 1,
-            visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::StorageTexture {
-                access: wgpu::StorageTextureAccess::WriteOnly,
-                format: LIGHT_FORMAT,
-                view_dimension: wgpu::TextureViewDimension::D3,
-            },
-            count: None,
-        };
-        let source = |sample_type| wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Texture {
-                sample_type,
-                view_dimension: wgpu::TextureViewDimension::D3,
-                multisampled: false,
-            },
-            count: None,
-        };
-        // `[Texture<u32>, StorageTexture<rgba16float>]`: the cells, the splat.
+        // These two layouts and `voxel-brick-layout` all bind one 3D texture and
+        // one 3D storage texture to compute, and must still be three distinct
+        // shapes (ADR-0058; `tonemap/tests.rs` asserts it). Hence the order and
+        // the source bound twice: a tidier arrangement re-collides a pair. Every
+        // entry is a full literal, because that scan reads only the spellings
+        // its `MARKERS` lists and a local helper is not one of them.
+        // `[StorageTexture<rgba16float>, Texture<u32>]`: the splat, the cells.
         let splat_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("voxel-light-splat-layout"),
-            entries: &[source(wgpu::TextureSampleType::Uint), storage],
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::WriteOnly,
+                        format: LIGHT_FORMAT,
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Uint,
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+            ],
         });
-        // `[Texture<f32>, StorageTexture<rgba16float>]`: the splat, the blurred.
+        // `[Texture<f32>, StorageTexture<rgba16float>, Texture<f32>]`: the
+        // splat, the blurred, and the splat again, which the shader never reads.
         let blur_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("voxel-light-blur-layout"),
             entries: &[
-                source(wgpu::TextureSampleType::Float { filterable: false }),
-                storage,
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::WriteOnly,
+                        format: LIGHT_FORMAT,
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
             ],
         });
-        let bind =
-            |layout: &wgpu::BindGroupLayout, src: &wgpu::TextureView, dst: &wgpu::TextureView| {
-                device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("voxel-light-bg"),
-                    layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(src),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::TextureView(dst),
-                        },
-                    ],
+        // `views[i]` is bound at binding `i`.
+        let bind = |layout: &wgpu::BindGroupLayout, views: &[&wgpu::TextureView]| {
+            let entries: Vec<wgpu::BindGroupEntry<'_>> = (0u32..)
+                .zip(views)
+                .map(|(binding, view)| wgpu::BindGroupEntry {
+                    binding,
+                    resource: wgpu::BindingResource::TextureView(view),
                 })
-            };
-        let splat_from_a = bind(&splat_layout, &a.read, &splat_write);
-        let splat_from_b = bind(&splat_layout, &b.read, &splat_write);
-        let blur_bg = bind(&blur_layout, &splat_read, &blurred_write);
+                .collect();
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("voxel-light-bg"),
+                layout,
+                entries: &entries,
+            })
+        };
+        let splat_from_a = bind(&splat_layout, &[&splat_write, &a.read]);
+        let splat_from_b = bind(&splat_layout, &[&splat_write, &b.read]);
+        let blur_bg = bind(&blur_layout, &[&splat_read, &blurred_write, &splat_read]);
         let pipeline = |label: &str, layout: &wgpu::BindGroupLayout, source: String| {
             let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some(label),

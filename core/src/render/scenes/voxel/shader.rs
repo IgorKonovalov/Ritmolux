@@ -225,8 +225,8 @@ fn main(
 /// mean. Decay stages emit nothing. A block past a grid that is not a multiple
 /// of `LIGHT_CELL` counts only the cells that exist, over the whole block.
 pub(super) const LIGHT_SPLAT_SHADER: &str = r#"
-@group(0) @binding(0) var cells: texture_3d<u32>;
-@group(0) @binding(1) var splat: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(0) var splat: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(1) var cells: texture_3d<u32>;
 
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
