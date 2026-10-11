@@ -967,6 +967,43 @@ threshold for crisp cubes.
 not as a surface, so on a turning camera it drags the shaded sides behind the lit ones. Leave
 `trails` off a solid preset unless that smear is the look.
 
+#### Cells that light each other
+
+**`bounce`** lets a solid face take light from the live cells in front of it, so a structure glows
+onto itself rather than only on screen. `0` is off and is the default, and the declared range runs
+to `2`.
+
+```toml
+[params]
+bounce        = "1"      # faces take their neighbours' light
+bloom_amount  = "0.3"    # so the bloom can come down
+```
+
+What it reads: the live cells, gathered into a coarse field of blocks four cells a side, each
+holding how much of the block is live and how old its live cells are. The field is softened once,
+and each lit face samples it half a cell in front of itself. A face adds its palette colour at the
+neighbours' mean age, times `bounce`, times how much light reached it, times `brightness`, its
+shell's light and the camera's `fog`. Decaying cells give no light to it. The colour is looked up
+when the face is drawn, so a bound `hue` or `palette_mix` moves the bounced light every frame. Only
+how much light there is, and its age, wait for the next generation.
+
+- **It is solid-only.** Under `glow` every cell already emits volumetrically, and `bounce` is inert
+  there; the reference marks it so, like the five light parameters above.
+- **It leaks through walls.** The field has no notion of what blocks light, so a face on the far
+  side of a thin slab is lit as readily as an open one. The light reaches about six cells. On thin
+  structures this reads as translucency.
+- **It is soft by construction.** One block of the field spans four cells, so the light cannot pick
+  out a single neighbour. A crisp one-cell glow is out of its reach.
+- **The shell is the receiver's.** With `shell_gain` on, the bounced light a face gets follows that
+  face's own band, not the bands of the cells that lit it.
+- **It composes with bloom.** Bounced light is light like any other: a face it lifts past the bloom
+  threshold blooms. With `bounce` doing the work inside the structure, a preset can lower its
+  `bloom_amount` and keep the glow off the background.
+
+The field costs nothing until a frame binds `bounce` above 0. It is then built once and refilled
+each time the automaton steps or a reseed lands, so its cost follows `step_rate` rather than the
+frame rate.
+
 #### Cutting the cube open
 
 A dense rule drawn solid shows only its skin: the ray stops at the first live cell, so whatever the

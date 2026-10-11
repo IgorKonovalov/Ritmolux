@@ -167,6 +167,10 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 ///   transparent backdrop clear, the paper pipeline at the surface format and
 ///   the tonemap's OVER write are unreached (ADR-0270). A solid voxel block on
 ///   a white paper.
+/// - `voxel_bounce` — every other voxel fixture leaves `bounce` at 0, so the
+///   light field is never built and the march never fetches it (ADR-0272). A
+///   porous solid ball at 32³, its faces lit by the cells in front of them.
+///   Its TOML is [`FIXTURES_VOXEL_BOUNCE`], held in this file.
 ///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
@@ -174,7 +178,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to (a WARP reading, unverified on lavapipe as of
 /// 2026-10-06). For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 23] = [
+const EXTRA_FIXTURES: [(&str, &str); 24] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -243,7 +247,47 @@ const EXTRA_FIXTURES: [(&str, &str); 23] = [
         "backdrop_paper",
         include_str!("fixtures/backdrop_paper.toml"),
     ),
+    ("voxel_bounce", FIXTURES_VOXEL_BOUNCE),
 ];
+
+/// The `voxel` scene drawn `solid` with `bounce` on: a do-not-tune fixture,
+/// like every file under `tests/fixtures/`.
+///
+/// `[voxel]` seeds a ball at 40% fill and `step_rate = 0` freezes it there, so
+/// the ball is porous: most faces look into a pocket whose walls are live cells,
+/// and the light field is far from uniform across it. The key light is low and
+/// the ambient lower, so the bounce is most of what the faces show. Every
+/// light and camera param is bound, so a change of default cannot move it.
+const FIXTURES_VOXEL_BOUNCE: &str = r#"
+system = "voxel"
+name   = "fixture_voxel_bounce"
+
+[generator]
+seed = 7
+
+[voxel]
+grid        = 32
+rules       = ["clouds"]
+seed_radius = 0.8
+seed_fill   = 0.4
+present     = "solid"
+
+[params]
+step_rate   = "0"
+hue         = "0.3"
+hue_spread  = "0.3"
+age_tint    = "0"
+key         = "0.4"
+ambient     = "0.2"
+ao          = "1"
+bounce      = "1"
+light_yaw   = "-0.6"
+light_pitch = "0.6"
+yaw         = "0.6"
+pitch       = "0.4"
+distance    = "3.5"
+fov         = "0.8"
+"#;
 
 /// The waterfall fixture, which both the roster above and
 /// [`the_waterfall_holds_a_ramped_ring`] render.

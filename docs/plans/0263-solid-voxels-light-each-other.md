@@ -138,8 +138,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: one face lit by its neighbours | dev | done | committed with this row |
-| 2 — Cost, the golden and the documentation | dev | not started | |
+| 1 — Walking skeleton: one face lit by its neighbours | dev | done | 88a42bca |
+| 2 — Cost, the golden and the documentation | dev | done | committed with this row |
 | 3 — The owner's look and the skill text | human | not started | |
 
 ### Notes
@@ -152,6 +152,28 @@ flowchart LR
 - Phase 1: the field is built and filled only under `present = "solid"`. Under `glow`, `bounce > 0`
   builds nothing, and `bounce_0_builds_no_light_field` asserts that.
 - Phase 1: the splat does not read the section plane, so a cut cell still emits into the field.
+- Phase 2: the `voxel_bounce` fixture is a TOML string constant in `core/tests/golden.rs`
+  (`FIXTURES_VOXEL_BOUNCE`), not a file under `core/tests/fixtures/`, which is outside the phase's
+  files. A porous 32³ ball, `bounce = 1`. It was blessed with `RLX_BLESS=1` because the stem was new.
+  The bless rewrote `backdrop_ramp.png` and `backdrop_band.png`, and those two were restored. Both
+  read mean 0.0005 against their committed baselines, within tolerance.
+- Phase 2: cost, `shot --report` frame-cost block, 1920x1080, release, on `AMD Radeon Graphics
+  (RADV RENOIR)` (integrated, Mesa 26.2.2). `shot` has no adapter flag, so this is the adapter it
+  picks, not the box's discrete GPU (ADR-0243). Each tier was one `--report` invocation over a
+  directory holding both presets (`docs/examples/voxel/solid.toml` with and without `bounce = "1"`).
+  ms/frame: Floor, off 5.981 and on 4.834. Rich, off 4.186 and on 4.032. In both pairs the frame
+  with `bounce` on read cheaper, which is inside the harness's noise. The harness cannot separate
+  the two per-generation dispatches from the frame.
+- Phase 2, the text for Phase 3: insert this into `.claude/skills/preset-author/references/systems.md`
+  after the **Solid** paragraph's last sentence ("Low `trail` (0.1-0.3) keeps the decay haze from
+  washing out the faces."), before **The section plane.**:
+
+  > **Bounce.** `bounce` (0-2, solid-only, default 0) lets a face take the light of the live cells
+  > in front of it, so a structure glows onto itself instead of through a screen-space halo. Start at
+  > 0.5-1 and lower `bloom_amount` to match: the glow then stays inside the structure and off the
+  > background. It is soft (blocks of 4 cells, reaching about 6) and has no occlusion, so light shows
+  > through thin walls and reads as translucency there. It is coloured at the neighbours' mean age, so `age_tint` tints it. It costs nothing
+  > at 0, and on is refilled per generation, not per frame.
 
 ### Close triggers
 
