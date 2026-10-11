@@ -40,6 +40,10 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0267 — the conductor's `Remove-Item` deletion bound was never asked of the real CLI](#0267--the-conductors-remove-item-deletion-bound-was-never-asked-of-the-real-cli)
 - [0276 — a collage element's own drift and spin are too slow for the animation gate to see, so a sparse canvas reads as frozen](#0276--a-collage-elements-own-drift-and-spin-are-too-slow-for-the-animation-gate-to-see-so-a-sparse-canvas-reads-as-frozen)
 - [0278 — `plexus` lays its points in a cube or on a plane, so a turning wire sphere is only approximated](#0278--plexus-lays-its-points-in-a-cube-or-on-a-plane-so-a-turning-wire-sphere-is-only-approximated)
+- [0287 — the backdrop cannot reach white, so black-on-white needs `exposure`, which also lifts the scene](#0287--the-backdrop-cannot-reach-white-so-black-on-white-needs-exposure-which-also-lifts-the-scene)
+- [0288 — a solid voxel mass has no cut-away, so seeing inside it depends on choosing a porous rule](#0288--a-solid-voxel-mass-has-no-cut-away-so-seeing-inside-it-depends-on-choosing-a-porous-rule)
+- [0289 — `shot --signal` beside `--all` silently draws a filmstrip of the first preset](#0289--shot---signal-beside---all-silently-draws-a-filmstrip-of-the-first-preset)
+- [0290 — the voxel scene fell to about 5 fps live on `Rich`, where headless `shot` reads 8 ms a frame](#0290--the-voxel-scene-fell-to-about-5-fps-live-on-rich-where-headless-shot-reads-8-ms-a-frame)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1477,3 +1481,67 @@ entry up then, or when a second look asks for a closed 3-D surface.
   `present: ALL: \[PlexusLayout; 2\] in: core/src/render/scenes/plexus/mod.rs`
 - **Verified 2026-10-01** — `absent: Sphere|Shell in: core/src/render/scenes/plexus/mod.rs`
 
+## 0287 — the backdrop cannot reach white, so black-on-white needs `exposure`, which also lifts the scene
+
+The owner asked for the voxel solid teaching preset black on white. The backdrop pass is the only
+way to paint a ground, and `bg_bright` is capped at `1`, which the engine tonemap renders as a
+light grey, not paper white. `docs/examples/voxel/solid.toml` reaches white with `exposure = "3"`,
+which works there only because its cubes are near-black: `exposure` multiplies the whole frame, so
+on any scene with mid-tones it lifts the figure along with the ground. `ink_amount = 1` is the
+other route to a white page, and it was rendered and rejected: it remaps luminance, so a lit solid
+loses its shading and reads flat grey. The ask is a ground that reaches display white on its own,
+whether a wider `bg_bright` range, a backdrop that bypasses the tonemap, or a `paper` colour
+outside the ink remap. Which of those is the right shape is the open question.
+
+- **Raised:** 2026-10-11 by `preset-author` on the voxel teaching presets (700584fb).
+  **Owner if taken:** `architect` (where a white ground belongs in the composite), then `dev`.
+- **Verified 2026-10-11** — the backdrop's range ends at 1:
+  `present: \| .bg_bright. \| .0. \| .0. – .1. \| in: presets/README.md`
+- **Verified 2026-10-11** — and the teaching preset leans on `exposure` for it:
+  `present: exposure     = "3" in: docs/examples/voxel/solid.toml`
+
+## 0288 — a solid voxel mass has no cut-away, so seeing inside it depends on choosing a porous rule
+
+The owner judged the solid voxel present a keep and asked to see holes inside the structure. With a
+dense rule (`clouds`, `amoeba`, `crystal`) the solid march stops at the first live cell, so the
+viewer sees a closed skin and nothing of the inside; rules written inline to hollow it gave a pitted
+skin whose pits do not go through. The teaching preset now runs `pyroclastic`, an open foam, which
+answers the ask by changing the content rather than the view. A section plane, a clip box or an
+onion-peel by depth would let any rule be opened, and would also serve the glow present, whose dense
+rules fill their ball solid. Nothing in `voxel` declares such a parameter today.
+
+- **Raised:** 2026-10-11 by `preset-author` after the owner's 0256 Phase 5 verdict.
+  **Owner if taken:** `architect` (a clip in the march, and whether it is a param or a `[voxel]`
+  key), then `dev`.
+- **Verified 2026-10-11** — no cut-away parameter:
+  `absent: name: "(cutaway|section|clip[a-z_]*)" in: core/src/render/scenes/voxel/mod.rs`
+
+## 0289 — `shot --signal` beside `--all` silently draws a filmstrip of the first preset
+
+`shot --presets <dir> --all --signal dynamic:110` was asked for a contact sheet driven by real
+audio. An audio source takes precedence over every mode, so the run wrote a time strip of one
+preset and said nothing about the `--all` it ignored. The precedence is deliberate and commented;
+the silence is the defect. Either the pair is a usage error at parse time, as `--render` beside
+either already is, or a contact sheet learns to take an audio source. The second is the more useful
+tool: a sheet under real audio is the honest set-wide read the `--set` sheets only approximate.
+
+- **Raised:** 2026-10-11 by `preset-author`. **Owner if taken:** `architect` (usage error or
+  feature), then `dev`.
+- **Verified 2026-10-11** — the audio source wins before the mode is read:
+  `present: if args.signal.is_some\(\) \|\| args.audio.is_some\(\) in: standalone/examples/shot.rs`
+
+## 0290 — the voxel scene fell to about 5 fps live on `Rich`, where headless `shot` reads 8 ms a frame
+
+Judging Plan 0255 Phase 6 live on the Arch box, the owner saw Voxel Clouds lag; the player's
+diagnostics log fell to about 5 fps after the tier was switched to `Rich`. `shot --report` at
+1920x1080 on the same adapter (RADV RENOIR) reads 8.4 ms on `Floor` and 8.3 ms on `Rich`, so the
+headless cost does not explain it. Two things muddy the live reading: for part of the window the
+player sat on a workspace not on screen, where Wayland stops its frame callbacks, and a `--thumb`
+render ran beside it. The repro is the player visible, on `Rich`, no thumbnail process, the
+diagnostics log read while it runs. If it holds, the difference between the window and `shot`
+(the window's size, the march target's cap, the grid scale) is where to look.
+
+- **Raised:** 2026-10-11 at the owner's look judgement. **Owner if taken:** `dev` (the repro and
+  the measurement), `architect` if the cause is a tier cap.
+- **Verified 2026-10-11** — the reading as recorded:
+  `present: tier was switched to .Rich. at 11:11 in: docs/plans/done/0255-the-voxel-automaton-glows.md`
