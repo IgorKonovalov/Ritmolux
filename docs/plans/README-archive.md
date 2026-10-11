@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0263 - Solid voxels light each other](#0263---solid-voxels-light-each-other)
   - [0261 - The report sees a world empty out](#0261---the-report-sees-a-world-empty-out)
   - [0262 - bloom_amount declares the range it reads](#0262---bloom_amount-declares-the-range-it-reads)
   - [0259 - The contact sheet hears the clip](#0259---the-contact-sheet-hears-the-clip)
@@ -305,6 +306,7 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0239 - The swarm moves into a real camera](done/0239-the-swarm-moves-into-a-real-camera.md) - closed 2026-10-06, Phases 7-8 owed. Review: **no blockers, no majors, four minors (three fixed), one nit.** Version: **0.167.0**. ADR-0259 accepted, Outcome. [Write-up](README-archive.md).
 - [0249 - A dispatched CI job blesses the named WARP baselines](done/0249-a-dispatched-ci-job-blesses-the-named-warp-baselines.md) - closed 2026-10-06, Phase 3 owed. Review: **no blockers, no majors, two minors (one fixed), one nit (fixed).** Version: none. ADR-0264 accepted. [Write-up](README-archive.md).
 - [0240 - The attractor projects through the shared camera](done/0240-the-attractor-projects-through-the-shared-camera.md) - closed 2026-10-06, Phases 6-8 owed. Review: **no blockers, no majors, five minors (four fixed).** Version: **0.166.0**. ADR-0260 accepted, Outcome. [Write-up](README-archive.md).
 - [0237 - The L-system turtle turns in space, and can grow without end](done/0237-the-l-system-turtle-turns-in-space.md) - closed 2026-10-06, Phases 8-9 owed. Review: **no blockers, no majors, five minors (three fixed).** Version: **0.165.0**. [Write-up](README-archive.md).
@@ -528,6 +530,27 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0263 - Solid voxels light each other](done/0263-solid-voxels-light-each-other.md)
+
+- closed 2026-10-11 by a conductor close in the lane
+`plan-0263-solid-voxels-light-each-other`, round 1. Phase 1 landed in `88a42bca`, Phase 2 in
+`9b33af60`, with a layout repair in `597cdcb9`; Phase 3 (the owner's look at Ember with `bounce`, and
+the preset-author skill text, `human`, `Blocks merge: no`) is owed after the merge (ADR-0249).
+Round 1: **no blockers, no majors, one minor, one nit**, both fixed at the close in `704e2440`.
+Version **0.178.0** (minor: a new voxel param). ADR-0272 was already accepted. Closes backlog 0295.
+The full review is the plan's own `## Close review`.
+- **What landed.** `voxel` gains `bounce` (0-2, solid-only, default 0): a lazily built `grid/4`
+  `rgba16float` light field, splatted and tent-blurred after every state change, sampled half a cell
+  in front of each solid face. At 0 nothing is built and the fetch is skipped. One golden,
+  `voxel_bounce`.
+- **Falsified.** Nothing; the term also carries `fog`, which ADR-0272's formula omits.
+- **Cost.** Unresolved: the four headless figures on RADV Renoir read cheaper with `bounce` on, inside
+  the harness's noise. A live reading belongs to backlog 0290's repro.
+- **Curation.** `presets/` touched only in generated files; no preset `.toml` moved, and no shipped
+  preset adopts `bounce` yet.
+- **Close readings.** Upstream CI green (run 38161158382 on `9c09060`). Translation advisory: two
+  rows, neither moved by this plan: `docs/how-it-works.ru.md` and `docs/running.ru.md`.
 
 ### [0261 - The report sees a world empty out](done/0261-the-report-sees-a-world-empty-out.md)
 

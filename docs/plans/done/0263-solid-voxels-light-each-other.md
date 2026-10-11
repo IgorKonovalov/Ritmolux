@@ -1,9 +1,9 @@
 # 0263 — Solid voxels light each other
 
-> **Status:** in-progress (2026-10-11)
+> **Status:** done - Phase 3 owed, ADR-0249 (closed 2026-10-11 by a conductor close, round 1: Phases 1-2 in `88a42bca` and `9b33af60`, layout repair `597cdcb9`; review no blockers, no majors, one minor and one nit, both fixed in `704e2440`; v0.178.0)
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0272](../adrs/0272-a-solid-voxel-takes-light-from-its-neighbours-through-a-coarse-field-rebuilt-each-generation.md) (accepted), [ADR-0269](../adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md), [ADR-0268](../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md)
+> **Related ADRs:** [ADR-0272](../../adrs/0272-a-solid-voxel-takes-light-from-its-neighbours-through-a-coarse-field-rebuilt-each-generation.md) (accepted), [ADR-0269](../../adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md), [ADR-0268](../../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md)
 > **Closes:** design-backlog 0295
 
 ## TL;DR
@@ -191,5 +191,135 @@ flowchart LR
   `cargo nextest run -p rlx-core --test golden --test suite` at Phase 1, exit 0, 333 passed and 1
   skipped; `cargo nextest run -p rlx-core --test golden` at Phase 2, exit 0, 5 passed; the voxel
   unit tests (`--lib scenes::voxel`) at Phase 1, exit 0, 25 passed.
+
+## Close review
+
+Conductor close, 2026-10-11. Round 1 is the only round, so no earlier finding was resolved by a fix
+round. Repaired at the close in `704e2440`: the minor (`docs/presets.md` now says the bounce ignores
+the section plane) and the nit (the Phase 2 cost note now says its figures leave the per-frame cost
+of `bounce` unresolved, and that a live reading belongs to backlog 0290's repro). **Phase 3 is owed**
+(ADR-0249): nobody has yet judged Voxel Ember live with `bounce` raised against the shipped Ember, so
+whether the leak through thin walls reads as soft or as wrong is unchecked, and
+`.claude/skills/preset-author/references/systems.md` does not yet carry the **Bounce** paragraph
+whose text is in the log above. The round's review follows in full.
+
+### Plan 0263 — close review, round 1
+
+Graded at `597cdcb9ee27d835c38f7231ae56b35db22e0a18` on `plan-0263-solid-voxels-light-each-other`.
+
+**Verdict: Plan 0263 landed cleanly. No blockers, no majors, one minor and one nit, both Markdown a
+close can repair.**
+
+#### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 8ded526 is green in the suite ledger, run by
+  0263-02-repair at 2026-10-11T18:55:25.116Z: 2107 tests run: 2107 passed (11 slow), 9 skipped`.
+  That ledger record is the lens-1 full-suite evidence. `dev`'s close block says the suite is owed to
+  the conductor's pre-review gate, which is correct in conductor mode.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: exit 0.
+- `node scripts/check-doc-links.mjs`: OK. `node scripts/toc.mjs --check`: OK.
+  `node scripts/check-comment-hygiene.mjs`: OK.
+- `node scripts/check-backlog-claims.mjs`: exit 0, 48 reductions across 23 live entries. The
+  advisory lists no entry this plan's paths falsify.
+
+#### Lens 1 — Alignment with the plan and ADR-0272
+
+- Every phase carries one in-vocabulary owner tag. Phase 3 is `human` with `**Blocks merge:** no`,
+  and the log row reads `owed`. The log is shorter than the phases section.
+- **Phase 1.** `bounce` is in `PARAMS` (`[0, 2]`, `Modal`, `ParamGroup::Light`, `main: false`) and in
+  `solid_only!`, with a `set_param` arm and a `reset_params` line. The light field
+  (`LightField`, `core/src/render/scenes/voxel/mod.rs:955`) is an `rgba16float` 3D texture of side
+  `grid.div_ceil(4)`, a splat pass and a 3x3x3 tent blur, built lazily by `ensure_light` on the first
+  frame with a non-zero applied bounce and filled that frame (`mod.rs:2203-2209`). It is refilled
+  after every frame that changed the state (seed, stamp or generation all clear `light_fresh`), which
+  is the brick pass's own trigger, so the reseed risk the plan names is covered. The march term
+  (`shader.rs:668-676`) is gated by `mp.bounce.x > 0.0` and samples half a cell in front of the hit
+  face. `applied_bounce` is 0 under `glow`, so `glow` never builds the field.
+- **The tests read what the done-whens say** (`core/src/render/scenes/voxel/tests.rs`):
+  - `bounce_0_builds_no_light_field` steps at least 10 generations at `bounce = 0` and asserts
+    `light_build_count() == 0` and `res.light.is_none()`; it also covers `glow` with `bounce = 1`.
+  - `a_face_brightens_toward_a_block_of_live_cells` puts one cell at x 4 and a 4³ block at x 8-11
+    (three empty cells between), asserts the face is identical at `bounce = 0` with and without the
+    block (so the gain is the field's alone), that the gain is positive, and that it exceeds twice
+    the lone cell's gain. That is stronger than the plan's "more than".
+  - `a_light_field_built_mid_run_matches_one_built_from_the_start` switches on at frame 10 and asserts
+    frames 10 and 11 byte-identical to a run on from frame 0, with a guard that bounce actually moves
+    those frames, and that the late run refilled fewer times.
+  - The generated reference and schemas were regenerated and the suite's `preset_schema::` and
+    `the_parameter_reference_block_is_current` are inside the green ledger run.
+- **Phase 2.** The `voxel_bounce` golden is appended at the end of `EXTRA_FIXTURES` with its TOML in
+  `core/tests/golden.rs` (logged: `core/tests/fixtures/` was outside the phase's files). The four
+  frame times are logged. `docs/presets.md` gains "Cells that light each other" covering what it
+  reads, solid-only, the leak, the softness, the shell approximation and bloom. The skill text for
+  Phase 3 is in the log.
+- **Deviations, all logged:** the bounce term also multiplies by `fog`, as the key and ambient terms
+  do (ADR-0272's formula omits it; the doc states it). The splat ignores the section plane (see the
+  minor below).
+- **The repair commit `597cdcb9`** separates the splat and blur layouts from `voxel-brick-layout`
+  under ADR-0058's scan by reordering the splat's entries and binding the splat a second, unread time
+  in the blur layout. ADR-0058's Decision prefers separation to an allowlist where separation is
+  cheap, and its Alternative A rejects padding only for the `[Uniform]` group, so this is inside the
+  ADR. The comment names the trap ("a tidier arrangement re-collides a pair").
+
+#### Lens 2 — Layering, coupling, real-time safety
+
+Nothing touches the audio path, the C ABI or the control protocol. Everything is inside the voxel
+scene and the wgpu layer. The lazy build allocates GPU resources once on a render frame, which the
+plan and ADR-0272 chose. No `unwrap`/`expect` added to the render path.
+
+#### Lens 3 — Docs and bookkeeping
+
+- Swept: `docs/presets.md`, `presets/README.md` (generated), `presets/preset.schema.json` and
+  `presets/schema/voxel.schema.json` (generated), `docs/specs/player-schema.json` (generated).
+  `.taplo.toml` did not need to move.
+- `.claude/skills/preset-author/references/systems.md` lacks `bounce` until the owed Phase 3 applies
+  the logged text. That is the plan's designed path (ADR-0210), not a finding.
+- **Owed by the close:** plan to `done/` with `Status: done - Phase 3 owed, ADR-0249`; backlog 0295's
+  archived body gets its `CLOSED` marker and moves `Promoted` -> `Closed`; ADR-0272 is already
+  `accepted`; a **minor** version bump (a new user-visible param) plus the studio's two copies.
+
+#### Lens 4 — Correctness and determinism
+
+- A grid that is not a multiple of 4 maps consistently: the march divides by `LIGHT_CELL * side`, so
+  texel `i`'s centre lands on cell `4i + 2` whatever the grid; the splat averages a partial block over
+  the full 64, which the shader doc states.
+- No aspect is touched. No new frozen numeric assertion: the gain test is a ratio of two luminance
+  gains on the same adapter and run, and the mid-run test is byte equality.
+- The Phase 2 cost figures cannot resolve the dispatch (see the nit).
+
+#### Lens 5 — Design integrity
+
+The field is a private struct of the voxel scene; the `Scene` trait is unchanged. The march bind
+group builder was factored into `march_bind_group` so the lazy rebind and the initial build share
+one spelling.
+
+#### Findings
+
+##### minor — the bounce documentation does not say cut-away cells still light faces
+
+- **Where:** `docs/presets.md:1001` (the end of the bounce bullets), and by contrast
+  `docs/presets.md:1042-1043`.
+- **What:** the splat does not read the section plane (logged as a Phase 1 note), so cells `cut`
+  hides still feed the light field. A section face's normal points into the hidden side, so with
+  `bounce` on the section face is lit by exactly the cells the viewer cannot see. The cut section
+  says the occlusion "treats a cut cell as empty, so a section face is not darkened by cells the
+  viewer cannot see"; a reader will assume the bounce follows the same rule, and it does the
+  opposite.
+- **Fix (Markdown, a close can repair):** add a bullet after "It composes with bloom.":
+  `- **It ignores the section plane.** The field is built from every live cell, cut or not, so with
+  `cut` bound a section face takes the light of the hidden cells behind it and glows. Following the
+  plane would refill the field every frame a swept `cut` moves.`
+
+##### nit — the Phase 2 cost figures do not resolve the bounce's cost
+
+- **Where:** `docs/plans/0263-solid-voxels-light-each-other.md:164` (the cost note).
+- **What:** Floor read 5.981 ms off and 4.834 ms on, a 19 % swing toward the configuration that does
+  strictly more work, so the harness's noise exceeds the effect being measured. The done-when's "or
+  the log names the difference" clause is met, but "no more than one extra texture fetch per lit
+  pixel" is unmeasured rather than shown.
+- **Fix (Markdown):** the close's `## Close review` states that the per-frame cost of `bounce` is
+  unresolved by these figures and that a live reading belongs to backlog 0290's repro, as the plan's
+  own Risks section already says.
 
 ## Followups (after this lands)

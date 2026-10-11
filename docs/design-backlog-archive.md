@@ -364,7 +364,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0295 | A solid voxel lights only itself, so a glowing structure fakes its light with ambient and bloom | [Plan 0263](plans/0263-solid-voxels-light-each-other.md). **Promoted** |
 | 0297 | Voxel Neon and Voxel Ice are Voxel Ember recoloured, and the owner wants three worlds | [Plan 0264](plans/0264-voxel-neon-and-ice-become-their-own-worlds.md). **Promoted** |
 <!-- roster:end -->
 
@@ -704,6 +703,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0289 | `shot --signal` beside `--all` silently draws a filmstrip of the first preset | [Plan 0259](plans/done/0259-the-contact-sheet-hears-the-clip.md). An audio contact sheet; Phase 3 owed. **Closed 2026-10-11** |
 | 0296 | `bloom_amount` declares `0..1` as the range that reads, and five shipped presets sit past it | [Plan 0262](plans/done/0262-bloom-amount-declares-the-range-it-reads.md). Declared `0..2`; Tidepool stays past it. **Closed 2026-10-11** |
 | 0294 | A voxel preset's own seed can die out, and no gate, report or check looks past frame 30 | [Plan 0261](plans/done/0261-the-report-sees-a-world-empty-out.md). A `late` reading; Phase 3 owed. **Closed 2026-10-11** |
+| 0295 | A solid voxel lights only itself, so a glowing structure fakes its light with ambient and bloom | [Plan 0263](plans/done/0263-solid-voxels-light-each-other.md). `bounce`; Phase 3 owed. **Closed 2026-10-11** |
 <!-- roster:end -->
 
 ---
@@ -17494,7 +17494,15 @@ capability, not a bug.** The shipped look is accepted as it is.
   `present: albedo \* \(ambient \* occ \+ key \* max\(0, n \. l\)\) in: core/src/render/scenes/voxel/shader.rs`
 - **Verified 2026-10-11** — the workaround as shipped:
   `present: bloom_threshold = "0\.55" in: presets/voxel_ember.toml`
-- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0263](plans/0263-solid-voxels-light-each-other.md) was approved.
+- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0263](plans/done/0263-solid-voxels-light-each-other.md) was approved.
+
+**CLOSED 2026-10-11** — [Plan 0263](plans/done/0263-solid-voxels-light-each-other.md) and
+ADR-0272. `voxel` gains `bounce` (0-2, solid-only, default 0): the second of this entry's two routes,
+a precomputed light field over the grid, at a quarter of its side and refilled per state change, not
+per frame. A face takes the light of the live cells in front of it, so the glow stays inside the
+structure. It leaks through thin walls and ignores the section plane. Its per-frame cost was not
+resolved by the headless figures, and the live reading stays with 0290. No shipped preset adopts it
+yet; the owner's look and the preset-author skill text are Phase 3, owed after the merge (ADR-0249).
 
 ## 0296 — `bloom_amount` declares `0..1` as the range that reads, and five shipped presets sit past it
 
