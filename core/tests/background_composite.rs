@@ -14,8 +14,10 @@
 //! boxes, macOS Metal CI) and via the `shot` CLI, and left unasserted where the
 //! adapter can't render it.
 //!
-//! One renderer per `#[test]`, and nextest runs each test in its own process, so
-//! the hardware renderer never coexists with a software device.
+//! One renderer per `#[test]`. The file holds a hardware test and a software
+//! test, so it **requires nextest**, which runs each test in its own process:
+//! only there does the hardware renderer never coexist with a software device.
+//! A plain `cargo test` runs both as threads of one process and voids that.
 //!
 //! The **paper** backdrop (ADR-0270) is checked here too, on the software
 //! adapter: it is a byte-equality claim about the tonemap's write, which holds
