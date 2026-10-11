@@ -68,7 +68,7 @@ ADR: there is no tradeoff a later reader would need, and the fix is a config lin
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Trace and stop the leak | studio-builder | done | committed with this row |
+| 1 — Trace and stop the leak | studio-builder | done | 400860c5 |
 
 ### Notes
 
@@ -87,5 +87,15 @@ ADR: there is no tradeoff a later reader would need, and the fix is a config lin
   across one run on a box with other lanes idle-or-unknown), which are the tests' own fixtures.
 
 ### Close triggers
+
+- `presets/` touched: none.
+- `**Closes:**` design-backlog 0291.
+- Shipped: fix-only, test configuration under `studio/` (`vitest.config.ts`, new
+  `studio/test/global-teardown.ts`); no shipped artifact changes.
+- Operator docs moved: none.
+- `node scripts/check-backlog-claims.mjs`: exit 0, 46 reductions across 22 live entries, 3
+  unprobeable; 0291 is not among the advisory entries.
+- Full suite: owed to the conductor's pre-review gate (ADR-0207).
+- `human` phases remaining: none.
 
 ## Followups (after this lands)
