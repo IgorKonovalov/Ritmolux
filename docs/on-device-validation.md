@@ -326,8 +326,8 @@ says what is expected, not what has been run. Each section's own record says tha
       coarser without changing what it is; lowering `voxel_grid` changes the content, so it routes
       to `architect` with the numbers.
 - [ ] **The voxel system's look, any box, with music.** Load `docs/examples/voxel/clouds.toml`, then
-      the same file with `rules = ["coral", "pyroclastic"]`, `rule = "mod(bar_index, 2)"` under
-      `[hold] rule = "bar"`, `reseed = "onset"` and `shells = 8` with `shell_gain = "1.5"`. Say whether
+      the same file with `rules = ["coral", "pyroclastic"]` and `rule = "mod(bar_index, 2)"` under
+      `[hold] rule = "bar"` (`clouds.toml` already reseeds on an onset and lights eight shells). Say whether
       the volume reads as a 3D structure rather than a haze as it turns, whether `density` gives it a
       front and a back, and whether an onset ball and the rule change at a bar line read as the
       music's doing.

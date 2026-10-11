@@ -493,9 +493,9 @@ instant. `rows` and `row_period` set how much history there is, in the
 
 ### `voxel`
 
-![A soft-edged cube of glowing orange on black, seen a little from above and turned off square: the
-volume reads as one dense amber mass, darker where it is thickest at the centre and fraying into
-grainy single cells along its edges](images/gallery/voxel.png)
+![A soft-edged ball of glowing orange on black with two small lobes budding off its rim: the volume
+reads as one dense amber mass, darker where it is thickest at the centre and grainy along its
+edges](images/gallery/voxel.png)
 
 *`rules = ["clouds"]` — the teaching preset
 [`docs/examples/voxel/clouds.toml`](examples/voxel/clouds.toml); the shipped set has none yet*
@@ -511,11 +511,11 @@ counts, and the `rule` parameter picks one. Held on the bar, the automaton chang
 bar line. Most 3D rules settle into a shape and hold it, so `reseed` on an onset is how the cube
 stays alive: each rise drops a ball of fresh cells that grows again.
 
-![A rounded mass of small orange cubes on black, with three smaller clumps beside it: each terrace
-of cubes is lit from the upper left, its sides a shade darker, and the creases between terraces
-darkest](images/voxel/solid.png)
+![A porous block of small orange cubes on black, full of holes that show into it: each cube is lit
+from the upper left, its sides a shade darker, the creases between them darkest, and pale decaying
+cells glow in the gaps inside](images/voxel/solid.png)
 
-*`present = "solid"` — the teaching preset
+*`present = "solid"`, `rules = ["pyroclastic"]` — the teaching preset
 [`docs/examples/voxel/solid.toml`](examples/voxel/solid.toml)*
 
 `present = "solid"` draws every live cell as a **lit cube** instead of as light: one key light

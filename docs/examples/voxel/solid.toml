@@ -1,16 +1,17 @@
 # The `voxel` system drawn solid, for the illustrated guide's picture of it.
-# Teaching material, not a shipped preset: the `clouds` rule settling from a
-# seeded ball into rounded masses, each live cell a lit cube under one key light
-# that turns with the camera, the decaying cells a faint glow around it. The
-# bass brightens the key light and an onset refills a ball of cells.
+# Teaching material, not a shipped preset: the `pyroclastic` rule, a restless
+# porous foam that never settles, each live cell a lit cube under one key light
+# that turns with the camera, the decaying cells a faint glow inside the gaps,
+# so the structure can be seen into. The bass brightens the key light and an
+# onset refills a ball of cells.
 system = "voxel"
 name = "Voxel Solid"
 
 [voxel]
 grid        = 64
-rules       = ["clouds"]
+rules       = ["pyroclastic"]
 seed_radius = 0.9
-seed_fill   = 0.55
+seed_fill   = 0.3
 present     = "solid"
 
 [palette]
