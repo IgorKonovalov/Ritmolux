@@ -149,8 +149,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: one plane through the march | dev | done | committed with this row |
-| 2 — The section is lit as a surface | dev | not started | |
+| 1 — Walking skeleton: one plane through the march | dev | done | 2ae1af1c |
+| 2 — The section is lit as a surface | dev | done | committed with this row |
 | 3 — Cost, the golden, the teaching preset and the docs | dev | not started | |
 | 4 — The owner's look and the skill text | human | not started | |
 
@@ -161,6 +161,11 @@ flowchart LR
   lies in the plane). The probe's target is cleared transparent for this test, so "alpha
   0" reads the volume's own coverage; the existing probes still clear opaque black.
   `.taplo.toml` did not change on regeneration.
+- Phase 2: the fixture is `core/tests/fixtures/voxel_section_lit.toml`, already at 32³, so
+  Phase 3's golden reads the same file. The test's tread is chosen on the block's `+x` side,
+  where a cut neighbour wrongly read as solid would close the corners unevenly; with
+  `|| cut_away(c)` removed from `solid_at` it fails (edge 0.238 against centre 0.194).
+  `shader.rs` was not changed.
 
 ### Close triggers
 

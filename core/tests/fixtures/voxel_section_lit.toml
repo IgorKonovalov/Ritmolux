@@ -1,0 +1,50 @@
+# The `voxel` scene drawn `solid`, cut through its centre on a tilted plane, with
+# its ambient occlusion on: the section reads as a staircase of lit faces.
+#
+# Read by `a_tilted_section_is_lit_as_a_surface_and_occluded_by_no_cut_cell` in
+# `core/src/render/scenes/voxel/tests.rs`, and the golden `voxel_section_lit`.
+#
+# The seeded ball's radius is past the cube's corner and its fill is 1, so
+# every cell of the 32-cell grid starts live: one solid block. `step_rate = 0`
+# freezes it there.
+#
+#  - `cut = 0.5` puts the plane through the centre. `cut_pitch = 0.6` tilts its
+#    normal from `+z` toward `+y`, so the section steps across both axes: treads
+#    facing `+z`, risers facing `+y`, each run along `x` the block's width.
+#  - The camera at `yaw = 0.6, pitch = 0.4` sees both from the cut side.
+#  - `ao = 1` with the key low and the ambient high, so a corner a cut cell
+#    wrongly closed would darken most of what a face shows.
+#  - `hue_spread` and `age_tint` at 0, so every cell is one colour and a face's
+#    brightness is its light alone.
+#  - Every light and camera param bound, so a change of default cannot move a
+#    baseline drawn from this file. The test reads the camera from here.
+system = "voxel"
+name   = "fixture_voxel_section_lit"
+
+[generator]
+seed = 7
+
+[voxel]
+grid        = 32
+rules       = ["clouds"]
+seed_radius = 2.0
+seed_fill   = 1.0
+present     = "solid"
+
+[params]
+step_rate   = "0"
+hue         = "0.3"
+hue_spread  = "0"
+age_tint    = "0"
+key         = "0.4"
+ambient     = "0.8"
+ao          = "1"
+light_yaw   = "-0.6"
+light_pitch = "0.6"
+cut         = "0.5"
+cut_yaw     = "0"
+cut_pitch   = "0.6"
+yaw         = "0.6"
+pitch       = "0.4"
+distance    = "3.5"
+fov         = "0.8"
