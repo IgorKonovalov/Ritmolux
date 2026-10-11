@@ -1059,3 +1059,51 @@ fn a_seeded_volume_draws_a_lit_non_uniform_frame() {
         "the frame is uniform rather than a structure"
     );
 }
+
+/// No expression in the march indexes a vector by a runtime value. FXC, the
+/// DX12 compiler, unrolls a loop whose body does, and fails the pipeline when
+/// the loop is too long to unroll; this holds that rule on a runner with no
+/// DX12. An array indexed at run time is not a vector and stays allowed.
+#[test]
+fn the_march_never_indexes_a_vector_at_run_time() {
+    use wgpu::naga;
+    let source = format!("{}{}", gpu::FULLSCREEN_VS_NDC, march_body());
+    let module = naga::front::wgsl::parse_str(&source).expect("the march parses");
+    let info = naga::valid::Validator::new(
+        naga::valid::ValidationFlags::all(),
+        naga::valid::Capabilities::default(),
+    )
+    .validate(&module)
+    .expect("the march validates");
+
+    let mut offenders = Vec::new();
+    let functions = module.functions.iter().map(|(h, f)| (f, &info[h])).chain(
+        module
+            .entry_points
+            .iter()
+            .enumerate()
+            .map(|(i, ep)| (&ep.function, info.get_entry_point(i))),
+    );
+    for (function, fn_info) in functions {
+        for (_, expr) in function.expressions.iter() {
+            let naga::Expression::Access { base, .. } = *expr else {
+                continue;
+            };
+            let vector = match *fn_info[base].ty.inner_with(&module.types) {
+                naga::TypeInner::Vector { .. } => true,
+                naga::TypeInner::ValuePointer { size, .. } => size.is_some(),
+                naga::TypeInner::Pointer { base, .. } => {
+                    matches!(module.types[base].inner, naga::TypeInner::Vector { .. })
+                }
+                _ => false,
+            };
+            if vector {
+                offenders.push(function.name.clone().unwrap_or_default());
+            }
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "a vector indexed at run time in: {offenders:?}"
+    );
+}

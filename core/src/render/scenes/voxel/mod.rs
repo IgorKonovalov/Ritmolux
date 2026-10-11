@@ -139,6 +139,18 @@ const WORKGROUP: u32 = 4;
 /// brick pass's workgroup, which scans one brick.
 const BRICK: u32 = 8;
 
+/// `shader::MARCH_SHADER` with the constants it is written against prepended;
+/// the vertex prelude goes in front of this.
+fn march_body() -> String {
+    format!(
+        "const MAX_MARCH: i32 = {};\nconst AGE_SPAN: f32 = {:?};\nconst BRICK: i32 = {};\n{}",
+        3 * MAX_GRID,
+        AGE_SPAN,
+        BRICK,
+        shader::MARCH_SHADER
+    )
+}
+
 /// The step the march target's axes are rounded to (`grid::grid_size`).
 const MARCH_STEP: u32 = 8;
 
@@ -1102,18 +1114,8 @@ impl Resources {
         };
         let march_from_a = march_bind(&a);
         let march_from_b = march_bind(&b);
-        let march_shader = gpu::fullscreen_shader(
-            device,
-            "voxel-march",
-            gpu::FULLSCREEN_VS_NDC,
-            &format!(
-                "const MAX_MARCH: i32 = {};\nconst AGE_SPAN: f32 = {:?};\nconst BRICK: i32 = {};\n{}",
-                3 * MAX_GRID,
-                AGE_SPAN,
-                BRICK,
-                shader::MARCH_SHADER
-            ),
-        );
+        let march_shader =
+            gpu::fullscreen_shader(device, "voxel-march", gpu::FULLSCREEN_VS_NDC, &march_body());
         // Into the march's own target, which is cleared every frame, so the
         // march writes its premultiplied colour and coverage as they are.
         let march_pipeline = gpu::fullscreen_pipeline(

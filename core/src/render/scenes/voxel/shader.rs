@@ -359,19 +359,49 @@ fn corner_closed(side_a: f32, side_b: f32, diagonal: f32) -> f32 {
     return (side_a + side_b + diagonal) / 3.0;
 }
 
+// The unit vector along `axis` (0, 1 or 2). This shader reaches a vector's
+// component by `select`, never by a runtime index: FXC, the DX12 compiler,
+// unrolls a loop whose body indexes a vector at run time, and a loop it
+// cannot unroll fails the pipeline.
+fn axis_unit(axis: i32) -> vec3<i32> {
+    return vec3<i32>(vec3<bool>(axis == 0, axis == 1, axis == 2));
+}
+
+// `v[axis]`, without the runtime index (`axis_unit`).
+fn pick_i(v: vec3<i32>, axis: i32) -> i32 {
+    return select(select(v.z, v.y, axis == 1), v.x, axis == 0);
+}
+
+// `v[axis]`, without the runtime index (`axis_unit`).
+fn pick_f(v: vec3<f32>, axis: i32) -> f32 {
+    return select(select(v.z, v.y, axis == 1), v.x, axis == 0);
+}
+
+// One axis of a brick jump: the cell index `c` stepped by `stride` past every
+// boundary the ray crosses before the exit parameter `t_e`, at most `BRICK`
+// of them. A boundary exactly at `t_e` is crossed only by an axis ordered
+// before the exit axis (`before_exit`), which is the step's own tie order.
+fn skip_axis(c: i32, ahead: i32, o: f32, inv_dg: f32, stride: i32, t_e: f32, before_exit: bool) -> i32 {
+    var at = c;
+    for (var k = 0; k < BRICK; k = k + 1) {
+        let t_b = (f32(at + ahead) - o) * inv_dg;
+        if (!(t_b < t_e || (t_b == t_e && before_exit))) {
+            break;
+        }
+        at = at + stride;
+    }
+    return at;
+}
+
 // The open fraction of the ambient light reaching point `p` (cell units) on
 // the face of `cell` whose outward normal is `facing` (+1 or -1) along `axis`:
 // the four corners' closure, interpolated bilinearly across the face.
 fn face_open(cell: vec3<i32>, axis: i32, facing: i32, p: vec3<f32>, ni: i32) -> f32 {
-    var outward = vec3<i32>(0);
-    outward[axis] = facing;
-    let front = cell + outward;
+    let front = cell + axis_unit(axis) * facing;
     let ua = (axis + 1) % 3;
     let va = (axis + 2) % 3;
-    var eu = vec3<i32>(0);
-    eu[ua] = 1;
-    var ev = vec3<i32>(0);
-    ev[va] = 1;
+    let eu = axis_unit(ua);
+    let ev = axis_unit(va);
     let u_lo = solid_at(front - eu, ni);
     let u_hi = solid_at(front + eu, ni);
     let v_lo = solid_at(front - ev, ni);
@@ -380,8 +410,8 @@ fn face_open(cell: vec3<i32>, axis: i32, facing: i32, p: vec3<f32>, ni: i32) -> 
     let c10 = corner_closed(u_hi, v_lo, solid_at(front + eu - ev, ni));
     let c01 = corner_closed(u_lo, v_hi, solid_at(front - eu + ev, ni));
     let c11 = corner_closed(u_hi, v_hi, solid_at(front + eu + ev, ni));
-    let fu = clamp(p[ua] - f32(cell[ua]), 0.0, 1.0);
-    let fv = clamp(p[va] - f32(cell[va]), 0.0, 1.0);
+    let fu = clamp(pick_f(p, ua) - f32(pick_i(cell, ua)), 0.0, 1.0);
+    let fv = clamp(pick_f(p, va) - f32(pick_i(cell, va)), 0.0, 1.0);
     return 1.0 - mix(mix(c00, c10, fu), mix(c01, c11, fu), fv);
 }
 
@@ -467,26 +497,21 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                 } else if (t_face.y <= t_face.z) {
                     e = 1;
                 }
-                let t_e = t_face[e];
+                // `t_face[e]`: `e` is the first axis holding the minimum.
+                let t_e = min(min(t_face.x, t_face.y), t_face.z);
                 if (t_e >= t_exit) {
                     break;
                 }
                 // The other two axes step past every boundary they cross before
                 // the exit, in the step's own order; the exit axis crosses its
                 // face.
-                for (var a = 0; a < 3; a = a + 1) {
-                    if (a == e) {
-                        cell[a] = select(face[a] - 1, face[a], forward_axis[a]);
-                        continue;
-                    }
-                    for (var k = 0; k < BRICK; k = k + 1) {
-                        let t_b = (f32(cell[a] + ahead[a]) - o[a]) * inv_dg[a];
-                        if (!(t_b < t_e || (t_b == t_e && a < e))) {
-                            break;
-                        }
-                        cell[a] = cell[a] + stride[a];
-                    }
-                }
+                let passed = vec3<i32>(
+                    skip_axis(cell.x, ahead.x, o.x, inv_dg.x, stride.x, t_e, 0 < e),
+                    skip_axis(cell.y, ahead.y, o.y, inv_dg.y, stride.y, t_e, 1 < e),
+                    skip_axis(cell.z, ahead.z, o.z, inv_dg.z, stride.z, t_e, 2 < e)
+                );
+                let crossed = select(face - vec3<i32>(1), face, forward_axis);
+                cell = select(passed, crossed, axis_unit(e) != vec3<i32>(0));
                 t = t_e;
                 axis = e;
                 if (any(cell < vec3<i32>(0)) || any(cell >= vec3<i32>(ni))) {
@@ -519,18 +544,21 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             var shell = 1.0;
             if (mp.d.z > 0.5) {
                 let i = min(u32(min(length(centre), 1.0) * mp.d.z), u32(mp.d.z) - 1u);
-                shell = 1.0 + mp.c.w * mp.shells[i / 4u][i % 4u];
+                let row = mp.shells[i / 4u];
+                let k = i % 4u;
+                let level = select(select(select(row.w, row.z, k == 2u), row.y, k == 1u), row.x, k == 0u);
+                shell = 1.0 + mp.c.w * level;
             }
             if (solid && state == 1u) {
                 // The first live cell ends the ray: its entry face, lit, under
                 // the light gathered in front of it, covering the pixel.
-                var normal = vec3<f32>(0.0);
-                normal[axis] = -f32(stride[axis]);
+                let facing = -pick_i(stride, axis);
+                let normal = vec3<f32>(axis_unit(axis) * facing);
                 let lambert = max(dot(normal, mp.light.xyz), 0.0);
                 // At `ao = 0` the ambient term is left exactly as it is.
                 var ambient = mp.lit.y;
                 if (mp.lit.z > 0.0) {
-                    let open = face_open(cell, axis, -stride[axis], o + dg * t, ni);
+                    let open = face_open(cell, axis, facing, o + dg * t, ni);
                     ambient = ambient * mix(1.0, open, mp.lit.z);
                 }
                 let lighting = ambient + mp.lit.x * lambert;
