@@ -151,7 +151,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — Walking skeleton: one plane through the march | dev | done | 2ae1af1c |
 | 2 — The section is lit as a surface | dev | done | 7b0c6a12 |
-| 3 — Cost, the golden, the teaching preset and the docs | dev | done | committed with this row |
+| 3 — Cost, the golden, the teaching preset and the docs | dev | done | 26e9e0b1 |
 | 4 — The owner's look and the skill text | human | not started | |
 
 ### Notes
@@ -201,5 +201,23 @@ flowchart LR
   > across the plane. The teaching preset is `docs/examples/voxel/section.toml`.
 
 ### Close triggers
+
+- **`presets/` touched:** yes, generated files only, in Phase 1: `presets/README.md` (the
+  params block), `presets/preset.schema.json`, `presets/schema/voxel.schema.json`. No preset
+  file.
+- **Plan header `Closes:`** design-backlog 0288.
+- **What shipped:** feature.
+- **Operator docs touched:** `docs/presets.md` (the `voxel` table's new "Cutting the cube open"
+  subsection), `presets/README.md` params block (regenerated), `presets/schema/` (regenerated;
+  `.taplo.toml` unchanged), `docs/specs/player-schema.json` (regenerated),
+  `scripts/docs-shots.mjs` + `docs/images/voxel/section.png`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0; 46 reductions across 22
+  live entries hold, no entry named.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Run here at Phase 3:
+  `cargo nextest run --workspace -P fast`, exit 0, 1995 passed, 106 skipped; the four gate
+  binaries (`--test sanity --test animation --test reactivity --test distinctness`) whole, exit
+  0, 90 passed, 3 skipped; `--test golden`, exit 0, 5 passed.
+- **Outstanding `human` phases:** Phase 4 (the owner's look and the skill text; `Blocks merge:
+  no`).
 
 ## Followups (after this lands)
