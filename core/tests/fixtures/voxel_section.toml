@@ -1,0 +1,44 @@
+# The `voxel` scene drawn `solid` and cut in half by its section plane.
+#
+# Read by `the_section_plane_hides_one_side_and_leaves_the_other` in
+# `core/src/render/scenes/voxel/tests.rs`, which renders it at `cut = 0`, 0.5
+# and 1. It pins no pixels.
+#
+# The seeded ball's radius is past the cube's corner and its fill is 1, so
+# every cell of the 16-cell grid starts live: one solid block. `step_rate = 0`
+# freezes it there.
+#
+#  - `cut_yaw = cut_pitch = 0` faces the plane along the cube's `+z`, and at
+#    `cut = 0.5` it is the plane `z = 0`, which falls between two layers of
+#    cells on the even grid.
+#  - `yaw = pi/2, pitch = 0` puts the eye on `+x`, inside that plane, so the
+#    plane projects to the frame's vertical centre line and every ray stays on
+#    its own side of it. The test relies on that; do not move the camera.
+#  - `ao = 0`, so no face corner reads a cell across the plane.
+#  - `hue_spread` and `age_tint` at 0, so every cell is one colour.
+system = "voxel"
+name   = "fixture_voxel_section"
+
+[generator]
+seed = 7
+
+[voxel]
+grid        = 16
+rules       = ["clouds"]
+seed_radius = 2.0
+seed_fill   = 1.0
+present     = "solid"
+
+[params]
+step_rate  = "0"
+hue        = "0.3"
+hue_spread = "0"
+age_tint   = "0"
+ao         = "0"
+cut        = "0.5"
+cut_yaw    = "0"
+cut_pitch  = "0"
+yaw        = "1.5707964"
+pitch      = "0"
+distance   = "4"
+fov        = "0.8"

@@ -27,6 +27,9 @@
         "step_rate": { "$ref": "#/definitions/param.step_rate.voxel" },
         "reseed": { "$ref": "#/definitions/param.reseed.voxel" },
         "reseed_radius": { "$ref": "#/definitions/param.reseed_radius" },
+        "cut": { "$ref": "#/definitions/param.cut" },
+        "cut_yaw": { "$ref": "#/definitions/param.cut_yaw" },
+        "cut_pitch": { "$ref": "#/definitions/param.cut_pitch" },
         "shell_gain": { "$ref": "#/definitions/param.shell_gain" },
         "density": { "$ref": "#/definitions/param.density.voxel" },
         "trail": { "$ref": "#/definitions/param.trail.voxel" },
@@ -70,6 +73,7 @@
         "bg_band_curve": { "$ref": "#/definitions/param.bg_band_curve" },
         "bg_band_hue": { "$ref": "#/definitions/param.bg_band_hue" },
         "bg_band_hue_span": { "$ref": "#/definitions/param.bg_band_hue_span" },
+        "bg_paper": { "$ref": "#/definitions/param.bg_paper" },
         "trails": { "$ref": "#/definitions/param.trails" },
         "fb_zoom": { "$ref": "#/definitions/param.fb_zoom.trails" },
         "fb_rotate": { "$ref": "#/definitions/param.fb_rotate.trails" },
@@ -968,6 +972,21 @@
       "description": "The radius of the ball a reseed fills, as a fraction of the cube's half-side.",
       "markdownDescription": "The radius of the ball a reseed fills, as a fraction of the cube's half-side.\n\n- default `0.25`\n- typical range `0.05` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
+    "param.cut": {
+      "type": "string",
+      "description": "How much of the cube a section plane hides, so the inside shows: 0.5 cuts it through the centre, 1 hides it all, 0 is off. Only the view is cut; the automaton runs on.",
+      "markdownDescription": "How much of the cube a section plane hides, so the inside shows: 0.5 cuts it through the centre, 1 hides it all, 0 is off. Only the view is cut; the automaton runs on.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.cut_yaw": {
+      "type": "string",
+      "description": "Which way the section plane faces around the cube's vertical axis, in radians: the side it hides. It turns with the cube, not the camera.",
+      "markdownDescription": "Which way the section plane faces around the cube's vertical axis, in radians: the side it hides. It turns with the cube, not the camera.\n\n- default `0.0`\n- typical range `0.0` to `6.2831855` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.cut_pitch": {
+      "type": "string",
+      "description": "How far the section plane's hidden side tilts up toward the cube's top, in radians; negative tilts it down.",
+      "markdownDescription": "How far the section plane's hidden side tilts up toward the cube's top, in radians; negative tilts it down.\n\n- default `0.0`\n- typical range `-1.5707964` to `1.5707964` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
     "param.shell_gain": {
       "type": "string",
       "description": "How strongly the spectrum lights the cube's radial shells, bass at the centre and treble at the faces; 0 leaves the light as the cells give it.",
@@ -1122,6 +1141,11 @@
       "type": "string",
       "description": "How far the band's colour travels along the palette across its width.",
       "markdownDescription": "How far the band's colour travels along the palette across its width.\n\n- default `0.0`\n- typical range `-0.5` to `0.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.bg_paper": {
+      "type": "string",
+      "description": "Paints the backdrop as paper rather than light: at 1 it is laid under the finished picture, so a white palette stop is display white and the scene covers it without being lifted. Paper does not bloom, fold, trail or follow exposure.",
+      "markdownDescription": "Paints the backdrop as paper rather than light: at 1 it is laid under the finished picture, so a white palette stop is display white and the scene covers it without being lifted. Paper does not bloom, fold, trail or follow exposure.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.trails": {
       "type": "string",

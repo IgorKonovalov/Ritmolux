@@ -218,6 +218,10 @@ pub(crate) struct Transition {
     /// a frame that is a *mix* of two presets, so it has to interpolate rather
     /// than pick a side. `None` until the capture frame has run.
     outgoing_exposure: Option<f32>,
+    /// Whether the outgoing preset's backdrop is paper (ADR-0270), held on the
+    /// same frame: a paper is drawn under the tonemap whenever either side has
+    /// one. `None` until the capture frame has run.
+    outgoing_paper: Option<bool>,
 }
 
 impl Transition {
@@ -245,6 +249,7 @@ impl Transition {
             stage: Stage::Capture,
             outgoing_ink: None,
             outgoing_exposure: None,
+            outgoing_paper: None,
         }
     }
 
@@ -310,14 +315,21 @@ impl Transition {
         self.outgoing_exposure
     }
 
+    /// Whether the outgoing preset's backdrop is paper, once the capture frame
+    /// has run (ADR-0270).
+    pub(crate) fn outgoing_paper(&self) -> Option<bool> {
+        self.outgoing_paper
+    }
+
     /// Advance the dissolve by `dt` real seconds, after the frame at the current
     /// [`progress`](Self::progress) has been encoded.
     ///
     /// Returns `Some(to_index)` on the capture frame — the renderer must flip the
     /// roster to that index and reconfigure its scene, so the next frame
-    /// composites the incoming preset live. `outgoing_ink` and
-    /// `outgoing_exposure` are the terminal params the capture frame evaluated for
-    /// the outgoing preset; they are held for the rest of the dissolve.
+    /// composites the incoming preset live. `outgoing_ink`,
+    /// `outgoing_exposure` and `outgoing_paper` are what the capture frame
+    /// evaluated for the outgoing preset; they are held for the rest of the
+    /// dissolve.
     ///
     /// [`finished`](Self::finished) becomes true once `t` reaches 1.
     ///
@@ -329,12 +341,14 @@ impl Transition {
         dt: f32,
         outgoing_ink: InkParams,
         outgoing_exposure: f32,
+        outgoing_paper: bool,
     ) -> Option<usize> {
         self.t = (self.t + dt / self.dur).min(1.0);
         if self.stage == Stage::Capture {
             self.stage = Stage::Dissolve;
             self.outgoing_ink = Some(outgoing_ink);
             self.outgoing_exposure = Some(outgoing_exposure);
+            self.outgoing_paper = Some(outgoing_paper);
             return Some(self.to_index);
         }
         None
@@ -379,34 +393,54 @@ fn luma(c: vec3<f32>) -> f32 {
     return clamp(dot(c, vec3<f32>(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
 }
 
+// The two sides' coverage, moved by the same per-pixel factor as their colour.
+//
+// Each side's alpha is 1 everywhere unless its backdrop is paper, which clears
+// the side transparent so its alpha is the scene's coverage (ADR-0270). The
+// tonemap lays the blended frame over the paper by this, so the paper shows
+// only where a paper side leaves it uncovered, by as much as that side is in
+// the mix.
+//
+// Written out rather than through `mix`, so `f = 0` returns `a` and `f = 1`
+// returns `b` exactly; and equal sides return `a` untouched, so two opaque
+// sides stay exactly 1.0 through every frame of the dissolve.
+fn coverage(a: f32, b: f32, f: f32) -> f32 {
+    return select(a * (1.0 - f) + b * f, a, a == b);
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // Both sides are *sampled*, never alpha-composited: the line and particle
     // families draw additively, so laying one over the other at 1-t alpha would
     // produce wrong colors and could not express a non-crossfade kind (ADR-0024).
-    let a = textureSample(t_out, samp, in.uv).rgb;
-    let b = textureSample(t_in, samp, in.uv).rgb;
+    let sa = textureSample(t_out, samp, in.uv);
+    let sb = textureSample(t_in, samp, in.uv);
+    let a = sa.rgb;
+    let b = sb.rgb;
     let t = clamp(u.p.x, 0.0, 1.0);
     let kind = u32(u.p.y + 0.5);
 
     if (kind == 1u) {
         // Add/burn: the linear mix plus an additive flare that rises and falls,
         // zero at both endpoints so the ends stay exact. `4t(1-t)` peaks at 1.
+        // The flare is light, not cover, so the coverage moves by `t` alone.
         let flare = BURN_PEAK * 4.0 * t * (1.0 - t);
-        return vec4<f32>(mix(a, b, t) + (a + b) * flare, 1.0);
+        return vec4<f32>(mix(a, b, t) + (a + b) * flare, coverage(sa.a, sb.a, t));
     }
     if (kind == 2u) {
         // Luma dissolve: the outgoing frame's own brightness orders the reveal,
         // darkest first — the incoming preset eats the old one out of its shadows.
-        return vec4<f32>(mix(a, b, sweep(luma(a), t, LUMA_EDGE)), 1.0);
+        let f = sweep(luma(a), t, LUMA_EDGE);
+        return vec4<f32>(mix(a, b, f), coverage(sa.a, sb.a, f));
     }
     if (kind == 3u) {
         // Wipe: a soft-edged diagonal boundary, top-left to bottom-right.
         let key = clamp((in.uv.x + in.uv.y) * 0.5, 0.0, 1.0);
-        return vec4<f32>(mix(a, b, sweep(key, t, WIPE_EDGE)), 1.0);
+        let f = sweep(key, t, WIPE_EDGE);
+        return vec4<f32>(mix(a, b, f), coverage(sa.a, sb.a, f));
     }
     // Crossfade (kind 0, and the fallback for any unknown code).
-    return vec4<f32>(mix(a, b, t), 1.0);
+    return vec4<f32>(mix(a, b, t), coverage(sa.a, sb.a, t));
 }
 "#;
 
@@ -945,9 +979,12 @@ impl Renderer {
         {
             tr.latch_freeze();
         }
+        // On the capture frame `side` is the outgoing preset's, evaluated this
+        // frame; that is the one frame `advance` keeps what it reads.
+        let outgoing_paper = self.side.background.paper();
         let advanced = self.transition.as_mut().map(|tr| {
             (
-                tr.advance(dt, captured_ink, captured_exposure),
+                tr.advance(dt, captured_ink, captured_exposure, outgoing_paper),
                 tr.finished(),
             )
         });
@@ -1029,7 +1066,7 @@ mod tests {
         assert_eq!(tr.progress(), 0.0, "t = 0 is exactly the outgoing look");
 
         assert_eq!(
-            tr.advance(1.0 / 60.0, default_ink(), 1.0),
+            tr.advance(1.0 / 60.0, default_ink(), 1.0, false),
             Some(5),
             "the capture frame reports the index to flip the roster to"
         );
@@ -1049,7 +1086,7 @@ mod tests {
             let mut seen = Vec::new();
             for &dt in dts {
                 seen.push(tr.progress());
-                tr.advance(dt, default_ink(), 1.0);
+                tr.advance(dt, default_ink(), 1.0, false);
             }
             seen
         };
@@ -1061,10 +1098,10 @@ mod tests {
         let mut fast = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::Freeze);
         let mut slow = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::Freeze);
         for _ in 0..30 {
-            fast.advance(1.0 / 60.0, default_ink(), 1.0);
+            fast.advance(1.0 / 60.0, default_ink(), 1.0, false);
         }
         for _ in 0..15 {
-            slow.advance(1.0 / 30.0, default_ink(), 1.0);
+            slow.advance(1.0 / 30.0, default_ink(), 1.0, false);
         }
         assert!(
             (fast.progress() - slow.progress()).abs() < 1e-5,
@@ -1086,7 +1123,7 @@ mod tests {
         let mut tr = Transition::new(3, 7, 0.25, TransitionKind::Crossfade, Mode::Freeze);
         let mut frames = 0;
         while !tr.finished() {
-            tr.advance(1.0 / 60.0, default_ink(), 1.0);
+            tr.advance(1.0 / 60.0, default_ink(), 1.0, false);
             frames += 1;
             assert!(frames < 1000, "a 0.25 s dissolve must terminate");
         }
@@ -1198,7 +1235,7 @@ mod tests {
             !tr.is_dual_live(),
             "the opening frame is the outgoing composite itself, never a second one"
         );
-        tr.advance(1.0 / 60.0, InkParams::default(), 1.0);
+        tr.advance(1.0 / 60.0, InkParams::default(), 1.0, false);
         assert!(tr.is_dual_live(), "the frames after it run both sides live");
 
         tr.latch_freeze();
@@ -1207,7 +1244,7 @@ mod tests {
             "a demoted dissolve stops rendering the outgoing side"
         );
         for _ in 0..30 {
-            tr.advance(1.0 / 60.0, InkParams::default(), 1.0);
+            tr.advance(1.0 / 60.0, InkParams::default(), 1.0, false);
             assert!(!tr.is_dual_live(), "and never upgrades again");
         }
     }
@@ -1218,7 +1255,7 @@ mod tests {
         for dur in [0.0, -1.0, f32::NAN, f32::INFINITY] {
             let mut tr = Transition::new(0, 1, dur, TransitionKind::Crossfade, Mode::Freeze);
             for _ in 0..200 {
-                tr.advance(1.0 / 60.0, default_ink(), 1.0);
+                tr.advance(1.0 / 60.0, default_ink(), 1.0, false);
             }
             assert!(tr.finished(), "duration {dur} must still terminate");
             assert_eq!(tr.progress(), 1.0);
@@ -1232,13 +1269,165 @@ mod tests {
     fn a_degenerate_dt_advances_progress_by_the_nominal_share() {
         for bad in [0.0, -0.5, f32::NAN, f32::INFINITY] {
             let mut tr = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::Freeze);
-            tr.advance(0.25, default_ink(), 1.0); // past the capture frame
+            tr.advance(0.25, default_ink(), 1.0, false); // past the capture frame
             let before = tr.progress();
-            tr.advance(crate::render::sanitize_frame_dt(bad), default_ink(), 1.0);
+            tr.advance(
+                crate::render::sanitize_frame_dt(bad),
+                default_ink(),
+                1.0,
+                false,
+            );
             assert_eq!(
                 tr.progress(),
                 before + crate::render::scenes::FALLBACK_DT / tr.dur,
                 "a {bad} delta must advance the dissolve one nominal step"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod paper_tests {
+    //! A dissolve with a paper backdrop on one side (ADR-0270), on the GPU.
+    //!
+    //! Here rather than beside the capture suites because the dissolve never
+    //! draws its own `t = 1` frame — it finalizes first — so the endpoint can
+    //! only be reached by setting `t` on the running [`Transition`].
+
+    #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
+
+    use super::TransitionKind;
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::Preset;
+    use crate::render::context::RenderError;
+    use crate::render::{CaptureImage, HeadlessOptions, Renderer};
+
+    const SIZE: u32 = 64;
+    /// The paper fixture: a frozen solid voxel block on a white paper.
+    const PAPER: &str = include_str!("../../tests/fixtures/backdrop_paper.toml");
+
+    fn headless() -> Option<Renderer> {
+        match Renderer::new_headless(HeadlessOptions {
+            width: SIZE,
+            height: SIZE,
+            prefer_software: true,
+        }) {
+            Ok(r) => Some(r),
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                None
+            }
+            Err(e) => panic!("headless renderer build failed: {e}"),
+        }
+    }
+
+    /// The fixture under `name`, with `bg_paper` and `bg_bright` rebound. The
+    /// same block either way, so every covered pixel is the same scene on both
+    /// sides and only the ground differs.
+    fn variant(name: &str, paper: &str, bright: &str) -> Preset {
+        let toml = PAPER
+            .replacen("fixture_backdrop_paper", name, 1)
+            .replacen(
+                "bg_paper     = \"1\"",
+                &format!("bg_paper     = \"{paper}\""),
+                1,
+            )
+            .replacen(
+                "bg_bright    = \"1\"",
+                &format!("bg_bright    = \"{bright}\""),
+                1,
+            );
+        let preset = Preset::from_toml_str(&toml).expect("the paper fixture parses");
+        assert_eq!(preset.name, name, "the paper fixture's name line moved");
+        preset
+    }
+
+    /// The three frames of one dissolve from roster index `from` to `to`: its
+    /// capture frame (`t = 0`), and the frames drawn at `t = 0.5` and `t = 1`.
+    fn dissolve(
+        r: &mut Renderer,
+        frame: &AnalysisFrame,
+        from: usize,
+        to: usize,
+    ) -> [CaptureImage; 3] {
+        r.select_preset_now(from);
+        let _ = r
+            .capture_frame(frame)
+            .expect("settle on the outgoing preset");
+        r.begin_transition(to);
+        let force = |r: &mut Renderer, t: Option<f32>| {
+            let tr = r.transition.as_mut().expect("a dissolve is running");
+            tr.kind = TransitionKind::Crossfade;
+            if let Some(t) = t {
+                tr.t = t;
+            }
+        };
+        force(r, None);
+        let opening = r.capture_frame(frame).expect("the capture frame");
+        force(r, Some(0.5));
+        let mid = r.capture_frame(frame).expect("the frame at t = 0.5");
+        force(r, Some(1.0));
+        let end = r.capture_frame(frame).expect("the frame at t = 1");
+        assert!(r.transition.is_none(), "the dissolve finalized after t = 1");
+        [opening, mid, end]
+    }
+
+    /// **A dissolve between a paper side and a black-ground side is exact at both
+    /// ends and moves the uncovered ground between them** (ADR-0270), in both
+    /// directions: `t = 0` is byte-identical to the outgoing fixture alone,
+    /// `t = 1` to the incoming one alone, and at `t = 0.5` a corner — which the
+    /// block never covers — lies strictly between its two end values.
+    #[test]
+    fn a_dissolve_holds_the_paper_of_whichever_side_has_one() {
+        let Some(mut r) = headless() else {
+            return;
+        };
+        let frame = AnalysisFrame {
+            bass: 0.6,
+            mid: 0.5,
+            treb: 0.6,
+            ..Default::default()
+        };
+        r.set_presets(vec![
+            variant("paper_side", "1", "1"),
+            variant("black_side", "0", "0"),
+        ]);
+        let paper = r
+            .capture_preset("paper_side", &frame, 2)
+            .expect("paper alone");
+        let black = r
+            .capture_preset("black_side", &frame, 2)
+            .expect("black alone");
+        let corner = |img: &CaptureImage| [img.rgba[0], img.rgba[1], img.rgba[2]];
+        assert_eq!(
+            corner(&paper),
+            [255, 255, 255],
+            "the paper fixture's corner is white"
+        );
+        assert_eq!(
+            corner(&black),
+            [0, 0, 0],
+            "the black fixture's corner is black"
+        );
+
+        for (label, from, to, start, finish) in [
+            ("paper -> black", 0, 1, &paper, &black),
+            ("black -> paper", 1, 0, &black, &paper),
+        ] {
+            let [opening, mid, end] = dissolve(&mut r, &frame, from, to);
+            assert!(
+                opening.rgba == start.rgba,
+                "{label}: t = 0 is not the outgoing fixture alone"
+            );
+            assert!(
+                end.rgba == finish.rgba,
+                "{label}: t = 1 is not the incoming fixture alone"
+            );
+            let (a, m, b) = (corner(start)[0], corner(&mid)[0], corner(finish)[0]);
+            assert!(
+                a.min(b) < m && m < a.max(b),
+                "{label}: the uncovered corner reads {m} at t = 0.5, not strictly between \
+                 {a} and {b}"
             );
         }
     }

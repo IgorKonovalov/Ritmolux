@@ -1,0 +1,52 @@
+# A paper backdrop (ADR-0270): one solid voxel block, lit, in the middle of a
+# white page.
+#
+# The scene is `voxel_solid_block`'s frozen block, whose solid hits make its
+# coverage exactly 0 or 1 per pixel, so "fully covered" is a property of a
+# pixel rather than a threshold. It covers the middle of the frame and leaves
+# the corners empty.
+#
+#  - The palette is flat white at **both** ends. `bg_hue = 1` sits on the LUT's
+#    wrap seam, where the repeat-addressed sampler blends the last texel with
+#    the first, so a white ground needs white on both sides of the seam.
+#  - The block takes the flat brick red in the middle (`hue = 0.5`), so a
+#    covered pixel is neither the ground's white nor black.
+#  - `bg_shade` and `bg_shade_end` at 1 and no vignette, so every uncovered
+#    pixel is the palette stop at `bg_bright` exactly.
+system = "voxel"
+name   = "fixture_backdrop_paper"
+
+[generator]
+seed = 7
+
+[voxel]
+grid        = 16
+rules       = ["clouds"]
+seed_radius = 2.0
+seed_fill   = 1.0
+present     = "solid"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#ffffff" },
+  { at = 0.2, color = "#ffffff" },
+  { at = 0.4, color = "#c04020" },
+  { at = 0.6, color = "#c04020" },
+  { at = 0.8, color = "#ffffff" },
+  { at = 1.0, color = "#ffffff" },
+]
+
+[params]
+step_rate    = "0"
+hue          = "0.5"
+hue_spread   = "0"
+age_tint     = "0"
+yaw          = "0.6"
+pitch        = "0.4"
+distance     = "5"
+fov          = "0.8"
+bg_paper     = "1"
+bg_bright    = "1"
+bg_hue       = "1"
+bg_shade     = "1"
+bg_shade_end = "1"

@@ -291,6 +291,6 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0267](0267-judging-a-preset-set-is-a-studio-session-over-an-isolated-player.md) | Judging a preset set is a studio session over an isolated player | accepted 2026-10-07, Plan 0254 |
 | [0268](0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md) | A 3D automaton is a voxel system marched as an emitting, absorbing volume, and its rules are a roster indexed by one held parameter | accepted 2026-10-09, Plan 0255, Outcome |
 | [0269](0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md) | A solid voxel is lit by one key light and its own occlusion, and its light blooms like any other | accepted 2026-10-11, Plan 0256 |
-| [0270](0270-a-paper-backdrop-is-painted-after-the-tonemap-and-the-scene-lies-over-it-by-coverage.md) | A paper backdrop is painted after the tonemap, and the scene lies over it by coverage | proposed, Plan 0257 |
-| [0271](0271-a-voxel-is-opened-by-one-section-plane-held-in-the-cubes-own-frame.md) | A voxel is opened by one section plane, held in the cube's own frame | proposed, Plan 0258 |
+| [0270](0270-a-paper-backdrop-is-painted-after-the-tonemap-and-the-scene-lies-over-it-by-coverage.md) | A paper backdrop is painted after the tonemap, and the scene lies over it by coverage | accepted 2026-10-11, Plan 0257 |
+| [0271](0271-a-voxel-is-opened-by-one-section-plane-held-in-the-cubes-own-frame.md) | A voxel is opened by one section plane, held in the cube's own frame | accepted 2026-10-11, Plan 0258 |
 <!-- roster:end -->

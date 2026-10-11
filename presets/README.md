@@ -1111,6 +1111,9 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | `step_rate` | `8` | `0` – `30` | How many generations the automaton runs per second, whatever the frame rate; 0 freezes it. | motion, main |
 | `reseed` | `0` | `0` – `1` | A rise past 0.5 fills one ball of the cube with fresh seeded cells, once per rise; bind an onset or a beat to it. | motion |
 | `reseed_radius` | `0.25` | `0.05` – `1` | The radius of the ball a reseed fills, as a fraction of the cube's half-side. | shape |
+| `cut` | `0` | `0` – `1` | How much of the cube a section plane hides, so the inside shows: 0.5 cuts it through the centre, 1 hides it all, 0 is off. Only the view is cut; the automaton runs on. | shape, main |
+| `cut_yaw` | `0` | `0` – `6.2831855` | Which way the section plane faces around the cube's vertical axis, in radians: the side it hides. It turns with the cube, not the camera. | shape |
+| `cut_pitch` | `0` | `-1.5707964` – `1.5707964` | How far the section plane's hidden side tilts up toward the cube's top, in radians; negative tilts it down. | shape |
 | `shell_gain` | `0` | `0` – `4` | How strongly the spectrum lights the cube's radial shells, bass at the centre and treble at the faces; 0 leaves the light as the cells give it. | light |
 | `density` | `1` | `0` – `8` | How strongly the volume absorbs the light behind it, per unit of the cube's width; 0 is pure additive glow with no front or back. | light, main |
 | `trail` | `0.6` | `0` – `1` | How much of its light a decaying cell keeps at each stage of its decay; 0 draws only the live cells. | light |
@@ -1143,6 +1146,7 @@ The **Group** cell is where the studio files the parameter — shape, motion, co
 | Parameter | Default | Range | What it does | Group |
 |---|---|---|---|---|
 | `bg_coord_mode` | `0` | `0` – `1` | Which way the backdrop ramp is measured: 0 straight across the frame, 1 around a point, which turns its bands into a fan converging on that point. | post |
+| `bg_paper` | `0` | `0` – `1` | Paints the backdrop as paper rather than light: at 1 it is laid under the finished picture, so a white palette stop is display white and the scene covers it without being lifted. Paper does not bloom, fold, trail or follow exposure. | post |
 
 **Modal**
 
@@ -3412,6 +3416,69 @@ strips `bg_*` bindings before scoring motion
 ([ADR-0091](../docs/adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)),
 so a galaxy earns a preset **nothing** at either. The figure and any `[layer]` carry both floors, no
 matter how much of the frame the sky fills.
+
+#### Paper — `bg_paper`
+
+Everything above paints **light**, before the tonemap, and the tonemap's shoulder never reaches 1:
+`bg_bright = 1` over a white stop comes out a light grey, and no `bg_*` value gives display white.
+`bg_paper = 1` paints the same backdrop as **paper** instead
+([ADR-0270](../docs/adrs/0270-a-paper-backdrop-is-painted-after-the-tonemap-and-the-scene-lies-over-it-by-coverage.md)).
+
+| Param | Default | What it does |
+|---|---|---|
+| `bg_paper` | `0` | `0` paints the backdrop as light, everything above. `1` paints it as paper, under the finished picture. Structural: read as on at `0.5` and above, with nothing in between. |
+
+At `1` the frame starts transparent, the scene and the post chain draw as they always do, and the
+tonemap turns their light into a picture. The backdrop is then painted underneath at display
+values, and the picture is laid over it by the scene's own coverage: a pixel reads
+`tonemap(scene) + (1 - coverage) * paper`. Every `bg_*` param above keeps its meaning — the ramp, the
+fan, the band, the vignette — except that `bg_bright` is now a display value, not a light. So:
+
+- **A `#ffffff` stop at `bg_bright = 1` is 255**, and a pixel the scene fully covers is exactly what
+  it would be over black. The figure is not lifted to get a white ground, which is what binding
+  `exposure` up does.
+- **Paper is not light.** It does not bloom, the kaleidoscope does not fold it, `trails` do not
+  smear it, and `exposure` does not move it. A preset that switches between the two routes changes
+  how its ground answers every one of those.
+- **Additive light over paper composites by its coverage, not by adding.** A swarm particle on white
+  reads as a coloured mark, not as a brighter spot, because adding light to white has nowhere to go.
+  Content written for a black ground does not port to paper unchanged; an opaque figure, such as a
+  `present = "solid"` voxel, is what paper is for.
+- **A gradient on paper is not dithered.** The display write's dither covers the scene only. A flat
+  paper cannot band; a paper ramp at 8 bits can.
+- **`multiply` cannot darken the paper.** The paper is under the whole chain, so a `[layer]` with
+  `blend = "multiply"` has nothing to darken where the first layer is empty, and the paper shows
+  there unchanged — as a lit backdrop already does.
+- **Ink sees the paper.** Ink remaps the finished picture, ground included, so `ink_amount` on a
+  paper preset remaps its own page — a second way to lose the white.
+- **Two paper presets cut their grounds at a dissolve.** One paper is drawn per frame: the incoming
+  preset's when it has one, else the outgoing one's. Between a paper preset and a light one the
+  ground fades with its side.
+
+**The white has to be a stop the coordinate actually lands on.** `bg_hue = 1` sits on the
+palette's wrap seam: the coordinate repeats, so at exactly `1` the gradient's last colour is blended
+with its first. A palette from near-black at `0` to white at `1` gives a mid grey there, not white.
+End the palette on a short flat run and aim `bg_hue` inside it:
+
+```toml
+[palette]
+stops = [
+  { at = 0.0,  color = "#1e1e1e" },
+  { at = 0.6,  color = "#4a4a4a" },
+  { at = 0.98, color = "#ffffff" },
+  { at = 1.0,  color = "#ffffff" },
+]
+
+[params]
+bg_paper     = "1"
+bg_bright    = "1"
+bg_hue       = "0.99"
+bg_shade     = "1"
+bg_shade_end = "1"
+```
+
+`bg_shade` and `bg_shade_end` at `1` take out the ramp's default 0.72 tilt, which paper keeps like
+every other `bg_*` default.
 
 ### Backdrop occlusion — `occlude`
 

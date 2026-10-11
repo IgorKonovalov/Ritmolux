@@ -19,6 +19,8 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Closed earlier (index bullets)](#closed-earlier-index-bullets)
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0257 - The backdrop reaches paper white](#0257---the-backdrop-reaches-paper-white)
+  - [0258 - The voxel opens along a section plane](#0258---the-voxel-opens-along-a-section-plane)
   - [0256 - The voxels turn solid](#0256---the-voxels-turn-solid)
   - [0255 - The voxel automaton glows](#0255---the-voxel-automaton-glows)
   - [0252 - The lost preset ask is located and answered](#0252---the-lost-preset-ask-is-located-and-answered)
@@ -299,6 +301,8 @@ hand-edited.
 
 ## Closed earlier (index bullets)
 
+- [0238 - The waterfall system](done/0238-the-waterfall-system.md) - closed 2026-10-02, Phase 4 judged: rows show through. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.163.0**. [Write-up](README-archive.md).
+- [0247 - The studio renders a neural clip](done/0247-the-studio-renders-a-neural-clip.md) - closed 2026-10-02, Phase 6 owed. Review: **no blockers, no majors, two minors (one fixed), one nit.** Version: **0.162.0**. ADR-0262 accepted. [Write-up](README-archive.md).
 - [0236 - Space curves, and the camera becomes a shared block](done/0236-space-curves-and-the-camera-becomes-a-shared-block.md) - closed 2026-10-02, Phase 6 judged: three engine findings. Review: **no blockers, no majors, two minors (one fixed).** Version: **0.161.0**. ADR-0258 accepted. [Write-up](README-archive.md).
 - [0244 - Sessions start lighter](done/0244-sessions-start-lighter.md) - closed 2026-10-02, Phase 3 done the same day. Review: **no blockers, no majors, one minor, one nit (both fixed).** Version: none. [Write-up](README-archive.md).
 - [0202 - The three mechanisms get their gate](done/0202-the-three-mechanisms-get-their-gate.md) - closed 2026-10-02 at Phase 3. Review: **no blockers, no majors, five minors (four fixed).** Version: **0.160.2**. [Write-up](README-archive.md).
@@ -516,6 +520,46 @@ hand-edited.
 - [0001 — Core + standalone MVP, then foobar parity](done/0001-core-and-standalone-mvp.md) — closed 2026-07-21. Review: no blockers; C ABI recorded in ADR-0003
 
 ## Recently closed (full entries)
+
+### [0257 - The backdrop reaches paper white](done/0257-the-backdrop-reaches-paper-white.md)
+
+- closed 2026-10-11 by a conductor close in the lane `plan-0257-the-backdrop-reaches-paper-white`,
+round 1. The phases landed in `9e026bb7` (Phase 1), `acf290cb` (2) and `2dc4be87` (3). Phase 4
+(the owner's look and the preset-author skill text) is a `human` phase marked `Blocks merge: no`
+and is owed (ADR-0249). Round 1: **no blockers, no majors, one minor, one nit.** The minor (the
+dissolve test never reaches the dual-live path with a paper side) is test logic and stays open; the
+nit (the `background_composite.rs` module doc relying on nextest) was fixed at the close
+(`a0e4eefe`). Version **0.175.0** (minor: a feature). ADR-0270 accepted. Closes backlog 0287. The
+full review is the plan's own `## Close review`.
+- **What landed.** A structural backdrop param `bg_paper`: at 1 the chain clears transparent, the
+  same backdrop shader paints the display target at the surface format, and the tonemap writes the
+  scene over it with a premultiplied OVER blend, so a `#ffffff` stop at `bg_bright = 1` reads 255
+  and a covered pixel is byte-identical to the same scene over black. The dissolve carries coverage
+  and holds either side's paper. A golden `backdrop_paper`; `docs/examples/voxel/solid.toml` on
+  white with `exposure` dropped.
+- **Measured.** RADV RENOIR, 1920x1080, `Floor`, the solid teaching preset: 4.296 ms with paper,
+  5.032 ms without, one run.
+- **Curation.** `presets/` touched by regeneration and the hand-written paper section only; no
+  preset `.toml` added or changed.
+- **Translation advisory.** `docs/how-it-works.ru.md` lags its source by the paper-route paragraph.
+
+### [0258 - The voxel opens along a section plane](done/0258-the-voxel-opens-along-a-section-plane.md)
+
+- closed 2026-10-11 by a conductor close in the lane `plan-0258-the-voxel-opens-along-a-section-plane`,
+round 1. The phases landed in `2ae1af1c` (Phase 1), `7b0c6a12` (2) and `26e9e0b1` (3). Phase 4
+(the owner's look and the preset-author skill text) is a `human` phase marked `Blocks merge: no`
+and is owed (ADR-0249). Round 1: **no blockers, no majors, one minor.** The minor (no test renders
+the `glow` present under a cut) is test logic and stays open. Version **0.174.0** (minor: a
+feature). ADR-0271 accepted. Closes backlog 0288. The full review is the plan's own
+`## Close review`.
+- **What landed.** `voxel` gains three modal params, `cut`, `cut_yaw` and `cut_pitch`: every cell
+  beyond one plane held in the cube's own frame is dead to the march and to `solid_at`, so a dense
+  rule shows a stepped section of its inside, lit as any face and unoccluded by the cut cells. A
+  golden `voxel_section_lit` and a teaching preset `docs/examples/voxel/section.toml` (`crystal`,
+  `cut` swept on `time`).
+- **Measured.** RADV RENOIR, 1920x1080, `Floor`, uncut / cut at 0.5: sparse 6.462 / 6.390, cloudy
+  12.321 / 9.778, worst 13.110 / 10.112 ms. No fixture slower cut, on either tier.
+- **Curation.** `presets/` touched by regeneration only; no preset `.toml` added or changed.
 
 ### [0256 - The voxels turn solid](done/0256-the-voxels-turn-solid.md)
 
