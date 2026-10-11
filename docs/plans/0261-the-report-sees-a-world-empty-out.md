@@ -1,6 +1,6 @@
 # 0261 — The report sees a world empty out
 
-> **Status:** approved (2026-10-11)
+> **Status:** in-progress (2026-10-11)
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md), [ADR-0196](../adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md)
@@ -147,15 +147,43 @@ flowchart LR
 
 ## Implementation log
 
-**Lane:**
+**Lane:** `plan-0261-the-report-sees-a-world-empty-out`, worktree `/home/igor/Work/rlx-plan-0261`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The capture primitive and the column | dev | not started | |
+| 1 — The capture primitive and the column | dev | done | committed with this row |
 | 2 — The documentation and the skill text | dev | not started | |
 | 3 — The skill text | human | not started | |
 
 ### Notes
+
+- **Phase 1, the fixture.** The bare fixture is `grid = 32`, `rules = ["slow_decay"]`,
+  `seed_radius = 0.5`, `seed_fill = 0.45`, `step_rate = "8"`, no `reseed`. At `seed_fill` 0.05,
+  0.1, 0.2, 0.3, 0.35 and 0.4 (radius 0.5), and at radius 0.25 fill 0.3, the same seed read `late`
+  0.734, 0.386, 0.395, 0.163, 0.147, 0.124 and 0.197 on the release CLI and was not listed
+  `EMPTIED`: `slow_decay` survives a cell with one live neighbour, and the 0.1-fill frame 900
+  (`shot --frames 900`) shows a residue of isolated pairs, not a black cube. The 0.45 fixture read
+  0.070 there, and the test finds its reseeded twin not `EMPTIED` on the software adapter (the
+  0.1-fill reseeded twin read 1.796 on the CLI). So the TL;DR's "goes black" was not reproduced for
+  a sparse fill; a fill just under the rule's own 0.5 empties to under a tenth.
+- **Phase 1, layout.** `late` prints as a one-column block under the frame-cost block, not as a
+  column of the main table, which sits at 99 of the 100 columns
+  `no_report_table_line_wraps_at_a_hundred_columns` holds. That test and
+  `two_names_sharing_their_first_fourteen_characters_print_as_distinct_rows` now count one more
+  table. The JSON omits the `late` key where the text cell prints `-`, as `in_frame_geometry` does.
+- **Phase 1, the stimulus.** Frame 0 is a pulse (`beat_index` 0, the analyzer's first-detection
+  numbering), unlike `clock_stimulus`, so frames 29 and 899 sit at one phase after a pulse; `bpm`
+  is set to 120.
+- **Phase 1, the voxel readings**, release profile, RADV Renoir, from
+  `cargo run --release -p standalone --example shot -- --presets presets --report family=voxel`.
+  `--presets presets` was added to the plan's command: without it this box resolves the per-user
+  library, which holds no voxel preset. `late`: Voxel Ember 3.166, Voxel Ice 2.861, Voxel Nebula
+  1.494, Voxel Neon 1.968, Voxel Section 1.960, Voxel Solid 1.887, Voxel Solid Dark 1.923. No
+  shipped preset in the whole-library run below is listed `EMPTIED`, and none prints `-`.
+- **Phase 1, wall time** of `cargo run --release -p standalone --example shot -- --presets presets
+  --report` (101 presets), timed by a scratch Node wrapper, same box, same sitting: **234.2 s**
+  before, **441.8 s** after. Other lanes' suite runs shared the machine during this session and
+  were not controlled for.
 
 ### Close triggers
 

@@ -307,6 +307,86 @@ fn an_earlier_row_is_unchanged_by_asking_for_a_longer_run() {
     );
 }
 
+/// Frames in the time-varying stimulus the sampled-sequence case drives.
+const SEQUENCE_FRAMES: usize = 18;
+
+/// A stimulus that changes frame to frame: a moderate band level, with `onset`
+/// and `beat` pulsing every sixth frame, so a preset reading either sees edges
+/// a held frame never gives it.
+fn pulsed_sequence() -> Vec<AnalysisFrame> {
+    (0..SEQUENCE_FRAMES)
+        .map(|i| {
+            let pulse = i % 6 == 0;
+            AnalysisFrame {
+                bass: 0.5,
+                mid: 0.4,
+                treb: 0.2,
+                onset: if pulse { 1.0 } else { 0.0 },
+                beat: pulse,
+                beat_index: (i / 6) as u32,
+                ..Default::default()
+            }
+        })
+        .collect()
+}
+
+/// `capture_preset_over_at` is `capture_preset_over` with the readbacks it was
+/// not asked for left out: element `i` of the full sequence and a sample of
+/// index `i` are the same bytes, for an early index, a middle one and the last.
+///
+/// Each index is requested alone, so the readback buffer is built at a
+/// different point of the run each time — the property the shared rule with
+/// `capture_preset_at` has to survive.
+#[test]
+fn a_sampled_sequence_frame_is_the_frame_the_full_sequence_returns() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let name = a_preset();
+    let stimulus = pulsed_sequence();
+    let full = renderer
+        .capture_preset_over(&name, &stimulus)
+        .expect("the full sequence");
+    assert_eq!(full.len(), SEQUENCE_FRAMES, "one image per stimulus entry");
+
+    let last = SEQUENCE_FRAMES - 1;
+    for i in [2, 9, last] {
+        let sampled = renderer
+            .capture_preset_over_at(&name, &stimulus, &[i])
+            .expect("sample one frame of the sequence");
+        let sampled = sampled.first().expect("one requested frame, one image");
+        let whole = &full[i];
+        assert_eq!(
+            (sampled.width, sampled.height),
+            (whole.width, whole.height),
+            "frame {i}: capture dimensions differ"
+        );
+        assert!(
+            sampled.rgba == whole.rgba,
+            "frame {i} of a sampled sequence differs from element {i} of the full one"
+        );
+    }
+
+    // Non-vacuity: the sampled frames are not all one frame, so the equality
+    // above is comparing frames that could have differed.
+    assert!(
+        full[2].rgba != full[last].rgba,
+        "frames 2 and {last} are identical (is `{name}` animating?)"
+    );
+
+    // Order and the out-of-range index, on the same terms as `capture_preset_at`.
+    let both = renderer
+        .capture_preset_over_at(&name, &stimulus, &[last, 2])
+        .expect("two indices, out of order");
+    assert!(both[0].rgba == full[last].rgba && both[1].rgba == full[2].rgba);
+    assert!(
+        renderer
+            .capture_preset_over_at(&name, &stimulus, &[SEQUENCE_FRAMES])
+            .is_err(),
+        "an index past the stimulus is never drawn, so it is an error"
+    );
+}
+
 /// The degenerate requests, which a horizon of zero intervals will reach.
 #[test]
 fn an_empty_request_renders_nothing_and_a_repeated_index_renders_once() {

@@ -29,7 +29,7 @@ use rlx_core::render::metrics::{set_extent_diagnostic, take_draw_extent};
 use rlx_core::render::{CaptureImage, Renderer, Tier};
 
 use crate::shot::film::FILMSTRIP_WARMUP;
-use crate::shot::json::{json_matrix, json_string, json_transient, num};
+use crate::shot::json::{json_late, json_matrix, json_string, json_transient, num};
 
 /// Report render size — small; the metrics don't need resolution.
 const REPORT_SIZE: u32 = 192;
@@ -109,6 +109,22 @@ const CLOCK_BEATS_PER_BAR: u32 = 4;
 /// give `time_since_beat` the seconds the capture actually renders between
 /// frames.
 const CAPTURE_DT: f32 = 1.0 / 60.0;
+
+/// Frames in the `late` reading's pulse stimulus: 15 s at [`CAPTURE_DT`]. The
+/// length is the reading — every other capture here ends inside the first
+/// second, which is the blind spot the column exists to see past.
+const PULSE_FRAMES: usize = 900;
+/// Frames between two pulses of the stimulus: 120 BPM at [`CAPTURE_DT`].
+const PULSE_FRAMES_PER_BEAT: usize = 30;
+/// The early frame the `late` ratio divides by: the last frame before the
+/// second pulse. [`LATE_FRAME`] sits at the same phase after a pulse, so the
+/// two coverages compare like with like.
+const LATE_EARLY_FRAME: usize = PULSE_FRAMES_PER_BEAT - 1;
+/// The frame whose coverage the `late` ratio reads: the stimulus's last.
+const LATE_FRAME: usize = PULSE_FRAMES - 1;
+/// A `late` ratio at or below this is listed `EMPTIED`: the world kept a tenth
+/// or less of the light it had at half a second. Advisory, never an exit code.
+const EMPTIED_AT: f32 = 0.1;
 
 /// The size the frame-cost reading is taken at: 1080p, because that is the size
 /// NFR section 1 states its floor budget at (ADR-0232). A scene's cost is per
@@ -266,6 +282,15 @@ struct PresetReport {
     /// one will be read as one unless the block that prints it says otherwise.
     /// It is marked past [`COST_BUDGET_MS`] and it never fails a run.
     cost: Option<f32>,
+    /// Coverage at [`LATE_FRAME`] of a capture over [`pulse_stimulus`], as a
+    /// fraction of coverage at [`LATE_EARLY_FRAME`] of the same capture, both
+    /// against the early frame's modal ground, at [`PROBE_SIZE`]. `None` when
+    /// the early frame lit nothing, so there is no ratio to take.
+    ///
+    /// **A reading, not a gate**: it answers "did the world empty out under a
+    /// pulse that keeps firing", not "is it alive" — a static residue holds its
+    /// coverage, and a world can fade by design.
+    late: Option<f32>,
     transient: Transient,
     /// Gates this preset's expressions never exercised under the realistic
     /// probe — suspects, not convictions (see [`probe_reachability`]).
@@ -388,12 +413,16 @@ fn build_family_report(
     // — that is what makes it free, and it is also why it is the one column
     // measured at `PROBE_SIZE` (ADR-0134).
     let mut rates = Vec::with_capacity(names.len());
+    // The `late` reading shares the probe's size, so it rides the same resize.
+    let pulse = pulse_stimulus();
+    let mut lates = Vec::with_capacity(names.len());
     for name in names {
         let images = r
             .capture_preset_over(name, &stimulus)
             .map_err(|e| format!("probe `{name}`: {e}"))?;
         transients.push(probe_response(&images));
         rates.push(probe_rate(&images));
+        lates.push(late_reading(r, name, &pulse)?);
     }
     r.resize(REPORT_SIZE, REPORT_SIZE);
 
@@ -482,6 +511,7 @@ fn build_family_report(
             // Filled by the cost pass below, which runs after every other
             // reading so no existing column's capture changes.
             cost: None,
+            late: lates.get(index).copied().flatten(),
             transient: transients.get(index).copied().unwrap_or(Transient {
                 response: StepResponse {
                     rise_frames: 0,
@@ -1073,6 +1103,42 @@ fn write_ceiling_summary(out: &mut String, fam: &FamilyReport) {
     );
 }
 
+/// The per-family emptied block: every preset whose `late` reading fell to
+/// [`EMPTIED_AT`] or below, one per line.
+///
+/// Advisory, like every note here: a world that fades by design reads the same
+/// as one that dies, so the line says what was measured and the exit code never
+/// moves. Silent for a family where nothing emptied.
+fn write_emptied(out: &mut String, fam: &FamilyReport) {
+    let emptied: Vec<(&str, f32)> = fam
+        .presets
+        .iter()
+        .filter(|p| is_emptied(p.late))
+        .filter_map(|p| p.late.map(|ratio| (p.name.as_str(), ratio)))
+        .collect();
+    if emptied.is_empty() {
+        return;
+    }
+    let _ = writeln!(
+        out,
+        "  emptied: kept a tenth or less of its frame-{LATE_EARLY_FRAME} cover at frame \
+         {LATE_FRAME} under a pulse that keeps firing — a world that died, or one that fades \
+         by design; look before retuning"
+    );
+    for (name, ratio) in &emptied {
+        let _ = writeln!(out, "  EMPTIED {name} late={ratio:.3}");
+    }
+}
+
+/// One `late` cell: the ratio to three places, or `-` where the early frame lit
+/// nothing and there was no ratio to take.
+fn late_cell(late: Option<f32>) -> String {
+    match late {
+        Some(ratio) => format!("{ratio:.3}"),
+        None => "-".to_owned(),
+    }
+}
+
 /// One flagged gate as a line of report text. Worded as a suspect: it says what
 /// was observed, not what is wrong.
 fn gate_line(preset: &str, gate: &GateReport) -> String {
@@ -1170,6 +1236,93 @@ fn clock_stimulus() -> Vec<AnalysisFrame> {
             }
         })
         .collect()
+}
+
+/// The `late` reading's stimulus: [`PULSE_FRAMES`] frames of a music-like
+/// pulse at 120 BPM.
+///
+/// Bass, mid and treble hold [`LOW_LEVELS`] throughout, each with its `*_raw`
+/// twin and its slice of the band array, as [`band_stimuli_low`] sets them.
+/// Every [`PULSE_FRAMES_PER_BEAT`] frames, from frame 0, `onset` goes to full
+/// scale and `beat` fires for that one frame, so every edge a preset can bind
+/// keeps firing for the whole run — a held frame fires an edge-triggered
+/// binding once and never again. The clock fields advance as
+/// [`clock_stimulus`] advances them, except that frame 0 is a beat: the
+/// analyzer publishes its first detection as `beat_index` 0.
+fn pulse_stimulus() -> Vec<AnalysisFrame> {
+    let [bass, mid, treb, _] = LOW_LEVELS;
+    let [bass_raw, mid_raw, treb_raw, onset_raw] = RAW_AT_FULL_SCALE;
+    let mut base = AnalysisFrame {
+        bass,
+        mid,
+        treb,
+        bass_raw: bass * bass_raw,
+        mid_raw: mid * mid_raw,
+        treb_raw: treb * treb_raw,
+        bpm: 60.0 / (PULSE_FRAMES_PER_BEAT as f32 * CAPTURE_DT),
+        ..Default::default()
+    };
+    for (bands, level) in [(BASS_BANDS, bass), (MID_BANDS, mid), (TREB_BANDS, treb)] {
+        for band in base.spectrum.iter_mut().take(bands.end).skip(bands.start) {
+            *band = level;
+        }
+    }
+
+    let per_beat = PULSE_FRAMES_PER_BEAT as u32;
+    (0..PULSE_FRAMES as u32)
+        .map(|i| {
+            let beat_index = i / per_beat;
+            let into_beat = i % per_beat;
+            let pulse = into_beat == 0;
+            let beat_phase = into_beat as f32 / per_beat as f32;
+            let beat_in_bar = beat_index % CLOCK_BEATS_PER_BAR;
+            AnalysisFrame {
+                onset: if pulse { 1.0 } else { 0.0 },
+                onset_raw: if pulse { onset_raw } else { 0.0 },
+                beat: pulse,
+                beat_index,
+                time_since_beat: into_beat as f32 * CAPTURE_DT,
+                bar: beat_phase,
+                beat_in_bar,
+                bar_index: beat_index / CLOCK_BEATS_PER_BAR,
+                bar_phase: (beat_in_bar as f32 + beat_phase) / CLOCK_BEATS_PER_BAR as f32,
+                ..base
+            }
+        })
+        .collect()
+}
+
+/// Capture `name` over `stimulus`, reading back only [`LATE_EARLY_FRAME`] and
+/// [`LATE_FRAME`], and take [`late_ratio`] of the two. Runs at whatever size the
+/// renderer is configured to; the report runs it at [`PROBE_SIZE`].
+fn late_reading(
+    r: &mut Renderer,
+    name: &str,
+    stimulus: &[AnalysisFrame],
+) -> Result<Option<f32>, String> {
+    let images = r
+        .capture_preset_over_at(name, stimulus, &[LATE_EARLY_FRAME, LATE_FRAME])
+        .map_err(|e| format!("late `{name}`: {e}"))?;
+    match images.as_slice() {
+        [early, late] => Ok(late_ratio(early, late)),
+        _ => Err(format!("late `{name}`: expected two frames back")),
+    }
+}
+
+/// `late`'s coverage as a fraction of `early`'s, both measured against
+/// `early`'s modal ground with [`COVERAGE_EPS`] — one ground for both frames,
+/// so a world whose ground itself shifts reads as the change it is. `None`
+/// when `early` lit nothing: a ratio over zero coverage says nothing.
+fn late_ratio(early: &CaptureImage, late: &CaptureImage) -> Option<f32> {
+    let ground = modal_ground(early);
+    let before = coverage(early, ground, COVERAGE_EPS);
+    (before > 0.0).then(|| coverage(late, ground, COVERAGE_EPS) / before)
+}
+
+/// Whether a `late` reading lists its preset `EMPTIED`. An absent reading
+/// never does: a world that lit nothing at half a second has not emptied out.
+fn is_emptied(late: Option<f32>) -> bool {
+    late.is_some_and(|ratio| ratio <= EMPTIED_AT)
 }
 
 /// A transient measurement together with whether each direction actually
@@ -1540,6 +1693,34 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier, machine: &Mac
             );
         }
 
+        // The `late` reading, in a block of its own: the main table is at the
+        // width budget, and this is the one column read over 15 s rather than
+        // inside the first second.
+        let _ = writeln!(
+            out,
+            "\n  late is cover at frame {LATE_FRAME} of a {PULSE_FRAMES}-frame pulse (onset and \
+             beat every {PULSE_FRAMES_PER_BEAT} frames, bands at realistic levels) over cover at \
+             frame {LATE_EARLY_FRAME}, at {PROBE_SIZE}px; `-` where frame {LATE_EARLY_FRAME} lit \
+             nothing. A reading, not a gate: a static residue holds its cover, and a world can \
+             fade by design"
+        );
+        let _ = writeln!(
+            out,
+            "  {:<name_w$} {:>6}",
+            "preset",
+            "late",
+            name_w = NAME_WIDTH
+        );
+        for p in &fam.presets {
+            let _ = writeln!(
+                out,
+                "  {:<name_w$} {:>6}",
+                fit_name(&p.name),
+                late_cell(p.late),
+                name_w = NAME_WIDTH
+            );
+        }
+
         // The footprint reading (Plan 0077 Phase 4, backlog 0088), its own
         // block for the same reason the realistic-levels one is: the table
         // above stays un-widened and every historical number stays in place.
@@ -1644,6 +1825,7 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier, machine: &Mac
         write_holds(&mut out, fam);
         write_saturation(&mut out, fam);
         write_ceiling_summary(&mut out, fam);
+        write_emptied(&mut out, fam);
 
         let marked = fam
             .presets
@@ -1774,6 +1956,20 @@ fn render_json(source: &str, reports: &[FamilyReport], tier: Tier, machine: &Mac
                     } else {
                         "false"
                     }
+                ));
+            }
+            // Omitted where the text cell prints `-`: no early cover, no ratio.
+            if let Some(ratio) = p.late {
+                out.push_str(&format!(
+                    "\"late\":{},",
+                    json_late(
+                        ratio,
+                        LATE_EARLY_FRAME,
+                        LATE_FRAME,
+                        PULSE_FRAMES_PER_BEAT,
+                        PROBE_SIZE,
+                        is_emptied(p.late),
+                    )
                 ));
             }
             out.push_str(&format!(

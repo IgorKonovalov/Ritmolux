@@ -340,6 +340,89 @@ impl Renderer {
             .collect()
     }
 
+    /// Advance preset `name` one frame per entry of `stimulus` and read back only
+    /// the frames named in `at_frames` — the sibling that is
+    /// [`capture_preset_over`](Self::capture_preset_over) in what it renders and
+    /// [`capture_preset_at`](Self::capture_preset_at) in what it reads back.
+    ///
+    /// A long time-varying run needs both halves: a held frame never re-fires
+    /// an edge-triggered binding such as voxel's `reseed`, and reading back
+    /// every frame of a 900-frame run pays 900 readbacks to keep two.
+    ///
+    /// Frame `i` is the frame `capture_preset_over(name, stimulus)` returns at
+    /// index `i`, byte for byte — asserted in `core/tests/suite/capture_advance.rs`.
+    /// Rendering stops at the largest requested index, so `stimulus` entries
+    /// past it are never drawn. Images come back in `at_frames` order; a
+    /// repeated index yields the same frame twice. An empty `at_frames` renders
+    /// nothing, and an index at or past `stimulus.len()` is
+    /// [`RenderError::CaptureReadback`], since that frame is never drawn.
+    ///
+    /// **Off the hot path** — it blocks on a GPU readback per requested frame.
+    /// The readback buffer follows `capture_preset_at`'s rule: built once, at the
+    /// first requested frame, and reused for every later one.
+    pub fn capture_preset_over_at(
+        &mut self,
+        name: &str,
+        stimulus: &[AnalysisFrame],
+        at_frames: &[usize],
+    ) -> Result<Vec<CaptureImage>, RenderError> {
+        self.reset_for_capture(name)?;
+        let Some(&last) = at_frames.iter().max() else {
+            return Ok(Vec::new());
+        };
+
+        let (width, height) = (self.ctx.config.width, self.ctx.config.height);
+        let format = self.ctx.surface_format();
+        let (texture, view) = capture::create_target(&self.ctx.device, format, width, height);
+        let mut readback: Option<(wgpu::Buffer, u32)> = None;
+
+        let mut captured: Vec<(usize, CaptureImage)> = Vec::with_capacity(at_frames.len());
+        for (index, frame) in stimulus.iter().enumerate().take(last.saturating_add(1)) {
+            self.time += scenes::FALLBACK_DT;
+            if !at_frames.contains(&index) {
+                self.step_offscreen(frame, &view, width, height, scenes::FALLBACK_DT);
+                continue;
+            }
+            let slot = readback
+                .get_or_insert_with(|| capture::create_readback(&self.ctx.device, width, height));
+            let (buffer, padded_bpr) = (&slot.0, slot.1);
+            let mut encoder =
+                self.ctx
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("rlx-capture-over-at"),
+                    });
+            capture::record_clear(&mut encoder, &view);
+            let _ = self.draw_frame(
+                frame,
+                &mut encoder,
+                &view,
+                (width, height),
+                scenes::FALLBACK_DT,
+                SaltMode::Pinned,
+            );
+            capture::record_copy(&mut encoder, &texture, buffer, padded_bpr, width, height);
+            self.ctx.queue.submit(std::iter::once(encoder.finish()));
+
+            #[cfg(feature = "text")]
+            self.text_layer.end_frame();
+
+            let img = capture::read_back(&self.ctx.device, buffer, width, height, padded_bpr)?;
+            captured.push((index, img));
+        }
+
+        at_frames
+            .iter()
+            .map(|idx| {
+                captured
+                    .iter()
+                    .find(|(i, _)| i == idx)
+                    .map(|(_, img)| img.clone())
+                    .ok_or(RenderError::CaptureReadback)
+            })
+            .collect()
+    }
+
     /// Render preset `name` for `frames` frames at an **injected** `dt`, handing
     /// each frame to `sink` the moment it is read back (Plan 0101 / ADR-0114) —
     /// the **streaming** primitive, and the one an offline video render needs.

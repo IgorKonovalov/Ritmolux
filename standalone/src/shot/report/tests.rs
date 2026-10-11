@@ -7,8 +7,10 @@
 //! subprocess test asserting that the JSON's braces balanced (ADR-0073, and the
 //! coverage gap Plan 0061 Phase 4b left open when it scoped that test down).
 //!
-//! Everything here is GPU-free. The one function that needs a device -
-//! `build_family_report` - stays covered by `standalone/tests/suite/shot_cli.rs`.
+//! Everything here is GPU-free but one test. `build_family_report` needs a
+//! device and stays covered by `standalone/tests/suite/shot_cli.rs`; the `late`
+//! reading's voxel fixtures drive `late_reading` on the software adapter, and
+//! skip with notice where there is none (ADR-0016).
 
 // Tests index, expect and panic freely; this is not the render path.
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
@@ -52,6 +54,7 @@ fn preset_report(name: &str, gates: Vec<GateReport>) -> PresetReport {
         level: 0.1234,
         geometry: None,
         cost: Some(4.567),
+        late: Some(0.8137),
         transient: Transient {
             response: StepResponse {
                 rise_frames: 7,
@@ -878,8 +881,8 @@ fn no_report_table_line_wraps_at_a_hundred_columns() {
         .collect();
     assert_eq!(
         table.len(),
-        10,
-        "all five tables carry a header and this preset's row:\n{out}"
+        12,
+        "all six tables carry a header and this preset's row:\n{out}"
     );
     assert!(
         table.iter().any(|l| l.contains("count")),
@@ -921,7 +924,7 @@ fn two_names_sharing_their_first_fourteen_characters_print_as_distinct_rows() {
         .filter(|l| l.starts_with("  Tiled"))
         .map(|l| l.get(2..2 + NAME_WIDTH).unwrap_or(l))
         .collect();
-    assert_eq!(labels.len(), 8, "four tables, two rows each:\n{out}");
+    assert_eq!(labels.len(), 10, "five tables, two rows each:\n{out}");
     for pair in labels.chunks(2) {
         assert_ne!(
             pair.first(),
@@ -1199,6 +1202,224 @@ fn the_count_column_follows_onset_and_carries_its_schedule_in_the_json() {
         &machine(),
     );
     assert!(json.contains("\"count\":{\"mean\":0,"), "{json}");
+}
+
+/// The `late` stimulus keeps every edge firing for 15 s: 900 frames, `onset`
+/// and `beat` together on every thirtieth frame from frame 0 and on no other,
+/// the bands held at the realistic levels throughout, and the clock stepping
+/// with the beat. The two frames the ratio reads sit at the same phase after a
+/// pulse.
+#[test]
+fn the_pulse_stimulus_fires_every_thirty_frames_for_fifteen_seconds() {
+    let frames = pulse_stimulus();
+    assert_eq!(frames.len(), 900, "15 s at the capture step");
+    assert_eq!(LATE_FRAME, 899);
+    assert_eq!(LATE_EARLY_FRAME, 29);
+    assert_eq!(
+        LATE_FRAME % PULSE_FRAMES_PER_BEAT,
+        LATE_EARLY_FRAME % PULSE_FRAMES_PER_BEAT,
+        "the two read frames are at one phase after a pulse"
+    );
+
+    let [bass, mid, treb, _] = LOW_LEVELS;
+    let mut pulses = 0;
+    for (i, f) in frames.iter().enumerate() {
+        let pulse = i % 30 == 0;
+        assert_eq!(f.beat, pulse, "frame {i}: beat");
+        assert_eq!(f.onset, if pulse { 1.0 } else { 0.0 }, "frame {i}: onset");
+        assert_eq!(
+            f.onset_raw > 0.0,
+            pulse,
+            "frame {i}: onset_raw follows onset"
+        );
+        assert_eq!(
+            (f.bass, f.mid, f.treb),
+            (bass, mid, treb),
+            "frame {i}: bands"
+        );
+        assert!(f.bass_raw > 0.0 && f.mid_raw > 0.0 && f.treb_raw > 0.0);
+        assert_eq!(f.spectrum[BASS_BANDS.start], bass, "frame {i}: band array");
+        assert_eq!(f.beat_index, (i / 30) as u32, "frame {i}: beat_index");
+        assert_eq!(f.bar_index, (i / 120) as u32, "frame {i}: bar_index");
+        assert_eq!(
+            f.time_since_beat,
+            (i % 30) as f32 * CAPTURE_DT,
+            "frame {i}: time_since_beat"
+        );
+        assert!((f.bpm - 120.0).abs() < 1e-3, "frame {i}: bpm {}", f.bpm);
+        if pulse {
+            pulses += 1;
+        }
+    }
+    assert_eq!(pulses, 30, "thirty pulses in fifteen seconds");
+}
+
+/// A frame of `lit` pixels at 200 on a ground of 0, the rest at the ground —
+/// enough for `coverage` to read an exact fraction.
+fn lit_frame(lit: usize) -> CaptureImage {
+    let mut rgba = vec![0u8; 10 * 10 * 4];
+    for px in rgba.chunks_mut(4).take(lit) {
+        px.copy_from_slice(&[200, 200, 200, 255]);
+    }
+    for px in rgba.chunks_mut(4).skip(lit) {
+        px[3] = 255;
+    }
+    CaptureImage {
+        width: 10,
+        height: 10,
+        rgba,
+    }
+}
+
+/// `late` is the late frame's cover over the early frame's, a zero early cover
+/// is no reading, and the flag falls at a tenth inclusive.
+#[test]
+fn the_late_ratio_is_late_cover_over_early_cover_and_flags_at_a_tenth() {
+    let ratio = late_ratio(&lit_frame(40), &lit_frame(3)).expect("early frame is lit");
+    assert!(
+        (ratio - 0.075).abs() < 1e-6,
+        "3 of 100 over 40 of 100: {ratio}"
+    );
+    assert!(is_emptied(Some(ratio)));
+    assert!(is_emptied(Some(EMPTIED_AT)), "a tenth itself is emptied");
+    let grown = late_ratio(&lit_frame(20), &lit_frame(30)).expect("early frame is lit");
+    assert!((grown - 1.5).abs() < 1e-6, "a world can grow: {grown}");
+    assert!(!is_emptied(Some(grown)));
+    assert!(!is_emptied(Some(0.101)));
+    assert_eq!(late_ratio(&lit_frame(0), &lit_frame(30)), None);
+    assert!(!is_emptied(None), "no reading is not an emptied world");
+}
+
+/// The `late` block prints one cell per preset with `-` for no reading, the
+/// notes list exactly the rows at or under a tenth, and the JSON carries the
+/// same reading with its schedule — omitted, like the text's `-`, where there
+/// is none.
+#[test]
+fn the_late_column_prints_per_preset_and_the_notes_list_what_emptied() {
+    let fam = || {
+        let mut dead = preset_report("dying", vec![]);
+        dead.late = Some(0.0612);
+        let mut dark = preset_report("dark", vec![]);
+        dark.late = None;
+        FamilyReport {
+            system: SystemKind::Voxel,
+            presets: vec![preset_report("living", vec![]), dead, dark],
+            pixel: vec![vec![0.0; 3]; 3],
+            shape: vec![vec![0.0; 3]; 3],
+            near_dups: Vec::new(),
+        }
+    };
+    let out = text_report("src", &[fam()], Tier::Floor, &machine());
+    assert!(
+        out.lines()
+            .any(|l| l.split_whitespace().collect::<Vec<_>>() == ["preset", "late"]),
+        "late prints as a one-column block:\n{out}"
+    );
+    let row = |name: &str, cell: &str| format!("  {name:<w$} {cell:>6}\n", w = NAME_WIDTH);
+    assert!(out.contains(&row("living", "0.814")), "{out}");
+    assert!(out.contains(&row("dying", "0.061")), "{out}");
+    assert!(out.contains(&row("dark", "-")), "{out}");
+    assert!(out.contains("  EMPTIED dying late=0.061\n"), "{out}");
+    assert_eq!(out.matches("EMPTIED").count(), 1, "only dying:\n{out}");
+
+    let json = render_json("src", &[fam()], Tier::Floor, &machine());
+    assert!(
+        json.contains(
+            "\"late\":{\"ratio\":0.0612,\"early_frame\":29,\"late_frame\":899,\
+             \"frames_per_beat\":30,\"measured_at_px\":96,\"emptied\":true}"
+        ),
+        "{json}"
+    );
+    assert!(json.contains("\"ratio\":0.8137"), "{json}");
+    assert_eq!(
+        json.matches("\"late\":").count(),
+        2,
+        "no key for dark: {json}"
+    );
+    assert_eq!(json.matches('{').count(), json.matches('}').count());
+
+    // A family where nothing emptied prints no emptied block at all.
+    let quiet = FamilyReport {
+        system: SystemKind::Voxel,
+        presets: vec![preset_report("living", vec![])],
+        pixel: vec![vec![0.0]],
+        shape: vec![vec![0.0]],
+        near_dups: Vec::new(),
+    };
+    let out = text_report("src", &[quiet], Tier::Floor, &machine());
+    assert!(
+        !out.contains("EMPTIED") && !out.contains("emptied:"),
+        "{out}"
+    );
+}
+
+/// A sparse voxel seed under `slow_decay`, half the rule's own seed radius,
+/// binding no `reseed`. The rule's survival counts leave it a few stable pairs
+/// at best, so it keeps well under a tenth of its early light by frame 899.
+const SPARSE_DECAY: &str = "system = \"voxel\"\n\
+     name = \"Sparse Decay\"\n\
+     [voxel]\ngrid = 32\nrules = [\"slow_decay\"]\nseed_radius = 0.5\n\
+     seed_fill = 0.45\npresent = \"solid\"\n\
+     [params]\nstep_rate = \"8\"\n";
+
+/// The `late` reading tells a world that dies under music from one music keeps
+/// alive. The same sparse `slow_decay` seed is run twice under the pulse: bare,
+/// it is listed `EMPTIED`, and with `reseed = "onset"` — refilled on every
+/// pulse — it is not.
+#[test]
+fn a_sparse_voxel_seed_empties_unless_an_onset_reseed_refills_it() {
+    use rlx_core::render::{HeadlessOptions, RenderError};
+
+    let bare = Preset::from_toml_str(SPARSE_DECAY).expect("bare fixture loads");
+    let reseeded = Preset::from_toml_str(&format!(
+        "{}reseed = \"onset\"\n",
+        SPARSE_DECAY.replace("Sparse Decay", "Sparse Reseed")
+    ))
+    .expect("reseeded fixture loads");
+    let mut r = match Renderer::new_headless(HeadlessOptions {
+        width: PROBE_SIZE,
+        height: PROBE_SIZE,
+        prefer_software: true,
+    }) {
+        Ok(r) => r,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    r.set_presets(vec![bare, reseeded]);
+
+    let pulse = pulse_stimulus();
+    let presets: Vec<PresetReport> = ["Sparse Decay", "Sparse Reseed"]
+        .iter()
+        .map(|name| {
+            let mut p = preset_report(name, vec![]);
+            p.late = late_reading(&mut r, name, &pulse).expect("late reading");
+            p
+        })
+        .collect();
+    let lates: Vec<Option<f32>> = presets.iter().map(|p| p.late).collect();
+    let out = text_report(
+        "src",
+        &[FamilyReport {
+            system: SystemKind::Voxel,
+            presets,
+            pixel: vec![vec![0.0; 2]; 2],
+            shape: vec![vec![0.0; 2]; 2],
+            near_dups: Vec::new(),
+        }],
+        Tier::Floor,
+        &machine(),
+    );
+    assert!(
+        out.contains("EMPTIED Sparse Decay late="),
+        "the bare seed empties out (late {lates:?}):\n{out}"
+    );
+    assert!(
+        !out.contains("EMPTIED Sparse Reseed"),
+        "an onset reseed keeps it alive (late {lates:?}):\n{out}"
+    );
 }
 
 /// The whole shipped library fits into distinct row labels. This is the claim
