@@ -1,11 +1,16 @@
 # The `voxel` system drawn solid, for the illustrated guide's picture of it.
 # Teaching material, not a shipped preset: the `pyroclastic` rule, a restless
 # porous foam that never settles, each live cell a near-black cube under one
-# key light that turns with the camera, on a white backdrop, so the structure
+# key light that turns with the camera, on a white page, so the structure
 # reads as ink on paper and can be seen into. The palette's dark end is the
-# cubes (`hue` 0, no spread); its white end is the backdrop (`bg_hue` 1), and
-# `exposure` 3 lifts that backdrop from the tonemap's grey to white. The bass
-# brightens the key light and an onset refills a ball of cells.
+# cubes (`hue` 0, no spread); its flat white end is the backdrop.
+#
+# The backdrop is paper (`bg_paper` 1): it is painted after the tonemap, so
+# the white stop at `bg_bright` 1 is display white, and the cubes lie over it
+# as rendered rather than being lifted with the ground. `bg_hue`
+# sits inside the flat white segment, short of 1: the palette repeats, and at
+# exactly 1 the white end blends with the dark start. The bass brightens the
+# key light and an onset refills a ball of cells.
 system = "voxel"
 name = "Voxel Solid"
 
@@ -18,9 +23,10 @@ present     = "solid"
 
 [palette]
 stops = [
-  { at = 0.0, color = "#1e1e1e" },
-  { at = 0.6, color = "#4a4a4a" },
-  { at = 1.0, color = "#ffffff" },
+  { at = 0.0,  color = "#1e1e1e" },
+  { at = 0.6,  color = "#4a4a4a" },
+  { at = 0.98, color = "#ffffff" },
+  { at = 1.0,  color = "#ffffff" },
 ]
 
 [params]
@@ -39,8 +45,8 @@ light_pitch  = "0.6"
 yaw          = "0.6 + time * 0.1"
 pitch        = "0.35"
 distance     = "4.2"
+bg_paper     = "1"
 bg_bright    = "1"
-bg_hue       = "1"
+bg_hue       = "0.99"
 bg_shade     = "1"
 bg_shade_end = "1"
-exposure     = "3"

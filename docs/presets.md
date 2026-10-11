@@ -267,6 +267,18 @@ is the single place the frame becomes a displayable picture. That is why
 `bloom_threshold` can mean "brighter than the display could show" and why stacked
 strokes roll off with their colour intact instead of flattening to white.
 
+**`bg_paper = 1` moves the backdrop to the other side of that line.** The
+background pass then clears the frame transparent, the same `bg_*` gradient is
+painted after the tonemap, and the tonemapped scene is laid over it by its own
+coverage. A `#ffffff` stop at `bg_bright = 1` is display white, which the light
+route cannot reach, and a pixel the scene fully covers is exactly what it is over
+black. Paper is not light: it does not bloom, it is not folded by the
+kaleidoscope, it does not smear under `trails`, and `exposure` does not move it.
+Additive light over it composites by its coverage rather than adding, and a
+gradient on it is not dithered. The details and the traps are under
+[Paper](../presets/README.md#paper--bg_paper)
+([ADR-0270](adrs/0270-a-paper-backdrop-is-painted-after-the-tonemap-and-the-scene-lies-over-it-by-coverage.md)).
+
 **The post chain renders at the render target's own resolution.** `trails` and
 `kaleido_*` follow the target (quantized and capped) rather than a fixed grid, so
 composing either one costs no sharpness at any display size.

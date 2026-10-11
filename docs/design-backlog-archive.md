@@ -360,7 +360,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0287 | the backdrop cannot reach white, so black-on-white needs `exposure`, which also lifts the scene | [Plan 0257](plans/0257-the-backdrop-reaches-paper-white.md). **Promoted** |
 | 0289 | `shot --signal` beside `--all` silently draws a filmstrip of the first preset | [Plan 0259](plans/0259-the-contact-sheet-hears-the-clip.md). **Promoted** |
 | 0291 | a studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it | [Plan 0260](plans/0260-the-studio-tests-leave-tmp-as-they-found-it.md). **Promoted** |
 <!-- roster:end -->
@@ -696,6 +695,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0219 | A `ctl/preset` datagram on loopback never reached the listener's queue | [ADR-0265](adrs/0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md) + [Plan 0252](plans/done/0252-the-lost-preset-ask-is-located-and-answered.md). Acked and resent. **Closed 2026-10-07** |
 | 0220 | A headless walk of the system roster stalls at `emitter` | [ADR-0265](adrs/0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md) + [Plan 0252](plans/done/0252-the-lost-preset-ask-is-located-and-answered.md). Acked and resent. **Closed 2026-10-07** |
 | 0288 | A solid voxel mass has no cut-away, so seeing inside it depends on choosing a porous rule | [ADR-0271](adrs/0271-a-voxel-is-opened-by-one-section-plane-held-in-the-cubes-own-frame.md) + [Plan 0258](plans/done/0258-the-voxel-opens-along-a-section-plane.md). A section plane; Phase 4 owed. **Closed 2026-10-11** |
+| 0287 | The backdrop cannot reach white, so black-on-white needs `exposure`, which also lifts the scene | ADR-0270 + [Plan 0257](plans/done/0257-the-backdrop-reaches-paper-white.md). `bg_paper`; Phase 4 owed. **Closed 2026-10-11** |
 <!-- roster:end -->
 
 ---
@@ -17343,7 +17343,15 @@ outside the ink remap. Which of those is the right shape is the open question.
   `present: \| .bg_bright. \| .0. \| .0. – .1. \| in: presets/README.md`
 - **Verified 2026-10-11** — and the teaching preset leans on `exposure` for it:
   `present: exposure     = "3" in: docs/examples/voxel/solid.toml`
-- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0257](plans/0257-the-backdrop-reaches-paper-white.md) was approved.
+- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0257](plans/done/0257-the-backdrop-reaches-paper-white.md) was approved.
+
+**CLOSED 2026-10-11** — [Plan 0257](plans/done/0257-the-backdrop-reaches-paper-white.md)
+and [ADR-0270](adrs/0270-a-paper-backdrop-is-painted-after-the-tonemap-and-the-scene-lies-over-it-by-coverage.md).
+The backdrop gains the structural param `bg_paper`: at 1 the chain clears transparent, the same
+backdrop shader paints the display target at the surface format, and the tonemap lays the scene over
+it by coverage. A `#ffffff` stop at `bg_bright = 1` reads 255, a covered pixel is byte-identical to
+the same scene over black, and `docs/examples/voxel/solid.toml` is black on white with no
+`exposure`. Phase 4 (the owner's live look and the preset-author skill row) is owed.
 
 ## 0288 — a solid voxel mass has no cut-away, so seeing inside it depends on choosing a porous rule
 

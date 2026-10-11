@@ -11,6 +11,7 @@ use crate::dsp::AnalysisFrame;
 use crate::preset::Preset;
 use crate::render::capture;
 use crate::render::context::{RenderContext, RenderError};
+use crate::render::gpu;
 use crate::render::{CaptureImage, HeadlessOptions, Renderer};
 
 /// **Near-identity below the mid-range** (ADR-0046). A frame whose values are
@@ -179,6 +180,19 @@ fn resolve_linear(
     texels: &[u8],
     dither: bool,
 ) -> CaptureImage {
+    resolve_onto(ctx, (width, height), texels, dither, None)
+}
+
+/// [`resolve_linear`], optionally over a **paper**: with `Some(colour)` the
+/// output is cleared to that colour first and the pass resolves through its
+/// OVER pipeline (ADR-0270), exactly as the frame path does after painting one.
+fn resolve_onto(
+    ctx: &RenderContext,
+    (width, height): (u32, u32),
+    texels: &[u8],
+    dither: bool,
+    paper: Option<wgpu::Color>,
+) -> CaptureImage {
     let mut tonemap = Tonemap::new(&ctx.device, ctx.surface_format());
     tonemap.set_dither(dither);
     let _ = tonemap.begin((width, height));
@@ -213,7 +227,15 @@ fn resolve_linear(
         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("tonemap-injected-frame"),
         });
-    tonemap.resolve(&ctx.queue, &mut encoder, &view);
+    if let Some(colour) = paper {
+        gpu::color_pass(
+            &mut encoder,
+            "tonemap-test-paper",
+            &view,
+            wgpu::LoadOp::Clear(colour),
+        );
+    }
+    tonemap.resolve(&ctx.queue, &mut encoder, &view, paper.is_some());
     capture::record_copy(&mut encoder, &target, &buffer, padded_bpr, width, height);
     ctx.queue.submit(std::iter::once(encoder.finish()));
     capture::read_back(&ctx.device, &buffer, width, height, padded_bpr)
@@ -385,6 +407,70 @@ fn the_shader_implements_the_documented_curve() {
             "the shader mapped {value} to byte {actual}, the documented curve \
              says {expected:.1}"
         );
+    }
+}
+
+/// **The OVER write lays the mapped scene over a paper by its coverage**
+/// (ADR-0270): `tonemap(scene) + (1 - alpha) * paper`.
+///
+/// Three column bands of one injected premultiplied frame, over a white paper:
+/// empty (`alpha = 0`) must be the paper exactly, opaque (`alpha = 1`) must be
+/// byte-identical to the same frame through the shipping `REPLACE` write, and
+/// half-covered must add half the paper to the mapped colour. The dither is on,
+/// as it ships: it fades to nothing at the black rail, which is what keeps an
+/// empty pixel the paper's own byte.
+#[test]
+fn the_over_write_lays_the_scene_over_the_paper_by_coverage() {
+    const SIZE: u32 = 12;
+    let Some(ctx) = context(SIZE, SIZE, true) else {
+        return;
+    };
+    // (premultiplied grey, alpha) per third of the frame, along x.
+    let band = |x: u32| match x * 3 / SIZE {
+        0 => (0.0f32, 0.0f32),
+        1 => (0.5, 1.0),
+        _ => (0.125, 0.5),
+    };
+    let mut texels = Vec::with_capacity((SIZE * SIZE * 8) as usize);
+    for _ in 0..SIZE {
+        for x in 0..SIZE {
+            let (grey, alpha) = band(x);
+            for channel in [grey, grey, grey, alpha] {
+                // `to_half` covers ordinary magnitudes only; zero is all bits clear.
+                let half = if channel == 0.0 { 0 } else { to_half(channel) };
+                texels.extend_from_slice(&half.to_le_bytes());
+            }
+        }
+    }
+
+    let over = resolve_onto(&ctx, (SIZE, SIZE), &texels, true, Some(wgpu::Color::WHITE));
+    let replace = resolve_onto(&ctx, (SIZE, SIZE), &texels, true, None);
+    for (index, (o, r)) in over
+        .rgba
+        .chunks_exact(4)
+        .zip(replace.rgba.chunks_exact(4))
+        .enumerate()
+    {
+        let x = index as u32 % SIZE;
+        match x * 3 / SIZE {
+            0 => assert_eq!(
+                &o[..3],
+                &[255, 255, 255],
+                "an empty pixel is not the paper at x {x}"
+            ),
+            1 => assert_eq!(o, r, "a covered pixel moved under the paper at x {x}"),
+            _ => {
+                // 0.125 is below the knee, so the map leaves it, and half the
+                // white paper shows through: 0.625 linear. The bound is the
+                // dither's one encoded level plus the write's rounding.
+                let expected = encode_srgb(0.625) * 255.0;
+                assert!(
+                    (o[0] as f32 - expected).abs() <= 2.0,
+                    "a half-covered pixel reads {} at x {x}, expected {expected:.1}",
+                    o[0]
+                );
+            }
+        }
     }
 }
 

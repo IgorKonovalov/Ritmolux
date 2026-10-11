@@ -130,6 +130,26 @@
 //! suite captures on a software adapter (lavapipe, ADR-0242). The mis-render is
 //! a WARP reading, unverified on lavapipe as of 2026-10-06.
 //!
+//! # Paper: the backdrop painted display-referred (ADR-0270)
+//!
+//! Everything above paints **light**, upstream of the tonemap, whose shoulder
+//! never reaches 1 — so no `bg_*` value gives display white. `bg_paper = 1`
+//! moves the same gradient to the other side of the format boundary:
+//!
+//! - [`render`](Background::render) clears the chain's destination to
+//!   **transparent** and draws nothing, so the tonemap's input alpha is the
+//!   scene's own coverage;
+//! - [`render_paper`](Background::render_paper) runs the same shader, with every
+//!   `bg_*` param meaning what it means above, into the tonemap's **output** at
+//!   the surface format, through a second pipeline built for that format;
+//! - the tonemap then writes over it with a premultiplied OVER blend, so a pixel
+//!   reads `tonemap(scene) + (1 - coverage) * paper`.
+//!
+//! Paper is therefore not light: it does not bloom, fold, trail or move with
+//! `exposure`. At `bg_paper = 0` neither the transparent clear nor the second
+//! pipeline is reached; each of the two pipelines is built on the first frame
+//! that draws through it.
+//!
 //! The **fragment field** is the one scene that still draws opaquely over the
 //! backdrop, so its bg params have no visible effect. Every other scene composites
 //! over it: the *sparse* scenes (lines, swarm, attractor) reveal the gradient in
@@ -173,6 +193,11 @@ const DEFAULT_COORD_MODE: f32 = default_of(PARAMS, "bg_coord_mode");
 /// The last mode the shader defines. Values past it clamp here rather than
 /// falling through to an arm that does not exist.
 const MAX_COORD_MODE: f32 = 1.0;
+
+/// `bg_paper` default — **0, the backdrop as light**. Read as on at `>= 0.5`,
+/// the threshold `bg_coord_mode` rounds at, so there is nothing between the
+/// two routes.
+const DEFAULT_PAPER: f32 = default_of(PARAMS, "bg_paper");
 
 /// The vanishing point's defaults — **the frame's own middle**, which is where a
 /// fan with no centre named should radiate from.
@@ -520,10 +545,17 @@ struct Bg {
     r: [f32; 4],
 }
 
-/// The gradient pipeline, its uniform and its LUT pair, built lazily on the first
-/// frame that actually paints a backdrop (see the module docs on the WARP quirk).
+/// The gradient's shader, uniform and LUT pair, built lazily on the first frame
+/// that actually paints a backdrop (see the module docs on the WARP quirk), and
+/// its two pipelines, each built on the first frame that draws through it.
 struct Resources {
-    pipeline: wgpu::RenderPipeline,
+    shader: wgpu::ShaderModule,
+    bind_layout: wgpu::BindGroupLayout,
+    lut_layout: wgpu::BindGroupLayout,
+    /// The linear pipeline, at the chain's format: the backdrop as light.
+    pipeline: Option<wgpu::RenderPipeline>,
+    /// The paper pipeline and the display format it was built for (ADR-0270).
+    paper: Option<(wgpu::TextureFormat, wgpu::RenderPipeline)>,
     uniforms: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     /// The gradient LUTs + sampler (group 1), kept out of the uniform group so
@@ -535,7 +567,7 @@ struct Resources {
 }
 
 impl Resources {
-    fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    fn build(device: &wgpu::Device) -> Self {
         let shader =
             gpu::fullscreen_shader(device, "background-shader", gpu::FULLSCREEN_VS_NDC, SHADER);
         let uniforms = gpu::uniform_buffer(device, "background-params", std::mem::size_of::<Bg>());
@@ -625,24 +657,37 @@ impl Resources {
                 },
             ],
         });
-        // Opaque: the backdrop establishes the frame the scene loads over.
-        let pipeline = gpu::fullscreen_pipeline(
-            device,
-            &shader,
-            &[&bind_layout, &lut_layout],
-            surface_format,
-            wgpu::BlendState::REPLACE,
-            "background",
-        );
-
         Self {
-            pipeline,
+            shader,
+            bind_layout,
+            lut_layout,
+            pipeline: None,
+            paper: None,
             uniforms,
             bind_group,
             lut_bind_group,
             lut_texture_a,
             lut_texture_b,
         }
+    }
+
+    /// One pipeline over this shader and these layouts, at `format`. Opaque
+    /// either way: the linear one establishes the frame the scene loads over,
+    /// and the paper one the frame the tonemap lies over.
+    fn pipeline_for(
+        &self,
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        label: &str,
+    ) -> wgpu::RenderPipeline {
+        gpu::fullscreen_pipeline(
+            device,
+            &self.shader,
+            &[&self.bind_layout, &self.lut_layout],
+            format,
+            wgpu::BlendState::REPLACE,
+            label,
+        )
     }
 }
 
@@ -716,6 +761,8 @@ pub struct Background {
     band_curve: f32,
     band_hue: f32,
     band_hue_span: f32,
+    /// `bg_paper`, raw as bound; [`paper`](Self::paper) reads it.
+    paper: f32,
     /// The active preset's baked palette pair, re-uploaded to the LUT textures
     /// when `palette_dirty` (a preset switch, or a lazy rebuild), off the hot
     /// path. Held here rather than in [`Resources`] so a backdrop that has not
@@ -899,6 +946,17 @@ pub const PARAMS: &[ParamSpec] = &[
         group: ParamGroup::Post,
         main: false,
     },
+    ParamSpec {
+        name: "bg_paper",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Paints the backdrop as paper rather than light: at 1 it is laid under the finished \
+              picture, so a white palette stop is display white and the scene covers it without \
+              being lifted. Paper does not bloom, fold, trail or follow exposure.",
+        kind: ParamKind::Structural,
+        group: ParamGroup::Post,
+        main: false,
+    },
 ];
 
 /// The exponent the shader will **actually apply** for a bound `bg_ramp_gamma`:
@@ -999,6 +1057,7 @@ impl Background {
             band_curve: DEFAULT_BAND_CURVE,
             band_hue: DEFAULT_BAND_HUE,
             band_hue_span: DEFAULT_BAND_HUE_SPAN,
+            paper: DEFAULT_PAPER,
             // Seeded with the default `spectrum`, so a backdrop painted
             // before any `set_palette` call is that palette's colour
             // rather than black.
@@ -1050,6 +1109,7 @@ impl Background {
         self.band_curve = DEFAULT_BAND_CURVE;
         self.band_hue = DEFAULT_BAND_HUE;
         self.band_hue_span = DEFAULT_BAND_HUE_SPAN;
+        self.paper = DEFAULT_PAPER;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
     }
@@ -1078,6 +1138,7 @@ impl Background {
             "bg_band_curve" => self.band_curve = value,
             "bg_band_hue" => self.band_hue = value,
             "bg_band_hue_span" => self.band_hue_span = value,
+            "bg_paper" => self.paper = value,
             _ => return false,
         }
         true
@@ -1098,7 +1159,9 @@ impl Background {
     /// Own the frame clear — the first pass of the composite. With no visible
     /// backdrop at all (`bg_bright <= 0` *and* `bg_band_amount <= 0`) this is a
     /// plain black clear (no pipeline); with either, it lazily builds the
-    /// gradient pipeline and paints it fullscreen.
+    /// gradient pipeline and paints it fullscreen. At `bg_paper = 1` it is a
+    /// **transparent** clear whatever is bound, and the gradient is painted by
+    /// [`render_paper`](Self::render_paper) instead.
     ///
     /// # `surface` is the **destination's** size, never an internal grid's
     ///
@@ -1117,11 +1180,19 @@ impl Background {
         view: &wgpu::TextureView,
         surface: (u32, u32),
     ) {
-        // **A band alone is enough to build this pass** (ADR-0095).
-        // Testing `bright <= 0` alone makes a galaxy over a near-black
-        // sky render nothing at all — and that is the configuration the
-        // reference photograph is, not an edge case.
-        if self.bright <= 0.0 && self.band_amount <= 0.0 {
+        // Paper (ADR-0270): the ground is painted past the tonemap by
+        // `render_paper`, so here the frame starts empty and the alpha the
+        // tonemap reads is the scene's own coverage.
+        if self.paper() {
+            gpu::color_pass(
+                encoder,
+                "background-clear-paper",
+                view,
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            );
+            return;
+        }
+        if !self.visible() {
             // Passthrough: a plain black clear establishes the frame without a
             // second fullscreen pipeline (module docs: NFR §1 + WARP).
             gpu::color_pass(
@@ -1133,12 +1204,104 @@ impl Background {
             return;
         }
 
+        self.prepare(queue, surface);
+        let Some(res) = self.res.as_mut() else {
+            return;
+        };
+        if res.pipeline.is_none() {
+            res.pipeline = Some(res.pipeline_for(&self.device, self.surface_format, "background"));
+        }
+        let Some(pipeline) = res.pipeline.as_ref() else {
+            return;
+        };
+        // The backdrop owns the clear: establish the frame here so no scene
+        // needs to (ADR-0018).
+        let mut pass = gpu::color_pass(
+            encoder,
+            "background-pass",
+            view,
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+        );
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &res.bind_group, &[]);
+        pass.set_bind_group(1, &res.lut_bind_group, &[]);
+        pass.draw(0..3, 0..1);
+    }
+
+    /// Whether this backdrop is paper (ADR-0270): `bg_paper >= 0.5`. A NaN
+    /// binding reads as off.
+    pub fn paper(&self) -> bool {
+        self.paper >= 0.5
+    }
+
+    /// Paint the paper into `view`, the tonemap's **output** at `format`, the
+    /// display format — ink's input, or the surface. Clears `view` to black
+    /// first, so with nothing visible bound the paper is black and this is a
+    /// plain clear, exactly as [`render`](Self::render)'s passthrough is.
+    ///
+    /// The tonemap then loads `view` and writes over it by coverage; the caller
+    /// draws this only when [`paper`](Self::paper) holds for the side it
+    /// paints. `surface` is the destination's size, for the same reason as
+    /// [`render`](Self::render)'s.
+    pub fn render_paper(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        surface: (u32, u32),
+        format: wgpu::TextureFormat,
+    ) {
+        if !self.visible() {
+            gpu::color_pass(
+                encoder,
+                "background-paper-clear",
+                view,
+                wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+            );
+            return;
+        }
+        self.prepare(queue, surface);
+        let Some(res) = self.res.as_mut() else {
+            return;
+        };
+        if res.paper.as_ref().is_none_or(|(built, _)| *built != format) {
+            let pipeline = res.pipeline_for(&self.device, format, "background-paper");
+            res.paper = Some((format, pipeline));
+        }
+        let Some((_, pipeline)) = res.paper.as_ref() else {
+            return;
+        };
+        let mut pass = gpu::color_pass(
+            encoder,
+            "background-paper-pass",
+            view,
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+        );
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &res.bind_group, &[]);
+        pass.set_bind_group(1, &res.lut_bind_group, &[]);
+        pass.draw(0..3, 0..1);
+    }
+
+    /// Whether the gradient paints anything: `bg_bright > 0` or
+    /// `bg_band_amount > 0`.
+    ///
+    /// **A band alone is enough** (ADR-0095). Testing `bright <= 0` alone makes
+    /// a galaxy over a near-black sky render nothing at all — and that is the
+    /// configuration the reference photograph is, not an edge case.
+    fn visible(&self) -> bool {
+        self.bright > 0.0 || self.band_amount > 0.0
+    }
+
+    /// Build the shared resources if absent, upload the palette if it is stale,
+    /// and write this frame's uniform. Both routes draw through them.
+    fn prepare(&mut self, queue: &wgpu::Queue, surface: (u32, u32)) {
         // A rebuild hands back empty LUT textures, so the upload below has to run
         // again whether or not the palette itself changed.
         let fresh = self.res.is_none();
         let res = self
             .res
-            .get_or_insert_with(|| Resources::build(&self.device, self.surface_format));
+            .get_or_insert_with(|| Resources::build(&self.device));
         if fresh || self.palette_dirty {
             palette::write_lut(queue, &res.lut_texture_a, &self.palette.lut_a_bytes());
             palette::write_lut(queue, &res.lut_texture_b, &self.palette.lut_b_bytes());
@@ -1172,17 +1335,5 @@ impl Background {
                 ],
             }),
         );
-        // The backdrop owns the clear: establish the frame here so no scene
-        // needs to (ADR-0018).
-        let mut pass = gpu::color_pass(
-            encoder,
-            "background-pass",
-            view,
-            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-        );
-        pass.set_pipeline(&res.pipeline);
-        pass.set_bind_group(0, &res.bind_group, &[]);
-        pass.set_bind_group(1, &res.lut_bind_group, &[]);
-        pass.draw(0..3, 0..1);
     }
 }

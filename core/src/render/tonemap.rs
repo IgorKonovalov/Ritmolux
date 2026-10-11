@@ -48,6 +48,11 @@
 //! unverified on lavapipe as of 2026-10-06). One pipeline, and ink's semantics are bit-for-bit
 //! unchanged.
 //!
+//! A second pipeline exists only for a **paper** backdrop (ADR-0270): the same shader at the same
+//! format, writing with a premultiplied OVER blend over a ground painted into the output first. It
+//! is built on the first frame that draws a paper, so a frame without one never has it on the
+//! device.
+//!
 //! # The write dithers (Plan 0082, ADR-0096)
 //!
 //! Being the one 8-bit boundary makes this the one place a **dither** belongs,
@@ -264,10 +269,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         vec3<f32>(0.0),
     );
 
-    // Alpha passes through untouched: the backdrop owns this target's clear and
-    // paints it opaque (ADR-0055 put the backdrop *under* the chain), so this is
-    // 1.0 on every frame — but reading it rather than writing a literal keeps
-    // the pass honest if that ever stops being true.
+    // Alpha passes through untouched. Under a linear backdrop it is 1.0 on
+    // every frame, because the backdrop owns this target's clear and paints it
+    // opaque (ADR-0055). Under paper (ADR-0270) the backdrop clears it
+    // transparent, so it is the scene's coverage, and the OVER pipeline lays
+    // the premultiplied `rgb` over the paper by it.
     return vec4<f32>(rgb, src.a);
 }
 "#;
@@ -286,7 +292,13 @@ struct Resources {
     _src: wgpu::Texture,
     src_view: wgpu::TextureView,
     uniform: wgpu::Buffer,
+    shader: wgpu::ShaderModule,
+    bind_layout: wgpu::BindGroupLayout,
+    /// The `REPLACE` write, used whenever no paper is drawn.
     pipeline: wgpu::RenderPipeline,
+    /// The premultiplied OVER write onto a paper (ADR-0270), built on the first
+    /// frame that draws one.
+    over: Option<wgpu::RenderPipeline>,
     bind_group: wgpu::BindGroup,
     width: u32,
     height: u32,
@@ -414,7 +426,10 @@ impl Resources {
             _src: src,
             src_view,
             uniform,
+            shader,
+            bind_layout,
             pipeline,
+            over: None,
             bind_group,
             width: width.max(1),
             height: height.max(1),
@@ -558,17 +573,47 @@ impl Tonemap {
         self.res.as_ref().map(|res| res.src_view.clone())
     }
 
+    /// The display-referred format this pass writes, which is the format a paper
+    /// under it must be painted at (ADR-0270).
+    pub(crate) fn target_format(&self) -> wgpu::TextureFormat {
+        self.target_format
+    }
+
     /// Map the linear input into `out` — ink's input when ink is active, the
     /// surface otherwise. Called after everything upstream has rendered into the
     /// [`begin`](Self::begin) target. Returns the draw calls encoded.
+    ///
+    /// `over_paper` is whether a paper has been painted into `out` this frame
+    /// (ADR-0270). Then the pass loads `out` and writes with a premultiplied
+    /// OVER blend, so a pixel reads `tonemap(scene) + (1 - coverage) * paper`;
+    /// otherwise it clears and writes with `REPLACE`, the shipping path.
     pub(crate) fn resolve(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         out: &wgpu::TextureView,
+        over_paper: bool,
     ) -> u32 {
+        if over_paper
+            && let Some(res) = self.res.as_mut()
+            && res.over.is_none()
+        {
+            res.over = Some(gpu::fullscreen_pipeline(
+                &self.device,
+                &res.shader,
+                &[&res.bind_layout],
+                self.target_format,
+                wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
+                "tonemap-over",
+            ));
+        }
         let Some(res) = self.res.as_ref() else {
             return 0;
+        };
+        let (pipeline, load) = match (over_paper, res.over.as_ref()) {
+            (true, Some(over)) => (over, wgpu::LoadOp::Load),
+            // Fully covered by the fullscreen draw below.
+            _ => (&res.pipeline, wgpu::LoadOp::Clear(wgpu::Color::BLACK)),
         };
         let exposure = self.applied_exposure();
         #[cfg(test)]
@@ -582,14 +627,8 @@ impl Tonemap {
                 v: [exposure, KNEE, dither, 0.0],
             }),
         );
-        // Fully covered by the fullscreen draw below.
-        let mut pass = gpu::color_pass(
-            encoder,
-            "tonemap-pass",
-            out,
-            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-        );
-        pass.set_pipeline(&res.pipeline);
+        let mut pass = gpu::color_pass(encoder, "tonemap-pass", out, load);
+        pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &res.bind_group, &[]);
         pass.draw(0..3, 0..1);
 
