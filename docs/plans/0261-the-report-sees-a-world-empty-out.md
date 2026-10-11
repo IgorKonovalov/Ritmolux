@@ -153,7 +153,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — The capture primitive and the column | dev | done | 0d04da40 |
 | 2 — The documentation and the skill text | dev | done | 439411ec |
-| 3 — The skill text | human | not started | |
+| 3 — The skill text | human | owed | |
 
 ### Notes
 
