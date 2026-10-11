@@ -259,7 +259,9 @@ pub struct BandLevels {
     /// `balance` over the treble band alone.
     pub treb_balance: BandStats,
     /// Hop index (within the measured, past-warm-up window) where `onset` peaked.
-    /// The frame a reseed-gated preset fires on, so a `--strip` can be aimed at it.
+    /// The frame a reseed-gated preset fires on, so a `--strip` can be aimed at it,
+    /// and the hop an audio contact sheet (`--all` beside a clip) captures every
+    /// preset at when `--frame-at` names none.
     pub onset_peak_hop: usize,
 }
 

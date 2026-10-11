@@ -1,6 +1,6 @@
 # 0259 — The contact sheet hears the clip
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0100](../adrs/0100-documentation-images-are-committed-headless-renders.md)
@@ -97,15 +97,23 @@ error because it fixes the silence without giving the set-wide read the entry as
 
 ## Implementation log
 
-**Lane:** _(not started)_
+**Lane:** `plan-0259-the-contact-sheet-hears-the-clip`, worktree `/home/igor/Work/rlx-plan-0259`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The audio sheet and the refusals | dev | not started | |
+| 1 — The audio sheet and the refusals | dev | done | committed with this row |
 | 2 — The operator docs | dev | not started | |
 | 3 — The skill text | human | not started | |
 
 ### Notes
+
+- Phase 1: the done-when run over `docs/examples/voxel` (3 presets, 1280x720) chose hop 25 and
+  `--frame-at 40` chose hop 40. That run took about 14 s of wall time on the Arch box, debug
+  build, already compiled. This was read from `date` before and after, because the allowlist refused
+  `/usr/bin/time`, so the figure includes the tool-call overhead.
+- Phase 1: `--strip` became `Option<u32>` in `Args` so that passing it is detectable, with the 8 kept as
+  `DEFAULT_STRIP`. The `--report` refusal is checked in the parser beside the existing `--signal`
+  checks, and `args.rs` changed only in the `onset_peak_hop` doc comment.
 
 ### Close triggers
 

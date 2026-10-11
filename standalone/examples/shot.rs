@@ -24,8 +24,13 @@
 //!   --frames <N>             frames to advance before capture (default 120)
 //!   --size <WxH>             render size (default 1280x720)
 //!   --out <path>             output PNG (single shot) or dir/file (--all)
-//!   --all                    contact sheet of every preset (needs --out)
-//!   --report [family=<sys>]  per-family reactivity / animation / distinctness
+//!   --all                    contact sheet of every preset (needs --out).
+//!                            Beside --signal or --audio, every preset at ONE
+//!                            hop of that clip: --frame-at if given, else the
+//!                            clip's peak-onset hop, named on the stdout line.
+//!                            Not combinable with --strip or --at there
+//!   --report [family=<sys>]  per-family reactivity / animation / distinctness.
+//!                            Not combinable with --signal or --audio
 //!            [--json]        emit JSON instead of a text table
 //!   --signal <kind:param>    synth audio filmstrip (click:120, dynamic:110, ...)
 //!   --signal-secs <s>        how long to synthesize it for (default 4). The
@@ -76,7 +81,7 @@ use std::path::{Path, PathBuf};
 use rlx_core::audio::AudioFormat;
 use rlx_core::dsp::AnalysisFrame;
 use rlx_core::preset::{Preset, SystemKind, default_presets, load_dir};
-use rlx_core::render::{CaptureImage, ImageRect, OverlayImage, Tier};
+use rlx_core::render::{CaptureImage, ImageRect, OverlayImage, Renderer, Tier};
 use standalone::shot::args::{
     BandLevels, SIGNAL_SECS, apply_set, band_levels, parse_hops, parse_signal_secs, parse_size,
     synth_signal_secs,
@@ -102,8 +107,13 @@ fn main() {
 // Argument parsing
 // ---------------------------------------------------------------------------
 
+/// Frames a filmstrip tiles along its clip when `--strip` names no count.
+const DEFAULT_STRIP: u32 = 8;
+
 enum Mode {
     Shot,
+    /// `--all`: one cell per preset. Held-stimulus by default; with `--signal`
+    /// or `--audio`, every preset at one hop of that clip.
     All,
     Report,
     /// `--horizon <minutes>`: the long-run drift check (Plan 0085 Phase 1).
@@ -141,7 +151,10 @@ struct Args {
     /// aim at inside four (ADR-0235).
     signal_secs: Option<f32>,
     audio: Option<PathBuf>,
-    strip: u32,
+    /// `--strip <N>`, `None` for [`DEFAULT_STRIP`]. An `Option` so "passed
+    /// beside an audio `--all`, which captures one hop per preset" is an exact
+    /// question.
+    strip: Option<u32>,
     /// `--at <hop>,...`: explicit filmstrip hop indices, overriding `--strip`'s
     /// even spacing. The only way to aim a capture at a *transient* — see
     /// [`parse_hops`].
@@ -212,7 +225,7 @@ impl Default for Args {
             signal: None,
             signal_secs: None,
             audio: None,
-            strip: 8,
+            strip: None,
             at: None,
             frame_at: None,
             tier: Tier::Floor,
@@ -267,11 +280,13 @@ fn parse_args() -> Result<Args, String> {
             }
             "--audio" => args.audio = Some(PathBuf::from(next_value(&mut it, "--audio")?)),
             "--strip" => {
-                args.strip = next_value(&mut it, "--strip")?
-                    .parse::<u32>()
-                    .ok()
-                    .filter(|n| *n >= 1)
-                    .ok_or("--strip expects a positive integer")?;
+                args.strip = Some(
+                    next_value(&mut it, "--strip")?
+                        .parse::<u32>()
+                        .ok()
+                        .filter(|n| *n >= 1)
+                        .ok_or("--strip expects a positive integer")?,
+                );
             }
             "--horizon" => {
                 let value = next_value(&mut it, "--horizon")?;
@@ -365,6 +380,37 @@ fn parse_args() -> Result<Args, String> {
              anything else: add --signal <kind:param>"
                 .to_string(),
         );
+    }
+    let audio_flag = match (&args.signal, &args.audio) {
+        (Some(_), _) => Some("--signal"),
+        (None, Some(_)) => Some("--audio"),
+        (None, None) => None,
+    };
+    if let Some(audio_flag) = audio_flag {
+        // The report drives every preset with stimuli of its own and has no clip
+        // to walk, so a clip beside it would be accepted and silently ignored.
+        if matches!(args.mode, Mode::Report) {
+            return Err(format!(
+                "--report measures its own stimuli and cannot also take {audio_flag}: \
+                 drop {audio_flag}, or drop --report for a filmstrip"
+            ));
+        }
+        // An audio sheet captures every preset at ONE hop. A strip count or a
+        // hop list would ask for a grid of filmstrips, which this is not.
+        if matches!(args.mode, Mode::All) {
+            for (flag, given) in [
+                ("--strip", args.strip.is_some()),
+                ("--at", args.at.is_some()),
+            ] {
+                if given {
+                    return Err(format!(
+                        "--all with {audio_flag} captures every preset at one hop and \
+                         cannot also take {flag}: name that hop with --frame-at, or \
+                         drop --all for a filmstrip of one preset"
+                    ));
+                }
+            }
+        }
     }
     // A horizon holds one stimulus for its whole run, which is what makes it
     // deterministic and what makes a row at minute nine comparable with a row at
@@ -474,8 +520,12 @@ fn print_usage() {
          --frames <N>               frames before capture (default 120)\n\
          --size <WxH>               render size (default 1280x720)\n\
          --out <path>               PNG path (shot) or dir/file (--all)\n\
-         --all                      contact sheet of every preset (needs --out)\n\
-         --report [family=<sys>]    metrics table (fragment_field | swarm)\n\
+         --all                      contact sheet of every preset (needs --out).\n\
+                                    With --signal/--audio: every preset at ONE\n\
+                                    hop, --frame-at or else the peak-onset hop;\n\
+                                    not combinable with --strip or --at there\n\
+         --report [family=<sys>]    metrics table (fragment_field | swarm).\n\
+                                    Not combinable with --signal or --audio\n\
          --json                     emit the report as JSON\n\
          --signal <kind:param>      synth audio filmstrip: click:120 bass:60\n\
                                     treble:10000 noise:7 chord dynamic:110\n\
@@ -601,11 +651,14 @@ fn preset_meta(presets: &[Preset]) -> Vec<(String, SystemKind)> {
 fn run() -> Result<(), String> {
     let args = parse_args()?;
     let (presets, source) = load_library(&args)?;
-    // An audio source (synth signal or WAV) takes precedence — it drives a
-    // filmstrip regardless of the shot/all/report mode default. `--render` is
-    // rejected alongside either one at parse time, so it never reaches here.
+    // An audio source (synth signal or WAV) drives an audio contact sheet under
+    // `--all` and a filmstrip otherwise. `--report`, `--horizon` and `--render`
+    // are rejected beside either one at parse time, so they never reach here.
     if args.signal.is_some() || args.audio.is_some() {
-        return filmstrip(args, presets, &source);
+        return match args.mode {
+            Mode::All => audio_contact_sheet(args, presets, &source),
+            _ => filmstrip(args, presets, &source),
+        };
     }
     // Rejected beside every other mode at parse time, so it is decided here.
     if args.ui.is_some() {
@@ -815,7 +868,77 @@ fn to_rgba(img: &CaptureImage) -> Result<image::RgbaImage, String> {
         .ok_or_else(|| "capture buffer does not match its dimensions".to_string())
 }
 
+/// `--all` without a clip: every preset under the held `--set` stimulus after
+/// `--frames` frames.
 fn contact_sheet(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {
+    let (stimulus, frames) = (args.stimulus, args.frames);
+    let sheet = tile_sheet(&args, presets, |r, name| {
+        r.capture_preset(name, &stimulus, frames)
+            .map_err(|e| format!("capture `{name}`: {e}"))
+    })?;
+    println!(
+        "wrote {} ({} presets, {}x{} grid) [{source}]",
+        sheet.path.display(),
+        sheet.presets,
+        sheet.cols,
+        sheet.rows
+    );
+    Ok(())
+}
+
+/// `--all` beside `--signal` or `--audio`: every preset driven through the real
+/// analyzer by the same clip and captured at the same hop, so the cells differ
+/// only in how each preset answers that one moment.
+///
+/// The hop is `--frame-at` when given, else the clip's peak-onset hop — the
+/// number the level table prints on its `onset peaks at` line, read off the same
+/// [`band_levels`] pass, so the sheet and the table cannot name different hops.
+/// Each preset re-renders every hop up to that one, so a late hop costs about
+/// that many frames per preset.
+fn audio_contact_sheet(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {
+    let (pcm, format, label) = load_clip(&args)?;
+    let levels = band_levels(&pcm, format)?;
+    let hop = match args.frame_at {
+        Some(hop) => {
+            check_hops(&[hop], pcm.len(), format, "--frame-at")?;
+            hop
+        }
+        None => u32::try_from(levels.onset_peak_hop)
+            .map_err(|_| format!("onset peak hop {} out of range", levels.onset_peak_hop))?,
+    };
+    let sheet = tile_sheet(&args, presets, |r, name| {
+        r.capture_audio(name, &pcm, format, &[hop])
+            .map_err(|e| format!("capture `{name}` at hop {hop}: {e}"))?
+            .into_iter()
+            .next()
+            .ok_or_else(|| format!("capture `{name}` at hop {hop}: no frame captured"))
+    })?;
+    print_band_levels(&levels);
+    println!(
+        "wrote {} ({} presets, {}x{} grid, hop {hop}, {label}) [{source}]",
+        sheet.path.display(),
+        sheet.presets,
+        sheet.cols,
+        sheet.rows
+    );
+    Ok(())
+}
+
+/// What [`tile_sheet`] wrote, for the caller's stdout line.
+struct Sheet {
+    path: PathBuf,
+    presets: usize,
+    cols: u32,
+    rows: u32,
+}
+
+/// Capture every preset in roster order with `capture` and tile the frames into
+/// a labelled near-square grid at `--out` — see [`contact_sheet_path`].
+fn tile_sheet(
+    args: &Args,
+    presets: Vec<Preset>,
+    mut capture: impl FnMut(&mut Renderer, &str) -> Result<CaptureImage, String>,
+) -> Result<Sheet, String> {
     let out = args.out.clone().ok_or("--all needs --out <dir-or-file>")?;
     let meta = preset_meta(&presets);
     if meta.is_empty() {
@@ -839,9 +962,7 @@ fn contact_sheet(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), S
         image::RgbaImage::from_pixel(canvas_w, canvas_h, image::Rgba([18, 18, 22, 255]));
 
     for (i, (name, _system)) in meta.iter().enumerate() {
-        let img = r
-            .capture_preset(name, &args.stimulus, args.frames)
-            .map_err(|e| format!("capture `{name}`: {e}"))?;
+        let img = capture(&mut r, name)?;
         let full = to_rgba(&img)?;
         let thumb = image::imageops::resize(
             &full,
@@ -873,12 +994,12 @@ fn contact_sheet(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), S
     canvas
         .save(&path)
         .map_err(|e| format!("write {}: {e}", path.display()))?;
-    println!(
-        "wrote {} ({} presets, {cols}x{rows} grid) [{source}]",
-        path.display(),
-        meta.len()
-    );
-    Ok(())
+    Ok(Sheet {
+        path,
+        presets: meta.len(),
+        cols,
+        rows,
+    })
 }
 
 /// A `.png` `--out` is used verbatim; anything else is treated as a directory
@@ -898,28 +1019,33 @@ fn contact_sheet_path(out: &Path) -> PathBuf {
 // Audio filmstrips (--signal / --audio)
 // ---------------------------------------------------------------------------
 
-fn filmstrip(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {
-    let out = args
-        .out
-        .clone()
-        .ok_or("--signal/--audio needs --out <path>")?;
-
-    let (pcm, format, label) = match (&args.signal, &args.audio) {
+/// The clip `--signal` synthesizes or `--audio` reads, with the label the
+/// stdout line names it by.
+fn load_clip(args: &Args) -> Result<(Vec<f32>, AudioFormat, String), String> {
+    match (&args.signal, &args.audio) {
         (Some(spec), _) => {
             // The default IS `SIGNAL_SECS`, so a call that passes no
             // `--signal-secs` synthesizes the same samples it did before the
             // flag existed — which is what keeps every committed capture and
             // every golden where it is. The label stays the spec alone: the
-            // level table below already prints how many hops the clip yielded.
+            // level table already prints how many hops the clip yielded.
             let (pcm, fmt) = synth_signal_secs(spec, args.signal_secs.unwrap_or(SIGNAL_SECS))?;
-            (pcm, fmt, format!("signal {spec}"))
+            Ok((pcm, fmt, format!("signal {spec}")))
         }
         (None, Some(path)) => {
             let (pcm, fmt) = read_wav_16bit(path)?;
-            (pcm, fmt, format!("audio {}", path.display()))
+            Ok((pcm, fmt, format!("audio {}", path.display())))
         }
-        (None, None) => return Err("no --signal or --audio given".to_string()),
-    };
+        (None, None) => Err("no --signal or --audio given".to_string()),
+    }
+}
+
+fn filmstrip(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {
+    let out = args
+        .out
+        .clone()
+        .ok_or("--signal/--audio needs --out <path>")?;
+    let (pcm, format, label) = load_clip(&args)?;
 
     let meta = preset_meta(&presets);
     let name = args
@@ -940,7 +1066,7 @@ fn filmstrip(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), Strin
             check_hops(hops, pcm.len(), format, "--at")?;
             hops.clone()
         }
-        (None, None) => filmstrip_indices(pcm.len(), format, args.strip)?,
+        (None, None) => filmstrip_indices(pcm.len(), format, args.strip.unwrap_or(DEFAULT_STRIP))?,
     };
     let frames = r
         .capture_audio(&name, &pcm, format, &at)

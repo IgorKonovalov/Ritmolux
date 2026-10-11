@@ -514,6 +514,155 @@ fn frame_at_rejects_a_second_hop_source_and_a_missing_clip() {
     );
 }
 
+/// The hop number following `marker` in `text`, e.g. `hop_after(text, "on hop ")`.
+fn hop_after(text: &str, marker: &str) -> u32 {
+    let tail = &text[text
+        .find(marker)
+        .unwrap_or_else(|| panic!("no `{marker}` in:\n{text}"))
+        + marker.len()..];
+    let digits: String = tail.chars().take_while(char::is_ascii_digit).collect();
+    digits
+        .parse()
+        .unwrap_or_else(|_| panic!("no hop number after `{marker}` in:\n{text}"))
+}
+
+/// `--all` beside a clip draws one sheet of every preset at one hop of it, and
+/// by default that hop is the one the level table names as onset's peak — the
+/// sheet and the table read the same analysis pass, so they cannot disagree.
+#[test]
+fn an_audio_contact_sheet_captures_every_preset_at_the_onset_peak_hop() {
+    let library = tiny_report_library();
+    let dir = scratch("audio-sheet");
+    let sheet = dir.join("sheet.png");
+    let common = [
+        "--presets",
+        &library.to_string_lossy(),
+        "--all",
+        "--signal",
+        "dynamic:110",
+        "--size",
+        "64x48",
+        "--out",
+        &sheet.to_string_lossy(),
+    ]
+    .map(str::to_owned);
+    let with = |extra: &[&str]| {
+        let mut args: Vec<&str> = common.iter().map(String::as_str).collect();
+        args.extend_from_slice(extra);
+        run(&args)
+    };
+
+    let out = with(&[]);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        out.status.success(),
+        "audio sheet failed\nstdout: {}\nstderr: {}",
+        stdout(&out),
+        stderr(&out)
+    );
+    let text = stdout(&out);
+    let wrote = text
+        .lines()
+        .find(|l| l.starts_with("wrote "))
+        .unwrap_or_else(|| panic!("no `wrote` line in:\n{text}"));
+    assert_eq!(
+        hop_after(wrote, "hop "),
+        hop_after(&text, "on hop "),
+        "the sheet's hop is not the level table's onset peak:\n{text}"
+    );
+    assert!(
+        wrote.contains("3 presets") && wrote.contains("signal dynamic:110"),
+        "the `wrote` line must count one cell per preset and name the clip:\n{wrote}"
+    );
+    image::open(&sheet).expect("the sheet decodes as an image");
+
+    // `--frame-at` moves the hop, and the line names the moved one.
+    let out = with(&["--frame-at", "40"]);
+    assert!(
+        out.status.success(),
+        "--frame-at 40 sheet failed\n{}",
+        stderr(&out)
+    );
+    let text = stdout(&out);
+    let wrote = text
+        .lines()
+        .find(|l| l.starts_with("wrote "))
+        .unwrap_or_else(|| panic!("no `wrote` line in:\n{text}"));
+    assert_eq!(hop_after(wrote, "hop "), 40, "{wrote}");
+}
+
+/// Every pair an audio source cannot honour is a parse-time refusal
+/// naming both flags, and a hop past the clip is refused before any capture.
+/// GPU-free: each exits before a renderer is built.
+#[test]
+fn an_audio_source_refuses_what_it_would_have_ignored() {
+    for (args, flags) in [
+        (
+            &["--report", "--signal", "dynamic:110"][..],
+            ["--report", "--signal"],
+        ),
+        (
+            &["--report", "--audio", "unused.wav"][..],
+            ["--report", "--audio"],
+        ),
+        (
+            &[
+                "--all",
+                "--signal",
+                "dynamic:110",
+                "--strip",
+                "4",
+                "--out",
+                "unused.png",
+            ][..],
+            ["--all", "--strip"],
+        ),
+        (
+            &[
+                "--all",
+                "--signal",
+                "dynamic:110",
+                "--at",
+                "30,40",
+                "--out",
+                "unused.png",
+            ][..],
+            ["--all", "--at"],
+        ),
+    ] {
+        let mut full = vec!["--preset-file", SHIPPED_PRESET_FILE];
+        full.extend_from_slice(args);
+        let out = run(&full);
+        let case = args.join(" ");
+        assert_failed_naming(&out, flags[0], &case);
+        assert_failed_naming(&out, flags[1], &case);
+        assert!(
+            !stderr(&out).contains(NO_ADAPTER) && stdout(&out).is_empty(),
+            "{case}: expected a parse-time refusal before any renderer\nstdout: {}\nstderr: {}",
+            stdout(&out),
+            stderr(&out)
+        );
+    }
+
+    assert_failed_naming(
+        &run(&[
+            "--preset-file",
+            SHIPPED_PRESET_FILE,
+            "--all",
+            "--signal",
+            "dynamic:110",
+            "--frame-at",
+            "9999",
+            "--out",
+            "unused.png",
+        ]),
+        "analysis hops long",
+        "an audio sheet hop past the end of the clip",
+    );
+}
+
 /// Decode a PNG `shot` wrote back into the shape `rlx_core`'s metrics take, so a
 /// CLI-level difference is measured with the same function the in-core harness
 /// uses rather than a second, subtly different one.
