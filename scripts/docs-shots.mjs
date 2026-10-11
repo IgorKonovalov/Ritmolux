@@ -328,6 +328,14 @@ const CARDS = [
   "swarm_braid",
   "swarm_maelstrom",
   "swarm_murmuration",
+  // voxel (7)
+  "voxel_ember",
+  "voxel_ice",
+  "voxel_nebula",
+  "voxel_neon",
+  "voxel_section",
+  "voxel_solid",
+  "voxel_solid_dark",
   // warp_mesh (4)
   "warp_ladder",
   "warp_sirocco",
@@ -706,11 +714,11 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // voxel — UNJUDGED, and not a choice: the system ships no preset yet, so
-    // its slot renders the teaching preset under docs/examples/. Swap it for a
-    // shipped world when the content lane lands one.
+    // voxel — UNJUDGED: Nebula is the one shipped world drawn in the glow
+    // present, the volume the guide's first voxel paragraph describes; the
+    // solid present has its own picture further down that section.
     out: "docs/images/gallery/voxel.png",
-    presetFile: "docs/examples/voxel/clouds.toml",
+    presetFile: "presets/voxel_nebula.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",

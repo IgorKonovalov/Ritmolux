@@ -493,11 +493,11 @@ instant. `rows` and `row_period` set how much history there is, in the
 
 ### `voxel`
 
-![A faint, ragged cube of blue glow on black, full of dark gaps: the far side shows through the near
-one, and a paler knot of cells glows at its centre](images/gallery/voxel.png)
+![A ragged cube of violet and teal glow on black, its front and back filaments overlapping through
+each other into a mottled haze, with a pink corner at the upper left](images/gallery/voxel.png)
 
-*`rules = ["pyroclastic"]`, `density = "0.05"` — the teaching preset
-[`docs/examples/voxel/clouds.toml`](examples/voxel/clouds.toml); the shipped set has none yet*
+*`rules = ["pyroclastic"]`, `density = "0.08"` — the shipped preset
+[`presets/voxel_nebula.toml`](../presets/voxel_nebula.toml)*
 
 A **cellular automaton in three dimensions**: a cube of cells, every generation each cell deciding
 its next state from how many of the cells around it are live, drawn as a glowing volume through the
@@ -515,12 +515,17 @@ cube is lit from the upper left, its sides a shade darker, and pale decaying cel
 inside](images/voxel/solid.png)
 
 *`present = "solid"`, `rules = ["pyroclastic"]` — the teaching preset
-[`docs/examples/voxel/solid.toml`](examples/voxel/solid.toml), black on white; white on black is
-[`solid_dark.toml`](examples/voxel/solid_dark.toml)*
+[`docs/examples/voxel/solid.toml`](examples/voxel/solid.toml), black on white, shipped as
+[`voxel_solid.toml`](../presets/voxel_solid.toml); white on black is
+[`voxel_solid_dark.toml`](../presets/voxel_solid_dark.toml)*
 
 `present = "solid"` draws every live cell as a **lit cube** instead of as light: one key light
 that turns with the camera, an ambient term, and an occlusion that darkens the creases where cubes
 meet, so the faces and corners of a structure read. The decaying cells in front of it still glow.
+Lift the ambient term toward 1 and the bloom over the faces, and the cubes read as lit from within
+instead: [`voxel_ember.toml`](../presets/voxel_ember.toml) is that look, and `cut` opens a solid
+structure along a plane to show its inside, as [`voxel_section.toml`](../presets/voxel_section.toml)
+does.
 
 **Reach for this when** the look is growth with depth to it: colonies, crystals, foam or clouds that
 build up inside a turning cube. The roster, the inline rule syntax and the tier caps are in the

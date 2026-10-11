@@ -27,9 +27,8 @@ the one place it is maintained; this document does not duplicate it.
 > ([ADR-0101](adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md)).
 
 > **Accurate as of 2026-09-11**, against the curated set in
-> [`presets/`](../presets/) and the v2 expression grammar. Most built-in systems ship
-> at least one preset; `analytic_field`, `cellular`, `plexus` and `voxel` are the newest and ship none
-> yet, so their pictures come from the teaching presets under
+> [`presets/`](../presets/) and the v2 expression grammar. Every built-in system ships
+> at least one preset, though some pictures still come from the teaching presets under
 > [`docs/examples/`](examples/). The number of presets is deliberately not written
 > down here: it moves constantly, and a count in this line is a line that goes
 > stale without anything noticing.

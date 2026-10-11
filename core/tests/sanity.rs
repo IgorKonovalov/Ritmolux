@@ -535,12 +535,11 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // the guess sat 1.56x under it. Half that minimum, like every floor
         // above.
         SystemKind::Waterfall => 0.015,
-        // **Not derived from a distribution**: the system ships no preset
-        // content. Set low because a sparse structure in a cube over a dark
-        // ground lights little of the frame — a guess, not a measurement.
-        // **Re-derive it from this test's printed distribution when the first
-        // preset ships**, at half the family minimum like every floor above.
-        SystemKind::Voxel => 0.02,
+        // Derived 2026-10-11 from the system's first seven shipped presets: the
+        // family minimum is `Voxel Solid` at 0.2318, the ink-on-paper foam whose
+        // cubes light the least of the frame. Half that minimum, like every
+        // floor above.
+        SystemKind::Voxel => 0.11,
     }
 }
 

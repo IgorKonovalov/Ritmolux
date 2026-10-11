@@ -1,0 +1,49 @@
+# A voxel nebula: the restless pyroclastic foam drawn as glowing gas rather than
+# cubes, teal through violet to pink, with almost no absorbing body, so the front
+# and back filaments both show through and overlap into light. The spectrum lights
+# the radial shells from bass at the core to treble at the rim (the mid swells
+# them), an onset refills a ball of cells and pushes the bloom, the bass lifts the
+# light, and the treble widens the halo. The camera orbits slowly.
+system = "voxel"
+name = "Voxel Nebula"
+representative = true
+
+[voxel]
+grid        = 64
+rules       = ["pyroclastic"]
+seed_radius = 0.9
+seed_fill   = 0.3
+shells      = 8
+
+[palette]
+stops = [
+  { at = 0.0, color = "#2de2c8" },
+  { at = 0.4, color = "#3a7bff" },
+  { at = 0.75, color = "#9b3cff" },
+  { at = 1.0, color = "#ff4fa8" },
+]
+
+[params]
+step_rate       = "5"
+reseed          = "onset"
+reseed_radius   = "0.35"
+density         = "0.08"
+trail           = "0.8"
+age_tint        = "0.7"
+shell_gain      = "2 + clamp(mid * 1.75, 0, 1.5)"
+hue             = "0.15 * noise(time * 0.04)"
+hue_spread      = "0.7"
+brightness      = "0.5 + clamp(bass * 0.3, 0, 0.25)"
+yaw             = "time * 0.09"
+pitch           = "0.3 + 0.12 * sin(time * 0.05)"
+distance        = "3.6"
+fog             = "0.25"
+bloom_amount    = "0.35 + clamp(onset * 0.5, 0, 0.3)"
+bloom_threshold = "0.7"
+bloom_radius    = "2.2 + clamp(treb * 1.0, 0, 0.6)"
+
+[smoothing]
+brightness   = 0.3
+shell_gain   = 0.25
+bloom_amount = { attack = 0.04, release = 0.5 }
+bloom_radius = 0.3

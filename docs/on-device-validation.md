@@ -317,8 +317,8 @@ says what is expected, not what has been run. Each section's own record says tha
       the grid's side in cells. `TierConfig::FLOOR` holds `voxel_grid` **64**, march scale **1.0**
       and a **1920x1080** cap. Measured on the development box's integrated GPU (`shot --report`,
       release build, 1920x1080, Floor): sparse **6.23** ms, cloudy **11.68**, worst case **12.70**.
-      No shipped preset draws the system yet, so point `RLX_PRESET_DIR` at `docs/examples/voxel/`
-      and load **`clouds.toml`**; then write the worst frame beside it, the same file with
+      Point `RLX_PRESET_DIR` at `docs/examples/voxel/` and load the teaching preset
+      **`clouds.toml`**; then write the worst frame beside it, the same file with
       `density = "0"`, `trail = "1"`, `distance = "2"` and `rules = ["pyroclastic"]`, so the cube
       fills the window and no ray stops early. Overlay on (`F3`), report **(a)** whether fps holds
       ≥ 60 @ 1080p on both, and **(b)** the p99. **If the worst frame misses, the levers are

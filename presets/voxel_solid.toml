@@ -1,0 +1,48 @@
+# Voxel cubes in ink on a white page: the restless `pyroclastic` rule, a porous
+# foam that never settles, each live cell a near-black cube under one key light
+# that turns with the camera, so the structure reads as ink on paper and can be
+# seen into. The palette's dark end is the cubes (`hue` 0, no spread); its flat
+# white end is the backdrop. The backdrop is paper (`bg_paper` 1): painted after
+# the tonemap, the white stop at `bg_bright` 1 is display white and the cubes lie
+# over it as rendered. `bg_hue` sits inside the flat white segment, short of 1,
+# because the palette repeats and at exactly 1 the white end blends with the dark
+# start. The bass brightens the key light and an onset refills a ball of cells.
+system = "voxel"
+name = "Voxel Solid"
+
+[voxel]
+grid        = 64
+rules       = ["pyroclastic"]
+seed_radius = 0.9
+seed_fill   = 0.3
+present     = "solid"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#1e1e1e" },
+  { at = 0.6,  color = "#4a4a4a" },
+  { at = 0.98, color = "#ffffff" },
+  { at = 1.0,  color = "#ffffff" },
+]
+
+[params]
+step_rate    = "6"
+reseed       = "onset"
+density      = "0.6"
+trail        = "0.2"
+age_tint     = "0.5"
+hue          = "0"
+hue_spread   = "0"
+brightness   = "0.9"
+key          = "0.4 + 1.6 * bass"
+ambient      = "0.3"
+light_yaw    = "-0.6"
+light_pitch  = "0.6"
+yaw          = "0.6 + time * 0.1"
+pitch        = "0.35"
+distance     = "4.2"
+bg_paper     = "1"
+bg_bright    = "1"
+bg_hue       = "0.99"
+bg_shade     = "1"
+bg_shade_end = "1"
