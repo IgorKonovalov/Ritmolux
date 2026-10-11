@@ -1768,11 +1768,13 @@ impl Renderer {
         // The opening frame is the exception that makes the whole scheme cheap: the
         // roster still points at the *outgoing* preset there, so this one ordinary
         // composite is the snapshot, and `side` is the right chain for it.
-        let live_side = match incoming_side.as_mut() {
+        // The outgoing side rides along whenever it is not the live one, so a
+        // dissolve out of a paper preset can still paint its paper (ADR-0270).
+        let (live_side, outgoing_side) = match incoming_side.as_mut() {
             Some(incoming) if !transition.as_ref().is_some_and(Transition::needs_snapshot) => {
-                incoming
+                (incoming, Some(side))
             }
-            _ => side,
+            _ => (side, None),
         };
         let Some(scene) = scene_for_mut(scenes, preset.system) else {
             return draw_calls;
@@ -1801,6 +1803,7 @@ impl Renderer {
                 tonemap,
                 ink,
                 transition: transition.as_ref(),
+                outgoing: outgoing_side,
             },
             &mut shared,
         );

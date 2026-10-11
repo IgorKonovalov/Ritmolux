@@ -164,8 +164,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: one preset on true white | dev | done | committed with this row |
-| 2 — The dissolve and ink | dev | not started | |
+| 1 — Walking skeleton: one preset on true white | dev | done | 9e026bb7 |
+| 2 — The dissolve and ink | dev | done | committed with this row |
 | 3 — Cost, the golden and the documentation | dev | not started | |
 | 4 — The owner's look and the skill text | human | not started | |
 
@@ -189,6 +189,17 @@ flowchart LR
   Building the linear backdrop pipeline before the queue writes, as the shipping code did, gives
   the same readings. A HEAD-only golden run was not possible in this session (no second worktree,
   no `git apply`), so whether the two readings predate this phase is not established.
+- Phase 2: the blend shader wrote alpha 1.0 on every kind, which would hide a paper under the whole
+  dissolve. It now writes the two sides' alpha moved by each kind's own per-pixel factor (`t` for
+  the burn's, not its flare), and returns the outgoing alpha unchanged when the two are equal.
+- Phase 2: `core/src/render/mod.rs`, outside the phase's list, now hands the outgoing
+  `CompositeSide` to `encode_active_side` (`DisplayTail::outgoing`) whenever the incoming side is
+  the live one: a freeze dissolve never evaluates the outgoing side otherwise, and its paper is
+  painted from that side's `Background`.
+- Phase 2: the dissolve test is `render::transition::paper_tests`, not in
+  `core/tests/background_composite.rs`. A dissolve finalizes without drawing its `t = 1` frame, so
+  the test sets `t` (and the kind, to `Crossfade`) on the running `Transition`, which only a test
+  inside `render/` can reach.
 
 ### Close triggers
 

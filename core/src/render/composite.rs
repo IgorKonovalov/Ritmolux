@@ -293,6 +293,10 @@ pub(super) struct DisplayTail<'a> {
     pub(super) tonemap: &'a mut Tonemap,
     pub(super) ink: &'a mut Ink,
     pub(super) transition: Option<&'a Transition>,
+    /// The outgoing preset's side while a dissolve's incoming side is the live
+    /// one, `None` otherwise. Read for one thing: painting the outgoing paper
+    /// when only that side is paper (ADR-0270).
+    pub(super) outgoing: Option<&'a mut CompositeSide>,
 }
 
 /// The active preset's side: the incoming one during a dissolve, the only one
@@ -333,6 +337,7 @@ pub(super) fn encode_active_side(
         tonemap,
         ink,
         transition,
+        outgoing,
     } = display_tail;
     let mut draw_calls = 0;
 
@@ -427,11 +432,30 @@ pub(super) fn encode_active_side(
         draw_calls += blend.resolve(&ctx.queue, encoder, terminal, tr.progress(), tr.kind());
     }
     // A paper backdrop (ADR-0270) is painted display-referred into the
-    // tonemap's output, and the tonemap lies over it by the scene's coverage.
-    // Its side cleared the linear composite transparent for exactly this.
-    let paper = tonemap_input.is_some() && live_side.background.paper();
-    if paper {
-        live_side.background.render_paper(
+    // tonemap's output, and the tonemap lies over it by the frame's coverage.
+    // A paper side cleared its linear composite transparent for exactly this.
+    //
+    // During a dissolve one paper is drawn if either side has one: the live
+    // side's when it is paper, which on the capture frame is the outgoing
+    // preset's own and from then on the incoming one's, else the outgoing
+    // side's as the transition held it. A non-paper side's frame is opaque, so
+    // the blend's coverage moves from one side's to the other's and the paper
+    // shows only where a paper side leaves it open.
+    let outgoing_paper = transition
+        .and_then(Transition::outgoing_paper)
+        .unwrap_or(false);
+    let paper = if tonemap_input.is_none() {
+        None
+    } else if live_side.background.paper() {
+        Some(&mut live_side.background)
+    } else if outgoing_paper {
+        outgoing.map(|side| &mut side.background)
+    } else {
+        None
+    };
+    let over_paper = paper.is_some();
+    if let Some(background) = paper {
+        background.render_paper(
             &ctx.queue,
             encoder,
             display,
@@ -441,7 +465,7 @@ pub(super) fn encode_active_side(
         draw_calls += 1;
     }
     if tonemap_input.is_some() {
-        draw_calls += tonemap.resolve(&ctx.queue, encoder, display, paper);
+        draw_calls += tonemap.resolve(&ctx.queue, encoder, display, over_paper);
     }
     if ink_input.is_some() {
         draw_calls += ink.resolve(&ctx.queue, encoder, view);
