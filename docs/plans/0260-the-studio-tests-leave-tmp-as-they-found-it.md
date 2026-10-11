@@ -1,6 +1,6 @@
 # 0260 — The studio tests leave /tmp as they found it
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-10-11
 > **Owner skill(s):** studio-builder
 > **Related ADRs:** none

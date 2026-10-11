@@ -1,6 +1,6 @@
 # 0257 — The backdrop reaches paper white
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0270](../adrs/0270-a-paper-backdrop-is-painted-after-the-tonemap-and-the-scene-lies-over-it-by-coverage.md) (proposed), [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md), [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md), [ADR-0201](../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md), [ADR-0096](../adrs/0096-the-display-write-dithers.md)

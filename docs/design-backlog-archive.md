@@ -328,6 +328,10 @@ accepted cost" are different documents and only one of them is honest.
 - [0277 — the owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/`](#0277--the-owners-hotkey-walk-and-the-live-retune-loop-exist-only-as-scratch-scripts-under-target)
 - [0285 — a render start that finishes its `--bars` read after a quit leaves `<output>.timeline.json` behind](#0285--a-render-start-that-finishes-its---bars-read-after-a-quit-leaves-outputtimelinejson-behind)
 - [0286 — the swarm's `sway_bound` over-allows at small headroom, so a swayed camera at a low zoom shows the wrap seam](#0286--the-swarms-sway_bound-over-allows-at-small-headroom-so-a-swayed-camera-at-a-low-zoom-shows-the-wrap-seam)
+- [0287 — the backdrop cannot reach white, so black-on-white needs `exposure`, which also lifts the scene](#0287--the-backdrop-cannot-reach-white-so-black-on-white-needs-exposure-which-also-lifts-the-scene)
+- [0288 — a solid voxel mass has no cut-away, so seeing inside it depends on choosing a porous rule](#0288--a-solid-voxel-mass-has-no-cut-away-so-seeing-inside-it-depends-on-choosing-a-porous-rule)
+- [0289 — `shot --signal` beside `--all` silently draws a filmstrip of the first preset](#0289--shot---signal-beside---all-silently-draws-a-filmstrip-of-the-first-preset)
+- [0291 — a studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it](#0291--a-studio-vitest-run-leaves-an-ssr-cache-directory-in-tmp-and-never-removes-it)
 <!-- toc:end -->
 
 ## The ledger
@@ -356,6 +360,10 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
+| 0287 | the backdrop cannot reach white, so black-on-white needs `exposure`, which also lifts the scene | [Plan 0257](plans/0257-the-backdrop-reaches-paper-white.md). **Promoted** |
+| 0288 | a solid voxel mass has no cut-away, so seeing inside it depends on choosing a porous rule | [Plan 0258](plans/0258-the-voxel-opens-along-a-section-plane.md). **Promoted** |
+| 0289 | `shot --signal` beside `--all` silently draws a filmstrip of the first preset | [Plan 0259](plans/0259-the-contact-sheet-hears-the-clip.md). **Promoted** |
+| 0291 | a studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it | [Plan 0260](plans/0260-the-studio-tests-leave-tmp-as-they-found-it.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -17316,3 +17324,75 @@ still let sprites reach 0.9961 NDC, so the seam is also inset by the largest see
 default `size` (`SPRITE_SIZE_MAX`). The seam test now sways zoom 0.85 in four diagonals with none
 inside the frame. A bound `size` or `size_spread` can draw sprites the inset does not cover; the
 bound does not see those params.
+
+## 0287 — the backdrop cannot reach white, so black-on-white needs `exposure`, which also lifts the scene
+
+The owner asked for the voxel solid teaching preset black on white. The backdrop pass is the only
+way to paint a ground, and `bg_bright` is capped at `1`, which the engine tonemap renders as a
+light grey, not paper white. `docs/examples/voxel/solid.toml` reaches white with `exposure = "3"`,
+which works there only because its cubes are near-black: `exposure` multiplies the whole frame, so
+on any scene with mid-tones it lifts the figure along with the ground. `ink_amount = 1` is the
+other route to a white page, and it was rendered and rejected: it remaps luminance, so a lit solid
+loses its shading and reads flat grey. The ask is a ground that reaches display white on its own,
+whether a wider `bg_bright` range, a backdrop that bypasses the tonemap, or a `paper` colour
+outside the ink remap. Which of those is the right shape is the open question.
+
+- **Raised:** 2026-10-11 by `preset-author` on the voxel teaching presets (700584fb).
+  **Owner if taken:** `architect` (where a white ground belongs in the composite), then `dev`.
+- **Verified 2026-10-11** — the backdrop's range ends at 1:
+  `present: \| .bg_bright. \| .0. \| .0. – .1. \| in: presets/README.md`
+- **Verified 2026-10-11** — and the teaching preset leans on `exposure` for it:
+  `present: exposure     = "3" in: docs/examples/voxel/solid.toml`
+- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0257](plans/0257-the-backdrop-reaches-paper-white.md) was approved.
+
+## 0288 — a solid voxel mass has no cut-away, so seeing inside it depends on choosing a porous rule
+
+The owner judged the solid voxel present a keep and asked to see holes inside the structure. With a
+dense rule (`clouds`, `amoeba`, `crystal`) the solid march stops at the first live cell, so the
+viewer sees a closed skin and nothing of the inside; rules written inline to hollow it gave a pitted
+skin whose pits do not go through. The teaching preset now runs `pyroclastic`, an open foam, which
+answers the ask by changing the content rather than the view. A section plane, a clip box or an
+onion-peel by depth would let any rule be opened, and would also serve the glow present, whose dense
+rules fill their ball solid. Nothing in `voxel` declares such a parameter today.
+
+- **Raised:** 2026-10-11 by `preset-author` after the owner's 0256 Phase 5 verdict.
+  **Owner if taken:** `architect` (a clip in the march, and whether it is a param or a `[voxel]`
+  key), then `dev`.
+- **Verified 2026-10-11** — no cut-away parameter:
+  `absent: name: "(cutaway|section|clip[a-z_]*)" in: core/src/render/scenes/voxel/mod.rs`
+- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0258](plans/0258-the-voxel-opens-along-a-section-plane.md) was approved.
+
+## 0289 — `shot --signal` beside `--all` silently draws a filmstrip of the first preset
+
+`shot --presets <dir> --all --signal dynamic:110` was asked for a contact sheet driven by real
+audio. An audio source takes precedence over every mode, so the run wrote a time strip of one
+preset and said nothing about the `--all` it ignored. The precedence is deliberate and commented;
+the silence is the defect. Either the pair is a usage error at parse time, as `--render` beside
+either already is, or a contact sheet learns to take an audio source. The second is the more useful
+tool: a sheet under real audio is the honest set-wide read the `--set` sheets only approximate.
+
+- **Raised:** 2026-10-11 by `preset-author`. **Owner if taken:** `architect` (usage error or
+  feature), then `dev`.
+- **Verified 2026-10-11** — the audio source wins before the mode is read:
+  `present: if args.signal.is_some\(\) \|\| args.audio.is_some\(\) in: standalone/examples/shot.rs`
+- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0259](plans/0259-the-contact-sheet-hears-the-clip.md) was approved.
+
+## 0291 — a studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it
+
+Each studio test run (`npm --prefix studio test`, which the pre-push hook runs whenever
+`studio/node_modules` exists) leaves a `/tmp/<random id>/ssr/` directory of transformed modules
+behind. On the Arch box, 2026-10-07: about 1,200 of them, 6 GB, deleted by hand. 2026-10-11: 76
+again, about 660 MB, all created since that morning's reboot cleared `/tmp`. `/tmp` is a tmpfs
+here, so the leak takes RAM until the next reboot. `tools/conductor/temp-dir-leak.md` is the same
+class of defect in the conductor's own tests, fixed there; this one sits in the studio's toolchain,
+and which vitest or vite option writes it has not been traced. The fix is either a config that keeps
+the cache inside `studio/` (where `node_modules/.vite` already lives) or a teardown that removes it.
+The `rlx-judging-sets-*` fixtures seen beside them on 2026-10-07 were not present on 2026-10-11.
+
+- **Raised:** 2026-10-07 during Plan 0243 Phase 1, filed 2026-10-11. **Owner if taken:**
+  `studio-builder` (the config or the teardown).
+- **Verified 2026-10-11** — the vitest whose run leaves them:
+  `present: "vitest": "5.0.1" in: studio/package.json`
+- **Verified 2026-10-11** — and nothing in the studio's vitest config places its cache:
+  `absent: cacheDir in: studio/vitest.config.ts`
+- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0260](plans/0260-the-studio-tests-leave-tmp-as-they-found-it.md) was approved.

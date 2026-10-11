@@ -1,6 +1,6 @@
 # 0259 — The contact sheet hears the clip
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0100](../adrs/0100-documentation-images-are-committed-headless-renders.md)

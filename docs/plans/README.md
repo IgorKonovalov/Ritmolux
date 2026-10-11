@@ -45,10 +45,10 @@ place. The plan file carries the real link.
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0246](0246-the-rig-session-measures-the-wave-modes-and-judges-the-fourth-gate.md) | The rig session measures the wave modes and judges the fourth gate | approved | human, dev | 0202's Phases 4-7. Not queued until the owner has the Windows rig; commit Phase 1's eight rows on main, then queue. |
 | [0243](0243-the-full-suite-gets-faster.md) | The full suite gets faster | approved | dev | Human-started, not conductor. Measures llvmpipe thread caps, batch size, priority; applies only what beats baseline 3 of 3. |
-| [0257](0257-the-backdrop-reaches-paper-white.md) | The backdrop reaches paper white | draft | dev, human | ADR-0270: `bg_paper` paints the backdrop after the tonemap, the scene over it by coverage. Closes backlog 0287. Byte-identical at 0. |
-| [0258](0258-the-voxel-opens-along-a-section-plane.md) | The voxel opens along a section plane | draft | dev, human | ADR-0271: `cut`, `cut_yaw`, `cut_pitch` hide cells beyond one plane in the cube's frame. Closes backlog 0288. Independent of 0257. |
-| [0259](0259-the-contact-sheet-hears-the-clip.md) | The contact sheet hears the clip | draft | dev, human | `shot --all` with `--signal`/`--audio` captures every preset at one hop; silent pairs become usage errors. Closes backlog 0289. |
-| [0260](0260-the-studio-tests-leave-tmp-as-they-found-it.md) | The studio tests leave /tmp as they found it | draft | studio-builder | One phase: trace and stop the `/tmp/<id>/ssr` leak from vitest. Closes backlog 0291. |
+| [0257](0257-the-backdrop-reaches-paper-white.md) | The backdrop reaches paper white | approved | dev, human | ADR-0270: `bg_paper` paints the backdrop after the tonemap, the scene over it by coverage. Closes backlog 0287. Byte-identical at 0. |
+| [0258](0258-the-voxel-opens-along-a-section-plane.md) | The voxel opens along a section plane | approved | dev, human | ADR-0271: `cut`, `cut_yaw`, `cut_pitch` hide cells beyond one plane in the cube's frame. Closes backlog 0288. Independent of 0257. |
+| [0259](0259-the-contact-sheet-hears-the-clip.md) | The contact sheet hears the clip | approved | dev, human | `shot --all` with `--signal`/`--audio` captures every preset at one hop; silent pairs become usage errors. Closes backlog 0289. |
+| [0260](0260-the-studio-tests-leave-tmp-as-they-found-it.md) | The studio tests leave /tmp as they found it | approved | studio-builder | One phase: trace and stop the `/tmp/<id>/ssr` leak from vitest. Closes backlog 0291. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
