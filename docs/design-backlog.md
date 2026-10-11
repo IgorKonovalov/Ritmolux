@@ -44,6 +44,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0288 — a solid voxel mass has no cut-away, so seeing inside it depends on choosing a porous rule](#0288--a-solid-voxel-mass-has-no-cut-away-so-seeing-inside-it-depends-on-choosing-a-porous-rule)
 - [0289 — `shot --signal` beside `--all` silently draws a filmstrip of the first preset](#0289--shot---signal-beside---all-silently-draws-a-filmstrip-of-the-first-preset)
 - [0290 — the voxel scene fell to about 5 fps live on `Rich`, where headless `shot` reads 8 ms a frame](#0290--the-voxel-scene-fell-to-about-5-fps-live-on-rich-where-headless-shot-reads-8-ms-a-frame)
+- [0291 — a studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it](#0291--a-studio-vitest-run-leaves-an-ssr-cache-directory-in-tmp-and-never-removes-it)
+- [0292 — the Windows CI arm flaked once on the lost-preset-ask resend test](#0292--the-windows-ci-arm-flaked-once-on-the-lost-preset-ask-resend-test)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1545,3 +1547,38 @@ diagnostics log read while it runs. If it holds, the difference between the wind
   the measurement), `architect` if the cause is a tier cap.
 - **Verified 2026-10-11** — the reading as recorded:
   `present: tier was switched to .Rich. at 11:11 in: docs/plans/done/0255-the-voxel-automaton-glows.md`
+
+## 0291 — a studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it
+
+Each studio test run (`npm --prefix studio test`, which the pre-push hook runs whenever
+`studio/node_modules` exists) leaves a `/tmp/<random id>/ssr/` directory of transformed modules
+behind. On the Arch box, 2026-10-07: about 1,200 of them, 6 GB, deleted by hand. 2026-10-11: 76
+again, about 660 MB, all created since that morning's reboot cleared `/tmp`. `/tmp` is a tmpfs
+here, so the leak takes RAM until the next reboot. `tools/conductor/temp-dir-leak.md` is the same
+class of defect in the conductor's own tests, fixed there; this one sits in the studio's toolchain,
+and which vitest or vite option writes it has not been traced. The fix is either a config that keeps
+the cache inside `studio/` (where `node_modules/.vite` already lives) or a teardown that removes it.
+The `rlx-judging-sets-*` fixtures seen beside them on 2026-10-07 were not present on 2026-10-11.
+
+- **Raised:** 2026-10-07 during Plan 0243 Phase 1, filed 2026-10-11. **Owner if taken:**
+  `studio-builder` (the config or the teardown).
+- **Verified 2026-10-11** — the vitest whose run leaves them:
+  `present: "vitest": "5.0.1" in: studio/package.json`
+- **Verified 2026-10-11** — and nothing in the studio's vitest config places its cache:
+  `absent: cacheDir in: studio/vitest.config.ts`
+
+## 0292 — the Windows CI arm flaked once on the lost-preset-ask resend test
+
+`a_lost_first_preset_ask_is_resent_and_lands_on_attempt_two` (Plan 0252) asserts that a sender
+losing its first `ctl/preset/req` lands on the second attempt and prints exactly one `RESENT` line
+naming attempt 2 of 3. It failed on the Windows CI arm at `ba0079bb` and passed at `78b70960` with
+no change between them that touches it, so the count of `RESENT` lines is not deterministic there:
+a third attempt or a second resend on a slow runner would break "exactly one". One failure is not a
+diagnosis. The next red should have its `RESENT` lines read (the binary prints them at the end of
+the run, `success-output = "final"`) before the assertion is loosened or the timing widened.
+
+- **Raised:** 2026-10-08, filed 2026-10-11. **Owner if taken:** `dev` (read the next failing log),
+  `architect` if the resend budget's timing needs a decision.
+- **Verified 2026-10-11** — the test, and its exactly-one assertion:
+  `present: fn a_lost_first_preset_ask_is_resent_and_lands_on_attempt_two in: standalone/tests/control_loopback.rs`
+- **Verified 2026-10-11** — `present: exactly one .RESENT. line in: standalone/tests/control_loopback.rs`
