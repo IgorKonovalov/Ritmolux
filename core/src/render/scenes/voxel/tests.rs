@@ -218,7 +218,8 @@ fn read_cells(ctx: &RenderContext, scene: &VoxelScene) -> Vec<u32> {
 
 /// Overwrite the current generation: every cell `live` names is live at age
 /// 0, every other dead. The bricks are re-marked, so the march jumps exactly
-/// the bricks this structure leaves empty.
+/// the bricks this structure leaves empty, and the light field is marked stale,
+/// so the next frame with `bounce` on refills it.
 fn write_cells(ctx: &RenderContext, scene: &mut VoxelScene, live: impl Fn([u32; 3]) -> bool) {
     let res = scene.res.as_mut().expect("configure builds the resources");
     let n = res.grid;
@@ -255,6 +256,7 @@ fn write_cells(ctx: &RenderContext, scene: &mut VoxelScene, live: impl Fn([u32; 
             label: Some("voxel-write-cells"),
         });
     res.encode_bricks(&mut encoder);
+    res.light_fresh = false;
     ctx.queue.submit([encoder.finish()]);
 }
 
@@ -539,6 +541,176 @@ fn ambient_occlusion_darkens_the_inner_edge_of_an_l() {
         on[4],
         on[5]
     );
+}
+
+// ---------------------------------------------------------------------------
+// Bounce
+// ---------------------------------------------------------------------------
+
+/// **An unbound `bounce` builds no light field**: a solid volume stepped
+/// through a run of generations at `bounce = 0` refills the field zero times
+/// and never builds it, and a `glow` volume with `bounce = 1` bound, which
+/// reads no light, builds none either.
+#[test]
+fn bounce_0_builds_no_light_field() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    for (present, bounce) in [(Present::Solid, 0.0), (Present::Glow, 1.0)] {
+        let mut scene = scene_with(
+            &ctx,
+            VoxelConfig {
+                present,
+                ..config(32, RosterRule::Clouds, 3)
+            },
+        );
+        let mut driver = Driver::new(&ctx);
+        let generations: u32 = (0..30)
+            .map(|_| {
+                driver.frame(
+                    &mut scene,
+                    1.0 / 30.0,
+                    &[("step_rate", 15.0), ("bounce", bounce)],
+                )
+            })
+            .sum();
+        assert!(
+            generations >= 10,
+            "the run stepped {generations} generations"
+        );
+        assert_eq!(
+            scene.light_build_count(),
+            0,
+            "{present:?} at bounce {bounce} refilled the light field"
+        );
+        assert!(
+            scene.res.as_ref().is_some_and(|res| res.light.is_none()),
+            "{present:?} at bounce {bounce} built the light field"
+        );
+    }
+}
+
+/// The probe for the bounce test, on a 16³ grid: one live cell at x 4, and
+/// beside it on `+x`, three empty cells away, the 4³ block x 8-11 that is
+/// exactly one light-field texel. Both sit at y and z 8-11.
+const LONE_CELL: [u32; 3] = [4, 9, 9];
+
+fn lone_cell(c: [u32; 3]) -> bool {
+    c == LONE_CELL
+}
+
+fn cell_and_block(c: [u32; 3]) -> bool {
+    lone_cell(c) || c.iter().all(|&v| (8..12).contains(&v))
+}
+
+/// The pixel at the centre of [`LONE_CELL`]'s `+x` face, drawn solid with
+/// `bounce` bound over the probe camera, `live` naming every live cell.
+fn lone_face(ctx: &RenderContext, live: fn([u32; 3]) -> bool, bounce: f32) -> [f32; 4] {
+    let (mut scene, mut driver) = scene_holding(ctx, AO_TARGET, 16, Present::Solid, live);
+    driver.frame(
+        &mut scene,
+        1.0 / 60.0,
+        &[
+            ("step_rate", 0.0),
+            ("yaw", SOLID_YAW),
+            ("pitch", SOLID_PITCH),
+            ("hue_spread", 0.0),
+            ("age_tint", 0.0),
+            ("bounce", bounce),
+        ],
+    );
+    let [x, y, z] = LONE_CELL.map(|v| v as f32);
+    let face = cells_to_world([x + 1.0, y + 0.5, z + 0.5]);
+    let p = driver.read_target()[pixel_of(AO_TARGET, SOLID_YAW, SOLID_PITCH, face)];
+    assert!(p[3] > 0.0, "the lone cell's +x face is not covered: {p:?}");
+    p
+}
+
+/// **A face brightens toward a block of live cells**: the `+x` face of one
+/// live cell, three cells from a 4³ block of live cells, reads brighter at
+/// `bounce = 1` than at 0, and gains more between the two than the same face
+/// gains when the cell is drawn alone. At `bounce = 0` the block moves the face
+/// not at all, so the gain is the field's alone: the block neither hides the
+/// face nor closes its occlusion.
+#[test]
+fn a_face_brightens_toward_a_block_of_live_cells() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let with_0 = lone_face(&ctx, cell_and_block, 0.0);
+    let with_1 = lone_face(&ctx, cell_and_block, 1.0);
+    let alone_0 = lone_face(&ctx, lone_cell, 0.0);
+    let alone_1 = lone_face(&ctx, lone_cell, 1.0);
+    println!(
+        "with the block: {with_0:?} at 0, {with_1:?} at 1; alone: {alone_0:?} at 0, {alone_1:?} \
+         at 1"
+    );
+    assert!(
+        with_0 == alone_0,
+        "at bounce 0 the block moved the face: {with_0:?} against {alone_0:?}"
+    );
+    let gain = luminance(with_1) - luminance(with_0);
+    let alone_gain = luminance(alone_1) - luminance(alone_0);
+    assert!(
+        gain > 0.0,
+        "the face toward the block reads no brighter at bounce 1"
+    );
+    assert!(
+        gain > 2.0 * alone_gain.max(0.0) + 1e-3,
+        "the face gains {gain} beside the block and {alone_gain} alone"
+    );
+}
+
+/// **A light field first built mid-run reads as one built from the start**:
+/// a stepping solid volume switched to `bounce = 1` after ten frames at 0
+/// draws the switch frame, and the frame after it, byte-identical to a run
+/// bound to 1 throughout — and bounce visibly moves that frame.
+#[test]
+fn a_light_field_built_mid_run_matches_one_built_from_the_start() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let switch = 10;
+    let run = |bounce_at: &dyn Fn(usize) -> f32| {
+        let mut scene = scene_with(
+            &ctx,
+            VoxelConfig {
+                present: Present::Solid,
+                ..config(32, RosterRule::Clouds, 3)
+            },
+        );
+        let mut driver = Driver::new(&ctx);
+        let mut frames = Vec::new();
+        for i in 0..switch + 2 {
+            driver.frame(
+                &mut scene,
+                1.0 / 60.0,
+                &[
+                    ("step_rate", 20.0),
+                    ("yaw", SOLID_YAW),
+                    ("pitch", SOLID_PITCH),
+                    ("bounce", bounce_at(i)),
+                ],
+            );
+            frames.push(driver.read_target());
+        }
+        (frames, scene.light_build_count())
+    };
+    let (always, always_builds) = run(&|_| 1.0);
+    let (late, late_builds) = run(&|i| if i < switch { 0.0 } else { 1.0 });
+    let (never, _) = run(&|_| 0.0);
+    println!("refills: {always_builds} from the start, {late_builds} from frame {switch}");
+    assert!(late_builds > 0 && late_builds < always_builds);
+    for i in [switch, switch + 1] {
+        assert!(
+            always[i] == late[i],
+            "frame {i} differs between a field built at frame 0 and at frame {switch}"
+        );
+        assert!(
+            always[i] != never[i],
+            "bounce 1 does not move frame {i}, so the comparison is empty"
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------

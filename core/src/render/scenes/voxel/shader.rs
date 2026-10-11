@@ -1,7 +1,8 @@
 //! The voxel system's two stages: the step pass, a compute dispatch that seeds
 //! or advances the 3D state one generation, and the march, a fullscreen pass
 //! that walks each pixel's ray through the cube under emission-absorption, and
-//! under `solid` stops at the first live cell and lights its face.
+//! under `solid` stops at the first live cell and lights its face — and,
+//! between them, the brick pass and the light field's splat and blur.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard). Only constants live here, compiled once at construction.
@@ -216,6 +217,79 @@ fn main(
 }
 "#;
 
+/// The light field's splat (ADR-0272). `const LIGHT_CELL: u32` and `const
+/// AGE_SPAN: f32` are prepended at construction. One invocation a texel, each
+/// reducing the `LIGHT_CELL`³ block of cells it covers: `r` the live fraction,
+/// `g` the live cells' ages (as the march colours a live cell) summed over the
+/// same count, so `g / r` is their mean and a blur of both stays a weighted
+/// mean. Decay stages emit nothing. A block past a grid that is not a multiple
+/// of `LIGHT_CELL` counts only the cells that exist, over the whole block.
+pub(super) const LIGHT_SPLAT_SHADER: &str = r#"
+@group(0) @binding(0) var cells: texture_3d<u32>;
+@group(0) @binding(1) var splat: texture_storage_3d<rgba16float, write>;
+
+@compute @workgroup_size(4, 4, 4)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+    if (any(gid >= textureDimensions(splat))) {
+        return;
+    }
+    let n = textureDimensions(cells).x;
+    let base = gid * LIGHT_CELL;
+    var live = 0.0;
+    var aged = 0.0;
+    for (var z = 0u; z < LIGHT_CELL; z = z + 1u) {
+        for (var y = 0u; y < LIGHT_CELL; y = y + 1u) {
+            for (var x = 0u; x < LIGHT_CELL; x = x + 1u) {
+                let c = base + vec3<u32>(x, y, z);
+                if (all(c < vec3<u32>(n))) {
+                    let texel = textureLoad(cells, vec3<i32>(c), 0).x;
+                    if ((texel & 0xFFu) == 1u) {
+                        live = live + 1.0;
+                        aged = aged + min(f32(texel >> 8u) / AGE_SPAN, 1.0);
+                    }
+                }
+            }
+        }
+    }
+    let k = 1.0 / f32(LIGHT_CELL * LIGHT_CELL * LIGHT_CELL);
+    textureStore(splat, vec3<i32>(gid), vec4<f32>(live * k, aged * k, 0.0, 0.0));
+}
+"#;
+
+/// The light field's blur: each texel the 3³ texels about it, weighted by a
+/// 1-2-1 tent on each axis (64 in all). A texel past the field's faces is
+/// empty, so the light fades toward the cube's faces rather than piling up.
+pub(super) const LIGHT_BLUR_SHADER: &str = r#"
+@group(0) @binding(0) var src: texture_3d<f32>;
+@group(0) @binding(1) var dst: texture_storage_3d<rgba16float, write>;
+
+fn tent(d: i32) -> f32 {
+    return select(1.0, 2.0, d == 0);
+}
+
+@compute @workgroup_size(4, 4, 4)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let side = vec3<i32>(textureDimensions(src));
+    let at = vec3<i32>(gid);
+    if (any(at >= side)) {
+        return;
+    }
+    var sum = vec2<f32>(0.0);
+    for (var dz = -1; dz <= 1; dz = dz + 1) {
+        for (var dy = -1; dy <= 1; dy = dy + 1) {
+            for (var dx = -1; dx <= 1; dx = dx + 1) {
+                let c = at + vec3<i32>(dx, dy, dz);
+                if (all(c >= vec3<i32>(0)) && all(c < side)) {
+                    let w = tent(dx) * tent(dy) * tent(dz);
+                    sum = sum + w * textureLoad(src, c, 0).xy;
+                }
+            }
+        }
+    }
+    textureStore(dst, at, vec4<f32>(sum / 64.0, 0.0, 0.0));
+}
+"#;
+
 /// The present: the march's target stretched over the render target,
 /// filtered. [`gpu::FULLSCREEN_VS_UV_FLIPPED`](crate::render::gpu::FULLSCREEN_VS_UV_FLIPPED)
 /// is prepended at construction.
@@ -254,7 +328,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// `albedo * (ambient * occ + key * max(0, n . l))`, added under the light in
 /// front of it, and `T` drops to 0, so the pixel's coverage is `occlude`.
 /// `occ` is the face's voxel ambient occlusion at the hit point, mixed in by
-/// `ao`; at `ao = 0` it is not evaluated.
+/// `ao`; at `ao = 0` it is not evaluated. With `bounce.x > 0` the face adds
+/// the light field sampled half a cell in front of the hit point, coloured at
+/// the field's mean age; at 0 the field is not fetched.
 ///
 /// A cell the section plane hides (`cut_away`) is dead to the walk and to
 /// `solid_at`, so the occlusion reads it as open. The brick jump does not know
@@ -296,6 +372,8 @@ struct March {
     // The section plane: xyz its unit normal toward the hidden side, in the
     // cube's frame; w its offset. Read only while lit.w is 1
     cut: vec4<f32>,
+    // x: bounce, 0 to skip the light field; yzw unused
+    bounce: vec4<f32>,
     // The shells' levels, four to a vec4, bass first
     shells: array<vec4<f32>, 4>,
 }
@@ -305,6 +383,10 @@ struct March {
 @group(0) @binding(3) var lut_a: texture_2d<f32>;
 @group(0) @binding(4) var lut_b: texture_2d<f32>;
 @group(0) @binding(5) var lut_samp: sampler;
+// r: intensity, g: intensity-weighted age; a one-texel stand-in while
+// bounce.x is 0
+@group(0) @binding(6) var light_field: texture_3d<f32>;
+@group(0) @binding(7) var light_samp: sampler;
 
 // Under this transmittance nothing further along the ray reaches one 8-bit
 // step of the frame.
@@ -580,6 +662,16 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                 }
                 let lighting = ambient + mp.lit.x * lambert;
                 light = light + transmit * shade(coord) * (max(mp.a.y, 0.0) * fog * shell * lighting);
+                if (mp.bounce.x > 0.0) {
+                    // The neighbours' light half a cell in front of the face,
+                    // in field texels of LIGHT_CELL cells each.
+                    let at = o + dg * t + normal * 0.5;
+                    let uvw = at / (LIGHT_CELL * vec3<f32>(textureDimensions(light_field)));
+                    let lf = textureSampleLevel(light_field, light_samp, uvw, 0.0).xy;
+                    let lit_age = select(0.0, lf.y / lf.x, lf.x > 1e-6);
+                    let lit_coord = mp.a.x + mp.c.y * (radius - 0.5) + mp.c.x * lit_age;
+                    light = light + transmit * shade(lit_coord) * (mp.bounce.x * lf.x * max(mp.a.y, 0.0) * fog * shell);
+                }
                 transmit = 0.0;
                 break;
             }

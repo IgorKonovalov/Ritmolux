@@ -1,6 +1,6 @@
 # 0263 — Solid voxels light each other
 
-> **Status:** approved (2026-10-11)
+> **Status:** in-progress (2026-10-11)
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0272](../adrs/0272-a-solid-voxel-takes-light-from-its-neighbours-through-a-coarse-field-rebuilt-each-generation.md) (accepted), [ADR-0269](../adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md), [ADR-0268](../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md)
@@ -134,15 +134,24 @@ flowchart LR
 
 ## Implementation log
 
-**Lane:**
+**Lane:** branch `plan-0263-solid-voxels-light-each-other`, worktree `/home/igor/Work/rlx-plan-0263`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Walking skeleton: one face lit by its neighbours | dev | not started | |
+| 1 — Walking skeleton: one face lit by its neighbours | dev | done | committed with this row |
 | 2 — Cost, the golden and the documentation | dev | not started | |
 | 3 — The owner's look and the skill text | human | not started | |
 
 ### Notes
+
+- Phase 1: `core/tests/suite/preset.rs` needed no row. `bounce` is `Modal`, and the only voxel
+  roster there is `STRUCTURAL`; `declared_params_match_set_param` reads the new arm from source.
+  `.taplo.toml` did not move on regeneration.
+- Phase 1: the bounce term also multiplies by `fog`, as the key and ambient terms do in the march.
+  ADR-0272's formula does not name fog.
+- Phase 1: the field is built and filled only under `present = "solid"`. Under `glow`, `bounce > 0`
+  builds nothing, and `bounce_0_builds_no_light_field` asserts that.
+- Phase 1: the splat does not read the section plane, so a cut cell still emits into the field.
 
 ### Close triggers
 

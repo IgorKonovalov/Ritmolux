@@ -74,6 +74,29 @@
 //! third — and the four are interpolated across the face at the hit point and
 //! mixed in by `ao`.
 //!
+//! # Bounce
+//!
+//! `bounce` (ADR-0272) lets a solid face take light from the live cells in
+//! front of it. A light field of side `grid / LIGHT_CELL` holds, per texel, the
+//! live fraction of the `LIGHT_CELL`³ block of cells it covers and that block's
+//! summed age weighted the same way; a second texture holds it blurred once over
+//! 3³ texels by a 1-2-1 tent on each axis. The march samples the blurred field
+//! trilinearly half a cell in front of the face it hit, and adds
+//!
+//! ```text
+//! bounce * palette(coord at L.age) * L.intensity * brightness * fog * shell
+//! ```
+//!
+//! where `L.age` is the sampled age over the sampled intensity. The colour is
+//! looked up at shade time, so only the intensity and the age wait for the
+//! next refill. The field has no occlusion: light passes through walls.
+//!
+//! The field is refilled beside the brick pass, after every frame that changed
+//! the state, and on the first frame `bounce` turns on after frames that did
+//! not fill it. It exists only once a frame under `solid` has `bounce > 0`:
+//! before that the march binds a one-texel stand-in and the uniform skips the
+//! fetch, so a preset that never binds `bounce` builds and reads nothing.
+//!
 //! # The section plane
 //!
 //! `cut`, `cut_yaw` and `cut_pitch` (ADR-0271) hide every cell whose centre `c`,
@@ -159,14 +182,32 @@ const WORKGROUP: u32 = 4;
 /// brick pass's workgroup, which scans one brick.
 const BRICK: u32 = 8;
 
+/// Each side of the block of cells one light-field texel covers —
+/// `LIGHT_CELL` in `shader::LIGHT_SPLAT_SHADER` and `shader::MARCH_SHADER`.
+const LIGHT_CELL: u32 = 4;
+
+/// The light field's texel: intensity in `r`, intensity-weighted age in `g`.
+/// Filterable, so the march samples it trilinearly, and a storage format.
+const LIGHT_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+
+/// Each side of the light passes' workgroup, in texels — `@workgroup_size(4,
+/// 4, 4)` in both light shaders.
+const LIGHT_WORKGROUP: u32 = 4;
+
+/// The largest `bounce` the march reads: well past the declared range, so it
+/// bounds a runaway binding rather than an author.
+const MAX_BOUNCE: f32 = 16.0;
+
 /// `shader::MARCH_SHADER` with the constants it is written against prepended;
 /// the vertex prelude goes in front of this.
 fn march_body() -> String {
     format!(
-        "const MAX_MARCH: i32 = {};\nconst AGE_SPAN: f32 = {:?};\nconst BRICK: i32 = {};\n{}",
+        "const MAX_MARCH: i32 = {};\nconst AGE_SPAN: f32 = {:?};\nconst BRICK: i32 = {};\n\
+         const LIGHT_CELL: f32 = {:?};\n{}",
         3 * MAX_GRID,
         AGE_SPAN,
         BRICK,
+        LIGHT_CELL as f32,
         shader::MARCH_SHADER
     )
 }
@@ -284,6 +325,7 @@ const DEFAULT_SHELL_GAIN: f32 = default_of(PARAMS, "shell_gain");
 const DEFAULT_KEY: f32 = default_of(PARAMS, "key");
 const DEFAULT_AMBIENT: f32 = default_of(PARAMS, "ambient");
 const DEFAULT_AO: f32 = default_of(PARAMS, "ao");
+const DEFAULT_BOUNCE: f32 = default_of(PARAMS, "bounce");
 const DEFAULT_LIGHT_YAW: f32 = default_of(PARAMS, "light_yaw");
 const DEFAULT_LIGHT_PITCH: f32 = default_of(PARAMS, "light_pitch");
 const DEFAULT_CUT: f32 = default_of(PARAMS, "cut");
@@ -464,6 +506,17 @@ pub const PARAMS: &[ParamSpec] = &[
         main: false,
     },
     ParamSpec {
+        name: "bounce",
+        default: 0.0,
+        range: Some([0.0, 2.0]),
+        doc: "How much light a solid face takes from the live cells in front of it, so a \
+              structure glows onto itself; soft, reaching a few cells and through thin \
+              walls. 0 is off.",
+        kind: ParamKind::Modal,
+        group: ParamGroup::Light,
+        main: false,
+    },
+    ParamSpec {
         name: "light_yaw",
         default: -0.6,
         range: Some([-PI, PI]),
@@ -525,6 +578,7 @@ pub const FAMILY_PARAMS: &[FamilyParam] = &[
     solid_only!("key": Some([0.0, 4.0])),
     solid_only!("ambient": Some([0.0, 1.0])),
     solid_only!("ao": Some([0.0, 1.0])),
+    solid_only!("bounce": Some([0.0, 2.0])),
     solid_only!("light_yaw": Some([-PI, PI])),
     solid_only!("light_pitch": Some([-1.5, 1.5])),
 ];
@@ -797,6 +851,9 @@ struct MarchParams {
     /// The section plane ([`cut_plane`]): xyz its unit normal, w its offset.
     /// Zero, and never read, while `lit.w` is 0.
     cut: [f32; 4],
+    /// x: the bounce the march adds, 0 to skip the light field's fetch — always
+    /// 0 under `glow`; yzw unused.
+    bounce: [f32; 4],
     /// The shells' levels, four to a `vec4`, bass first.
     shells: [[f32; 4]; (MAX_SHELLS / 4) as usize],
 }
@@ -895,6 +952,174 @@ impl StateTexture {
     }
 }
 
+/// The light field (ADR-0272): the splat texture each refill reduces the cells
+/// into, the blurred texture the march samples, and the two passes between
+/// them. Built on the first frame that reads it, never at `configure`.
+struct LightField {
+    /// Held beside the views the passes take of them.
+    _splat: wgpu::Texture,
+    _blurred: wgpu::Texture,
+    /// The blurred field, sampled by the march.
+    blurred_view: wgpu::TextureView,
+    splat_pipeline: wgpu::ComputePipeline,
+    blur_pipeline: wgpu::ComputePipeline,
+    /// Splat the cells of A, and of B.
+    splat_from_a: wgpu::BindGroup,
+    splat_from_b: wgpu::BindGroup,
+    blur_bg: wgpu::BindGroup,
+    /// Texels a side.
+    side: u32,
+}
+
+impl LightField {
+    fn build(device: &wgpu::Device, grid: u32, a: &StateTexture, b: &StateTexture) -> Self {
+        let side = grid.div_ceil(LIGHT_CELL);
+        let field = |label: &str| {
+            device.create_texture(&wgpu::TextureDescriptor {
+                label: Some(label),
+                size: wgpu::Extent3d {
+                    width: side,
+                    height: side,
+                    depth_or_array_layers: side,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D3,
+                format: LIGHT_FORMAT,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
+                view_formats: &[],
+            })
+        };
+        let splat = field("voxel-light-splat");
+        let blurred = field("voxel-light-blurred");
+        let splat_read = splat.create_view(&wgpu::TextureViewDescriptor::default());
+        let splat_write = splat.create_view(&wgpu::TextureViewDescriptor::default());
+        let blurred_write = blurred.create_view(&wgpu::TextureViewDescriptor::default());
+        let blurred_view = blurred.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let storage = wgpu::BindGroupLayoutEntry {
+            binding: 1,
+            visibility: wgpu::ShaderStages::COMPUTE,
+            ty: wgpu::BindingType::StorageTexture {
+                access: wgpu::StorageTextureAccess::WriteOnly,
+                format: LIGHT_FORMAT,
+                view_dimension: wgpu::TextureViewDimension::D3,
+            },
+            count: None,
+        };
+        let source = |sample_type| wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::COMPUTE,
+            ty: wgpu::BindingType::Texture {
+                sample_type,
+                view_dimension: wgpu::TextureViewDimension::D3,
+                multisampled: false,
+            },
+            count: None,
+        };
+        // `[Texture<u32>, StorageTexture<rgba16float>]`: the cells, the splat.
+        let splat_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("voxel-light-splat-layout"),
+            entries: &[source(wgpu::TextureSampleType::Uint), storage],
+        });
+        // `[Texture<f32>, StorageTexture<rgba16float>]`: the splat, the blurred.
+        let blur_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("voxel-light-blur-layout"),
+            entries: &[
+                source(wgpu::TextureSampleType::Float { filterable: false }),
+                storage,
+            ],
+        });
+        let bind =
+            |layout: &wgpu::BindGroupLayout, src: &wgpu::TextureView, dst: &wgpu::TextureView| {
+                device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("voxel-light-bg"),
+                    layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(src),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::TextureView(dst),
+                        },
+                    ],
+                })
+            };
+        let splat_from_a = bind(&splat_layout, &a.read, &splat_write);
+        let splat_from_b = bind(&splat_layout, &b.read, &splat_write);
+        let blur_bg = bind(&blur_layout, &splat_read, &blurred_write);
+        let pipeline = |label: &str, layout: &wgpu::BindGroupLayout, source: String| {
+            let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some(label),
+                source: wgpu::ShaderSource::Wgsl(source.into()),
+            });
+            let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some(label),
+                bind_group_layouts: &[Some(layout)],
+                immediate_size: 0,
+            });
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some(label),
+                layout: Some(&pipeline_layout),
+                module: &module,
+                entry_point: Some("main"),
+                compilation_options: Default::default(),
+                cache: None,
+            })
+        };
+        let splat_pipeline = pipeline(
+            "voxel-light-splat",
+            &splat_layout,
+            format!(
+                "const LIGHT_CELL: u32 = {LIGHT_CELL}u;\nconst AGE_SPAN: f32 = {AGE_SPAN:?};\n{}",
+                shader::LIGHT_SPLAT_SHADER
+            ),
+        );
+        let blur_pipeline = pipeline(
+            "voxel-light-blur",
+            &blur_layout,
+            shader::LIGHT_BLUR_SHADER.to_string(),
+        );
+        Self {
+            _splat: splat,
+            _blurred: blurred,
+            blurred_view,
+            splat_pipeline,
+            blur_pipeline,
+            splat_from_a,
+            splat_from_b,
+            blur_bg,
+            side,
+        }
+    }
+
+    /// Refill the field from the generation `reading_a` names: the splat, then
+    /// the blur, each its own pass so the blur reads a complete splat.
+    fn encode(&self, encoder: &mut wgpu::CommandEncoder, reading_a: bool) {
+        let groups = self.side.div_ceil(LIGHT_WORKGROUP);
+        {
+            let mut cpass = gpu::compute_pass(encoder, "voxel-light-splat");
+            cpass.set_pipeline(&self.splat_pipeline);
+            cpass.set_bind_group(
+                0,
+                if reading_a {
+                    &self.splat_from_a
+                } else {
+                    &self.splat_from_b
+                },
+                &[],
+            );
+            cpass.dispatch_workgroups(groups, groups, groups);
+        }
+        let mut cpass = gpu::compute_pass(encoder, "voxel-light-blur");
+        cpass.set_pipeline(&self.blur_pipeline);
+        cpass.set_bind_group(0, &self.blur_bg, &[]);
+        cpass.dispatch_workgroups(groups, groups, groups);
+    }
+}
+
 /// The march's own target and the bind group that presents it, rebuilt when
 /// the size the frame asks for changes.
 struct MarchTarget {
@@ -927,14 +1152,30 @@ struct Resources {
     /// One texel a brick: non-zero where the brick holds a non-dead cell.
     /// Held beside the views the passes take of it.
     _bricks: wgpu::Texture,
+    /// The march's view of the bricks, kept so its bind groups can be rebuilt
+    /// when the light field arrives.
+    bricks_read: wgpu::TextureView,
     brick_pipeline: wgpu::ComputePipeline,
     /// Mark the bricks of A, and of B.
     brick_from_a: wgpu::BindGroup,
     brick_from_b: wgpu::BindGroup,
+    march_layout: wgpu::BindGroupLayout,
     march_pipeline: wgpu::RenderPipeline,
     march_uniform: wgpu::Buffer,
+    /// Each bound to the light field once it exists, to `light_stand_in`
+    /// before.
     march_from_a: wgpu::BindGroup,
     march_from_b: wgpu::BindGroup,
+    /// A one-texel field the march binds until the light field is built; the
+    /// uniform never lets it be read. Held beside the bind groups' view of it.
+    _light_stand_in: wgpu::Texture,
+    /// Clamps at the cube's faces and filters trilinearly.
+    light_sampler: wgpu::Sampler,
+    /// Built on the first frame under `solid` with `bounce > 0`.
+    light: Option<LightField>,
+    /// Whether `light` holds the current generation. Cleared by every frame
+    /// that changes the state without refilling it.
+    light_fresh: bool,
     present_layout: wgpu::BindGroupLayout,
     present_pipeline: wgpu::RenderPipeline,
     present_sampler: wgpu::Sampler,
@@ -1118,9 +1359,9 @@ impl Resources {
         });
 
         let luts = palette::LutPair::new(device, "voxel");
-        // `[Uniform+size, Texture, Texture, Texture, Texture, Sampler]`: the
-        // uniform first and sized, so the shape is not `cellular-present-layout`'s
-        // field-LUTs-sampler-uniform (ADR-0058).
+        // `[Uniform+size, Texture, Texture, Texture, Texture, Sampler, Texture3D,
+        // Sampler]`: the uniform first and sized, so the shape is not
+        // `cellular-present-layout`'s field-LUTs-sampler-uniform (ADR-0058).
         let march_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("voxel-march-layout"),
             entries: &[
@@ -1159,31 +1400,55 @@ impl Resources {
                 gpu::texture(3, true),
                 gpu::texture(4, true),
                 gpu::sampler(5),
+                wgpu::BindGroupLayoutEntry {
+                    binding: 6,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                gpu::sampler(7),
             ],
         });
+        let light_stand_in = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("voxel-light-stand-in"),
+            size: wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D3,
+            format: LIGHT_FORMAT,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let light_stand_in_view =
+            light_stand_in.create_view(&wgpu::TextureViewDescriptor::default());
+        let light_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("voxel-light-sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
         let march_bind = |field: &StateTexture| {
-            let [lut_a, lut_b, lut_sampler] = luts.bind_entries(3, 4, 5);
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("voxel-march-bg"),
-                layout: &march_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: march_uniform.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::TextureView(&field.read),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(&bricks_read),
-                    },
-                    lut_a,
-                    lut_b,
-                    lut_sampler,
-                ],
-            })
+            march_bind_group(
+                device,
+                &march_layout,
+                &march_uniform,
+                &field.read,
+                &bricks_read,
+                &luts,
+                &light_stand_in_view,
+                &light_sampler,
+            )
         };
         let march_from_a = march_bind(&a);
         let march_from_b = march_bind(&b);
@@ -1250,18 +1515,56 @@ impl Resources {
             step_from_a,
             step_from_b,
             _bricks: bricks,
+            bricks_read,
             brick_pipeline,
             brick_from_a,
             brick_from_b,
+            march_layout,
             march_pipeline,
             march_uniform,
             march_from_a,
             march_from_b,
+            _light_stand_in: light_stand_in,
+            light_sampler,
+            light: None,
+            light_fresh: false,
             present_layout,
             present_pipeline,
             present_sampler,
             target: None,
             luts,
+        }
+    }
+
+    /// Build the light field if it does not exist, and rebind the march to it.
+    fn ensure_light(&mut self, device: &wgpu::Device) {
+        if self.light.is_some() {
+            return;
+        }
+        let light = LightField::build(device, self.grid, &self.a, &self.b);
+        let bind = |field: &StateTexture| {
+            march_bind_group(
+                device,
+                &self.march_layout,
+                &self.march_uniform,
+                &field.read,
+                &self.bricks_read,
+                &self.luts,
+                &light.blurred_view,
+                &self.light_sampler,
+            )
+        };
+        self.march_from_a = bind(&self.a);
+        self.march_from_b = bind(&self.b);
+        self.light = Some(light);
+        self.light_fresh = false;
+    }
+
+    /// Refill the light field from the current generation, if it exists.
+    fn encode_light(&mut self, encoder: &mut wgpu::CommandEncoder) {
+        if let Some(light) = self.light.as_ref() {
+            light.encode(encoder, self.reading_a);
+            self.light_fresh = true;
         }
     }
 
@@ -1368,6 +1671,51 @@ impl Resources {
     }
 }
 
+/// The march's bind group over the generation `field`, its bricks, the palette
+/// LUTs, and `light` — the light field, or the stand-in before it exists.
+#[allow(clippy::too_many_arguments)]
+fn march_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    uniform: &wgpu::Buffer,
+    field: &wgpu::TextureView,
+    bricks: &wgpu::TextureView,
+    luts: &palette::LutPair,
+    light: &wgpu::TextureView,
+    light_sampler: &wgpu::Sampler,
+) -> wgpu::BindGroup {
+    let [lut_a, lut_b, lut_sampler] = luts.bind_entries(3, 4, 5);
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("voxel-march-bg"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(field),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::TextureView(bricks),
+            },
+            lut_a,
+            lut_b,
+            lut_sampler,
+            wgpu::BindGroupEntry {
+                binding: 6,
+                resource: wgpu::BindingResource::TextureView(light),
+            },
+            wgpu::BindGroupEntry {
+                binding: 7,
+                resource: wgpu::BindingResource::Sampler(light_sampler),
+            },
+        ],
+    })
+}
+
 /// A 3D automaton in a cube, marched as an emitting, absorbing volume, or as
 /// lit solid cells inside the glow of their own decay.
 pub struct VoxelScene {
@@ -1422,6 +1770,10 @@ pub struct VoxelScene {
     key: f32,
     ambient: f32,
     ao: f32,
+    bounce: f32,
+    /// How many times the light field has been refilled since this scene was
+    /// built. Diagnostic: a preset that never binds `bounce` keeps it at 0.
+    light_builds: u32,
     light_yaw: f32,
     light_pitch: f32,
     cut: f32,
@@ -1481,6 +1833,8 @@ impl VoxelScene {
             key: DEFAULT_KEY,
             ambient: DEFAULT_AMBIENT,
             ao: DEFAULT_AO,
+            bounce: DEFAULT_BOUNCE,
+            light_builds: 0,
             light_yaw: DEFAULT_LIGHT_YAW,
             light_pitch: DEFAULT_LIGHT_PITCH,
             cut: DEFAULT_CUT,
@@ -1529,6 +1883,22 @@ impl VoxelScene {
                 stamp.centre[2],
                 stamp.radius_sq,
             ],
+        }
+    }
+
+    /// How many times the light field has been refilled. See
+    /// [`Self::light_builds`].
+    #[cfg(test)]
+    pub(crate) fn light_build_count(&self) -> u32 {
+        self.light_builds
+    }
+
+    /// The bounce the march adds this frame: the bound value, held finite and
+    /// inside `0..=`[`MAX_BOUNCE`], and 0 under `glow`, which reads no light.
+    fn applied_bounce(&self) -> f32 {
+        match self.config.present {
+            Present::Glow => 0.0,
+            Present::Solid => finite_or(self.bounce, DEFAULT_BOUNCE).clamp(0.0, MAX_BOUNCE),
         }
     }
 
@@ -1591,6 +1961,7 @@ impl VoxelScene {
                 if cut.is_some() { 1.0 } else { 0.0 },
             ],
             cut: cut.unwrap_or([0.0; 4]),
+            bounce: [self.applied_bounce(), 0.0, 0.0, 0.0],
             shells: {
                 let mut out = [[0.0; 4]; (MAX_SHELLS / 4) as usize];
                 for (slot, level) in out.iter_mut().flatten().zip(self.levels) {
@@ -1670,6 +2041,7 @@ impl Scene for VoxelScene {
         self.key = DEFAULT_KEY;
         self.ambient = DEFAULT_AMBIENT;
         self.ao = DEFAULT_AO;
+        self.bounce = DEFAULT_BOUNCE;
         self.light_yaw = DEFAULT_LIGHT_YAW;
         self.light_pitch = DEFAULT_LIGHT_PITCH;
         self.cut = DEFAULT_CUT;
@@ -1712,6 +2084,7 @@ impl Scene for VoxelScene {
             "key" => self.key = value,
             "ambient" => self.ambient = value,
             "ao" => self.ao = value,
+            "bounce" => self.bounce = value,
             "light_yaw" => self.light_yaw = value,
             "light_pitch" => self.light_pitch = value,
             "cut" => self.cut = value,
@@ -1789,6 +2162,16 @@ impl Scene for VoxelScene {
         // marked once, after it.
         if changed {
             res.encode_bricks(encoder);
+            res.light_fresh = false;
+        }
+        // The light field follows the bricks, and a field built or switched
+        // back on this frame is filled this frame, state change or not.
+        if march.bounce[0] > 0.0 {
+            res.ensure_light(&self.device);
+            if !res.light_fresh {
+                res.encode_light(encoder);
+                self.light_builds = self.light_builds.wrapping_add(1);
+            }
         }
 
         res.ensure_target(&self.device, self.surface_format, size);
