@@ -1,8 +1,8 @@
 # ADR-0271 — A voxel is opened by one section plane, held in the cube's own frame
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-11 (Plan 0258)
 > **Date:** 2026-10-11
-> **Related plan(s):** [0258](../plans/0258-the-voxel-opens-along-a-section-plane.md)
+> **Related plan(s):** [0258](../plans/done/0258-the-voxel-opens-along-a-section-plane.md)
 
 ## Context
 

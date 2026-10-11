@@ -361,7 +361,6 @@ live entry citing this one.
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
 | 0287 | the backdrop cannot reach white, so black-on-white needs `exposure`, which also lifts the scene | [Plan 0257](plans/0257-the-backdrop-reaches-paper-white.md). **Promoted** |
-| 0288 | a solid voxel mass has no cut-away, so seeing inside it depends on choosing a porous rule | [Plan 0258](plans/0258-the-voxel-opens-along-a-section-plane.md). **Promoted** |
 | 0289 | `shot --signal` beside `--all` silently draws a filmstrip of the first preset | [Plan 0259](plans/0259-the-contact-sheet-hears-the-clip.md). **Promoted** |
 | 0291 | a studio vitest run leaves an `ssr` cache directory in `/tmp` and never removes it | [Plan 0260](plans/0260-the-studio-tests-leave-tmp-as-they-found-it.md). **Promoted** |
 <!-- roster:end -->
@@ -696,6 +695,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0277 | The owner's hotkey walk and the live retune loop exist only as scratch scripts under `target/` | [ADR-0267](adrs/0267-judging-a-preset-set-is-a-studio-session-over-an-isolated-player.md) + [Plan 0254](plans/done/0254-the-studio-judges-a-preset-set.md). Phase 4 owed. **Closed 2026-10-07** |
 | 0219 | A `ctl/preset` datagram on loopback never reached the listener's queue | [ADR-0265](adrs/0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md) + [Plan 0252](plans/done/0252-the-lost-preset-ask-is-located-and-answered.md). Acked and resent. **Closed 2026-10-07** |
 | 0220 | A headless walk of the system roster stalls at `emitter` | [ADR-0265](adrs/0265-a-preset-ask-carries-a-request-id-and-the-player-answers-it-at-the-drain.md) + [Plan 0252](plans/done/0252-the-lost-preset-ask-is-located-and-answered.md). Acked and resent. **Closed 2026-10-07** |
+| 0288 | A solid voxel mass has no cut-away, so seeing inside it depends on choosing a porous rule | [ADR-0271](adrs/0271-a-voxel-is-opened-by-one-section-plane-held-in-the-cubes-own-frame.md) + [Plan 0258](plans/done/0258-the-voxel-opens-along-a-section-plane.md). A section plane; Phase 4 owed. **Closed 2026-10-11** |
 <!-- roster:end -->
 
 ---
@@ -17360,7 +17360,15 @@ rules fill their ball solid. Nothing in `voxel` declares such a parameter today.
   key), then `dev`.
 - **Verified 2026-10-11** — no cut-away parameter:
   `absent: name: "(cutaway|section|clip[a-z_]*)" in: core/src/render/scenes/voxel/mod.rs`
-- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0258](plans/0258-the-voxel-opens-along-a-section-plane.md) was approved.
+- **Moved to the archive 2026-10-11 on promotion**, when [Plan 0258](plans/done/0258-the-voxel-opens-along-a-section-plane.md) was approved.
+
+**CLOSED 2026-10-11** — [Plan 0258](plans/done/0258-the-voxel-opens-along-a-section-plane.md)
+and [ADR-0271](adrs/0271-a-voxel-is-opened-by-one-section-plane-held-in-the-cubes-own-frame.md).
+`voxel` gains `cut`, `cut_yaw` and `cut_pitch`: every cell beyond one plane in the cube's own frame
+is dead to the march and to the solid present's occlusion, so a dense rule shows its inside as a
+stepped section, under either present. Only the view is cut; the automaton keeps running. The
+teaching preset is `docs/examples/voxel/section.toml`. Phase 4 (the owner's look and the
+preset-author skill text) is owed (ADR-0249).
 
 ## 0289 — `shot --signal` beside `--all` silently draws a filmstrip of the first preset
 

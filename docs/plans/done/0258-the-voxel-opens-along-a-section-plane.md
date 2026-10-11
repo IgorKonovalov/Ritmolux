@@ -1,9 +1,10 @@
 # 0258 — The voxel opens along a section plane
 
-> **Status:** in-progress
+> **Status:** done - Phase 4 owed, ADR-0249. Phases 1-3 in `2ae1af1c`, `7b0c6a12`, `26e9e0b1`;
+> conductor close round 1: no blockers, no majors, one minor (open). Version 0.174.0.
 > **Created:** 2026-10-11
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0271](../adrs/0271-a-voxel-is-opened-by-one-section-plane-held-in-the-cubes-own-frame.md) (proposed), [ADR-0268](../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md), [ADR-0269](../adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md), [ADR-0256](../adrs/0256-a-parameter-declares-its-group-and-whether-it-is-main.md)
+> **Related ADRs:** [ADR-0271](../../adrs/0271-a-voxel-is-opened-by-one-section-plane-held-in-the-cubes-own-frame.md) (accepted), [ADR-0268](../../adrs/0268-a-3d-automaton-is-a-voxel-system-marched-as-an-emitting-absorbing-volume.md), [ADR-0269](../../adrs/0269-a-solid-voxel-is-lit-by-one-key-light-and-its-own-occlusion-and-its-light-blooms-like-any-other.md), [ADR-0256](../../adrs/0256-a-parameter-declares-its-group-and-whether-it-is-main.md)
 > **Closes:** design-backlog 0288
 
 ## TL;DR
@@ -219,5 +220,127 @@ flowchart LR
   0, 90 passed, 3 skipped; `--test golden`, exit 0, 5 passed.
 - **Outstanding `human` phases:** Phase 4 (the owner's look and the skill text; `Blocks merge:
   no`).
+
+## Close review
+
+Conductor close, round 1, graded at `478b0c1a`. No earlier round, so no finding was resolved by a
+fix round. **Phase 4 is owed** (ADR-0249): nobody has yet judged the section preset live, and
+`.claude/skills/preset-author/references/systems.md`'s `## voxel` section does not yet describe the
+section plane; the replacement text is in the log above. The round 1 review, in full:
+
+**Plan 0258 — close review, round 1**
+
+Graded at tip `478b0c1a5e8b96563c9408874729e6f8c28abcdc` (tree `c6da4d11`), lane
+`/home/igor/Work/rlx-plan-0258` on `plan-0258-the-voxel-opens-along-a-section-plane`.
+
+**Verdict: Plan 0258 landed cleanly. No blockers, no majors, one minor.** All three `dev` phases do
+what the plan says, the tests assert what the done-whens claim, and Phase 4 (`human`,
+`Blocks merge: no`) is correctly logged `owed`.
+
+### Evidence
+
+- **Full suite:** `node .../with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree c6da4d1 is green in the suite ledger, run
+  by gate 0258-pre-review at 2026-10-11T12:35:20.779Z: 2092 tests run: 2092 passed (10 slow), 9
+  skipped`. `git rev-parse HEAD^{tree}` is `c6da4d1126480fcb0d3bbaae41ccb77b0c6131de`, so the ledger
+  record covers this exact tree. The log's `Full suite:` bullet defers to the conductor's
+  `pre-review` gate, which is correct in conductor mode.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: clean.
+- `node scripts/check-doc-links.mjs`: OK. `node scripts/toc.mjs --check`: OK.
+  `node scripts/check-reader-prose.mjs`: OK (docs/presets.md 34 citations, 0 bare).
+  `node scripts/check-comment-hygiene.mjs`: OK.
+- `node scripts/check-backlog-claims.mjs`: exit 0, 46 reductions across 22 live entries; advisory
+  lists 31 moved paths and 3 unprobeable claims, none touched by this plan. Backlog 0288 is already
+  in `docs/design-backlog-archive.md`'s `### Promoted` table (line 364), so the close owes step 3c.
+
+### Lens 1 — alignment
+
+- **Owner tags:** every phase carries one in-vocabulary tag (`dev`, `dev`, `dev`, `human`); Phase 4
+  alone carries `Blocks merge: no`, and no later phase reads its output.
+- **Phase 1** (`2ae1af1c`): `cut` / `cut_yaw` / `cut_pitch` are `ParamKind::Modal`, all in
+  `ParamGroup::Shape`, only `cut` `main` (`core/src/render/scenes/voxel/mod.rs:353-383`). The plane
+  is packed into a new `cut` vec4 with the on-flag in the formerly unused `lit.w`
+  (`mod.rs:795-799`, `1591-1593`); `cut_plane` matches ADR-0271's formula with `CUBE_RADIUS =
+  sqrt(3)`. In `shader.rs` one `cut_away` gates both the march's state read (`shader.rs:546`, before
+  `glow_of`, so both presents) and `solid_at` (`shader.rs:362`), and the brick skip is untouched,
+  as the plan specified. `the_section_plane_hides_one_side_and_leaves_the_other` asserts alpha 0
+  on every normal-side pixel, bitwise equality (`f32::to_bits`) on every other pixel, a non-empty
+  comparison on both halves (>100 covered each), and alpha 0 everywhere at `cut = 1`. The fixture
+  puts the eye on `+x`, inside the plane `z = 0`, and the test derives the normal's side from a
+  projected `+z` point rather than assuming it. Byte identity at `cut = 0` for the existing goldens
+  rests on the golden test passing plus the shader's `cut_away` returning false under the flag;
+  the arithmetic on the uncut path is unchanged, which is sufficient.
+- **Phase 2** (`7b0c6a12`): `a_tilted_section_is_lit_as_a_surface_and_occluded_by_no_cut_cell`
+  searches the CPU mirror of the plane for a tread with every in-grid front neighbour cut, then
+  asserts edge and centre luminance within 1e-3 at `ao = 1`, equality with the `ao = 0` render,
+  a match to the analytic `+z`-face colour, and that the uncut render differs at that pixel. The
+  log records that removing `|| cut_away(c)` from `solid_at` fails it (0.238 against 0.194), so
+  the test discriminates the defect it guards. No shader change was needed, as the plan allowed.
+- **Phase 3** (`26e9e0b1`): cost probe logged for all three fixtures at both `cut` values on both
+  tiers, none slower cut; golden `voxel_section_lit` appended at the end of `EXTRA_FIXTURES`
+  (`core/tests/golden.rs:234`), and `RLX_BLESS` panics off lavapipe, so it was blessed on the
+  software adapter. `docs/examples/voxel/section.toml` runs `crystal` with `cut` swept on `time`,
+  joins `scripts/docs-shots.mjs`, and joins the sanity, animation, reactivity and distinctness
+  rosters with real assertions (coverage/quadrants/blot, both motion floors, the reactivity floor;
+  distinctness is a report, as for its two siblings). `docs/presets.md` "Cutting the cube open"
+  documents the three params, the cube-frame turning, the cell-size stepping and that only the view
+  is cut.
+- **Implementation log:** present, not longer than the phases section.
+
+### Lens 2 — layering and real-time safety
+
+Core-only change inside one scene; no ABI, protocol or `Scene` trait widening, no new dependency,
+no audio-path code. `cut_plane` sanitizes non-finite inputs through `finite_or` and clamps `cut` and
+`cut_pitch`, so the per-frame path has no panic. `docs/specs/player-schema.json`,
+`presets/schema/voxel.schema.json`, `presets/preset.schema.json` and the `presets/README.md` params
+block were regenerated and are held by `preset_schema` in the green suite.
+
+### Lens 3 — docs and bookkeeping owed by the close
+
+- ADR-0271 is `proposed`: flip to `accepted` with `docs/adrs/README.md`.
+- Plan to `done/` with `Status: done - Phase 4 owed, ADR-0249`; refresh `docs/plans/README.md`.
+- Backlog 0288: `CLOSED` marker and move its row from `### Promoted` to `### Closed` (step 3c).
+- **Version bump owed: minor** (a feature plan: three new params and a teaching preset).
+- Preset curation (3b): `presets/` was touched by regeneration only; no preset file landed.
+- `.claude/skills/preset-author/references/systems.md` `## voxel` does not yet describe the section
+  plane. That sweep row is Phase 4's, owed by the owner; the replacement text is in the log, and I
+  checked it against the tree (the `+z` default, the three rule names, the teaching preset path are
+  all correct).
+
+### Lens 4 — correctness
+
+No grid-derived aspect; the plane is in the cube's `[-1, 1]^3` frame using `mp.eye.w` (the grid
+size) for the cell centre, identical to the march's own centre formula. Numeric assertions in the
+new tests are dimensionless or exact (bitwise equality, alpha 0, 1e-3 luminance agreement between
+two reads of one frame), not frozen machine measurements. The configuration the tests do not probe
+is the finding below.
+
+### Lens 5 — design integrity
+
+The cut lives entirely in the voxel scene; the brick-skip cost risk the plan named was measured and
+did not materialize. Nothing to flag.
+
+### Findings
+
+#### minor
+
+1. **The glow present under a cut is unprobed** — `core/src/render/scenes/voxel/tests.rs:610`.
+   Both section tests and the golden draw `present = "solid"`; nothing renders `glow` at
+   `cut > 0`, yet `docs/presets.md` and the module doc both state that `cut` works under `glow`.
+   The shader routes both presents through one `select` before `glow_of` (`shader.rs:546`), so the
+   risk is low, but a later change to the glow branch that reads `texel` directly would pass every
+   gate. Fix: a probe that renders a dense `glow` fixture at `cut = 0` and `cut = 1` and asserts the
+   latter is the backdrop alone (alpha 0 under a transparent clear), mirroring Phase 1's last
+   done-when. Test logic, so a close cannot repair it; it stays open.
+
+### Close notes
+
+- Upstream CI (`node scripts/check-upstream-ci.mjs`): green, run 38132564345 on `main` at
+  `da03dfa`.
+- The merge of `main` was already up to date at the graded tip.
+- Curation (3b): no preset `.toml` added or changed; nothing to curate.
+- Backlog probes: exit 0, 46 reductions across 22 live entries; no entry touched by this plan.
+- Translations: `docs/running.ru.md` is behind `docs/running.md` (stamped `fb237a6c`, source at
+  `b25cd8cf10`); not moved by this plan.
 
 ## Followups (after this lands)
