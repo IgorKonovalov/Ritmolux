@@ -140,7 +140,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — Walking skeleton: one face lit by its neighbours | dev | done | 88a42bca |
 | 2 — Cost, the golden and the documentation | dev | done | 9b33af60 |
-| 3 — The owner's look and the skill text | human | not started | |
+| 3 — The owner's look and the skill text | human | owed | |
 
 ### Notes
 
