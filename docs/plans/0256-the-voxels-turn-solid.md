@@ -253,7 +253,7 @@ pub enum Present { Glow, Solid }      // [voxel] present, structural
   that phase adds:
 
   > **Solid.** `[voxel] present = "solid"` draws each live cell as a lit cube; the decay stages in
-  > front still glow. Four params, inert under `glow`: `key` (the key light, working range 0.4-1.6;
+  > front still glow. Five params, inert under `glow`: `key` (the key light, working range 0.4-1.6;
   > bind the bass here for a pulse), `ambient` (0.15-0.4; 1 with `key = 0` shows the palette flat),
   > `ao` (0.6-1; it darkens the creases where cubes meet, which is what makes a cluster read as
   > structure, and at 0 the faces go flat), and `light_yaw` / `light_pitch`, given relative to the

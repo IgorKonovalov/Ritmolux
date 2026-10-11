@@ -930,8 +930,8 @@ light_yaw   = "-0.6"               # the light stands to the viewer's left...
 light_pitch = "0.6"                # ...and above
 ```
 
-A face is shaded as its palette colour, times `brightness` and its shell's light, times
-`ambient × occlusion + key × (how squarely the face turns toward the light)`.
+A face is shaded as its palette colour, times `brightness`, its shell's light and the camera's
+`fog`, times `ambient × occlusion + key × (how squarely the face turns toward the light)`.
 
 - **`key`** is one directional light. A face turned straight at it takes all of `key`, one edge-on
   or turned away takes none.
@@ -945,7 +945,7 @@ A face is shaded as its palette colour, times `brightness` and its shell's light
   positive `light_pitch` above. The light turns with an orbit, so the lit side stays lit. It is not
   fixed on the world.
 
-These four are inert under `glow`, and the reference marks them so.
+These five are inert under `glow`, and the reference marks them so.
 
 **A lit face blooms like any other light.** Nothing marks it as reflected light, so a face brighter
 than the bloom threshold blooms, and a bright enough solid preset can glow until it reads emissive
@@ -958,7 +958,8 @@ not as a surface, so on a turning camera it drags the shaded sides behind the li
 
 The camera is the shared one: `yaw`, `pitch`, `distance`, `fov` and `fog` behave as on
 [`plexus`](#the-plexus-table). `focus` and `aperture` are inert, because the volume has no drawn
-primitive to blur, and there is no `solid`.
+primitive to blur, and the line systems' `solid` parameter is not read here: a voxel is drawn
+solid by `present = "solid"` above.
 
 **`grid` is capped by the quality tier**: the Floor tier allows 64, the Rich tier 128. A preset
 asking within 64 runs identically on both; one asking for more runs at the cap and **says so**.
