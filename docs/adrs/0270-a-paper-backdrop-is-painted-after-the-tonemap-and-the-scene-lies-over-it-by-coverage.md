@@ -1,8 +1,8 @@
 # ADR-0270 — A paper backdrop is painted after the tonemap, and the scene lies over it by coverage
 
-> **Status:** proposed
+> **Status:** accepted 2026-10-11
 > **Date:** 2026-10-11
-> **Related plan(s):** [0257](../plans/0257-the-backdrop-reaches-paper-white.md)
+> **Related plan(s):** [0257](../plans/done/0257-the-backdrop-reaches-paper-white.md)
 
 ## Context
 
