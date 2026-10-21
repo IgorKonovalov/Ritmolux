@@ -103,7 +103,10 @@ serve both. The seam between audio and picture is a **lock-free ring buffer**: a
 device's cadence, frames render at the display's, and neither loop drives the other.
 
 **[How it works](https://igorkonovalov.github.io/Ritmolux/engine/how-it-works/)** has the diagram,
-and what happens to a sample on its way to a shape on screen.
+and what happens to a sample on its way to a shape on screen. The same split, told from the
+outside as one story — why a single engine serves two players, and what that bought — is
+**[Ritmolux: one core, two frontends](https://igorkonovalov.github.io/projects/2026/09/10/ritmolux_one_core_two_frontends/)**
+on the author's blog.
 
 
 ## Repository layout
